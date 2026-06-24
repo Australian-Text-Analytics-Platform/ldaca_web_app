@@ -12,7 +12,7 @@ This guide walks through every setting in the parameter panel and explains what 
 
 <h2 id="help-topic-modeling-parameters">Parameter panel</h2>
 
-The parameter panel is split into two columns. The **left** column controls _which_ documents are processed (selection and sampling). The **right** column controls _how_ the topics are formed (size mode, randomness, display).
+The parameter panel starts with the selected data blocks. Each block owns its text-column choice and sampling percentage. The compact parameter row below controls how topics are formed, reproducibility, and display.
 
 <h3 id="help-topic-modeling-data-block">Step 1 — Select your data</h3>
 
@@ -20,32 +20,31 @@ Use the data-block selector at the top to pick which corpus (or corpora) to anal
 
 For each selected block, choose the **text column** that contains the documents you want to analyse. Only columns that hold plain text are available.
 
-<h3 id="help-topic-modeling-sampling">Step 2 — Data Block Sampling</h3>
+<h3 id="help-topic-modeling-sampling">Step 2 — Sampling Per Data Block</h3>
 
-![Topic modelling parameters](tutorials/assets/topic_modelling/parameters.png)
 Embedding (converting documents into numbers the model can work with) is the slowest part of the process. If your corpus has tens of thousands of documents or more, running on the full set can take a very long time. Sampling lets the model work on a representative subset instead.
 
 **How it works**
 
-- The tool **automatically suggests** a sampling percentage when you select a corpus. If the corpus is small (roughly under 4,000 documents), sampling is turned off and the full set is used.
-- For larger corpora, the tool calculates a percentage that aims to keep the working set around 4,000 documents.
-- The coloured circle next to each corpus turns sampling on or off. When it is on, the circle fills with the corpus colour.
-- The percentage input lets you adjust the sample size. The estimated number of documents that will be processed is shown to the right.
+- Each selected data block card includes a **Sampling (N documents)** number input beside the text-column selector.
+- The default is **100%** per data block, which uses the full selected corpus.
+- The title shows the effective number of documents that will be processed after applying the percentage.
+- Increase the percentage for better topic stability; decrease it for faster exploratory runs.
 
 **Guidelines**
 
-| Corpus size      | Suggested approach                                |
-| ---------------- | ------------------------------------------------- |
-| < 5,000 docs     | Use the full corpus (no sampling needed)          |
-| 5,000 – 50,000   | 20–50 % is usually sufficient                     |
-| 50,000 – 500,000 | 5–15 %                                            |
-| > 500,000        | 2–5 %, or aim for roughly 20,000–50,000 documents |
+| Corpus size      | Suggested approach                                               |
+| ---------------- | ---------------------------------------------------------------- |
+| < 100 docs       | Use 100%                                                         |
+| 100 – 5,000 docs | Start with 20–100% depending on how quickly the run needs to fit |
+| 5,000 – 50,000   | Use 10–50% for exploration, then increase for stability          |
+| > 50,000         | Start with 1–10% and increase when time allows                   |
 
 A working set of **10,000 – 50,000 documents** typically gives good topic quality while keeping run times manageable. Going much lower can produce noisy or unstable topics; going much higher increases run time without a proportional gain in quality.
 
-If the working set is less than five times the target number of topics, a warning appears below the sampling rows. If you see it, either increase the sample size or reduce the number of topics you are aiming for.
+If the working set is less than five times the target number of topics, a warning appears below the selected data blocks. If you see it, either increase the sampling percentage or reduce the number of topics you are aiming for.
 
-<h3 id="help-topic-modeling-options">Step 3 — Topic Modelling Options</h3>
+<h3 id="help-topic-modeling-options">Step 3 — Topic Parameters</h3>
 
 <h4 id="help-topic-modeling-topic-size-mode">Topic size mode</h4>
 
@@ -94,7 +93,7 @@ The ratio is calculated differently depending on the mode:
 - **Aim Topic No. / Exact Topic No.**: working-doc count ÷ value entered. For example, 500 documents with a target of 80 topics → 6.25 docs/topic → orange.
 - **Min Topic Size**: the value itself is already the minimum number of documents per topic, so it is compared directly. For example, a min topic size of 2 → red regardless of corpus size.
 
-If you see orange or red, hover over the input for a short explanation. The most common fixes are to increase the working document count (reduce sampling) or lower the number of topics.
+If you see orange or red, hover over the input for a short explanation. The most common fixes are to increase the working document count (raise sampling) or lower the number of topics.
 
 <h3 id="help-topic-modeling-random-seed">Random Seed</h3>
 
@@ -157,16 +156,16 @@ Topic modelling results are saved in the backend so this tab can reload and keep
 | Symptom                           | Likely cause                                                                             | What to try                                                     |
 | --------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | Far fewer topics than the target  | Min topic size too high relative to corpus                                               | Increase the target number, or increase the sample size         |
-| Almost all documents are outliers | Min topic size too high, or corpus too varied                                            | Lower Min Topic Size, increase sampling, or accept fewer topics |
+| Almost all documents are outliers | Min topic size too high, or corpus too varied                                            | Lower Min Topic Size, raise sampling, or accept fewer topics |
 | Topics all look the same          | Target too low                                                                           | Increase Aim Topic No.                                          |
 | Results change a lot between runs | Topics are not stable — corpus may be too small or too diverse for this number of topics | Try different seeds; reduce target; increase sample             |
-| Very long run time                | Large working set                                                                        | Reduce sampling percentage                                      |
+| Very long run time                | Large working set                                                                        | Reduce the sampling percentage                                  |
 
 <h2 id="help-topic-modeling-defaults">Quick-reference defaults</h2>
 
 | Setting         | Default                    | Reasonable range                              |
 | --------------- | -------------------------- | --------------------------------------------- |
-| Sampling        | Auto (on if > ~4,000 docs) | Aim for 10,000–50,000 docs in working set     |
+| Sampling        | 100% per data block         | Aim for 10,000–50,000 docs in working set     |
 | Topic size mode | Aim Topic No.              | —                                             |
 | Aim Topic No.   | Auto                       | 10–200 depending on corpus size and diversity |
 | Random Seed     | 42                         | Any non-negative whole number                 |
@@ -174,7 +173,7 @@ Topic modelling results are saved in the backend so this tab can reload and keep
 
 ## Practice exercise
 
-1. Run topic modelling on a single corpus with the suggested sampling and default _Aim Topic No._ mode.
+1. Run topic modelling on a single corpus with the default sampling and default _Aim Topic No._ mode.
 2. Switch to _Exact Topic No._ with a small number (e.g. 10) and compare the granularity.
 3. Re-run with two different random seeds and check whether the dominant topics remain stable.
 4. Detach a topic of interest into a new data block for further analysis.

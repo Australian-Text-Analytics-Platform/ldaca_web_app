@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
@@ -18,7 +18,7 @@ describe('useTopicModelingParameters', () => {
   it('derives default corpus sampling from selected node sizes', async () => {
     const { result } = renderHook(() =>
       useTopicModelingParameters({
-        panelSelectedNodes: nodes(8000, 3000),
+        panelSelectedNodes: nodes(8000, 80),
         panelNodeIdsKey: 'node-1|node-2',
       }),
     );
@@ -27,13 +27,11 @@ describe('useTopicModelingParameters', () => {
       await Promise.resolve();
     });
 
-    expect(result.current.nodeDocCounts).toEqual([8000, 3000]);
-    expect(result.current.corpusSamples).toEqual([
-      { percent: '50', enabled: true },
-      { percent: '100', enabled: false },
-    ]);
-    expect(result.current.sampleFractionsForRequest).toEqual([0.5, null]);
-    expect(result.current.hasAnySampling).toBe(true);
+    expect(result.current.nodeDocCounts).toEqual([8000, 80]);
+    expect(result.current.corpusSamples).toEqual([{ percent: '100' }, { percent: '100' }]);
+    expect(result.current.effectiveDocCounts).toEqual([8000, 80]);
+    expect(result.current.sampleFractionsForRequest).toEqual([null, null]);
+    expect(result.current.hasAnySampling).toBe(false);
   });
 
   it('tracks user-set parameters and preserves tuned sampling across clear', async () => {
@@ -49,7 +47,7 @@ describe('useTopicModelingParameters', () => {
     });
 
     act(() => {
-      result.current.updateCorpusSample(0, { percent: '25', enabled: true });
+      result.current.updateCorpusSample(0, { percent: '25' });
       result.current.setTopicSizeValueFromUser(6);
       result.current.setRandomSeedFromUser(99);
       result.current.setRepresentativeWordsCountFromUser(25);
@@ -65,7 +63,7 @@ describe('useTopicModelingParameters', () => {
       result.current.resetAfterClear();
     });
 
-    expect(result.current.corpusSamples).toEqual([{ percent: '25', enabled: true }]);
+    expect(result.current.corpusSamples).toEqual([{ percent: '25' }]);
     expect(result.current.topicSizeValue).toBe(DEFAULT_TOPIC_SIZE_VALUE);
     expect(result.current.topicSizeUserSet).toBe(false);
     expect(result.current.randomSeed).toBe(99);
@@ -97,10 +95,48 @@ describe('useTopicModelingParameters', () => {
     expect(result.current.representativeWordsCountUserSet).toBe(true);
     expect(result.current.topicSizeValue).toBe(12);
     expect(result.current.topicSizeUserSet).toBe(true);
-    expect(result.current.corpusSamples).toEqual([
-      { percent: '20', enabled: true },
-      { percent: '100', enabled: false },
-    ]);
+    expect(result.current.corpusSamples).toEqual([{ percent: '20' }, { percent: '100' }]);
     expect(result.current.corpusSamplesUserSet).toBe(true);
+  });
+
+  it('restores hydrated sampling fractions after selected node counts resolve', async () => {
+    const { result, rerender } = renderHook(
+      ({
+        panelSelectedNodes,
+        panelNodeIdsKey,
+      }: {
+        panelSelectedNodes: WorkspaceNodeLike[];
+        panelNodeIdsKey: string;
+      }) =>
+        useTopicModelingParameters({
+          panelSelectedNodes,
+          panelNodeIdsKey,
+        }),
+      {
+        initialProps: {
+          panelSelectedNodes: [] as WorkspaceNodeLike[],
+          panelNodeIdsKey: '',
+        },
+      },
+    );
+
+    act(() => {
+      result.current.hydrateParameters({
+        random_seed: 7,
+        representative_words_count: 30,
+        min_topic_size: 12,
+        sample_fractions: [0.2],
+      });
+    });
+
+    rerender({
+      panelSelectedNodes: nodes(10000),
+      panelNodeIdsKey: 'node-1',
+    });
+
+    await waitFor(() => {
+      expect(result.current.corpusSamples).toEqual([{ percent: '20' }]);
+      expect(result.current.sampleFractionsForRequest).toEqual([0.2]);
+    });
   });
 });

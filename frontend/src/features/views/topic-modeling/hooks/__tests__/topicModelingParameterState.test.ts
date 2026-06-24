@@ -9,7 +9,7 @@ describe('topicModelingParameterReducer', () => {
   it('marks corpus sampling as user-set when a row changes', () => {
     const state = topicModelingParameterReducer(createTopicModelingParameterState(), {
       type: 'applyNodeDefaultSamples',
-      samples: [{ percent: '50', enabled: true }],
+      samples: [{ percent: '100' }],
     });
     const updated = topicModelingParameterReducer(state, {
       type: 'updateCorpusSample',
@@ -17,7 +17,7 @@ describe('topicModelingParameterReducer', () => {
       update: { percent: '25' },
     });
 
-    expect(updated.corpusSamples).toEqual([{ percent: '25', enabled: true }]);
+    expect(updated.corpusSamples).toEqual([{ percent: '25' }]);
     expect(updated.corpusSamplesUserSet).toBe(true);
   });
 
@@ -30,7 +30,7 @@ describe('topicModelingParameterReducer', () => {
         min_topic_size: 12,
         sample_fractions: [0.2, null],
       },
-      nodeCount: 2,
+      nodeDocCounts: [10000, 5000],
     });
 
     expect(state).toMatchObject({
@@ -40,10 +40,7 @@ describe('topicModelingParameterReducer', () => {
       representativeWordsCountUserSet: true,
       topicSizeValue: 12,
       topicSizeUserSet: true,
-      corpusSamples: [
-        { percent: '20', enabled: true },
-        { percent: '100', enabled: false },
-      ],
+      corpusSamples: [{ percent: '20' }, { percent: '100' }],
       corpusSamplesUserSet: true,
     });
   });
@@ -57,14 +54,14 @@ describe('topicModelingParameterReducer', () => {
         min_topic_size: 6,
         sample_fractions: [0.25],
       },
-      nodeCount: 1,
+      nodeDocCounts: [10000],
     });
     const cleared = topicModelingParameterReducer(state, {
       type: 'resetAfterClear',
-      defaultSamples: [{ percent: '100', enabled: false }],
+      defaultSamples: [{ percent: '100' }],
     });
 
-    expect(cleared.corpusSamples).toEqual([{ percent: '25', enabled: true }]);
+    expect(cleared.corpusSamples).toEqual([{ percent: '25' }]);
     expect(cleared.corpusSamplesUserSet).toBe(true);
     expect(cleared.topicSizeValue).toBe(10);
     expect(cleared.topicSizeUserSet).toBe(false);

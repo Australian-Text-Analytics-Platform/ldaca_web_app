@@ -3,14 +3,21 @@ import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTyp
 import {
   DEFAULT_TOPIC_SIZE_VALUE,
   createTopicModelingParameterState,
-  defaultSampleForDocCount,
+  defaultCorpusSample,
+  effectiveSampleDocumentCount,
   normalizeTopicSampleFractions,
   sampleToFraction,
+  sanitizeSamplePercent,
   topicModelingParameterReducer,
   type CorpusSample,
 } from './topicModelingParameterState';
 
-export { DEFAULT_TOPIC_SIZE_VALUE, normalizeTopicSampleFractions };
+export {
+  DEFAULT_TOPIC_SIZE_VALUE,
+  effectiveSampleDocumentCount,
+  normalizeTopicSampleFractions,
+  sanitizeSamplePercent,
+};
 export type { CorpusSample };
 
 interface UseTopicModelingParametersArgs {
@@ -80,15 +87,27 @@ export function useTopicModelingParameters({
     representativeWordsCountUserSet,
   } = parameterState;
   const skipNextNodeDefaultRef = useRef(false);
+  // Keeps saved sampling from being overwritten when task hydration arrives before node ids resolve.
+  const preserveHydratedSamplingNodeIdsKeyRef = useRef<string | null>(null);
 
   const nodeDocCounts = panelSelectedNodes.slice(0, 2).map(nodeDocumentCount);
-  const defaultCorpusSamples = () => nodeDocCounts.map(defaultSampleForDocCount);
+  const defaultCorpusSamples = () => nodeDocCounts.map(defaultCorpusSample);
 
   useEffect(() => {
     const samples = defaultCorpusSamples();
     void Promise.resolve().then(() => {
       if (skipNextNodeDefaultRef.current) {
         skipNextNodeDefaultRef.current = false;
+        if (preserveHydratedSamplingNodeIdsKeyRef.current !== panelNodeIdsKey) {
+          preserveHydratedSamplingNodeIdsKeyRef.current = null;
+        }
+        return;
+      }
+      if (
+        preserveHydratedSamplingNodeIdsKeyRef.current !== null &&
+        preserveHydratedSamplingNodeIdsKeyRef.current !== panelNodeIdsKey
+      ) {
+        preserveHydratedSamplingNodeIdsKeyRef.current = null;
         return;
       }
       dispatchParameters({ type: 'applyNodeDefaultSamples', samples });
@@ -97,7 +116,7 @@ export function useTopicModelingParameters({
   }, [panelNodeIdsKey]);
 
   /** Updates one corpus sampling row and marks sampling as explicitly edited. */
-  // Called by: TopicModelingParameterPanel because the sampling controls edit sparse per-corpus percentage/enabled patches.
+  // Called by: TopicModelingParameterPanel because the sampling controls edit sparse per-corpus percentage patches.
   const updateCorpusSample = (index: number, update: Partial<CorpusSample>) => {
     dispatchParameters({ type: 'updateCorpusSample', index, update });
   };
@@ -124,12 +143,22 @@ export function useTopicModelingParameters({
   // Called by: TopicModelingFeature.onHydratedRequest because persisted tasks should reopen with the same run parameters the backend stored.
   const hydrateParameters = (request: Record<string, unknown>) => {
     if (Array.isArray(request.sample_fractions)) {
-      const nodeCount = Math.max(2, request.sample_fractions.length, panelSelectedNodes.length);
+      const nodeCount = Math.max(request.sample_fractions.length, panelSelectedNodes.length);
+      const hydratedNodeDocCounts = Array.from(
+        { length: nodeCount },
+        (_, index) => nodeDocCounts[index] ?? 0,
+      );
       skipNextNodeDefaultRef.current = true;
-      dispatchParameters({ type: 'hydrateRequest', request, nodeCount });
+      preserveHydratedSamplingNodeIdsKeyRef.current =
+        panelSelectedNodes.length === 0 ? panelNodeIdsKey : null;
+      dispatchParameters({
+        type: 'hydrateRequest',
+        request,
+        nodeDocCounts: hydratedNodeDocCounts,
+      });
       return;
     }
-    dispatchParameters({ type: 'hydrateRequest', request, nodeCount: panelSelectedNodes.length });
+    dispatchParameters({ type: 'hydrateRequest', request, nodeDocCounts });
   };
 
   /** Resets result-scoped run flags after Clear Results while preserving user-tuned values. */
@@ -138,12 +167,9 @@ export function useTopicModelingParameters({
     dispatchParameters({ type: 'resetAfterClear', defaultSamples: defaultCorpusSamples() });
   };
 
-  const effectiveDocCounts = nodeDocCounts.map((n, idx) => {
-    const sample = corpusSamples[idx];
-    if (!sample?.enabled) return n;
-    const pct = Math.min(100, Math.max(1, Number(sample.percent) || 100));
-    return Math.max(1, Math.round((n * pct) / 100));
-  });
+  const effectiveDocCounts = nodeDocCounts.map((n, idx) =>
+    effectiveSampleDocumentCount(corpusSamples[idx], n),
+  );
   const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
   const topicSizeWarning: 'orange' | 'red' | null =
     combinedEffective <= 0 || topicSizeValue <= 0
@@ -155,7 +181,7 @@ export function useTopicModelingParameters({
           : null;
   const showSamplingWarning = combinedEffective > 0 && combinedEffective < 5 * topicSizeValue;
   const sampleFractionsForRequest = Array.from({ length: nodeDocCounts.length }, (_, index) =>
-    sampleToFraction(corpusSamples[index]),
+    sampleToFraction(corpusSamples[index], nodeDocCounts[index] ?? 0),
   );
 
   return {

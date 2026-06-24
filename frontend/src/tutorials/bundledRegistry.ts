@@ -371,12 +371,12 @@ const tutorial = {
   'analysis.topic-modeling.sampling': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-sampling',
-    label: 'Data block sampling',
+    label: 'Sampling',
   },
   'analysis.topic-modeling.options': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-options',
-    label: 'Topic modelling options',
+    label: 'Topic parameters',
   },
   'analysis.topic-modeling.topic-size-mode': {
     file: 'tutorials/topic-modeling.md',

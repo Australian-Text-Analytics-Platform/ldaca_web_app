@@ -3,11 +3,17 @@ import { CircleHelp } from 'lucide-react';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import HelpIcon from '@/components/help/HelpIcon';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
-import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
+import {
+  NodeInputsPanel,
+  type NodeInputColumnAddonArgs,
+} from '@/features/views/common/components/NodeInputsPanel';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
-import type { CorpusSample } from '../../hooks/useTopicModelingParameters';
+import {
+  effectiveSampleDocumentCount,
+  sanitizeSamplePercent,
+  type CorpusSample,
+} from '../../hooks/useTopicModelingParameters';
 
 interface NumericInputDraft {
   source: number;
@@ -93,7 +99,6 @@ export function TopicModelingParameterPanel({
   hasMissingColumns,
   resultState,
 }: Props) {
-  const selectedNodes = nodeInputs.selectedNodes;
   const [topicSizeDraft, setTopicSizeDraft] = useState<NumericInputDraft>(() => ({
     source: topicSizeValue,
     value: String(topicSizeValue),
@@ -145,6 +150,52 @@ export function TopicModelingParameterPanel({
     onRepresentativeWordsCountChange(clamped);
   };
 
+  // Called by: NodeInputsPanel to place topic sampling next to each selected node's text column because sampling is per-corpus input context rather than a separate global option.
+  const renderSamplingInput = ({ index, nodeId }: NodeInputColumnAddonArgs) => {
+    const sample = corpusSamples[index] ?? { percent: '100' };
+    const nDocs = nodeDocCounts[index] ?? 0;
+    const effectiveDocs = effectiveSampleDocumentCount(sample, nDocs);
+    const label = `Sampling (${effectiveDocs.toLocaleString()} ${
+      effectiveDocs === 1 ? 'document' : 'documents'
+    })`;
+    const inputId = `topic-sampling-percent-${String(index)}-${nodeId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+
+    return (
+      <div className="inline-grid w-max max-w-full gap-1" data-testid="topic-sampling-wrapper">
+        <Label
+          htmlFor={inputId}
+          className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+        >
+          {label}
+        </Label>
+        <div
+          className="flex w-full items-center rounded-md border border-input bg-transparent shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+          data-testid="topic-sampling-control"
+        >
+          <Input
+            id={inputId}
+            aria-label={label}
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={sample.percent}
+            className="h-9 w-14 flex-1 border-0 bg-transparent px-2 text-right text-sm shadow-none focus-visible:ring-0"
+            onChange={(event) => {
+              onCorpusSampleChange(index, { percent: event.target.value });
+            }}
+            onBlur={(event) => {
+              onCorpusSampleChange(index, {
+                percent: String(sanitizeSamplePercent(event.currentTarget.value)),
+              });
+            }}
+          />
+          <span className="pr-2 text-sm text-muted-foreground">%</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <AnalysisCardLayout
       title="Topic Modelling - BERTopic"
@@ -184,127 +235,23 @@ export function TopicModelingParameterPanel({
         defaultPalette={defaultPalette}
         nodeColors={nodeColors}
         onNodeColorChange={onNodeColorChange}
+        columnAddonWidth="auto"
+        renderColumnAddon={renderSamplingInput}
       />
 
-      <div className="mt-4 grid grid-cols-2 gap-6">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-1.5">
-            <Label className="text-sm font-medium">Data Block Sampling</Label>
-            <HelpIcon targetKey="analysis.topic-modeling.sampling" />
-          </div>
+      {showSamplingWarning && (
+        <p className="mx-3 mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs leading-tight text-amber-700">
+          Sampled corpus may be too small for the target topic count.
+        </p>
+      )}
 
-          {/* Always render exactly 2 rows */}
-          {([0, 1] as const).map((idx) => {
-            const node = selectedNodes[idx];
-            const sample = corpusSamples[idx] ?? { percent: '100', enabled: false };
-            const nodeId = node?.id ?? '';
-            const color = nodeId
-              ? (nodeColors[nodeId] ?? defaultPalette[idx % defaultPalette.length] ?? '#6b7280')
-              : '#9ca3af';
-            const nDocs = nodeDocCounts[idx] ?? 0;
-
-            // When unchecked: display 100 and show full doc count
-            const displayPercent = sample.enabled ? sample.percent : '100';
-            const effectiveDocs = sample.enabled
-              ? Math.max(
-                  1,
-                  Math.round(
-                    (nDocs * Math.min(100, Math.max(1, Number(sample.percent) || 100))) / 100,
-                  ),
-                )
-              : nDocs;
-
-            if (!node) {
-              // Placeholder row — same height as a real row, no interaction
-              return (
-                <div
-                  key={`placeholder-${String(idx)}`}
-                  className="flex items-center gap-2 opacity-25"
-                  style={{ minHeight: '2rem' }}
-                >
-                  <div
-                    className="h-5 w-5 shrink-0 rounded-full border-2"
-                    style={{ borderColor: '#9ca3af' }}
-                  />
-                  <span className="text-sm text-muted-foreground">—</span>
-                </div>
-              );
-            }
-
-            return (
-              <div key={nodeId || idx} className="flex items-center gap-2">
-                {/* Coloured circle radio toggle */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onCorpusSampleChange(idx, { enabled: !sample.enabled });
-                  }}
-                  aria-label={sample.enabled ? 'Disable sampling' : 'Enable sampling'}
-                  className="h-5 w-5 shrink-0 rounded-full border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    backgroundColor: sample.enabled ? color : 'transparent',
-                    borderColor: color,
-                  }}
-                />
-
-                <span
-                  className={`text-sm font-medium${sample.enabled ? '' : ' text-muted-foreground'}`}
-                >
-                  Random
-                </span>
-
-                {/* % input — vertically aligned across rows by identical prefix */}
-                <Input
-                  aria-label={`Sampling percentage for corpus ${String(idx + 1)}`}
-                  type="number"
-                  min={1}
-                  max={100}
-                  step={10}
-                  value={displayPercent}
-                  disabled={!sample.enabled}
-                  className="h-8 w-14 shrink-0 px-1.5 text-center text-sm"
-                  onChange={(e) => {
-                    onCorpusSampleChange(idx, { percent: e.target.value });
-                  }}
-                  onBlur={(e) => {
-                    const raw = Number(e.target.value);
-                    const clamped = Math.min(100, Math.max(1, isNaN(raw) ? 1 : Math.round(raw)));
-                    onCorpusSampleChange(idx, { percent: String(clamped) });
-                  }}
-                />
-
-                <span className="text-sm font-medium">%</span>
-
-                {nDocs > 0 && (
-                  <span className="text-sm font-medium">
-                    {`→ ~`}
-                    <span style={{ color }}>{effectiveDocs.toLocaleString()}</span>
-                    {` documents`}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-
-          {showSamplingWarning && (
-            <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs leading-tight text-amber-700">
-              Sampled corpus may be too small for the target topic count.
-            </p>
-          )}
-        </div>
-
-        {/* ── Right column: Topic Modelling Options ── */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-1.5">
-            <Label className="text-sm font-medium">Topic Modelling Options</Label>
-            <HelpIcon targetKey="analysis.topic-modeling.options" />
-          </div>
-
-          {/* Row 1: minimum topic size (HDBSCAN min cluster size) */}
-          <div className="flex items-center justify-between gap-2">
+      <div className="mt-4 px-3">
+        <div className="flex flex-wrap items-end gap-4">
+          {/* Minimum topic size (HDBSCAN min cluster size) */}
+          <div className="min-w-[11rem] space-y-1">
             <Label
               htmlFor="topic-size-value"
-              className="flex min-w-0 flex-1 items-center gap-1.5 whitespace-nowrap pl-3 text-sm"
+              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
             >
               Minimum topic size
               <span
@@ -329,7 +276,7 @@ export function TopicModelingParameterPanel({
                     ? 'Fewer than 10 documents per topic — topics may be noisy or unstable'
                     : undefined
               }
-              className={`h-8 w-24 shrink-0 px-2 text-right text-sm${
+              className={`h-9 w-full px-2 text-right text-sm${
                 topicSizeWarning === 'red'
                   ? ' text-red-500'
                   : topicSizeWarning === 'orange'
@@ -345,9 +292,12 @@ export function TopicModelingParameterPanel({
             />
           </div>
 
-          {/* Row 2: random seed */}
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="random-seed" className="whitespace-nowrap pl-3 text-sm">
+          {/* Random seed */}
+          <div className="min-w-[9rem] space-y-1">
+            <Label
+              htmlFor="random-seed"
+              className="block whitespace-nowrap text-xs font-medium text-muted-foreground"
+            >
               Random Seed
             </Label>
             <Input
@@ -356,16 +306,19 @@ export function TopicModelingParameterPanel({
               min={0}
               step={1}
               value={randomSeed}
-              className={`h-8 w-24 text-right text-sm${!randomSeedUserSet ? ' text-muted-foreground' : ''}`}
+              className={`h-9 w-full text-right text-sm${!randomSeedUserSet ? ' text-muted-foreground' : ''}`}
               onChange={(e) => {
                 onRandomSeedChange(Math.max(0, Number(e.target.value) || 0));
               }}
             />
           </div>
 
-          {/* Row 3: words per topic */}
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="representative-words-count" className="whitespace-nowrap pl-3 text-sm">
+          {/* Words per topic */}
+          <div className="min-w-[10rem] space-y-1">
+            <Label
+              htmlFor="representative-words-count"
+              className="block whitespace-nowrap text-xs font-medium text-muted-foreground"
+            >
               Words per topic
             </Label>
             <DisabledReasonTooltip
@@ -383,7 +336,7 @@ export function TopicModelingParameterPanel({
                 max={representativeWordsCountCap}
                 step={1}
                 value={representativeWordsCountDraft}
-                className={`h-8 w-24 text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
+                className={`h-9 w-full text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
                 onChange={(e) => {
                   setRepresentativeWordsCountDraft(e.target.value);
                 }}

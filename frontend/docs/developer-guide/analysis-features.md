@@ -196,12 +196,13 @@ The tab still owns metadata-column visibility state.
 ## Topic Modeling
 
 Topic modeling submits BERTopic/embedding work through backend workers. The UI
-handles minimum topic size, sampling per corpus, random seed, representative
-words, and chart interactions. `useTopicModelingParameters` owns the run
-parameter model so request hydration, clear behavior, sampling warnings, and
-`sample_fractions` diffing stay aligned. Its scalar value/user-set pairs and
-sampling defaults are backed by `topicModelingParameterState.ts`, keeping
-hydration and Clear Results transitions testable without rendering the feature.
+handles minimum topic size, percentage sampling per corpus, random seed,
+representative words, and chart interactions. `useTopicModelingParameters`
+owns the run parameter model so request hydration, clear behavior, sampling
+warnings, and `sample_fractions` diffing stay aligned. Its scalar value/user-set
+pairs and sampling defaults are backed by `topicModelingParameterState.ts`,
+keeping hydration and Clear Results transitions testable without rendering the
+feature.
 `useTopicModelingResultControls` owns result-panel interaction state: bubble
 hover, tooltip payloads, selected topic ids, and the topic search query. Keep
 chart/result controls there instead of adding independent state cells to

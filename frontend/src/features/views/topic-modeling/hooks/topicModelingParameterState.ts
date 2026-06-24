@@ -1,8 +1,8 @@
 export const DEFAULT_TOPIC_SIZE_VALUE = 10;
+export const DEFAULT_TOPIC_SAMPLE_PERCENT = 100;
 
 export interface CorpusSample {
   percent: string;
-  enabled: boolean;
 }
 
 export interface TopicModelingParameterState {
@@ -22,7 +22,7 @@ type TopicModelingParameterAction =
   | { type: 'setTopicSizeFromUser'; value: number }
   | { type: 'setRandomSeedFromUser'; value: number }
   | { type: 'setRepresentativeWordsCountFromUser'; value: number }
-  | { type: 'hydrateRequest'; request: Record<string, unknown>; nodeCount: number }
+  | { type: 'hydrateRequest'; request: Record<string, unknown>; nodeDocCounts: number[] }
   | { type: 'resetAfterClear'; defaultSamples: CorpusSample[] };
 
 /**
@@ -42,15 +42,34 @@ export const createTopicModelingParameterState = (): TopicModelingParameterState
   representativeWordsCountUserSet: false,
 });
 
-export const defaultSampleForDocCount = (nDocs: number): CorpusSample => {
-  const autoPercent = nDocs > 0 ? Math.min(100, Math.ceil(((4000 / nDocs) * 100) / 10) * 10) : 100;
-  return { percent: String(autoPercent), enabled: autoPercent < 100 };
+export const defaultCorpusSample = (): CorpusSample => {
+  return { percent: String(DEFAULT_TOPIC_SAMPLE_PERCENT) };
 };
 
-export const sampleToFraction = (sample: CorpusSample | undefined): number | null => {
-  if (!sample?.enabled) return null;
-  const pct = Math.min(100, Math.max(1, Number(sample.percent) || 100));
-  return pct >= 100 ? null : pct / 100;
+export const sanitizeSamplePercent = (value: string | number | undefined): number => {
+  const raw = typeof value === 'number' ? value : Number(value);
+  const rounded = Number.isFinite(raw) ? Math.round(raw) : DEFAULT_TOPIC_SAMPLE_PERCENT;
+  return Math.min(100, Math.max(1, rounded));
+};
+
+export const effectiveSampleDocumentCount = (
+  sample: CorpusSample | undefined,
+  nDocs: number,
+): number => {
+  if (nDocs <= 0) return 0;
+  const percent = sanitizeSamplePercent(sample?.percent);
+  if (percent >= 100) return nDocs;
+  return Math.max(1, Math.round((nDocs * percent) / 100));
+};
+
+export const sampleToFraction = (
+  sample: CorpusSample | undefined,
+  nDocs: number,
+): number | null => {
+  if (nDocs <= 0) return null;
+  const percent = sanitizeSamplePercent(sample?.percent);
+  if (percent >= 100) return null;
+  return percent / 100;
 };
 
 export const normalizeTopicSampleFractions = (
@@ -65,16 +84,15 @@ export const normalizeTopicSampleFractions = (
   });
 };
 
-const fractionsToSamples = (raw: unknown, nodeCount: number): CorpusSample[] => {
-  const fractions = normalizeTopicSampleFractions(raw, nodeCount);
+const fractionsToSamples = (raw: unknown, nodeDocCounts: number[]): CorpusSample[] => {
+  const rawList: unknown[] = Array.isArray(raw) ? raw : [];
+  const sampleCount = Math.max(rawList.length, nodeDocCounts.length);
+  const fractions = normalizeTopicSampleFractions(raw, sampleCount);
   return fractions.map((fraction) => {
     if (typeof fraction === 'number' && fraction > 0 && fraction < 1) {
-      return {
-        percent: String(Math.max(1, Math.min(99, Math.round(fraction * 100)))),
-        enabled: true,
-      };
+      return { percent: String(Math.max(1, Math.min(99, Math.round(fraction * 100)))) };
     }
-    return { percent: '100', enabled: false };
+    return defaultCorpusSample();
   });
 };
 
@@ -84,7 +102,7 @@ const fractionsToSamples = (raw: unknown, nodeCount: number): CorpusSample[] => 
  * resets, and Clear Results cannot update them inconsistently.
  * Used by: useTopicModelingParameters, which adapts these transitions to the
  * existing hook API consumed by TopicModelingFeature.
- * Flow: apply node-derived sampling defaults, mark explicit edits, hydrate
+ * Flow: apply node-derived sampling defaults, mark explicit percentage edits, hydrate
  * saved request values, and reset result-scoped user flags while preserving
  * values the UI intentionally keeps after Clear Results.
  */
@@ -102,7 +120,7 @@ export const topicModelingParameterReducer = (
     case 'updateCorpusSample': {
       const next = [...state.corpusSamples];
       next[action.index] = {
-        ...(next[action.index] ?? { percent: '100', enabled: false }),
+        ...(next[action.index] ?? defaultCorpusSample()),
         ...action.update,
       };
       return { ...state, corpusSamples: next, corpusSamplesUserSet: true };
@@ -128,7 +146,7 @@ export const topicModelingParameterReducer = (
         topicSizeValue: Number(action.request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
         topicSizeUserSet: true,
         corpusSamples: hasSampling
-          ? fractionsToSamples(action.request.sample_fractions, action.nodeCount)
+          ? fractionsToSamples(action.request.sample_fractions, action.nodeDocCounts)
           : state.corpusSamples,
         corpusSamplesUserSet: hasSampling ? true : state.corpusSamplesUserSet,
       };

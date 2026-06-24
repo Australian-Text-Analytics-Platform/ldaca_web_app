@@ -68,6 +68,8 @@ export interface NodeInputsPanelProps {
   disabled?: boolean;
   /** Optional control rendered after each node's column picker (e.g. tokenizer model). */
   renderColumnAddon?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
+  /** Whether a column add-on should fill its grid track or keep its intrinsic width. */
+  columnAddonWidth?: 'fill' | 'auto';
 }
 
 /**
@@ -115,6 +117,7 @@ export function NodeInputsPanel({
   renderExtraNodeContent,
   disabled = false,
   renderColumnAddon,
+  columnAddonWidth = 'fill',
 }: NodeInputsPanelProps) {
   const nodes = resolvedNodes.map((r) => r.node);
   const nodeIds = resolvedNodes.map((r) => r.id);
@@ -200,7 +203,17 @@ export function NodeInputsPanel({
     ) : null;
     const controls = [
       selector,
-      ...(addon ? [<div key="addon" className="min-w-0">{addon}</div>] : []),
+      ...(addon
+        ? [
+            <div
+              key="addon"
+              className={cn('min-w-0', columnAddonWidth === 'auto' && 'w-max max-w-full')}
+              data-testid="node-inputs-column-addon"
+            >
+              {addon}
+            </div>,
+          ]
+        : []),
       ...(colorControl ? [colorControl] : []),
     ];
     if (controls.length === 1) return selector;
@@ -209,11 +222,18 @@ export function NodeInputsPanel({
       columnLayout =
         controls.length === 2
           ? 'md:grid-cols-[minmax(0,1fr)_auto]'
-          : 'md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]';
+          : columnAddonWidth === 'auto'
+            ? 'md:grid-cols-[minmax(0,1fr)_auto_auto]'
+            : 'md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]';
     } else if (controls.length === 2) {
-      columnLayout = 'md:grid-cols-2';
+      columnLayout =
+        columnAddonWidth === 'auto' ? 'md:grid-cols-[minmax(0,1fr)_auto]' : 'md:grid-cols-2';
     }
-    return <div className={cn('grid items-end gap-2', columnLayout)}>{controls}</div>;
+    return (
+      <div className={cn('grid items-end gap-2', columnLayout)} data-testid="node-inputs-controls">
+        {controls}
+      </div>
+    );
   };
 
   const count = originalCount ?? resolvedNodes.length;
