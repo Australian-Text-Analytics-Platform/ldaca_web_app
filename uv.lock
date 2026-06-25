@@ -898,15 +898,11 @@ name = "polars-text"
 version = "0.4.0"
 source = { editable = "polars-text" }
 dependencies = [
-    { name = "duckdb" },
     { name = "polars" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "duckdb", specifier = ">=1.4.0" },
-    { name = "polars", specifier = "==1.40.0" },
-]
+requires-dist = [{ name = "polars", specifier = "==1.40.0" }]
 
 [package.metadata.requires-dev]
 dev = [

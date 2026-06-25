@@ -20,6 +20,25 @@ pnpm check-versions
 `scripts/check-versions.mjs` is also wired into the desktop release workflow,
 so a tagged release with drift fails before desktop builds start.
 
+## Source Mode Versus Package Mode
+
+Development and branch CI run in source mode: sibling repositories are checked
+out beside the package under test and uv follows the local paths in
+`tool.uv.sources`. This is what validates unpublished, coordinated changes
+across `polars-source-utils`, `polars-text`, `docworkspace`, and the backend.
+
+Release validation runs in package mode:
+
+```bash
+uv build --no-sources
+```
+
+`--no-sources` ignores local source overrides and verifies the distribution can
+be built with its publishable metadata. Run that mode only after dependency
+versions required by the package have already been published. The release order
+is `polars-source-utils` and `polars-text`, then `docworkspace`, then the
+backend package, then root desktop assets.
+
 ## Frontend Bundle In Backend Package
 
 The backend can serve the production frontend from package resources. The flow
@@ -41,11 +60,17 @@ falls back to `index.html` for SPA routes.
 `scripts/package_backend_runtime.py` builds a relocatable Python runtime under
 `dist-tauri/backend-runtime`:
 
-- installs a managed Python version through uv,
-- creates a venv under the runtime folder,
-- runs `uv sync --frozen --no-dev --no-editable` from `backend/`,
+- runs `uv venv --python 3.14t --managed-python --clear` so uv downloads the
+  managed Python into the runtime-local `managed-python/` directory if needed,
+- runs `uv sync --frozen --no-dev --no-editable --link-mode copy
+  --managed-python` from `backend/` into the runtime venv,
 - copies the platform libpython when needed,
 - writes `runtime-manifest.json`.
+
+Release, desktop-package, and `desktop:dev` scripts pass `--clean` and use
+non-editable installs so the staged runtime is self-contained. Native compile
+reuse should come from uv, Cargo, maturin, and sccache caches rather than a
+separate dev-only runtime mode.
 
 `frontend/scripts/stage-backend-runtime.mjs` copies that runtime into
 `frontend/src-tauri/backend-runtime`, rewrites manifest paths to relative
@@ -67,7 +92,7 @@ submodules checked out, then delegates platform builds to:
 - `.github/workflows/desktop-macos.yml`
 
 Both platform workflows install Node, Rust stable for Tauri, Rust nightly for
-`polars-source-utils`, and uv; package the backend runtime; stage it for Tauri;
-build the desktop app; and validate that the bundled Python can import
-`ldaca_wordflow`, `polars_text`, and `polars_source_utils`. The release
-workflow then uploads MSI and DMG assets to the GitHub release.
+`polars-source-utils`, uv, and sccache; package the backend runtime; stage it for
+Tauri; build the desktop app; and validate that the bundled Python can import
+`ldaca_wordflow`, `polars_text`, and `polars_source_utils`. The release workflow
+then uploads MSI and DMG assets to the GitHub release.

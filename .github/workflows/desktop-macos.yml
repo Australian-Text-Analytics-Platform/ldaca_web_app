@@ -31,10 +31,13 @@ jobs:
     runs-on: macos-latest
     env:
       CI: "true"
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
     steps:
       - name: Checkout repository with submodules
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
           submodules: recursive
@@ -53,13 +56,14 @@ jobs:
           toolchain: stable
           targets: aarch64-apple-darwin
 
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
       - name: Prepare cache directories
         run: |
           mkdir -p ~/.cargo/registry
           mkdir -p ~/.cargo/git
           mkdir -p ~/.rustup
-          mkdir -p ~/.cache/uv
-          mkdir -p ~/.local/share/uv
 
       - name: Cache Cargo registry
         uses: actions/cache@v5
@@ -88,18 +92,14 @@ jobs:
             ${{ runner.os }}-rustup-
 
       - name: Install uv CLI
-        uses: astral-sh/setup-uv@v7
-
-      - name: Cache uv workspace
-        uses: actions/cache@v5
+        uses: astral-sh/setup-uv@v8.2.0
         with:
-          path: |
-            ~/.cache/uv
-            ~/.local/share/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock',
-            'backend/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+          python-version: "3.14t"
+          enable-cache: true
+          cache-python: true
+          cache-dependency-glob: |
+            backend/pyproject.toml
+            backend/uv.lock
 
       - name: Install Node dependencies
         shell: bash
@@ -110,8 +110,8 @@ jobs:
       - name: Package backend runtime
         shell: bash
         run:
-          uv run --no-project --python 3.14 python scripts/package_backend_runtime.py
-          --clean --python-version 3.14
+          uv run --no-project --python 3.14t python scripts/package_backend_runtime.py
+          --clean --python-version 3.14t
 
       - name: Stage backend runtime for Tauri
         shell: bash
@@ -161,6 +161,12 @@ jobs:
           echo "path=$labeled_dmg" >> "$GITHUB_OUTPUT"
           echo "Primary DMG: $primary_dmg"
           echo "Labeled DMG: $labeled_dmg"
+
+      - name: Show sccache stats
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: sccache --show-stats
 
       - name: Upload macOS Apple Silicon DMG artifact
         uses: actions/upload-artifact@v7

@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--python-version",
         type=str,
-        default="3.14",
+        default="3.14t",
         help="Python version to vendor inside the runtime",
     )
     return parser.parse_args()
@@ -128,19 +128,10 @@ def remove_tree_with_retries(
     raise RuntimeError(f"Failed to remove directory: {path}")
 
 
-def remove_externally_managed_markers(root: Path) -> None:
-    for marker in root.rglob("EXTERNALLY-MANAGED"):
-        marker.unlink()
-
-
-def create_uv_packaging_env(managed_install_dir: Path) -> dict[str, str]:
-    """Create a uv environment tuned for relocatable runtime packaging."""
+def create_uv_managed_python_env(managed_install_dir: Path) -> dict[str, str]:
+    """Point uv-managed Python discovery at the runtime-local install dir."""
     return {
-        "UV_LINK_MODE": "copy",
         "UV_PYTHON_INSTALL_DIR": str(managed_install_dir),
-        "UV_PYTHON_PREFER_MANAGED": "1",
-        "UV_PYTHON_DOWNLOADS": "automatic",
-        "UV_VENV_CLEAR": "1",
     }
 
 
@@ -221,12 +212,11 @@ def ensure_venv_libpython(
 
 
 def sync_runtime_environment(
-    *, runtime_python_dir: Path, uv_packaging_env: dict[str, str]
+    *, runtime_python_dir: Path, managed_python_dir: Path
 ) -> None:
     print("[INFO] Syncing backend runtime environment from backend/uv.lock")
-    sync_env = dict(uv_packaging_env)
+    sync_env = create_uv_managed_python_env(managed_python_dir)
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_python_dir)
-    sync_env["VIRTUAL_ENV"] = str(runtime_python_dir)
     run(
         [
             "uv",
@@ -234,6 +224,9 @@ def sync_runtime_environment(
             "--frozen",
             "--no-dev",
             "--no-editable",
+            "--link-mode",
+            "copy",
+            "--managed-python",
         ],
         cwd=BACKEND_PROJECT_ROOT,
         extra_env=sync_env,
@@ -273,7 +266,7 @@ def main() -> None:
     output_dir = Path(args.output).expanduser().resolve()
     dist_root = output_dir.parent
     managed_python_dir = output_dir / "managed-python"
-    uv_packaging_env = create_uv_packaging_env(managed_python_dir)
+    uv_managed_python_env = create_uv_managed_python_env(managed_python_dir)
 
     print("[INFO] Packaging backend runtime")
     print(f"   Output dir:     {output_dir}")
@@ -283,19 +276,10 @@ def main() -> None:
         print(f"[INFO] Removing previous dist at {dist_root}")
         remove_tree_with_retries(dist_root)
 
-    for d in (output_dir, dist_root):
-        d.mkdir(parents=True, exist_ok=True)
-
-    print("[INFO] Setting up Python runtime via uv venv...")
-    run(
-        ["uv", "python", "install", args.python_version],
-        extra_env=uv_packaging_env,
-    )
-
+    output_dir.mkdir(parents=True, exist_ok=True)
     runtime_python_dir = output_dir / "python"
-    if runtime_python_dir.exists():
-        remove_tree_with_retries(runtime_python_dir)
 
+    print("[INFO] Setting up managed Python runtime via uv venv...")
     run(
         [
             "uv",
@@ -303,11 +287,11 @@ def main() -> None:
             str(runtime_python_dir),
             "--python",
             args.python_version,
+            "--managed-python",
+            "--clear",
         ],
-        extra_env=uv_packaging_env,
+        extra_env=uv_managed_python_env,
     )
-
-    remove_externally_managed_markers(runtime_python_dir)
 
     python_bin = find_runtime_python(output_dir, runtime_python_dir)
     assert_runtime_python_is_relocatable(python_bin, output_dir)
@@ -319,7 +303,7 @@ def main() -> None:
 
     sync_runtime_environment(
         runtime_python_dir=runtime_python_dir,
-        uv_packaging_env=uv_packaging_env,
+        managed_python_dir=managed_python_dir,
     )
 
     write_runtime_manifest(
@@ -331,7 +315,7 @@ def main() -> None:
     print("[SUCCESS] Backend runtime created")
     print(f"   Runtime folder: {output_dir}")
     print(f"   Python entry:   {python_bin}")
-    print("   Install mode:   uv sync --no-editable")
+    print("   Install mode:   uv sync --no-editable --link-mode copy")
 
 
 if __name__ == "__main__":

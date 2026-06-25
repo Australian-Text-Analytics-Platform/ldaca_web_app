@@ -50,7 +50,7 @@ if (process.platform === 'win32') {
       path.join(process.env.SYSTEMROOT || 'C:\\Windows', 'System32'),
     ];
     for (const dll of msvcDlls) {
-      const dest = path.join(cpythonDir, dll);
+      const dest = path.join(managedCpythonDir, dll);
       if (fs.existsSync(dest)) continue;
       for (const sysDir of systemDirs) {
         const src = path.join(sysDir, dll);

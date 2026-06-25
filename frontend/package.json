@@ -98,7 +98,7 @@
     "format:check": "biome format src/",
     "tauri": "tauri",
     "clean": "cd src-tauri && cargo clean",
-    "package:backend-runtime": "cd .. && uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14",
+    "package:backend-runtime": "cd .. && uv run --no-project --python 3.14t python scripts/package_backend_runtime.py --clean --python-version 3.14t",
     "stage:backend-runtime": "node scripts/stage-backend-runtime.mjs",
     "prepare:backend-runtime": "pnpm package:backend-runtime && pnpm stage:backend-runtime",
     "desktop:dev": "pnpm prepare:backend-runtime && tauri dev",

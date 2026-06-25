@@ -43,6 +43,9 @@ jobs:
       CI: "true"
       PYTHONUTF8: "1"
       PYTHONIOENCODING: "utf-8"
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       # Debug builds (a) keep the Windows console subsystem so backend stdout/
       # stderr print to cmd.exe, and (b) leave WebView2 devtools enabled so
       # Ctrl+Shift+I works. Used to diagnose runtime issues that don't surface
@@ -59,7 +62,7 @@ jobs:
           New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force -ErrorAction SilentlyContinue
 
       - name: Checkout repository with submodules
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
           submodules: recursive
@@ -78,6 +81,9 @@ jobs:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
 
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
       - name: Cache Cargo registry
         uses: actions/cache@v5
         with:
@@ -93,17 +99,14 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install uv CLI
-        uses: astral-sh/setup-uv@v7
-
-      - name: Cache uv workspace
-        uses: actions/cache@v5
+        uses: astral-sh/setup-uv@v8.2.0
         with:
-          path: |
-            ~/AppData/Local/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock',
-            'backend/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+          python-version: "3.14t"
+          enable-cache: true
+          cache-python: true
+          cache-dependency-glob: |
+            backend/pyproject.toml
+            backend/uv.lock
 
       - name: Install Node dependencies
         shell: pwsh
@@ -117,7 +120,7 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
+          uv run --no-project --python 3.14t python scripts/package_backend_runtime.py --clean --python-version 3.14t
 
       - name: Stage backend runtime for Tauri
         shell: pwsh
@@ -152,6 +155,12 @@ jobs:
           }
 
           & $pythonExe -c "import encodings, ldaca_wordflow, polars_source_utils, polars_text, sys; print(sys.version)"
+
+      - name: Show sccache stats
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: sccache --show-stats
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7

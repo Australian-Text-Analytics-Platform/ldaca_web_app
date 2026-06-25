@@ -23,6 +23,22 @@ pnpm install
 Do not set `PYTHONPATH` for normal development; uv and package manifests own
 resolution.
 
+## Source Dependencies In CI
+
+The Python packages use `tool.uv.sources` for coordinated local development
+across the root repo, `backend/`, `docworkspace/`, `polars-text/`, and
+`polars-source-utils/`. Branch and pull-request CI should run in source mode:
+check out the package under test plus the sibling repositories at the relative
+paths declared in `pyproject.toml`, then run:
+
+```bash
+uv sync --frozen --group dev
+```
+
+Use `uv sync --no-sources` only when dependency versions are already available
+from the package index. It is not the right default for coordinated branch work
+because newly bumped sibling package versions may not be published yet.
+
 ## Frontend Checks
 
 Run frontend commands through the root wrapper or with `pnpm -C frontend`:
@@ -68,6 +84,19 @@ make build
 make test
 ```
 
+Use the feature-scoped targets when iterating on one Rust surface:
+
+```bash
+make check-basic
+make check-tokenization
+make check-embedding
+make check-topic
+make build-tokenization
+```
+
+Cargo chooses its own parallel job count by default. Override it only when you
+need a specific limit, for example `make build-tokenization JOBS=12`.
+
 Some `polars-text` tokenizers download Hugging Face or Lindera assets on first
 use. That is expected for tokenizer features and should not be treated as a
 network regression without more evidence.
@@ -88,3 +117,6 @@ Inspect these before changing desktop packaging:
 
 The desktop launcher starts the Python backend itself. The web frontend's API
 base resolver reads the injected `window.__BACKEND_URL__` in desktop mode.
+`pnpm desktop:dev` uses the same packaged-runtime path as desktop builds. Build
+speedups should come from uv, Cargo, maturin, and sccache configuration rather
+than a separate dev-only runtime mode.
