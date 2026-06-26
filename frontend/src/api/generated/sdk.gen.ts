@@ -29,7 +29,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * Why:
  * - Provides a human-readable entrypoint summary for backend capabilities.
  */
-export const root = <ThrowOnError extends boolean = false>(options?: Options<RootData, ThrowOnError>): RequestResult<RootResponses, unknown, ThrowOnError> => (options?.client ?? client).get<RootResponses, unknown, ThrowOnError>({ url: '/', ...options });
+export const root = <ThrowOnError extends boolean = false>(options?: Options<RootData, ThrowOnError>): RequestResult<RootResponses, unknown, ThrowOnError> => (options?.client ?? client).get<RootResponses, unknown, ThrowOnError>({ url: '/api', ...options });
 
 /**
  * Admin Cleanup

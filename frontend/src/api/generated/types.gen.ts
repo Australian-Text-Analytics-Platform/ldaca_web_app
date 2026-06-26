@@ -2258,7 +2258,9 @@ export type FilterCondition = {
     /**
      * Value
      */
-    value: unknown;
+    value: string | number | number | boolean | Array<string | number | number | boolean | null> | {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -3586,11 +3588,11 @@ export type SelectedPeriod = {
     /**
      * Period End
      */
-    period_end: unknown;
+    period_end: string | number | number;
     /**
      * Period Start
      */
-    period_start: unknown;
+    period_start: string | number | number;
 };
 
 /**
@@ -5149,7 +5151,7 @@ export type VisibleGroupSelection = {
      * Values
      */
     values: {
-        [key: string]: unknown;
+        [key: string]: string | number | number | boolean;
     };
 };
 
@@ -5543,7 +5545,7 @@ export type RootData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/';
+    url: '/api';
 };
 
 export type RootResponses = {

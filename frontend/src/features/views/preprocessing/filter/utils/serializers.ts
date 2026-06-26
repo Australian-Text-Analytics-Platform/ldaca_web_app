@@ -53,7 +53,7 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
     const payload: FilterCondition = {
       column: condition.column,
       operator: condition.operator,
-      value,
+      value: value as FilterCondition['value'],
     };
 
     if (condition.negate !== undefined) payload.negate = condition.negate;

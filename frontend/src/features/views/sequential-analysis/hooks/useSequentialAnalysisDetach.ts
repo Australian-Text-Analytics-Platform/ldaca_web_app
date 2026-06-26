@@ -53,7 +53,7 @@ export function useSequentialAnalysisDetach({
   const visibleGroups = (() => {
     if (!groupByColumns.length || excludedGroupKeys.size === 0) return undefined;
 
-    const dedupedVisibleGroups = new Map<string, Record<string, unknown>>();
+    const dedupedVisibleGroups = new Map<string, Record<string, string | number | boolean>>();
     rawRows.forEach((row) => {
       const groupKey = groupByColumns
         .map((column) => String((row[column] as string | number | undefined) ?? ''))
@@ -64,7 +64,7 @@ export function useSequentialAnalysisDetach({
 
       const values = Object.fromEntries(
         groupByColumns.map((column) => [column, row[column] ?? null]),
-      );
+      ) as Record<string, string | number | boolean>;
       const dedupeKey = JSON.stringify(groupByColumns.map((column) => row[column] ?? null));
       dedupedVisibleGroups.set(dedupeKey, values);
     });
@@ -95,10 +95,9 @@ export function useSequentialAnalysisDetach({
     const selectedPeriods = Array.from(selectedPeriodIndices)
       .sort((left, right) => left - right)
       .map((index) => ({
-        period_start: chartData[index]?.period_start,
-        period_end: chartData[index]?.period_end,
-      }))
-      .filter((period) => period.period_start !== undefined && period.period_end !== undefined);
+        period_start: chartData[index]?.period_start as string | number,
+        period_end: chartData[index]?.period_end as string | number,
+      }));
 
     if (selectedPeriods.length === 0) {
       toast.error('Selected periods are missing boundaries for filtering');

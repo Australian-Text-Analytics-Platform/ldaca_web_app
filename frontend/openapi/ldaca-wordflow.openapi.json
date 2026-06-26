@@ -3043,6 +3043,49 @@
             "title": "Regex"
           },
           "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Value"
           }
         },
@@ -4723,9 +4766,31 @@
         "description": "API schema used by routes and generated clients for selected period.\n\nUsed by:\n- backend API routes because they need this unit's \"API schema used by routes and generated clients for selected period\" behavior.",
         "properties": {
           "period_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
             "title": "Period End"
           },
           "period_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
             "title": "Period Start"
           }
         },
@@ -7089,7 +7154,22 @@
         "description": "API schema used by routes and generated clients for visible group selection.\n\nUsed by:\n- backend API routes because they need this unit's \"API schema used by routes and generated clients for visible group selection\" behavior.",
         "properties": {
           "values": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
             "title": "Values",
             "type": "object"
           }
@@ -7595,7 +7675,7 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/": {
+    "/api": {
       "get": {
         "description": "Return API feature/index metadata.\n\nUsed by:\n- browser/manual root checks and basic service discovery because callers need the shared\n  shared backend behavior rule in one place instead of duplicating it.\nWhy:\n- Provides a human-readable entrypoint summary for backend capabilities.",
         "operationId": "root",
