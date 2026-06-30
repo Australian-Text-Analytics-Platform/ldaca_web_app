@@ -13,6 +13,9 @@ import type { AnalysisTab, AnalysisTabGroup, AnalysisTabInput, WorkspaceTabsStat
 
 /** Empty default returned when a workspace has no tabs sidecar yet. */
 export const EMPTY_TABS_STATE: WorkspaceTabsState = { groups: {} };
+/** Selector id mirrored to the legacy AnalysisTab.inputs field. */
+export const DEFAULT_TAB_INPUT_SET_ID = 'source';
+export type AnalysisTabInputSets = NonNullable<AnalysisTab['input_sets']>;
 
 /**
  * Generates a stable unique tab id.
@@ -49,6 +52,23 @@ export function getTabs(
   analysisType: string,
 ): AnalysisTab[] {
   return getGroup(state, analysisType).tabs ?? [];
+}
+
+/**
+ * Reads one tab-owned selector value by id.
+ * Called by: AnalysisTabsHost/useTabNodeInputs to support views with more than
+ * one NodeInputsPanel while preserving old sidecars that only have ``inputs``.
+ * Flow: prefer an explicit ``input_sets[selectorId]`` value, then fall back to
+ * the legacy ``inputs`` array only for the default ``source`` selector.
+ */
+export function getTabInputSet(
+  tab: Pick<AnalysisTab, 'inputs' | 'input_sets'> | null | undefined,
+  selectorId: string = DEFAULT_TAB_INPUT_SET_ID,
+): AnalysisTabInput[] {
+  const namedInputs = tab?.input_sets?.[selectorId];
+  if (namedInputs) return namedInputs;
+  if (selectorId === DEFAULT_TAB_INPUT_SET_ID) return tab?.inputs ?? [];
+  return [];
 }
 
 /**
@@ -103,7 +123,13 @@ export function createTabInState(
   tabId: string = newTabId(),
 ): { state: WorkspaceTabsState; tabId: string } {
   const group = getGroup(state, analysisType);
-  const tab: AnalysisTab = { tab_id: tabId, task_id: null, title, inputs: [] };
+  const tab: AnalysisTab = {
+    tab_id: tabId,
+    task_id: null,
+    title,
+    inputs: [],
+    input_sets: { [DEFAULT_TAB_INPUT_SET_ID]: [] },
+  };
   const nextGroup: AnalysisTabGroup = {
     tabs: [...(group.tabs ?? []), tab],
     active_tab_id: tabId,
@@ -231,12 +257,40 @@ export function setTabTaskInState(
 }
 
 /**
- * Replaces a tab's input node set (the add-node-as-needed selection).
+ * Replaces one named input node set (the add-node-as-needed selection).
+ * Called by: useWorkspaceTabs.setTabInputSet whenever a feature has more than
+ * one node selector on the same tab. The default ``source`` selector is also
+ * mirrored to ``inputs`` so legacy single-selector features and old sidecar
+ * readers keep seeing the same selection.
+ */
+export function setTabInputSetInState(
+  state: WorkspaceTabsState | null | undefined,
+  analysisType: string,
+  tabId: string,
+  selectorId: string,
+  inputs: AnalysisTabInput[],
+): WorkspaceTabsState {
+  const group = getGroup(state, analysisType);
+  const nextTabs = (group.tabs ?? []).map((t) => {
+    if (t.tab_id !== tabId) return t;
+    const input_sets: AnalysisTabInputSets = {
+      ...(t.input_sets ?? {}),
+      [selectorId]: inputs,
+    };
+    return selectorId === DEFAULT_TAB_INPUT_SET_ID
+      ? { ...t, inputs, input_sets }
+      : { ...t, input_sets };
+  });
+  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
+}
+
+/**
+ * Replaces a tab's legacy source input node set.
  * Called by: useWorkspaceTabs.setTabInputs whenever the user adds, removes,
  * clears, or re-columns a node in an analysis tab, and during one-time
  * hydration migration when a run-tab's inputs are derived from its task
- * request. This is the only place a tab's ``inputs`` array changes; each tab
- * owns its selection so switching tabs never reconfigures another tab.
+ * request. Delegates to the named selector reducer so ``inputs`` and
+ * ``input_sets.source`` stay in sync.
  */
 export function setTabInputsInState(
   state: WorkspaceTabsState | null | undefined,
@@ -244,9 +298,7 @@ export function setTabInputsInState(
   tabId: string,
   inputs: AnalysisTabInput[],
 ): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  const nextTabs = (group.tabs ?? []).map((t) => (t.tab_id === tabId ? { ...t, inputs } : t));
-  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
+  return setTabInputSetInState(state, analysisType, tabId, DEFAULT_TAB_INPUT_SET_ID, inputs);
 }
 
 /**

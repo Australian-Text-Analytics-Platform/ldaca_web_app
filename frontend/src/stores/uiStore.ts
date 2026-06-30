@@ -23,7 +23,7 @@ export type ViewType =
   | 'analysis'
   | 'topic-modeling'
   | 'quotation'
-  | 'ai-annotator'
+  | 'annotation'
   | 'export';
 
 export const ALL_VIEWS: ViewType[] = [
@@ -34,14 +34,12 @@ export const ALL_VIEWS: ViewType[] = [
   'analysis',
   'topic-modeling',
   'quotation',
-  'ai-annotator',
+  'annotation',
   'export',
 ];
 
-/** Views shown out of the box; AI Annotator is opt-in via preferences. */
-export const DEFAULT_VISIBLE_VIEWS: ViewType[] = ALL_VIEWS.filter(
-  (view) => view !== 'ai-annotator',
-);
+/** Views shown out of the box in the sidebar. */
+export const DEFAULT_VISIBLE_VIEWS: ViewType[] = [...ALL_VIEWS];
 
 type ModalKind = 'feedback' | 'tutorial' | 'warning' | 'info' | 'reference';
 

@@ -18,6 +18,11 @@ const ConcordanceFeature = lazy(
 /** Points at the tabbed wrapper (QuotationTabbedFeature) so the quotation
  *  view renders the Chrome-style analysis tab strip as its outermost element. */
 const QuotationFeature = lazy(() => import('@/features/views/quotation/QuotationTabbedFeature'));
+/** Points at the tabbed wrapper (AnnotationTabbedFeature) so the annotation
+ *  view renders the shared analysis tab strip as its outermost element. */
+const AnnotationFeature = lazy(
+  () => import('@/features/views/annotation/AnnotationTabbedFeature'),
+);
 /** Points at the tabbed wrapper (TopicModelingTabbedFeature) so the topic-modeling
  *  view renders the Chrome-style analysis tab strip as its outermost element. */
 const TopicModelingFeature = lazy(
@@ -35,9 +40,6 @@ const ExportFeature = lazy(() => import('@/features/views/export/ExportFeature')
 const TokenFrequencyFeature = lazy(
   () => import('@/features/views/token-frequency/TokenFrequencyTabbedFeature'),
 );
-/** Lazy AI annotator chunk consumed by `VIEW_COMPONENTS` when the optional annotator view is visible. */
-const AiAnnotatorFeature = lazy(() => import('@/features/views/ai-annotator/AiAnnotatorFeature'));
-
 /**
  * Each feature renders only when the matching `currentView` value is set.
  * Switching views unmounts the previous feature so its hooks reset cleanly.
@@ -50,7 +52,7 @@ const VIEW_COMPONENTS: Record<ViewType, React.ComponentType> = {
   analysis: SequentialAnalysisFeature,
   'topic-modeling': TopicModelingFeature,
   quotation: QuotationFeature,
-  'ai-annotator': AiAnnotatorFeature,
+  annotation: AnnotationFeature,
   export: ExportFeature,
 };
 

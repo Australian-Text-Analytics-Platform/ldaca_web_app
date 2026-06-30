@@ -74,7 +74,7 @@ subdirectory maps to one `ViewType`:
 | `analysis`        | `views/sequential-analysis/` | Time-series trends                                                                      |
 | `topic-modeling`  | `views/topic-modeling/`      | BERTopic topic modeling + bubble chart                                                  |
 | `quotation`       | `views/quotation/`           | Quotation extraction                                                                    |
-| `ai-annotator`    | `views/ai-annotator/`        | LLM-powered text annotation                                                             |
+| `annotation`      | `views/annotation/`          | Annotation setup and class-description selection                                        |
 | `export`          | `views/export/`              | Data block export/download                                                              |
 
 Shared code used by multiple views lives in `views/common/`:
@@ -84,7 +84,8 @@ Shared code used by multiple views lives in `views/common/`:
 - `common/hooks/` — shared hooks (`useAnalysisFeature`, `useLastRunRequest`,
   `useDetachColumnsState`, `useMaterializeLifecycle`, etc.).
 - `common/tabs/` — Chrome-style analysis tab host and `tabs.json` sidecar
-  bridge. Each tab owns an optional `task_id` and an `inputs` node set.
+  bridge. Each tab owns an optional `task_id`, a legacy/default `inputs`
+  node set, and optional named `input_sets` for multi-selector views.
   The reusable strip lives in `src/components/tabs/`: `chromeTabsLayout.ts`
   keeps DOM-free geometry helpers, while `chromeTabsInteractionState.ts` owns
   the coupled drag-preview and inline-rename reducer state.

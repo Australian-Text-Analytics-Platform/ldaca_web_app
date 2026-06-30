@@ -63,6 +63,16 @@ describe('validateAdd', () => {
   it('allows a valid string node', () => {
     expect(validateAdd('n1', [], map, { allowedDataTypes: ['string'] })).toBeNull();
   });
+
+  it('accepts exactly two string columns when exactStringColumns is set', () => {
+    expect(validateAdd('n1', [], map, { exactStringColumns: 2 })).toBeNull();
+  });
+
+  it('rejects nodes that do not have exactly two string columns', () => {
+    const wide = buildNodeMap([stringNode('w', ['a', 'b', 'c'])]);
+    expect(validateAdd('w', [], wide, { exactStringColumns: 2 })).toMatch(/exactly 2 string/i);
+    expect(validateAdd('n3', [], map, { exactStringColumns: 2 })).toMatch(/exactly 2 string/i);
+  });
 });
 
 describe('defaultColumnForNode', () => {

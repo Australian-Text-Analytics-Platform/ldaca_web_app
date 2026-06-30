@@ -9,7 +9,6 @@ import Sidebar from '@/components/layout/Sidebar';
 import { InsetCard } from '@/components/layout/InsetCard';
 import { RefreshStatusBanner } from '@/features/auth/components/RefreshStatusBanner';
 import { useUIStore } from '@/stores';
-import type { ViewType } from '@/stores';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -19,6 +18,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
+import { isTabbedMainView } from '@/components/layout/tabbedMainViews';
 
 const FeedbackPanel = lazy(() =>
   import('@/features/feedback/components/FeedbackPanel').then((m) => ({
@@ -29,21 +29,6 @@ const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 const HintsController = lazy(() =>
   import('@/features/hints/HintsController').then((m) => ({ default: m.HintsController })),
 );
-
-/**
- * Views that render their own tabbed card (AnalysisTabbedPanel via
- * AnalysisTabsHost) instead of sitting inside the shared main card. For these,
- * the main InsetCard frame is made transparent so the tab strip can protrude
- * above the view's own card with no double-card nesting. Every analysis view
- * that has migrated to the shared tab shell must be listed here.
- */
-const TABBED_MAIN_VIEWS = new Set<ViewType>([
-  'concordance',
-  'token-frequency',
-  'analysis',
-  'topic-modeling',
-  'quotation',
-]);
 
 /**
  * Headless bridge between the global multi-tab preference and workspace tab
@@ -71,7 +56,7 @@ export function WorkspaceShell() {
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const syncVisibleViews = useUIStore((s) => s.syncVisibleViewsFromPreferences);
   const currentView = useUIStore((s) => s.currentView);
-  const isTabbedMain = TABBED_MAIN_VIEWS.has(currentView);
+  const isTabbedMain = isTabbedMainView(currentView);
   useEffect(() => {
     if (prefsHydrated) syncVisibleViews();
   }, [prefsHydrated, syncVisibleViews]);

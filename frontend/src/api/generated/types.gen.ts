@@ -5,618 +5,6 @@ export type ClientOptions = {
 };
 
 /**
- * AiAnnotationCategoriesData
- *
- * Data payload schema embedded in API responses for ai annotation categories data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationCategoriesData = {
-    /**
-     * Categories
-     */
-    categories: Array<string>;
-};
-
-/**
- * AiAnnotationCategoriesResponse
- *
- * Response schema returned by API routes and consumed by generated clients for ai annotation categories response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationCategoriesResponse = {
-    data: AiAnnotationCategoriesData;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'successful' | 'failed';
-};
-
-/**
- * AiAnnotationClassDef
- *
- * API schema used by routes and generated clients for ai annotation class def.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationClassDef = {
-    /**
-     * Description
-     */
-    description: string;
-    /**
-     * Name
-     */
-    name: string;
-};
-
-/**
- * AiAnnotationDetachData
- *
- * Data payload schema embedded in API responses for ai annotation detach data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationDetachData = {
-    /**
-     * New Node Name
-     */
-    new_node_name: string;
-    /**
-     * Record Count
-     */
-    record_count: number;
-};
-
-/**
- * AiAnnotationDetachRequest
- *
- * Request schema used by API routes and generated clients for ai annotation detach request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationDetachRequest = {
-    /**
-     * Annotation Column
-     */
-    annotation_column?: string | null;
-    /**
-     * Api Key
-     */
-    api_key?: string | null;
-    /**
-     * Base Url
-     */
-    base_url?: string | null;
-    /**
-     * Batch Size
-     */
-    batch_size?: number;
-    /**
-     * Classes
-     */
-    classes: Array<AiAnnotationClassDef>;
-    /**
-     * Column
-     */
-    column: string;
-    /**
-     * Examples
-     */
-    examples?: Array<AiAnnotationExample>;
-    /**
-     * Model
-     */
-    model: string;
-    /**
-     * New Node Name
-     */
-    new_node_name?: string | null;
-    /**
-     * Seed
-     */
-    seed?: number | null;
-    /**
-     * Temperature
-     */
-    temperature?: number;
-    /**
-     * Top P
-     */
-    top_p?: number;
-};
-
-/**
- * AiAnnotationDetachResponse
- *
- * Response schema returned by API routes and consumed by generated clients for ai annotation detach response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationDetachResponse = {
-    data: AiAnnotationDetachData;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
-};
-
-/**
- * AiAnnotationEdit
- *
- * API schema used by routes and generated clients for ai annotation edit.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationEdit = {
-    /**
-     * Annotation
-     */
-    annotation?: string;
-    /**
-     * Provider
-     */
-    provider: string;
-    /**
-     * Row Index
-     */
-    row_index: number;
-};
-
-/**
- * AiAnnotationExample
- *
- * API schema used by routes and generated clients for ai annotation example.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationExample = {
-    /**
-     * Classification
-     */
-    classification: string;
-    /**
-     * Query
-     */
-    query: string;
-};
-
-/**
- * AiAnnotationModelInfo
- *
- * Metadata schema used by API responses to describe ai annotation model info.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationModelInfo = {
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Name
-     */
-    name: string;
-};
-
-/**
- * AiAnnotationModelsData
- *
- * Data payload schema embedded in API responses for ai annotation models data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationModelsData = {
-    /**
-     * Models
-     */
-    models: Array<AiAnnotationModelInfo>;
-};
-
-/**
- * AiAnnotationModelsRequest
- *
- * Request schema used by API routes and generated clients for ai annotation models request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationModelsRequest = {
-    /**
-     * Api Key
-     */
-    api_key?: string | null;
-    /**
-     * Base Url
-     */
-    base_url?: string | null;
-};
-
-/**
- * AiAnnotationModelsResponse
- *
- * Response schema returned by API routes and consumed by generated clients for ai annotation models response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationModelsResponse = {
-    data: AiAnnotationModelsData;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'successful' | 'failed';
-};
-
-/**
- * AiAnnotationNodeResult
- *
- * API schema used by routes and generated clients for ai annotation node result.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationNodeResult = {
-    /**
-     * Columns
-     */
-    columns: Array<string>;
-    /**
-     * Data
-     */
-    data: Array<{
-        [key: string]: unknown;
-    }>;
-    metadata?: AnalysisTaskMetadata | null;
-    pagination?: SourceRowPagination | null;
-    sorting?: AnalysisSorting | null;
-};
-
-/**
- * AiAnnotationProvidersData
- *
- * Data payload schema embedded in API responses for ai annotation providers data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationProvidersData = {
-    /**
-     * Providers
-     */
-    providers: Array<string>;
-};
-
-/**
- * AiAnnotationProvidersResponse
- *
- * Response schema returned by API routes and consumed by generated clients for ai annotation providers response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationProvidersResponse = {
-    data: AiAnnotationProvidersData;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'successful' | 'failed';
-};
-
-/**
- * AiAnnotationRequest
- *
- * Request schema used by API routes and generated clients for ai annotation request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationRequest = {
-    /**
-     * Annotation Column
-     */
-    annotation_column?: string | null;
-    /**
-     * Api Key
-     */
-    api_key?: string | null;
-    /**
-     * Base Url
-     */
-    base_url?: string | null;
-    /**
-     * Batch Size
-     */
-    batch_size?: number;
-    /**
-     * Classes
-     */
-    classes: Array<AiAnnotationClassDef>;
-    /**
-     * Descending
-     */
-    descending?: boolean;
-    /**
-     * Examples
-     */
-    examples?: Array<AiAnnotationExample>;
-    /**
-     * Model
-     */
-    model: string;
-    /**
-     * Node Columns
-     */
-    node_columns: {
-        [key: string]: string;
-    };
-    /**
-     * Node Ids
-     */
-    node_ids: Array<string>;
-    /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Page Size
-     */
-    page_size?: number;
-    /**
-     * Seed
-     */
-    seed?: number | null;
-    /**
-     * Sort By
-     */
-    sort_by?: string | null;
-    /**
-     * Temperature
-     */
-    temperature?: number;
-    /**
-     * Top P
-     */
-    top_p?: number;
-    [key: string]: unknown;
-};
-
-/**
- * AiAnnotationResponse
- *
- * Response schema returned by API routes and consumed by generated clients for ai annotation response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationResponse = {
-    /**
-     * Analysis Params
-     */
-    analysis_params?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Combinable
-     */
-    combinable?: boolean | null;
-    /**
-     * Data
-     */
-    data?: {
-        [key: string]: AiAnnotationNodeResult;
-    } | null;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * AiAnnotationResultQuery
- *
- * API schema used by routes and generated clients for ai annotation result query.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationResultQuery = {
-    /**
-     * Descending
-     */
-    descending?: boolean | null;
-    /**
-     * Page
-     */
-    page?: number | null;
-    /**
-     * Page Size
-     */
-    page_size?: number | null;
-    /**
-     * Sort By
-     */
-    sort_by?: string | null;
-};
-
-/**
- * AiAnnotationSaveData
- *
- * Data payload schema embedded in API responses for ai annotation save data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationSaveData = {
-    /**
-     * Annotation Column
-     */
-    annotation_column: string;
-    /**
-     * Edits Applied
-     */
-    edits_applied: number;
-};
-
-/**
- * AiAnnotationSaveRequest
- *
- * Request schema used by API routes and generated clients for ai annotation save request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationSaveRequest = {
-    /**
-     * Annotation Column
-     */
-    annotation_column?: string | null;
-    /**
-     * Edits
-     */
-    edits?: Array<AiAnnotationEdit>;
-};
-
-/**
- * AiAnnotationSaveResponse
- *
- * Response schema returned by API routes and consumed by generated clients for ai annotation save response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AiAnnotationSaveResponse = {
-    data: AiAnnotationSaveData;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
-};
-
-/**
  * AnalysisClearResponse
  *
  * Response schema returned by API routes and consumed by generated clients for analysis clear response.
@@ -668,15 +56,23 @@ export type AnalysisSorting = {
  * A single analysis tab.
  *
  * Carries identity (``tab_id``), a pointer to the analysis result it shows
- * (``task_id``), a display ``title``, and the ``inputs`` node set it analyses.
- * Remaining analysis parameters live on the referenced
- * ``AnalysisTask.request``.
+ * (``task_id``), a display ``title``, and selector state. ``inputs`` remains
+ * the legacy source selector for existing clients. ``input_sets`` is keyed by
+ * selector id (for example, ``source`` or ``classDescriptions``) so newer
+ * views can persist multiple node selectors on the same tab. Remaining
+ * analysis parameters live on the referenced ``AnalysisTask.request``.
  *
  * Used by:
  * - `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab
  * store round-trips this exact shape.
  */
 export type AnalysisTab = {
+    /**
+     * Input Sets
+     */
+    input_sets?: {
+        [key: string]: Array<AnalysisTabInput>;
+    };
     /**
      * Inputs
      */
@@ -727,8 +123,8 @@ export type AnalysisTabGroup = {
  * model.
  *
  * Used by:
- * - `AnalysisTab.inputs` and the GET/PUT tab routes because the frontend tab
- * store round-trips this exact shape.
+ * - `AnalysisTab.inputs`, `AnalysisTab.input_sets`, and the GET/PUT tab
+ * routes because the frontend tab store round-trips this exact shape.
  */
 export type AnalysisTabInput = {
     /**
@@ -787,6 +183,68 @@ export type AnalysisTaskMetadata = {
      */
     task_id?: string | null;
     [key: string]: unknown;
+};
+
+/**
+ * AnnotationClassDescriptionRow
+ *
+ * One editable class-description row returned to the Annotation UI.
+ *
+ * Used by:
+ * - ``get_annotation_class_descriptions`` and
+ * ``update_annotation_class_descriptions`` because the frontend editor
+ * should always work with semantic ``class``/``description`` keys even when
+ * the selected workspace columns have different names.
+ */
+export type AnnotationClassDescriptionRow = {
+    /**
+     * Class
+     */
+    class?: string;
+    /**
+     * Description
+     */
+    description?: string;
+};
+
+/**
+ * AnnotationClassDescriptionsPayload
+ *
+ * Class-description editor payload for one selected workspace node.
+ *
+ * Used by:
+ * - Annotation class-description GET/PUT routes to round-trip the selected
+ * class and description columns plus their editable row values.
+ */
+export type AnnotationClassDescriptionsPayload = {
+    /**
+     * Class Column
+     */
+    class_column?: string;
+    /**
+     * Description Column
+     */
+    description_column?: string;
+    /**
+     * Rows
+     */
+    rows?: Array<AnnotationClassDescriptionRow>;
+};
+
+/**
+ * AnnotationSetParentRequest
+ *
+ * Request to set a class-description node's parent to the source node.
+ *
+ * Used by:
+ * - Frontend Annotation view when Start is clicked because the class table
+ * should hang off the annotated source block in the workspace graph.
+ */
+export type AnnotationSetParentRequest = {
+    /**
+     * Parent Node Id
+     */
+    parent_node_id: string;
 };
 
 /**
@@ -6726,7 +6184,7 @@ export type CreateWorkspaceResponses = {
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
-export type ClearAiAnnotationData = {
+export type CreateAnnotationClassDescriptionsData = {
     body?: never;
     headers?: {
         /**
@@ -6736,90 +6194,28 @@ export type ClearAiAnnotationData = {
     };
     path?: never;
     query?: never;
-    url: '/api/workspaces/ai-annotation';
+    url: '/api/workspaces/annotation/class-descriptions';
 };
 
-export type ClearAiAnnotationErrors = {
+export type CreateAnnotationClassDescriptionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ClearAiAnnotationError = ClearAiAnnotationErrors[keyof ClearAiAnnotationErrors];
+export type CreateAnnotationClassDescriptionsError = CreateAnnotationClassDescriptionsErrors[keyof CreateAnnotationClassDescriptionsErrors];
 
-export type ClearAiAnnotationResponses = {
+export type CreateAnnotationClassDescriptionsResponses = {
     /**
      * Successful Response
      */
-    200: AnalysisClearResponse;
+    200: WorkspaceNodeInfo;
 };
 
-export type ClearAiAnnotationResponse = ClearAiAnnotationResponses[keyof ClearAiAnnotationResponses];
+export type CreateAnnotationClassDescriptionsResponse = CreateAnnotationClassDescriptionsResponses[keyof CreateAnnotationClassDescriptionsResponses];
 
-export type RunAiAnnotationData = {
-    body: AiAnnotationRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/ai-annotation';
-};
-
-export type RunAiAnnotationErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type RunAiAnnotationError = RunAiAnnotationErrors[keyof RunAiAnnotationErrors];
-
-export type RunAiAnnotationResponses = {
-    /**
-     * Successful Response
-     */
-    200: AiAnnotationResponse;
-};
-
-export type RunAiAnnotationResponse = RunAiAnnotationResponses[keyof RunAiAnnotationResponses];
-
-export type GetAiAnnotationModelsData = {
-    body: AiAnnotationModelsRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/ai-annotation/models';
-};
-
-export type GetAiAnnotationModelsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetAiAnnotationModelsError = GetAiAnnotationModelsErrors[keyof GetAiAnnotationModelsErrors];
-
-export type GetAiAnnotationModelsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AiAnnotationModelsResponse;
-};
-
-export type GetAiAnnotationModelsResponse = GetAiAnnotationModelsResponses[keyof GetAiAnnotationModelsResponses];
-
-export type AiAnnotationTaskRequestData = {
+export type GetAnnotationClassDescriptionsData = {
     body?: never;
     headers?: {
         /**
@@ -6829,89 +6225,43 @@ export type AiAnnotationTaskRequestData = {
     };
     path: {
         /**
-         * Task Id
+         * Node Id
          */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/ai-annotation/tasks/{task_id}/request';
-};
-
-export type AiAnnotationTaskRequestErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AiAnnotationTaskRequestError = AiAnnotationTaskRequestErrors[keyof AiAnnotationTaskRequestErrors];
-
-export type AiAnnotationTaskRequestResponses = {
-    /**
-     * Successful Response
-     */
-    200: AiAnnotationRequest;
-};
-
-export type AiAnnotationTaskRequestResponse = AiAnnotationTaskRequestResponses[keyof AiAnnotationTaskRequestResponses];
-
-export type AiAnnotationTaskResultData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
+        node_id: string;
     };
     query?: {
         /**
-         * Page
+         * Class Column
          */
-        page?: number | null;
+        class_column?: string;
         /**
-         * Page Size
+         * Description Column
          */
-        page_size?: number | null;
-        /**
-         * Sort By
-         */
-        sort_by?: string | null;
-        /**
-         * Descending
-         */
-        descending?: boolean | null;
+        description_column?: string;
     };
-    url: '/api/workspaces/ai-annotation/tasks/{task_id}/result';
+    url: '/api/workspaces/annotation/class-descriptions/{node_id}';
 };
 
-export type AiAnnotationTaskResultErrors = {
+export type GetAnnotationClassDescriptionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AiAnnotationTaskResultError = AiAnnotationTaskResultErrors[keyof AiAnnotationTaskResultErrors];
+export type GetAnnotationClassDescriptionsError = GetAnnotationClassDescriptionsErrors[keyof GetAnnotationClassDescriptionsErrors];
 
-export type AiAnnotationTaskResultResponses = {
+export type GetAnnotationClassDescriptionsResponses = {
     /**
-     * Response Ai Annotation Task Result
-     *
      * Successful Response
      */
-    200: AiAnnotationResponse | null;
+    200: AnnotationClassDescriptionsPayload;
 };
 
-export type AiAnnotationTaskResultResponse = AiAnnotationTaskResultResponses[keyof AiAnnotationTaskResultResponses];
+export type GetAnnotationClassDescriptionsResponse = GetAnnotationClassDescriptionsResponses[keyof GetAnnotationClassDescriptionsResponses];
 
-export type AiAnnotationTaskResultPostData = {
-    body: AiAnnotationResultQuery;
+export type UpdateAnnotationClassDescriptionsData = {
+    body: AnnotationClassDescriptionsPayload;
     headers?: {
         /**
          * Authorization
@@ -6920,31 +6270,67 @@ export type AiAnnotationTaskResultPostData = {
     };
     path: {
         /**
-         * Task Id
+         * Node Id
          */
-        task_id: string;
+        node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/ai-annotation/tasks/{task_id}/result';
+    url: '/api/workspaces/annotation/class-descriptions/{node_id}';
 };
 
-export type AiAnnotationTaskResultPostErrors = {
+export type UpdateAnnotationClassDescriptionsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AiAnnotationTaskResultPostError = AiAnnotationTaskResultPostErrors[keyof AiAnnotationTaskResultPostErrors];
+export type UpdateAnnotationClassDescriptionsError = UpdateAnnotationClassDescriptionsErrors[keyof UpdateAnnotationClassDescriptionsErrors];
 
-export type AiAnnotationTaskResultPostResponses = {
+export type UpdateAnnotationClassDescriptionsResponses = {
     /**
      * Successful Response
      */
-    200: AiAnnotationResponse;
+    200: AnnotationClassDescriptionsPayload;
 };
 
-export type AiAnnotationTaskResultPostResponse = AiAnnotationTaskResultPostResponses[keyof AiAnnotationTaskResultPostResponses];
+export type UpdateAnnotationClassDescriptionsResponse = UpdateAnnotationClassDescriptionsResponses[keyof UpdateAnnotationClassDescriptionsResponses];
+
+export type SetAnnotationClassParentData = {
+    body: AnnotationSetParentRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/annotation/class-descriptions/{node_id}/parent';
+};
+
+export type SetAnnotationClassParentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetAnnotationClassParentError = SetAnnotationClassParentErrors[keyof SetAnnotationClassParentErrors];
+
+export type SetAnnotationClassParentResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type SetAnnotationClassParentResponse = SetAnnotationClassParentResponses[keyof SetAnnotationClassParentResponses];
 
 export type RunConcordanceData = {
     body: ConcordanceAnalysisRequest;
@@ -7871,160 +7257,6 @@ export type GetNodeInfoResponses = {
 };
 
 export type GetNodeInfoResponse = GetNodeInfoResponses[keyof GetNodeInfoResponses];
-
-export type GetAiAnnotationCategoriesData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Annotation Column
-         */
-        annotation_column?: string;
-    };
-    url: '/api/workspaces/nodes/{node_id}/ai-annotation/categories';
-};
-
-export type GetAiAnnotationCategoriesErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetAiAnnotationCategoriesError = GetAiAnnotationCategoriesErrors[keyof GetAiAnnotationCategoriesErrors];
-
-export type GetAiAnnotationCategoriesResponses = {
-    /**
-     * Successful Response
-     */
-    200: AiAnnotationCategoriesResponse;
-};
-
-export type GetAiAnnotationCategoriesResponse = GetAiAnnotationCategoriesResponses[keyof GetAiAnnotationCategoriesResponses];
-
-export type DetachAiAnnotationData = {
-    body: AiAnnotationDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}/ai-annotation/detach';
-};
-
-export type DetachAiAnnotationErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DetachAiAnnotationError = DetachAiAnnotationErrors[keyof DetachAiAnnotationErrors];
-
-export type DetachAiAnnotationResponses = {
-    /**
-     * Successful Response
-     */
-    200: AiAnnotationDetachResponse;
-};
-
-export type DetachAiAnnotationResponse = DetachAiAnnotationResponses[keyof DetachAiAnnotationResponses];
-
-export type GetAiAnnotationProvidersData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Annotation Column
-         */
-        annotation_column?: string;
-    };
-    url: '/api/workspaces/nodes/{node_id}/ai-annotation/providers';
-};
-
-export type GetAiAnnotationProvidersErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetAiAnnotationProvidersError = GetAiAnnotationProvidersErrors[keyof GetAiAnnotationProvidersErrors];
-
-export type GetAiAnnotationProvidersResponses = {
-    /**
-     * Successful Response
-     */
-    200: AiAnnotationProvidersResponse;
-};
-
-export type GetAiAnnotationProvidersResponse = GetAiAnnotationProvidersResponses[keyof GetAiAnnotationProvidersResponses];
-
-export type SaveAiAnnotationData = {
-    body: AiAnnotationSaveRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}/ai-annotation/save';
-};
-
-export type SaveAiAnnotationErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SaveAiAnnotationError = SaveAiAnnotationErrors[keyof SaveAiAnnotationErrors];
-
-export type SaveAiAnnotationResponses = {
-    /**
-     * Successful Response
-     */
-    200: AiAnnotationSaveResponse;
-};
-
-export type SaveAiAnnotationResponse = SaveAiAnnotationResponses[keyof SaveAiAnnotationResponses];
 
 export type CastNodeData = {
     body: CastNodeRequest;

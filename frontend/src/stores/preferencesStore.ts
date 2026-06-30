@@ -22,7 +22,7 @@ import { getPreferences, updatePreferences } from '@/api';
 import type { UserPreferences, UserPreferencesUpdate } from '@/api';
 import type { ViewType } from '@/stores/uiStore';
 
-const DEFAULT_HIDDEN_VIEWS: string[] = ['ai-annotator'];
+const DEFAULT_HIDDEN_VIEWS: string[] = [];
 
 interface PreferencesState {
   hiddenViews: string[];

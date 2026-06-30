@@ -44,7 +44,7 @@ const VIEW_LABELS: Record<ViewType, string> = {
   analysis: 'Trends',
   'topic-modeling': 'Topic Modeling',
   quotation: 'Quotation',
-  'ai-annotator': 'AI Annotator',
+  annotation: 'Annotation',
   export: 'Export',
 };
 

@@ -6,7 +6,7 @@
  * frontend only manages UI state and triggers refetches via React Query.
  *
  * Shared across the workspace data view and the analysis result tables
- * (concordance, quotation, AI annotator) so every on-demand paginated table
+ * (concordance, quotation, etc.) so every on-demand paginated table
  * shares one TanStack instance contract instead of hand-rolling markup.
  */
 import { useState } from 'react';
@@ -40,7 +40,7 @@ export interface ServerTableOptions<TData> {
 /** Creates a TanStack Table instance whose sort/filter/page state drives backend queries. */
 /**
  * Used by: WorkspaceTable, PreviewTable, and the analysis result tables
- * (ConcordanceTableNodeBlock, QuotationFeature, AiAnnotatorFeature) because the
+ * (ConcordanceTableNodeBlock, QuotationFeature, etc.) because the
  * hook needs local steps to normalize inputs before exposing stable state to
  * consumers.
  * Flow: initialize controlled or internal sorting/filter state, bridge table

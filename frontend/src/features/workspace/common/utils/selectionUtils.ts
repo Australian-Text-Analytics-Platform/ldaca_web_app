@@ -5,7 +5,7 @@
  * index 0 and the most recent selection is at the end. When more items are
  * selected than a feature allows, this helper keeps the *most recent* ones.
  */
-/** Used by: src/features/views/ai-annotator/AiAnnotatorFeature.tsx, src/features/views/concordance/components/ConcordanceDispersionNodeBlock.tsx, src/features/views/concordance/components/ConcordanceTableNodeBlock.tsx and 16 other importers because the utility needs local normalization steps before returning a shared result. */
+/** Used by: src/features/views/concordance/components/ConcordanceDispersionNodeBlock.tsx, src/features/views/concordance/components/ConcordanceTableNodeBlock.tsx, src/features/views/quotation/QuotationFeature.tsx and other importers because the utility needs local normalization steps before returning a shared result. */
 export function takeMostRecent<T>(items: T[], max: number): T[] {
   if (items.length <= max) return items;
   return items.slice(-max);

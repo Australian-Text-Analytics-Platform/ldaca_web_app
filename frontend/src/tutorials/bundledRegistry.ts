@@ -536,11 +536,6 @@ const info = {
     anchor: 'info-export-overview',
     label: 'About Exporting Data',
   },
-  'ai-annotator.overview': {
-    file: 'information/ai-annotator.md',
-    anchor: 'info-ai-annotator-overview',
-    label: 'About AI Annotation and Review',
-  },
 } as const satisfies Record<string, DocTarget>;
 
 const reference = {

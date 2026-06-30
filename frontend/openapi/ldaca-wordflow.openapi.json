@@ -1,846 +1,6 @@
 {
   "components": {
     "schemas": {
-      "AiAnnotationCategoriesData": {
-        "description": "Data payload schema embedded in API responses for ai annotation categories data.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "categories": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Categories",
-            "type": "array"
-          }
-        },
-        "required": [
-          "categories"
-        ],
-        "title": "AiAnnotationCategoriesData",
-        "type": "object"
-      },
-      "AiAnnotationCategoriesResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for ai annotation categories response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/AiAnnotationCategoriesData"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnalysisTaskMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "enum": [
-              "successful",
-              "failed"
-            ],
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "message",
-          "data"
-        ],
-        "title": "AiAnnotationCategoriesResponse",
-        "type": "object"
-      },
-      "AiAnnotationClassDef": {
-        "description": "API schema used by routes and generated clients for ai annotation class def.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "description"
-        ],
-        "title": "AiAnnotationClassDef",
-        "type": "object"
-      },
-      "AiAnnotationDetachData": {
-        "description": "Data payload schema embedded in API responses for ai annotation detach data.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "new_node_name": {
-            "title": "New Node Name",
-            "type": "string"
-          },
-          "record_count": {
-            "title": "Record Count",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "new_node_name",
-          "record_count"
-        ],
-        "title": "AiAnnotationDetachData",
-        "type": "object"
-      },
-      "AiAnnotationDetachRequest": {
-        "description": "Request schema used by API routes and generated clients for ai annotation detach request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "annotation_column": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Annotation Column"
-          },
-          "api_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Key"
-          },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
-          },
-          "batch_size": {
-            "default": 100,
-            "minimum": 1.0,
-            "title": "Batch Size",
-            "type": "integer"
-          },
-          "classes": {
-            "items": {
-              "$ref": "#/components/schemas/AiAnnotationClassDef"
-            },
-            "minItems": 1,
-            "title": "Classes",
-            "type": "array"
-          },
-          "column": {
-            "title": "Column",
-            "type": "string"
-          },
-          "examples": {
-            "items": {
-              "$ref": "#/components/schemas/AiAnnotationExample"
-            },
-            "title": "Examples",
-            "type": "array"
-          },
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "new_node_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "New Node Name"
-          },
-          "seed": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 42,
-            "title": "Seed"
-          },
-          "temperature": {
-            "default": 1.0,
-            "exclusiveMinimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
-          },
-          "top_p": {
-            "default": 1.0,
-            "exclusiveMinimum": 0.0,
-            "maximum": 1.0,
-            "title": "Top P",
-            "type": "number"
-          }
-        },
-        "required": [
-          "column",
-          "classes",
-          "model"
-        ],
-        "title": "AiAnnotationDetachRequest",
-        "type": "object"
-      },
-      "AiAnnotationDetachResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for ai annotation detach response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/AiAnnotationDetachData"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "state": {
-            "const": "successful",
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "message",
-          "data"
-        ],
-        "title": "AiAnnotationDetachResponse",
-        "type": "object"
-      },
-      "AiAnnotationEdit": {
-        "description": "API schema used by routes and generated clients for ai annotation edit.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "annotation": {
-            "default": "",
-            "title": "Annotation",
-            "type": "string"
-          },
-          "provider": {
-            "minLength": 1,
-            "title": "Provider",
-            "type": "string"
-          },
-          "row_index": {
-            "minimum": 0.0,
-            "title": "Row Index",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "row_index",
-          "provider"
-        ],
-        "title": "AiAnnotationEdit",
-        "type": "object"
-      },
-      "AiAnnotationExample": {
-        "description": "API schema used by routes and generated clients for ai annotation example.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "classification": {
-            "title": "Classification",
-            "type": "string"
-          },
-          "query": {
-            "title": "Query",
-            "type": "string"
-          }
-        },
-        "required": [
-          "query",
-          "classification"
-        ],
-        "title": "AiAnnotationExample",
-        "type": "object"
-      },
-      "AiAnnotationModelInfo": {
-        "description": "Metadata schema used by API responses to describe ai annotation model info.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "AiAnnotationModelInfo",
-        "type": "object"
-      },
-      "AiAnnotationModelsData": {
-        "description": "Data payload schema embedded in API responses for ai annotation models data.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "models": {
-            "items": {
-              "$ref": "#/components/schemas/AiAnnotationModelInfo"
-            },
-            "title": "Models",
-            "type": "array"
-          }
-        },
-        "required": [
-          "models"
-        ],
-        "title": "AiAnnotationModelsData",
-        "type": "object"
-      },
-      "AiAnnotationModelsRequest": {
-        "description": "Request schema used by API routes and generated clients for ai annotation models request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "api_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Key"
-          },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
-          }
-        },
-        "title": "AiAnnotationModelsRequest",
-        "type": "object"
-      },
-      "AiAnnotationModelsResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for ai annotation models response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/AiAnnotationModelsData"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnalysisTaskMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "enum": [
-              "successful",
-              "failed"
-            ],
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "message",
-          "data"
-        ],
-        "title": "AiAnnotationModelsResponse",
-        "type": "object"
-      },
-      "AiAnnotationNodeResult": {
-        "description": "API schema used by routes and generated clients for ai annotation node result.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Columns",
-            "type": "array"
-          },
-          "data": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnalysisTaskMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "pagination": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SourceRowPagination"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "sorting": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnalysisSorting"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "data",
-          "columns"
-        ],
-        "title": "AiAnnotationNodeResult",
-        "type": "object"
-      },
-      "AiAnnotationProvidersData": {
-        "description": "Data payload schema embedded in API responses for ai annotation providers data.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "providers": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Providers",
-            "type": "array"
-          }
-        },
-        "required": [
-          "providers"
-        ],
-        "title": "AiAnnotationProvidersData",
-        "type": "object"
-      },
-      "AiAnnotationProvidersResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for ai annotation providers response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/AiAnnotationProvidersData"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnalysisTaskMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "enum": [
-              "successful",
-              "failed"
-            ],
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "message",
-          "data"
-        ],
-        "title": "AiAnnotationProvidersResponse",
-        "type": "object"
-      },
-      "AiAnnotationRequest": {
-        "additionalProperties": true,
-        "description": "Request schema used by API routes and generated clients for ai annotation request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "example": {
-          "classes": [
-            {
-              "description": "Supportive tone",
-              "name": "support"
-            },
-            {
-              "description": "Critical tone",
-              "name": "critical"
-            }
-          ],
-          "examples": [
-            {
-              "classification": "support",
-              "query": "This policy is fantastic and fair."
-            }
-          ],
-          "model": "gpt-4o-mini",
-          "node_columns": {
-            "node1": "document"
-          },
-          "node_ids": [
-            "node1"
-          ],
-          "temperature": 0.7,
-          "top_p": 0.9
-        },
-        "properties": {
-          "annotation_column": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Annotation Column"
-          },
-          "api_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Key"
-          },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
-          },
-          "batch_size": {
-            "default": 100,
-            "minimum": 1.0,
-            "title": "Batch Size",
-            "type": "integer"
-          },
-          "classes": {
-            "items": {
-              "$ref": "#/components/schemas/AiAnnotationClassDef"
-            },
-            "minItems": 1,
-            "title": "Classes",
-            "type": "array"
-          },
-          "descending": {
-            "default": true,
-            "title": "Descending",
-            "type": "boolean"
-          },
-          "examples": {
-            "items": {
-              "$ref": "#/components/schemas/AiAnnotationExample"
-            },
-            "title": "Examples",
-            "type": "array"
-          },
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "node_columns": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "title": "Node Columns",
-            "type": "object"
-          },
-          "node_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Node Ids",
-            "type": "array"
-          },
-          "page": {
-            "default": 1,
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "default": 20,
-            "title": "Page Size",
-            "type": "integer"
-          },
-          "seed": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 42,
-            "title": "Seed"
-          },
-          "sort_by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sort By"
-          },
-          "temperature": {
-            "default": 1.0,
-            "exclusiveMinimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
-          },
-          "top_p": {
-            "default": 1.0,
-            "exclusiveMinimum": 0.0,
-            "maximum": 1.0,
-            "title": "Top P",
-            "type": "number"
-          }
-        },
-        "required": [
-          "node_ids",
-          "node_columns",
-          "classes",
-          "model"
-        ],
-        "title": "AiAnnotationRequest",
-        "type": "object"
-      },
-      "AiAnnotationResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for ai annotation response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "analysis_params": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Analysis Params"
-          },
-          "combinable": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Combinable"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/AiAnnotationNodeResult"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnalysisTaskMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "enum": [
-              "pending",
-              "running",
-              "successful",
-              "failed",
-              "cancelled"
-            ],
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "message"
-        ],
-        "title": "AiAnnotationResponse",
-        "type": "object"
-      },
-      "AiAnnotationResultQuery": {
-        "additionalProperties": false,
-        "description": "API schema used by routes and generated clients for ai annotation result query.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "descending": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Descending"
-          },
-          "page": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page"
-          },
-          "page_size": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page Size"
-          },
-          "sort_by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sort By"
-          }
-        },
-        "title": "AiAnnotationResultQuery",
-        "type": "object"
-      },
-      "AiAnnotationSaveData": {
-        "description": "Data payload schema embedded in API responses for ai annotation save data.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "annotation_column": {
-            "title": "Annotation Column",
-            "type": "string"
-          },
-          "edits_applied": {
-            "title": "Edits Applied",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "annotation_column",
-          "edits_applied"
-        ],
-        "title": "AiAnnotationSaveData",
-        "type": "object"
-      },
-      "AiAnnotationSaveRequest": {
-        "description": "Request schema used by API routes and generated clients for ai annotation save request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "annotation_column": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Annotation Column"
-          },
-          "edits": {
-            "items": {
-              "$ref": "#/components/schemas/AiAnnotationEdit"
-            },
-            "title": "Edits",
-            "type": "array"
-          }
-        },
-        "title": "AiAnnotationSaveRequest",
-        "type": "object"
-      },
-      "AiAnnotationSaveResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for ai annotation save response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/AiAnnotationSaveData"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "state": {
-            "const": "successful",
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "message",
-          "data"
-        ],
-        "title": "AiAnnotationSaveResponse",
-        "type": "object"
-      },
       "AnalysisClearResponse": {
         "description": "Response schema returned by API routes and consumed by generated clients for analysis clear response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
         "properties": {
@@ -887,8 +47,18 @@
         "type": "object"
       },
       "AnalysisTab": {
-        "description": "A single analysis tab.\n\nCarries identity (``tab_id``), a pointer to the analysis result it shows\n(``task_id``), a display ``title``, and the ``inputs`` node set it analyses.\nRemaining analysis parameters live on the referenced\n``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
+        "description": "A single analysis tab.\n\nCarries identity (``tab_id``), a pointer to the analysis result it shows\n(``task_id``), a display ``title``, and selector state. ``inputs`` remains\nthe legacy source selector for existing clients. ``input_sets`` is keyed by\nselector id (for example, ``source`` or ``classDescriptions``) so newer\nviews can persist multiple node selectors on the same tab. Remaining\nanalysis parameters live on the referenced ``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
         "properties": {
+          "input_sets": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/AnalysisTabInput"
+              },
+              "type": "array"
+            },
+            "title": "Input Sets",
+            "type": "object"
+          },
           "inputs": {
             "items": {
               "$ref": "#/components/schemas/AnalysisTabInput"
@@ -949,7 +119,7 @@
         "type": "object"
       },
       "AnalysisTabInput": {
-        "description": "One node selected as input for an analysis tab.\n\nPairs a workspace ``node_id`` with an optional ``column`` pick (the single\ntext/data column the analysis runs on; ``None`` until a column is chosen or\nfor views that need no column). The frontend ``useNodeInputs`` hook adds,\nremoves, and column-assigns these entries under the add-node-as-needed\nmodel.\n\nUsed by:\n- `AnalysisTab.inputs` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
+        "description": "One node selected as input for an analysis tab.\n\nPairs a workspace ``node_id`` with an optional ``column`` pick (the single\ntext/data column the analysis runs on; ``None`` until a column is chosen or\nfor views that need no column). The frontend ``useNodeInputs`` hook adds,\nremoves, and column-assigns these entries under the add-node-as-needed\nmodel.\n\nUsed by:\n- `AnalysisTab.inputs`, `AnalysisTab.input_sets`, and the GET/PUT tab\n  routes because the frontend tab store round-trips this exact shape.",
         "properties": {
           "column": {
             "anyOf": [
@@ -1030,6 +200,61 @@
           }
         },
         "title": "AnalysisTaskMetadata",
+        "type": "object"
+      },
+      "AnnotationClassDescriptionRow": {
+        "description": "One editable class-description row returned to the Annotation UI.\n\nUsed by:\n- ``get_annotation_class_descriptions`` and\n  ``update_annotation_class_descriptions`` because the frontend editor\n  should always work with semantic ``class``/``description`` keys even when\n  the selected workspace columns have different names.",
+        "properties": {
+          "class": {
+            "default": "",
+            "title": "Class",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "title": "AnnotationClassDescriptionRow",
+        "type": "object"
+      },
+      "AnnotationClassDescriptionsPayload": {
+        "description": "Class-description editor payload for one selected workspace node.\n\nUsed by:\n- Annotation class-description GET/PUT routes to round-trip the selected\n  class and description columns plus their editable row values.",
+        "properties": {
+          "class_column": {
+            "default": "class",
+            "title": "Class Column",
+            "type": "string"
+          },
+          "description_column": {
+            "default": "description",
+            "title": "Description Column",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationClassDescriptionRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "title": "AnnotationClassDescriptionsPayload",
+        "type": "object"
+      },
+      "AnnotationSetParentRequest": {
+        "description": "Request to set a class-description node's parent to the source node.\n\nUsed by:\n- Frontend Annotation view when Start is clicked because the class table\n  should hang off the annotated source block in the workspace graph.",
+        "properties": {
+          "parent_node_id": {
+            "title": "Parent Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent_node_id"
+        ],
+        "title": "AnnotationSetParentRequest",
         "type": "object"
       },
       "AuthInfoResponse": {
@@ -9801,10 +9026,10 @@
         ]
       }
     },
-    "/api/workspaces/ai-annotation": {
-      "delete": {
-        "description": "Clear stored AI annotation task state.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI DELETE /ai-annotation route because they need this unit's \"Clear stored AI annotation task state\" behavior.",
-        "operationId": "clear_ai_annotation",
+    "/api/workspaces/annotation/class-descriptions": {
+      "post": {
+        "description": "Create an empty class-description table for the Annotation view.\n\nUsed by:\n- Frontend Annotation view through the generated SDK because users need a\n  one-click way to seed the class/description table required by the view.\n\nFlow:\n- Resolve the active workspace.\n- Build an empty ``class``/``description`` table with string dtypes.\n- Persist it to the workspace data folder and add it as a root node.\n- Save the workspace and return the standard node metadata response.",
+        "operationId": "create_annotation_class_descriptions",
         "parameters": [
           {
             "in": "header",
@@ -9828,7 +9053,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AnalysisClearResponse"
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
                 }
               }
             },
@@ -9845,334 +9070,102 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Clear Ai Annotation",
+        "summary": "Create Annotation Class Descriptions",
         "tags": [
           "workspace_management",
-          "ai-annotation"
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/class-descriptions/{node_id}": {
+      "get": {
+        "description": "Return editable class-description rows for one selected node.\n\nUsed by:\n- Frontend Annotation view because the class editor needs a compact\n  two-column row payload independent of the full workspace table UI.",
+        "operationId": "get_annotation_class_descriptions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_column",
+            "required": false,
+            "schema": {
+              "default": "class",
+              "title": "Class Column",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "description_column",
+            "required": false,
+            "schema": {
+              "default": "description",
+              "title": "Description Column",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationClassDescriptionsPayload"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Annotation Class Descriptions",
+        "tags": [
+          "workspace_management",
+          "annotation"
         ]
       },
-      "post": {
-        "description": "Run AI annotation classification on selected nodes.\n\nCalls the OpenAI-compatible endpoint, stores results in\nthe analysis task manager, and returns paginated output.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI POST /ai-annotation route because they need this unit's \"Run AI annotation classification on selected nodes\" behavior.",
-        "operationId": "run_ai_annotation",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AiAnnotationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Run Ai Annotation",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      }
-    },
-    "/api/workspaces/ai-annotation/models": {
-      "post": {
-        "description": "List available models from an OpenAI-compatible endpoint.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI POST /ai-annotation/models route because they need this unit's \"List available models from an OpenAI-compatible endpoint\" behavior.",
-        "operationId": "get_ai_annotation_models",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AiAnnotationModelsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationModelsResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Ai Annotation Models",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      }
-    },
-    "/api/workspaces/ai-annotation/tasks/{task_id}/request": {
-      "get": {
-        "description": "Return stored request payload for an AI annotation task.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /ai-annotation/tasks/{task_id}/request route because they need this unit's \"Return stored request payload for an AI annotation task\" behavior.",
-        "operationId": "ai_annotation_task_request",
+      "put": {
+        "description": "Persist edited class-description rows back to the selected node.\n\nUsed by:\n- Frontend Annotation view on cell blur/add-row because class labels and\n  descriptions should behave like workspace data, not transient UI state.\n\nFlow:\n- Validate the node and selected columns.\n- Rewrite the selected class/description columns from the submitted rows.\n- Restage the dataframe as workspace data and save the workspace.",
+        "operationId": "update_annotation_class_descriptions",
         "parameters": [
           {
             "in": "path",
-            "name": "task_id",
+            "name": "node_id",
             "required": true,
             "schema": {
-              "title": "Task Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationRequest"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Ai Annotation Task Request",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      }
-    },
-    "/api/workspaces/ai-annotation/tasks/{task_id}/result": {
-      "get": {
-        "description": "Read AI annotation result with optional pagination/sort overrides.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /ai-annotation/tasks/{task_id}/result route because they need this unit's \"Read AI annotation result with optional pagination/sort overrides\" behavior.",
-        "operationId": "ai_annotation_task_result",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "task_id",
-            "required": true,
-            "schema": {
-              "title": "Task Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Page"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page_size",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Page Size"
-            }
-          },
-          {
-            "in": "query",
-            "name": "sort_by",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Sort By"
-            }
-          },
-          {
-            "in": "query",
-            "name": "descending",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Descending"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/AiAnnotationResponse"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "title": "Response Ai Annotation Task Result"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Ai Annotation Task Result",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      },
-      "post": {
-        "description": "Read AI annotation result using POST body overrides.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI POST /ai-annotation/tasks/{task_id}/result route because they need this unit's \"Read AI annotation result using POST body overrides\" behavior.",
-        "operationId": "ai_annotation_task_result_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "task_id",
-            "required": true,
-            "schema": {
-              "title": "Task Id",
+              "title": "Node Id",
               "type": "string"
             }
           },
@@ -10197,7 +9190,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AiAnnotationResultQuery"
+                "$ref": "#/components/schemas/AnnotationClassDescriptionsPayload"
               }
             }
           },
@@ -10208,7 +9201,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationResponse"
+                  "$ref": "#/components/schemas/AnnotationClassDescriptionsPayload"
                 }
               }
             },
@@ -10225,10 +9218,80 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Ai Annotation Task Result Post",
+        "summary": "Update Annotation Class Descriptions",
         "tags": [
           "workspace_management",
-          "ai-annotation"
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/class-descriptions/{node_id}/parent": {
+      "put": {
+        "description": "Reparent a class-description node under the annotated source node.\n\nUsed by:\n- Frontend Annotation view on Start because making the class table a child\n  of the source node keeps the annotation lineage visible in the graph.\n\nFlow:\n- Resolve workspace, source, and class nodes (404 if missing).\n- Reject self-parenting, then set the class node's only parent to the source\n  and re-tidy its list position.\n- Persist and return the standard node metadata response.",
+        "operationId": "set_annotation_class_parent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationSetParentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Annotation Class Parent",
+        "tags": [
+          "workspace_management",
+          "annotation"
         ]
       }
     },
@@ -11971,286 +11034,6 @@
         "tags": [
           "workspace_management",
           "nodes"
-        ]
-      }
-    },
-    "/api/workspaces/nodes/{node_id}/ai-annotation/categories": {
-      "get": {
-        "description": "Return distinct category values from the annotation column of a node.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /nodes/{node_id}/ai-annotation/categories route because they need this unit's \"Return distinct category values from the annotation column of a node\" behavior.",
-        "operationId": "get_ai_annotation_categories",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "node_id",
-            "required": true,
-            "schema": {
-              "title": "Node Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "annotation_column",
-            "required": false,
-            "schema": {
-              "default": "ai_annotation",
-              "title": "Annotation Column",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationCategoriesResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Ai Annotation Categories",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      }
-    },
-    "/api/workspaces/nodes/{node_id}/ai-annotation/detach": {
-      "post": {
-        "description": "Run AI annotation on a node and detach the result as a new child node.\n\nClassifies texts using the OpenAI-compatible endpoint, writes the result\nas a parquet file, and adds it as a new node in the workspace.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI POST /nodes/{node_id}/ai-annotation/detach route because they need this unit's \"Run AI annotation on a node and detach the result as a new child node\" behavior.",
-        "operationId": "detach_ai_annotation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "node_id",
-            "required": true,
-            "schema": {
-              "title": "Node Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AiAnnotationDetachRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationDetachResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Detach Ai Annotation",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      }
-    },
-    "/api/workspaces/nodes/{node_id}/ai-annotation/providers": {
-      "get": {
-        "description": "Return distinct provider values from the annotation column of a node.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI GET /nodes/{node_id}/ai-annotation/providers route because they need this unit's \"Return distinct provider values from the annotation column of a node\" behavior.",
-        "operationId": "get_ai_annotation_providers",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "node_id",
-            "required": true,
-            "schema": {
-              "title": "Node Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "annotation_column",
-            "required": false,
-            "schema": {
-              "default": "ai_annotation",
-              "title": "Annotation Column",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationProvidersResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Ai Annotation Providers",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
-        ]
-      }
-    },
-    "/api/workspaces/nodes/{node_id}/ai-annotation/save": {
-      "post": {
-        "description": "Save AI annotation edits back to the source node.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend and API clients through the FastAPI POST /nodes/{node_id}/ai-annotation/save route because they need this unit's \"Save AI annotation edits back to the source node\" behavior.",
-        "operationId": "save_ai_annotation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "node_id",
-            "required": true,
-            "schema": {
-              "title": "Node Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AiAnnotationSaveRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiAnnotationSaveResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Save Ai Annotation",
-        "tags": [
-          "workspace_management",
-          "ai-annotation"
         ]
       }
     },

@@ -43,7 +43,6 @@ import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
 import {
   BookOpen,
-  Bot,
   Circle,
   Cog,
   FileText,
@@ -58,6 +57,7 @@ import {
   Upload,
   ChevronDown,
   Pencil,
+  Tags,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -110,7 +110,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'analysis', label: 'Trends', icon: TrendingUp },
   { id: 'topic-modeling', label: 'Topic Modeling', icon: Puzzle },
   { id: 'quotation', label: 'Quotation', icon: Quote },
-  { id: 'ai-annotator', label: 'AI Annotator', icon: Bot },
+  { id: 'annotation', label: 'Annotation', icon: Tags },
   { id: 'export', label: 'Export', icon: Upload },
 ];
 

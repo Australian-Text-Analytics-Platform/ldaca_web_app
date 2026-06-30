@@ -78,8 +78,8 @@ export interface ServerPaginationFooterProps<TData> {
  * number of hit rows.
  *
  * Rendered by: WorkspaceTable (compact), ConcordanceTableNodeBlock,
- * QuotationNodeBlock, AiAnnotatorFeature, ConcordanceDispersionNodeBlock,
- * PreviewTable because every on-demand paginated table needs one consistent
+ * QuotationNodeBlock, ConcordanceDispersionNodeBlock, PreviewTable because
+ * every on-demand paginated table needs one consistent
  * footer that mutates query state instead of slicing rows locally.
  * Flow: derive page bounds from the props, render the page-size selector, page
  * links and optional summary/loading/trailing actions, then emit changes back

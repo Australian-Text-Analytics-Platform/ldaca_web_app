@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { AddNodeToWorkspaceData, AddNodeToWorkspaceErrors, AddNodeToWorkspaceResponses, AdminCleanupData, AdminCleanupErrors, AdminCleanupResponses, AiAnnotationTaskRequestData, AiAnnotationTaskRequestErrors, AiAnnotationTaskRequestResponses, AiAnnotationTaskResultData, AiAnnotationTaskResultErrors, AiAnnotationTaskResultPostData, AiAnnotationTaskResultPostErrors, AiAnnotationTaskResultPostResponses, AiAnnotationTaskResultResponses, AuthHealthData, AuthHealthResponses, AuthStatusData, AuthStatusErrors, AuthStatusResponses, CalculateTokenFrequenciesData, CalculateTokenFrequenciesErrors, CalculateTokenFrequenciesResponses, CancelTaskData, CancelTaskErrors, CancelTaskResponses, CastNodeData, CastNodeErrors, CastNodeResponses, CilogonCallbackData, CilogonCallbackErrors, CilogonCallbackResponses, CilogonLoginData, CilogonLoginResponses, ClearAiAnnotationData, ClearAiAnnotationErrors, ClearAiAnnotationResponses, ClearFilesTasksData, ClearFilesTasksErrors, ClearFilesTasksResponses, ClearTasksData, ClearTasksErrors, ClearTasksResponses, ClearTokenFrequenciesData, ClearTokenFrequenciesErrors, ClearTokenFrequenciesResponses, ClearTopicModelingResultsData, ClearTopicModelingResultsErrors, ClearTopicModelingResultsResponses, CloneNodeData, CloneNodeErrors, CloneNodeResponses, ColumnOperationsData, ColumnOperationsErrors, ColumnOperationsResponses, ConcatNodesData, ConcatNodesErrors, ConcatNodesPreviewData, ConcatNodesPreviewErrors, ConcatNodesPreviewResponses, ConcatNodesResponses, ConcordanceDetachOptionsData, ConcordanceDetachOptionsErrors, ConcordanceDetachOptionsResponses, ConcordanceTaskDispersionBinsData, ConcordanceTaskDispersionBinsErrors, ConcordanceTaskDispersionBinsResponses, ConcordanceTaskRequestData, ConcordanceTaskRequestErrors, ConcordanceTaskRequestResponses, ConcordanceTaskResultData, ConcordanceTaskResultErrors, ConcordanceTaskResultPostData, ConcordanceTaskResultPostErrors, ConcordanceTaskResultPostResponses, ConcordanceTaskResultResponses, CreateFolderData, CreateFolderErrors, CreateFolderResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DeleteFileData, DeleteFileErrors, DeleteFileResponses, DeleteNodeColumnData, DeleteNodeColumnErrors, DeleteNodeColumnResponses, DeleteNodeData, DeleteNodeErrors, DeleteNodeResponses, DeleteWorkspaceData, DeleteWorkspaceErrors, DeleteWorkspaceResponses, DescribeColumnData, DescribeColumnErrors, DescribeColumnResponses, DetachAiAnnotationData, DetachAiAnnotationErrors, DetachAiAnnotationResponses, DetachConcordanceData, DetachConcordanceDispersionData, DetachConcordanceDispersionErrors, DetachConcordanceDispersionResponses, DetachConcordanceErrors, DetachConcordanceResponses, DetachQuotationData, DetachQuotationErrors, DetachQuotationResponses, DetachSequentialAnalysisTaskData, DetachSequentialAnalysisTaskErrors, DetachSequentialAnalysisTaskResponses, DetachTopicModelingData, DetachTopicModelingErrors, DetachTopicModelingResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, DownloadWorkspaceArtifactData, DownloadWorkspaceArtifactErrors, DownloadWorkspaceArtifactResponses, ExportNodesData, ExportNodesErrors, ExportNodesResponses, FilterNodeData, FilterNodeErrors, FilterNodeResponses, FilterPreviewData, FilterPreviewErrors, FilterPreviewResponses, GetAiAnnotationCategoriesData, GetAiAnnotationCategoriesErrors, GetAiAnnotationCategoriesResponses, GetAiAnnotationModelsData, GetAiAnnotationModelsErrors, GetAiAnnotationModelsResponses, GetAiAnnotationProvidersData, GetAiAnnotationProvidersErrors, GetAiAnnotationProvidersResponses, GetAuthInfoData, GetAuthInfoErrors, GetAuthInfoResponses, GetColumnUniqueValuesData, GetColumnUniqueValuesErrors, GetColumnUniqueValuesResponses, GetConfigData, GetConfigResponses, GetCurrentUserInfoData, GetCurrentUserInfoErrors, GetCurrentUserInfoResponses, GetCurrentWorkspaceData, GetCurrentWorkspaceErrors, GetCurrentWorkspaceResponses, GetFileInfoData, GetFileInfoErrors, GetFileInfoResponses, GetNodeDataData, GetNodeDataErrors, GetNodeDataResponses, GetNodeInfoData, GetNodeInfoErrors, GetNodeInfoResponses, GetNodeQueryPlanData, GetNodeQueryPlanErrors, GetNodeQueryPlanResponses, GetNodeShapeData, GetNodeShapeErrors, GetNodeShapeResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetRawFileData, GetRawFileErrors, GetRawFileResponses, GetSampleDataCatalogueData, GetSampleDataCatalogueErrors, GetSampleDataCatalogueResponses, GetSampleDataReadmeData, GetSampleDataReadmeErrors, GetSampleDataReadmeResponses, GetTokenizerModelsData, GetTokenizerModelsErrors, GetTokenizerModelsResponses, GetUserFilesData, GetUserFilesErrors, GetUserFilesResponses, GetWorkspaceGraphData, GetWorkspaceGraphErrors, GetWorkspaceGraphResponses, GetWorkspaceInfoData, GetWorkspaceInfoErrors, GetWorkspaceInfoResponses, GetWorkspaceNodesData, GetWorkspaceNodesErrors, GetWorkspaceNodesResponses, GetWorkspaceTabsData, GetWorkspaceTabsErrors, GetWorkspaceTabsResponses, GoogleAuthCallbackData, GoogleAuthCallbackErrors, GoogleAuthCallbackResponses, GoogleAuthData, GoogleAuthErrors, GoogleAuthResponses, HealthCheckData, HealthCheckResponses, ImportLdacaDatasetData, ImportLdacaDatasetErrors, ImportLdacaDatasetResponses, ImportSampleDataData, ImportSampleDataErrors, ImportSampleDataResponses, JoinNodesData, JoinNodesErrors, JoinNodesPreviewData, JoinNodesPreviewErrors, JoinNodesPreviewResponses, JoinNodesResponses, ListFilesTasksData, ListFilesTasksErrors, ListFilesTasksResponses, ListLdacaFeaturedCollectionsData, ListLdacaFeaturedCollectionsErrors, ListLdacaFeaturedCollectionsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListUsersData, ListUsersErrors, ListUsersResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, LogoutData, LogoutErrors, LogoutResponses, MaterializeConcordanceData, MaterializeConcordanceErrors, MaterializeConcordanceResponses, MaterializeQuotationData, MaterializeQuotationErrors, MaterializeQuotationResponses, MoveFileData, MoveFileErrors, MoveFileResponses, PolarsExpressionApplyData, PolarsExpressionApplyErrors, PolarsExpressionApplyResponses, PolarsExpressionPreviewData, PolarsExpressionPreviewErrors, PolarsExpressionPreviewResponses, PreviewSequentialAnalysisData, PreviewSequentialAnalysisErrors, PreviewSequentialAnalysisResponses, PutWorkspaceTabsData, PutWorkspaceTabsErrors, PutWorkspaceTabsResponses, QuotationDetachOptionsData, QuotationDetachOptionsErrors, QuotationDetachOptionsResponses, QuotationTaskRequestData, QuotationTaskRequestErrors, QuotationTaskRequestResponses, QuotationTaskResultData, QuotationTaskResultErrors, QuotationTaskResultResponses, RedoNodeOperationData, RedoNodeOperationErrors, RedoNodeOperationResponses, RenameNodeColumnData, RenameNodeColumnErrors, RenameNodeColumnResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, ReorderWorkspaceNodesData, ReorderWorkspaceNodesErrors, ReorderWorkspaceNodesResponses, ReplaceApplyData, ReplaceApplyErrors, ReplaceApplyResponses, ReplacePreviewData, ReplacePreviewErrors, ReplacePreviewResponses, RootData, RootResponses, RunAiAnnotationData, RunAiAnnotationErrors, RunAiAnnotationResponses, RunConcordanceData, RunConcordanceErrors, RunConcordanceResponses, RunSequentialAnalysisData, RunSequentialAnalysisErrors, RunSequentialAnalysisResponses, RunTopicModelingData, RunTopicModelingErrors, RunTopicModelingResponses, SaveAiAnnotationData, SaveAiAnnotationErrors, SaveAiAnnotationResponses, SaveWorkspaceData, SaveWorkspaceErrors, SaveWorkspaceResponses, SearchLdacaCollectionsData, SearchLdacaCollectionsErrors, SearchLdacaCollectionsResponses, SequentialAnalysisTaskRequestData, SequentialAnalysisTaskRequestErrors, SequentialAnalysisTaskRequestResponses, SequentialAnalysisTaskResultData, SequentialAnalysisTaskResultErrors, SequentialAnalysisTaskResultResponses, SetCurrentWorkspaceData, SetCurrentWorkspaceErrors, SetCurrentWorkspaceResponses, SetNodeColorData, SetNodeColorErrors, SetNodeColorResponses, SetNodeDocumentColumnData, SetNodeDocumentColumnErrors, SetNodeDocumentColumnResponses, SetNodeTokenizationPreferenceData, SetNodeTokenizationPreferenceErrors, SetNodeTokenizationPreferenceResponses, SliceNodeData, SliceNodeErrors, SliceNodeResponses, SlicePreviewData, SlicePreviewErrors, SlicePreviewResponses, StartWorkspaceDownloadData, StartWorkspaceDownloadErrors, StartWorkspaceDownloadResponses, StatusData, StatusResponses, StreamTasksData, StreamTasksErrors, StreamTasksResponses, TokenFrequenciesTaskRequestData, TokenFrequenciesTaskRequestErrors, TokenFrequenciesTaskRequestResponses, TokenFrequenciesTaskResultData, TokenFrequenciesTaskResultErrors, TokenFrequenciesTaskResultResponses, TopicModelingDetachOptionsData, TopicModelingDetachOptionsErrors, TopicModelingDetachOptionsResponses, TopicModelingTaskRequestData, TopicModelingTaskRequestErrors, TopicModelingTaskRequestResponses, TopicModelingTaskResultData, TopicModelingTaskResultErrors, TopicModelingTaskResultResponses, UndoNodeOperationData, UndoNodeOperationErrors, UndoNodeOperationResponses, UnifiedFilePreviewData, UnifiedFilePreviewErrors, UnifiedFilePreviewResponses, UnloadWorkspaceData, UnloadWorkspaceErrors, UnloadWorkspaceResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateNodeNameData, UpdateNodeNameErrors, UpdateNodeNameResponses, UpdatePreferencesData, UpdatePreferencesErrors, UpdatePreferencesResponses, UpdateQuotationTaskResultData, UpdateQuotationTaskResultErrors, UpdateQuotationTaskResultResponses, UpdateSequentialAnalysisTaskResultData, UpdateSequentialAnalysisTaskResultErrors, UpdateSequentialAnalysisTaskResultResponses, UpdateTokenFrequenciesTaskResultData, UpdateTokenFrequenciesTaskResultErrors, UpdateTokenFrequenciesTaskResultResponses, UpdateWorkspaceDescriptionData, UpdateWorkspaceDescriptionErrors, UpdateWorkspaceDescriptionResponses, UploadFileData, UploadFileErrors, UploadFileResponses, UploadWorkspaceZipData, UploadWorkspaceZipErrors, UploadWorkspaceZipResponses } from './types.gen';
+import type { AddNodeToWorkspaceData, AddNodeToWorkspaceErrors, AddNodeToWorkspaceResponses, AdminCleanupData, AdminCleanupErrors, AdminCleanupResponses, AuthHealthData, AuthHealthResponses, AuthStatusData, AuthStatusErrors, AuthStatusResponses, CalculateTokenFrequenciesData, CalculateTokenFrequenciesErrors, CalculateTokenFrequenciesResponses, CancelTaskData, CancelTaskErrors, CancelTaskResponses, CastNodeData, CastNodeErrors, CastNodeResponses, CilogonCallbackData, CilogonCallbackErrors, CilogonCallbackResponses, CilogonLoginData, CilogonLoginResponses, ClearFilesTasksData, ClearFilesTasksErrors, ClearFilesTasksResponses, ClearTasksData, ClearTasksErrors, ClearTasksResponses, ClearTokenFrequenciesData, ClearTokenFrequenciesErrors, ClearTokenFrequenciesResponses, ClearTopicModelingResultsData, ClearTopicModelingResultsErrors, ClearTopicModelingResultsResponses, CloneNodeData, CloneNodeErrors, CloneNodeResponses, ColumnOperationsData, ColumnOperationsErrors, ColumnOperationsResponses, ConcatNodesData, ConcatNodesErrors, ConcatNodesPreviewData, ConcatNodesPreviewErrors, ConcatNodesPreviewResponses, ConcatNodesResponses, ConcordanceDetachOptionsData, ConcordanceDetachOptionsErrors, ConcordanceDetachOptionsResponses, ConcordanceTaskDispersionBinsData, ConcordanceTaskDispersionBinsErrors, ConcordanceTaskDispersionBinsResponses, ConcordanceTaskRequestData, ConcordanceTaskRequestErrors, ConcordanceTaskRequestResponses, ConcordanceTaskResultData, ConcordanceTaskResultErrors, ConcordanceTaskResultPostData, ConcordanceTaskResultPostErrors, ConcordanceTaskResultPostResponses, ConcordanceTaskResultResponses, CreateAnnotationClassDescriptionsData, CreateAnnotationClassDescriptionsErrors, CreateAnnotationClassDescriptionsResponses, CreateFolderData, CreateFolderErrors, CreateFolderResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DeleteFileData, DeleteFileErrors, DeleteFileResponses, DeleteNodeColumnData, DeleteNodeColumnErrors, DeleteNodeColumnResponses, DeleteNodeData, DeleteNodeErrors, DeleteNodeResponses, DeleteWorkspaceData, DeleteWorkspaceErrors, DeleteWorkspaceResponses, DescribeColumnData, DescribeColumnErrors, DescribeColumnResponses, DetachConcordanceData, DetachConcordanceDispersionData, DetachConcordanceDispersionErrors, DetachConcordanceDispersionResponses, DetachConcordanceErrors, DetachConcordanceResponses, DetachQuotationData, DetachQuotationErrors, DetachQuotationResponses, DetachSequentialAnalysisTaskData, DetachSequentialAnalysisTaskErrors, DetachSequentialAnalysisTaskResponses, DetachTopicModelingData, DetachTopicModelingErrors, DetachTopicModelingResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, DownloadWorkspaceArtifactData, DownloadWorkspaceArtifactErrors, DownloadWorkspaceArtifactResponses, ExportNodesData, ExportNodesErrors, ExportNodesResponses, FilterNodeData, FilterNodeErrors, FilterNodeResponses, FilterPreviewData, FilterPreviewErrors, FilterPreviewResponses, GetAnnotationClassDescriptionsData, GetAnnotationClassDescriptionsErrors, GetAnnotationClassDescriptionsResponses, GetAuthInfoData, GetAuthInfoErrors, GetAuthInfoResponses, GetColumnUniqueValuesData, GetColumnUniqueValuesErrors, GetColumnUniqueValuesResponses, GetConfigData, GetConfigResponses, GetCurrentUserInfoData, GetCurrentUserInfoErrors, GetCurrentUserInfoResponses, GetCurrentWorkspaceData, GetCurrentWorkspaceErrors, GetCurrentWorkspaceResponses, GetFileInfoData, GetFileInfoErrors, GetFileInfoResponses, GetNodeDataData, GetNodeDataErrors, GetNodeDataResponses, GetNodeInfoData, GetNodeInfoErrors, GetNodeInfoResponses, GetNodeQueryPlanData, GetNodeQueryPlanErrors, GetNodeQueryPlanResponses, GetNodeShapeData, GetNodeShapeErrors, GetNodeShapeResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetRawFileData, GetRawFileErrors, GetRawFileResponses, GetSampleDataCatalogueData, GetSampleDataCatalogueErrors, GetSampleDataCatalogueResponses, GetSampleDataReadmeData, GetSampleDataReadmeErrors, GetSampleDataReadmeResponses, GetTokenizerModelsData, GetTokenizerModelsErrors, GetTokenizerModelsResponses, GetUserFilesData, GetUserFilesErrors, GetUserFilesResponses, GetWorkspaceGraphData, GetWorkspaceGraphErrors, GetWorkspaceGraphResponses, GetWorkspaceInfoData, GetWorkspaceInfoErrors, GetWorkspaceInfoResponses, GetWorkspaceNodesData, GetWorkspaceNodesErrors, GetWorkspaceNodesResponses, GetWorkspaceTabsData, GetWorkspaceTabsErrors, GetWorkspaceTabsResponses, GoogleAuthCallbackData, GoogleAuthCallbackErrors, GoogleAuthCallbackResponses, GoogleAuthData, GoogleAuthErrors, GoogleAuthResponses, HealthCheckData, HealthCheckResponses, ImportLdacaDatasetData, ImportLdacaDatasetErrors, ImportLdacaDatasetResponses, ImportSampleDataData, ImportSampleDataErrors, ImportSampleDataResponses, JoinNodesData, JoinNodesErrors, JoinNodesPreviewData, JoinNodesPreviewErrors, JoinNodesPreviewResponses, JoinNodesResponses, ListFilesTasksData, ListFilesTasksErrors, ListFilesTasksResponses, ListLdacaFeaturedCollectionsData, ListLdacaFeaturedCollectionsErrors, ListLdacaFeaturedCollectionsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListUsersData, ListUsersErrors, ListUsersResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, LogoutData, LogoutErrors, LogoutResponses, MaterializeConcordanceData, MaterializeConcordanceErrors, MaterializeConcordanceResponses, MaterializeQuotationData, MaterializeQuotationErrors, MaterializeQuotationResponses, MoveFileData, MoveFileErrors, MoveFileResponses, PolarsExpressionApplyData, PolarsExpressionApplyErrors, PolarsExpressionApplyResponses, PolarsExpressionPreviewData, PolarsExpressionPreviewErrors, PolarsExpressionPreviewResponses, PreviewSequentialAnalysisData, PreviewSequentialAnalysisErrors, PreviewSequentialAnalysisResponses, PutWorkspaceTabsData, PutWorkspaceTabsErrors, PutWorkspaceTabsResponses, QuotationDetachOptionsData, QuotationDetachOptionsErrors, QuotationDetachOptionsResponses, QuotationTaskRequestData, QuotationTaskRequestErrors, QuotationTaskRequestResponses, QuotationTaskResultData, QuotationTaskResultErrors, QuotationTaskResultResponses, RedoNodeOperationData, RedoNodeOperationErrors, RedoNodeOperationResponses, RenameNodeColumnData, RenameNodeColumnErrors, RenameNodeColumnResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, ReorderWorkspaceNodesData, ReorderWorkspaceNodesErrors, ReorderWorkspaceNodesResponses, ReplaceApplyData, ReplaceApplyErrors, ReplaceApplyResponses, ReplacePreviewData, ReplacePreviewErrors, ReplacePreviewResponses, RootData, RootResponses, RunConcordanceData, RunConcordanceErrors, RunConcordanceResponses, RunSequentialAnalysisData, RunSequentialAnalysisErrors, RunSequentialAnalysisResponses, RunTopicModelingData, RunTopicModelingErrors, RunTopicModelingResponses, SaveWorkspaceData, SaveWorkspaceErrors, SaveWorkspaceResponses, SearchLdacaCollectionsData, SearchLdacaCollectionsErrors, SearchLdacaCollectionsResponses, SequentialAnalysisTaskRequestData, SequentialAnalysisTaskRequestErrors, SequentialAnalysisTaskRequestResponses, SequentialAnalysisTaskResultData, SequentialAnalysisTaskResultErrors, SequentialAnalysisTaskResultResponses, SetAnnotationClassParentData, SetAnnotationClassParentErrors, SetAnnotationClassParentResponses, SetCurrentWorkspaceData, SetCurrentWorkspaceErrors, SetCurrentWorkspaceResponses, SetNodeColorData, SetNodeColorErrors, SetNodeColorResponses, SetNodeDocumentColumnData, SetNodeDocumentColumnErrors, SetNodeDocumentColumnResponses, SetNodeTokenizationPreferenceData, SetNodeTokenizationPreferenceErrors, SetNodeTokenizationPreferenceResponses, SliceNodeData, SliceNodeErrors, SliceNodeResponses, SlicePreviewData, SlicePreviewErrors, SlicePreviewResponses, StartWorkspaceDownloadData, StartWorkspaceDownloadErrors, StartWorkspaceDownloadResponses, StatusData, StatusResponses, StreamTasksData, StreamTasksErrors, StreamTasksResponses, TokenFrequenciesTaskRequestData, TokenFrequenciesTaskRequestErrors, TokenFrequenciesTaskRequestResponses, TokenFrequenciesTaskResultData, TokenFrequenciesTaskResultErrors, TokenFrequenciesTaskResultResponses, TopicModelingDetachOptionsData, TopicModelingDetachOptionsErrors, TopicModelingDetachOptionsResponses, TopicModelingTaskRequestData, TopicModelingTaskRequestErrors, TopicModelingTaskRequestResponses, TopicModelingTaskResultData, TopicModelingTaskResultErrors, TopicModelingTaskResultResponses, UndoNodeOperationData, UndoNodeOperationErrors, UndoNodeOperationResponses, UnifiedFilePreviewData, UnifiedFilePreviewErrors, UnifiedFilePreviewResponses, UnloadWorkspaceData, UnloadWorkspaceErrors, UnloadWorkspaceResponses, UpdateAnnotationClassDescriptionsData, UpdateAnnotationClassDescriptionsErrors, UpdateAnnotationClassDescriptionsResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateNodeNameData, UpdateNodeNameErrors, UpdateNodeNameResponses, UpdatePreferencesData, UpdatePreferencesErrors, UpdatePreferencesResponses, UpdateQuotationTaskResultData, UpdateQuotationTaskResultErrors, UpdateQuotationTaskResultResponses, UpdateSequentialAnalysisTaskResultData, UpdateSequentialAnalysisTaskResultErrors, UpdateSequentialAnalysisTaskResultResponses, UpdateTokenFrequenciesTaskResultData, UpdateTokenFrequenciesTaskResultErrors, UpdateTokenFrequenciesTaskResultResponses, UpdateWorkspaceDescriptionData, UpdateWorkspaceDescriptionErrors, UpdateWorkspaceDescriptionResponses, UploadFileData, UploadFileErrors, UploadFileResponses, UploadWorkspaceZipData, UploadWorkspaceZipErrors, UploadWorkspaceZipResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -820,38 +820,49 @@ export const createWorkspace = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
- * Clear Ai Annotation
+ * Create Annotation Class Descriptions
  *
- * Clear stored AI annotation task state.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
+ * Create an empty class-description table for the Annotation view.
  *
  * Used by:
- * - Frontend and API clients through the FastAPI DELETE /ai-annotation route because they need this unit's "Clear stored AI annotation task state" behavior.
+ * - Frontend Annotation view through the generated SDK because users need a
+ * one-click way to seed the class/description table required by the view.
+ *
+ * Flow:
+ * - Resolve the active workspace.
+ * - Build an empty ``class``/``description`` table with string dtypes.
+ * - Persist it to the workspace data folder and add it as a root node.
+ * - Save the workspace and return the standard node metadata response.
  */
-export const clearAiAnnotation = <ThrowOnError extends boolean = false>(options?: Options<ClearAiAnnotationData, ThrowOnError>): RequestResult<ClearAiAnnotationResponses, ClearAiAnnotationErrors, ThrowOnError> => (options?.client ?? client).delete<ClearAiAnnotationResponses, ClearAiAnnotationErrors, ThrowOnError>({ url: '/api/workspaces/ai-annotation', ...options });
+export const createAnnotationClassDescriptions = <ThrowOnError extends boolean = false>(options?: Options<CreateAnnotationClassDescriptionsData, ThrowOnError>): RequestResult<CreateAnnotationClassDescriptionsResponses, CreateAnnotationClassDescriptionsErrors, ThrowOnError> => (options?.client ?? client).post<CreateAnnotationClassDescriptionsResponses, CreateAnnotationClassDescriptionsErrors, ThrowOnError>({ url: '/api/workspaces/annotation/class-descriptions', ...options });
 
 /**
- * Run Ai Annotation
+ * Get Annotation Class Descriptions
  *
- * Run AI annotation classification on selected nodes.
- *
- * Calls the OpenAI-compatible endpoint, stores results in
- * the analysis task manager, and returns paginated output.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
+ * Return editable class-description rows for one selected node.
  *
  * Used by:
- * - Frontend and API clients through the FastAPI POST /ai-annotation route because they need this unit's "Run AI annotation classification on selected nodes" behavior.
+ * - Frontend Annotation view because the class editor needs a compact
+ * two-column row payload independent of the full workspace table UI.
  */
-export const runAiAnnotation = <ThrowOnError extends boolean = false>(options: Options<RunAiAnnotationData, ThrowOnError>): RequestResult<RunAiAnnotationResponses, RunAiAnnotationErrors, ThrowOnError> => (options.client ?? client).post<RunAiAnnotationResponses, RunAiAnnotationErrors, ThrowOnError>({
-    url: '/api/workspaces/ai-annotation',
+export const getAnnotationClassDescriptions = <ThrowOnError extends boolean = false>(options: Options<GetAnnotationClassDescriptionsData, ThrowOnError>): RequestResult<GetAnnotationClassDescriptionsResponses, GetAnnotationClassDescriptionsErrors, ThrowOnError> => (options.client ?? client).get<GetAnnotationClassDescriptionsResponses, GetAnnotationClassDescriptionsErrors, ThrowOnError>({ url: '/api/workspaces/annotation/class-descriptions/{node_id}', ...options });
+
+/**
+ * Update Annotation Class Descriptions
+ *
+ * Persist edited class-description rows back to the selected node.
+ *
+ * Used by:
+ * - Frontend Annotation view on cell blur/add-row because class labels and
+ * descriptions should behave like workspace data, not transient UI state.
+ *
+ * Flow:
+ * - Validate the node and selected columns.
+ * - Rewrite the selected class/description columns from the submitted rows.
+ * - Restage the dataframe as workspace data and save the workspace.
+ */
+export const updateAnnotationClassDescriptions = <ThrowOnError extends boolean = false>(options: Options<UpdateAnnotationClassDescriptionsData, ThrowOnError>): RequestResult<UpdateAnnotationClassDescriptionsResponses, UpdateAnnotationClassDescriptionsErrors, ThrowOnError> => (options.client ?? client).put<UpdateAnnotationClassDescriptionsResponses, UpdateAnnotationClassDescriptionsErrors, ThrowOnError>({
+    url: '/api/workspaces/annotation/class-descriptions/{node_id}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -860,72 +871,22 @@ export const runAiAnnotation = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
- * Get Ai Annotation Models
+ * Set Annotation Class Parent
  *
- * List available models from an OpenAI-compatible endpoint.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
+ * Reparent a class-description node under the annotated source node.
  *
  * Used by:
- * - Frontend and API clients through the FastAPI POST /ai-annotation/models route because they need this unit's "List available models from an OpenAI-compatible endpoint" behavior.
- */
-export const getAiAnnotationModels = <ThrowOnError extends boolean = false>(options: Options<GetAiAnnotationModelsData, ThrowOnError>): RequestResult<GetAiAnnotationModelsResponses, GetAiAnnotationModelsErrors, ThrowOnError> => (options.client ?? client).post<GetAiAnnotationModelsResponses, GetAiAnnotationModelsErrors, ThrowOnError>({
-    url: '/api/workspaces/ai-annotation/models',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Ai Annotation Task Request
- *
- * Return stored request payload for an AI annotation task.
+ * - Frontend Annotation view on Start because making the class table a child
+ * of the source node keeps the annotation lineage visible in the graph.
  *
  * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /ai-annotation/tasks/{task_id}/request route because they need this unit's "Return stored request payload for an AI annotation task" behavior.
+ * - Resolve workspace, source, and class nodes (404 if missing).
+ * - Reject self-parenting, then set the class node's only parent to the source
+ * and re-tidy its list position.
+ * - Persist and return the standard node metadata response.
  */
-export const aiAnnotationTaskRequest = <ThrowOnError extends boolean = false>(options: Options<AiAnnotationTaskRequestData, ThrowOnError>): RequestResult<AiAnnotationTaskRequestResponses, AiAnnotationTaskRequestErrors, ThrowOnError> => (options.client ?? client).get<AiAnnotationTaskRequestResponses, AiAnnotationTaskRequestErrors, ThrowOnError>({ url: '/api/workspaces/ai-annotation/tasks/{task_id}/request', ...options });
-
-/**
- * Ai Annotation Task Result
- *
- * Read AI annotation result with optional pagination/sort overrides.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /ai-annotation/tasks/{task_id}/result route because they need this unit's "Read AI annotation result with optional pagination/sort overrides" behavior.
- */
-export const aiAnnotationTaskResult = <ThrowOnError extends boolean = false>(options: Options<AiAnnotationTaskResultData, ThrowOnError>): RequestResult<AiAnnotationTaskResultResponses, AiAnnotationTaskResultErrors, ThrowOnError> => (options.client ?? client).get<AiAnnotationTaskResultResponses, AiAnnotationTaskResultErrors, ThrowOnError>({ url: '/api/workspaces/ai-annotation/tasks/{task_id}/result', ...options });
-
-/**
- * Ai Annotation Task Result Post
- *
- * Read AI annotation result using POST body overrides.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI POST /ai-annotation/tasks/{task_id}/result route because they need this unit's "Read AI annotation result using POST body overrides" behavior.
- */
-export const aiAnnotationTaskResultPost = <ThrowOnError extends boolean = false>(options: Options<AiAnnotationTaskResultPostData, ThrowOnError>): RequestResult<AiAnnotationTaskResultPostResponses, AiAnnotationTaskResultPostErrors, ThrowOnError> => (options.client ?? client).post<AiAnnotationTaskResultPostResponses, AiAnnotationTaskResultPostErrors, ThrowOnError>({
-    url: '/api/workspaces/ai-annotation/tasks/{task_id}/result',
+export const setAnnotationClassParent = <ThrowOnError extends boolean = false>(options: Options<SetAnnotationClassParentData, ThrowOnError>): RequestResult<SetAnnotationClassParentResponses, SetAnnotationClassParentErrors, ThrowOnError> => (options.client ?? client).put<SetAnnotationClassParentResponses, SetAnnotationClassParentErrors, ThrowOnError>({
+    url: '/api/workspaces/annotation/class-descriptions/{node_id}/parent',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -1320,83 +1281,6 @@ export const deleteNode = <ThrowOnError extends boolean = false>(options: Option
  * Return workspace node metadata.
  */
 export const getNodeInfo = <ThrowOnError extends boolean = false>(options: Options<GetNodeInfoData, ThrowOnError>): RequestResult<GetNodeInfoResponses, GetNodeInfoErrors, ThrowOnError> => (options.client ?? client).get<GetNodeInfoResponses, GetNodeInfoErrors, ThrowOnError>({ url: '/api/workspaces/nodes/{node_id}', ...options });
-
-/**
- * Get Ai Annotation Categories
- *
- * Return distinct category values from the annotation column of a node.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /nodes/{node_id}/ai-annotation/categories route because they need this unit's "Return distinct category values from the annotation column of a node" behavior.
- */
-export const getAiAnnotationCategories = <ThrowOnError extends boolean = false>(options: Options<GetAiAnnotationCategoriesData, ThrowOnError>): RequestResult<GetAiAnnotationCategoriesResponses, GetAiAnnotationCategoriesErrors, ThrowOnError> => (options.client ?? client).get<GetAiAnnotationCategoriesResponses, GetAiAnnotationCategoriesErrors, ThrowOnError>({ url: '/api/workspaces/nodes/{node_id}/ai-annotation/categories', ...options });
-
-/**
- * Detach Ai Annotation
- *
- * Run AI annotation on a node and detach the result as a new child node.
- *
- * Classifies texts using the OpenAI-compatible endpoint, writes the result
- * as a parquet file, and adds it as a new node in the workspace.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI POST /nodes/{node_id}/ai-annotation/detach route because they need this unit's "Run AI annotation on a node and detach the result as a new child node" behavior.
- */
-export const detachAiAnnotation = <ThrowOnError extends boolean = false>(options: Options<DetachAiAnnotationData, ThrowOnError>): RequestResult<DetachAiAnnotationResponses, DetachAiAnnotationErrors, ThrowOnError> => (options.client ?? client).post<DetachAiAnnotationResponses, DetachAiAnnotationErrors, ThrowOnError>({
-    url: '/api/workspaces/nodes/{node_id}/ai-annotation/detach',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Get Ai Annotation Providers
- *
- * Return distinct provider values from the annotation column of a node.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI GET /nodes/{node_id}/ai-annotation/providers route because they need this unit's "Return distinct provider values from the annotation column of a node" behavior.
- */
-export const getAiAnnotationProviders = <ThrowOnError extends boolean = false>(options: Options<GetAiAnnotationProvidersData, ThrowOnError>): RequestResult<GetAiAnnotationProvidersResponses, GetAiAnnotationProvidersErrors, ThrowOnError> => (options.client ?? client).get<GetAiAnnotationProvidersResponses, GetAiAnnotationProvidersErrors, ThrowOnError>({ url: '/api/workspaces/nodes/{node_id}/ai-annotation/providers', ...options });
-
-/**
- * Save Ai Annotation
- *
- * Save AI annotation edits back to the source node.
- *
- * Flow:
- * - Resolve authentication and request parameters from FastAPI dependencies.
- * - Delegate validation, manager calls, artifacts, or state changes to the owning helper.
- * - Shape the response payload or raise the HTTP error the client should see.
- *
- * Used by:
- * - Frontend and API clients through the FastAPI POST /nodes/{node_id}/ai-annotation/save route because they need this unit's "Save AI annotation edits back to the source node" behavior.
- */
-export const saveAiAnnotation = <ThrowOnError extends boolean = false>(options: Options<SaveAiAnnotationData, ThrowOnError>): RequestResult<SaveAiAnnotationResponses, SaveAiAnnotationErrors, ThrowOnError> => (options.client ?? client).post<SaveAiAnnotationResponses, SaveAiAnnotationErrors, ThrowOnError>({
-    url: '/api/workspaces/nodes/{node_id}/ai-annotation/save',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
 
 /**
  * Cast Node

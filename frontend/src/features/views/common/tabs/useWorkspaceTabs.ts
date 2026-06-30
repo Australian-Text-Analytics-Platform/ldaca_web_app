@@ -26,6 +26,7 @@ import {
   renameTabInState,
   reorderTabsInState,
   setActiveTabInState,
+  setTabInputSetInState,
   setTabInputsInState,
   setTabTaskInState,
 } from './tabStateOps';
@@ -58,8 +59,10 @@ export interface UseWorkspaceTabsResult {
   reorderTabs: (orderedTabIds: string[]) => void;
   /** Wires a tab to a task id (or clears it with null). */
   setTabTask: (tabId: string, taskId: string | null) => void;
-  /** Replaces a tab's input node set (add-node-as-needed selection). */
+  /** Replaces a tab's legacy source input node set. */
   setTabInputs: (tabId: string, inputs: AnalysisTabInput[]) => void;
+  /** Replaces one named input node set for multi-selector views. */
+  setTabInputSet: (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 /**
@@ -229,6 +232,13 @@ export function useWorkspaceTabs(
     [analysisType, readState, commit],
   );
 
+  const setTabInputSet = useCallback(
+    (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => {
+      commit(setTabInputSetInState(readState(), analysisType, tabId, selectorId, inputs));
+    },
+    [analysisType, readState, commit],
+  );
+
   return {
     tabs: getTabs(state, analysisType),
     activeTabId: getActiveTabId(state, analysisType),
@@ -240,5 +250,6 @@ export function useWorkspaceTabs(
     reorderTabs,
     setTabTask,
     setTabInputs,
+    setTabInputSet,
   };
 }

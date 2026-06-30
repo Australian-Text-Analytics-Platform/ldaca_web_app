@@ -57,7 +57,8 @@ export interface UseNodeInputsResult {
  * Owns no storage of its own: callers pass ``value``/``onChange`` bound to
  * whatever persists the inputs — an analysis tab's ``inputs`` (backend
  * tabs.json via useWorkspaceTabs), the preprocessing inputs store
- * (frontend-persisted), or plain ``useState`` (AI annotator, in-memory). This
+ * (frontend-persisted), or plain ``useState`` (annotation class descriptions,
+ * in-memory). This
  * keeps every view on one selection contract while letting persistence differ.
  *
  * Used by: all analysis ``*Feature`` components and preprocessing subtab hooks

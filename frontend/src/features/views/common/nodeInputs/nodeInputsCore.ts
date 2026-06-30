@@ -44,6 +44,12 @@ export interface NodeInputConstraints {
   maxNodes?: number;
   /** When true, only a backend-declared document column is an acceptable pick. */
   docTypeOnly?: boolean;
+  /**
+   * When set, the node's full schema must contain exactly this many columns and
+   * every column must be a string. Used by the Annotation class-description
+   * selector, which only accepts two-column class/description tables.
+   */
+  exactStringColumns?: number;
 }
 
 /** A node resolved against the live workspace, ready for the selection panel. */
@@ -154,6 +160,18 @@ export function validateAdd(
   if (constraints.allowedDataTypes?.length && allowed.length === 0) {
     const types = constraints.allowedDataTypes.join(', ');
     return `No compatible column (needs ${types})`;
+  }
+  if (constraints.exactStringColumns != null) {
+    // Inspect the full schema (not the allowed-type filtered view) so a table
+    // with an extra non-string column is rejected rather than silently trimmed.
+    const allColumns = getColumnInfos?.(node) ?? mapColumnsToInfo(node);
+    const stringColumns = allColumns.filter((info) => info.dataType === 'string');
+    if (
+      allColumns.length !== constraints.exactStringColumns ||
+      stringColumns.length !== constraints.exactStringColumns
+    ) {
+      return `Needs exactly ${String(constraints.exactStringColumns)} string columns`;
+    }
   }
   // Note: we intentionally do NOT reject nodes that lack a backend-declared
   // document column even when ``docTypeOnly`` is set. Any node may be added;

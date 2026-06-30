@@ -5,11 +5,13 @@ import {
   countTabsRemovedBySingleTabMode,
   createTabInState,
   getActiveTabId,
+  getTabInputSet,
   getTabs,
   keepFirstTabInState,
   renameTabInState,
   reorderTabsInState,
   setActiveTabInState,
+  setTabInputSetInState,
   setTabInputsInState,
   setTabTaskInState,
 } from '../tabStateOps';
@@ -121,6 +123,50 @@ describe('tabStateOps', () => {
       inputs: [],
     });
     expect(getActiveTabId(state, TYPE)).toBe('b');
+  });
+
+  it('stores multiple named input sets while keeping legacy inputs as the source selector', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    const sourceInputs = [{ node_id: 'source-node', column: 'text' }];
+    const classInputs = [{ node_id: 'class-node', column: 'class' }];
+
+    state = setTabInputsInState(state, TYPE, 'a', sourceInputs);
+    state = setTabInputSetInState(state, TYPE, 'a', 'classDescriptions', classInputs);
+
+    expect(getTabs(state, TYPE)[0]).toMatchObject({
+      inputs: sourceInputs,
+      input_sets: {
+        source: sourceInputs,
+        classDescriptions: classInputs,
+      },
+    });
+  });
+
+  it('resolves named input sets with a legacy source fallback', () => {
+    const legacyTab = {
+      tab_id: 'legacy',
+      task_id: null,
+      title: 'Legacy',
+      inputs: [{ node_id: 'source-node', column: 'text' }],
+    };
+    const namedTab = {
+      ...legacyTab,
+      input_sets: {
+        source: [{ node_id: 'named-source-node', column: 'text' }],
+        classDescriptions: [{ node_id: 'class-node', column: 'class' }],
+      },
+    };
+
+    expect(getTabInputSet(legacyTab, 'source')).toEqual([
+      { node_id: 'source-node', column: 'text' },
+    ]);
+    expect(getTabInputSet(namedTab, 'source')).toEqual([
+      { node_id: 'named-source-node', column: 'text' },
+    ]);
+    expect(getTabInputSet(namedTab, 'classDescriptions')).toEqual([
+      { node_id: 'class-node', column: 'class' },
+    ]);
+    expect(getTabInputSet(namedTab, 'missing')).toEqual([]);
   });
 
   it('falls back to the first tab when active_tab_id is dangling', () => {

@@ -141,25 +141,31 @@ describe('Sidebar view visibility menu', () => {
     toastMock.mockReset();
   });
 
-  it('hides AI Annotator by default and allows showing it from the views editor', async () => {
+  it('allows hiding and showing optional views from the views editor', async () => {
     const user = userEvent.setup();
 
     renderSidebar();
 
-    expect(screen.queryByRole('button', { name: 'AI Annotator' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Data Loader' })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
 
-    const aiAnnotatorToggle = screen.getByRole('menuitemcheckbox', { name: 'AI Annotator' });
-    expect(aiAnnotatorToggle).not.toBeChecked();
+    const exportToggle = screen.getByRole('menuitemcheckbox', { name: 'Export' });
+    expect(exportToggle).toBeChecked();
 
-    await user.click(aiAnnotatorToggle);
-    expect(screen.getByRole('menuitemcheckbox', { name: 'AI Annotator' })).toBeChecked();
+    await user.click(exportToggle);
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Export' })).not.toBeChecked();
 
     await user.keyboard('{Escape}');
 
-    expect(await screen.findByRole('button', { name: 'AI Annotator' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Export' }));
+    await user.keyboard('{Escape}');
+
+    expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument();
   });
 
   it('keeps Data Loader out of the views editor so it always remains visible', async () => {

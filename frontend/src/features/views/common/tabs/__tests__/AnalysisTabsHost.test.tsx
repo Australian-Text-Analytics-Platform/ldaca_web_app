@@ -50,6 +50,7 @@ function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspac
     reorderTabs: vi.fn(),
     setTabTask: vi.fn(),
     setTabInputs: vi.fn(),
+    setTabInputSet: vi.fn(),
     ...overrides,
   };
 }

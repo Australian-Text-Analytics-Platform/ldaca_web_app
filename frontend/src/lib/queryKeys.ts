@@ -51,6 +51,23 @@ export const queryKeys = {
     ] as const;
   },
 
+  /** Annotation class-description rows for one selected class table node. */
+  annotationClassDescriptions: (
+    workspaceId: string,
+    nodeId: string,
+    classColumn: string,
+    descriptionColumn: string,
+  ) =>
+    [
+      'workspaces',
+      workspaceId,
+      'annotation',
+      'class-descriptions',
+      nodeId,
+      classColumn,
+      descriptionColumn,
+    ] as const,
+
   /** Lightweight schema cache for panels that only need columns/types, not full node info. */
   /** Consumed by: TanStack Query hooks and invalidation helpers because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
   nodeSchema: (workspaceId: string, nodeId: string) =>

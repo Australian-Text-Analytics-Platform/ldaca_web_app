@@ -32,8 +32,8 @@ and auth bootstrap before mounting the workspace shell.
   `workspace`, and `views` (sidebar-tab features).
 - `src/features/views/`: all left-sidebar view tabs (data-loader,
   preprocessing, token-frequency, concordance, sequential-analysis,
-  topic-modeling, quotation, ai-annotator, export) plus `views/common/` for
-  shared analysis code.
+  topic-modeling, quotation, annotation, export) plus `views/common/` for shared analysis
+  code.
 - `src/hooks/`: globally shared hooks that are not feature-specific (e.g.
   `useBackendHealth`, `usePreferences`, `useResizableSplit`). Feature-specific
   hooks live in the owning feature module.

@@ -15,15 +15,18 @@ active feature. Each persisted tab owns:
 - `task_id`: the optional backend task/result the tab currently shows;
 - `title`: the tab label;
 - `inputs`: the add-as-needed node inputs, each with `node_id` and optional
-  `column`.
+  `column`; this is the legacy/default `source` selector;
+- `input_sets`: named selector values for views that need more than one
+  `NodeInputsPanel`; `input_sets.source` mirrors `inputs`.
 
-When a tab becomes active, the host passes `tabTaskId` and `tabInputs` into the
-feature. The feature must pass `tabTaskId` to `useAnalysisFeature` as
-`hydrationTaskId` and provide both `fetchRequest(taskId, headers)` and
-`fetchResult(taskId, headers)`. Hydration then resolves the tab-owned task id,
-fetches the saved request first, applies feature parameters from that request,
-and fetches the result for the same task id. New runs report their assigned task
-id through `onTabTaskChange`, which persists it back to `tabs.json`. The
+When a tab becomes active, the host passes `tabTaskId`, `tabInputs`, and the
+named `tabInputSets` map into the feature. The feature must pass `tabTaskId` to
+`useAnalysisFeature` as `hydrationTaskId` and provide both
+`fetchRequest(taskId, headers)` and `fetchResult(taskId, headers)`. Hydration
+then resolves the tab-owned task id, fetches the saved request first, applies
+feature parameters from that request, and fetches the result for the same task
+id. New runs report their assigned task id through `onTabTaskChange`, which
+persists it back to `tabs.json`. The
 `hydrationTaskId` change itself is a hydration trigger: after a run assigns a
 new task id, the feature fetches both request and result for that id instead of
 waiting solely for a task-stream terminal event. Clear Results clears the same
@@ -73,18 +76,21 @@ feature tabs know which task ids and descendants the backend should resolve.
 Analysis tabs use the add-node-as-needed model. `NodeInputsPanel` is the shared
 UI for selecting data blocks, selecting the per-node column when a feature needs
 one, adding graph/recent presets, removing nodes, and clearing a tab's inputs.
-`useTabNodeInputs` binds the panel to a tab's persisted `inputs` and live
-workspace node metadata. `nodeInputsFromSelections` is the shared adapter for
-hydration and handoff paths that receive `{nodeId, column}` selections and need
-to persist `AnalysisTabInput` records. The current graph selection is only a
-source for "Add preset" or graph-node add buttons; it is not the analysis input
-state.
+`useTabNodeInputs` binds the panel to a tab's persisted selector value and live
+workspace node metadata. Single-selector views use the default `source`
+selector, which falls back to legacy `inputs`; multi-selector views pass a
+`selectorId` and persist through `input_sets`. `nodeInputsFromSelections` is the
+shared adapter for hydration and handoff paths that receive `{nodeId, column}`
+selections and need to persist `AnalysisTabInput` records. The current graph
+selection is only a source for "Add preset" or graph-node add buttons; it is not
+the analysis input state.
 
 Feature-specific caps are enforced through `NodeInputConstraints`:
 
 - token frequency, concordance, and topic modeling allow one or two document
   nodes;
-- sequential analysis, quotation, and AI annotation use one node;
+- sequential analysis and quotation use one node;
+- annotation uses one source text node plus a second class-description selector;
 - preprocessing stores per-subtab inputs in `preprocessingInputsStore` and
   renders the same `NodeInputsPanel` inside each subtab parameter card;
 - export remains graph-selection based because it acts on workspace nodes rather
@@ -193,6 +199,36 @@ results card, metadata selector, context-length control, and per-node result
 table wiring; keep task lifecycle and request hydration in `QuotationFeature`.
 The tab still owns metadata-column visibility state.
 
+## Annotation
+
+Annotation is currently a setup/editing tabbed view. Its source selector is
+backed by `input_sets.source`/`inputs` and accepts one string text column plus
+an Annotation-specific companion column picker with a `Start new annotation`
+option. Class descriptions use the same `useTabNodeInputs` hook with the
+`classDescriptions` selector id and persist under `input_sets.classDescriptions`.
+The class-description selector and inline class editor live in one analysis
+card. The `Add new` button calls
+`POST /api/workspaces/annotation/class-descriptions`, which creates an empty
+two-column `class`/`description` data block in the active workspace and selects
+it for the class-description panel. The editor fetches and saves the selected
+class/description columns through
+`GET /api/workspaces/annotation/class-descriptions/{node_id}` and
+`PUT /api/workspaces/annotation/class-descriptions/{node_id}`. The card footer
+shows one run button that toggles on the source node's annotation column:
+`Start` when the column is `Start new annotation`, otherwise `Resume`. It is a
+placeholder (toast only) until a backend annotation run endpoint exists. When
+the column is `Start new annotation`, a `New Column Name` input appears below the
+source selector; its grayed placeholder defaults to the next free
+`annotation`/`annotation_1`/... name based on the source node's columns. The
+class-description selector only accepts tables with exactly two string columns
+(`exactStringColumns: 2`); ineligible workspace adds are rejected with a toast.
+On Start, the class node is reparented under the source node via
+`PUT /api/workspaces/annotation/class-descriptions/{node_id}/parent`. After
+Start/Resume, a preview below the parameter panel shows the source text column
+beside the annotation column in a fixed two-column layout (wraps, no horizontal
+scroll); each annotation cell is a dropdown of class names from the
+class-description node (Resume seeds the existing value, new starts blank).
+
 ## Topic Modeling
 
 Topic modeling submits BERTopic/embedding work through backend workers. The UI
@@ -226,21 +262,6 @@ legend metadata. `sequentialResultVisibility.ts` owns hidden-series and
 selected-period count derivation so the result panel and chart export header use
 the same shown/chosen totals.
 
-## AI Annotation
-
-AI annotation calls backend OpenAI classification endpoints, manages providers
-and categories, and can detach saved labels into a workspace node.
-`useAiAnnotationSettings` owns provider/model/prompt settings and request
-parsing. `useAiAnnotationTaskFlow` owns run, page-load, model-list, clear, and
-detach side effects plus their busy flags, while the feature shell keeps the
-shared lifecycle status message so hydration and task actions can both report
-through one banner. `useAiAnnotationResultControls` owns annotation
-result-node normalization, visible-column derivation, paging state, and
-metadata-column selection. `useAiAnnotationReviewWorkflow` coordinates review
-API side effects on top of a reducer-backed review state model for the loaded
-row page, provider/category caches, draft edits, autosave flags, and add
-dialogs.
-
 ## Adding A New Analysis Tab
 
 Start from `AnalysisTabsHost`, `NodeInputsPanel`/`useTabNodeInputs`, the shared
@@ -250,13 +271,15 @@ when a generated response would otherwise become `unknown`.
 The minimum task-backed contract is:
 
 - accept `tabId`, `tabTaskId`, `onTabTaskChange`, `tabInputs`, and
-  `onTabInputsChange` from `AnalysisTabFeatureProps`;
+  `onTabInputsChange` from `AnalysisTabFeatureProps`; accept `tabInputSets`
+  and `onTabInputSetChange` only when the view has multiple node selectors;
 - pass `tabTaskId ?? null` as `hydrationTaskId` to `useAnalysisFeature`;
 - implement `fetchRequest` and `fetchResult` for the analysis task endpoints;
 - call `onTabTaskChange(taskId)` when a run assigns a backend task id;
 - call `onTabTaskChange(null)` when Clear Results removes the tab's task;
-- use `tabInputs` as the only analysis input state, seeding it from hydrated
-  requests only for legacy tabs whose saved task predates persisted inputs.
+- use `tabInputs`/`input_sets.source` as the only source-selector state,
+  seeding it from hydrated requests only for legacy tabs whose saved task
+  predates persisted inputs.
 
 Keep task refresh event-driven, and expose detach or materialize flows only
 through workspace actions so graph invalidation remains centralized.

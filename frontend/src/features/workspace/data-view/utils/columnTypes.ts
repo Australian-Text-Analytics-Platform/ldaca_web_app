@@ -68,7 +68,7 @@ const TYPE_RULES: [(s: string) => boolean, string][] = [
  * `'string'` for unknown/missing input — most components render strings
  * safely, so this is the least-surprising default.
  */
-/** Used by: src/features/views/ai-annotator/AiAnnotatorFeature.tsx, src/features/views/common/useNodeColumnOptions.ts, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx and 6 other importers because the utility needs local normalization steps before returning a shared result. */
+/** Used by: src/features/views/common/useNodeColumnOptions.ts, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, workspace data-view tables, and other importers because the utility needs local normalization steps before returning a shared result. */
 export const normalizeTypeName = (type?: string | null): string => {
   if (!type || typeof type !== 'string') return 'string';
   const s = type.toLowerCase();

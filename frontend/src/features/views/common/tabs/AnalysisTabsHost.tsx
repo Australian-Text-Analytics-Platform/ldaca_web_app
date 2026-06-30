@@ -5,12 +5,12 @@
  *
  * Why this exists: the orchestration (load tab group → auto-create one tab on entry →
  * draw the tab bar → mount the feature keyed by the active tab) is identical
- * across concordance, token-frequency, quotation, topic-modeling, and
- * sequential-analysis. Centralizing it here means every view shares exactly the
+ * across concordance, token-frequency, quotation, topic-modeling,
+ * sequential-analysis, and annotation. Centralizing it here means every view shares exactly the
  * same tab UI and behaviour, and each per-view wrapper shrinks to a one-liner
  * that supplies only its tab-group namespace + panel component.
  *
- * Rendered by: the five ``*TabbedFeature`` wrappers (one per analysis view),
+ * Rendered by: the tabbed ``*Feature`` wrappers (one per analysis-style view),
  * which ViewRouter lazy-loads. Each wrapper passes its own ``tabGroup`` and
  * ``Feature``.
  * Flow: resolve workspace + auth, load this workspace's tab group, auto-create
@@ -26,6 +26,8 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
+import type { AnalysisTabInputSets } from './tabStateOps';
+import { DEFAULT_TAB_INPUT_SET_ID, getTabInputSet } from './tabStateOps';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 
 /**
@@ -40,6 +42,10 @@ interface AnalysisTabFeatureProps {
   tabInputs?: AnalysisTabInput[];
   /** Commit a new input node set for this tab (persists to tabs.json). */
   onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
+  /** All named input node sets owned by this tab. */
+  tabInputSets?: AnalysisTabInputSets;
+  /** Commit one named input node set for this tab (persists to tabs.json). */
+  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 export interface AnalysisTabsHostProps {
@@ -72,6 +78,7 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     reorderTabs,
     setTabTask,
     setTabInputs,
+    setTabInputSet,
   } = useWorkspaceTabs(currentWorkspaceId, tabGroup, getAuthHeaders);
 
   // Requirement: entering an empty analysis view presents one ready tab, but
@@ -119,9 +126,13 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
           onTabTaskChange={(taskId) => {
             setTabTask(activeTab.tab_id, taskId);
           }}
-          tabInputs={activeTab.inputs ?? []}
+          tabInputs={getTabInputSet(activeTab, DEFAULT_TAB_INPUT_SET_ID)}
           onTabInputsChange={(inputs) => {
             setTabInputs(activeTab.tab_id, inputs);
+          }}
+          tabInputSets={activeTab.input_sets ?? {}}
+          onTabInputSetChange={(selectorId, inputs) => {
+            setTabInputSet(activeTab.tab_id, selectorId, inputs);
           }}
         />
       ) : null}

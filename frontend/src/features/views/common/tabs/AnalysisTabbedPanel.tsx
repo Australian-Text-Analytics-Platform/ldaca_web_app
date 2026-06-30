@@ -9,9 +9,10 @@
  * another bordered card (WorkspaceShell neutralizes the main InsetCard frame for
  * tabbed views so this is the only visible card).
  *
- * Rendered by: AnalysisTabsHost, which every analysis view shares (concordance,
- * token-frequency, quotation, topic-modeling, sequential-analysis) by feeding
- * its own useWorkspaceTabs group + panel content.
+ * Rendered by: AnalysisTabsHost, which every analysis-style view shares
+ * (concordance, token-frequency, quotation, topic-modeling,
+ * sequential-analysis, annotation) by feeding its own useWorkspaceTabs group +
+ * panel content.
  */
 import { type ReactNode } from 'react';
 import { ChromeTabs, type ChromeTabItem } from '@/components/tabs';

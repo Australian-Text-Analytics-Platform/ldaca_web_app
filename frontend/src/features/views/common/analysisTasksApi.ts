@@ -1,5 +1,4 @@
 import {
-  aiAnnotationTaskRequest,
   concordanceTaskRequest,
   quotationTaskRequest,
   sequentialAnalysisTaskRequest,
@@ -11,7 +10,6 @@ export type LastRunAnalysisType =
   | 'token_frequencies'
   | 'quotation_analysis'
   | 'concordance_analysis'
-  | 'ai_annotation'
   | 'topic_modeling'
   | 'sequential_analysis';
 
@@ -45,14 +43,6 @@ export async function getAnalysisTaskRequest(
     }
     case 'concordance_analysis': {
       const { data } = await concordanceTaskRequest({
-        headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
-    }
-    case 'ai_annotation': {
-      const { data } = await aiAnnotationTaskRequest({
         headers,
         path: { task_id: taskId },
         throwOnError: true,

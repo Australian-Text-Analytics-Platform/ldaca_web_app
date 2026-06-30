@@ -37,7 +37,7 @@ type PreferenceTestState = Partial<ReturnType<typeof usePreferencesStore.getStat
 /** Used by: SettingsDialog tests because each test needs a deterministic preferences store snapshot before rendering the dialog. */
 function resetPreferenceState(analysisMultiTabEnabled = false) {
   usePreferencesStore.setState({
-    hiddenViews: ['ai-annotator'],
+    hiddenViews: [],
     favoriteWorkspaces: [],
     defaultTokenizerModel: null,
     ldacaOniApiToken: null,
