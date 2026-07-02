@@ -97,6 +97,41 @@ describe('CustomNode', () => {
     expect(screen.getByRole('button', { name: 'Redo' })).toBeInTheDocument();
   });
 
+  it('paints a left color accent on the card when the node has a color', () => {
+    mockZoom = 1;
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-1',
+          name: 'Corpus',
+          color: '#2563eb',
+          shape: [10, 3],
+          columns: [],
+          preview: [],
+          is_text_data: false,
+        },
+        onDelete: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+
+    const card = screen.getByTestId('custom-node-card');
+    expect(card).toHaveStyle({ borderLeftWidth: '6px' });
+    expect(card.style.borderLeftColor).not.toBe('');
+  });
+
   it('marks the rename input as non-draggable so React Flow does not intercept clicks', async () => {
     mockZoom = 1;
     const user = userEvent.setup();
@@ -190,5 +225,91 @@ describe('CustomNode', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument();
+  });
+
+  it('hides the node toolbar immediately when the pointer leaves the node', async () => {
+    // Regression guard: the toolbar must vanish instantly on mouse-out with no
+    // grace-period timer. `user.unhover` does not advance any long timer, so a
+    // reintroduced hide delay would keep the button mounted and fail this test.
+    mockZoom = 1;
+    const user = userEvent.setup();
+    const props = {
+      id: 'node-hide',
+      type: 'custom',
+      data: {
+        node: {
+          node_id: 'node-hide',
+          name: 'sample_data/ADO/qldelection2020_candidate_tweets',
+          shape: [480, 8],
+          columns: [],
+          preview: [],
+          is_text_data: false,
+        },
+        onDelete: vi.fn(),
+        onRename: vi.fn(),
+        onCopy: vi.fn(),
+        onUndo: vi.fn(),
+        onRedo: vi.fn(),
+      },
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+
+    const nodeLabel = screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets');
+    await user.hover(nodeLabel);
+    expect(getLatestNodeSettingsButton()).toBeInTheDocument();
+
+    await user.unhover(nodeLabel);
+    expect(screen.queryAllByRole('button', { name: /node settings/i })).toHaveLength(0);
+  });
+
+  it('counter-scales the fresh "new" dot so it stays a constant size when zoomed out', () => {
+    // Regression guard: the red "new" dot lives inside the zoom-scaled node, so
+    // without an inverse-scale transform it would shrink to near-invisible at low
+    // zoom. At zoom 0.2 the dot must cancel the viewport with scale(5) and keep a
+    // constant 4px corner poke-out (translate 20px = 4px * 5) so it reads the same
+    // on screen as the fixed-size NodeToolbar menu.
+    mockZoom = 0.2;
+
+    render(
+      <CustomNode
+        id="node-fresh"
+        type="custom"
+        data={{
+          node: {
+            node_id: 'node-fresh',
+            name: 'Fresh corpus',
+            shape: [10, 3],
+            columns: [],
+            preview: [],
+            is_text_data: false,
+          },
+          isFresh: true,
+          onDelete: vi.fn(),
+        }}
+        selected={false}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        draggable
+        isConnectable
+        positionAbsoluteX={0}
+        positionAbsoluteY={0}
+      />,
+    );
+
+    const dot = screen.getByTitle('New data block');
+    expect(dot.style.transform).toContain('scale(5)');
+    expect(dot.style.transform).toContain('translate(20px, -20px)');
   });
 });

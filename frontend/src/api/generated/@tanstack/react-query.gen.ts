@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addNodeToWorkspace, adminCleanup, authHealth, authStatus, calculateTokenFrequencies, cancelTask, castNode, cilogonCallback, cilogonLogin, clearFilesTasks, clearTasks, clearTokenFrequencies, clearTopicModelingResults, cloneNode, columnOperations, concatNodes, concatNodesPreview, concordanceDetachOptions, concordanceTaskDispersionBins, concordanceTaskRequest, concordanceTaskResult, concordanceTaskResultPost, createAnnotationClassDescriptions, createFolder, createWorkspace, deleteFile, deleteNode, deleteNodeColumn, deleteWorkspace, describeColumn, detachConcordance, detachConcordanceDispersion, detachQuotation, detachSequentialAnalysisTask, detachTopicModeling, downloadFile, downloadWorkspaceArtifact, exportNodes, filterNode, filterPreview, getAnnotationClassDescriptions, getAuthInfo, getColumnUniqueValues, getConfig, getCurrentUserInfo, getCurrentWorkspace, getFileInfo, getNodeData, getNodeInfo, getNodeQueryPlan, getNodeShape, getPreferences, getQuotation, getRawFile, getSampleDataCatalogue, getSampleDataReadme, getTokenizerModels, getUserFiles, getWorkspaceGraph, getWorkspaceInfo, getWorkspaceNodes, getWorkspaceTabs, googleAuth, googleAuthCallback, healthCheck, importLdacaDataset, importSampleData, joinNodes, joinNodesPreview, listFilesTasks, listLdacaFeaturedCollections, listTasks, listUsers, listWorkspaces, logout, materializeConcordance, materializeQuotation, moveFile, type Options, polarsExpressionApply, polarsExpressionPreview, previewSequentialAnalysis, putWorkspaceTabs, quotationDetachOptions, quotationTaskRequest, quotationTaskResult, redoNodeOperation, renameNodeColumn, renameWorkspace, reorderWorkspaceNodes, replaceApply, replacePreview, root, runConcordance, runSequentialAnalysis, runTopicModeling, saveWorkspace, searchLdacaCollections, sequentialAnalysisTaskRequest, sequentialAnalysisTaskResult, setAnnotationClassParent, setCurrentWorkspace, setNodeColor, setNodeDocumentColumn, setNodeTokenizationPreference, sliceNode, slicePreview, startWorkspaceDownload, status, streamTasks, tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult, topicModelingDetachOptions, topicModelingTaskRequest, topicModelingTaskResult, undoNodeOperation, unifiedFilePreview, unloadWorkspace, updateAnnotationClassDescriptions, updateConfig, updateNodeName, updatePreferences, updateQuotationTaskResult, updateSequentialAnalysisTaskResult, updateTokenFrequenciesTaskResult, updateWorkspaceDescription, uploadFile, uploadWorkspaceZip } from '../sdk.gen';
-import type { AddNodeToWorkspaceData, AddNodeToWorkspaceError, AddNodeToWorkspaceResponse, AdminCleanupData, AdminCleanupError, AuthHealthData, AuthStatusData, AuthStatusError, CalculateTokenFrequenciesData, CalculateTokenFrequenciesError, CalculateTokenFrequenciesResponse, CancelTaskData, CancelTaskError, CancelTaskResponse, CastNodeData, CastNodeError, CastNodeResponse2, CilogonCallbackData, CilogonCallbackError, CilogonLoginData, ClearFilesTasksData, ClearFilesTasksError, ClearFilesTasksResponse, ClearTasksData, ClearTasksError, ClearTasksResponse, ClearTokenFrequenciesData, ClearTokenFrequenciesError, ClearTokenFrequenciesResponse, ClearTopicModelingResultsData, ClearTopicModelingResultsError, ClearTopicModelingResultsResponse, CloneNodeData, CloneNodeError, CloneNodeResponse, ColumnOperationsData, ColumnOperationsError, ColumnOperationsResponse2, ConcatNodesData, ConcatNodesError, ConcatNodesPreviewData, ConcatNodesPreviewError, ConcatNodesPreviewResponse, ConcatNodesResponse, ConcordanceDetachOptionsData, ConcordanceDetachOptionsError, ConcordanceDetachOptionsResponse2, ConcordanceTaskDispersionBinsData, ConcordanceTaskDispersionBinsError, ConcordanceTaskDispersionBinsResponse, ConcordanceTaskRequestData, ConcordanceTaskRequestError, ConcordanceTaskRequestResponse, ConcordanceTaskResultData, ConcordanceTaskResultError, ConcordanceTaskResultPostData, ConcordanceTaskResultPostError, ConcordanceTaskResultPostResponse, ConcordanceTaskResultResponse, CreateAnnotationClassDescriptionsData, CreateAnnotationClassDescriptionsError, CreateAnnotationClassDescriptionsResponse, CreateFolderData, CreateFolderError, CreateFolderResponse2, CreateWorkspaceData, CreateWorkspaceError, CreateWorkspaceResponse, DeleteFileData, DeleteFileError, DeleteFileResponse, DeleteNodeColumnData, DeleteNodeColumnError, DeleteNodeColumnResponse, DeleteNodeData, DeleteNodeError, DeleteNodeResponse, DeleteWorkspaceData, DeleteWorkspaceError, DeleteWorkspaceResponse, DescribeColumnData, DescribeColumnError, DescribeColumnResponse, DetachConcordanceData, DetachConcordanceDispersionData, DetachConcordanceDispersionError, DetachConcordanceDispersionResponse, DetachConcordanceError, DetachConcordanceResponse, DetachQuotationData, DetachQuotationError, DetachQuotationResponse, DetachSequentialAnalysisTaskData, DetachSequentialAnalysisTaskError, DetachSequentialAnalysisTaskResponse, DetachTopicModelingData, DetachTopicModelingError, DetachTopicModelingResponse, DownloadFileData, DownloadFileError, DownloadWorkspaceArtifactData, DownloadWorkspaceArtifactError, ExportNodesData, ExportNodesError, FilterNodeData, FilterNodeError, FilterNodeResponse, FilterPreviewData, FilterPreviewError, FilterPreviewResponse2, GetAnnotationClassDescriptionsData, GetAnnotationClassDescriptionsError, GetAnnotationClassDescriptionsResponse, GetAuthInfoData, GetAuthInfoError, GetAuthInfoResponse, GetColumnUniqueValuesData, GetColumnUniqueValuesError, GetColumnUniqueValuesResponse, GetConfigData, GetConfigResponse, GetCurrentUserInfoData, GetCurrentUserInfoError, GetCurrentUserInfoResponse, GetCurrentWorkspaceData, GetCurrentWorkspaceError, GetCurrentWorkspaceResponse, GetFileInfoData, GetFileInfoError, GetFileInfoResponse, GetNodeDataData, GetNodeDataError, GetNodeDataResponse, GetNodeInfoData, GetNodeInfoError, GetNodeInfoResponse, GetNodeQueryPlanData, GetNodeQueryPlanError, GetNodeQueryPlanResponse, GetNodeShapeData, GetNodeShapeError, GetNodeShapeResponse, GetPreferencesData, GetPreferencesError, GetPreferencesResponse, GetQuotationData, GetQuotationError, GetQuotationResponse, GetRawFileData, GetRawFileError, GetSampleDataCatalogueData, GetSampleDataCatalogueError, GetSampleDataCatalogueResponse, GetSampleDataReadmeData, GetSampleDataReadmeError, GetTokenizerModelsData, GetTokenizerModelsError, GetTokenizerModelsResponse, GetUserFilesData, GetUserFilesError, GetUserFilesResponse, GetWorkspaceGraphData, GetWorkspaceGraphError, GetWorkspaceGraphResponse, GetWorkspaceInfoData, GetWorkspaceInfoError, GetWorkspaceInfoResponse, GetWorkspaceNodesData, GetWorkspaceNodesError, GetWorkspaceNodesResponse, GetWorkspaceTabsData, GetWorkspaceTabsError, GetWorkspaceTabsResponse, GoogleAuthCallbackData, GoogleAuthCallbackError, GoogleAuthData, GoogleAuthError, GoogleAuthResponse, HealthCheckData, ImportLdacaDatasetData, ImportLdacaDatasetError, ImportLdacaDatasetResponse, ImportSampleDataData, ImportSampleDataError, ImportSampleDataResponse2, JoinNodesData, JoinNodesError, JoinNodesPreviewData, JoinNodesPreviewError, JoinNodesPreviewResponse, JoinNodesResponse, ListFilesTasksData, ListFilesTasksError, ListFilesTasksResponse, ListLdacaFeaturedCollectionsData, ListLdacaFeaturedCollectionsError, ListLdacaFeaturedCollectionsResponse, ListTasksData, ListTasksError, ListTasksResponse, ListUsersData, ListUsersError, ListWorkspacesData, ListWorkspacesError, ListWorkspacesResponse, LogoutData, LogoutError, MaterializeConcordanceData, MaterializeConcordanceError, MaterializeConcordanceResponse, MaterializeQuotationData, MaterializeQuotationError, MaterializeQuotationResponse, MoveFileData, MoveFileError, MoveFileResponse, PolarsExpressionApplyData, PolarsExpressionApplyError, PolarsExpressionApplyResponse2, PolarsExpressionPreviewData, PolarsExpressionPreviewError, PolarsExpressionPreviewResponse, PreviewSequentialAnalysisData, PreviewSequentialAnalysisError, PreviewSequentialAnalysisResponse, PutWorkspaceTabsData, PutWorkspaceTabsError, PutWorkspaceTabsResponse, QuotationDetachOptionsData, QuotationDetachOptionsError, QuotationDetachOptionsResponse2, QuotationTaskRequestData, QuotationTaskRequestError, QuotationTaskRequestResponse, QuotationTaskResultData, QuotationTaskResultError, QuotationTaskResultResponse, RedoNodeOperationData, RedoNodeOperationError, RedoNodeOperationResponse, RenameNodeColumnData, RenameNodeColumnError, RenameNodeColumnResponse, RenameWorkspaceData, RenameWorkspaceError, RenameWorkspaceResponse, ReorderWorkspaceNodesData, ReorderWorkspaceNodesError, ReorderWorkspaceNodesResponse, ReplaceApplyData, ReplaceApplyError, ReplaceApplyResponse2, ReplacePreviewData, ReplacePreviewError, ReplacePreviewResponse, RootData, RunConcordanceData, RunConcordanceError, RunConcordanceResponse, RunSequentialAnalysisData, RunSequentialAnalysisError, RunSequentialAnalysisResponse, RunTopicModelingData, RunTopicModelingError, RunTopicModelingResponse, SaveWorkspaceData, SaveWorkspaceError, SaveWorkspaceResponse, SearchLdacaCollectionsData, SearchLdacaCollectionsError, SearchLdacaCollectionsResponse, SequentialAnalysisTaskRequestData, SequentialAnalysisTaskRequestError, SequentialAnalysisTaskRequestResponse, SequentialAnalysisTaskResultData, SequentialAnalysisTaskResultError, SequentialAnalysisTaskResultResponse, SetAnnotationClassParentData, SetAnnotationClassParentError, SetAnnotationClassParentResponse, SetCurrentWorkspaceData, SetCurrentWorkspaceError, SetCurrentWorkspaceResponse2, SetNodeColorData, SetNodeColorError, SetNodeColorResponse, SetNodeDocumentColumnData, SetNodeDocumentColumnError, SetNodeDocumentColumnResponse, SetNodeTokenizationPreferenceData, SetNodeTokenizationPreferenceError, SetNodeTokenizationPreferenceResponse, SliceNodeData, SliceNodeError, SliceNodeResponse, SlicePreviewData, SlicePreviewError, SlicePreviewResponse, StartWorkspaceDownloadData, StartWorkspaceDownloadError, StartWorkspaceDownloadResponse, StatusData, StreamTasksData, StreamTasksError, TokenFrequenciesTaskRequestData, TokenFrequenciesTaskRequestError, TokenFrequenciesTaskRequestResponse, TokenFrequenciesTaskResultData, TokenFrequenciesTaskResultError, TokenFrequenciesTaskResultResponse, TopicModelingDetachOptionsData, TopicModelingDetachOptionsError, TopicModelingDetachOptionsResponse2, TopicModelingTaskRequestData, TopicModelingTaskRequestError, TopicModelingTaskRequestResponse, TopicModelingTaskResultData, TopicModelingTaskResultError, TopicModelingTaskResultResponse, UndoNodeOperationData, UndoNodeOperationError, UndoNodeOperationResponse, UnifiedFilePreviewData, UnifiedFilePreviewError, UnifiedFilePreviewResponse, UnloadWorkspaceData, UnloadWorkspaceError, UnloadWorkspaceResponse, UpdateAnnotationClassDescriptionsData, UpdateAnnotationClassDescriptionsError, UpdateAnnotationClassDescriptionsResponse, UpdateConfigData, UpdateConfigError, UpdateConfigResponse, UpdateNodeNameData, UpdateNodeNameError, UpdateNodeNameResponse, UpdatePreferencesData, UpdatePreferencesError, UpdatePreferencesResponse, UpdateQuotationTaskResultData, UpdateQuotationTaskResultError, UpdateQuotationTaskResultResponse, UpdateSequentialAnalysisTaskResultData, UpdateSequentialAnalysisTaskResultError, UpdateSequentialAnalysisTaskResultResponse, UpdateTokenFrequenciesTaskResultData, UpdateTokenFrequenciesTaskResultError, UpdateTokenFrequenciesTaskResultResponse, UpdateWorkspaceDescriptionData, UpdateWorkspaceDescriptionError, UpdateWorkspaceDescriptionResponse, UploadFileData, UploadFileError, UploadFileResponse, UploadWorkspaceZipData, UploadWorkspaceZipError, UploadWorkspaceZipResponse } from '../types.gen';
+import { addNodeToWorkspace, adminCleanup, annotateAiAll, annotateAiPreview, annotateAiPreviewClear, annotateAiPreviewOverride, annotateAiPreviewState, authHealth, authStatus, calculateTokenFrequencies, cancelTask, castNode, cilogonCallback, cilogonLogin, clearFilesTasks, clearTasks, clearTokenFrequencies, clearTopicModelingResults, cloneNode, columnOperations, concatNodes, concatNodesPreview, concordanceDetachOptions, concordanceTaskDispersionBins, concordanceTaskRequest, concordanceTaskResult, concordanceTaskResultPost, createAnnotationClassDescriptions, createAnnotationColumn, createFolder, createWorkspace, deleteFile, deleteNode, deleteNodeColumn, deleteWorkspace, describeColumn, detachAiPreviewedRows, detachConcordance, detachConcordanceDispersion, detachQuotation, detachSequentialAnalysisTask, detachTopicModeling, downloadFile, downloadWorkspaceArtifact, exportNodes, filterNode, filterPreview, getAnnotationClassDescriptions, getAuthInfo, getColumnUniqueValues, getConfig, getCurrentUserInfo, getCurrentWorkspace, getFileInfo, getNodeData, getNodeInfo, getNodeQueryPlan, getNodeShape, getPreferences, getQuotation, getRawFile, getSampleDataCatalogue, getSampleDataReadme, getTokenizerModels, getUserFiles, getWorkspaceGraph, getWorkspaceInfo, getWorkspaceNodes, getWorkspaceTabs, googleAuth, googleAuthCallback, healthCheck, importLdacaDataset, importSampleData, joinNodes, joinNodesPreview, listAnnotationAiModels, listFilesTasks, listLdacaFeaturedCollections, listTasks, listUsers, listWorkspaces, logout, materializeConcordance, materializeQuotation, moveFile, type Options, polarsExpressionApply, polarsExpressionPreview, previewSequentialAnalysis, putWorkspaceTabs, quotationDetachOptions, quotationTaskRequest, quotationTaskResult, redoNodeOperation, renameNodeColumn, renameWorkspace, reorderWorkspaceNodes, replaceApply, replacePreview, root, runConcordance, runSequentialAnalysis, runTopicModeling, saveWorkspace, searchLdacaCollections, sequentialAnalysisTaskRequest, sequentialAnalysisTaskResult, setAnnotationCell, setAnnotationClassParent, setCurrentWorkspace, setNodeColor, setNodeDocumentColumn, setNodeTokenizationPreference, sliceNode, slicePreview, startWorkspaceDownload, status, streamTasks, tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult, topicModelingDetachOptions, topicModelingTaskRequest, topicModelingTaskResult, undoNodeOperation, unifiedFilePreview, unloadWorkspace, updateAnnotationClassDescriptions, updateConfig, updateNodeName, updatePreferences, updateQuotationTaskResult, updateSequentialAnalysisTaskResult, updateTokenFrequenciesTaskResult, updateWorkspaceDescription, uploadFile, uploadWorkspaceZip } from '../sdk.gen';
+import type { AddNodeToWorkspaceData, AddNodeToWorkspaceError, AddNodeToWorkspaceResponse, AdminCleanupData, AdminCleanupError, AnnotateAiAllData, AnnotateAiAllError, AnnotateAiAllResponse, AnnotateAiPreviewClearData, AnnotateAiPreviewClearError, AnnotateAiPreviewClearResponse, AnnotateAiPreviewData, AnnotateAiPreviewError, AnnotateAiPreviewOverrideData, AnnotateAiPreviewOverrideError, AnnotateAiPreviewOverrideResponse, AnnotateAiPreviewResponse, AnnotateAiPreviewStateData, AnnotateAiPreviewStateError, AnnotateAiPreviewStateResponse, AuthHealthData, AuthStatusData, AuthStatusError, CalculateTokenFrequenciesData, CalculateTokenFrequenciesError, CalculateTokenFrequenciesResponse, CancelTaskData, CancelTaskError, CancelTaskResponse, CastNodeData, CastNodeError, CastNodeResponse2, CilogonCallbackData, CilogonCallbackError, CilogonLoginData, ClearFilesTasksData, ClearFilesTasksError, ClearFilesTasksResponse, ClearTasksData, ClearTasksError, ClearTasksResponse, ClearTokenFrequenciesData, ClearTokenFrequenciesError, ClearTokenFrequenciesResponse, ClearTopicModelingResultsData, ClearTopicModelingResultsError, ClearTopicModelingResultsResponse, CloneNodeData, CloneNodeError, CloneNodeResponse, ColumnOperationsData, ColumnOperationsError, ColumnOperationsResponse2, ConcatNodesData, ConcatNodesError, ConcatNodesPreviewData, ConcatNodesPreviewError, ConcatNodesPreviewResponse, ConcatNodesResponse, ConcordanceDetachOptionsData, ConcordanceDetachOptionsError, ConcordanceDetachOptionsResponse2, ConcordanceTaskDispersionBinsData, ConcordanceTaskDispersionBinsError, ConcordanceTaskDispersionBinsResponse, ConcordanceTaskRequestData, ConcordanceTaskRequestError, ConcordanceTaskRequestResponse, ConcordanceTaskResultData, ConcordanceTaskResultError, ConcordanceTaskResultPostData, ConcordanceTaskResultPostError, ConcordanceTaskResultPostResponse, ConcordanceTaskResultResponse, CreateAnnotationClassDescriptionsData, CreateAnnotationClassDescriptionsError, CreateAnnotationClassDescriptionsResponse, CreateAnnotationColumnData, CreateAnnotationColumnError, CreateAnnotationColumnResponse, CreateFolderData, CreateFolderError, CreateFolderResponse2, CreateWorkspaceData, CreateWorkspaceError, CreateWorkspaceResponse, DeleteFileData, DeleteFileError, DeleteFileResponse, DeleteNodeColumnData, DeleteNodeColumnError, DeleteNodeColumnResponse, DeleteNodeData, DeleteNodeError, DeleteNodeResponse, DeleteWorkspaceData, DeleteWorkspaceError, DeleteWorkspaceResponse, DescribeColumnData, DescribeColumnError, DescribeColumnResponse, DetachAiPreviewedRowsData, DetachAiPreviewedRowsError, DetachAiPreviewedRowsResponse, DetachConcordanceData, DetachConcordanceDispersionData, DetachConcordanceDispersionError, DetachConcordanceDispersionResponse, DetachConcordanceError, DetachConcordanceResponse, DetachQuotationData, DetachQuotationError, DetachQuotationResponse, DetachSequentialAnalysisTaskData, DetachSequentialAnalysisTaskError, DetachSequentialAnalysisTaskResponse, DetachTopicModelingData, DetachTopicModelingError, DetachTopicModelingResponse, DownloadFileData, DownloadFileError, DownloadWorkspaceArtifactData, DownloadWorkspaceArtifactError, ExportNodesData, ExportNodesError, FilterNodeData, FilterNodeError, FilterNodeResponse, FilterPreviewData, FilterPreviewError, FilterPreviewResponse2, GetAnnotationClassDescriptionsData, GetAnnotationClassDescriptionsError, GetAnnotationClassDescriptionsResponse, GetAuthInfoData, GetAuthInfoError, GetAuthInfoResponse, GetColumnUniqueValuesData, GetColumnUniqueValuesError, GetColumnUniqueValuesResponse, GetConfigData, GetConfigResponse, GetCurrentUserInfoData, GetCurrentUserInfoError, GetCurrentUserInfoResponse, GetCurrentWorkspaceData, GetCurrentWorkspaceError, GetCurrentWorkspaceResponse, GetFileInfoData, GetFileInfoError, GetFileInfoResponse, GetNodeDataData, GetNodeDataError, GetNodeDataResponse, GetNodeInfoData, GetNodeInfoError, GetNodeInfoResponse, GetNodeQueryPlanData, GetNodeQueryPlanError, GetNodeQueryPlanResponse, GetNodeShapeData, GetNodeShapeError, GetNodeShapeResponse, GetPreferencesData, GetPreferencesError, GetPreferencesResponse, GetQuotationData, GetQuotationError, GetQuotationResponse, GetRawFileData, GetRawFileError, GetSampleDataCatalogueData, GetSampleDataCatalogueError, GetSampleDataCatalogueResponse, GetSampleDataReadmeData, GetSampleDataReadmeError, GetTokenizerModelsData, GetTokenizerModelsError, GetTokenizerModelsResponse, GetUserFilesData, GetUserFilesError, GetUserFilesResponse, GetWorkspaceGraphData, GetWorkspaceGraphError, GetWorkspaceGraphResponse, GetWorkspaceInfoData, GetWorkspaceInfoError, GetWorkspaceInfoResponse, GetWorkspaceNodesData, GetWorkspaceNodesError, GetWorkspaceNodesResponse, GetWorkspaceTabsData, GetWorkspaceTabsError, GetWorkspaceTabsResponse, GoogleAuthCallbackData, GoogleAuthCallbackError, GoogleAuthData, GoogleAuthError, GoogleAuthResponse, HealthCheckData, ImportLdacaDatasetData, ImportLdacaDatasetError, ImportLdacaDatasetResponse, ImportSampleDataData, ImportSampleDataError, ImportSampleDataResponse2, JoinNodesData, JoinNodesError, JoinNodesPreviewData, JoinNodesPreviewError, JoinNodesPreviewResponse, JoinNodesResponse, ListAnnotationAiModelsData, ListAnnotationAiModelsError, ListAnnotationAiModelsResponse, ListFilesTasksData, ListFilesTasksError, ListFilesTasksResponse, ListLdacaFeaturedCollectionsData, ListLdacaFeaturedCollectionsError, ListLdacaFeaturedCollectionsResponse, ListTasksData, ListTasksError, ListTasksResponse, ListUsersData, ListUsersError, ListWorkspacesData, ListWorkspacesError, ListWorkspacesResponse, LogoutData, LogoutError, MaterializeConcordanceData, MaterializeConcordanceError, MaterializeConcordanceResponse, MaterializeQuotationData, MaterializeQuotationError, MaterializeQuotationResponse, MoveFileData, MoveFileError, MoveFileResponse, PolarsExpressionApplyData, PolarsExpressionApplyError, PolarsExpressionApplyResponse2, PolarsExpressionPreviewData, PolarsExpressionPreviewError, PolarsExpressionPreviewResponse, PreviewSequentialAnalysisData, PreviewSequentialAnalysisError, PreviewSequentialAnalysisResponse, PutWorkspaceTabsData, PutWorkspaceTabsError, PutWorkspaceTabsResponse, QuotationDetachOptionsData, QuotationDetachOptionsError, QuotationDetachOptionsResponse2, QuotationTaskRequestData, QuotationTaskRequestError, QuotationTaskRequestResponse, QuotationTaskResultData, QuotationTaskResultError, QuotationTaskResultResponse, RedoNodeOperationData, RedoNodeOperationError, RedoNodeOperationResponse, RenameNodeColumnData, RenameNodeColumnError, RenameNodeColumnResponse, RenameWorkspaceData, RenameWorkspaceError, RenameWorkspaceResponse, ReorderWorkspaceNodesData, ReorderWorkspaceNodesError, ReorderWorkspaceNodesResponse, ReplaceApplyData, ReplaceApplyError, ReplaceApplyResponse2, ReplacePreviewData, ReplacePreviewError, ReplacePreviewResponse, RootData, RunConcordanceData, RunConcordanceError, RunConcordanceResponse, RunSequentialAnalysisData, RunSequentialAnalysisError, RunSequentialAnalysisResponse, RunTopicModelingData, RunTopicModelingError, RunTopicModelingResponse, SaveWorkspaceData, SaveWorkspaceError, SaveWorkspaceResponse, SearchLdacaCollectionsData, SearchLdacaCollectionsError, SearchLdacaCollectionsResponse, SequentialAnalysisTaskRequestData, SequentialAnalysisTaskRequestError, SequentialAnalysisTaskRequestResponse, SequentialAnalysisTaskResultData, SequentialAnalysisTaskResultError, SequentialAnalysisTaskResultResponse, SetAnnotationCellData, SetAnnotationCellError, SetAnnotationCellResponse, SetAnnotationClassParentData, SetAnnotationClassParentError, SetAnnotationClassParentResponse, SetCurrentWorkspaceData, SetCurrentWorkspaceError, SetCurrentWorkspaceResponse2, SetNodeColorData, SetNodeColorError, SetNodeColorResponse, SetNodeDocumentColumnData, SetNodeDocumentColumnError, SetNodeDocumentColumnResponse, SetNodeTokenizationPreferenceData, SetNodeTokenizationPreferenceError, SetNodeTokenizationPreferenceResponse, SliceNodeData, SliceNodeError, SliceNodeResponse, SlicePreviewData, SlicePreviewError, SlicePreviewResponse, StartWorkspaceDownloadData, StartWorkspaceDownloadError, StartWorkspaceDownloadResponse, StatusData, StreamTasksData, StreamTasksError, TokenFrequenciesTaskRequestData, TokenFrequenciesTaskRequestError, TokenFrequenciesTaskRequestResponse, TokenFrequenciesTaskResultData, TokenFrequenciesTaskResultError, TokenFrequenciesTaskResultResponse, TopicModelingDetachOptionsData, TopicModelingDetachOptionsError, TopicModelingDetachOptionsResponse2, TopicModelingTaskRequestData, TopicModelingTaskRequestError, TopicModelingTaskRequestResponse, TopicModelingTaskResultData, TopicModelingTaskResultError, TopicModelingTaskResultResponse, UndoNodeOperationData, UndoNodeOperationError, UndoNodeOperationResponse, UnifiedFilePreviewData, UnifiedFilePreviewError, UnifiedFilePreviewResponse, UnloadWorkspaceData, UnloadWorkspaceError, UnloadWorkspaceResponse, UpdateAnnotationClassDescriptionsData, UpdateAnnotationClassDescriptionsError, UpdateAnnotationClassDescriptionsResponse, UpdateConfigData, UpdateConfigError, UpdateConfigResponse, UpdateNodeNameData, UpdateNodeNameError, UpdateNodeNameResponse, UpdatePreferencesData, UpdatePreferencesError, UpdatePreferencesResponse, UpdateQuotationTaskResultData, UpdateQuotationTaskResultError, UpdateQuotationTaskResultResponse, UpdateSequentialAnalysisTaskResultData, UpdateSequentialAnalysisTaskResultError, UpdateSequentialAnalysisTaskResultResponse, UpdateTokenFrequenciesTaskResultData, UpdateTokenFrequenciesTaskResultError, UpdateTokenFrequenciesTaskResultResponse, UpdateWorkspaceDescriptionData, UpdateWorkspaceDescriptionError, UpdateWorkspaceDescriptionResponse, UploadFileData, UploadFileError, UploadFileResponse, UploadWorkspaceZipData, UploadWorkspaceZipError, UploadWorkspaceZipResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -1245,6 +1245,244 @@ export const createWorkspaceMutation = (options?: Partial<Options<CreateWorkspac
 };
 
 /**
+ * Annotate Ai All
+ *
+ * AI-classify every row concurrently and write the whole column in one go.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel's "Annotate All" button because filling a
+ * whole column one cell at a time is slow; this runs all batches concurrently
+ * on the server and persists the result as a single column rewrite.
+ *
+ * Flow:
+ * - Resolve the workspace + source node (404), collect it once, and require an
+ * existing *string* annotation column (400) so the write target is valid.
+ * - Load the authoritative class list from the class node (404/400).
+ * - Reuse any labels already cached in the preview store (rows the user previewed,
+ * with their manual overrides), and dispatch batches concurrently via
+ * ``annotate_all`` for ONLY the remaining rows — so a full run never re-spends on
+ * pages the user already previewed and respects edits made during preview.
+ * - Overwrite the annotation column with the merged labels (null where the model
+ * chose no class) and restage/persist the node; clear the cache since the
+ * predictions now live in the column. Provider errors become a 502 and nothing
+ * is written.
+ */
+export const annotateAiAllMutation = (options?: Partial<Options<AnnotateAiAllData>>): UseMutationOptions<AnnotateAiAllResponse, AnnotateAiAllError, Options<AnnotateAiAllData>> => {
+    const mutationOptions: UseMutationOptions<AnnotateAiAllResponse, AnnotateAiAllError, Options<AnnotateAiAllData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await annotateAiAll({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Detach Ai Previewed Rows
+ *
+ * Copy the already-previewed rows into a new annotated child node.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel's "Detach Previewed Rows" button because
+ * AI preview predictions live only in the server-side preview store; detaching
+ * turns every page the user has already assessed (not just the current one) into
+ * a persisted child table so those labels survive as a real data block without
+ * re-running (or persisting) the whole column on the source node.
+ *
+ * Flow:
+ * - Resolve the workspace + source node (404).
+ * - Build the row->label map from the node's active preview session (every
+ * previewed row across all viewed pages, override winning over the model label);
+ * fall back to any explicit ``rows`` the client sent.
+ * - When ``dry_run`` is set, return that map's size immediately (``node=None``,
+ * nothing created). The panel calls this on mount to gate/label its Detach
+ * button from the authoritative server session, so a tab switch (which wipes the
+ * panel's local page map) no longer leaves the button wrongly disabled.
+ * - Otherwise require a non-blank annotation column (400) and at least one row
+ * (400) — this is what fixes "detach only grabbed one page", since the source of
+ * truth is now the whole server session rather than the panel's current page.
+ * - Collect the source once; validate every ``row_index`` is in range (400).
+ * - Filter the source down to those indices (original order preserved), overwrite
+ * the annotation column with the aligned labels (blank/whitespace -> null), and
+ * stage the subset as a lazy frame.
+ * - Add it as a child of the source via ``_create_and_persist_child_node`` (so the
+ * lineage shows in the graph) and return the new node metadata + row count.
+ */
+export const detachAiPreviewedRowsMutation = (options?: Partial<Options<DetachAiPreviewedRowsData>>): UseMutationOptions<DetachAiPreviewedRowsResponse, DetachAiPreviewedRowsError, Options<DetachAiPreviewedRowsData>> => {
+    const mutationOptions: UseMutationOptions<DetachAiPreviewedRowsResponse, DetachAiPreviewedRowsError, Options<DetachAiPreviewedRowsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await detachAiPreviewedRows({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * List Annotation Ai Models
+ *
+ * Proxy a provider's model listing so the browser never calls providers.
+ *
+ * Used by:
+ * - Frontend ModelNameCombobox to populate the model dropdown. Authentication is
+ * required (per-user gate) even though no workspace is touched, so an
+ * unauthenticated caller cannot use the backend as an open model-listing proxy.
+ *
+ * Flow:
+ * - Delegate to ``core.annotation_ai.list_models`` (native SDK per provider).
+ * - Translate any provider/SDK failure into a 502 with the provider's message.
+ */
+export const listAnnotationAiModelsMutation = (options?: Partial<Options<ListAnnotationAiModelsData>>): UseMutationOptions<ListAnnotationAiModelsResponse, ListAnnotationAiModelsError, Options<ListAnnotationAiModelsData>> => {
+    const mutationOptions: UseMutationOptions<ListAnnotationAiModelsResponse, ListAnnotationAiModelsError, Options<ListAnnotationAiModelsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await listAnnotationAiModels({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Annotate Ai Preview
+ *
+ * AI-classify one page of texts, caching results in the preview store.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel because previewing must not mutate the
+ * workspace; the panel renders the returned labels beside the (unchanged)
+ * source column so users can eyeball provider/model/prompt/class quality.
+ *
+ * Flow:
+ * - Resolve the workspace + source node (404) and require the text column (400).
+ * - Load the authoritative class list from the class-description node (404/400).
+ * - Slice exactly the requested page of the text column — the same
+ * ``(page-1)*page_size`` slice ``get_node_data`` uses — so labels line up with
+ * the rows the panel displays.
+ * - Sync the server-side preview session for this node + config signature, then
+ * dispatch a provider batch for ONLY the page rows not already cached (re-viewed
+ * pages are cache hits and cost nothing). Store the fresh labels and return the
+ * model labels for the whole page in order; provider errors become a 502.
+ */
+export const annotateAiPreviewMutation = (options?: Partial<Options<AnnotateAiPreviewData>>): UseMutationOptions<AnnotateAiPreviewResponse, AnnotateAiPreviewError, Options<AnnotateAiPreviewData>> => {
+    const mutationOptions: UseMutationOptions<AnnotateAiPreviewResponse, AnnotateAiPreviewError, Options<AnnotateAiPreviewData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await annotateAiPreview({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Annotate Ai Preview Clear
+ *
+ * Discard the node's cached AI preview session.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel when the user clicks "Close preview". The
+ * in-memory preview store keeps a node's predictions across tab switches so the
+ * panel can rehydrate, but an explicit close means those predictions are no
+ * longer wanted; dropping the session frees the memory and resets the
+ * detach/annotate-all counts so a later preview starts clean.
+ *
+ * Flow:
+ * - Resolve the current workspace (the store is keyed per user+workspace+node).
+ * - Clear the node's session unconditionally. Clearing is idempotent, so a missing
+ * session (nothing previewed, or already cleared) is a successful no-op; the node
+ * itself is not required to still exist, which is why no 404 is raised here.
+ */
+export const annotateAiPreviewClearMutation = (options?: Partial<Options<AnnotateAiPreviewClearData>>): UseMutationOptions<AnnotateAiPreviewClearResponse, AnnotateAiPreviewClearError, Options<AnnotateAiPreviewClearData>> => {
+    const mutationOptions: UseMutationOptions<AnnotateAiPreviewClearResponse, AnnotateAiPreviewClearError, Options<AnnotateAiPreviewClearData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await annotateAiPreviewClear({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Annotate Ai Preview Override
+ *
+ * Persist one manual cell edit onto the node's active preview session.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel when the user changes a prediction in the
+ * dropdown, so the edit survives a tab switch (it returns via ``preview/state``)
+ * and is honoured by detach/annotate-all. A blank label is stored as an explicit
+ * null override (the user chose "None"), which still wins over the model label.
+ *
+ * Flow:
+ * - Resolve the workspace + source node (404).
+ * - Write the override to the current session; ``ok=False`` when there is no active
+ * session (the edit is stale — an override can only follow a preview).
+ */
+export const annotateAiPreviewOverrideMutation = (options?: Partial<Options<AnnotateAiPreviewOverrideData>>): UseMutationOptions<AnnotateAiPreviewOverrideResponse, AnnotateAiPreviewOverrideError, Options<AnnotateAiPreviewOverrideData>> => {
+    const mutationOptions: UseMutationOptions<AnnotateAiPreviewOverrideResponse, AnnotateAiPreviewOverrideError, Options<AnnotateAiPreviewOverrideData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await annotateAiPreviewOverride({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Annotate Ai Preview State
+ *
+ * Return the cached preview rows for a node so the panel can rehydrate.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel on mount because its per-row AI labels and
+ * manual overrides are in-memory only; after a tab switch the panel re-reads
+ * them here so the preview reappears exactly as the user left it.
+ *
+ * Flow:
+ * - Resolve the workspace + source node (404).
+ * - Recompute the config signature and ask the store for its rows; if the stored
+ * session belongs to a different config the store returns nothing, so the panel
+ * shows an empty preview and re-classifies on demand rather than displaying
+ * stale labels.
+ */
+export const annotateAiPreviewStateMutation = (options?: Partial<Options<AnnotateAiPreviewStateData>>): UseMutationOptions<AnnotateAiPreviewStateResponse, AnnotateAiPreviewStateError, Options<AnnotateAiPreviewStateData>> => {
+    const mutationOptions: UseMutationOptions<AnnotateAiPreviewStateResponse, AnnotateAiPreviewStateError, Options<AnnotateAiPreviewStateData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await annotateAiPreviewState({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
  * Create Annotation Class Descriptions
  *
  * Create an empty class-description table for the Annotation view.
@@ -1344,6 +1582,68 @@ export const setAnnotationClassParentMutation = (options?: Partial<Options<SetAn
     const mutationOptions: UseMutationOptions<SetAnnotationClassParentResponse, SetAnnotationClassParentError, Options<SetAnnotationClassParentData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await setAnnotationClassParent({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Set Annotation Cell
+ *
+ * Write a single class label into the source node's annotation column.
+ *
+ * Used by:
+ * - Frontend Annotation results table because each per-row class dropdown
+ * persists its selection so annotations survive reloads and feed downstream
+ * analyses, rather than staying as local component state.
+ *
+ * Flow:
+ * - Resolve the workspace and source node (404 if missing).
+ * - Require a non-blank, existing string annotation column (400 otherwise).
+ * - Bounds-check the absolute row index against the collected frame (400).
+ * - Rewrite just the target cell (blank/whitespace clears it to null), restage
+ * the materialized frame, persist the workspace, and return node metadata.
+ */
+export const setAnnotationCellMutation = (options?: Partial<Options<SetAnnotationCellData>>): UseMutationOptions<SetAnnotationCellResponse, SetAnnotationCellError, Options<SetAnnotationCellData>> => {
+    const mutationOptions: UseMutationOptions<SetAnnotationCellResponse, SetAnnotationCellError, Options<SetAnnotationCellData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setAnnotationCell({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Create Annotation Column
+ *
+ * Add an empty string annotation column to the selected source node.
+ *
+ * Used by:
+ * - Frontend Annotation view on Start (new-annotation mode) because the source
+ * block needs a real, persisted column before the per-row class dropdowns can
+ * record annotations and before the view can switch into resume mode.
+ *
+ * Flow:
+ * - Resolve the workspace and source node (404 if missing).
+ * - Reject blank names and names that already exist on the node (400).
+ * - Append a null-filled string column lazily, then restage the materialized
+ * frame so the node stays portable and lazy by default.
+ * - Persist the workspace and return the refreshed node metadata.
+ */
+export const createAnnotationColumnMutation = (options?: Partial<Options<CreateAnnotationColumnData>>): UseMutationOptions<CreateAnnotationColumnResponse, CreateAnnotationColumnError, Options<CreateAnnotationColumnData>> => {
+    const mutationOptions: UseMutationOptions<CreateAnnotationColumnResponse, CreateAnnotationColumnError, Options<CreateAnnotationColumnData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAnnotationColumn({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

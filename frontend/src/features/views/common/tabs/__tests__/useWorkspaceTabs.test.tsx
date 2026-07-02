@@ -95,3 +95,43 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
     expect(clearTasksMock).not.toHaveBeenCalled();
   });
 });
+
+describe('useWorkspaceTabs setTabSetting', () => {
+  beforeEach(() => {
+    getWorkspaceTabsMock.mockReset();
+    getWorkspaceTabsMock.mockResolvedValue({ data: initialState(), error: undefined });
+    putWorkspaceTabsMock.mockReset();
+    putWorkspaceTabsMock.mockImplementation(({ body }: { body: WorkspaceTabsState }) =>
+      Promise.resolve({ data: body, error: undefined }),
+    );
+    clearTasksMock.mockReset();
+    clearTasksMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
+  });
+
+  it('persists a free-form tab setting through to the PUT body', async () => {
+    const { result } = renderHook(
+      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE, () => ({ Authorization: 'Bearer t' })),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.tabs).toHaveLength(2);
+    });
+
+    act(() => {
+      result.current.setTabSetting('tab-with-task', 'aiProvider', 'openai');
+    });
+
+    // The mutation PUTs the full state; the targeted tab carries the new setting.
+    await waitFor(() => {
+      expect(putWorkspaceTabsMock).toHaveBeenCalled();
+    });
+    const calls = putWorkspaceTabsMock.mock.calls;
+    const lastArg = calls[calls.length - 1]?.[0] as { body: WorkspaceTabsState } | undefined;
+    const body: WorkspaceTabsState | undefined = lastArg?.body;
+    const updatedTab = body?.groups?.[ANALYSIS_TYPE]?.tabs?.find(
+      (t) => t.tab_id === 'tab-with-task',
+    );
+    expect(updatedTab?.settings).toEqual({ aiProvider: 'openai' });
+  });
+});

@@ -46,6 +46,10 @@ interface AnalysisTabFeatureProps {
   tabInputSets?: AnalysisTabInputSets;
   /** Commit one named input node set for this tab (persists to tabs.json). */
   onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  /** This tab's free-form scalar settings (Manual/AI mode, provider, ...). */
+  tabSettings?: Record<string, string>;
+  /** Commit one free-form scalar setting for this tab (persists to tabs.json). */
+  onTabSettingChange?: (key: string, value: string) => void;
 }
 
 export interface AnalysisTabsHostProps {
@@ -79,6 +83,7 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     setTabTask,
     setTabInputs,
     setTabInputSet,
+    setTabSetting,
   } = useWorkspaceTabs(currentWorkspaceId, tabGroup, getAuthHeaders);
 
   // Requirement: entering an empty analysis view presents one ready tab, but
@@ -133,6 +138,10 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
           tabInputSets={activeTab.input_sets ?? {}}
           onTabInputSetChange={(selectorId, inputs) => {
             setTabInputSet(activeTab.tab_id, selectorId, inputs);
+          }}
+          tabSettings={activeTab.settings ?? {}}
+          onTabSettingChange={(key, value) => {
+            setTabSetting(activeTab.tab_id, key, value);
           }}
         />
       ) : null}

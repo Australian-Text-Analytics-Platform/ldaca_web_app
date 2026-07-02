@@ -5,6 +5,15 @@ import type { CreateClientConfig } from '@/api';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+// Opt-in per-request timeout override (milliseconds). Callers set this header to
+// extend or disable the default 30s client timeout for genuinely long-running
+// endpoints — e.g. the Annotation tab's AI preview/annotate-all, where the
+// backend fans provider requests out concurrently and one HTTP call can outlast
+// 30s. A value of "0" (or negative) disables the client timeout entirely,
+// deferring to the backend's own per-request bound. The header is stripped
+// before the request leaves the browser so it never reaches the server.
+const TIMEOUT_OVERRIDE_HEADER = 'x-client-timeout-ms';
+
 /** Detects Request objects so generated SDK calls can preserve caller-provided headers and signals. */
 /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
 const isRequest = (input: RequestInfo | URL): input is Request =>
@@ -37,11 +46,16 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
  * Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * Flow: read runtime configuration, normalize request or response details, then return the backend-facing value.
  */
-const createTimeout = (sourceSignal?: AbortSignal) => {
+const createTimeout = (sourceSignal?: AbortSignal, timeoutMs: number = DEFAULT_TIMEOUT_MS) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, DEFAULT_TIMEOUT_MS);
+  // timeoutMs <= 0 disables the client-side timeout (long-running calls); we then
+  // only abort when the caller's own signal fires.
+  const timeoutId =
+    timeoutMs > 0
+      ? setTimeout(() => {
+          controller.abort();
+        }, timeoutMs)
+      : undefined;
   /** Preserves the caller's abort reason when we chain their signal. */
   /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
   const abortFromSource = () => {
@@ -58,14 +72,35 @@ const createTimeout = (sourceSignal?: AbortSignal) => {
     signal: controller.signal,
     /** Distinguishes our timeout abort from an abort requested by the original caller. */
     /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-    didTimeOut: () => controller.signal.aborted && !sourceSignal?.aborted,
+    didTimeOut: () =>
+      timeoutId !== undefined && controller.signal.aborted && !sourceSignal?.aborted,
     /** Removes timeout/listener resources once fetch resolves or rejects. */
     /** Used by: src/test/setup.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
     cleanup: () => {
-      clearTimeout(timeoutId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
       sourceSignal?.removeEventListener('abort', abortFromSource);
     },
   };
+};
+
+/**
+ * Pull the opt-in `x-client-timeout-ms` override off the outgoing headers and
+ * return the resolved timeout plus an init whose headers no longer carry the
+ * sentinel. Called by createGeneratedApiFetch before it builds the timeout so
+ * long-running callers (AI preview/annotate-all) can extend or disable the
+ * default 30s cap without the header ever reaching the server.
+ */
+const resolveTimeoutOverride = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): { timeoutMs: number; init?: RequestInit } => {
+  const headers = new Headers(init?.headers ?? (isRequest(input) ? input.headers : undefined));
+  const raw = headers.get(TIMEOUT_OVERRIDE_HEADER);
+  if (raw == null) return { timeoutMs: DEFAULT_TIMEOUT_MS, init };
+  headers.delete(TIMEOUT_OVERRIDE_HEADER);
+  const parsed = Number(raw);
+  const timeoutMs = Number.isFinite(parsed) ? parsed : DEFAULT_TIMEOUT_MS;
+  return { timeoutMs, init: { ...init, headers } };
 };
 
 /** Injects auth headers into a Request while leaving explicit caller headers untouched. */
@@ -124,9 +159,10 @@ const parseErrorResponse = async (response: Response): Promise<ApiError> => {
  */
 const createGeneratedApiFetch = (fetchImpl?: typeof fetch): typeof fetch => {
   return async (input, init) => {
-    const timeout = createTimeout(getRequestSignal(input, init));
+    const { timeoutMs, init: cleanedInit } = resolveTimeoutOverride(input, init);
+    const timeout = createTimeout(getRequestSignal(input, cleanedInit), timeoutMs);
     try {
-      const request = await createRequest(input, init, timeout.signal);
+      const request = await createRequest(input, cleanedInit, timeout.signal);
       const response = await (fetchImpl ?? globalThis.fetch)(request);
       if (!response.ok) {
         throw await parseErrorResponse(response);

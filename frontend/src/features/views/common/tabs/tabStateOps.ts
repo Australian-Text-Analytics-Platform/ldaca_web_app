@@ -72,6 +72,20 @@ export function getTabInputSet(
 }
 
 /**
+ * Reads one tab-owned free-form setting by key.
+ * Called by: AnalysisTabsHost to hydrate a feature's persisted scalar
+ * parameters (for example, the Annotation tab's Manual/AI mode, AI provider id,
+ * model name, and prompt). Returns undefined when the tab predates ``settings``
+ * or never set the key, so callers apply their own default.
+ */
+export function getTabSetting(
+  tab: Pick<AnalysisTab, 'settings'> | null | undefined,
+  key: string,
+): string | undefined {
+  return tab?.settings?.[key];
+}
+
+/**
  * Resolves the active tab id, defaulting to the first tab when the persisted
  * pointer is missing or dangling (e.g. the active tab was closed elsewhere).
  * Called by: useWorkspaceTabs so consumers always get a valid active id when at
@@ -129,6 +143,7 @@ export function createTabInState(
     title,
     inputs: [],
     input_sets: { [DEFAULT_TAB_INPUT_SET_ID]: [] },
+    settings: {},
   };
   const nextGroup: AnalysisTabGroup = {
     tabs: [...(group.tabs ?? []), tab],
@@ -299,6 +314,28 @@ export function setTabInputsInState(
   inputs: AnalysisTabInput[],
 ): WorkspaceTabsState {
   return setTabInputSetInState(state, analysisType, tabId, DEFAULT_TAB_INPUT_SET_ID, inputs);
+}
+
+/**
+ * Sets one free-form ``settings`` key on a tab (preserving the other keys).
+ * Called by: useWorkspaceTabs.setTabSetting whenever a feature persists a
+ * lightweight scalar parameter that is not a node selection — the Annotation
+ * tab uses it for its Manual/AI mode, provider id, model name, and prompt so
+ * those round-trip with the rest of the tab state. A no-op (unknown tab) leaves
+ * the state untouched.
+ */
+export function setTabSettingInState(
+  state: WorkspaceTabsState | null | undefined,
+  analysisType: string,
+  tabId: string,
+  key: string,
+  value: string,
+): WorkspaceTabsState {
+  const group = getGroup(state, analysisType);
+  const nextTabs = (group.tabs ?? []).map((t) =>
+    t.tab_id === tabId ? { ...t, settings: { ...(t.settings ?? {}), [key]: value } } : t,
+  );
+  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
 }
 
 /**

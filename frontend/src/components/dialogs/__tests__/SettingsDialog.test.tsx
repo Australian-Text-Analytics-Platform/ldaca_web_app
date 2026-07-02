@@ -169,4 +169,15 @@ describe('SettingsDialog', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(usePreferencesStore.getState().analysisMultiTabEnabled).toBe(false);
   });
+
+  it('renders the AI providers panel in the AI tab', async () => {
+    const user = userEvent.setup();
+    renderSettingsDialog();
+
+    await user.click(screen.getByRole('tab', { name: 'AI' }));
+
+    expect(await screen.findByText('AI Providers')).toBeInTheDocument();
+    expect(screen.getByText('OpenRouter')).toBeInTheDocument();
+    expect(screen.getByText('Custom Providers')).toBeInTheDocument();
+  });
 });

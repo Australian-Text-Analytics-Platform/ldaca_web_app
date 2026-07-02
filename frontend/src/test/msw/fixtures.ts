@@ -18,6 +18,7 @@ export const preferencesResponse = (overrides: Partial<UserPreferences> = {}): U
   default_tokenizer_model: null,
   ldaca_oni_api_token: null,
   analysis_multi_tab_enabled: false,
+  annotation_ai: { api_keys: {}, custom_providers: [] },
   ...overrides,
 });
 

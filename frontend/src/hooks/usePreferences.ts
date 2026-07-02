@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import type { AnnotationAiCustomProvider } from '@/api';
 
 /**
  * Coalesce rapid preference changes into a single backend write. Hand-tuned:
@@ -16,6 +17,8 @@ interface PersistedSnapshot {
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
   analysisMultiTabEnabled: boolean;
+  annotationAiApiKeys: Record<string, string>;
+  annotationAiCustomProviders: readonly AnnotationAiCustomProvider[];
 }
 
 /**
@@ -32,6 +35,8 @@ const snapshotPersisted = (
   defaultTokenizerModel: state.defaultTokenizerModel,
   ldacaOniApiToken: state.ldacaOniApiToken,
   analysisMultiTabEnabled: state.analysisMultiTabEnabled,
+  annotationAiApiKeys: state.annotationAiApiKeys,
+  annotationAiCustomProviders: state.annotationAiCustomProviders,
 });
 
 /** Compares the persisted preference subset so cosmetic store changes do not sync to the backend. */
@@ -50,6 +55,18 @@ const snapshotsEqual = (a: PersistedSnapshot, b: PersistedSnapshot) => {
   }
   for (let i = 0; i < a.favoriteWorkspaces.length; i++) {
     if (a.favoriteWorkspaces[i] !== b.favoriteWorkspaces[i]) return false;
+  }
+  // annotation_ai keys/providers are small; stringify-compare is cheap and simple.
+  if (
+    JSON.stringify(a.annotationAiApiKeys) !== JSON.stringify(b.annotationAiApiKeys)
+  ) {
+    return false;
+  }
+  if (
+    JSON.stringify(a.annotationAiCustomProviders) !==
+    JSON.stringify(b.annotationAiCustomProviders)
+  ) {
+    return false;
   }
   return true;
 };

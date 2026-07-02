@@ -223,6 +223,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           node: {
             node_id: node.id,
             name: node.name || `Node ${String(index + 1)}`,
+            // Carry the persisted colour through so CustomNode can paint the
+            // left accent; backend omits it (null) for uncoloured nodes.
+            color: node.color ?? null,
             shape: parsedShape,
             columns,
             preview: [],

@@ -19,7 +19,11 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { getPreferences, updatePreferences } from '@/api';
-import type { UserPreferences, UserPreferencesUpdate } from '@/api';
+import type {
+  AnnotationAiCustomProvider,
+  UserPreferences,
+  UserPreferencesUpdate,
+} from '@/api';
 import type { ViewType } from '@/stores/uiStore';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = [];
@@ -30,6 +34,10 @@ interface PreferencesState {
   defaultTokenizerModel: string | null;
   ldacaOniApiToken: string | null;
   analysisMultiTabEnabled: boolean;
+  /** Per-provider AI API keys for the Annotation tab, keyed by provider id. */
+  annotationAiApiKeys: Record<string, string>;
+  /** User-defined custom AI providers (OpenAI-compatible) for the Annotation tab. */
+  annotationAiCustomProviders: AnnotationAiCustomProvider[];
   /** True once the first backend fetch completes */
   hydrated: boolean;
   /** True while a backend sync is in-flight */
@@ -45,6 +53,12 @@ interface PreferencesActions {
   setDefaultTokenizerModel: (model: string | null) => void;
   setLdacaOniApiToken: (token: string | null) => void;
   setAnalysisMultiTabEnabled: (enabled: boolean) => void;
+  /** Save (or clear when empty) the AI API key for a provider id. */
+  setAnnotationAiApiKey: (providerId: string, key: string | null) => void;
+  /** Add or replace a user-defined custom AI provider (matched by id). */
+  addAnnotationAiCustomProvider: (provider: AnnotationAiCustomProvider) => void;
+  /** Remove a custom AI provider (and its stored API key) by id. */
+  removeAnnotationAiCustomProvider: (providerId: string) => void;
   /** Fetch preferences from backend and hydrate the store */
   loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
   /** Push current state to backend */
@@ -60,12 +74,15 @@ type ResolvedUserPreferences = Omit<
   | 'hidden_views'
   | 'ldaca_oni_api_token'
   | 'analysis_multi_tab_enabled'
+  | 'annotation_ai'
 > & {
   hidden_views: string[];
   favorite_workspaces: string[];
   default_tokenizer_model: string | null;
   ldaca_oni_api_token: string | null;
   analysis_multi_tab_enabled: boolean;
+  annotation_ai_api_keys: Record<string, string>;
+  annotation_ai_custom_providers: AnnotationAiCustomProvider[];
 };
 
 /** Converts frontend auth header casing to the generated preferences client contract. */
@@ -89,6 +106,8 @@ const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences =>
   default_tokenizer_model: data.default_tokenizer_model ?? null,
   ldaca_oni_api_token: data.ldaca_oni_api_token ?? null,
   analysis_multi_tab_enabled: data.analysis_multi_tab_enabled ?? false,
+  annotation_ai_api_keys: data.annotation_ai?.api_keys ?? {},
+  annotation_ai_custom_providers: data.annotation_ai?.custom_providers ?? [],
 });
 
 /** Hydrates persisted preference fields into the immer draft after a successful backend load. */
@@ -102,6 +121,8 @@ function applyServerState(state: PreferencesState, data: ResolvedUserPreferences
   state.defaultTokenizerModel = data.default_tokenizer_model;
   state.ldacaOniApiToken = data.ldaca_oni_api_token;
   state.analysisMultiTabEnabled = data.analysis_multi_tab_enabled;
+  state.annotationAiApiKeys = data.annotation_ai_api_keys;
+  state.annotationAiCustomProviders = data.annotation_ai_custom_providers;
   state.hydrated = true;
 }
 
@@ -114,6 +135,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
         defaultTokenizerModel: null,
         ldacaOniApiToken: null,
         analysisMultiTabEnabled: false,
+        annotationAiApiKeys: {},
+        annotationAiCustomProviders: [],
         hydrated: false,
         syncing: false,
         lastSyncError: null,
@@ -181,6 +204,71 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
+        /**
+         * Saves (or clears, when blank) the AI API key for a provider id.
+         * Why: the Annotation AI panel commits keys on blur so they persist to
+         * the TOML preferences via the debounced backend sync; an empty value
+         * removes the entry so we never write blank keys.
+         * Used by: AnnotationFeature's AI settings API-key input.
+         */
+        setAnnotationAiApiKey: (providerId, key) => {
+          const value = typeof key === 'string' && key.trim() ? key.trim() : null;
+          set((state) => {
+            if (value === null) {
+              // Reassign without the key (no-dynamic-delete forbids `delete`).
+              const next: Record<string, string> = {};
+              for (const [k, v] of Object.entries(state.annotationAiApiKeys)) {
+                if (k !== providerId) next[k] = v;
+              }
+              state.annotationAiApiKeys = next;
+            } else {
+              state.annotationAiApiKeys[providerId] = value;
+            }
+          });
+        },
+
+        /**
+         * Adds or replaces a user-defined custom AI provider (matched by id).
+         * Why: the Annotation "Custom…" dialog registers OpenAI-compatible
+         * providers that persist and reappear in the provider dropdown; updating
+         * an existing id lets the same dialog edit a provider later.
+         * Used by: the custom-provider dialog flow in AnnotationFeature.
+         */
+        addAnnotationAiCustomProvider: (provider) => {
+          set((state) => {
+            const idx = state.annotationAiCustomProviders.findIndex(
+              (p) => p.id === provider.id,
+            );
+            if (idx === -1) {
+              state.annotationAiCustomProviders.push(provider);
+            } else {
+              state.annotationAiCustomProviders[idx] = provider;
+            }
+          });
+        },
+
+        /**
+         * Removes a custom AI provider and any API key stored under its id.
+         * Why: the AI providers preferences panel lets users delete custom
+         * providers; dropping the matching key avoids leaving an orphaned secret
+         * in the persisted preferences. Built-in providers cannot be removed, so
+         * callers only pass `custom:<uuid>` ids here.
+         * Used by: AiProvidersPreferencesPanel's delete action.
+         */
+        removeAnnotationAiCustomProvider: (providerId) => {
+          set((state) => {
+            state.annotationAiCustomProviders = state.annotationAiCustomProviders.filter(
+              (p) => p.id !== providerId,
+            );
+            // Reassign without the key (no-dynamic-delete forbids `delete`).
+            const next: Record<string, string> = {};
+            for (const [k, v] of Object.entries(state.annotationAiApiKeys)) {
+              if (k !== providerId) next[k] = v;
+            }
+            state.annotationAiApiKeys = next;
+          });
+        },
+
         /** Loads preferences from the backend once auth is available, falling back to local state. */
         /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         loadFromBackend: async (headers) => {
@@ -221,6 +309,10 @@ export const usePreferencesStore = create<PreferencesStore>()(
               : {}),
             ldaca_oni_api_token: state.ldacaOniApiToken,
             analysis_multi_tab_enabled: state.analysisMultiTabEnabled,
+            annotation_ai: {
+              api_keys: state.annotationAiApiKeys,
+              custom_providers: state.annotationAiCustomProviders,
+            },
           };
           try {
             await updatePreferences({
@@ -249,6 +341,8 @@ export const usePreferencesStore = create<PreferencesStore>()(
           defaultTokenizerModel: state.defaultTokenizerModel,
           ldacaOniApiToken: state.ldacaOniApiToken,
           analysisMultiTabEnabled: state.analysisMultiTabEnabled,
+          annotationAiApiKeys: state.annotationAiApiKeys,
+          annotationAiCustomProviders: state.annotationAiCustomProviders,
         }),
       },
     ),

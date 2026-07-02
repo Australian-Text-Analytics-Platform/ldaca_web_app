@@ -28,8 +28,9 @@ import { workspaceTabsQueryKey } from '@/features/views/common/tabs/useWorkspace
 import { ALL_VIEWS, type ViewType, useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
 import { toast } from 'sonner';
-import { Eye, FolderOpen, Hash, KeyRound, RotateCcw, Sparkles } from 'lucide-react';
+import { Bot, Eye, FolderOpen, Hash, KeyRound, RotateCcw, Sparkles } from 'lucide-react';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -51,6 +52,7 @@ const VIEW_LABELS: Record<ViewType, string> = {
 const SETTINGS_TABS = [
   { value: 'general', label: 'General', icon: Sparkles },
   { value: 'portal', label: 'Portal', icon: KeyRound },
+  { value: 'ai', label: 'AI', icon: Bot },
   { value: 'workspace', label: 'Workspace', icon: FolderOpen },
   { value: 'views', label: 'Views', icon: Eye },
   { value: 'hints', label: 'Hints', icon: Hash },
@@ -304,6 +306,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </div>
                   </div>
                 </section>
+              </TabsContent>
+
+              <TabsContent value="ai" className="mt-0">
+                <AiProvidersPreferencesPanel />
               </TabsContent>
 
               <TabsContent value="workspace" className="mt-0 space-y-5">

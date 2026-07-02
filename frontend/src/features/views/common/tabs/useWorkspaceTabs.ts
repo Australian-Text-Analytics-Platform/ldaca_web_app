@@ -28,6 +28,7 @@ import {
   setActiveTabInState,
   setTabInputSetInState,
   setTabInputsInState,
+  setTabSettingInState,
   setTabTaskInState,
 } from './tabStateOps';
 
@@ -63,6 +64,8 @@ export interface UseWorkspaceTabsResult {
   setTabInputs: (tabId: string, inputs: AnalysisTabInput[]) => void;
   /** Replaces one named input node set for multi-selector views. */
   setTabInputSet: (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => void;
+  /** Persists one free-form per-view setting (string→string) on a tab. */
+  setTabSetting: (tabId: string, key: string, value: string) => void;
 }
 
 /**
@@ -239,6 +242,13 @@ export function useWorkspaceTabs(
     [analysisType, readState, commit],
   );
 
+  const setTabSetting = useCallback(
+    (tabId: string, key: string, value: string) => {
+      commit(setTabSettingInState(readState(), analysisType, tabId, key, value));
+    },
+    [analysisType, readState, commit],
+  );
+
   return {
     tabs: getTabs(state, analysisType),
     activeTabId: getActiveTabId(state, analysisType),
@@ -251,5 +261,6 @@ export function useWorkspaceTabs(
     setTabTask,
     setTabInputs,
     setTabInputSet,
+    setTabSetting,
   };
 }

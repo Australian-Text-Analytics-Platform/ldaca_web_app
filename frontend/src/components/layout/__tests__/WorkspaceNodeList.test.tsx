@@ -62,6 +62,33 @@ describe('WorkspaceNodeList', () => {
     expect(onToggleNodeSelection).toHaveBeenCalledTimes(3);
   });
 
+  it('paints a left accent from the node color while keeping the label legible', () => {
+    render(
+      <WorkspaceNodeList
+        nodes={[{ id: 'node-1', color: '#2563eb', data: { nodeName: 'Corpus' } }]}
+        onToggleNodeSelection={vi.fn()}
+      />,
+    );
+
+    const accentBox = screen.getByTestId('workspace-node-row-node-1');
+    expect(accentBox).toHaveStyle({ borderLeftWidth: '4px' });
+    expect(accentBox.style.borderLeftColor).not.toBe('');
+    // The name is a sibling of the accent border, never overlaid by it.
+    expect(screen.getByText('Corpus')).toBeInTheDocument();
+  });
+
+  it('renders no accent style for a node without a color', () => {
+    render(
+      <WorkspaceNodeList
+        nodes={[{ id: 'node-1', data: { nodeName: 'Corpus' } }]}
+        onToggleNodeSelection={vi.fn()}
+      />,
+    );
+
+    const accentBox = screen.getByTestId('workspace-node-row-node-1');
+    expect(accentBox.style.borderLeftWidth).toBe('');
+  });
+
   it('groups pinned nodes before selected non-pinned nodes and regular nodes', () => {
     usePinnedNodesStore.getState().togglePinnedNode('node-3');
     render(

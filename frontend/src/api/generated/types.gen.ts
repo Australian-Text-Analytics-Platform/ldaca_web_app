@@ -56,11 +56,16 @@ export type AnalysisSorting = {
  * A single analysis tab.
  *
  * Carries identity (``tab_id``), a pointer to the analysis result it shows
- * (``task_id``), a display ``title``, and selector state. ``inputs`` remains
- * the legacy source selector for existing clients. ``input_sets`` is keyed by
- * selector id (for example, ``source`` or ``classDescriptions``) so newer
- * views can persist multiple node selectors on the same tab. Remaining
- * analysis parameters live on the referenced ``AnalysisTask.request``.
+ * (``task_id``), a display ``title``, selector state, and free-form view
+ * settings. ``inputs`` remains the legacy source selector for existing
+ * clients. ``input_sets`` is keyed by selector id (for example, ``source`` or
+ * ``classDescriptions``) so newer views can persist multiple node selectors on
+ * the same tab. ``settings`` is a flat string→string map a view uses to
+ * round-trip lightweight scalar parameters that are not node selections — for
+ * example the Annotation tab persists its Manual/AI mode, AI provider id,
+ * model name, and prompt here so they survive reloads and tab switches like
+ * the node selectors do. Heavier analysis parameters still live on the
+ * referenced ``AnalysisTask.request``.
  *
  * Used by:
  * - `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab
@@ -77,6 +82,12 @@ export type AnalysisTab = {
      * Inputs
      */
     inputs?: Array<AnalysisTabInput>;
+    /**
+     * Settings
+     */
+    settings?: {
+        [key: string]: string;
+    };
     /**
      * Tab Id
      */
@@ -186,6 +197,533 @@ export type AnalysisTaskMetadata = {
 };
 
 /**
+ * AnnotationAiAnnotateAllRequest
+ *
+ * Request to AI-classify every row and persist the whole annotation column.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel's "Annotate All" button because a full run
+ * classifies the entire source node in concurrent batches and writes the
+ * results back in one go, unlike the transient per-page preview.
+ */
+export type AnnotationAiAnnotateAllRequest = {
+    /**
+     * Annotation Column
+     */
+    annotation_column: string;
+    /**
+     * Api Key
+     */
+    api_key?: string;
+    /**
+     * Base Url
+     */
+    base_url?: string | null;
+    /**
+     * Batch Size
+     */
+    batch_size?: number | null;
+    /**
+     * Class Column
+     */
+    class_column?: string;
+    /**
+     * Class Node Id
+     */
+    class_node_id: string;
+    /**
+     * Description Column
+     */
+    description_column?: string;
+    /**
+     * Instruction
+     */
+    instruction: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Reasoning Effort
+     */
+    reasoning_effort?: string;
+    /**
+     * Reasoning Enabled
+     */
+    reasoning_enabled?: boolean;
+    /**
+     * Temperature
+     */
+    temperature?: number;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
+
+/**
+ * AnnotationAiAnnotateAllResponse
+ *
+ * Refreshed node metadata plus how many of the total rows got a label.
+ */
+export type AnnotationAiAnnotateAllResponse = {
+    /**
+     * Labeled Rows
+     */
+    labeled_rows: number;
+    node: WorkspaceNodeInfo;
+    /**
+     * Total Rows
+     */
+    total_rows: number;
+};
+
+/**
+ * AnnotationAiCustomProvider
+ *
+ * A user-defined OpenAI-compatible AI provider for annotation.
+ *
+ * Used by:
+ * - `AnnotationAiPreferences` (and therefore `UserPreferences`) because the Annotation
+ * tab lets users register custom providers (name + base URL) that persist to the
+ * TOML preferences file and reappear in the provider dropdown.
+ *
+ * Flow: validate the provider id/name/base_url, then serialize alongside the rest of
+ * the preferences payload for disk persistence and the JSON API contract.
+ */
+export type AnnotationAiCustomProvider = {
+    /**
+     * Base Url
+     */
+    base_url: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * AnnotationAiDetachRequest
+ *
+ * Request to copy the previewed rows into a new annotated child table.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel's "Detach Previewed Rows" button. The rows
+ * the user previewed (across every page they viewed) are read from the
+ * server-side preview store, so the panel sends only the node + target column.
+ * ``rows`` is optional: when omitted the server materialises exactly the stored
+ * previewed rows (with their overrides applied); when supplied it takes
+ * precedence, preserving the old explicit-list behaviour.
+ * - The same panel's Detach button *gating*: with ``dry_run`` true the endpoint
+ * only probes the server session and returns how many rows would be detached
+ * (``node`` is null, nothing is created). The panel calls this on mount so the
+ * button reflects the cached preview after a tab switch — the local page map is
+ * reset on remount, but the server session is the source of truth — and so the
+ * confirmation dialog can show the exact count.
+ */
+export type AnnotationAiDetachRequest = {
+    /**
+     * Annotation Column
+     */
+    annotation_column: string;
+    /**
+     * Dry Run
+     */
+    dry_run?: boolean;
+    /**
+     * New Node Name
+     */
+    new_node_name?: string | null;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Rows
+     */
+    rows?: Array<AnnotationAiDetachRow> | null;
+};
+
+/**
+ * AnnotationAiDetachResponse
+ *
+ * Metadata for the newly created child node plus how many rows it holds.
+ *
+ * ``node`` is null for a ``dry_run`` probe (nothing is created); ``detached_rows``
+ * is then the number of rows that *would* be detached, used only to gate/label the
+ * frontend Detach button.
+ */
+export type AnnotationAiDetachResponse = {
+    /**
+     * Detached Rows
+     */
+    detached_rows: number;
+    node?: WorkspaceNodeInfo | null;
+};
+
+/**
+ * AnnotationAiDetachRow
+ *
+ * One previewed row to detach: its absolute source-row index and label.
+ *
+ * Used by:
+ * - AnnotationAiDetachRequest as an optional client-supplied override list. The
+ * authoritative previewed rows now live in the server-side preview store, so
+ * the panel no longer needs to send them; this model is kept for backward
+ * compatibility and lets a caller force specific row/label pairs if provided.
+ */
+export type AnnotationAiDetachRow = {
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Row Index
+     */
+    row_index: number;
+};
+
+/**
+ * AnnotationAiModelsRequest
+ *
+ * Request to list a provider's available models for the AI model picker.
+ *
+ * Used by:
+ * - Frontend ModelNameCombobox because model listing now runs server-side (the
+ * browser no longer calls providers directly); it sends only the provider id,
+ * an optional custom base URL, and the API key needed to authenticate the
+ * listing call.
+ */
+export type AnnotationAiModelsRequest = {
+    /**
+     * Api Key
+     */
+    api_key?: string;
+    /**
+     * Base Url
+     */
+    base_url?: string | null;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+};
+
+/**
+ * AnnotationAiModelsResponse
+ *
+ * Sorted, de-duplicated model-id list returned to the model picker.
+ */
+export type AnnotationAiModelsResponse = {
+    /**
+     * Models
+     */
+    models?: Array<string>;
+};
+
+/**
+ * AnnotationAiPreferences
+ *
+ * Persisted Annotation-tab AI settings: provider API keys and custom providers.
+ *
+ * Used by:
+ * - `UserPreferences` because the Annotation AI panel persists per-provider API keys
+ * (keyed by provider id) and any user-defined custom providers so they survive
+ * reloads and sync across the frontend preferences store.
+ *
+ * Flow: hold the api_keys map and custom_providers list, defaulting both to empty so
+ * older preference files (lacking this section) still validate cleanly.
+ */
+export type AnnotationAiPreferences = {
+    /**
+     * Api Keys
+     */
+    api_keys?: {
+        [key: string]: string;
+    };
+    /**
+     * Custom Providers
+     */
+    custom_providers?: Array<AnnotationAiCustomProvider>;
+};
+
+/**
+ * AnnotationAiPreviewClearRequest
+ *
+ * Request to drop a node's cached AI preview session.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel's "Close preview" action. Closing the panel
+ * is an explicit "I'm done previewing" signal (unlike a tab switch, which only
+ * unmounts the panel and must keep the cache so it can rehydrate). Only the node
+ * is needed — the store is keyed per user+workspace+node, so the current
+ * workspace resolves the rest.
+ */
+export type AnnotationAiPreviewClearRequest = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+};
+
+/**
+ * AnnotationAiPreviewClearResponse
+ *
+ * Acknowledgement that the node's preview session was cleared.
+ */
+export type AnnotationAiPreviewClearResponse = {
+    /**
+     * Ok
+     */
+    ok?: boolean;
+};
+
+/**
+ * AnnotationAiPreviewOverrideRequest
+ *
+ * One manual cell edit to persist onto the node's current preview session.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel when the user changes a prediction in the
+ * dropdown, so the choice survives a tab switch and is honoured by
+ * detach/annotate-all. Only the row and its new label are needed — the edit
+ * targets the node's single active session, so no config has to travel with it.
+ * A blank/whitespace ``label`` means the user picked "None" and is stored as an
+ * explicit null override (which still wins over the model's label).
+ */
+export type AnnotationAiPreviewOverrideRequest = {
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Row Index
+     */
+    row_index: number;
+};
+
+/**
+ * AnnotationAiPreviewOverrideResponse
+ *
+ * Whether the edit was applied (False when no active session exists).
+ */
+export type AnnotationAiPreviewOverrideResponse = {
+    /**
+     * Ok
+     */
+    ok?: boolean;
+};
+
+/**
+ * AnnotationAiPreviewRequest
+ *
+ * Request to AI-classify one page of a source node's texts (no persistence).
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel per visible page because the preview shows
+ * the model's predictions without writing them, so the panel sends the same
+ * page/page_size slice it displays and gets back one label per row.
+ */
+export type AnnotationAiPreviewRequest = {
+    /**
+     * Annotation Column
+     */
+    annotation_column?: string;
+    /**
+     * Api Key
+     */
+    api_key?: string;
+    /**
+     * Base Url
+     */
+    base_url?: string | null;
+    /**
+     * Class Column
+     */
+    class_column?: string;
+    /**
+     * Class Node Id
+     */
+    class_node_id: string;
+    /**
+     * Description Column
+     */
+    description_column?: string;
+    /**
+     * Instruction
+     */
+    instruction: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Reasoning Effort
+     */
+    reasoning_effort?: string;
+    /**
+     * Reasoning Enabled
+     */
+    reasoning_enabled?: boolean;
+    /**
+     * Temperature
+     */
+    temperature?: number;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
+
+/**
+ * AnnotationAiPreviewResponse
+ *
+ * One predicted class (or null) per previewed row, aligned to page order.
+ */
+export type AnnotationAiPreviewResponse = {
+    /**
+     * Labels
+     */
+    labels?: Array<string | null>;
+};
+
+/**
+ * AnnotationAiPreviewRowState
+ *
+ * One hydrated row: the model label, the user override, and the effective one.
+ */
+export type AnnotationAiPreviewRowState = {
+    /**
+     * Ai
+     */
+    ai?: string | null;
+    /**
+     * Effective
+     */
+    effective?: string | null;
+    /**
+     * Has Override
+     */
+    has_override?: boolean;
+    /**
+     * Override
+     */
+    override?: string | null;
+    /**
+     * Row Index
+     */
+    row_index: number;
+};
+
+/**
+ * AnnotationAiPreviewStateRequest
+ *
+ * Config identifying which cached preview session to hydrate.
+ *
+ * Used by:
+ * - Frontend AnnotationAiPreviewPanel on mount because the panel's per-row maps
+ * (AI labels + manual overrides) live only in memory and are lost when the tab
+ * unmounts; on remount it re-reads them from the server so the preview looks
+ * exactly as the user left it. Carries the same prediction-affecting config as
+ * the preview request so the server can confirm the cached labels still match
+ * the panel's current provider/model/prompt/classes/knobs before returning them.
+ */
+export type AnnotationAiPreviewStateRequest = {
+    /**
+     * Base Url
+     */
+    base_url?: string | null;
+    /**
+     * Class Column
+     */
+    class_column?: string;
+    /**
+     * Class Node Id
+     */
+    class_node_id: string;
+    /**
+     * Description Column
+     */
+    description_column?: string;
+    /**
+     * Instruction
+     */
+    instruction: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Reasoning Effort
+     */
+    reasoning_effort?: string;
+    /**
+     * Reasoning Enabled
+     */
+    reasoning_enabled?: boolean;
+    /**
+     * Temperature
+     */
+    temperature?: number;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
+
+/**
+ * AnnotationAiPreviewStateResponse
+ *
+ * Every stored row for the requested session (empty when config changed).
+ */
+export type AnnotationAiPreviewStateResponse = {
+    /**
+     * Rows
+     */
+    rows?: Array<AnnotationAiPreviewRowState>;
+};
+
+/**
  * AnnotationClassDescriptionRow
  *
  * One editable class-description row returned to the Annotation UI.
@@ -229,6 +767,48 @@ export type AnnotationClassDescriptionsPayload = {
      * Rows
      */
     rows?: Array<AnnotationClassDescriptionRow>;
+};
+
+/**
+ * AnnotationCreateColumnRequest
+ *
+ * Request to add a new empty annotation column to a source node.
+ *
+ * Used by:
+ * - Frontend Annotation view when Start is pressed in "Start new annotation"
+ * mode because beginning a fresh pass must materialize the column that the
+ * results table then fills in, before the view switches into resume mode.
+ */
+export type AnnotationCreateColumnRequest = {
+    /**
+     * Column Name
+     */
+    column_name: string;
+};
+
+/**
+ * AnnotationSetCellRequest
+ *
+ * Request to set one annotation cell value on a source node.
+ *
+ * Used by:
+ * - Frontend Annotation results table when a reviewer picks a class in a row's
+ * dropdown, because the chosen label must be written into the annotation
+ * column cell instead of living only in transient component state.
+ */
+export type AnnotationSetCellRequest = {
+    /**
+     * Column Name
+     */
+    column_name: string;
+    /**
+     * Row Index
+     */
+    row_index: number;
+    /**
+     * Value
+     */
+    value?: string | null;
 };
 
 /**
@@ -4467,6 +5047,7 @@ export type UserPreferences = {
      * Analysis Multi Tab Enabled
      */
     analysis_multi_tab_enabled?: boolean;
+    annotation_ai?: AnnotationAiPreferences;
     /**
      * Default Tokenizer Model
      */
@@ -4503,6 +5084,7 @@ export type UserPreferencesUpdate = {
      * Analysis Multi Tab Enabled
      */
     analysis_multi_tab_enabled?: boolean | null;
+    annotation_ai?: AnnotationAiPreferences | null;
     /**
      * Default Tokenizer Model
      */
@@ -6184,6 +6766,223 @@ export type CreateWorkspaceResponses = {
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
+export type AnnotateAiAllData = {
+    body: AnnotationAiAnnotateAllRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/annotation/ai/annotate-all';
+};
+
+export type AnnotateAiAllErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AnnotateAiAllError = AnnotateAiAllErrors[keyof AnnotateAiAllErrors];
+
+export type AnnotateAiAllResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiAnnotateAllResponse;
+};
+
+export type AnnotateAiAllResponse = AnnotateAiAllResponses[keyof AnnotateAiAllResponses];
+
+export type DetachAiPreviewedRowsData = {
+    body: AnnotationAiDetachRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/annotation/ai/detach-previewed';
+};
+
+export type DetachAiPreviewedRowsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DetachAiPreviewedRowsError = DetachAiPreviewedRowsErrors[keyof DetachAiPreviewedRowsErrors];
+
+export type DetachAiPreviewedRowsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiDetachResponse;
+};
+
+export type DetachAiPreviewedRowsResponse = DetachAiPreviewedRowsResponses[keyof DetachAiPreviewedRowsResponses];
+
+export type ListAnnotationAiModelsData = {
+    body: AnnotationAiModelsRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/annotation/ai/models';
+};
+
+export type ListAnnotationAiModelsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListAnnotationAiModelsError = ListAnnotationAiModelsErrors[keyof ListAnnotationAiModelsErrors];
+
+export type ListAnnotationAiModelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiModelsResponse;
+};
+
+export type ListAnnotationAiModelsResponse = ListAnnotationAiModelsResponses[keyof ListAnnotationAiModelsResponses];
+
+export type AnnotateAiPreviewData = {
+    body: AnnotationAiPreviewRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/annotation/ai/preview';
+};
+
+export type AnnotateAiPreviewErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AnnotateAiPreviewError = AnnotateAiPreviewErrors[keyof AnnotateAiPreviewErrors];
+
+export type AnnotateAiPreviewResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiPreviewResponse;
+};
+
+export type AnnotateAiPreviewResponse = AnnotateAiPreviewResponses[keyof AnnotateAiPreviewResponses];
+
+export type AnnotateAiPreviewClearData = {
+    body: AnnotationAiPreviewClearRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/annotation/ai/preview/clear';
+};
+
+export type AnnotateAiPreviewClearErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AnnotateAiPreviewClearError = AnnotateAiPreviewClearErrors[keyof AnnotateAiPreviewClearErrors];
+
+export type AnnotateAiPreviewClearResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiPreviewClearResponse;
+};
+
+export type AnnotateAiPreviewClearResponse = AnnotateAiPreviewClearResponses[keyof AnnotateAiPreviewClearResponses];
+
+export type AnnotateAiPreviewOverrideData = {
+    body: AnnotationAiPreviewOverrideRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/annotation/ai/preview/override';
+};
+
+export type AnnotateAiPreviewOverrideErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AnnotateAiPreviewOverrideError = AnnotateAiPreviewOverrideErrors[keyof AnnotateAiPreviewOverrideErrors];
+
+export type AnnotateAiPreviewOverrideResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiPreviewOverrideResponse;
+};
+
+export type AnnotateAiPreviewOverrideResponse = AnnotateAiPreviewOverrideResponses[keyof AnnotateAiPreviewOverrideResponses];
+
+export type AnnotateAiPreviewStateData = {
+    body: AnnotationAiPreviewStateRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/annotation/ai/preview/state';
+};
+
+export type AnnotateAiPreviewStateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AnnotateAiPreviewStateError = AnnotateAiPreviewStateErrors[keyof AnnotateAiPreviewStateErrors];
+
+export type AnnotateAiPreviewStateResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiPreviewStateResponse;
+};
+
+export type AnnotateAiPreviewStateResponse = AnnotateAiPreviewStateResponses[keyof AnnotateAiPreviewStateResponses];
+
 export type CreateAnnotationClassDescriptionsData = {
     body?: never;
     headers?: {
@@ -6331,6 +7130,78 @@ export type SetAnnotationClassParentResponses = {
 };
 
 export type SetAnnotationClassParentResponse = SetAnnotationClassParentResponses[keyof SetAnnotationClassParentResponses];
+
+export type SetAnnotationCellData = {
+    body: AnnotationSetCellRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/annotation/source/{node_id}/annotation-cell';
+};
+
+export type SetAnnotationCellErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetAnnotationCellError = SetAnnotationCellErrors[keyof SetAnnotationCellErrors];
+
+export type SetAnnotationCellResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type SetAnnotationCellResponse = SetAnnotationCellResponses[keyof SetAnnotationCellResponses];
+
+export type CreateAnnotationColumnData = {
+    body: AnnotationCreateColumnRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/annotation/source/{node_id}/annotation-column';
+};
+
+export type CreateAnnotationColumnErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateAnnotationColumnError = CreateAnnotationColumnErrors[keyof CreateAnnotationColumnErrors];
+
+export type CreateAnnotationColumnResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type CreateAnnotationColumnResponse = CreateAnnotationColumnResponses[keyof CreateAnnotationColumnResponses];
 
 export type RunConcordanceData = {
     body: ConcordanceAnalysisRequest;

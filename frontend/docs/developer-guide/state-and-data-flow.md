@@ -84,17 +84,29 @@ auth probes during startup.
 ## Preferences
 
 `preferencesStore` holds backend-synced preferences such as hidden views,
-favorites, LDaCA token, default tokenizer model, and whether analysis views
-show the multi-tab controls.
+favorites, LDaCA token, default tokenizer model, whether analysis views show the
+multi-tab controls, and the Annotation AI settings (per-provider API keys keyed
+by provider id, and user-defined custom providers).
 `usePreferences` initializes the store from `/api/preferences` and debounces
 backend sync. `SettingsDialog` is the unified preference surface: it edits
 backend preferences, working-directory config, and browser-local settings such
-as hint enablement/dismissals. View visibility is mirrored into `uiStore`.
+as hint enablement/dismissals. Its **AI** tab renders
+`AiProvidersPreferencesPanel`, which manages the built-in providers' API keys
+(save-on-blur) and lets users add, edit (name + base URL), and delete custom
+OpenAI-compatible providers — deleting one also drops its stored key. View
+visibility is mirrored into `uiStore`.
 When the multi-tab preference is off, a workspace-level cleanup collapses every
 persisted analysis tab group in the current workspace to the first tab and
 clears tasks owned by removed tabs. `SettingsDialog` checks the current
 workspace sidecar before disabling the preference and opens a destructive
 confirmation only when that cleanup would remove extra tabs.
+
+Backend persistence is **sparse, VS Code-style**: `save_preferences`
+serializes with `exclude_defaults=True` (plus `exclude_none=True`), so the
+`preferences.toml` file records only values the user actually changed from the
+model defaults. This recurses into nested models, so an all-default
+`annotation_ai` section is omitted entirely; missing keys re-hydrate from the
+model defaults on the next load.
 
 ## Task Stream
 

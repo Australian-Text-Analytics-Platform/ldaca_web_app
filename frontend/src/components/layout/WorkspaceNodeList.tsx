@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { normalizeNodeAccentColor } from '@/lib/nodeColor';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -241,6 +242,9 @@ function WorkspaceNodeList({
               const isPinned = pinnedIdSet.has(node.id);
               const pinnedRowAction = isPinned ? renderPinnedRowAction?.(node) : null;
               const rowActions = renderRowActions?.(node);
+              // Persisted node colour drawn as a thin left spine on the row so
+              // the right-aligned name and its left fade stay fully legible.
+              const accentColor = normalizeNodeAccentColor(node.color);
 
               return (
                 <Tooltip key={node.id}>
@@ -271,6 +275,16 @@ function WorkspaceNodeList({
                             ? 'border-primary/70 bg-primary/10 ring-1 ring-primary/20'
                             : 'border-border/60 group-hover/row:border-border group-hover/row:bg-accent/60',
                         )}
+                        data-testid={`workspace-node-row-${node.id}`}
+                        style={
+                          accentColor
+                            ? {
+                                borderLeftColor: accentColor,
+                                borderLeftWidth: '4px',
+                                borderLeftStyle: 'solid',
+                              }
+                            : undefined
+                        }
                       >
                         {pinnedRowAction && (
                           <div

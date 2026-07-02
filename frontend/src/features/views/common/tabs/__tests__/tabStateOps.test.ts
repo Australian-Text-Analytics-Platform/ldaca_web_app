@@ -6,6 +6,7 @@ import {
   createTabInState,
   getActiveTabId,
   getTabInputSet,
+  getTabSetting,
   getTabs,
   keepFirstTabInState,
   renameTabInState,
@@ -13,6 +14,7 @@ import {
   setActiveTabInState,
   setTabInputSetInState,
   setTabInputsInState,
+  setTabSettingInState,
   setTabTaskInState,
 } from '../tabStateOps';
 
@@ -140,6 +142,41 @@ describe('tabStateOps', () => {
         classDescriptions: classInputs,
       },
     });
+  });
+
+  it('initializes a new tab with an empty settings map', () => {
+    const { state } = createTabInState(null, TYPE, 'A', 'a');
+    expect(getTabs(state, TYPE)[0]).toMatchObject({ settings: {} });
+  });
+
+  it('sets and merges free-form tab settings without dropping other keys', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+
+    state = setTabSettingInState(state, TYPE, 'a', 'annotationMode', 'ai');
+    state = setTabSettingInState(state, TYPE, 'a', 'aiProvider', 'openai');
+    // Overwriting one key preserves the others.
+    state = setTabSettingInState(state, TYPE, 'a', 'annotationMode', 'manual');
+
+    expect(getTabs(state, TYPE)[0]?.settings).toEqual({
+      annotationMode: 'manual',
+      aiProvider: 'openai',
+    });
+  });
+
+  it('reads one tab setting by key (undefined when absent)', () => {
+    let state = createTabInState(null, TYPE, 'A', 'a').state;
+    state = setTabSettingInState(state, TYPE, 'a', 'aiModel', 'gpt-4o-mini');
+    const tab = getTabs(state, TYPE)[0];
+
+    expect(getTabSetting(tab, 'aiModel')).toBe('gpt-4o-mini');
+    expect(getTabSetting(tab, 'aiPrompt')).toBeUndefined();
+    expect(getTabSetting(undefined, 'aiModel')).toBeUndefined();
+  });
+
+  it('leaves state untouched when setting a key on an unknown tab', () => {
+    const state = createTabInState(null, TYPE, 'A', 'a').state;
+    const next = setTabSettingInState(state, TYPE, 'missing', 'aiModel', 'x');
+    expect(getTabs(next, TYPE)[0]?.settings).toEqual({});
   });
 
   it('resolves named input sets with a legacy source fallback', () => {

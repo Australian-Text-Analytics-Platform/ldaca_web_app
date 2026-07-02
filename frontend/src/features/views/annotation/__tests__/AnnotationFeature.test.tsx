@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
@@ -11,13 +11,23 @@ import type {
 } from '@/features/views/common/components/NodeInputsPanel';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 
 const mocks = vi.hoisted(() => ({
   createAnnotationClassDescriptions: vi.fn(),
+  createAnnotationColumn: vi.fn(),
   getAnnotationClassDescriptions: vi.fn(),
   updateAnnotationClassDescriptions: vi.fn(),
   setAnnotationClassParent: vi.fn(),
+  setAnnotationCell: vi.fn(),
   getNodeData: vi.fn(),
+  annotateAiPreview: vi.fn(),
+  annotateAiPreviewState: vi.fn(),
+  annotateAiPreviewOverride: vi.fn(),
+  annotateAiPreviewClear: vi.fn(),
+  detachAiPreviewedRows: vi.fn(),
+  annotateAiAll: vi.fn(),
+  listAnnotationAiModels: vi.fn(),
   useAuth: vi.fn(),
   useWorkspaceData: vi.fn(),
   useTabNodeInputs: vi.fn(),
@@ -26,10 +36,19 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/api', () => ({
   createAnnotationClassDescriptions: mocks.createAnnotationClassDescriptions,
+  createAnnotationColumn: mocks.createAnnotationColumn,
   getAnnotationClassDescriptions: mocks.getAnnotationClassDescriptions,
   updateAnnotationClassDescriptions: mocks.updateAnnotationClassDescriptions,
   setAnnotationClassParent: mocks.setAnnotationClassParent,
+  setAnnotationCell: mocks.setAnnotationCell,
   getNodeData: mocks.getNodeData,
+  annotateAiPreview: mocks.annotateAiPreview,
+  annotateAiPreviewState: mocks.annotateAiPreviewState,
+  annotateAiPreviewOverride: mocks.annotateAiPreviewOverride,
+  annotateAiPreviewClear: mocks.annotateAiPreviewClear,
+  detachAiPreviewedRows: mocks.detachAiPreviewedRows,
+  annotateAiAll: mocks.annotateAiAll,
+  listAnnotationAiModels: mocks.listAnnotationAiModels,
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
@@ -164,6 +183,51 @@ const classNodeInputs = (
     ...overrides,
   });
 
+// AI-mode example selector. Defaults to one string node so the example
+// annotation-column addon can be exercised once AI mode is enabled.
+const exampleNodeInputs = (
+  overrides: Partial<UseTabNodeInputsResult> = {},
+): UseTabNodeInputsResult =>
+  ({
+    inputs: [{ node_id: 'example-node', column: 'text' }],
+    resolvedNodes: [
+      {
+        id: 'example-node',
+        name: 'Example',
+        node: {
+          id: 'example-node',
+          name: 'Example',
+          columns: ['text', 'existing_annotation'],
+          schema: { text: 'String', existing_annotation: 'String' },
+        },
+        column: 'text',
+        columnOptions: [
+          { name: 'text', dataType: 'string' },
+          { name: 'existing_annotation', dataType: 'string' },
+        ],
+      },
+    ],
+    selectedNodes: [
+      {
+        id: 'example-node',
+        name: 'Example',
+        columns: ['text', 'existing_annotation'],
+      },
+    ],
+    nodeColumnSelections: [{ nodeId: 'example-node', column: 'text' }],
+    availableNodes: [],
+    canAddMore: false,
+    addNodes: vi.fn(() => []),
+    getAddRejection: vi.fn(() => null),
+    removeNode: vi.fn(),
+    clear: vi.fn(),
+    setColumn: vi.fn(),
+    graphSelectedIds: [],
+    workspaceId: 'workspace-1',
+    recentPresets: [],
+    ...overrides,
+  });
+
 function nodeInputRequestsStore(
   overrides: Partial<NodeInputRequestsStore> = {},
 ): NodeInputRequestsStore {
@@ -218,6 +282,12 @@ describe('AnnotationFeature', () => {
       });
     }
     vi.clearAllMocks();
+    // Reset the (real) preferences store so AI api-keys/custom providers from one
+    // test do not leak into the next.
+    usePreferencesStore.setState({
+      annotationAiApiKeys: {},
+      annotationAiCustomProviders: [],
+    });
     mocks.useAuth.mockReturnValue({
       getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
     });
@@ -225,9 +295,11 @@ describe('AnnotationFeature', () => {
       currentWorkspaceId: 'workspace-1',
     });
     nodeInputRequestsStore();
-    mocks.useTabNodeInputs.mockImplementation((config: { selectorId?: string }) =>
-      config.selectorId === 'classDescriptions' ? classNodeInputs() : sourceNodeInputs(),
-    );
+    mocks.useTabNodeInputs.mockImplementation((config: { selectorId?: string }) => {
+      if (config.selectorId === 'classDescriptions') return classNodeInputs();
+      if (config.selectorId === 'exampleNodes') return exampleNodeInputs();
+      return sourceNodeInputs();
+    });
     mocks.createAnnotationClassDescriptions.mockResolvedValue({
       data: {
         id: 'new-class-node',
@@ -251,6 +323,14 @@ describe('AnnotationFeature', () => {
       },
     });
     mocks.setAnnotationClassParent.mockResolvedValue({ data: { id: 'classes-node' } });
+    mocks.setAnnotationCell.mockResolvedValue({ data: { id: 'source-node' } });
+    mocks.createAnnotationColumn.mockResolvedValue({
+      data: {
+        id: 'source-node',
+        columns: ['text', 'existing_annotation', 'annotation'],
+        schema: { text: 'String', existing_annotation: 'String', annotation: 'String' },
+      },
+    });
     mocks.getNodeData.mockResolvedValue({
       data: {
         columns: ['text', 'existing_annotation'],
@@ -261,6 +341,17 @@ describe('AnnotationFeature', () => {
         filtering: {},
       },
     });
+    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['support'] } });
+    mocks.annotateAiPreviewState.mockResolvedValue({ data: { rows: [] } });
+    mocks.annotateAiPreviewOverride.mockResolvedValue({ data: { ok: true } });
+    mocks.annotateAiPreviewClear.mockResolvedValue({ data: { ok: true } });
+    mocks.detachAiPreviewedRows.mockResolvedValue({
+      data: { node: { id: 'child-node' }, detached_rows: 1 },
+    });
+    mocks.annotateAiAll.mockResolvedValue({
+      data: { node: { id: 'source-node' }, labeled_rows: 1, total_rows: 1 },
+    });
+    mocks.listAnnotationAiModels.mockResolvedValue({ data: { models: ['openai/gpt-4o'] } });
   });
 
   it('renders source and class-description selectors with annotation-specific column pickers', async () => {
@@ -387,6 +478,55 @@ describe('AnnotationFeature', () => {
     expect(await screen.findByText('hello world')).toBeInTheDocument();
   });
 
+  it('creates the annotation column and leaves new-annotation mode on Start', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+
+    expect(screen.getByRole('textbox', { name: 'New Column Name' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(mocks.createAnnotationColumn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { node_id: 'source-node' },
+        body: { column_name: 'annotation' },
+      }),
+    );
+    // New-annotation mode ends: the run button flips to Reset and the
+    // new-column-name input disappears because the picker now resumes a column.
+    expect(await screen.findByRole('button', { name: 'Reset' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'New Column Name' })).not.toBeInTheDocument();
+  });
+
+  it('locks the column picker after Start and returns to resume mode on Reset', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+
+    const resetButton = await screen.findByRole('button', { name: 'Reset' });
+    expect(
+      within(screen.getByTestId('Selected Data Blocks-addon')).getByRole('combobox', {
+        name: 'Annotation Column',
+      }),
+    ).toBeDisabled();
+    expect(await screen.findByRole('region', { name: 'Annotation Results' })).toBeInTheDocument();
+
+    await user.click(resetButton);
+
+    // Reset keeps the created column (resume mode): the button reads Resume, the
+    // picker is editable again, the new-column-name input stays hidden, and the
+    // results are cleared.
+    expect(screen.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('Selected Data Blocks-addon')).getByRole('combobox', {
+        name: 'Annotation Column',
+      }),
+    ).toBeEnabled();
+    expect(screen.queryByRole('textbox', { name: 'New Column Name' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Annotation Results' })).not.toBeInTheDocument();
+  });
+
   it('shows paginated annotation results instead of a preview', async () => {
     const user = userEvent.setup();
     mocks.getNodeData.mockImplementation(
@@ -431,6 +571,75 @@ describe('AnnotationFeature', () => {
     expect(await within(resultsPanel).findByText('second page row')).toBeInTheDocument();
   });
 
+  it('clears a seeded annotation cell when the None option is picked', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+
+    // Resume the existing column so the cell seeds from the saved value.
+    const sourceAddon = screen.getByTestId('Selected Data Blocks-addon');
+    await user.click(within(sourceAddon).getByRole('combobox', { name: 'Annotation Column' }));
+    await user.click(await screen.findByRole('option', { name: 'existing_annotation' }));
+    await user.click(screen.getByRole('button', { name: 'Resume' }));
+
+    const resultsPanel = await screen.findByRole('region', { name: 'Annotation Results' });
+    const cell = await within(resultsPanel).findByRole('combobox', { name: 'Class for row 1' });
+    expect(cell).toHaveTextContent('support');
+
+    // The leading "None" option resets the cell back to the empty placeholder.
+    await user.click(cell);
+    await user.click(await screen.findByRole('option', { name: 'None' }));
+
+    expect(
+      within(resultsPanel).getByRole('combobox', { name: 'Class for row 1' }),
+    ).toHaveTextContent('Select class');
+    // Clearing persists a null cell to the resumed annotation column.
+    expect(mocks.setAnnotationCell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { node_id: 'source-node' },
+        body: { column_name: 'existing_annotation', row_index: 0, value: null },
+      }),
+    );
+  });
+
+  it('persists the chosen class to the annotation column when a cell is set', async () => {
+    const user = userEvent.setup();
+    // Seed the row with an empty annotation so picking a class is a real change
+    // (re-selecting the already-seeded value would not fire onValueChange).
+    mocks.getNodeData.mockResolvedValue({
+      data: {
+        columns: ['text', 'existing_annotation'],
+        data: [{ text: 'hello world', existing_annotation: '' }],
+        dtypes: { text: 'String', existing_annotation: 'String' },
+        pagination: { page: 1, page_size: 50, total_rows: 1, total_pages: 1 },
+        sorting: {},
+        filtering: {},
+      },
+    });
+    renderAnnotationFeature();
+
+    // Resume the existing column so the dropdown options come from the class node.
+    const sourceAddon = screen.getByTestId('Selected Data Blocks-addon');
+    await user.click(within(sourceAddon).getByRole('combobox', { name: 'Annotation Column' }));
+    await user.click(await screen.findByRole('option', { name: 'existing_annotation' }));
+    await user.click(screen.getByRole('button', { name: 'Resume' }));
+
+    const resultsPanel = await screen.findByRole('region', { name: 'Annotation Results' });
+    const cell = await within(resultsPanel).findByRole('combobox', { name: 'Class for row 1' });
+
+    await user.click(cell);
+    await user.click(await screen.findByRole('option', { name: 'support' }));
+
+    expect(
+      within(resultsPanel).getByRole('combobox', { name: 'Class for row 1' }),
+    ).toHaveTextContent('support');
+    expect(mocks.setAnnotationCell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { node_id: 'source-node' },
+        body: { column_name: 'existing_annotation', row_index: 0, value: 'support' },
+      }),
+    );
+  });
+
   it('shows annotation results without reparenting when resuming an existing column', async () => {
     const user = userEvent.setup();
     renderAnnotationFeature();
@@ -461,17 +670,28 @@ describe('AnnotationFeature', () => {
     ]);
   });
 
-  it('shows editable class-description rows under the class node selector', async () => {
+  it('shows classes compactly and edits them through the Edit dialog', async () => {
     const user = userEvent.setup();
     renderAnnotationFeature();
 
     const classSetup = screen.getByRole('region', { name: 'Class Description Setup' });
     expect(within(classSetup).getByRole('button', { name: 'Add new' })).toBeInTheDocument();
 
-    const classCell = await within(classSetup).findByRole('textbox', { name: 'Class 1' });
-    const descriptionCell = within(classSetup).getByRole('textbox', { name: 'Description 1' });
+    // Compact card: class name shown as a badge, description text hidden.
+    expect(await within(classSetup).findByText('support')).toBeInTheDocument();
+    expect(within(classSetup).queryByText('Supportive stance')).not.toBeInTheDocument();
+    expect(
+      within(classSetup).queryByRole('textbox', { name: 'Class 1' }),
+    ).not.toBeInTheDocument();
+
+    // Open the Edit dialog and rename a class; the change persists on blur.
+    await user.click(within(classSetup).getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit classes' });
+    const classCell = within(dialog).getByRole('textbox', { name: 'Class 1' });
     expect(classCell).toHaveValue('support');
-    expect(descriptionCell).toHaveValue('Supportive stance');
+    expect(within(dialog).getByRole('textbox', { name: 'Description 1' })).toHaveValue(
+      'Supportive stance',
+    );
 
     await user.clear(classCell);
     await user.type(classCell, 'critical');
@@ -489,13 +709,102 @@ describe('AnnotationFeature', () => {
     });
   });
 
-  it('shows only the first 30 class-description rows until expanded', async () => {
+  it('reveals a class description in a hover tooltip when one exists', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+
+    const classSetup = screen.getByRole('region', { name: 'Class Description Setup' });
+    // The compact card shows only the class name; the description lives in a tooltip.
+    const chip = await within(classSetup).findByText('support');
+    expect(within(classSetup).queryByText('Supportive stance')).not.toBeInTheDocument();
+
+    // Hovering the chip surfaces the description through the Radix tooltip portal.
+    await user.hover(chip);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Supportive stance');
+  });
+
+  it('keeps the class Edit button enabled after annotation starts', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+
+    const classSetup = screen.getByRole('region', { name: 'Class Description Setup' });
+    // Wait for the class list to load so the Edit trigger leaves its loading state.
+    await within(classSetup).findByText('support');
+    expect(within(classSetup).getByRole('button', { name: 'Edit' })).toBeEnabled();
+
+    // Start locks the rest of the setup card, but classes must stay editable.
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await screen.findByRole('region', { name: 'Annotation Results' });
+
+    expect(within(classSetup).getByRole('button', { name: 'Edit' })).toBeEnabled();
+  });
+
+  it('deletes a class from the Edit dialog and persists the remaining classes', async () => {
     const user = userEvent.setup();
     mocks.getAnnotationClassDescriptions.mockResolvedValue({
       data: {
         class_column: 'class',
         description_column: 'description',
-        rows: Array.from({ length: 31 }, (_, index) => ({
+        rows: [
+          { class: 'support', description: 'Supportive stance' },
+          { class: 'critical', description: 'Critical stance' },
+        ],
+      },
+    });
+    renderAnnotationFeature();
+
+    const classSetup = screen.getByRole('region', { name: 'Class Description Setup' });
+    await within(classSetup).findByText('support');
+
+    await user.click(within(classSetup).getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit classes' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete class 1' }));
+
+    expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
+      headers: { Authorization: 'Bearer test' },
+      path: { node_id: 'classes-node' },
+      body: {
+        class_column: 'class',
+        description_column: 'description',
+        rows: [{ class: 'critical', description: 'Critical stance' }],
+      },
+      throwOnError: true,
+    });
+  });
+
+  it('adds a new class row from the Edit dialog', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+
+    const classSetup = screen.getByRole('region', { name: 'Class Description Setup' });
+    await within(classSetup).findByText('support');
+
+    await user.click(within(classSetup).getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit classes' });
+    await user.click(within(dialog).getByRole('button', { name: 'Add class' }));
+
+    expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
+      headers: { Authorization: 'Bearer test' },
+      path: { node_id: 'classes-node' },
+      body: {
+        class_column: 'class',
+        description_column: 'description',
+        rows: [
+          { class: 'support', description: 'Supportive stance' },
+          { class: '', description: '' },
+        ],
+      },
+      throwOnError: true,
+    });
+  });
+
+  it('collapses extra class names into a "+N more" badge in the compact card', async () => {
+    mocks.getAnnotationClassDescriptions.mockResolvedValue({
+      data: {
+        class_column: 'class',
+        description_column: 'description',
+        rows: Array.from({ length: 22 }, (_, index) => ({
           class: `class-${String(index + 1)}`,
           description: `Description ${String(index + 1)}`,
         })),
@@ -505,16 +814,9 @@ describe('AnnotationFeature', () => {
     renderAnnotationFeature();
 
     const classSetup = screen.getByRole('region', { name: 'Class Description Setup' });
-    expect(await within(classSetup).findByRole('textbox', { name: 'Class 30' })).toHaveValue(
-      'class-30',
-    );
-    expect(within(classSetup).queryByRole('textbox', { name: 'Class 31' })).not.toBeInTheDocument();
-
-    await user.click(within(classSetup).getByRole('button', { name: 'Expand all' }));
-
-    expect(await within(classSetup).findByRole('textbox', { name: 'Class 31' })).toHaveValue(
-      'class-31',
-    );
+    expect(await within(classSetup).findByText('class-20')).toBeInTheDocument();
+    expect(within(classSetup).queryByText('class-21')).not.toBeInTheDocument();
+    expect(within(classSetup).getByText('+2 more')).toBeInTheDocument();
   });
 
   it('routes workspace plus requests to the source selector after user choice', async () => {
@@ -567,5 +869,312 @@ describe('AnnotationFeature', () => {
     expect(addClassNodes).toHaveBeenCalledWith(['node-b']);
     expect(addSourceNodes).not.toHaveBeenCalled();
     expect(consume).toHaveBeenCalledWith(13);
+  });
+
+  it('gates the Start button to manual mode and reveals AI settings when toggled', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+
+    // Manual mode (default): the Start button is shown and AI controls are hidden.
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
+    const aiToggle = screen.getByRole('switch', { name: 'Toggle AI annotation mode' });
+    expect(aiToggle).not.toBeChecked();
+    expect(screen.queryByRole('combobox', { name: 'Provider' })).not.toBeInTheDocument();
+
+    // Flip to AI mode: the Start button disappears and the provider, model, and
+    // example-node controls appear.
+    await user.click(aiToggle);
+    expect(aiToggle).toBeChecked();
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Provider' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Model')).toBeInTheDocument();
+    expect(screen.getByText('Example Node')).toBeInTheDocument();
+    const exampleAddon = screen.getByTestId('Example Node-addon');
+    expect(within(exampleAddon).getByText('Annotation Column')).toBeInTheDocument();
+  });
+
+  it('runs the Start lifecycle on first Preview and shows the AI preview, not manual results', async () => {
+    const user = userEvent.setup();
+    // OpenRouter needs a key to annotate; seed one so the Preview button enables.
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    // Start directly in AI mode with a model already chosen (persisted setting).
+    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    // Preview reuses the manual Start lifecycle for a "Start new annotation"
+    // column: it creates the column and reparents the class node under the source.
+    expect(mocks.createAnnotationColumn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { node_id: 'source-node' },
+        body: { column_name: 'annotation' },
+      }),
+    );
+    expect(mocks.setAnnotationClassParent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { node_id: 'classes-node' },
+        body: { parent_node_id: 'source-node' },
+      }),
+    );
+
+    // The button flips to Close preview and the AI preview panel appears — the
+    // manual results panel never shows in AI mode.
+    expect(await screen.findByRole('button', { name: 'Close preview' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'AI Annotation Preview' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Annotation Results' })).not.toBeInTheDocument();
+
+    // Nodes lock (the source annotation-column picker disables)…
+    expect(
+      within(screen.getByTestId('Selected Data Blocks-addon')).getByRole('combobox', {
+        name: 'Annotation Column',
+      }),
+    ).toBeDisabled();
+    // …but the class Edit button stays enabled, exactly like manual mode.
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled();
+  });
+
+  it('closing the AI preview unlocks the panel and can reopen without recreating the column', async () => {
+    const user = userEvent.setup();
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    const closeButton = await screen.findByRole('button', { name: 'Close preview' });
+
+    // The source annotation-column picker is locked while previewing.
+    const columnPicker = () =>
+      within(screen.getByTestId('Selected Data Blocks-addon')).getByRole('combobox', {
+        name: 'Annotation Column',
+      });
+    expect(columnPicker()).toBeDisabled();
+
+    // Close hides the panel and unlocks the parameter panel (like manual Reset),
+    // but keeps the source pointed at the created column (resume mode).
+    await user.click(closeButton);
+    expect(screen.queryByRole('region', { name: 'AI Annotation Preview' })).not.toBeInTheDocument();
+    expect(columnPicker()).toBeEnabled();
+
+    // Reopening does not create the column again — it already exists (resume).
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(await screen.findByRole('region', { name: 'AI Annotation Preview' })).toBeInTheDocument();
+    expect(columnPicker()).toBeDisabled();
+    expect(mocks.createAnnotationColumn).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the AI Preview button when the class node has no classes', async () => {
+    // A runnable provider/model/key so the ONLY missing ingredient is a class to
+    // classify into — isolating the class-count gate.
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    // The class node resolves, but its class column holds no rows.
+    mocks.getAnnotationClassDescriptions.mockResolvedValue({
+      data: { class_column: 'class', description_column: 'description', rows: [] },
+    });
+    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+
+    const previewButton = await screen.findByRole('button', { name: 'Preview' });
+    // Stays disabled after the class-count query settles on an empty list.
+    await waitFor(() => expect(previewButton).toBeDisabled());
+  });
+
+  it('enables the AI Preview button once the class node has at least one class', async () => {
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    // The default class mock returns one class ("support"), so the same runnable
+    // config that was gated above now enables Preview once the query resolves.
+    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+
+    const previewButton = await screen.findByRole('button', { name: 'Preview' });
+    await waitFor(() => expect(previewButton).toBeEnabled());
+  });
+
+  it('clears the server-side preview cache when the AI preview is closed', async () => {
+    const user = userEvent.setup();
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    const closeButton = await screen.findByRole('button', { name: 'Close preview' });
+    await user.click(closeButton);
+
+    // Closing is an explicit "done previewing", so the node's cached preview
+    // session is dropped on the server (unlike a tab switch, which keeps it).
+    expect(mocks.annotateAiPreviewClear).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { node_id: 'source-node' } }),
+    );
+  });
+
+  it('shows an API-key hint after switching to a key-required provider', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+    await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
+
+    // OpenRouter (default) lists models without a key — no hint shown.
+    expect(
+      screen.queryByText(/Enter an API key to browse available models/i),
+    ).not.toBeInTheDocument();
+
+    // Google requires a key to list models, so the hint appears.
+    await user.click(screen.getByRole('combobox', { name: 'Provider' }));
+    await user.click(await screen.findByRole('option', { name: 'Google' }));
+
+    expect(
+      screen.getByText(/Enter an API key to browse available models/i),
+    ).toBeInTheDocument();
+  });
+
+  it('persists the AI API key to preferences on blur', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+    await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
+
+    const apiKeyInput = screen.getByLabelText(/API Key/i);
+    await user.click(apiKeyInput);
+    await user.type(apiKeyInput, 'sk-secret');
+    // Blur commits the key to the preferences store (keyed by provider id).
+    // Click a non-interactive label so focus leaves the field without opening
+    // the adjacent model combobox (which would fire a model-list fetch).
+    await user.click(screen.getByText('Manual'));
+
+    expect(usePreferencesStore.getState().annotationAiApiKeys).toEqual({
+      openrouter: 'sk-secret',
+    });
+  });
+
+  it('saves a custom provider from the dialog and selects it', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature();
+    await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
+
+    // The "Custom…" entry opens the definition dialog.
+    await user.click(screen.getByRole('combobox', { name: 'Provider' }));
+    await user.click(await screen.findByRole('option', { name: 'Custom…' }));
+
+    await user.type(screen.getByLabelText('Name'), 'My LLM');
+    await user.type(screen.getByLabelText('Base URL'), 'https://llm.example/v1');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    // Persisted to preferences and selected in the dropdown.
+    expect(usePreferencesStore.getState().annotationAiCustomProviders).toEqual([
+      expect.objectContaining({ name: 'My LLM', base_url: 'https://llm.example/v1' }),
+    ]);
+    expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveTextContent('My LLM');
+  });
+
+  it('hydrates AI mode, provider, model, and prompt from persisted tab settings', () => {
+    renderAnnotationFeature({
+      tabSettings: {
+        annotationMode: 'ai',
+        aiProvider: 'openai',
+        aiModel: 'gpt-4o-mini',
+        aiPrompt: 'Classify the stance.',
+      },
+    });
+
+    // The switch starts in AI mode and the AI controls reflect the saved values.
+    expect(
+      screen.getByRole('switch', { name: 'Toggle AI annotation mode' }),
+    ).toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveTextContent('OpenAI');
+    expect(screen.getByLabelText('Model')).toHaveValue('gpt-4o-mini');
+    expect(screen.getByLabelText(/Prompt/)).toHaveValue('Classify the stance.');
+  });
+
+  it('write-through persists the mode switch and provider selection', async () => {
+    const user = userEvent.setup();
+    const onTabSettingChange = vi.fn();
+    renderAnnotationFeature({ onTabSettingChange });
+
+    // Flipping the switch persists the mode immediately.
+    await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
+    expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
+
+    // Choosing a provider persists its id immediately.
+    await user.click(screen.getByRole('combobox', { name: 'Provider' }));
+    await user.click(await screen.findByRole('option', { name: 'Anthropic' }));
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiProvider', 'anthropic');
+  });
+
+  it('commits the model and prompt on blur (save-on-blur persistence)', async () => {
+    mocks.listAnnotationAiModels.mockResolvedValue({ data: { models: ['openai/gpt-4o'] } });
+    const user = userEvent.setup();
+    const onTabSettingChange = vi.fn();
+    renderAnnotationFeature({ onTabSettingChange });
+    await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
+
+    // Type a model id, then blur by clicking the non-interactive "Manual" label
+    // (mirrors the API-key blur pattern; avoids opening the model popover overlay).
+    const modelInput = screen.getByLabelText('Model');
+    await user.click(modelInput);
+    await user.type(modelInput, 'gpt-custom');
+    await user.click(screen.getByText('Manual'));
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiModel', 'gpt-custom');
+
+    // Same for the prompt textarea.
+    const promptInput = screen.getByLabelText(/Prompt/);
+    await user.click(promptInput);
+    await user.type(promptInput, 'label it');
+    await user.click(screen.getByText('Manual'));
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiPrompt', 'label it');
+  });
+
+  it('hydrates the Model Configuration knobs from persisted tab settings', async () => {
+    const user = userEvent.setup();
+    renderAnnotationFeature({
+      tabSettings: {
+        annotationMode: 'ai',
+        aiModel: 'gpt-4o',
+        aiTemperature: '0.8',
+        aiReasoningEnabled: 'true',
+        aiReasoningEffort: 'high',
+      },
+    });
+
+    // The section is collapsed by default; open it to read the controls.
+    await user.click(screen.getByText('Model Configuration'));
+    expect(screen.getByLabelText('Temperature')).toHaveValue(0.8);
+    expect(screen.getByRole('switch', { name: 'Toggle reasoning' })).toBeChecked();
+    expect(screen.getByLabelText('Thinking effort')).toHaveTextContent('high');
+  });
+
+  it('write-through persists reasoning, effort, and temperature', async () => {
+    const user = userEvent.setup();
+    const onTabSettingChange = vi.fn();
+    renderAnnotationFeature({
+      tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' },
+      onTabSettingChange,
+    });
+
+    await user.click(screen.getByText('Model Configuration'));
+
+    // Enabling reasoning persists immediately and reveals the effort select.
+    await user.click(screen.getByRole('switch', { name: 'Toggle reasoning' }));
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEnabled', 'true');
+
+    await user.click(screen.getByLabelText('Thinking effort'));
+    await user.click(await screen.findByRole('option', { name: 'high' }));
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEffort', 'high');
+
+    // Temperature commits on blur, clamped to the supported range.
+    const temperature = screen.getByLabelText('Temperature');
+    await user.clear(temperature);
+    await user.type(temperature, '1.5');
+    await user.tab();
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiTemperature', '1.5');
   });
 });

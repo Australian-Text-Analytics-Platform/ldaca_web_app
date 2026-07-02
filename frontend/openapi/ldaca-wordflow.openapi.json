@@ -47,7 +47,7 @@
         "type": "object"
       },
       "AnalysisTab": {
-        "description": "A single analysis tab.\n\nCarries identity (``tab_id``), a pointer to the analysis result it shows\n(``task_id``), a display ``title``, and selector state. ``inputs`` remains\nthe legacy source selector for existing clients. ``input_sets`` is keyed by\nselector id (for example, ``source`` or ``classDescriptions``) so newer\nviews can persist multiple node selectors on the same tab. Remaining\nanalysis parameters live on the referenced ``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
+        "description": "A single analysis tab.\n\nCarries identity (``tab_id``), a pointer to the analysis result it shows\n(``task_id``), a display ``title``, selector state, and free-form view\nsettings. ``inputs`` remains the legacy source selector for existing\nclients. ``input_sets`` is keyed by selector id (for example, ``source`` or\n``classDescriptions``) so newer views can persist multiple node selectors on\nthe same tab. ``settings`` is a flat string\u2192string map a view uses to\nround-trip lightweight scalar parameters that are not node selections \u2014 for\nexample the Annotation tab persists its Manual/AI mode, AI provider id,\nmodel name, and prompt here so they survive reloads and tab switches like\nthe node selectors do. Heavier analysis parameters still live on the\nreferenced ``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
         "properties": {
           "input_sets": {
             "additionalProperties": {
@@ -65,6 +65,13 @@
             },
             "title": "Inputs",
             "type": "array"
+          },
+          "settings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Settings",
+            "type": "object"
           },
           "tab_id": {
             "title": "Tab Id",
@@ -202,6 +209,639 @@
         "title": "AnalysisTaskMetadata",
         "type": "object"
       },
+      "AnnotationAiAnnotateAllRequest": {
+        "description": "Request to AI-classify every row and persist the whole annotation column.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel's \"Annotate All\" button because a full run\n  classifies the entire source node in concurrent batches and writes the\n  results back in one go, unlike the transient per-page preview.",
+        "properties": {
+          "annotation_column": {
+            "title": "Annotation Column",
+            "type": "string"
+          },
+          "api_key": {
+            "default": "",
+            "title": "Api Key",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Size"
+          },
+          "class_column": {
+            "default": "class",
+            "title": "Class Column",
+            "type": "string"
+          },
+          "class_node_id": {
+            "title": "Class Node Id",
+            "type": "string"
+          },
+          "description_column": {
+            "default": "description",
+            "title": "Description Column",
+            "type": "string"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "reasoning_effort": {
+            "default": "medium",
+            "title": "Reasoning Effort",
+            "type": "string"
+          },
+          "reasoning_enabled": {
+            "default": false,
+            "title": "Reasoning Enabled",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "text_column": {
+            "title": "Text Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "text_column",
+          "annotation_column",
+          "class_node_id",
+          "provider_id",
+          "model",
+          "instruction"
+        ],
+        "title": "AnnotationAiAnnotateAllRequest",
+        "type": "object"
+      },
+      "AnnotationAiAnnotateAllResponse": {
+        "description": "Refreshed node metadata plus how many of the total rows got a label.",
+        "properties": {
+          "labeled_rows": {
+            "title": "Labeled Rows",
+            "type": "integer"
+          },
+          "node": {
+            "$ref": "#/components/schemas/WorkspaceNodeInfo"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node",
+          "labeled_rows",
+          "total_rows"
+        ],
+        "title": "AnnotationAiAnnotateAllResponse",
+        "type": "object"
+      },
+      "AnnotationAiCustomProvider": {
+        "additionalProperties": false,
+        "description": "A user-defined OpenAI-compatible AI provider for annotation.\n\nUsed by:\n- `AnnotationAiPreferences` (and therefore `UserPreferences`) because the Annotation\n  tab lets users register custom providers (name + base URL) that persist to the\n  TOML preferences file and reappear in the provider dropdown.\n\nFlow: validate the provider id/name/base_url, then serialize alongside the rest of\n    the preferences payload for disk persistence and the JSON API contract.",
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "base_url"
+        ],
+        "title": "AnnotationAiCustomProvider",
+        "type": "object"
+      },
+      "AnnotationAiDetachRequest": {
+        "description": "Request to copy the previewed rows into a new annotated child table.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel's \"Detach Previewed Rows\" button. The rows\n  the user previewed (across every page they viewed) are read from the\n  server-side preview store, so the panel sends only the node + target column.\n  ``rows`` is optional: when omitted the server materialises exactly the stored\n  previewed rows (with their overrides applied); when supplied it takes\n  precedence, preserving the old explicit-list behaviour.\n- The same panel's Detach button *gating*: with ``dry_run`` true the endpoint\n  only probes the server session and returns how many rows would be detached\n  (``node`` is null, nothing is created). The panel calls this on mount so the\n  button reflects the cached preview after a tab switch \u2014 the local page map is\n  reset on remount, but the server session is the source of truth \u2014 and so the\n  confirmation dialog can show the exact count.",
+        "properties": {
+          "annotation_column": {
+            "title": "Annotation Column",
+            "type": "string"
+          },
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "new_node_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Node Name"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationAiDetachRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          }
+        },
+        "required": [
+          "node_id",
+          "annotation_column"
+        ],
+        "title": "AnnotationAiDetachRequest",
+        "type": "object"
+      },
+      "AnnotationAiDetachResponse": {
+        "description": "Metadata for the newly created child node plus how many rows it holds.\n\n``node`` is null for a ``dry_run`` probe (nothing is created); ``detached_rows``\nis then the number of rows that *would* be detached, used only to gate/label the\nfrontend Detach button.",
+        "properties": {
+          "detached_rows": {
+            "title": "Detached Rows",
+            "type": "integer"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceNodeInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "detached_rows"
+        ],
+        "title": "AnnotationAiDetachResponse",
+        "type": "object"
+      },
+      "AnnotationAiDetachRow": {
+        "description": "One previewed row to detach: its absolute source-row index and label.\n\nUsed by:\n- AnnotationAiDetachRequest as an optional client-supplied override list. The\n  authoritative previewed rows now live in the server-side preview store, so\n  the panel no longer needs to send them; this model is kept for backward\n  compatibility and lets a caller force specific row/label pairs if provided.",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_index"
+        ],
+        "title": "AnnotationAiDetachRow",
+        "type": "object"
+      },
+      "AnnotationAiModelsRequest": {
+        "description": "Request to list a provider's available models for the AI model picker.\n\nUsed by:\n- Frontend ModelNameCombobox because model listing now runs server-side (the\n  browser no longer calls providers directly); it sends only the provider id,\n  an optional custom base URL, and the API key needed to authenticate the\n  listing call.",
+        "properties": {
+          "api_key": {
+            "default": "",
+            "title": "Api Key",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider_id"
+        ],
+        "title": "AnnotationAiModelsRequest",
+        "type": "object"
+      },
+      "AnnotationAiModelsResponse": {
+        "description": "Sorted, de-duplicated model-id list returned to the model picker.",
+        "properties": {
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "title": "AnnotationAiModelsResponse",
+        "type": "object"
+      },
+      "AnnotationAiPreferences": {
+        "additionalProperties": false,
+        "description": "Persisted Annotation-tab AI settings: provider API keys and custom providers.\n\nUsed by:\n- `UserPreferences` because the Annotation AI panel persists per-provider API keys\n  (keyed by provider id) and any user-defined custom providers so they survive\n  reloads and sync across the frontend preferences store.\n\nFlow: hold the api_keys map and custom_providers list, defaulting both to empty so\n    older preference files (lacking this section) still validate cleanly.",
+        "properties": {
+          "api_keys": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Api Keys",
+            "type": "object"
+          },
+          "custom_providers": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationAiCustomProvider"
+            },
+            "title": "Custom Providers",
+            "type": "array"
+          }
+        },
+        "title": "AnnotationAiPreferences",
+        "type": "object"
+      },
+      "AnnotationAiPreviewClearRequest": {
+        "description": "Request to drop a node's cached AI preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel's \"Close preview\" action. Closing the panel\n  is an explicit \"I'm done previewing\" signal (unlike a tab switch, which only\n  unmounts the panel and must keep the cache so it can rehydrate). Only the node\n  is needed \u2014 the store is keyed per user+workspace+node, so the current\n  workspace resolves the rest.",
+        "properties": {
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id"
+        ],
+        "title": "AnnotationAiPreviewClearRequest",
+        "type": "object"
+      },
+      "AnnotationAiPreviewClearResponse": {
+        "description": "Acknowledgement that the node's preview session was cleared.",
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "AnnotationAiPreviewClearResponse",
+        "type": "object"
+      },
+      "AnnotationAiPreviewOverrideRequest": {
+        "description": "One manual cell edit to persist onto the node's current preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user changes a prediction in the\n  dropdown, so the choice survives a tab switch and is honoured by\n  detach/annotate-all. Only the row and its new label are needed \u2014 the edit\n  targets the node's single active session, so no config has to travel with it.\n  A blank/whitespace ``label`` means the user picked \"None\" and is stored as an\n  explicit null override (which still wins over the model's label).",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node_id",
+          "row_index"
+        ],
+        "title": "AnnotationAiPreviewOverrideRequest",
+        "type": "object"
+      },
+      "AnnotationAiPreviewOverrideResponse": {
+        "description": "Whether the edit was applied (False when no active session exists).",
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "AnnotationAiPreviewOverrideResponse",
+        "type": "object"
+      },
+      "AnnotationAiPreviewRequest": {
+        "description": "Request to AI-classify one page of a source node's texts (no persistence).\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel per visible page because the preview shows\n  the model's predictions without writing them, so the panel sends the same\n  page/page_size slice it displays and gets back one label per row.",
+        "properties": {
+          "annotation_column": {
+            "default": "",
+            "title": "Annotation Column",
+            "type": "string"
+          },
+          "api_key": {
+            "default": "",
+            "title": "Api Key",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "class_column": {
+            "default": "class",
+            "title": "Class Column",
+            "type": "string"
+          },
+          "class_node_id": {
+            "title": "Class Node Id",
+            "type": "string"
+          },
+          "description_column": {
+            "default": "description",
+            "title": "Description Column",
+            "type": "string"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "page": {
+            "default": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 20,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "reasoning_effort": {
+            "default": "medium",
+            "title": "Reasoning Effort",
+            "type": "string"
+          },
+          "reasoning_enabled": {
+            "default": false,
+            "title": "Reasoning Enabled",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "text_column": {
+            "title": "Text Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "text_column",
+          "class_node_id",
+          "provider_id",
+          "model",
+          "instruction"
+        ],
+        "title": "AnnotationAiPreviewRequest",
+        "type": "object"
+      },
+      "AnnotationAiPreviewResponse": {
+        "description": "One predicted class (or null) per previewed row, aligned to page order.",
+        "properties": {
+          "labels": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Labels",
+            "type": "array"
+          }
+        },
+        "title": "AnnotationAiPreviewResponse",
+        "type": "object"
+      },
+      "AnnotationAiPreviewRowState": {
+        "description": "One hydrated row: the model label, the user override, and the effective one.",
+        "properties": {
+          "ai": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai"
+          },
+          "effective": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective"
+          },
+          "has_override": {
+            "default": false,
+            "title": "Has Override",
+            "type": "boolean"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_index"
+        ],
+        "title": "AnnotationAiPreviewRowState",
+        "type": "object"
+      },
+      "AnnotationAiPreviewStateRequest": {
+        "description": "Config identifying which cached preview session to hydrate.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel on mount because the panel's per-row maps\n  (AI labels + manual overrides) live only in memory and are lost when the tab\n  unmounts; on remount it re-reads them from the server so the preview looks\n  exactly as the user left it. Carries the same prediction-affecting config as\n  the preview request so the server can confirm the cached labels still match\n  the panel's current provider/model/prompt/classes/knobs before returning them.",
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "class_column": {
+            "default": "class",
+            "title": "Class Column",
+            "type": "string"
+          },
+          "class_node_id": {
+            "title": "Class Node Id",
+            "type": "string"
+          },
+          "description_column": {
+            "default": "description",
+            "title": "Description Column",
+            "type": "string"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "reasoning_effort": {
+            "default": "medium",
+            "title": "Reasoning Effort",
+            "type": "string"
+          },
+          "reasoning_enabled": {
+            "default": false,
+            "title": "Reasoning Enabled",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "text_column": {
+            "title": "Text Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "text_column",
+          "class_node_id",
+          "provider_id",
+          "model",
+          "instruction"
+        ],
+        "title": "AnnotationAiPreviewStateRequest",
+        "type": "object"
+      },
+      "AnnotationAiPreviewStateResponse": {
+        "description": "Every stored row for the requested session (empty when config changed).",
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationAiPreviewRowState"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "title": "AnnotationAiPreviewStateResponse",
+        "type": "object"
+      },
       "AnnotationClassDescriptionRow": {
         "description": "One editable class-description row returned to the Annotation UI.\n\nUsed by:\n- ``get_annotation_class_descriptions`` and\n  ``update_annotation_class_descriptions`` because the frontend editor\n  should always work with semantic ``class``/``description`` keys even when\n  the selected workspace columns have different names.",
         "properties": {
@@ -241,6 +881,50 @@
           }
         },
         "title": "AnnotationClassDescriptionsPayload",
+        "type": "object"
+      },
+      "AnnotationCreateColumnRequest": {
+        "description": "Request to add a new empty annotation column to a source node.\n\nUsed by:\n- Frontend Annotation view when Start is pressed in \"Start new annotation\"\n  mode because beginning a fresh pass must materialize the column that the\n  results table then fills in, before the view switches into resume mode.",
+        "properties": {
+          "column_name": {
+            "title": "Column Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column_name"
+        ],
+        "title": "AnnotationCreateColumnRequest",
+        "type": "object"
+      },
+      "AnnotationSetCellRequest": {
+        "description": "Request to set one annotation cell value on a source node.\n\nUsed by:\n- Frontend Annotation results table when a reviewer picks a class in a row's\n  dropdown, because the chosen label must be written into the annotation\n  column cell instead of living only in transient component state.",
+        "properties": {
+          "column_name": {
+            "title": "Column Name",
+            "type": "string"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "column_name",
+          "row_index"
+        ],
+        "title": "AnnotationSetCellRequest",
         "type": "object"
       },
       "AnnotationSetParentRequest": {
@@ -6171,6 +6855,9 @@
             "title": "Analysis Multi Tab Enabled",
             "type": "boolean"
           },
+          "annotation_ai": {
+            "$ref": "#/components/schemas/AnnotationAiPreferences"
+          },
           "default_tokenizer_model": {
             "anyOf": [
               {
@@ -6225,6 +6912,16 @@
               }
             ],
             "title": "Analysis Multi Tab Enabled"
+          },
+          "annotation_ai": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationAiPreferences"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "default_tokenizer_model": {
             "anyOf": [
@@ -9026,6 +9723,433 @@
         ]
       }
     },
+    "/api/workspaces/annotation/ai/annotate-all": {
+      "post": {
+        "description": "AI-classify every row concurrently and write the whole column in one go.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel's \"Annotate All\" button because filling a\n  whole column one cell at a time is slow; this runs all batches concurrently\n  on the server and persists the result as a single column rewrite.\n\nFlow:\n- Resolve the workspace + source node (404), collect it once, and require an\n  existing *string* annotation column (400) so the write target is valid.\n- Load the authoritative class list from the class node (404/400).\n- Reuse any labels already cached in the preview store (rows the user previewed,\n  with their manual overrides), and dispatch batches concurrently via\n  ``annotate_all`` for ONLY the remaining rows \u2014 so a full run never re-spends on\n  pages the user already previewed and respects edits made during preview.\n- Overwrite the annotation column with the merged labels (null where the model\n  chose no class) and restage/persist the node; clear the cache since the\n  predictions now live in the column. Provider errors become a 502 and nothing\n  is written.",
+        "operationId": "annotate_ai_all",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationAiAnnotateAllRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationAiAnnotateAllResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Annotate Ai All",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/ai/detach-previewed": {
+      "post": {
+        "description": "Copy the already-previewed rows into a new annotated child node.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel's \"Detach Previewed Rows\" button because\n  AI preview predictions live only in the server-side preview store; detaching\n  turns every page the user has already assessed (not just the current one) into\n  a persisted child table so those labels survive as a real data block without\n  re-running (or persisting) the whole column on the source node.\n\nFlow:\n- Resolve the workspace + source node (404).\n- Build the row->label map from the node's active preview session (every\n  previewed row across all viewed pages, override winning over the model label);\n  fall back to any explicit ``rows`` the client sent.\n- When ``dry_run`` is set, return that map's size immediately (``node=None``,\n  nothing created). The panel calls this on mount to gate/label its Detach\n  button from the authoritative server session, so a tab switch (which wipes the\n  panel's local page map) no longer leaves the button wrongly disabled.\n- Otherwise require a non-blank annotation column (400) and at least one row\n  (400) \u2014 this is what fixes \"detach only grabbed one page\", since the source of\n  truth is now the whole server session rather than the panel's current page.\n- Collect the source once; validate every ``row_index`` is in range (400).\n- Filter the source down to those indices (original order preserved), overwrite\n  the annotation column with the aligned labels (blank/whitespace -> null), and\n  stage the subset as a lazy frame.\n- Add it as a child of the source via ``_create_and_persist_child_node`` (so the\n  lineage shows in the graph) and return the new node metadata + row count.",
+        "operationId": "detach_ai_previewed_rows",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationAiDetachRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationAiDetachResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detach Ai Previewed Rows",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/ai/models": {
+      "post": {
+        "description": "Proxy a provider's model listing so the browser never calls providers.\n\nUsed by:\n- Frontend ModelNameCombobox to populate the model dropdown. Authentication is\n  required (per-user gate) even though no workspace is touched, so an\n  unauthenticated caller cannot use the backend as an open model-listing proxy.\n\nFlow:\n- Delegate to ``core.annotation_ai.list_models`` (native SDK per provider).\n- Translate any provider/SDK failure into a 502 with the provider's message.",
+        "operationId": "list_annotation_ai_models",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationAiModelsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationAiModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Annotation Ai Models",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/ai/preview": {
+      "post": {
+        "description": "AI-classify one page of texts, caching results in the preview store.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel because previewing must not mutate the\n  workspace; the panel renders the returned labels beside the (unchanged)\n  source column so users can eyeball provider/model/prompt/class quality.\n\nFlow:\n- Resolve the workspace + source node (404) and require the text column (400).\n- Load the authoritative class list from the class-description node (404/400).\n- Slice exactly the requested page of the text column \u2014 the same\n  ``(page-1)*page_size`` slice ``get_node_data`` uses \u2014 so labels line up with\n  the rows the panel displays.\n- Sync the server-side preview session for this node + config signature, then\n  dispatch a provider batch for ONLY the page rows not already cached (re-viewed\n  pages are cache hits and cost nothing). Store the fresh labels and return the\n  model labels for the whole page in order; provider errors become a 502.",
+        "operationId": "annotate_ai_preview",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationAiPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationAiPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Annotate Ai Preview",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/ai/preview/clear": {
+      "post": {
+        "description": "Discard the node's cached AI preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user clicks \"Close preview\". The\n  in-memory preview store keeps a node's predictions across tab switches so the\n  panel can rehydrate, but an explicit close means those predictions are no\n  longer wanted; dropping the session frees the memory and resets the\n  detach/annotate-all counts so a later preview starts clean.\n\nFlow:\n- Resolve the current workspace (the store is keyed per user+workspace+node).\n- Clear the node's session unconditionally. Clearing is idempotent, so a missing\n  session (nothing previewed, or already cleared) is a successful no-op; the node\n  itself is not required to still exist, which is why no 404 is raised here.",
+        "operationId": "annotate_ai_preview_clear",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationAiPreviewClearRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationAiPreviewClearResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Annotate Ai Preview Clear",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/ai/preview/override": {
+      "put": {
+        "description": "Persist one manual cell edit onto the node's active preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user changes a prediction in the\n  dropdown, so the edit survives a tab switch (it returns via ``preview/state``)\n  and is honoured by detach/annotate-all. A blank label is stored as an explicit\n  null override (the user chose \"None\"), which still wins over the model label.\n\nFlow:\n- Resolve the workspace + source node (404).\n- Write the override to the current session; ``ok=False`` when there is no active\n  session (the edit is stale \u2014 an override can only follow a preview).",
+        "operationId": "annotate_ai_preview_override",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationAiPreviewOverrideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationAiPreviewOverrideResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Annotate Ai Preview Override",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/ai/preview/state": {
+      "post": {
+        "description": "Return the cached preview rows for a node so the panel can rehydrate.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel on mount because its per-row AI labels and\n  manual overrides are in-memory only; after a tab switch the panel re-reads\n  them here so the preview reappears exactly as the user left it.\n\nFlow:\n- Resolve the workspace + source node (404).\n- Recompute the config signature and ask the store for its rows; if the stored\n  session belongs to a different config the store returns nothing, so the panel\n  shows an empty preview and re-classifies on demand rather than displaying\n  stale labels.",
+        "operationId": "annotate_ai_preview_state",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationAiPreviewStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationAiPreviewStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Annotate Ai Preview State",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
     "/api/workspaces/annotation/class-descriptions": {
       "post": {
         "description": "Create an empty class-description table for the Annotation view.\n\nUsed by:\n- Frontend Annotation view through the generated SDK because users need a\n  one-click way to seed the class/description table required by the view.\n\nFlow:\n- Resolve the active workspace.\n- Build an empty ``class``/``description`` table with string dtypes.\n- Persist it to the workspace data folder and add it as a root node.\n- Save the workspace and return the standard node metadata response.",
@@ -9289,6 +10413,146 @@
           }
         },
         "summary": "Set Annotation Class Parent",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/source/{node_id}/annotation-cell": {
+      "put": {
+        "description": "Write a single class label into the source node's annotation column.\n\nUsed by:\n- Frontend Annotation results table because each per-row class dropdown\n  persists its selection so annotations survive reloads and feed downstream\n  analyses, rather than staying as local component state.\n\nFlow:\n- Resolve the workspace and source node (404 if missing).\n- Require a non-blank, existing string annotation column (400 otherwise).\n- Bounds-check the absolute row index against the collected frame (400).\n- Rewrite just the target cell (blank/whitespace clears it to null), restage\n  the materialized frame, persist the workspace, and return node metadata.",
+        "operationId": "set_annotation_cell",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationSetCellRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Annotation Cell",
+        "tags": [
+          "workspace_management",
+          "annotation"
+        ]
+      }
+    },
+    "/api/workspaces/annotation/source/{node_id}/annotation-column": {
+      "post": {
+        "description": "Add an empty string annotation column to the selected source node.\n\nUsed by:\n- Frontend Annotation view on Start (new-annotation mode) because the source\n  block needs a real, persisted column before the per-row class dropdowns can\n  record annotations and before the view can switch into resume mode.\n\nFlow:\n- Resolve the workspace and source node (404 if missing).\n- Reject blank names and names that already exist on the node (400).\n- Append a null-filled string column lazily, then restage the materialized\n  frame so the node stays portable and lazy by default.\n- Persist the workspace and return the refreshed node metadata.",
+        "operationId": "create_annotation_column",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationCreateColumnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Annotation Column",
         "tags": [
           "workspace_management",
           "annotation"

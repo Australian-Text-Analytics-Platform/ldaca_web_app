@@ -42,6 +42,23 @@ describe('generatedClientConfig', () => {
     expect(getGeneratedApiBase('/api')).toBe('');
   });
 
+  it('strips the x-client-timeout-ms override header before the request leaves the browser', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const config = createClientConfig({ baseUrl: 'http://api.test/api', fetch: fetchMock });
+
+    await requireFetch(config.fetch)(
+      new Request(`${String(config.baseUrl)}/config/`, {
+        headers: { 'x-client-timeout-ms': '600000' },
+      }),
+    );
+
+    // The opt-in override is a client-only hint; it must never reach the server.
+    const [request] = fetchMock.mock.calls[0] as [Request];
+    expect(request.headers.has('x-client-timeout-ms')).toBe(false);
+  });
+
   it('normalizes fetch network failures to ApiError', async () => {
     const config = createClientConfig({
       baseUrl: 'http://api.test/api',

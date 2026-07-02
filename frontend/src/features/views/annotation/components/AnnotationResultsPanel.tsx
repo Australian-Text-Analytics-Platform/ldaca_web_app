@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { getAnnotationClassDescriptions, getNodeData } from '@/api';
+import { toast } from 'sonner';
+import { getAnnotationClassDescriptions, getNodeData, setAnnotationCell } from '@/api';
 import {
   Select,
   SelectContent,
@@ -18,10 +19,13 @@ import {
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { queryKeys } from '@/lib/queryKeys';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef, PaginationState } from '@tanstack/react-table';
 
 const ANNOTATION_RESULT_PAGE_SIZE = 50;
+// Radix `Select` rejects an empty-string item value, so the "clear" option uses
+// a sentinel that onValueChange maps back to '' (an unset/null annotation).
+const NO_CLASS_VALUE = '__no_class__';
 type AnnotationResultRow = Record<string, unknown>;
 
 /** Coerce an unknown cell value to display text without object stringification. */
@@ -57,9 +61,12 @@ interface AnnotationResultsPanelProps {
  *
  * Flow: fetch the current source-node page plus the class list, then render two
  * fixed-width columns with server pagination for the complete source node. The
- * text column is plain; each annotation cell is a dropdown of class names.
- * Resume seeds each dropdown from the existing value; a new annotation starts
- * blank.
+ * text column is plain; each annotation cell is a dropdown of class names plus a
+ * leading "None" option that clears the cell back to an unset value. Resume
+ * seeds each dropdown from the existing value; a new annotation starts blank.
+ * Picking a class optimistically updates the dropdown and persists the cell to
+ * the backend annotation column via PUT .../annotation-cell, reverting + toasting
+ * on failure so the displayed value never drifts from what was actually saved.
  */
 export function AnnotationResultsPanel({
   workspaceId,
@@ -77,6 +84,38 @@ export function AnnotationResultsPanel({
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: ANNOTATION_RESULT_PAGE_SIZE,
+  });
+  const queryClient = useQueryClient();
+
+  // Persist a single annotation cell to the backend column. row_index is the
+  // ABSOLUTE 0-based position across the node (page offset + row), matching the
+  // backend's int_range rewrite. On failure the dropdown rolls back to the value
+  // it showed before the change so optimistic UI never diverges from storage.
+  const setCellMutation = useMutation({
+    mutationFn: async (vars: { rowPosition: number; value: string; previous: string }) => {
+      const { data } = await setAnnotationCell({
+        headers: getAuthHeaders(),
+        path: { node_id: nodeId },
+        body: {
+          column_name: annotationColumn,
+          row_index: vars.rowPosition,
+          value: vars.value === '' ? null : vars.value,
+        },
+        throwOnError: true,
+      });
+      return data;
+    },
+    onError: (_error, vars) => {
+      setSelections((current) => ({ ...current, [vars.rowPosition]: vars.previous }));
+      toast.error('Could not save annotation.');
+    },
+    onSuccess: () => {
+      // Refetch so other views of this node reflect the saved cell; the local
+      // override already matches, so the visible dropdown does not flicker.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.nodeData(workspaceId ?? '', nodeId),
+      });
+    },
   });
 
   const resultsQuery = useQuery({
@@ -176,9 +215,25 @@ export function AnnotationResultsPanel({
                       </TableCell>
                       <TableCell>
                         <Select
-                          value={value || undefined}
+                          // `value` is always a string ('' when unset); passing it
+                          // directly keeps the Select controlled for its lifetime.
+                          // Radix shows the placeholder for '' as well as undefined.
+                          value={value}
                           onValueChange={(next) => {
-                            setSelections((current) => ({ ...current, [rowPosition]: next }));
+                            // The sentinel clears the cell back to an unset value.
+                            const resolved = next === NO_CLASS_VALUE ? '' : next;
+                            const previous = value;
+                            setSelections((current) => ({
+                              ...current,
+                              [rowPosition]: resolved,
+                            }));
+                            // New columns are created on Start before this panel
+                            // shows, so persistence runs in resume mode against an
+                            // existing column; skip the request in the unlikely
+                            // new-mode render to avoid a guaranteed 400.
+                            if (!isNew) {
+                              setCellMutation.mutate({ rowPosition, value: resolved, previous });
+                            }
                           }}
                         >
                           <SelectTrigger
@@ -188,6 +243,9 @@ export function AnnotationResultsPanel({
                             <SelectValue placeholder="Select class" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value={NO_CLASS_VALUE} className="text-muted-foreground">
+                              None
+                            </SelectItem>
                             {classOptions.map((name) => (
                               <SelectItem key={name} value={name}>
                                 {name}
