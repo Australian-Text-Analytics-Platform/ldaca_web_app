@@ -110,6 +110,7 @@ and test/mock comments so they stay accurate.
 - Use `Depends(get_current_user)` for backend route authentication; do not bypass it in new routes.
 - For worker tasks, follow the existing worker pattern: call `configure_worker_environment()` first, import heavy dependencies inside the worker function, and write large outputs to artifacts.
 - In frontend code, do not add `useMemo`, `useCallback`, or `React.memo` for routine optimization. The repo uses React Compiler.
+- React Flow (`@xyflow/react`) caches each node's `data` in its own internal state; the graph only re-syncs `setNodes` when a *visible* field in `nodeSignatureFor` changes (`useWorkspaceGraph.ts`). Any callback put on `node.data` that closes over volatile state NOT in that signature (e.g. `currentView`) will go **stale** on a plain view switch. Read such values live at call time (e.g. `useUIStore.getState().currentView`) instead of closing over them — this is what caused the "graph + button silently does nothing after switching tools" bug. When debugging hover-revealed graph/sidebar controls, test with a single continuous `page.mouse.move(x, y, { steps: N })`; stepped moves with waits create false "toolbar vanished / click intercepted" artifacts that tempt you into band-aids for the wrong root cause.
 
 ## Cutting A Release
 

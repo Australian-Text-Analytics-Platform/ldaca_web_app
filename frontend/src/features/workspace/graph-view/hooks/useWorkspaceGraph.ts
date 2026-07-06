@@ -133,7 +133,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [redoNode],
   );
 
-  const currentView = useUIStore((state) => state.currentView);
   // "Fresh" = nodes that appeared mid-session (detach / join / stack /
   // clone / etc. outputs) and haven't been interacted with yet. The
   // graph marks them with a red "new" dot so the user can find them in
@@ -153,14 +152,25 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
    * Called by: CustomNode's fixed-size side controls. The graph does not own
    * analysis inputs, so this queues an intent consumed by useTabNodeInputs in
    * the currently mounted view instead of selecting/highlighting the graph node.
+   *
+   * The active view is read live from the store at click time rather than
+   * closed over. React Flow caches each node's ``data`` (including this
+   * callback) in its own internal state, and the graph's node-sync effect only
+   * pushes fresh node data when a *visible* field changes (see
+   * ``nodeSignatureFor``). A plain view switch changes no visible field, so a
+   * captured ``currentView`` would stay frozen at whatever view was active when
+   * the nodes were last synced — tagging the request with the wrong view so no
+   * mounted analysis consumer matches it and the "+" silently does nothing.
+   * Reading ``getState()`` sidesteps that staleness entirely.
    */
   const handleAddToSelection = useCallback(
     (nodeId: string) => {
       if (!nodeId) return;
-      requestNodeInputAdd(currentWorkspaceId, currentView, nodeId);
+      const activeView = useUIStore.getState().currentView;
+      requestNodeInputAdd(currentWorkspaceId, activeView, nodeId);
       markInteracted([nodeId]);
     },
-    [requestNodeInputAdd, currentWorkspaceId, currentView, markInteracted],
+    [requestNodeInputAdd, currentWorkspaceId, markInteracted],
   );
   const currentGraphNodeIds = useMemo(
     () => (workspaceGraph?.nodes ?? []).map((n: GraphNode) => n.id),
