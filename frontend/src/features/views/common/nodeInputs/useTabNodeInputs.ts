@@ -69,8 +69,10 @@ const NO_OP = (_inputs: AnalysisTabInput[]) => {
  * Flow: resolve the requested selector id from ``input_sets`` with a legacy
  * ``inputs`` fallback for ``source``, read live nodes + graph selection, fetch
  * typed columns for the already-selected nodes, delegate to ``useNodeInputs``
- * with the selector's value, then optionally consume graph/sidebar "+"
- * requests directly for single-selector views.
+ * with the selector's value, then consume graph/sidebar "+" requests directly
+ * by default. Multi-selector features pass ``consumeNodeInputRequests: false``
+ * on every participating selector so the request stays pending and the visible
+ * ``NodeInputsPanel`` instances render the dashed chooser instead.
  */
 export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInputsResult {
   const {

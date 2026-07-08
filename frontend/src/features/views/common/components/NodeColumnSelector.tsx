@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -80,16 +81,18 @@ export function NodeColumnSelector({
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {clearOptionValue && (
-              <SelectItem key={clearOptionValue} value={clearOptionValue}>
-                {clearOptionLabel}
-              </SelectItem>
-            )}
-            {optionValues.map((column) => (
-              <SelectItem key={column} value={column}>
-                {column}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {clearOptionValue && (
+                <SelectItem key={clearOptionValue} value={clearOptionValue}>
+                  {clearOptionLabel}
+                </SelectItem>
+              )}
+              {optionValues.map((column) => (
+                <SelectItem key={column} value={column}>
+                  {column}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </DisabledReasonTooltip>

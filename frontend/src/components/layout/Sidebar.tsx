@@ -180,8 +180,15 @@ function Sidebar() {
     canRedo: node.can_redo,
   });
 
+  /**
+   * Queues a data-block add request for the view that is active at click time.
+   * Called by: NodeActionsToolbar in the Data Blocks sidebar section. The graph
+   * path uses the same live-read pattern because add requests are scoped to the
+   * active analysis view, and stale closures can otherwise tag a click for the
+   * previous tool so no mounted selector consumes it.
+   */
   const handleAddToSelection = (nodeId: string) => {
-    requestNodeInputAdd(currentWorkspaceId, currentView, nodeId);
+    requestNodeInputAdd(currentWorkspaceId, useUIStore.getState().currentView, nodeId);
     markInteracted([nodeId]);
   };
 

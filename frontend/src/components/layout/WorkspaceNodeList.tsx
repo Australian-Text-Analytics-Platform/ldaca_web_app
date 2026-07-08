@@ -316,7 +316,7 @@ function WorkspaceNodeList({
                           // so the row keeps one stable height while names fade.
                           // Stop row-toggle when interacting with the actions.
                           <div
-                            className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 pointer-events-none"
+                            className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 pointer-events-none group-hover/row:!pointer-events-auto group-hover/row:opacity-100"
                             onPointerDown={(event) => {
                               event.stopPropagation();
                             }}

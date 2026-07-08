@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AnnotationFeature from '../AnnotationFeature';
 import type {
@@ -12,6 +12,8 @@ import type {
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+
+const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 
 const mocks = vi.hoisted(() => ({
   createAnnotationClassDescriptions: vi.fn(),
@@ -87,7 +89,13 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => {
           <div>{title}</div>
           {addonArgs ? (
             <div data-testid={`${title}-addon`}>
+              <span>
+                {typeof props.columnLabel === 'function'
+                  ? props.columnLabel(addonArgs)
+                  : props.columnLabel}
+              </span>
               {props.renderColumnAddon?.(addonArgs)}
+              {props.renderExtraNodeContent?.(addonArgs)}
             </div>
           ) : null}
           {props.headerAddon}
@@ -99,134 +107,131 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => {
 
 const sourceNodeInputs = (
   overrides: Partial<UseTabNodeInputsResult> = {},
-): UseTabNodeInputsResult =>
-  ({
-    inputs: [{ node_id: 'source-node', column: 'text' }],
-    resolvedNodes: [
-      {
-        id: 'source-node',
-        name: 'Source',
-        node: {
-          id: 'source-node',
-          name: 'Source',
-          columns: ['text', 'existing_annotation'],
-          schema: { text: 'String', existing_annotation: 'String' },
-        },
-        column: 'text',
-        columnOptions: [
-          { name: 'text', dataType: 'string' },
-          { name: 'existing_annotation', dataType: 'string' },
-        ],
-      },
-    ],
-    selectedNodes: [
-      {
+): UseTabNodeInputsResult => ({
+  inputs: [{ node_id: 'source-node', column: 'text' }],
+  resolvedNodes: [
+    {
+      id: 'source-node',
+      name: 'Source',
+      node: {
         id: 'source-node',
         name: 'Source',
         columns: ['text', 'existing_annotation'],
+        schema: { text: 'String', existing_annotation: 'String' },
       },
-    ],
-    nodeColumnSelections: [{ nodeId: 'source-node', column: 'text' }],
-    availableNodes: [],
-    canAddMore: false,
-    addNodes: vi.fn(() => []),
-    getAddRejection: vi.fn(() => null),
-    removeNode: vi.fn(),
-    clear: vi.fn(),
-    setColumn: vi.fn(),
-    graphSelectedIds: [],
-    workspaceId: 'workspace-1',
-    recentPresets: [],
-    ...overrides,
-  });
+      column: 'text',
+      columnOptions: [
+        { name: 'text', dataType: 'string' },
+        { name: 'existing_annotation', dataType: 'string' },
+      ],
+    },
+  ],
+  selectedNodes: [
+    {
+      id: 'source-node',
+      name: 'Source',
+      columns: ['text', 'existing_annotation'],
+    },
+  ],
+  nodeColumnSelections: [{ nodeId: 'source-node', column: 'text' }],
+  availableNodes: [],
+  canAddMore: false,
+  addNodes: vi.fn(() => []),
+  getAddRejection: vi.fn(() => null),
+  removeNode: vi.fn(),
+  clear: vi.fn(),
+  setColumn: vi.fn(),
+  graphSelectedIds: [],
+  workspaceId: 'workspace-1',
+  recentPresets: [],
+  ...overrides,
+});
 
 const classNodeInputs = (
   overrides: Partial<UseTabNodeInputsResult> = {},
-): UseTabNodeInputsResult =>
-  ({
-    inputs: [{ node_id: 'classes-node', column: 'class' }],
-    resolvedNodes: [
-      {
-        id: 'classes-node',
-        name: 'Annotation Classes',
-        node: {
-          id: 'classes-node',
-          name: 'Annotation Classes',
-          columns: ['class', 'description'],
-          schema: { class: 'String', description: 'String' },
-        },
-        column: 'class',
-        columnOptions: [
-          { name: 'class', dataType: 'string' },
-          { name: 'description', dataType: 'string' },
-        ],
-      },
-    ],
-    selectedNodes: [
-      {
+): UseTabNodeInputsResult => ({
+  inputs: [{ node_id: 'classes-node', column: 'class' }],
+  resolvedNodes: [
+    {
+      id: 'classes-node',
+      name: 'Annotation Classes',
+      node: {
         id: 'classes-node',
         name: 'Annotation Classes',
         columns: ['class', 'description'],
+        schema: { class: 'String', description: 'String' },
       },
-    ],
-    nodeColumnSelections: [{ nodeId: 'classes-node', column: 'class' }],
-    availableNodes: [],
-    canAddMore: false,
-    addNodes: vi.fn(() => []),
-    getAddRejection: vi.fn(() => null),
-    removeNode: vi.fn(),
-    clear: vi.fn(),
-    setColumn: vi.fn(),
-    graphSelectedIds: [],
-    workspaceId: 'workspace-1',
-    recentPresets: [],
-    ...overrides,
-  });
+      column: 'class',
+      columnOptions: [
+        { name: 'class', dataType: 'string' },
+        { name: 'description', dataType: 'string' },
+      ],
+    },
+  ],
+  selectedNodes: [
+    {
+      id: 'classes-node',
+      name: 'Annotation Classes',
+      columns: ['class', 'description'],
+    },
+  ],
+  nodeColumnSelections: [{ nodeId: 'classes-node', column: 'class' }],
+  availableNodes: [],
+  canAddMore: false,
+  addNodes: vi.fn(() => []),
+  getAddRejection: vi.fn(() => null),
+  removeNode: vi.fn(),
+  clear: vi.fn(),
+  setColumn: vi.fn(),
+  graphSelectedIds: [],
+  workspaceId: 'workspace-1',
+  recentPresets: [],
+  ...overrides,
+});
 
 // AI-mode example selector. Defaults to one string node so the example
 // annotation-column addon can be exercised once AI mode is enabled.
 const exampleNodeInputs = (
   overrides: Partial<UseTabNodeInputsResult> = {},
-): UseTabNodeInputsResult =>
-  ({
-    inputs: [{ node_id: 'example-node', column: 'text' }],
-    resolvedNodes: [
-      {
-        id: 'example-node',
-        name: 'Example',
-        node: {
-          id: 'example-node',
-          name: 'Example',
-          columns: ['text', 'existing_annotation'],
-          schema: { text: 'String', existing_annotation: 'String' },
-        },
-        column: 'text',
-        columnOptions: [
-          { name: 'text', dataType: 'string' },
-          { name: 'existing_annotation', dataType: 'string' },
-        ],
-      },
-    ],
-    selectedNodes: [
-      {
+): UseTabNodeInputsResult => ({
+  inputs: [{ node_id: 'example-node', column: 'text' }],
+  resolvedNodes: [
+    {
+      id: 'example-node',
+      name: 'Example',
+      node: {
         id: 'example-node',
         name: 'Example',
         columns: ['text', 'existing_annotation'],
+        schema: { text: 'String', existing_annotation: 'String' },
       },
-    ],
-    nodeColumnSelections: [{ nodeId: 'example-node', column: 'text' }],
-    availableNodes: [],
-    canAddMore: false,
-    addNodes: vi.fn(() => []),
-    getAddRejection: vi.fn(() => null),
-    removeNode: vi.fn(),
-    clear: vi.fn(),
-    setColumn: vi.fn(),
-    graphSelectedIds: [],
-    workspaceId: 'workspace-1',
-    recentPresets: [],
-    ...overrides,
-  });
+      column: 'text',
+      columnOptions: [
+        { name: 'text', dataType: 'string' },
+        { name: 'existing_annotation', dataType: 'string' },
+      ],
+    },
+  ],
+  selectedNodes: [
+    {
+      id: 'example-node',
+      name: 'Example',
+      columns: ['text', 'existing_annotation'],
+    },
+  ],
+  nodeColumnSelections: [{ nodeId: 'example-node', column: 'text' }],
+  availableNodes: [],
+  canAddMore: false,
+  addNodes: vi.fn(() => []),
+  getAddRejection: vi.fn(() => null),
+  removeNode: vi.fn(),
+  clear: vi.fn(),
+  setColumn: vi.fn(),
+  graphSelectedIds: [],
+  workspaceId: 'workspace-1',
+  recentPresets: [],
+  ...overrides,
+});
 
 function nodeInputRequestsStore(
   overrides: Partial<NodeInputRequestsStore> = {},
@@ -265,7 +270,21 @@ function renderAnnotationFeature(props: Partial<ComponentProps<typeof Annotation
   );
 }
 
+function openRouterModelsResponse(modelIds: string[]) {
+  return new Response(
+    JSON.stringify({
+      data: modelIds.map((id) => ({
+        id,
+        pricing: { prompt: '0.0000007', completion: '0.0000014' },
+      })),
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  );
+}
+
 describe('AnnotationFeature', () => {
+  const fetchMock = vi.fn();
+
   beforeEach(() => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom may not implement hasPointerCapture despite lib.dom types
     if (!HTMLElement.prototype.hasPointerCapture) {
@@ -282,6 +301,8 @@ describe('AnnotationFeature', () => {
       });
     }
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockResolvedValue(openRouterModelsResponse(['openai/gpt-4o', 'gpt-custom']));
     // Reset the (real) preferences store so AI api-keys/custom providers from one
     // test do not leak into the next.
     usePreferencesStore.setState({
@@ -354,6 +375,10 @@ describe('AnnotationFeature', () => {
     mocks.listAnnotationAiModels.mockResolvedValue({ data: { models: ['openai/gpt-4o'] } });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders source and class-description selectors with annotation-specific column pickers', async () => {
     const user = userEvent.setup();
     renderAnnotationFeature();
@@ -369,14 +394,34 @@ describe('AnnotationFeature', () => {
     expect(screen.getByRole('option', { name: 'existing_annotation' })).toBeInTheDocument();
 
     const classAddon = screen.getByTestId('Class Description Node-addon');
-    expect(within(classAddon).getByText('Description')).toBeInTheDocument();
+    expect(within(classAddon).getByText('Class Column')).toBeInTheDocument();
+    expect(within(classAddon).getByText('Description Column')).toBeInTheDocument();
     expect(mocks.useTabNodeInputs).toHaveBeenCalledWith(
-      expect.objectContaining({ consumeNodeInputRequests: false, selectorId: 'source' }),
+      expect.objectContaining({
+        selectorId: 'classDescriptions',
+      }),
+    );
+  });
+
+  it('opts all annotation selectors into the visible add-request chooser', () => {
+    renderAnnotationFeature();
+
+    expect(mocks.useTabNodeInputs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectorId: 'source',
+        consumeNodeInputRequests: false,
+      }),
     );
     expect(mocks.useTabNodeInputs).toHaveBeenCalledWith(
       expect.objectContaining({
-        consumeNodeInputRequests: false,
         selectorId: 'classDescriptions',
+        consumeNodeInputRequests: false,
+      }),
+    );
+    expect(mocks.useTabNodeInputs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectorId: 'exampleNodes',
+        consumeNodeInputRequests: false,
       }),
     );
   });
@@ -680,9 +725,7 @@ describe('AnnotationFeature', () => {
     // Compact card: class name shown as a badge, description text hidden.
     expect(await within(classSetup).findByText('support')).toBeInTheDocument();
     expect(within(classSetup).queryByText('Supportive stance')).not.toBeInTheDocument();
-    expect(
-      within(classSetup).queryByRole('textbox', { name: 'Class 1' }),
-    ).not.toBeInTheDocument();
+    expect(within(classSetup).queryByRole('textbox', { name: 'Class 1' })).not.toBeInTheDocument();
 
     // Open the Edit dialog and rename a class; the change persists on blur.
     await user.click(within(classSetup).getByRole('button', { name: 'Edit' }));
@@ -819,56 +862,16 @@ describe('AnnotationFeature', () => {
     expect(within(classSetup).getByText('+2 more')).toBeInTheDocument();
   });
 
-  it('routes workspace plus requests to the source selector after user choice', async () => {
+  it('renders the optional example selector as another shared node-input target in AI mode', async () => {
     const user = userEvent.setup();
-    const addSourceNodes = vi.fn(() => []);
-    const addClassNodes = vi.fn(() => []);
-    const consume = vi.fn();
-    nodeInputRequestsStore({
-      requests: [{ id: 12, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
-      consume,
-    });
-    mocks.useTabNodeInputs.mockImplementation((config: { selectorId?: string }) =>
-      config.selectorId === 'classDescriptions'
-        ? classNodeInputs({ addNodes: addClassNodes, canAddMore: true })
-        : sourceNodeInputs({ addNodes: addSourceNodes, canAddMore: true }),
-    );
-
     renderAnnotationFeature();
 
-    const chooser = screen.getByRole('dialog', { name: 'Choose annotation node selector' });
-    expect(chooser).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
 
-    await user.click(within(chooser).getByRole('button', { name: 'Add to Selected Data Blocks' }));
-
-    expect(addSourceNodes).toHaveBeenCalledWith(['node-a']);
-    expect(addClassNodes).not.toHaveBeenCalled();
-    expect(consume).toHaveBeenCalledWith(12);
-  });
-
-  it('routes workspace plus requests to the class-description selector after user choice', async () => {
-    const user = userEvent.setup();
-    const addSourceNodes = vi.fn(() => []);
-    const addClassNodes = vi.fn(() => []);
-    const consume = vi.fn();
-    nodeInputRequestsStore({
-      requests: [{ id: 13, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-b'] }],
-      consume,
-    });
-    mocks.useTabNodeInputs.mockImplementation((config: { selectorId?: string }) =>
-      config.selectorId === 'classDescriptions'
-        ? classNodeInputs({ addNodes: addClassNodes, canAddMore: true })
-        : sourceNodeInputs({ addNodes: addSourceNodes, canAddMore: true }),
+    expect(screen.getByText('Example Node')).toBeInTheDocument();
+    expect(mocks.useTabNodeInputs).toHaveBeenCalledWith(
+      expect.objectContaining({ selectorId: 'exampleNodes' }),
     );
-
-    renderAnnotationFeature();
-
-    const chooser = screen.getByRole('dialog', { name: 'Choose annotation node selector' });
-    await user.click(within(chooser).getByRole('button', { name: 'Add to Class Description' }));
-
-    expect(addClassNodes).toHaveBeenCalledWith(['node-b']);
-    expect(addSourceNodes).not.toHaveBeenCalled();
-    expect(consume).toHaveBeenCalledWith(13);
   });
 
   it('gates the Start button to manual mode and reveals AI settings when toggled', async () => {
@@ -879,15 +882,14 @@ describe('AnnotationFeature', () => {
     expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
     const aiToggle = screen.getByRole('switch', { name: 'Toggle AI annotation mode' });
     expect(aiToggle).not.toBeChecked();
-    expect(screen.queryByRole('combobox', { name: 'Provider' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Provider' })).not.toBeInTheDocument();
 
-    // Flip to AI mode: the Start button disappears and the provider, model, and
-    // example-node controls appear.
+    // Flip to AI mode: the Start button disappears and the provider-card dropdown
+    // plus example-node controls appear.
     await user.click(aiToggle);
     expect(aiToggle).toBeChecked();
     expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Provider' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Model')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Provider' })).toBeInTheDocument();
     expect(screen.getByText('Example Node')).toBeInTheDocument();
     const exampleAddon = screen.getByTestId('Example Node-addon');
     expect(within(exampleAddon).getByText('Annotation Column')).toBeInTheDocument();
@@ -901,7 +903,9 @@ describe('AnnotationFeature', () => {
       annotationAiCustomProviders: [],
     });
     // Start directly in AI mode with a model already chosen (persisted setting).
-    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+    renderAnnotationFeature({
+      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+    });
 
     await user.click(screen.getByRole('button', { name: 'Preview' }));
 
@@ -944,7 +948,9 @@ describe('AnnotationFeature', () => {
       annotationAiApiKeys: { openrouter: 'sk-test' },
       annotationAiCustomProviders: [],
     });
-    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+    renderAnnotationFeature({
+      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+    });
 
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     const closeButton = await screen.findByRole('button', { name: 'Close preview' });
@@ -964,7 +970,9 @@ describe('AnnotationFeature', () => {
 
     // Reopening does not create the column again — it already exists (resume).
     await user.click(screen.getByRole('button', { name: 'Preview' }));
-    expect(await screen.findByRole('region', { name: 'AI Annotation Preview' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'AI Annotation Preview' }),
+    ).toBeInTheDocument();
     expect(columnPicker()).toBeDisabled();
     expect(mocks.createAnnotationColumn).toHaveBeenCalledTimes(1);
   });
@@ -994,7 +1002,9 @@ describe('AnnotationFeature', () => {
     });
     // The default class mock returns one class ("support"), so the same runnable
     // config that was gated above now enables Preview once the query resolves.
-    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+    renderAnnotationFeature({
+      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+    });
 
     const previewButton = await screen.findByRole('button', { name: 'Preview' });
     await waitFor(() => expect(previewButton).toBeEnabled());
@@ -1006,7 +1016,9 @@ describe('AnnotationFeature', () => {
       annotationAiApiKeys: { openrouter: 'sk-test' },
       annotationAiCustomProviders: [],
     });
-    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+    renderAnnotationFeature({
+      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+    });
 
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     const closeButton = await screen.findByRole('button', { name: 'Close preview' });
@@ -1019,41 +1031,38 @@ describe('AnnotationFeature', () => {
     );
   });
 
-  it('shows an API-key hint after switching to a key-required provider', async () => {
+  it('opens an empty provider dropdown with only the add-provider action by default', async () => {
     const user = userEvent.setup();
     renderAnnotationFeature();
     await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
 
-    // OpenRouter (default) lists models without a key — no hint shown.
-    expect(
-      screen.queryByText(/Enter an API key to browse available models/i),
-    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
 
-    // Google requires a key to list models, so the hint appears.
-    await user.click(screen.getByRole('combobox', { name: 'Provider' }));
-    await user.click(await screen.findByRole('option', { name: 'Google' }));
-
-    expect(
-      screen.getByText(/Enter an API key to browse available models/i),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add provider' })).toBeInTheDocument();
+    expect(screen.queryByText('OpenRouter')).not.toBeInTheDocument();
   });
 
-  it('persists the AI API key to preferences on blur', async () => {
+  it('saves a built-in provider card with its API key and model', async () => {
     const user = userEvent.setup();
     renderAnnotationFeature();
     await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
 
-    const apiKeyInput = screen.getByLabelText(/API Key/i);
-    await user.click(apiKeyInput);
-    await user.type(apiKeyInput, 'sk-secret');
-    // Blur commits the key to the preferences store (keyed by provider id).
-    // Click a non-interactive label so focus leaves the field without opening
-    // the adjacent model combobox (which would fire a model-list fetch).
-    await user.click(screen.getByText('Manual'));
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
+    await user.click(screen.getByRole('button', { name: 'Add provider' }));
+    await user.type(screen.getByLabelText('API key'), 'sk-secret');
+    await user.type(screen.getByLabelText('Model'), 'openai/gpt-4o');
+    await user.click(screen.getByRole('button', { name: 'Save provider' }));
 
-    expect(usePreferencesStore.getState().annotationAiApiKeys).toEqual({
-      openrouter: 'sk-secret',
-    });
+    const keys = usePreferencesStore.getState().annotationAiApiKeys;
+    const providerId = Object.keys(keys)[0];
+    expect(providerId).toMatch(/^provider:openrouter:/);
+    expect(providerId ? keys[providerId] : undefined).toBe('sk-secret');
+    expect(screen.getByRole('button', { name: 'Provider' })).toHaveTextContent('OpenRouter');
+    expect(screen.getByRole('button', { name: 'Provider' })).toHaveTextContent('openai/gpt-4o');
+    expect(fetchMock).toHaveBeenCalledWith(
+      OPENROUTER_MODELS_URL,
+      expect.objectContaining({ method: 'GET' }),
+    );
   });
 
   it('saves a custom provider from the dialog and selects it', async () => {
@@ -1061,69 +1070,86 @@ describe('AnnotationFeature', () => {
     renderAnnotationFeature();
     await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
 
-    // The "Custom…" entry opens the definition dialog.
-    await user.click(screen.getByRole('combobox', { name: 'Provider' }));
-    await user.click(await screen.findByRole('option', { name: 'Custom…' }));
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
+    await user.click(screen.getByRole('button', { name: 'Add provider' }));
+    await user.click(screen.getByRole('combobox', { name: 'Provider type' }));
+    await user.click(await screen.findByRole('option', { name: 'Custom base URL' }));
 
-    await user.type(screen.getByLabelText('Name'), 'My LLM');
+    await user.type(screen.getByLabelText('Provider name'), 'My LLM');
     await user.type(screen.getByLabelText('Base URL'), 'https://llm.example/v1');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.type(screen.getByLabelText(/API key/), 'sk-custom');
+    await user.type(screen.getByLabelText('Model'), 'llm-large');
+    await user.click(screen.getByRole('button', { name: 'Save provider' }));
 
     // Persisted to preferences and selected in the dropdown.
     expect(usePreferencesStore.getState().annotationAiCustomProviders).toEqual([
       expect.objectContaining({ name: 'My LLM', base_url: 'https://llm.example/v1' }),
     ]);
-    expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveTextContent('My LLM');
+    expect(screen.getByRole('button', { name: 'Provider' })).toHaveTextContent('My LLM');
+    expect(screen.getByRole('button', { name: 'Provider' })).toHaveTextContent('llm-large');
   });
 
   it('hydrates AI mode, provider, model, and prompt from persisted tab settings', () => {
+    const providerId = 'provider:openai:test';
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { [providerId]: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
     renderAnnotationFeature({
       tabSettings: {
         annotationMode: 'ai',
-        aiProvider: 'openai',
+        aiProvider: providerId,
         aiModel: 'gpt-4o-mini',
+        aiProviderModels: JSON.stringify({ [providerId]: 'gpt-4o-mini' }),
         aiPrompt: 'Classify the stance.',
       },
     });
 
     // The switch starts in AI mode and the AI controls reflect the saved values.
-    expect(
-      screen.getByRole('switch', { name: 'Toggle AI annotation mode' }),
-    ).toBeChecked();
-    expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveTextContent('OpenAI');
-    expect(screen.getByLabelText('Model')).toHaveValue('gpt-4o-mini');
+    expect(screen.getByRole('switch', { name: 'Toggle AI annotation mode' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Provider' })).toHaveTextContent('OpenAI');
+    expect(screen.getByRole('button', { name: 'Provider' })).toHaveTextContent('gpt-4o-mini');
     expect(screen.getByLabelText(/Prompt/)).toHaveValue('Classify the stance.');
   });
 
   it('write-through persists the mode switch and provider selection', async () => {
     const user = userEvent.setup();
     const onTabSettingChange = vi.fn();
+    const providerId = 'provider:anthropic:test';
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { [providerId]: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
     renderAnnotationFeature({ onTabSettingChange });
 
     // Flipping the switch persists the mode immediately.
     await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
 
-    // Choosing a provider persists its id immediately.
-    await user.click(screen.getByRole('combobox', { name: 'Provider' }));
-    await user.click(await screen.findByRole('option', { name: 'Anthropic' }));
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiProvider', 'anthropic');
+    // Choosing a provider card persists both the card id and its model immediately.
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
+    await user.click(screen.getByText('Anthropic'));
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiProvider', providerId);
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiModel', '');
   });
 
-  it('commits the model and prompt on blur (save-on-blur persistence)', async () => {
+  it('commits provider models on save and prompt on blur', async () => {
     mocks.listAnnotationAiModels.mockResolvedValue({ data: { models: ['openai/gpt-4o'] } });
     const user = userEvent.setup();
     const onTabSettingChange = vi.fn();
     renderAnnotationFeature({ onTabSettingChange });
     await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
 
-    // Type a model id, then blur by clicking the non-interactive "Manual" label
-    // (mirrors the API-key blur pattern; avoids opening the model popover overlay).
-    const modelInput = screen.getByLabelText('Model');
-    await user.click(modelInput);
-    await user.type(modelInput, 'gpt-custom');
-    await user.click(screen.getByText('Manual'));
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
+    await user.click(screen.getByRole('button', { name: 'Add provider' }));
+    await user.type(screen.getByLabelText('API key'), 'sk-secret');
+    await user.type(screen.getByLabelText('Model'), 'gpt-custom');
+    await user.click(screen.getByRole('button', { name: 'Save provider' }));
     expect(onTabSettingChange).toHaveBeenCalledWith('aiModel', 'gpt-custom');
+    expect(onTabSettingChange).toHaveBeenCalledWith(
+      'aiProviderModels',
+      expect.stringContaining('gpt-custom'),
+    );
 
     // Same for the prompt textarea.
     const promptInput = screen.getByLabelText(/Prompt/);

@@ -9,8 +9,10 @@ import { immer } from 'zustand/middleware/immer';
  * The React Flow graph is mounted outside individual analysis panels, so a
  * node's side "+" button cannot directly call the active tab's
  * ``useNodeInputs.addNodes``. Instead it queues an add request scoped by
- * workspace + active view. The mounted ``useTabNodeInputs`` hook for that view
- * consumes matching requests and commits them to that tab's ``inputs``.
+ * workspace + active view. Single-selector views consume matching requests
+ * directly through ``useTabNodeInputs``. Multi-selector views opt out of direct
+ * consumption so each visible ``NodeInputsPanel`` can show the dashed "Add
+ * here" target and let the user choose.
  *
  * This store is intentionally not persisted: button clicks are transient UI
  * intents, not canonical selection state.

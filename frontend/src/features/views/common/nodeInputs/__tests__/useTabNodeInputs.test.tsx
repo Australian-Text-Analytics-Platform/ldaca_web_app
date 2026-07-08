@@ -112,7 +112,7 @@ describe('useTabNodeInputs', () => {
     expect(consume).not.toHaveBeenCalled();
   });
 
-  it('consumes graph add requests queued for the current active view', () => {
+  it('consumes current-view graph add requests by default', () => {
     const consume = vi.fn();
     const onTabInputsChange = vi.fn();
     nodeInputRequestsStore({
@@ -130,6 +130,27 @@ describe('useTabNodeInputs', () => {
 
     expect(onTabInputsChange).toHaveBeenCalledWith([{ node_id: 'node-a', column: 'text' }]);
     expect(consume).toHaveBeenCalledWith(8);
+  });
+
+  it('leaves current-view add requests pending when direct consumption is disabled', () => {
+    const consume = vi.fn();
+    const onTabInputsChange = vi.fn();
+    nodeInputRequestsStore({
+      requests: [{ id: 10, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
+      consume,
+    });
+
+    renderHook(() =>
+      useTabNodeInputs({
+        tabInputs: [],
+        onTabInputsChange,
+        constraints: { allowedDataTypes: ['string'], maxNodes: 1 },
+        consumeNodeInputRequests: false,
+      }),
+    );
+
+    expect(onTabInputsChange).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
   });
 
   it('writes named selector changes through onTabInputSetChange', () => {

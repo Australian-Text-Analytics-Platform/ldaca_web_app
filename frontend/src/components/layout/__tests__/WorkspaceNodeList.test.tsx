@@ -174,6 +174,27 @@ describe('WorkspaceNodeList', () => {
     expect(hoverToolbar).not.toHaveClass('right-1');
   });
 
+  it('lets hover-revealed row actions receive pointer clicks', () => {
+    render(
+      <WorkspaceNodeList
+        nodes={orderedNodes}
+        selectedNodeIds={[]}
+        onToggleNodeSelection={vi.fn()}
+        renderRowActions={(node) => (
+          <button type="button" aria-label={`Add ${node.data?.nodeName ?? node.id}`}>
+            Add
+          </button>
+        )}
+      />,
+    );
+
+    const betaRow = screen.getByRole('button', { name: 'Select Beta' });
+    const hoverToolbar = within(betaRow).getByRole('toolbar', { name: 'Actions for Beta' });
+
+    expect(hoverToolbar).toHaveClass('pointer-events-none');
+    expect(hoverToolbar).toHaveClass('group-hover/row:!pointer-events-auto');
+  });
+
   it('right-aligns long data-block names and fades the left edge for leading actions', () => {
     render(
       <WorkspaceNodeList

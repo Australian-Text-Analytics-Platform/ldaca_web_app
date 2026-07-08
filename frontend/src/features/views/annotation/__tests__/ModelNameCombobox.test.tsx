@@ -7,13 +7,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModelNameCombobox } from '../components/ModelNameCombobox';
 import { makeCustomProvider, resolveAnnotationAiProvider } from '../aiProviders';
 
-// The combobox now lists models through our backend (`/annotation/ai/models`),
-// so we mock the generated SDK function instead of stubbing global fetch. The
-// backend performs the real provider SDK call and returns a sorted id list.
+// Non-OpenRouter providers still list models through our backend
+// (`/annotation/ai/models`), so we mock the generated SDK function for those
+// paths. OpenRouter is fetched directly client-side to display pricing.
 const { listAnnotationAiModels } = vi.hoisted(() => ({
   listAnnotationAiModels: vi.fn(),
 }));
 vi.mock('@/api', () => ({ listAnnotationAiModels }));
+
+const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 
 // Resolve a test id to a provider: built-ins from the catalogue, 'custom' stands
 // in for a user-defined OpenAI-compatible provider (now backend-listable against
@@ -30,6 +32,7 @@ function resolveForTest(providerId: string) {
   if (providerId === 'nolisting') {
     return {
       id: 'nolisting:test',
+      requestProviderId: 'nolisting:test',
       label: 'No Listing',
       baseUrl: 'https://nolist.example/v1',
       isCustom: true,
@@ -42,7 +45,30 @@ function resolveForTest(providerId: string) {
 
 // Return a resolved SDK payload (matching `{ data: { models } }`) for a model id list.
 function modelsResult(ids: string[]) {
-  return { data: { models: ids }, error: undefined, request: new Request('http://t'), response: new Response() };
+  return {
+    data: { models: ids },
+    error: undefined,
+    request: new Request('http://t'),
+    response: new Response(),
+  };
+}
+
+function openRouterModelsResult(
+  models: { id: string; name?: string; prompt?: string; completion?: string }[],
+) {
+  return new Response(
+    JSON.stringify({
+      data: models.map(({ id, name, prompt = '0.0000007', completion = '0.0000014' }) => ({
+        id,
+        name,
+        pricing: { prompt, completion },
+      })),
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
 }
 
 // Small stateful host so the controlled combobox actually updates as the user
@@ -78,8 +104,17 @@ function renderHarness(providerId: string, apiKey = '', onCommit?: (value: strin
 }
 
 describe('ModelNameCombobox', () => {
+  const fetchMock = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockResolvedValue(
+      openRouterModelsResult([
+        { id: 'anthropic/claude-3-haiku', name: 'Anthropic: Claude 3 Haiku' },
+        { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o' },
+      ]),
+    );
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom may lack hasPointerCapture despite lib.dom types
     if (!HTMLElement.prototype.hasPointerCapture) {
       Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
@@ -103,9 +138,22 @@ describe('ModelNameCombobox', () => {
     expect(listAnnotationAiModels).not.toHaveBeenCalled();
   });
 
-  it('opens the backend-backed model list, filters as you type, and fills the field on click', async () => {
-    listAnnotationAiModels.mockResolvedValue(
-      modelsResult(['anthropic/claude-3-haiku', 'openai/gpt-4o']),
+  it('opens the OpenRouter client-side model list with prices, filters as you type, and fills the field on click', async () => {
+    fetchMock.mockResolvedValue(
+      openRouterModelsResult([
+        {
+          id: 'anthropic/claude-3-haiku',
+          name: 'Anthropic: Claude 3 Haiku',
+          prompt: '0.00000025',
+          completion: '0.00000125',
+        },
+        {
+          id: 'openai/gpt-4o',
+          name: 'OpenAI: GPT-4o',
+          prompt: '0.0000025',
+          completion: '0.00001',
+        },
+      ]),
     );
 
     const user = userEvent.setup();
@@ -115,35 +163,63 @@ describe('ModelNameCombobox', () => {
     await user.click(input);
 
     // Both listed models appear once the query resolves.
-    expect(await screen.findByRole('button', { name: 'openai/gpt-4o' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'anthropic/claude-3-haiku' })).toBeInTheDocument();
-    // The backend is asked to list for this provider (base_url null for built-ins).
-    expect(listAnnotationAiModels).toHaveBeenCalledWith(
+    expect(await screen.findByRole('button', { name: /openai\/gpt-4o/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /anthropic\/claude-3-haiku/i })).toBeInTheDocument();
+    expect(screen.getByText('In $2.50 / Out $10.00 per 1M')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      OPENROUTER_MODELS_URL,
       expect.objectContaining({
-        body: { provider_id: 'openrouter', base_url: null, api_key: '' },
-        throwOnError: true,
+        method: 'GET',
+        headers: { Accept: 'application/json' },
       }),
     );
+    expect(listAnnotationAiModels).not.toHaveBeenCalled();
 
     // Typing narrows the list to matching ids.
     await user.type(input, 'claude');
-    expect(screen.queryByRole('button', { name: 'openai/gpt-4o' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'anthropic/claude-3-haiku' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /openai\/gpt-4o/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /anthropic\/claude-3-haiku/i })).toBeInTheDocument();
 
     // Clicking a row fills the input with that model id.
-    await user.click(screen.getByRole('button', { name: 'anthropic/claude-3-haiku' }));
+    await user.click(screen.getByRole('button', { name: /anthropic\/claude-3-haiku/i }));
     expect(input).toHaveValue('anthropic/claude-3-haiku');
   });
 
+  it('wildcard-searches OpenRouter models across separated id/name terms', async () => {
+    fetchMock.mockResolvedValue(
+      openRouterModelsResult([
+        { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o' },
+        { id: 'anthropic/claude-sonnet-5', name: 'Anthropic: Claude Sonnet 5' },
+      ]),
+    );
+
+    const user = userEvent.setup();
+    renderHarness('openrouter');
+
+    const input = screen.getByRole('textbox');
+    await user.click(input);
+    expect(await screen.findByRole('button', { name: /openai\/gpt-4o/i })).toBeInTheDocument();
+
+    await user.type(input, 'gpt 4o');
+    expect(screen.getByRole('button', { name: /openai\/gpt-4o/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /anthropic\/claude-sonnet-5/i }),
+    ).not.toBeInTheDocument();
+
+    await user.clear(input);
+    await user.type(input, 'claude*sonnet');
+    expect(screen.getByRole('button', { name: /anthropic\/claude-sonnet-5/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /openai\/gpt-4o/i })).not.toBeInTheDocument();
+  });
+
   it('commits the selected model id when a row is picked', async () => {
-    listAnnotationAiModels.mockResolvedValue(modelsResult(['openai/gpt-4o']));
     const onCommit = vi.fn();
 
     const user = userEvent.setup();
     renderHarness('openrouter', '', onCommit);
 
     await user.click(screen.getByRole('textbox'));
-    await user.click(await screen.findByRole('button', { name: 'openai/gpt-4o' }));
+    await user.click(await screen.findByRole('button', { name: /openai\/gpt-4o/i }));
 
     // Picking a row persists the chosen id (without waiting for a blur).
     expect(onCommit).toHaveBeenCalledWith('openai/gpt-4o');
@@ -204,10 +280,10 @@ describe('ModelNameCombobox', () => {
     expect(input).toHaveValue('system');
   });
 
-  it('renders the full model list without an artificial cap', async () => {
+  it('renders the full OpenRouter model list without an artificial cap', async () => {
     // 120 ids exceeds the old 50-row cap; every one should be reachable.
     const ids = Array.from({ length: 120 }, (_, i) => `vendor/model-${String(i).padStart(3, '0')}`);
-    listAnnotationAiModels.mockResolvedValue(modelsResult(ids));
+    fetchMock.mockResolvedValue(openRouterModelsResult(ids.map((id) => ({ id }))));
 
     const user = userEvent.setup();
     renderHarness('openrouter');
@@ -215,20 +291,20 @@ describe('ModelNameCombobox', () => {
     await user.click(screen.getByRole('textbox'));
 
     // The first and last entries both render — nothing is sliced off.
-    expect(await screen.findByRole('button', { name: 'vendor/model-000' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'vendor/model-119' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /vendor\/model-000/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /vendor\/model-119/ })).toBeInTheDocument();
     // All 120 rows are present.
-    expect(screen.getAllByRole('button', { name: /^vendor\/model-\d{3}$/ })).toHaveLength(120);
+    expect(screen.getAllByRole('button', { name: /vendor\/model-\d{3}/ })).toHaveLength(120);
   });
 
-  it('surfaces a listing error from the backend', async () => {
-    listAnnotationAiModels.mockRejectedValue(new Error('Failed to list OpenRouter models: 500'));
+  it('surfaces a listing error from the OpenRouter client fetch', async () => {
+    fetchMock.mockResolvedValue(new Response('nope', { status: 500, statusText: 'Server Error' }));
 
     const user = userEvent.setup();
     renderHarness('openrouter');
 
     await user.click(screen.getByRole('textbox'));
 
-    expect(await screen.findByText(/Failed to list OpenRouter models/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Failed to load OpenRouter models: 500/i)).toBeInTheDocument();
   });
 });

@@ -1,10 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Bookmark, Plus, Search, Trash2 } from 'lucide-react';
+import { Bookmark, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { cn } from '@/lib/utils';
+import { useUIStore } from '@/stores';
+import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
 import { getNodeDisplayName, getNodeIdentifier } from '../nodeSelectionTypes';
 import type { NodeAddRejection, ResolvedNodeInput } from '../nodeInputs/nodeInputsCore';
@@ -63,7 +66,7 @@ export interface NodeInputsPanelProps {
   statusVariant?: 'info' | 'warning' | 'error';
   headerAddon?: React.ReactNode;
   renderNodeMeta?: (args: NodeSelectionRenderArgs) => React.ReactNode;
-  renderExtraNodeContent?: (args: NodeSelectionRenderArgs) => React.ReactNode;
+  renderExtraNodeContent?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
   /** Disable all mutation controls (e.g. while a run is in flight). */
   disabled?: boolean;
   /** Optional control rendered after each node's column picker (e.g. tokenizer model). */
@@ -76,7 +79,7 @@ export interface NodeInputsPanelProps {
  * Node-input selection panel for the add-node-as-needed model.
  *
  * Owns the Add control (graph selection + per-node dropdown, invalid candidates
- * greyed with a reason), per-node remove (\u00d7), and Clear all, on top of the
+ * greyed with a reason), per-node remove (x), and Clear all, on top of the
  * existing column picker rendered via NodeSelectionList.
  *
  * Used by: every analysis *Feature and preprocessing subtab through their
@@ -85,7 +88,10 @@ export interface NodeInputsPanelProps {
  *
  * Flow: surface add affordances bound to ``onAddNodes`` (reporting rejections
  * via toast), then render each resolved node as a removable card with its
- * column picker fed by the node's resolved ``columnOptions``.
+ * column picker fed by the node's resolved ``columnOptions``. Single-selector
+ * views consume graph/sidebar "+" requests directly in ``useTabNodeInputs``;
+ * multi-selector views opt out there, leaving the pending request for every
+ * visible panel with add controls to render as a dashed choose-target overlay.
  */
 export function NodeInputsPanel({
   resolvedNodes,
@@ -119,6 +125,14 @@ export function NodeInputsPanel({
   renderColumnAddon,
   columnAddonWidth = 'fill',
 }: NodeInputsPanelProps) {
+  const { currentWorkspaceId } = useWorkspaceData();
+  const currentView = useUIStore((state) => state.currentView);
+  const consumeInputRequest = useNodeInputRequestsStore((state) => state.consume);
+  const pendingInputRequest = useNodeInputRequestsStore((state) =>
+    state.requests.find(
+      (request) => request.workspaceId === currentWorkspaceId && request.view === currentView,
+    ),
+  );
   const nodes = resolvedNodes.map((r) => r.node);
   const nodeIds = resolvedNodes.map((r) => r.id);
   const columnByNode = new Map(resolvedNodes.map((r) => [r.id, r]));
@@ -236,8 +250,23 @@ export function NodeInputsPanel({
     );
   };
 
+  /** Renders optional per-node content with the same resolved column context as column add-ons. */
+  const renderExtraNodeBody = renderExtraNodeContent
+    ? (args: NodeSelectionRenderArgs) => {
+        const resolved = columnByNode.get(args.nodeId);
+        const columns = (resolved?.columnOptions ?? []).map((c) => c.name);
+        return renderExtraNodeContent({
+          ...args,
+          column: resolved?.column ?? '',
+          columns,
+        });
+      }
+    : undefined;
+
   const count = originalCount ?? resolvedNodes.length;
   const countLabel = maxNodes != null ? `${String(count)}/${String(maxNodes)}` : String(count);
+  const showInputRequestTarget = showAddControls && pendingInputRequest !== undefined;
+  const inputRequestTargetDisabled = disabled || !canAddMore;
   const statusVariantClass = {
     info: 'border-sky-500/50 bg-sky-100/60 text-sky-900',
     warning: 'border-amber-500/60 bg-amber-100/60 text-amber-900',
@@ -245,7 +274,7 @@ export function NodeInputsPanel({
   }[statusVariant];
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('relative flex flex-col gap-2', className)}>
       <div className="flex items-center justify-between gap-2 px-3 pt-1.5">
         <div className="flex items-center gap-2">
           <label className="block text-sm font-medium text-muted-foreground">
@@ -444,7 +473,7 @@ export function NodeInputsPanel({
           onRemoveNode={showRemoveButtons && !disabled ? onRemoveNode : undefined}
           renderNodeMeta={renderNodeMeta}
           renderNodeBody={showColumnPicker ? renderColumnBody : undefined}
-          renderExtraNodeContent={renderExtraNodeContent}
+          renderExtraNodeContent={renderExtraNodeBody}
         />
       )}
       {maxNodes != null && count > maxNodes && (
@@ -453,6 +482,43 @@ export function NodeInputsPanel({
           selected.
         </div>
       )}
+      {showInputRequestTarget ? (
+        <div className="absolute inset-0 z-10 rounded-lg bg-background/75 p-1 backdrop-blur-[1px]">
+          <button
+            type="button"
+            aria-label={`Add to ${title}`}
+            disabled={inputRequestTargetDisabled}
+            className={cn(
+              'flex h-full min-h-24 w-full items-center justify-start gap-5 rounded-lg border-2 border-dashed border-muted-foreground/35 bg-card/95 px-7 text-left transition-colors',
+              'hover:border-primary/70 hover:bg-card focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+            )}
+            onClick={() => {
+              handleAdd(pendingInputRequest.nodeIds);
+              consumeInputRequest(pendingInputRequest.id);
+            }}
+          >
+            <Plus className="size-10 stroke-[1.7] text-muted-foreground" aria-hidden="true" />
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="truncate text-base font-semibold text-foreground">{title}</span>
+              <span className="text-xs text-muted-foreground">
+                Add selected node{pendingInputRequest.nodeIds.length === 1 ? '' : 's'} here
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label="Cancel adding node"
+            className="absolute right-3 top-3 inline-flex h-7 items-center gap-1 rounded-md bg-background/90 px-2 text-xs text-muted-foreground shadow-sm hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => {
+              consumeInputRequest(pendingInputRequest.id);
+            }}
+          >
+            <X className="size-3.5" aria-hidden="true" />
+            Cancel
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

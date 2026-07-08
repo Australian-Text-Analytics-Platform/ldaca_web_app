@@ -20,17 +20,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -50,21 +46,24 @@ import {
   AnnotationPromptInput,
   DEFAULT_ANNOTATION_PROMPT,
 } from './components/AnnotationPromptInput';
+import type { AnnotationProviderConfigSave } from './components/AnnotationProviderConfigDialog';
 import type { AnnotationAiProviderId } from './aiProviders';
-import { canAnnotate, resolveAnnotationAiProvider } from './aiProviders';
+import {
+  canAnnotate,
+  parseConfiguredBuiltinProviderId,
+  resolveAnnotationAiProvider,
+} from './aiProviders';
 import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
-import type { NodeAddRejection, NodeInputConstraints } from '@/features/views/common/nodeInputs';
+import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
 import {
   DEFAULT_TAB_INPUT_SET_ID,
   type AnalysisTabInputSets,
 } from '@/features/views/common/tabs/tabStateOps';
 import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
-import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import type { AnnotationAiCustomProvider } from '@/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const SOURCE_NODE_CONSTRAINTS: NodeInputConstraints = {
@@ -119,12 +118,6 @@ interface ColumnPickerProps {
   disabled?: boolean;
 }
 
-interface AnnotationNodeRequestTargetProps {
-  label: string;
-  disabled: boolean;
-  onAdd: () => void;
-}
-
 interface AnnotationClassDescriptionsEditorProps {
   workspaceId: string | null;
   nodeId: string | null;
@@ -162,27 +155,28 @@ const computeDefaultAnnotationColumnName = (columns: string[]): string => {
 };
 
 /**
- * Large target laid over one selector while Annotation is choosing where a
- * graph/sidebar "+" request should land.
+ * Parse a persisted tab-setting string as a provider-card model map.
  *
- * Used by: AnnotationFeature's two selector wrappers after the card-level mask
- * dims everything except the node-selection regions.
+ * Used by: AnnotationFeature when hydrating the AI provider dropdown. The value
+ * lives in tabs.json as a string map because generic tab settings are
+ * Record<string,string>; malformed user-edited JSON is ignored with a warning so
+ * the tab still opens and the user can save a fresh provider card.
  */
-function AnnotationNodeRequestTarget({ label, disabled, onAdd }: AnnotationNodeRequestTargetProps) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      aria-label={`Add to ${label}`}
-      disabled={disabled}
-      className="absolute inset-0 z-10 h-full w-full justify-start gap-6 rounded-lg border-2 border-dashed border-muted-foreground/35 bg-card/95 px-8 text-left text-base shadow-none hover:border-primary/70 hover:bg-card focus-visible:ring-2"
-      onClick={onAdd}
-    >
-      <Plus className="h-11 w-11 stroke-[1.7]" aria-hidden="true" />
-      <span className="text-lg font-semibold">{label}</span>
-    </Button>
-  );
-}
+const parseProviderModelSetting = (value: string | undefined): Record<string, string> => {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const models: Record<string, string> = {};
+    for (const [key, model] of Object.entries(parsed)) {
+      if (typeof model === 'string') models[key] = model;
+    }
+    return models;
+  } catch (error) {
+    console.warn('[annotation] Ignoring malformed AI provider model setting:', error);
+    return {};
+  }
+};
 
 /**
  * Small select used for Annotation-specific companion columns next to the
@@ -208,11 +202,13 @@ function AnnotationColumnPicker({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
+          <SelectGroup>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>
@@ -303,7 +299,12 @@ function AnnotationClassDescriptionsEditor({
       setDraftRows(rows);
       if (workspaceId && nodeId && classColumn && descriptionColumn) {
         queryClient.setQueryData(
-          queryKeys.annotationClassDescriptions(workspaceId, nodeId, classColumn, descriptionColumn),
+          queryKeys.annotationClassDescriptions(
+            workspaceId,
+            nodeId,
+            classColumn,
+            descriptionColumn,
+          ),
           { ...payload, rows },
         );
         void queryClient.invalidateQueries({
@@ -322,11 +323,7 @@ function AnnotationClassDescriptionsEditor({
     updateClassDescriptionsMutation.mutate(normalizeClassDescriptionRows(rows));
   };
 
-  const updateDraftCell = (
-    rowIndex: number,
-    field: 'class' | 'description',
-    value: string,
-  ) => {
+  const updateDraftCell = (rowIndex: number, field: 'class' | 'description', value: string) => {
     setDraftRows((current) =>
       (current ?? editorRows).map((row, index) =>
         index === rowIndex ? { ...row, [field]: value } : row,
@@ -334,11 +331,7 @@ function AnnotationClassDescriptionsEditor({
     );
   };
 
-  const persistDraftCell = (
-    rowIndex: number,
-    field: 'class' | 'description',
-    value: string,
-  ) => {
+  const persistDraftCell = (rowIndex: number, field: 'class' | 'description', value: string) => {
     const nextRows = editorRows.map((row, index) =>
       index === rowIndex ? { ...row, [field]: value } : row,
     );
@@ -554,10 +547,9 @@ function AnnotationFeature({
   // and AnalysisTabsHost remounts this feature per tab (key=tab_id), so the
   // seed re-reads when the active tab changes. Keeping a local mirror also lets
   // the component work standalone in tests without the tab host. Mode/provider
-  // commit on change (discrete actions); model/prompt commit on blur (they
-  // double as typed input, so per-keystroke persistence would be wasteful),
-  // mirroring the API-key save-on-blur pattern. The API key itself lives in
-  // preferences, never in tab settings.
+  // commit on change (discrete actions); provider-card models persist as a JSON
+  // map in tab settings; prompt commits on blur because it doubles as typed input.
+  // API keys live in preferences, never in tab settings.
   const [annotationMode, setAnnotationModeState] = useState<'manual' | 'ai'>(() =>
     tabSettings?.annotationMode === 'ai' ? 'ai' : 'manual',
   );
@@ -565,17 +557,26 @@ function AnnotationFeature({
     setAnnotationModeState(mode);
     onTabSettingChange?.('annotationMode', mode);
   };
-  const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(
-    () => tabSettings?.aiProvider ?? 'openrouter',
+  const [aiProviderModels, setAiProviderModelsState] = useState<Record<string, string>>(() =>
+    parseProviderModelSetting(tabSettings?.aiProviderModels),
   );
-  const setAiProvider = (id: AnnotationAiProviderId) => {
-    setAiProviderState(id);
-    onTabSettingChange?.('aiProvider', id);
+  const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(
+    () => tabSettings?.aiProvider ?? '',
+  );
+  const [aiModel, setAiModel] = useState(() => {
+    const providerModels = parseProviderModelSetting(tabSettings?.aiProviderModels);
+    const providerId = tabSettings?.aiProvider ?? '';
+    return providerModels[providerId] ?? tabSettings?.aiModel ?? '';
+  });
+  const persistAiProviderModels = (models: Record<string, string>) => {
+    setAiProviderModelsState(models);
+    onTabSettingChange?.('aiProviderModels', JSON.stringify(models));
   };
-  const [aiModel, setAiModel] = useState(() => tabSettings?.aiModel ?? '');
-  // Persist the model id (blur / model pick) — see ModelNameCombobox onCommit.
-  const commitAiModel = (model: string) => {
-    onTabSettingChange?.('aiModel', model);
+  const selectAiProvider = (id: AnnotationAiProviderId, modelForProvider: string) => {
+    setAiProviderState(id);
+    setAiModel(modelForProvider);
+    onTabSettingChange?.('aiProvider', id);
+    onTabSettingChange?.('aiModel', modelForProvider);
   };
   // Instruction prompt for AI annotation. Empty means "use the grayed default",
   // which the prompt editor offers via Tab. Persisted on blur.
@@ -622,12 +623,11 @@ function AnnotationFeature({
     onTabSettingChange?.('aiPreviewOpen', String(open));
   };
   const annotationAiApiKeys = usePreferencesStore((s) => s.annotationAiApiKeys);
-  const annotationAiCustomProviders = usePreferencesStore(
-    (s) => s.annotationAiCustomProviders,
-  );
+  const annotationAiCustomProviders = usePreferencesStore((s) => s.annotationAiCustomProviders);
   const setAnnotationAiApiKey = usePreferencesStore((s) => s.setAnnotationAiApiKey);
-  const addAnnotationAiCustomProvider = usePreferencesStore(
-    (s) => s.addAnnotationAiCustomProvider,
+  const addAnnotationAiCustomProvider = usePreferencesStore((s) => s.addAnnotationAiCustomProvider);
+  const removeAnnotationAiCustomProvider = usePreferencesStore(
+    (s) => s.removeAnnotationAiCustomProvider,
   );
   // Annotation-column choice per example node (plain columns only — no "Start
   // new annotation" option, since examples reference existing labels).
@@ -637,8 +637,37 @@ function AnnotationFeature({
   const { getAuthHeaders } = useAuth();
   const { currentWorkspaceId } = useWorkspaceData();
   const queryClient = useQueryClient();
-  const nodeInputRequests = useNodeInputRequestsStore((state) => state.requests);
-  const consumeNodeInputRequest = useNodeInputRequestsStore((state) => state.consume);
+
+  const handleSaveAiProvider = (config: AnnotationProviderConfigSave) => {
+    if (config.customProvider) addAnnotationAiCustomProvider(config.customProvider);
+    setAnnotationAiApiKey(config.id, config.apiKey);
+    const nextModels = { ...aiProviderModels, [config.id]: config.model };
+    persistAiProviderModels(nextModels);
+    selectAiProvider(config.id, config.model);
+    const label = config.customProvider?.name ?? resolveAnnotationAiProvider(config.id, []).label;
+    toast.success(`Saved provider "${label}"`);
+  };
+
+  const handleDeleteAiProvider = (providerId: AnnotationAiProviderId) => {
+    const customProvider = annotationAiCustomProviders.find(
+      (candidate) => candidate.id === providerId,
+    );
+    if (customProvider) {
+      removeAnnotationAiCustomProvider(providerId);
+    } else if (parseConfiguredBuiltinProviderId(providerId)) {
+      setAnnotationAiApiKey(providerId, null);
+    } else {
+      console.warn(`[annotation] Ignoring delete for unknown AI provider card: ${providerId}`);
+      return;
+    }
+    const nextModels: Record<string, string> = {};
+    for (const [id, savedModel] of Object.entries(aiProviderModels)) {
+      if (id !== providerId) nextModels[id] = savedModel;
+    }
+    persistAiProviderModels(nextModels);
+    if (aiProvider === providerId) selectAiProvider('', '');
+    toast.success(`Removed provider "${customProvider?.name ?? providerId}"`);
+  };
 
   // Once annotation has started, the run/results are pinned and every selector
   // and column picker locks until Reset; `isStarting` also locks during the
@@ -649,6 +678,10 @@ function AnnotationFeature({
   // closing the preview clears the lock.
   const isLocked = hasRun || isStarting || (annotationMode === 'ai' && isPreviewing);
 
+  // Annotation has multiple valid selector targets in the same feature panel.
+  // Graph/sidebar "+" requests stay pending so each visible NodeInputsPanel can
+  // offer its own dashed chooser target instead of the source selector claiming
+  // the request directly.
   const sourceNodeInputs = useTabNodeInputs({
     selectorId: DEFAULT_TAB_INPUT_SET_ID,
     tabInputs,
@@ -676,9 +709,6 @@ function AnnotationFeature({
     constraints: EXAMPLE_NODE_CONSTRAINTS,
     consumeNodeInputRequests: false,
   });
-  const pendingNodeInputRequest = nodeInputRequests.find(
-    (request) => request.workspaceId === currentWorkspaceId && request.view === 'annotation',
-  );
 
   const renderAnnotationColumnPicker = ({ nodeId, columns }: NodeInputColumnAddonArgs) => {
     const value = annotationColumns[nodeId] ?? START_NEW_ANNOTATION_VALUE;
@@ -699,16 +729,12 @@ function AnnotationFeature({
     );
   };
 
-  const renderDescriptionColumnPicker = ({
-    nodeId,
-    columns,
-    column,
-  }: NodeInputColumnAddonArgs) => {
+  const renderDescriptionColumnPicker = ({ nodeId, columns, column }: NodeInputColumnAddonArgs) => {
     const fallback = resolveDescriptionColumn(columns, column);
     const value = descriptionColumns[nodeId] ?? fallback;
     return (
       <AnnotationColumnPicker
-        label="Description"
+        label="Description Column"
         value={value}
         placeholder="Select description column"
         disabled={isLocked}
@@ -717,6 +743,31 @@ function AnnotationFeature({
           setDescriptionColumns((current) => ({ ...current, [nodeId]: next }));
         }}
       />
+    );
+  };
+
+  const renderNewAnnotationColumnInput = ({ nodeId, columns }: NodeInputColumnAddonArgs) => {
+    const annotationColumn = annotationColumns[nodeId] ?? START_NEW_ANNOTATION_VALUE;
+    if (annotationColumn !== START_NEW_ANNOTATION_VALUE) return null;
+    const defaultName = computeDefaultAnnotationColumnName(columns);
+    const inputId = `annotation-new-column-name-${nodeId}`;
+    return (
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={inputId} className="block text-xs font-medium text-muted-foreground">
+          New Column Name
+        </Label>
+        <Input
+          id={inputId}
+          aria-label="New Column Name"
+          value={newColumnNames[nodeId] ?? ''}
+          placeholder={defaultName}
+          disabled={isLocked}
+          onChange={(event) => {
+            const { value } = event.target;
+            setNewColumnNames((current) => ({ ...current, [nodeId]: value }));
+          }}
+        />
+      </div>
     );
   };
 
@@ -755,9 +806,7 @@ function AnnotationFeature({
           queryKey: queryKeys.workspaceNodes(currentWorkspaceId),
         }),
       ]);
-      onTabInputSetChange?.(CLASS_DESCRIPTION_SELECTOR_ID, [
-        { node_id: data.id, column: 'class' },
-      ]);
+      onTabInputSetChange?.(CLASS_DESCRIPTION_SELECTOR_ID, [{ node_id: data.id, column: 'class' }]);
     } catch (error) {
       console.warn('[annotation] Failed to create class-description node:', error);
       toast.error('Could not create class descriptions');
@@ -766,31 +815,6 @@ function AnnotationFeature({
     }
   };
 
-  const reportNodeAddRejections = (rejections: NodeAddRejection[]) => {
-    if (rejections.length === 1) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length===1 guarantees index 0 exists
-      toast.warning(`Couldn't add node: ${rejections[0]!.reason}`);
-    } else if (rejections.length > 1) {
-      toast.warning(
-        `Couldn't add ${String(rejections.length)} nodes (incompatible or already added).`,
-      );
-    }
-  };
-
-  const handleRequestedNodeAdd = (target: 'source' | 'classDescriptions') => {
-    if (!pendingNodeInputRequest) return;
-    const rejections =
-      target === 'source'
-        ? sourceNodeInputs.addNodes(pendingNodeInputRequest.nodeIds)
-        : classNodeInputs.addNodes(pendingNodeInputRequest.nodeIds);
-    reportNodeAddRejections(rejections);
-    consumeNodeInputRequest(pendingNodeInputRequest.id);
-  };
-
-  const handleRequestedNodeCancel = () => {
-    if (!pendingNodeInputRequest) return;
-    consumeNodeInputRequest(pendingNodeInputRequest.id);
-  };
   const classDescriptionNode = classNodeInputs.resolvedNodes[0] ?? null;
   const classDescriptionClassColumn =
     classDescriptionNode?.column ?? classNodeInputs.inputs[0]?.column ?? null;
@@ -853,9 +877,6 @@ function AnnotationFeature({
   const aiClassCount = normalizeClassDescriptionRows(classCountQuery.data?.rows).filter(
     (row) => (row.class ?? '').trim().length > 0,
   ).length;
-  const isChoosingNodeTarget = Boolean(pendingNodeInputRequest);
-  const highlightedSelectorClassName = 'z-30 rounded-lg bg-card';
-
   // Source node drives the run action: "Start new annotation" begins a fresh
   // pass, while picking an existing column resumes annotating that column.
   const sourceNode = sourceNodeInputs.resolvedNodes[0] ?? null;
@@ -877,7 +898,7 @@ function AnnotationFeature({
   // non-empty class list to classify into, so previewing an empty class node would
   // only ever return blanks.
   const resolvedAiProvider = resolveAnnotationAiProvider(aiProvider, annotationAiCustomProviders);
-  const aiApiKey = annotationAiApiKeys[aiProvider] ?? '';
+  const aiApiKey = aiProvider ? (annotationAiApiKeys[aiProvider] ?? '') : '';
   const resolvedSystemPrompt = aiPrompt.trim() || DEFAULT_ANNOTATION_PROMPT;
   const hasClassNodeForAi = Boolean(
     classDescriptionNode && classDescriptionClassColumn && classDescriptionDescriptionColumn,
@@ -983,11 +1004,7 @@ function AnnotationFeature({
 
   return (
     <section aria-label="Annotation Setup" className="space-y-5">
-      <div
-        className="relative"
-        role={isChoosingNodeTarget ? 'dialog' : undefined}
-        aria-label={isChoosingNodeTarget ? 'Choose annotation node selector' : undefined}
-      >
+      <div className="relative">
         <section aria-label="Annotation Parameter Panel">
           <AnalysisCardLayout
             title="Annotation"
@@ -1019,7 +1036,7 @@ function AnnotationFeature({
               )
             }
           >
-            <div className={cn('relative', isChoosingNodeTarget && highlightedSelectorClassName)}>
+            <div>
               <NodeInputsPanel
                 title="Selected Data Blocks"
                 resolvedNodes={sourceNodeInputs.resolvedNodes}
@@ -1035,38 +1052,9 @@ function AnnotationFeature({
                 onColumnChange={sourceNodeInputs.setColumn}
                 columnLabel="Text Column"
                 renderColumnAddon={renderAnnotationColumnPicker}
+                renderExtraNodeContent={renderNewAnnotationColumnInput}
                 disabled={isLocked}
               />
-              {sourceNode && isStartNewAnnotation ? (
-                <div className="mt-3 space-y-1">
-                  <Label
-                    htmlFor="annotation-new-column-name"
-                    className="block text-xs font-medium text-muted-foreground"
-                  >
-                    New Column Name
-                  </Label>
-                  <Input
-                    id="annotation-new-column-name"
-                    aria-label="New Column Name"
-                    value={newColumnName}
-                    placeholder={defaultNewColumnName}
-                    disabled={isLocked}
-                    onChange={(event) => {
-                      const { value } = event.target;
-                      setNewColumnNames((current) => ({ ...current, [sourceNode.id]: value }));
-                    }}
-                  />
-                </div>
-              ) : null}
-              {isChoosingNodeTarget ? (
-                <AnnotationNodeRequestTarget
-                  label="Selected Data Blocks"
-                  disabled={!sourceNodeInputs.canAddMore}
-                  onAdd={() => {
-                    handleRequestedNodeAdd('source');
-                  }}
-                />
-              ) : null}
             </div>
 
             <section
@@ -1074,7 +1062,7 @@ function AnnotationFeature({
               className="mt-5 rounded-lg border bg-background/60 p-4"
             >
               <h3 className="mb-4 text-base font-semibold">Class Descriptions</h3>
-              <div className={cn('relative', isChoosingNodeTarget && highlightedSelectorClassName)}>
+              <div>
                 <NodeInputsPanel
                   title="Class Description Node"
                   resolvedNodes={classNodeInputs.resolvedNodes}
@@ -1086,7 +1074,7 @@ function AnnotationFeature({
                   onRemoveNode={classNodeInputs.removeNode}
                   onClear={classNodeInputs.clear}
                   onColumnChange={classNodeInputs.setColumn}
-                  columnLabel="Class"
+                  columnLabel="Class Column"
                   disabled={isLocked}
                   headerAddon={
                     <Button
@@ -1105,15 +1093,6 @@ function AnnotationFeature({
                   }
                   renderColumnAddon={renderDescriptionColumnPicker}
                 />
-                {isChoosingNodeTarget ? (
-                  <AnnotationNodeRequestTarget
-                    label="Class Description"
-                    disabled={!classNodeInputs.canAddMore}
-                    onAdd={() => {
-                      handleRequestedNodeAdd('classDescriptions');
-                    }}
-                  />
-                ) : null}
               </div>
               <AnnotationClassDescriptionsEditor
                 key={[
@@ -1166,22 +1145,13 @@ function AnnotationFeature({
                 <div className="mt-4">
                   <AnnotationAiSettings
                     provider={aiProvider}
-                    onProviderChange={setAiProvider}
+                    onProviderChange={selectAiProvider}
+                    apiKeys={annotationAiApiKeys}
+                    providerModels={aiProviderModels}
                     customProviders={annotationAiCustomProviders}
-                    onAddCustomProvider={(definition: AnnotationAiCustomProvider) => {
-                      // Persist (debounced backend sync) then select the new
-                      // provider so the dropdown immediately reflects the choice.
-                      addAnnotationAiCustomProvider(definition);
-                      setAiProvider(definition.id);
-                      toast.success(`Saved provider “${definition.name}”`);
-                    }}
-                    apiKey={annotationAiApiKeys[aiProvider] ?? ''}
-                    onApiKeyCommit={(key) => {
-                      setAnnotationAiApiKey(aiProvider, key);
-                    }}
+                    onSaveProvider={handleSaveAiProvider}
+                    onDeleteProvider={handleDeleteAiProvider}
                     model={aiModel}
-                    onModelChange={setAiModel}
-                    onModelCommit={commitAiModel}
                     disabled={isLocked}
                   >
                     <div className="space-y-2">
@@ -1237,22 +1207,6 @@ function AnnotationFeature({
             </section>
           </AnalysisCardLayout>
         </section>
-        {isChoosingNodeTarget ? (
-          <div className="absolute inset-0 z-20 rounded-xl bg-background/80 p-5 backdrop-blur-[2px]">
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 bg-background/80 px-2 text-xs"
-                onClick={handleRequestedNodeCancel}
-              >
-                <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : null}
       </div>
       {annotationMode === 'manual' && hasRun && sourceNode ? (
         <AnnotationResultsPanel
@@ -1278,7 +1232,7 @@ function AnnotationFeature({
           classNodeId={classDescriptionNode?.id ?? null}
           classColumn={classDescriptionClassColumn}
           descriptionColumn={classDescriptionDescriptionColumn}
-          providerId={resolvedAiProvider.id}
+          providerId={resolvedAiProvider.requestProviderId}
           baseUrl={resolvedAiProvider.baseUrl ?? null}
           apiKey={aiApiKey}
           model={aiModel}

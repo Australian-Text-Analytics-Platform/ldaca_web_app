@@ -6,6 +6,7 @@ import {
   canAnnotate,
   canListModels,
   makeCustomProvider,
+  parseConfiguredBuiltinProviderId,
   resolveAnnotationAiProvider,
 } from '../aiProviders';
 
@@ -49,12 +50,20 @@ describe('aiProviders metadata', () => {
   it('falls back to the first provider for an unknown id', () => {
     expect(resolveAnnotationAiProvider('nope', []).id).toBe('openrouter');
   });
+
+  it('resolves configured built-in provider cards through their base provider id', () => {
+    const resolved = resolveAnnotationAiProvider('provider:openai:test-card', []);
+    expect(parseConfiguredBuiltinProviderId(resolved.id)).toBe('openai');
+    expect(resolved.label).toBe('OpenAI');
+    expect(resolved.requestProviderId).toBe('openai');
+  });
 });
 
 describe('makeCustomProvider / buildAnnotationAiProviders', () => {
   it('wraps a saved custom def as a key-optional, listable provider', () => {
     expect(customProvider).toEqual({
       id: 'custom:test',
+      requestProviderId: 'custom:test',
       label: 'My LLM',
       baseUrl: 'https://llm.example/v1',
       isCustom: true,

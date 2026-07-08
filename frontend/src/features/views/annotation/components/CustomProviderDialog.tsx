@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { AnnotationAiCustomProvider } from '@/api';
+import { generateCustomProviderId } from '../aiProviders';
 
 interface CustomProviderDialogProps {
   open: boolean;
@@ -43,19 +44,6 @@ interface CustomProviderDialogProps {
    * provider with a freshly generated id.
    */
   provider?: AnnotationAiCustomProvider | null;
-}
-
-/**
- * Generate an opaque `custom:<uuid>` id for a new custom provider. Prefers
- * crypto.randomUUID (browsers + Node 20+), falling back to a timestamp+random
- * string in environments where it is unavailable so the id is still unique.
- */
-function generateCustomProviderId(): string {
-  const uuid =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  return `custom:${uuid}`;
 }
 
 interface CustomProviderFormProps {
@@ -95,8 +83,8 @@ function CustomProviderForm({ provider, onSave, onCancel }: CustomProviderFormPr
       <DialogHeader>
         <DialogTitle>{isEdit ? 'Edit custom provider' : 'Add custom provider'}</DialogTitle>
         <DialogDescription>
-          Register an OpenAI-compatible endpoint. It is saved to your preferences and
-          appears in the provider list.
+          Register an OpenAI-compatible endpoint. It is saved to your preferences and appears in the
+          provider list.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">

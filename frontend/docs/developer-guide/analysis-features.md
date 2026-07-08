@@ -91,7 +91,12 @@ selector, which falls back to legacy `inputs`; multi-selector views pass a
 shared adapter for hydration and handoff paths that receive `{nodeId, column}`
 selections and need to persist `AnalysisTabInput` records. The current graph
 selection is only a source for "Add preset" or graph-node add buttons; it is not
-the analysis input state.
+the analysis input state. Graph/sidebar `+` buttons queue a workspace + active
+view request in `nodeInputRequestsStore`. By default, `useTabNodeInputs`
+consumes matching requests directly into that selector. Multi-selector features
+set `consumeNodeInputRequests: false` on every participating selector, leaving
+the request pending so each visible `NodeInputsPanel` with add controls can show
+the dashed "Add here" chooser.
 
 Feature-specific caps are enforced through `NodeInputConstraints`:
 
@@ -233,8 +238,8 @@ reviewers can amend classes on the go (it only greys out while the class list is
 still loading or no class node is selected). The card footer
 shows one run button that toggles on the source node's annotation column:
 `Start` when the column is `Start new annotation`, otherwise `Resume`. When
-the column is `Start new annotation`, a `New Column Name` input appears below the
-source selector; its grayed placeholder defaults to the next free
+the column is `Start new annotation`, a `New Column Name` input appears inside the
+selected source-node card; its grayed placeholder defaults to the next free
 `annotation`/`annotation_1`/... name based on the source node's columns. The
 class-description selector only accepts tables with exactly two string columns
 (`exactStringColumns: 2`); ineligible workspace adds are rejected with a toast.
@@ -294,32 +299,31 @@ keeps the cache so it can rehydrate — so a re-open re-classifies from scratch 
 no stale detach/annotate-all count lingers. The clear is fire-and-forget: a failed
 cleanup never blocks closing the panel. The manual `AnnotationResultsPanel` is gated to `Manual` mode, so AI
 mode shows only the preview. Alongside the switch an
-`AnnotationAiSettings` block appears with a provider dropdown, an API-key
-password field, a model field, and an optional example-node selector. The
-provider catalogue lives in `annotation/aiProviders.ts`, which is now pure
-metadata — all LLM traffic (preview, annotate-all, and model listing) runs
-server-side under `/annotation/ai/*`, so no provider SDK or provider HTTP call
-ships in the browser bundle. The four hosted providers
-(OpenRouter/OpenAI/Anthropic/Google) are static; `buildAnnotationAiProviders`
-appends any user-defined custom providers (from preferences) and
-`resolveAnnotationAiProvider` looks one up by id. Each provider declares whether
-it `requiresApiKey` and whether the backend can enumerate its models
-(`supportsModelListing`, true for all four built-ins and for custom endpoints —
-they are OpenAI-compatible, so the backend lists them through the OpenAI SDK's
-`/models` route). The dropdown ends with a
-`Custom…` sentinel item that opens `CustomProviderDialog` (name + base URL);
-saving generates a `custom:<uuid>` id via `makeCustomProvider`, persists it, and
-selects it. Custom providers carry their own `baseUrl` and treat the key as
-optional (local servers such as Apple's `fm serve`, Ollama, and LM Studio often
-need none). `ModelNameCombobox` renders the model field: for providers the backend
-can list it is an `Input` + `Popover` whose list is fetched lazily through React
-Query by calling the backend (`listAnnotationAiModels` → `POST /annotation/ai/models`,
-keyed by provider + base URL + key, enabled only while the popover is open and
-the key requirement is met) and filtered as the user types; clicking a row fills
-the field. The input stays free-text either way, so a custom endpoint that lacks a
-`/models` route just surfaces the backend error in the popover while the user
-types an id by hand. The backend performs the provider's native SDK model call and
-returns a sorted id list, so the browser never talks to a provider directly. The example-node selector reuses `NodeInputsPanel` through a third
+`AnnotationAiSettings` block appears with an instance-based provider-card
+dropdown, a model field, and an optional example-node selector. The dropdown is
+empty until the user adds a provider card; each card stores one provider choice,
+API key, and model, then renders as provider label + model name. The add/edit
+dialog lets users choose a built-in provider or a custom OpenAI-compatible base
+URL; saving writes API keys/custom endpoints to preferences and per-card models
+to tab settings. The provider catalogue lives in `annotation/aiProviders.ts`,
+which is pure metadata for display names, key requirements, built-in category
+mapping, and model-list support. Actual LLM traffic (preview and annotate-all)
+runs server-side under `/annotation/ai/*`; OpenRouter's public model catalogue is
+the exception and is fetched client-side by `ModelNameCombobox` so the dropdown
+can show input/output prices from `GET https://openrouter.ai/api/v1/models`.
+The four hosted providers (OpenRouter/OpenAI/Anthropic/Google) are static;
+configured built-in cards use opaque `provider:<provider>:<uuid>` ids that
+resolve back to their category for backend requests, while custom providers use
+`custom:<uuid>` ids and treat the key as optional (local servers such as Apple's
+`fm serve`, Ollama, and LM Studio often need none). `ModelNameCombobox` renders
+the model field: OpenRouter uses the direct client fetch with pricing; other
+listable providers fetch lazily through React Query by calling the backend
+(`listAnnotationAiModels` -> `POST /annotation/ai/models`, keyed by provider +
+base URL + key, enabled only while the popover is open and the key requirement
+is met). The list is wildcard-filtered as the user types, clicking a row fills
+the field, and the input stays free-text either way, so a custom endpoint that
+lacks a `/models` route just surfaces the backend error in the popover while the
+user types an id by hand. The example-node selector reuses `NodeInputsPanel` through a third
 `useTabNodeInputs` selector (`exampleNodes`, one string node, text + plain
 annotation column pickers — no `Start new annotation` option) so a few-shot
 example block can later seed AI annotation. Directly under the example block, `AnnotationPromptInput`
@@ -337,27 +341,25 @@ off); flipping reasoning on reveals a **Thinking effort** select
 (`low`/`medium`/`high`, default `medium`). When the parameter panel is locked
 (a run/preview is active) the disclosure still opens so the values a run is using
 can be inspected — only its inner inputs go read-only, so unlike the other
-selectors the trigger itself is never disabled. API keys (keyed per provider, committed on blur) and custom
-providers are persisted to backend preferences through the preferences store
-(`annotationAiApiKeys` / `annotationAiCustomProviders`), which debounce-syncs an
-`annotation_ai` payload to the unified `PUT /preferences/` endpoint (TOML-backed,
-modeled by `AnnotationAiPreferences`/`AnnotationAiCustomProvider`). The remaining
-AI settings state (mode, provider, model, and the instruction prompt) is local
-mirror state in `AnnotationFeature` that is seeded from and written back to the
-tab's `settings` map (`annotationMode`/`aiProvider`/`aiModel`/`aiPrompt`, plus the
-Model Configuration knobs `aiTemperature`/`aiReasoningEnabled`/`aiReasoningEffort`,
-booleans stringified as `'true'`/`'false'` and the temperature as `String(value)`)
-through `onTabSettingChange`, so the whole parameter panel — like the source and class
+selectors the trigger itself is never disabled. API keys (keyed by provider-card
+id) and custom providers are persisted to backend preferences through the
+preferences store (`annotationAiApiKeys` / `annotationAiCustomProviders`), which
+debounce-syncs an `annotation_ai` payload to the unified `PUT /preferences/`
+endpoint (TOML-backed, modeled by `AnnotationAiPreferences` /
+`AnnotationAiCustomProvider`). The remaining AI settings state (mode, active
+provider-card id, active model, per-card model map, and the instruction prompt)
+is local mirror state in `AnnotationFeature` that is seeded from and written back
+to the tab's `settings` map (`annotationMode`/`aiProvider`/`aiModel`/`aiPrompt`/
+`aiProviderModels`, plus the Model Configuration knobs
+`aiTemperature`/`aiReasoningEnabled`/`aiReasoningEffort`, booleans stringified as
+`'true'`/`'false'` and the temperature as `String(value)`) through
+`onTabSettingChange`, so the whole parameter panel — like the source and class
 node selectors — survives reloads and tab switches; the example-node selector
 persists separately through its `exampleNodes` `input_sets` entry. API keys stay
 out of `tabs.json` and live only in preferences. Every AI control plus the mode
-switch locks once annotation has started. The
-same API keys and custom providers can also be managed outside the Annotation
-tab from **Settings → AI** (`AiProvidersPreferencesPanel`), which exposes a
-save-on-blur key field per built-in provider and full add/edit/delete for custom
-providers (the shared `CustomProviderDialog` doubles as the editor by accepting
-an optional `provider`). Both surfaces write to the same preferences store, so a
-key entered in one appears in the other.
+switch locks once annotation has started. Settings -> AI
+(`AiProvidersPreferencesPanel`) still manages preference-level provider keys and
+custom endpoint definitions used by existing/legacy configuration surfaces.
 
 The `Preview` button runs AI annotation through the backend via
 `AnnotationAiPreviewPanel`. For the current page of the source node (20 rows per
