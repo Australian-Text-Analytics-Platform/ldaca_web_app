@@ -1,5 +1,5 @@
 export const DEFAULT_TOPIC_SIZE_VALUE = 10;
-export const DEFAULT_TOPIC_SAMPLE_PERCENT = 100;
+const DEFAULT_TOPIC_SAMPLE_PERCENT = 100;
 
 export interface CorpusSample {
   percent: string;

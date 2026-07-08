@@ -101,5 +101,3 @@ export function AnnotationPromptInput({
     </div>
   );
 }
-
-export default AnnotationPromptInput;

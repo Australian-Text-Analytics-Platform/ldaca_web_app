@@ -1,30 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
-import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { SidebarWorkspaceNode } from './sidebar/types';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface WorkspaceNodeListProps {
   nodes: SidebarWorkspaceNode[];
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
-  onClearSelection?: () => void;
-  /** Deletes the selected visible rows after the header confirmation dialog. */
-  onDeleteSelected?: (nodeIds: string[]) => Promise<void> | void;
   /** Optional action rendered for a pinned row while the row is not hovered. */
   renderPinnedRowAction?: (node: SidebarWorkspaceNode) => React.ReactNode;
   /** Optional actions rendered for each node row (e.g. the
@@ -113,20 +99,15 @@ const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
  * Rendered by: the sidebar Data Blocks section because graph selection and
  * fresh-node acknowledgement must stay aligned with visible rows.
  * Flow: read fresh state and pinned ids, order pinned/selected/regular nodes,
- * then render the batch-delete affordance and toggleable node rows.
+ * then render toggleable node rows.
  */
 function WorkspaceNodeList({
   nodes,
   selectedNodeIds,
   onToggleNodeSelection,
-  onClearSelection,
-  onDeleteSelected,
   renderPinnedRowAction,
   renderRowActions,
 }: WorkspaceNodeListProps) {
-  const selectedCount = selectedNodeIds?.length ?? 0;
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
 
   const freshIds = useFreshNodesStore((state) => state.freshIds);
@@ -156,81 +137,8 @@ function WorkspaceNodeList({
   );
   const orderedNodes = [...pinnedNodes, ...selectedNodes, ...regularNodes];
 
-  const selectedForDelete = nodes
-    .filter((node) => selectedIdSet.has(node.id))
-    .map((node) => ({
-      id: node.id,
-      name: getNodeDisplayName(node) || 'Untitled data block',
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const canBatchDelete = selectedForDelete.length > 0;
-
-  /** Deletes the currently selected visible rows, then clears stale selection ids. */
-  const handleBatchDelete = async () => {
-    if (!onDeleteSelected || !canBatchDelete || isDeleting) return;
-    setIsDeleting(true);
-    try {
-      await onDeleteSelected(selectedForDelete.map((item) => item.id));
-      onClearSelection?.();
-      setDeleteConfirmOpen(false);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   return (
     <div className="flex flex-col gap-2">
-      {onDeleteSelected && canBatchDelete && (
-        <div className="flex items-center justify-end gap-2 pb-1">
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteConfirmOpen(true);
-            }}
-            disabled={isDeleting}
-            title="Delete the selected data blocks"
-            aria-label="Delete selected data blocks"
-            className={cn(
-              'inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-              'border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:border-destructive/90',
-            )}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>Delete ({selectedCount})</span>
-          </button>
-        </div>
-      )}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {selectedForDelete.length} data block
-              {selectedForDelete.length === 1 ? '' : 's'}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This cannot be undone. The following data blocks will be removed:
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
-            {selectedForDelete.map((item) => (
-              <li key={item.id}>{item.name}</li>
-            ))}
-          </ul>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                void handleBatchDelete();
-              }}
-              disabled={isDeleting || !canBatchDelete}
-              className="bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50"
-            >
-              {isDeleting ? 'Deleting…' : `Delete ${String(selectedForDelete.length)}`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <TooltipProvider delayDuration={120} skipDelayDuration={0}>
         <div className="relative">
         {nodes.length ? (

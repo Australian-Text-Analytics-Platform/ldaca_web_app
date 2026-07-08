@@ -244,5 +244,3 @@ export function AiProvidersPreferencesPanel() {
     </div>
   );
 }
-
-export default AiProvidersPreferencesPanel;

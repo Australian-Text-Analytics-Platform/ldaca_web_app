@@ -148,5 +148,3 @@ export function AnnotationInferenceSettings({
     </Collapsible>
   );
 }
-
-export default AnnotationInferenceSettings;

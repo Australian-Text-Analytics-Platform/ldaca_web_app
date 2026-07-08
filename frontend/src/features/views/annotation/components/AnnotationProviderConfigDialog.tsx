@@ -285,5 +285,3 @@ export function AnnotationProviderConfigDialog({
     </Dialog>
   );
 }
-
-export default AnnotationProviderConfigDialog;

@@ -153,7 +153,6 @@ function Sidebar() {
   const { selectedNodeIds } = useWorkspaceSelection();
   const {
     toggleNodeSelection,
-    clearSelection,
     deleteNode,
     copyNode,
     renameNode,
@@ -432,7 +431,6 @@ function Sidebar() {
                             nodes={nodes}
                             selectedNodeIds={selectedNodeIds}
                             onToggleNodeSelection={toggleNodeSelection}
-                            onClearSelection={clearSelection}
                             renderPinnedRowAction={(node: SidebarWorkspaceNode) => (
                               <NodePinButton
                                 node={getToolbarNode(node)}

@@ -151,5 +151,3 @@ export function CustomProviderDialog({
     </Dialog>
   );
 }
-
-export default CustomProviderDialog;

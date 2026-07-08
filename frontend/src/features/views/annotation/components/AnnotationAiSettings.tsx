@@ -216,5 +216,3 @@ export function AnnotationAiSettings({
     </div>
   );
 }
-
-export default AnnotationAiSettings;

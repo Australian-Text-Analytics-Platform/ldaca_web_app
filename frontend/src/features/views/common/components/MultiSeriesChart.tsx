@@ -22,7 +22,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 
-export type MultiSeriesChartType = 'line' | 'bar' | 'area';
+type MultiSeriesChartType = 'line' | 'bar' | 'area';
 
 export interface MultiSeriesChartSeries {
   /** Data key in each row of `data`. */

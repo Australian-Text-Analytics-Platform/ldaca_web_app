@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -218,31 +218,5 @@ describe('WorkspaceNodeList', () => {
     const fade = within(row).getByTestId('node-name-left-fade');
     expect(fade).toHaveClass('left-0');
     expect(fade).toHaveClass('group-hover/row:w-32');
-  });
-
-  it('shows a graph-style selection header and batch-deletes selected rows', async () => {
-    const user = userEvent.setup();
-    const onDeleteSelected = vi.fn().mockResolvedValue(undefined);
-    const onClearSelection = vi.fn();
-
-    render(
-      <WorkspaceNodeList
-        nodes={orderedNodes}
-        selectedNodeIds={['node-2']}
-        onToggleNodeSelection={vi.fn()}
-        onClearSelection={onClearSelection}
-        onDeleteSelected={onDeleteSelected}
-      />,
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Delete selected data blocks' }));
-    expect(screen.getByRole('heading', { name: 'Delete 1 data block?' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Delete 1' }));
-
-    await waitFor(() => {
-      expect(onDeleteSelected).toHaveBeenCalledWith(['node-2']);
-    });
-    expect(onClearSelection).toHaveBeenCalledOnce();
   });
 });

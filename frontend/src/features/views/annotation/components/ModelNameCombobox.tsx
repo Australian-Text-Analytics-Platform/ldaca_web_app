@@ -320,5 +320,3 @@ export function ModelNameCombobox({
     </Popover>
   );
 }
-
-export default ModelNameCombobox;
