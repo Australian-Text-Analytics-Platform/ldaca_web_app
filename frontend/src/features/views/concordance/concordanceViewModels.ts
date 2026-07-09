@@ -333,7 +333,6 @@ export const CONCORDANCE_COMBINED_NODE_KEY = '__COMBINED__';
 
 interface ConcordanceNodeIdentity {
   id?: string;
-  node_id?: string;
   name?: string;
   label?: string;
   data?: unknown;
@@ -373,8 +372,8 @@ export function normalizeConcordanceLabelToNodeMap(
 /**
  * Assigns visual colours to each selected concordance node id variant.
  * Used by: useConcordanceResultViewModel and metadata-column grouping because
- * combined result rows can refer to either `id` or `node_id`, and both variants
- * should resolve to the same source colour.
+ * combined result rows should resolve the selected node id to the same source
+ * colour across table and dispersion views.
  * Flow: start from deterministic palette colours by selected-node order, then
  * apply the effective ``Node.color`` map supplied by the selected-node controls.
  */
@@ -387,14 +386,11 @@ export function buildConcordanceNodeColorMap(
   if (palette.length === 0) return map;
 
   nodes.forEach((node, index) => {
-    const candidateIds = [node.id, node.node_id].filter(
-      (value): value is string => typeof value === 'string' && value.length > 0,
-    );
-    const override = candidateIds.map((candidate) => nodeColorOverrides[candidate]).find(Boolean);
+    const nodeId = typeof node.id === 'string' && node.id.length > 0 ? node.id : null;
+    if (!nodeId) return;
+    const override = nodeColorOverrides[nodeId];
     const colour = override ?? palette[index % palette.length] ?? '';
-    for (const candidate of candidateIds) {
-      map[candidate] = colour;
-    }
+    map[nodeId] = colour;
   });
   return map;
 }
@@ -411,8 +407,8 @@ const getNodeDataLabelCandidates = (node: ConcordanceNodeIdentity): string[] => 
 
 /**
  * Builds the lower-case label lookup used to colour combined-result table rows.
- * Used by: useConcordanceResultViewModel so source-label, id, node_id, and
- * nested node metadata aliases all share the same palette assignment.
+ * Used by: useConcordanceResultViewModel so source-label, id, and nested node
+ * metadata labels all share the same palette assignment.
  */
 export function buildConcordanceSourceColorMap(
   nodes: readonly ConcordanceNodeIdentity[],
@@ -422,14 +418,11 @@ export function buildConcordanceSourceColorMap(
   const map: Record<string, string> = {};
 
   nodes.forEach((node, index) => {
-    const candidateIds = [node.id, node.node_id].filter(
-      (value): value is string => typeof value === 'string' && value.length > 0,
-    );
-    const primaryId = candidateIds[0] ?? `node-${String(index)}`;
+    const primaryId =
+      typeof node.id === 'string' && node.id.length > 0 ? node.id : `node-${String(index)}`;
     const assigned = nodeColors[primaryId] ?? palette[index % palette.length] ?? '';
     const variants = new Set<string>([
       primaryId,
-      ...candidateIds,
       ...(typeof node.name === 'string' ? [node.name] : []),
       ...(typeof node.label === 'string' ? [node.label] : []),
       ...getNodeDataLabelCandidates(node),
@@ -466,7 +459,7 @@ export function findConcordanceSourceNode<T extends ConcordanceNodeIdentity>(
         : undefined;
     const dataName = typeof data?.name === 'string' ? data.name : undefined;
     const dataLabel = typeof data?.label === 'string' ? data.label : undefined;
-    const candidates = [node.id, node.node_id, node.name, dataName, node.label, dataLabel]
+    const candidates = [node.id, node.name, dataName, node.label, dataLabel]
       .filter(Boolean)
       .map((value) => String(value).toLowerCase());
     return candidates.includes(normalizedSource);
@@ -519,14 +512,12 @@ export function resolveConcordanceNodeIdForKey(
     const dataName = typeof data?.name === 'string' ? data.name : undefined;
     return (
       node.id === nodeKey ||
-      node.node_id === nodeKey ||
       node.name === nodeKey ||
       node.label === nodeKey ||
       dataName === nodeKey
     );
   });
   if (direct?.id) return direct.id;
-  if (typeof direct?.node_id === 'string' && direct.node_id) return direct.node_id;
   const mapped = labelToNodeId?.[nodeKey];
   return mapped ?? null;
 }
@@ -544,7 +535,7 @@ export function getConcordanceNodeIdsForKey(
 ): string[] {
   if (nodeKey === CONCORDANCE_COMBINED_NODE_KEY) {
     return selectedNodes
-      .map((node) => node.id ?? node.node_id)
+      .map((node) => node.id)
       .filter((id: string | undefined): id is string => Boolean(id));
   }
   const id = resolveConcordanceNodeIdForKey(nodeKey, selectedNodes, labelToNodeId);
@@ -586,7 +577,7 @@ export function getMaterializedBinsForConcordanceKey(
 
   const tagged: TaggedBinRow[] = [];
   for (const id of ids) {
-    const node = selectedNodes.find((entry) => entry.id === id || entry.node_id === id);
+    const node = selectedNodes.find((entry) => entry.id === id);
     const sourceLabel = node?.name ?? node?.label ?? id;
     const bins = materializedBins[id];
     if (!bins) continue;

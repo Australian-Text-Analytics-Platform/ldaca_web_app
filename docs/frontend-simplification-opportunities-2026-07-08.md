@@ -165,6 +165,12 @@ rescan should be added here before implementation.
       `total_nodes`) instead of accepting `unique_id`, `updated_at`, or
       `dataframe_count` fallbacks.
 
+28. Remove selected-node `node_id` aliases in concordance view models
+    - Done 2026-07-09. Concordance source/colour/materialization helpers now
+      resolve selected workspace nodes by generated `id` plus backend
+      `label_to_node_map`; they no longer accept an extra `node_id` alias on
+      selected-node objects.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -182,6 +188,8 @@ React Flow `CustomNode` data also uses `id` directly; it no longer carries a
 frontend-only `node_id` alias.
 Data Loader workspace summaries also use generated `WorkspaceSummary` directly;
 legacy `unique_id`/`updated_at`/`dataframe_count` aliases were removed.
+Concordance selected-node helpers use generated `id` and backend
+`label_to_node_map`; selected-node `node_id` aliases were removed.
 
 Raw frontend URL construction is limited to boundaries that need URL strings or
 external resources: health checks, document/file rendering, remote tutorial

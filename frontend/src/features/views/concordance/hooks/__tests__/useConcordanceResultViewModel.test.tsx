@@ -51,7 +51,7 @@ const defaultArgs = {
   results: makeResult(),
   concordanceTaskId: 'task-1',
   panelSelectedNodes: [
-    { id: 'node-1', node_id: 'legacy-node-1', name: 'Left Corpus' },
+    { id: 'node-1', name: 'Left Corpus' },
     { id: 'node-2', name: 'Right Corpus' },
   ],
   showDispersion: true,
@@ -79,7 +79,7 @@ describe('useConcordanceResultViewModel', () => {
     const { result } = renderHook(() => useConcordanceResultViewModel(defaultArgs));
 
     expect(result.current.labelToNodeId).toEqual({ 'Left result': 'node-1' });
-    expect(result.current.nodeColors['legacy-node-1']).toBe(result.current.nodeColors['node-1']);
+    expect(result.current.nodeColors['node-1']).toBe('#2563eb');
     expect(result.current.sourceColorMap['left corpus']).toBe(result.current.nodeColors['node-1']);
 
     act(() => {

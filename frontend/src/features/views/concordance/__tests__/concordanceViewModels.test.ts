@@ -222,10 +222,10 @@ describe('concordance source display helpers', () => {
     expect(normalizeConcordanceLabelToNodeMap(null)).toBeNull();
   });
 
-  it('builds node and source colour maps across id, node_id, label, and nested metadata aliases', () => {
+  it('builds node and source colour maps across id, label, and nested metadata aliases', () => {
     const nodeColors = buildConcordanceNodeColorMap(
       [
-        { id: 'node-1', node_id: 'legacy-1', name: 'Left Corpus' },
+        { id: 'node-1', name: 'Left Corpus' },
         { id: 'node-2', label: 'Right Label', data: { name: 'Nested Corpus' } },
       ],
       ['red', 'blue'],
@@ -233,13 +233,12 @@ describe('concordance source display helpers', () => {
 
     expect(nodeColors).toEqual({
       'node-1': 'red',
-      'legacy-1': 'red',
       'node-2': 'blue',
     });
     expect(
       buildConcordanceSourceColorMap(
         [
-          { id: 'node-1', node_id: 'legacy-1', name: 'Left Corpus' },
+          { id: 'node-1', name: 'Left Corpus' },
           { id: 'node-2', label: 'Right Label', data: { name: 'Nested Corpus' } },
         ],
         nodeColors,
@@ -247,7 +246,6 @@ describe('concordance source display helpers', () => {
       ),
     ).toEqual({
       'node-1': 'red',
-      'legacy-1': 'red',
       'left corpus': 'red',
       'node-2': 'blue',
       'right label': 'blue',
@@ -255,16 +253,15 @@ describe('concordance source display helpers', () => {
     });
   });
 
-  it('applies node colour overrides across id and node_id aliases', () => {
+  it('applies node colour overrides by selected node id', () => {
     expect(
       buildConcordanceNodeColorMap(
-        [{ id: 'node-1', node_id: 'legacy-1', name: 'Left Corpus' }],
+        [{ id: 'node-1', name: 'Left Corpus' }],
         ['red'],
         { 'node-1': '#123456' },
       ),
     ).toEqual({
       'node-1': '#123456',
-      'legacy-1': '#123456',
     });
   });
 
