@@ -143,6 +143,11 @@ rescan should be added here before implementation.
       because browsers cannot attach SDK headers there, but the endpoint path
       and `token` query shape now come from one helper.
 
+24. Centralize auth redirect URL construction
+    - Done 2026-07-09. Google and CILogon login components now use
+      `authRedirectUrls.ts`, typed against generated redirect endpoint data,
+      instead of manually joining `getApiBase()` with `/auth/...` paths.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -157,8 +162,8 @@ request bodies, `AnalysisTabInput`, and detach-option/result DTOs.
 Raw frontend URL construction is limited to boundaries that need URL strings or
 external resources: health checks, document/file rendering, remote tutorial
 registry reads, OpenRouter model discovery, export blob downloads, and native
-EventSource task streaming. Backend export and task-stream URL builders are
-typed against generated endpoint contracts.
+EventSource task streaming. Backend auth redirect, export, and task-stream URL
+builders are typed against generated endpoint contracts.
 
 ## Layers Checked And Not Recommended For Flattening
 

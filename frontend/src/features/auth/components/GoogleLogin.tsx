@@ -1,6 +1,6 @@
 import { GoogleLogin as OAuthGoogleLogin } from '@react-oauth/google';
-import { getApiBase } from '@/lib/backend/env';
 import { AuthProviderCard } from '@/features/auth/components/AuthProviderCard';
+import { buildGoogleLoginUri } from '@/features/auth/authRedirectUrls';
 
 interface GoogleLoginProps {
   isLoading?: boolean;
@@ -8,7 +8,7 @@ interface GoogleLoginProps {
 }
 
 export default function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
-  const loginUri = `${getApiBase()}/auth/google/callback`;
+  const loginUri = buildGoogleLoginUri();
 
   return (
     <AuthProviderCard isLoading={isLoading} error={error}>

@@ -1,5 +1,5 @@
-import { getApiBase } from '@/lib/backend/env';
 import { AuthProviderCard } from '@/features/auth/components/AuthProviderCard';
+import { buildCilogonLoginUrl } from '@/features/auth/authRedirectUrls';
 
 interface CILogonLoginProps {
   isLoading?: boolean;
@@ -7,7 +7,7 @@ interface CILogonLoginProps {
 }
 
 export default function CILogonLogin({ isLoading, error }: CILogonLoginProps) {
-  const loginUrl = `${getApiBase()}/auth/cilogon/login`;
+  const loginUrl = buildCilogonLoginUrl();
 
   return (
     <AuthProviderCard isLoading={isLoading} error={error}>
