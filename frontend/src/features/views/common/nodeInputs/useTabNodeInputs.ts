@@ -58,9 +58,9 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
   /** Node-info responses for the currently selected input nodes. */
   nodeInfoCache: Record<string, NodeInfo>;
   /** Returns cached typed columns for a selected input node, with snapshot fallback. */
-  getColumnInfos: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
+  getColumnInfos: (node: NodeLike | null | undefined) => ColumnInfo[];
   /** Returns cached node-info metadata for a selected input node when loaded. */
-  getNodeInfo: (node: NodeLike | null | undefined, idx?: number) => NodeInfo | undefined;
+  getNodeInfo: (node: NodeLike | null | undefined) => NodeInfo | undefined;
 }
 
 const NO_OP = (_inputs: AnalysisTabInput[]) => {
@@ -124,7 +124,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   // the node snapshot for any node not in this query set (e.g. add candidates).
   const selectedNodeObjs = useMemo(() => {
     const ids = new Set(value.map((i) => i.node_id));
-    return allNodes.filter((node, idx) => ids.has(getNodeIdentifier(node, idx)));
+    return allNodes.filter((node) => ids.has(getNodeIdentifier(node)));
   }, [allNodes, value]);
 
   const { getColumnInfos, getNodeInfo, nodeInfoCache } = useNodeColumnInfos({
@@ -185,8 +185,8 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
 
   const nodeNameById = useMemo(() => {
     const map = new Map<string, string>();
-    allNodes.forEach((node, idx) => {
-      const id = getNodeIdentifier(node, idx);
+    allNodes.forEach((node) => {
+      const id = getNodeIdentifier(node);
       map.set(id, getNodeDisplayName(node, id));
     });
     return map;

@@ -57,20 +57,15 @@ export const buildSelectionNameKey = (
 
 /** Resolves the selected token-frequency node ids used for ordering and submission. */
 /**
- * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because the tab input panel exposes backend nodes with id/node_id variants while analysis requests need stable ids.
- * Flow: cap the panel selection to two nodes, prefer each node's stable backend id, fall back to the resolved tab input id, and discard empty values.
+ * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because
+ * analysis requests need the selected live workspace node ids in panel order.
+ * Flow: cap the panel selection to two nodes and keep each generated
+ * workspace-node `id`.
  */
-export const derivePanelNodeIds = (
-  panelSelectedNodes: WorkspaceNodeLike[],
-  activeNodeIds: string[],
-): string[] =>
+export const derivePanelNodeIds = (panelSelectedNodes: WorkspaceNodeLike[]): string[] =>
   panelSelectedNodes
     .slice(0, 2)
-    .map((node, idx) => {
-      if (isNonEmptyString(node.id)) return node.id;
-      if (isNonEmptyString(node.node_id)) return node.node_id;
-      return activeNodeIds[idx] ?? getNodeIdentifier(node, idx);
-    })
+    .map((node) => getNodeIdentifier(node))
     .filter((id): id is string => Boolean(id));
 
 /** Derives the study-corpus id and backend comparison order for token-frequency runs. */

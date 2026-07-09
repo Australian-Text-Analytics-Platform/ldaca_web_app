@@ -2,8 +2,7 @@ import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface NodeWithTokenizerModels {
-  id?: unknown;
-  node_id?: unknown;
+  id: string;
   tokenizer_models?: unknown;
   [key: string]: unknown;
 }
@@ -19,9 +18,9 @@ export interface TokensColumnMismatchNoticeProps {
   className?: string;
 }
 
-/** Called by: TokensColumnMismatchNotice when matching selections to workspace nodes because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Called by: TokensColumnMismatchNotice when matching selections to live workspace nodes because selected analysis inputs store the same node id. */
 const nodeMatchesId = (node: NodeWithTokenizerModels, id: string) =>
-  [node.id, node.node_id].some((value) => typeof value === 'string' && value === id);
+  node.id === id;
 
 /** Called by: TokensColumnMismatchNotice to describe saved tokenizer-model columns because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
 const collectTokenizerModelSources = (tokenizerModels: unknown): string[] => {

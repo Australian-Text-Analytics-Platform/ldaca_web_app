@@ -90,7 +90,7 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
   const selectedIds = useMemo(() => new Set(value.map((i) => i.node_id)), [value]);
 
   const availableNodes = useMemo(
-    () => allNodes.filter((node, idx) => !selectedIds.has(getNodeIdentifier(node, idx))),
+    () => allNodes.filter((node) => !selectedIds.has(getNodeIdentifier(node))),
     [allNodes, selectedIds],
   );
 

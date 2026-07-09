@@ -18,7 +18,7 @@ export interface ConcordanceMetadataColumnSet {
   metadataDisabledReason: string | undefined;
 }
 
-type GetColumnInfo = (node: WorkspaceNodeLike, idx: number) => { name?: string }[];
+type GetColumnInfo = (node: WorkspaceNodeLike) => { name?: string }[];
 type ResolveNodeIdForKey = (nodeKey: string) => string | null;
 
 interface Params {
@@ -60,14 +60,14 @@ export function useConcordanceMetadataColumns({
     perBlock.push({ nodeKey, columns: cols });
   }
   if (perBlock.length === 0 && panelSelectedNodes.length > 0) {
-    panelSelectedNodes.forEach((node, idx) => {
-      const rawId = (node as { id?: string }).id;
-      const rawName = (node as { name?: string }).name;
+    panelSelectedNodes.forEach((node) => {
+      const rawId = node.id;
+      const rawName = node.name;
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string name/id should fall back to the next identifier
-      const nodeKey = rawName || rawId || `node-${String(idx)}`;
-      const sel = rawId ? effectiveNodeColumnSelections.find((s) => s.nodeId === rawId) : undefined;
+      const nodeKey = rawName || rawId;
+      const sel = effectiveNodeColumnSelections.find((s) => s.nodeId === rawId);
       const textColumn = sel?.column;
-      const cols = getColumnInfos(node, idx)
+      const cols = getColumnInfos(node)
         .map((info) => info.name)
         .filter(
           (name): name is string => !!name && name !== textColumn && name !== '__source_node',

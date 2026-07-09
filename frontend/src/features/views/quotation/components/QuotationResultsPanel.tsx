@@ -87,7 +87,7 @@ export function QuotationResultsPanel({
   onMaterialize,
   onOpenDetachDialog,
 }: QuotationResultsPanelProps) {
-  const metadataNodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '';
+  const metadataNodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0]) : '';
   const quotationMetadataColumns = buildQuotationMetadataColumns(
     metadataNodeId ? resultsByNode[metadataNodeId] : null,
   );
@@ -164,8 +164,8 @@ export function QuotationResultsPanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-8">
-        {displayedNodes.map((node, idx) => {
-          const nodeId = getNodeIdentifier(node, idx);
+        {displayedNodes.map((node) => {
+          const nodeId = getNodeIdentifier(node);
           const selection = activeSelections.find((entry) => entry.nodeId === nodeId);
           const textCol = selection?.column ?? '';
 

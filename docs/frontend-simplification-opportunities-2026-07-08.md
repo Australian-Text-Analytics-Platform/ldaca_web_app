@@ -390,11 +390,13 @@ Recommendation:
 
 Derive schema only from node-info through `nodeInfoQueryOptions` / `fetchNodeInfo` (now backed by the collection node-info endpoint). Remove the `nodeData` and `selectedNode` fallback props, remove `queryKeys.nodeSchema` if no callers remain, and let snapshot fetch failures surface instead of submitting empty schema placeholders.
 
-### 18. Remove legacy workspace-node identity fallbacks
+### ~~18. Remove legacy workspace-node identity fallbacks~~
 
 Status:
 
 Partially implemented on 2026-07-08. Live graph consumers now use generated `WorkspaceGraphNode` summaries, and `ExportFeature` now reads selected-node `id`/`name` directly instead of walking legacy aliases. Shared node-input helpers still accept `node_id` and sparse fixture/request shapes because persisted analysis inputs and task/request payloads explicitly use `node_id`; those need a narrower follow-up rather than deletion inside the endpoint split.
+
+Status 2026-07-09: Completed for live workspace-node helpers. `WorkspaceNodeLike` now requires the generated workspace node `id`, `getNodeIdentifier` returns that id directly, and the shared node-input, column-info, auto-column, preprocessing metadata, token-frequency, topic-modeling, quotation, concordance selection, and tokenizer-mismatch helpers no longer walk `node_id`, nested `data.id`/`data.node_id`, `unique_id`, active-id, or synthetic `node-${index}` fallback chains for live nodes. Remaining `node_id` usage is intentionally constrained to explicit contracts: `AnalysisTabInput`, generated path/body fields, detach-option/result DTOs, and legacy analysis payload adapters tracked in item 22.
 
 Evidence:
 

@@ -352,9 +352,9 @@ export function ConcordanceResultsPanel({
                   const keyedOrder = Object.keys(results.data);
                   const approxIndex = keyedOrder.indexOf(nodeName);
                   let node = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-                    const d = n.data as Record<string, unknown> | undefined;
+                    const d = n.data;
                     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node id
-                    return ((d?.name as string | undefined) || n.id) === nodeName;
+                    return (d?.name || n.id) === nodeName;
                   });
                   node ??= panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === nodeName);
                   node ??= panelSelectedNodes.find((n: WorkspaceNodeLike) => n.name === nodeName);

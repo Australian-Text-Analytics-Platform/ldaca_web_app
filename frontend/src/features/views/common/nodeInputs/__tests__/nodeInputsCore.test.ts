@@ -21,7 +21,7 @@ const nodes: WorkspaceNodeLike[] = [
     name: 'n3',
     columns: ['count'],
     schema: [{ name: 'count', type: 'Int64' }],
-  } as unknown as WorkspaceNodeLike,
+  },
 ];
 
 const map = buildNodeMap(nodes);

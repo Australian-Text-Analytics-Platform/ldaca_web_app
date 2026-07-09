@@ -56,7 +56,7 @@ export function NodeSelectionList({
   const derivedNodeIds =
     nodeIds?.length === nodes.length
       ? nodeIds
-      : nodes.map((node, index) => getNodeIdentifier(node, index));
+      : nodes.map((node) => getNodeIdentifier(node));
 
   // Auto-scroll to the right end when the selection changes so the
   // most recently selected data blocks are always visible.

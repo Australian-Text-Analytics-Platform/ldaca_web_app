@@ -36,9 +36,7 @@ export function AggregateSubTab(props: AggregateSubTabComponentProps) {
 const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string => {
   const [selectedNode] = takeMostRecent(props.selectedNodes, 1);
   if (selectedNode) {
-    // Empty-string ids should fall through to the backend node_id, so keep `||`.
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    return selectedNode.id || selectedNode.node_id || 'none';
+    return selectedNode.id;
   }
   return 'none';
 };
@@ -222,11 +220,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                               ) : (
                                 <OperationPopover
                                   workspaceId={props.currentWorkspaceId}
-                                  nodeId={
-                                    nodeSelection.effectiveNodes[0]?.id ??
-                                    nodeSelection.effectiveNodes[0]?.node_id ??
-                                    ''
-                                  }
+                                  nodeId={nodeSelection.effectiveNodes[0]?.id ?? ''}
                                   column={token.column}
                                   onSelect={(op) => {
                                     basicBuilder.addOperation(token.id, op);

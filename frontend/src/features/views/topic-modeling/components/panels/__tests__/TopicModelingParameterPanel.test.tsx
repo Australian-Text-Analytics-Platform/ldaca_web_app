@@ -45,17 +45,17 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
   ),
 }));
 
-const nodeInputsFixture = (selectedNodes: { id?: string; name?: string }[] = []) => ({
-  inputs: selectedNodes.map((node) => ({ node_id: node.id ?? '', column: 'text' })),
+const nodeInputsFixture = (selectedNodes: { id: string; name?: string }[] = []) => ({
+  inputs: selectedNodes.map((node) => ({ node_id: node.id, column: 'text' })),
   resolvedNodes: selectedNodes.map((node) => ({
-    id: node.id ?? '',
-    name: node.name ?? node.id ?? '',
+    id: node.id,
+    name: node.name ?? node.id,
     node,
     column: 'text',
     columnOptions: [{ name: 'text', dataType: 'string' }],
   })),
   selectedNodes,
-  nodeColumnSelections: selectedNodes.map((node) => ({ nodeId: node.id ?? '', column: 'text' })),
+  nodeColumnSelections: selectedNodes.map((node) => ({ nodeId: node.id, column: 'text' })),
   availableNodes: [],
   canAddMore: true,
   addNodes: vi.fn(() => []),

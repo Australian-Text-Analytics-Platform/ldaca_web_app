@@ -43,9 +43,7 @@ export function useNodeColorControls({
   const [optimisticNodeColors, setOptimisticNodeColors] = useState<Record<string, string>>({});
 
   const defaultNodeColors = vizColorMapForNodes(nodeIds);
-  const nodeById = new Map(
-    nodes.map((node, index) => [getNodeIdentifier(node, index), node] as const),
-  );
+  const nodeById = new Map(nodes.map((node) => [getNodeIdentifier(node), node] as const));
   const nodeColors = { ...defaultNodeColors };
   nodeIds.forEach((nodeId) => {
     const persisted = normalizeHexColor(nodeById.get(nodeId)?.color);

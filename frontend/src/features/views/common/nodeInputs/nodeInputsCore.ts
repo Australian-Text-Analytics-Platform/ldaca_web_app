@@ -89,8 +89,8 @@ export function nodeInputsFromSelections(selections: NodeSelectionInput[]): Node
  */
 export function buildNodeMap(allNodes: WorkspaceNodeLike[]): Map<string, WorkspaceNodeLike> {
   const map = new Map<string, WorkspaceNodeLike>();
-  allNodes.forEach((node, idx) => {
-    map.set(getNodeIdentifier(node, idx), node);
+  allNodes.forEach((node) => {
+    map.set(getNodeIdentifier(node), node);
   });
   return map;
 }

@@ -161,16 +161,16 @@ export function NodeInputsPanel({
   const filteredAvailableNodes = useMemo(() => {
     const q = blockSearch.trim().toLowerCase();
     if (!q) return availableNodes;
-    return availableNodes.filter((node, idx) =>
-      getNodeDisplayName(node, getNodeIdentifier(node, idx)).toLowerCase().includes(q),
+    return availableNodes.filter((node) =>
+      getNodeDisplayName(node, getNodeIdentifier(node)).toLowerCase().includes(q),
     );
   }, [availableNodes, blockSearch]);
 
   /** Resolves graph-selected addable ids to display names for the preset entry. */
   const graphSelectionLabels = useMemo(() => {
     const byId = new Map(
-      availableNodes.map((node, idx) => {
-        const id = getNodeIdentifier(node, idx);
+      availableNodes.map((node) => {
+        const id = getNodeIdentifier(node);
         return [id, getNodeDisplayName(node, id)];
       }),
     );
@@ -410,8 +410,8 @@ export function NodeInputsPanel({
                       No matching data blocks
                     </div>
                   ) : (
-                    filteredAvailableNodes.map((node, idx) => {
-                      const id = getNodeIdentifier(node, idx);
+                    filteredAvailableNodes.map((node) => {
+                      const id = getNodeIdentifier(node);
                       const reason = getAddRejection(id);
                       return (
                         <button

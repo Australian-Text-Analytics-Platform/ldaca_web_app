@@ -15,13 +15,6 @@ interface SingleNodeSelectionPanelModel {
 }
 
 /**
- * Safely treats loose workspace-node metadata as an object.
- * Used by: local callers in preprocessing/nodeMetadata module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
-const toRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-
-/**
  * Derives the human label used by preprocessing panels and auto names.
  * Used by: join, concat, slice, and expression preprocessing hooks because
  * those subtabs need the same name/label/id order for user-facing status text
@@ -34,17 +27,10 @@ export const deriveNodeLabel = (node: WorkspaceNodeLike | null | undefined): str
 
 /**
  * Resolves a stable key for node maps and selection panel lookups.
- * Used by: preprocessing subtab hooks because backend node metadata may expose
- * either `id` or `node_id`, while subtab selection maps need one lookup key.
+ * Used by: preprocessing subtab hooks because live workspace-node maps should
+ * share the generated `WorkspaceNodeInfo.id` identity.
  */
-export const getNodeKey = (node: WorkspaceNodeLike): string => {
-  const base = toRecord(node);
-  const id = base.id;
-  if (typeof id === 'string' && id.length > 0) return id;
-  const nodeId = base.node_id;
-  if (typeof nodeId === 'string' && nodeId.length > 0) return nodeId;
-  return '';
-};
+export const getNodeKey = (node: WorkspaceNodeLike): string => node.id;
 
 /**
  * Builds the node lookup map shared by single- and multi-node preprocessing

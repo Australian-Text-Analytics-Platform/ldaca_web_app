@@ -7,27 +7,12 @@ import {
 import { type NodeInfo, nodeInfosQueryOptions } from '@/lib/nodeInfo';
 
 export type NodeLike = Record<string, unknown> & {
-  id?: string;
-  node_id?: string;
-  data?: Record<string, unknown> & {
-    id?: string;
-    node_id?: string;
-  };
-  unique_id?: string;
+  id: string;
 };
 
-/** Resolves the backend node id from graph, table, or legacy node payload shapes. */
+/** Resolves the backend node id from a live workspace node. */
 /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-const resolveNodeId = (node: NodeLike | null | undefined, fallbackIndex: number): string | null => {
-  if (!node) return null;
-  const candidates = [node.id, node.node_id, node.data?.id, node.data?.node_id, node.unique_id];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.length) {
-      return candidate;
-    }
-  }
-  return `node-${String(fallbackIndex)}`;
-};
+const resolveNodeId = (node: NodeLike | null | undefined): string | null => node?.id ?? null;
 
 export interface UseNodeColumnInfosResult {
   columnInfoCache: Record<string, ColumnInfo[]>;
@@ -38,9 +23,9 @@ export interface UseNodeColumnInfosResult {
    * mapping if the cache has not been hydrated yet, ensuring the selector
    * always renders something while the typed schema is loading.
    */
-  getColumnInfos: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
+  getColumnInfos: (node: NodeLike | null | undefined) => ColumnInfo[];
   /** Returns the cached node-info response for consumers that need shape or tokenizer metadata. */
-  getNodeInfo: (node: NodeLike | null | undefined, idx?: number) => NodeInfo | undefined;
+  getNodeInfo: (node: NodeLike | null | undefined) => NodeInfo | undefined;
   /** True while one or more schemas are being fetched. */
   isLoading: boolean;
 }
@@ -52,7 +37,7 @@ export interface UseNodeColumnInfosResult {
  */
 /**
  * Used by: add-node-as-needed input hooks and analysis feature screens because the hook needs local steps to normalize inputs before exposing stable state to consumers.
- * Flow: resolve node ids, issue one batch node-info query, build typed metadata caches, then return fallback-aware getters and loading flag.
+ * Flow: resolve live node ids, issue one batch node-info query, build typed metadata caches, then return cached getters and loading flag.
  */
 export const useNodeColumnInfos = (params: {
   workspaceId?: string | null;
@@ -63,7 +48,7 @@ export const useNodeColumnInfos = (params: {
   const { getAuthHeaders } = useAuth();
 
   const nodeIds = nodes
-    .map((node, idx) => resolveNodeId(node, idx))
+    .map((node) => resolveNodeId(node))
     .filter((id): id is string => !!id);
 
   const queryEnabled = enabled && Boolean(workspaceId) && nodeIds.length > 0;
@@ -88,8 +73,8 @@ export const useNodeColumnInfos = (params: {
 
   /** Returns typed cached columns when available, otherwise derives from the node snapshot. */
   /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-  const getColumnInfos = (node: NodeLike | null | undefined, idx = 0): ColumnInfo[] => {
-    const nodeId = resolveNodeId(node, idx);
+  const getColumnInfos = (node: NodeLike | null | undefined): ColumnInfo[] => {
+    const nodeId = resolveNodeId(node);
     if (!nodeId) return [];
     const cached = columnInfoCache[nodeId];
     if (cached?.length) {
@@ -100,8 +85,8 @@ export const useNodeColumnInfos = (params: {
 
   /** Returns cached node metadata for consumers that need full node-info fields. */
   /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-  const getNodeInfo = (node: NodeLike | null | undefined, idx = 0): NodeInfo | undefined => {
-    const nodeId = resolveNodeId(node, idx);
+  const getNodeInfo = (node: NodeLike | null | undefined): NodeInfo | undefined => {
+    const nodeId = resolveNodeId(node);
     return nodeId ? nodeInfoCache[nodeId] : undefined;
   };
 

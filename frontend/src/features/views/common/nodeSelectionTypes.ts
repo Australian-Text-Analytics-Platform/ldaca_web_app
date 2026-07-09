@@ -1,27 +1,36 @@
+import type { WorkspaceNodeInfo } from '@/api';
+
 export type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
-export interface WorkspaceNodeLike extends Record<string, unknown> {
-  id?: string;
-  node_id?: string;
+export interface WorkspaceNodeLike
+  extends Omit<Partial<WorkspaceNodeInfo>, 'id'>,
+    Record<string, unknown> {
+  id: WorkspaceNodeInfo['id'];
   name?: string;
   label?: string;
   color?: string | null;
   shape?: [number | null, number | null] | number[];
   columns?: string[];
-  schema?: Record<string, unknown>;
+  schema?: Record<string, unknown> | Record<string, unknown>[];
   dtypes?: Record<string, unknown>;
   column_schema?: Record<string, unknown>;
   tokenizer_models?: Record<string, string>;
+  data?: {
+    name?: string;
+    label?: string;
+    document?: string;
+    columns?: string[];
+    schema?: Record<string, unknown> | Record<string, unknown>[];
+    dtypes?: Record<string, unknown>;
+  };
 }
 
 /**
- * Gives shared analysis selection UIs a stable id even when backend previews use
- * either node_id or id fields, with index fallback for incomplete fixtures.
- * Used by: analysis node selectors and per-node result panels because backend nodes may arrive with id, node_id, or neither in tests and fixtures.
+ * Returns the generated workspace node id used by live node-selection UIs.
+ * Used by: analysis node selectors and per-node result panels because live
+ * workspace nodes share `WorkspaceNodeInfo.id` as their only identity.
  */
-export const getNodeIdentifier = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty id/node_id should fall through to the index fallback
-  node.id || node.node_id || `node-${String(fallbackIndex)}`;
+export const getNodeIdentifier = (node: WorkspaceNodeLike): string => node.id;
 
 /**
  * Resolves the human label used by shared node-selection controls while keeping

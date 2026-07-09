@@ -38,8 +38,8 @@ describe('nodeMetadata', () => {
     });
   });
 
-  it('uses node_id and label metadata when preprocessing receives backend-shaped nodes', () => {
-    const node = { node_id: 'backend-node-1', label: 'Backend Corpus' };
+  it('uses id and label metadata from live workspace nodes', () => {
+    const node = { id: 'backend-node-1', label: 'Backend Corpus' };
 
     expect(getNodeKey(node)).toBe('backend-node-1');
     expect(deriveNodeLabel(node)).toBe('Backend Corpus');

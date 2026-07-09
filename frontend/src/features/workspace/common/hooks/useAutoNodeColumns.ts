@@ -36,16 +36,10 @@ interface ColumnOptionInfo {
 type NodeColumnSource = string[] | ColumnInfo[];
 
 /**
- * Resolves a stable selection key from the node shapes used by graph, tables, and tests.
- * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
+ * Resolves the stable selection key from the live workspace node id.
+ * Why: hook consumers need one id boundary for state, effects, and cache coordination.
  */
-const resolveNodeId = (node: NodeLike, idx: number): string => {
-  const candidates = [node.id, node.node_id, node.data?.id, node.data?.node_id, node.unique_id];
-  for (const candidate of candidates) {
-    if (candidate) return candidate;
-  }
-  return `node-${String(idx)}`;
-};
+const resolveNodeId = (node: NodeLike): string => node.id;
 
 /** Canonicalizes typed column info before option lists compare/filter data types. */
 const normalizeColumns = (columns: ColumnInfo[]): ColumnInfo[] => {
@@ -124,7 +118,7 @@ export const useAutoNodeColumns = ({
     const nodes = selectedNodesRef.current;
     const ids = nodes
       .slice(0, maxNodesRef.current)
-      .map((n, idx) => resolveNodeId(n, idx))
+      .map((node) => resolveNodeId(node))
       .filter(Boolean);
     lastSelectedIdsRef.current = ids;
 
@@ -185,7 +179,7 @@ export const useAutoNodeColumns = ({
 
   const selectedNodeIdsKey = selectedNodes
     .slice(0, maxNodes)
-    .map((n, idx) => resolveNodeId(n, idx))
+    .map((node) => resolveNodeId(node))
     .filter(Boolean)
     .join(',');
 
@@ -219,8 +213,8 @@ export const useAutoNodeColumns = ({
 
     return selectedNodes
       .slice(0, maxNodes)
-      .reduce<Record<string, ColumnOptionInfo>>((acc, node, idx) => {
-        const nodeId = resolveNodeId(node, idx);
+      .reduce<Record<string, ColumnOptionInfo>>((acc, node) => {
+        const nodeId = resolveNodeId(node);
         const infos = normalizeColumns(deriveColumnInfosForRender(node));
         const filtered = allowedDataTypes?.length
           ? filterColumnsByType(infos, allowedDataTypes)

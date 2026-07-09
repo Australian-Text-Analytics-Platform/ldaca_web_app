@@ -248,7 +248,7 @@ function QuotationFeature({
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!result) return;
       const targetNode = displayedNodes[0];
-      const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+      const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
       const selection = activeSelections.find((s) => s.nodeId === nodeId);
       const column = selection?.column ?? '';
       applyContextLengthPreferenceFromResult(result);
@@ -310,8 +310,8 @@ function QuotationFeature({
 
   const hasIncompleteSelections =
     !displayedNodes.length ||
-    displayedNodes.some((node, idx) => {
-      const nodeId = getNodeIdentifier(node, idx);
+    displayedNodes.some((node) => {
+      const nodeId = getNodeIdentifier(node);
       const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
       return !selection?.column;
     });

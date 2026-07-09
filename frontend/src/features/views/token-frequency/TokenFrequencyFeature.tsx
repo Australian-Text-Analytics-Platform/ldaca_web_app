@@ -90,7 +90,6 @@ const TokenFrequencyFeature = ({
   const nodeColumnSelections = nodeInputs.nodeColumnSelections;
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
-  const activeNodeIds = nodeInputs.resolvedNodes.map((r) => r.id);
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
@@ -109,7 +108,7 @@ const TokenFrequencyFeature = ({
   const lastCompareNodeIds = liveLastCompareNodeIds;
   const studyNodeId = liveStudyNodeId;
 
-  const panelNodeIds = derivePanelNodeIds(panelSelectedNodes, activeNodeIds);
+  const panelNodeIds = derivePanelNodeIds(panelSelectedNodes);
   const { effectiveStudyNodeId, orderedPanelNodeIds } = deriveStudyNodeOrder(
     panelNodeIds,
     studyNodeId,

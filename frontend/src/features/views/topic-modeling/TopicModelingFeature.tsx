@@ -73,10 +73,9 @@ function TopicModelingFeature({
   const nodeColumnSelections = nodeInputs.nodeColumnSelections;
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
-  const activeNodeIds = nodeInputs.resolvedNodes.map((node) => node.id);
   const panelNodeIds = panelSelectedNodes
     .slice(0, 2)
-    .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
+    .map((node) => getNodeIdentifier(node))
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
@@ -566,7 +565,7 @@ function TopicModelingFeature({
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
           activeDomain={activeDomain}
-          nodeNames={panelSelectedNodes.map((n) => n.name ?? n.id ?? '').filter(Boolean)}
+          nodeNames={panelSelectedNodes.map((n) => n.name ?? n.id)}
           randomSeed={randomSeed}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}

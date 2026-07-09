@@ -69,13 +69,14 @@ describe('tokenFrequencyUtils', () => {
     expect(buildSelectionNameKey(selected, panel)).toBe('a:Panel A|b:Beta');
   });
 
-  it('derivePanelNodeIds keeps the first two stable ids with active-id fallback', () => {
-    const panelNodes = [{ id: 'node-a' }, {}, { node_id: 'ignored' }];
+  it('derivePanelNodeIds keeps the first two live workspace node ids', () => {
+    const panelNodes = [
+      { id: 'node-a', name: 'Node A' },
+      { id: 'node-b', name: 'Node B' },
+      { id: 'ignored', name: 'Ignored' },
+    ];
 
-    expect(derivePanelNodeIds(panelNodes, ['fallback-a', 'fallback-b', 'fallback-c'])).toEqual([
-      'node-a',
-      'fallback-b',
-    ]);
+    expect(derivePanelNodeIds(panelNodes)).toEqual(['node-a', 'node-b']);
   });
 
   it('deriveStudyNodeOrder defaults to the first node and moves the study node to the comparison end', () => {

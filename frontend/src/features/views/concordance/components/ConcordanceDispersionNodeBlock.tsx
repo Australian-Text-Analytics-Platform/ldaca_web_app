@@ -378,7 +378,7 @@ export function ConcordanceDispersionNodeBlock({
                           )?.column;
                           if (!col) return null;
                           const sourceNode = panelSelectedNodes.find(
-                            (node, idx) => getNodeIdentifier(node, idx) === nid,
+                            (node) => getNodeIdentifier(node) === nid,
                           );
                           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
                           const label = sourceNode?.name || sourceNode?.id || nid;
@@ -441,7 +441,7 @@ export function ConcordanceDispersionNodeBlock({
               const sel =
                 nodeObj && effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
               if (nodeObj && sel?.column) {
-                handleRowClick(row, nodeObj.id ?? '', sel.column, hits);
+                handleRowClick(row, nodeObj.id, sel.column, hits);
               }
             }}
           />

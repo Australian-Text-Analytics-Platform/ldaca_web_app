@@ -136,7 +136,7 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow as a local helper in this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
    */
   const resolveNodeLabel = (nodeId: string): string => {
-    const match = displayedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nodeId);
+    const match = displayedNodes.find((node) => getNodeIdentifier(node) === nodeId);
     // node label fields may be '' and must fall through to the next identifier source
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const rawLabel = match?.name || match?.label || match?.id || nodeId;
@@ -153,7 +153,7 @@ export function useQuotationTaskFlow({
   } | null => {
     const sourceNode = displayedNodes[0];
     if (!sourceNode) return null;
-    const nodeId = getNodeIdentifier(sourceNode, 0);
+    const nodeId = getNodeIdentifier(sourceNode);
     const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
     const column = selection?.column;
     if (!column) return null;
@@ -302,7 +302,7 @@ export function useQuotationTaskFlow({
    */
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+    const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
     if (!nodeId) return;
 
     setIsLoadingQuotations(true);
@@ -321,7 +321,7 @@ export function useQuotationTaskFlow({
    */
   const handlePageChange = async (newPage: number) => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+    const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
     if (!nodeId) {
       baseHandlePageChange(newPage);
       return;
@@ -340,7 +340,7 @@ export function useQuotationTaskFlow({
    */
   const handlePageSizeChange = async (pageSize: number) => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+    const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
     if (!nodeId) {
       baseHandlePageSizeChange(pageSize);
       return;
