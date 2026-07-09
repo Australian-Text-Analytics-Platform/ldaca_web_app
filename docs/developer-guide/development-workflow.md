@@ -47,9 +47,12 @@ Run frontend commands through the root wrapper or with `pnpm -C frontend`:
 pnpm -C frontend build
 pnpm -C frontend test -- --run
 pnpm -C frontend lint
+pnpm -C frontend knip
 ```
 
 Frontend work is not complete until tests and lint have run after the edit.
+Run `knip` after export/dependency cleanup or when removing dead code; it is an
+unused-export/dependency guard, not a replacement for build, tests, or lint.
 The app uses React Compiler, so routine manual memoization is not part of the
 normal development style.
 

@@ -230,9 +230,10 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       : undefined,
     onQueryPlan: selectedNode?.id
       ? async () => {
+          if (!currentWorkspaceId) return null;
           const { data: resp } = await getNodeQueryPlan({
             headers: getAuthHeaders(),
-            path: { node_id: selectedNode.id },
+            path: { workspace_id: currentWorkspaceId, node_id: selectedNode.id },
             throwOnError: true,
           });
           return resp.plan;

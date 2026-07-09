@@ -13,7 +13,7 @@ describe('replaceRequestModel', () => {
     connector: '',
   };
 
-  it('builds replace-all requests with source-column output fallback', () => {
+  it('builds replace-all requests with source-column output default', () => {
     expect(buildReplaceRequest(baseDraft)).toEqual({
       source_column: 'Body',
       pattern: String.raw`\d+`,

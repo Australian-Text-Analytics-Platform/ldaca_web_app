@@ -50,7 +50,7 @@ describe('useFilterCategoricalOptions', () => {
     const key = result.current.getCategoricalKey('speaker');
     expect(getColumnUniqueValuesMock).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer token' },
-      path: { column_name: 'speaker', node_id: 'node-1' },
+      path: { workspace_id: 'workspace-1', column_name: 'speaker', node_id: 'node-1' },
       throwOnError: true,
     });
     expect(result.current.categoricalOptions[key]).toMatchObject({
@@ -109,7 +109,9 @@ describe('useFilterCategoricalOptions', () => {
 
     await waitFor(() => {
       expect(getColumnUniqueValuesMock).toHaveBeenCalledWith(
-        expect.objectContaining({ path: { column_name: 'speaker', node_id: 'node-1' } }),
+        expect.objectContaining({
+          path: { workspace_id: 'workspace-1', column_name: 'speaker', node_id: 'node-1' },
+        }),
       );
     });
 

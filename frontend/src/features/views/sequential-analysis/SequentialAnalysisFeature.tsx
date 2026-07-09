@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { sequentialAnalysisTaskRequest, sequentialAnalysisTaskResult } from '@/api';
 import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
@@ -19,9 +18,11 @@ import {
   useSafeResult,
   executeAnalysisRerun,
 } from '../common';
+import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
+import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import {
   useSequentialAnalysisTaskFlow,
@@ -75,7 +76,7 @@ const SequentialAnalysisFeature = ({
   onTabInputsChange,
 }: SequentialAnalysisFeatureProps = {}) => {
   const queryClient = useQueryClient();
-  const { nodeData, currentWorkspaceId } = useWorkspaceData();
+  const { currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'analysis';
@@ -94,12 +95,17 @@ const SequentialAnalysisFeature = ({
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
-  const selectedNode = nodeInputs.resolvedNodes[0]?.node ?? null;
+  const sourceDocumentCount = (() => {
+    const firstShapeValue = activeNodeId ? nodeInputs.nodeInfoCache[activeNodeId]?.shape?.[0] : null;
+    return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
+      ? firstShapeValue
+      : undefined;
+  })();
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
-    analysisType: 'sequential_analysis',
+    analysisType: ANALYSIS_TAB_GROUPS.sequential,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     taskId: tabTaskId ?? null,
@@ -138,15 +144,12 @@ const SequentialAnalysisFeature = ({
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Use schema management hook
-  const { setLockedSchema, availableColumns, lockCurrentSchema, currentSchemaRef } =
-    useSchemaManagement({
-      nodeId: activeNodeId,
-      isLocked: false,
-      workspaceId: currentWorkspaceId ?? undefined,
-      getAuthHeaders,
-      nodeData,
-      selectedNode: selectedNode ?? undefined,
-    });
+  const { setLockedSchema, availableColumns, lockCurrentSchema } = useSchemaManagement({
+    nodeId: activeNodeId,
+    isLocked: false,
+    workspaceId: currentWorkspaceId ?? undefined,
+    getAuthHeaders,
+  });
 
   const [liveResults, resultRef, setResultSafely, setResults] =
     useSafeResult<Record<string, unknown>>();
@@ -163,8 +166,8 @@ const SequentialAnalysisFeature = ({
     clearResults,
     stopTask,
   } = useAnalysisFeature<Record<string, unknown>>({
-    analysisType: 'sequential_analysis',
-    taskType: 'sequential_analysis',
+    analysisType: ANALYSIS_TAB_GROUPS.sequential,
+    taskType: ANALYSIS_TASK_TYPES.sequential,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
@@ -175,22 +178,19 @@ const SequentialAnalysisFeature = ({
     // Loads the latest sequential-analysis result for polling and task resumption.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
-      const { data } = await sequentialAnalysisTaskResult({
-        headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskResult<Record<string, unknown>>(currentWorkspaceId, taskId, headers);
     },
     // Retrieves the submitted request so hydration can restore parameters and locks.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
-      const { data } = await sequentialAnalysisTaskRequest({
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskRequest(
+        ANALYSIS_TAB_GROUPS.sequential,
+        currentWorkspaceId,
+        taskId,
         headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      );
     },
     // Applies freshly fetched task results to chart state after lifecycle polling completes.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
@@ -249,34 +249,28 @@ const SequentialAnalysisFeature = ({
       > | null;
       if (!req) return;
       setHydratingSelection(true);
-      const hydrated = sequentialParameters.applyHydratedRequest(req);
-      const nodeIdStr = hydrated.nodeId;
-      const reqTimeColumn = hydrated.state.timeColumn;
-      if (nodeIdStr && reqTimeColumn) {
-        if (!tabInputs || tabInputs.length === 0) {
-          applyInputsFromSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+      try {
+        const hydrated = sequentialParameters.applyHydratedRequest(req);
+        const nodeIdStr = hydrated.nodeId;
+        const reqTimeColumn = hydrated.state.timeColumn;
+        if (nodeIdStr && reqTimeColumn) {
+          if (!tabInputs || tabInputs.length === 0) {
+            applyInputsFromSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+          }
         }
-      }
-      hydratedParamsRef.current = hydrated.hydratedParams;
-      if (nodeIdStr && currentWorkspaceId) {
-        try {
+        hydratedParamsRef.current = hydrated.hydratedParams;
+        if (nodeIdStr && currentWorkspaceId) {
           const info = await fetchNodeInfo({
             queryClient,
             workspaceId: currentWorkspaceId,
             nodeId: nodeIdStr,
             getAuthHeaders,
           });
-          const normalizedSchema = normalizeSchemaFromInfo(info);
-          if (Object.keys(normalizedSchema).length > 0) {
-            setLockedSchema(normalizedSchema);
-          } else {
-            setLockedSchema((prev) => prev ?? currentSchemaRef.current);
-          }
-        } catch {
-          setLockedSchema((prev) => prev ?? currentSchemaRef.current);
+          setLockedSchema(normalizeSchemaFromInfo(info));
         }
+      } finally {
+        setHydratingSelection(false);
       }
-      setHydratingSelection(false);
     },
     // Clears sequential-specific state after the shared lifecycle removes the task result.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -528,7 +522,7 @@ const SequentialAnalysisFeature = ({
     chartData,
     selectedPeriodIndices,
     resultTotalRecords: results?.total_records,
-    sourceDocumentCount: panelSelectedNodes[0]?.shape?.[0],
+    sourceDocumentCount,
   });
 
   const resultsSummary = summaryTimeColumn

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-import type { AuthInfoResponse, ConfigResponse } from '@/api';
+import type { AuthInfoResponse, RuntimeConfigResponse } from '@/api';
 
 // ---------- API mocks (hoisted so they're in place before the auth store
 // imports the generated SDK; `runAuthFetch` would otherwise hit the network
@@ -9,7 +9,7 @@ import type { AuthInfoResponse, ConfigResponse } from '@/api';
 
 const generatedApiMock = vi.hoisted(() => ({
   getAuthInfo: vi.fn<(...args: unknown[]) => Promise<{ data: AuthInfoResponse }>>(),
-  getConfig: vi.fn<() => Promise<{ data: ConfigResponse }>>(),
+  getRuntimeConfig: vi.fn<() => Promise<{ data: RuntimeConfigResponse }>>(),
   googleAuth: vi.fn<(...args: unknown[]) => Promise<{ data: { access_token: string } }>>(),
   logout: vi.fn<(...args: unknown[]) => Promise<{ data: unknown }>>(),
 }));
@@ -28,11 +28,11 @@ const buildAuthInfo = (overrides: Partial<AuthInfoResponse> = {}): AuthInfoRespo
 
 /** Builds config fixtures for auth-mode tests without repeating generated response fields. */
 /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-const buildConfig = (overrides: Partial<ConfigResponse> = {}): ConfigResponse =>
+const buildConfig = (overrides: Partial<RuntimeConfigResponse> = {}): RuntimeConfigResponse =>
   ({
     multi_user_mode: true,
     ...overrides,
-  }) as ConfigResponse;
+  });
 
 // Each test wants a clean module instance: the Zustand auth store is created
 // at module load, plus a few imperative module-locals (`bootstrapAttempts`,
@@ -50,7 +50,7 @@ describe('useAuth', () => {
   beforeEach(() => {
     vi.resetModules();
     generatedApiMock.getAuthInfo.mockReset();
-    generatedApiMock.getConfig.mockReset();
+    generatedApiMock.getRuntimeConfig.mockReset();
     generatedApiMock.googleAuth.mockReset();
     generatedApiMock.logout.mockReset();
     window.localStorage.clear();
@@ -65,7 +65,7 @@ describe('useAuth', () => {
     const info = buildAuthInfo();
     const config = buildConfig();
     generatedApiMock.getAuthInfo.mockResolvedValue({ data: info });
-    generatedApiMock.getConfig.mockResolvedValue({ data: config });
+    generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: config });
 
     const { useAuth } = await importUseAuth();
 
@@ -81,12 +81,12 @@ describe('useAuth', () => {
     expect(result.current.requiresAuthentication).toBe(true);
     expect(result.current.isLoading).toBe(false);
     expect(generatedApiMock.getAuthInfo).toHaveBeenCalledTimes(1);
-    expect(generatedApiMock.getConfig).toHaveBeenCalledTimes(1);
+    expect(generatedApiMock.getRuntimeConfig).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces a bootstrap failure as phase=bootstrapping with an error message', async () => {
     generatedApiMock.getAuthInfo.mockRejectedValue(new Error('boom'));
-    generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
+    generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
     const { useAuth } = await importUseAuth();
     const { result } = renderHook(() => useAuth({ autoStart: true }));
@@ -103,7 +103,7 @@ describe('useAuth', () => {
 
   it('does not bootstrap when autoStart=false; refreshAuth triggers it on demand', async () => {
     generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo() });
-    generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
+    generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
     const { useAuth } = await importUseAuth();
     const { result } = renderHook(() => useAuth({ autoStart: false }));
@@ -127,7 +127,7 @@ describe('useAuth', () => {
       generatedApiMock.getAuthInfo.mockResolvedValue({
         data: buildAuthInfo({ requires_authentication: true }),
       });
-      generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
+      generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
@@ -143,7 +143,7 @@ describe('useAuth', () => {
       generatedApiMock.getAuthInfo.mockResolvedValue({
         data: buildAuthInfo({ requires_authentication: true }),
       });
-      generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
+      generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
@@ -159,7 +159,7 @@ describe('useAuth', () => {
       generatedApiMock.getAuthInfo.mockResolvedValue({
         data: buildAuthInfo({ requires_authentication: false }),
       });
-      generatedApiMock.getConfig.mockResolvedValue({ data: buildConfig() });
+      generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
       const { useAuth } = await importUseAuth();
       const { result } = renderHook(() => useAuth({ autoStart: true }));
@@ -175,7 +175,7 @@ describe('useAuth', () => {
     it('calls generated logout with the current bearer headers, clears the token, and refetches', async () => {
       window.localStorage.setItem('auth_token', 'tok-9');
       generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo() });
-      generatedApiMock.getConfig.mockResolvedValue({
+      generatedApiMock.getRuntimeConfig.mockResolvedValue({
         data: buildConfig({ multi_user_mode: true }),
       });
       (generatedApiMock.logout as Mock).mockResolvedValue({ data: undefined });
@@ -207,7 +207,7 @@ describe('useAuth', () => {
       generatedApiMock.getAuthInfo.mockResolvedValue({
         data: buildAuthInfo({ requires_authentication: false }),
       });
-      generatedApiMock.getConfig.mockResolvedValue({
+      generatedApiMock.getRuntimeConfig.mockResolvedValue({
         data: buildConfig({ multi_user_mode: false }),
       });
 
@@ -230,7 +230,7 @@ describe('useAuth', () => {
       generatedApiMock.getAuthInfo.mockResolvedValue({
         data: buildAuthInfo({ requires_authentication: false }),
       });
-      generatedApiMock.getConfig.mockResolvedValue({
+      generatedApiMock.getRuntimeConfig.mockResolvedValue({
         data: buildConfig({ multi_user_mode: false }),
       });
 
@@ -250,7 +250,7 @@ describe('useAuth', () => {
       generatedApiMock.getAuthInfo.mockResolvedValue({
         data: buildAuthInfo({ authenticated: false, user: null }),
       });
-      generatedApiMock.getConfig.mockResolvedValue({
+      generatedApiMock.getRuntimeConfig.mockResolvedValue({
         data: buildConfig({ multi_user_mode: true }),
       });
       (generatedApiMock.googleAuth as Mock).mockResolvedValue({

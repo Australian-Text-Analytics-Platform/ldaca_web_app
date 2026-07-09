@@ -1,8 +1,13 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getCurrentWorkspace, getNodeData, getWorkspaceGraph, listWorkspaces } from '@/api';
+import {
+  getMyCurrentWorkspace,
+  getNodeDataByWorkspaceId,
+  getWorkspaceGraphById,
+  listWorkspaces,
+} from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
-import type { WorkspaceNodeInfo as GraphNode, NodeDataResponse } from '@/api';
+import type { WorkspaceGraphNode as GraphNode, NodeDataResponse } from '@/api';
 import { type PaginationState } from './types';
 
 // Frozen module-scope fallback so every "no node selected" render shares
@@ -72,7 +77,7 @@ export const useWorkspaceQueries = ({
      * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
      */
     queryFn: async () => {
-      const { data } = await getCurrentWorkspace({ headers: authHeaders, throwOnError: true });
+      const { data } = await getMyCurrentWorkspace({ headers: authHeaders, throwOnError: true });
       return data.id ?? null;
     },
     enabled: isAuthenticated,
@@ -89,7 +94,12 @@ export const useWorkspaceQueries = ({
      * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
      */
     queryFn: async () => {
-      const { data } = await getWorkspaceGraph({ headers: authHeaders, throwOnError: true });
+      if (!currentWorkspaceId) throw new Error('Missing workspace ID');
+      const { data } = await getWorkspaceGraphById({
+        headers: authHeaders,
+        path: { workspace_id: currentWorkspaceId },
+        throwOnError: true,
+      });
       return data;
     },
     enabled: isAuthenticated && !!currentWorkspaceId,
@@ -118,9 +128,9 @@ export const useWorkspaceQueries = ({
       if (!currentWorkspaceId || !selectedNodeId) throw new Error('Missing workspace or node ID');
       const { currentPage, pageSize, sortBy, descending, filterColumn, filterValue, filterOp } =
         getPaginationForNode(selectedNodeId);
-      return getNodeData({
+      return getNodeDataByWorkspaceId({
         headers: authHeaders,
-        path: { node_id: selectedNodeId },
+        path: { workspace_id: currentWorkspaceId, node_id: selectedNodeId },
         query: {
           page: currentPage,
           page_size: pageSize,

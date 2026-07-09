@@ -4,6 +4,7 @@ import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
 } from '@/features/views/common/nodeSelectionTypes';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   ConcatNodeSummary,
@@ -16,8 +17,6 @@ import { MAX_CONCAT_NODES } from '../../types';
 import {
   buildWorkspaceNodeMap,
   deriveNodeLabel,
-  extractNodeColumns,
-  extractNodeDtypes,
   getNodeKey,
 } from '../../utils/nodeMetadata';
 import { dedupeNodeIds, takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
@@ -37,6 +36,7 @@ export interface ConcatSubTabProps {
   selectedNodeIds: string[];
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeLike[];
+  getColumnInfos: (node: WorkspaceNodeLike) => ColumnInfo[];
   concatNodes: (nodeIds: string[], newNodeName?: string, deduplicate?: boolean) => Promise<unknown>;
   concatPreview: (
     nodeIds: string[],
@@ -124,13 +124,19 @@ const noop = () => undefined;
  * Steps: derive display labels, collect unique columns, normalize dtype lookup keys, and
  * return the metadata needed by preview/apply paths.
  */
-const buildConcatNodeSummaries = (nodes: WorkspaceNodeLike[]): ConcatNodeSummary[] => {
+const buildConcatNodeSummaries = (
+  nodes: WorkspaceNodeLike[],
+  getColumnInfos: (node: WorkspaceNodeLike) => ColumnInfo[],
+): ConcatNodeSummary[] => {
   return nodes.map((node) => {
     const nodeId = getNodeKey(node);
     const displayName = deriveNodeLabel(node) || nodeId;
 
-    const columns = extractNodeColumns(node);
-    const rawDtypes = extractNodeDtypes(node);
+    const columnInfos = getColumnInfos(node);
+    const columns = columnInfos.map((column) => column.name);
+    const rawDtypes = Object.fromEntries(
+      columnInfos.map((column) => [column.name, column.dataType]),
+    );
 
     const uniqueColumns = Array.from(new Set(columns));
     const normalizedColumns = uniqueColumns.toSorted((a, b) => a.localeCompare(b));
@@ -259,6 +265,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     selectedNodeIds,
     currentWorkspaceId,
     workspaceNodes,
+    getColumnInfos,
     concatPreview,
     concatNodes,
     isLoading,
@@ -281,7 +288,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
       .filter((node): node is WorkspaceNodeLike => Boolean(node));
   })();
 
-  const concatNodeSummaries = buildConcatNodeSummaries(concatSelectedNodes);
+  const concatNodeSummaries = buildConcatNodeSummaries(concatSelectedNodes, getColumnInfos);
 
   const concatAnalysis = analyzeSchema(concatNodeSummaries);
 
@@ -359,20 +366,6 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     signature: concatPreviewSignature,
     fetcher: concatPreviewFetcher,
   });
-
-  const concatPreviewColumnsToRender = (() => {
-    if (concatPreviewColumns.length > 0) return concatPreviewColumns;
-    if (
-      concatPreviewData.length > 0 &&
-      typeof concatPreviewData[0] === 'object' &&
-      // preview rows come from the API; keep the explicit null guard.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      concatPreviewData[0] !== null
-    ) {
-      return Object.keys(concatPreviewData[0]);
-    }
-    return [];
-  })();
 
   /**
    * Resets preview pagination when the user changes rows per page.
@@ -467,7 +460,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     extraSelectionMessage,
     analysis: concatAnalysis,
     preview: {
-      columns: concatPreviewColumnsToRender,
+      columns: concatPreviewColumns,
       data: concatPreviewData,
       pagination: concatPreviewPagination,
       loading: concatPreviewLoading,

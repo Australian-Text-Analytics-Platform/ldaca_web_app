@@ -12,7 +12,7 @@ import {
 } from '@xyflow/react';
 
 import CustomNode from '@/features/workspace/graph-view/components/CustomNode';
-import type { WorkspaceNodeInfo as GraphNode, WorkspaceGraphEdge as GraphEdge } from '@/api';
+import type { WorkspaceGraphNode as GraphNode, WorkspaceGraphEdge as GraphEdge } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -195,33 +195,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     );
 
     return workspaceGraph.nodes.map((node: GraphNode, index: number) => {
-      const columns = Array.isArray(node.columns)
-        ? node.columns.map((column: unknown) => String(column))
-        : [];
-
-      const columnSchema =
-        node.schema && typeof node.schema === 'object'
-          ? Object.entries(node.schema as Record<string, unknown>).reduce<Record<string, string>>(
-              (acc, [key, value]) => {
-                acc[key] = String(value);
-                return acc;
-              },
-              {},
-            )
-          : {};
-
       const documentColumn =
         typeof node.document === 'string' && node.document.trim().length > 0 ? node.document : null;
-
-      const shapeCandidate = (node as { shape?: unknown[] }).shape;
-      const rawShape: unknown[] | null = Array.isArray(shapeCandidate) ? shapeCandidate : null;
-      const parsedShape: [number | null, number | null] =
-        rawShape && rawShape.length >= 2
-          ? [
-              typeof rawShape[0] === 'number' ? rawShape[0] : null,
-              typeof rawShape[1] === 'number' ? rawShape[1] : null,
-            ]
-          : [null, null];
 
       const position = positions.get(node.id) ?? { x: index * 320, y: 50 };
 
@@ -236,8 +211,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             // Carry the persisted colour through so CustomNode can paint the
             // left accent; backend omits it (null) for uncoloured nodes.
             color: node.color ?? null,
-            shape: parsedShape,
-            columns,
+            shape: [null, null],
+            columns: [],
             preview: [],
             is_text_data: Boolean(documentColumn),
             data_type: 'LazyFrame',
@@ -245,7 +220,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             can_redo: Boolean(node.can_redo),
             document: documentColumn,
             document_column: documentColumn,
-            column_schema: columnSchema,
+            column_schema: {},
           },
           isMultiSelected: selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
           isFresh: freshIds.has(node.id),

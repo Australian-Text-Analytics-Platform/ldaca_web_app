@@ -1,9 +1,10 @@
-import type { ConfigResponse, NodeDataResponse, UserPreferences } from '@/api';
+import type { NodeDataResponse, RuntimeConfigResponse, UserPreferences } from '@/api';
 
-/** Builds backend config responses for MSW handlers while letting tests override fields. */
+/** Builds backend runtime-config responses for MSW handlers while letting tests override fields. */
 /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-export const configResponse = (overrides: Partial<ConfigResponse> = {}): ConfigResponse => ({
-  data_root: '/tmp/ldaca-wordflow',
+export const configResponse = (
+  overrides: Partial<RuntimeConfigResponse> = {},
+): RuntimeConfigResponse => ({
   multi_user_mode: false,
   ...overrides,
 });
@@ -24,7 +25,7 @@ export const preferencesResponse = (overrides: Partial<UserPreferences> = {}): U
 
 /**
  * Builds a minimal paginated node-data response for shared component tests.
- * Used by: MSW handlers for generated `getNodeData` calls because language
+ * Used by: MSW handlers for generated node-data calls because language
  * detection, table, and selector tests need a normal backend-shaped page.
  * Flow: return one text row plus pagination/sorting metadata, then let tests
  * override fields for feature-specific fixtures.

@@ -46,7 +46,12 @@ export function useLastRunRequest({ analysisType, workspaceId, getAuthHeaders, t
         return empty;
       }
       try {
-        const request = await getAnalysisTaskRequest(analysisType, taskId, getAuthHeaders());
+        const request = await getAnalysisTaskRequest(
+          analysisType,
+          workspaceId,
+          taskId,
+          getAuthHeaders(),
+        );
         const serverRequest =
           request && typeof request === 'object' ? (request as Record<string, unknown>) : null;
         return {

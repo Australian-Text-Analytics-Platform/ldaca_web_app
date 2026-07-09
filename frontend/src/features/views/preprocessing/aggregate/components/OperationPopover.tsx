@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 interface OperationPopoverProps {
+  workspaceId: string | null;
   nodeId: string;
   column: string;
   onSelect: (operation: string) => void;
@@ -26,6 +27,7 @@ interface OperationPopoverProps {
  * and expose removal controls for existing operations.
  */
 export function OperationPopover({
+  workspaceId,
   nodeId,
   column,
   onSelect,
@@ -40,11 +42,11 @@ export function OperationPopover({
 
   useEffect(() => {
     if (!open) return;
-    if (!nodeId || !column) return;
+    if (!workspaceId || !nodeId || !column) return;
     let cancelled = false;
     columnOperations({
       headers: getAuthHeaders(),
-      path: { column_name: column, node_id: nodeId },
+      path: { workspace_id: workspaceId, column_name: column, node_id: nodeId },
       throwOnError: true,
     })
       .then((res) => {
@@ -56,7 +58,7 @@ export function OperationPopover({
     return () => {
       cancelled = true;
     };
-  }, [open, nodeId, column, getAuthHeaders]);
+  }, [open, workspaceId, nodeId, column, getAuthHeaders]);
 
   /**
    * Applies the chosen operation to the parent token and closes the popover.

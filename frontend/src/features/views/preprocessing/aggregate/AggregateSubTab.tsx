@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { getNodeDocumentColumn } from '../utils/nodeMetadata';
+import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
 import { OperationPopover } from './components/OperationPopover';
 import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
@@ -36,13 +36,11 @@ export function AggregateSubTab(props: AggregateSubTabComponentProps) {
 const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string => {
   const [selectedNode] = takeMostRecent(props.selectedNodes, 1);
   if (selectedNode) {
-    // Empty-string ids should fall through to the next candidate, so keep `||`.
+    // Empty-string ids should fall through to the backend node_id, so keep `||`.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    return selectedNode.id || selectedNode.node_id || props.selectedNodeId || 'none';
+    return selectedNode.id || selectedNode.node_id || 'none';
   }
-  // Empty selectedNodeId should fall back to 'none', so keep `||`.
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  return props.selectedNodeId || 'none';
+  return 'none';
 };
 
 /**
@@ -223,6 +221,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                                 )
                               ) : (
                                 <OperationPopover
+                                  workspaceId={props.currentWorkspaceId}
                                   nodeId={
                                     nodeSelection.effectiveNodes[0]?.id ??
                                     nodeSelection.effectiveNodes[0]?.node_id ??

@@ -6,16 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceTabsState } from '@/api';
 import { useWorkspaceTabs } from '../useWorkspaceTabs';
 
-const { getWorkspaceTabsMock, putWorkspaceTabsMock, clearTasksMock } = vi.hoisted(() => ({
+const { getWorkspaceTabsMock, putWorkspaceTabsMock, clearTaskMock } = vi.hoisted(() => ({
   getWorkspaceTabsMock: vi.fn(),
   putWorkspaceTabsMock: vi.fn(),
-  clearTasksMock: vi.fn(),
+  clearTaskMock: vi.fn(),
 }));
 
 vi.mock('@/api/generated/sdk.gen', () => ({
   getWorkspaceTabs: getWorkspaceTabsMock,
   putWorkspaceTabs: putWorkspaceTabsMock,
-  clearTasks: clearTasksMock,
+  clearTask: clearTaskMock,
 }));
 
 const ANALYSIS_TYPE = 'concordance_analysis';
@@ -53,8 +53,8 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
     putWorkspaceTabsMock.mockImplementation(({ body }: { body: WorkspaceTabsState }) =>
       Promise.resolve({ data: body, error: undefined }),
     );
-    clearTasksMock.mockReset();
-    clearTasksMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
+    clearTaskMock.mockReset();
+    clearTaskMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
   });
 
   it('clears the backend task when a tab that owns a task id is closed', async () => {
@@ -71,14 +71,14 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
       result.current.closeTab('tab-with-task');
     });
 
-    expect(clearTasksMock).toHaveBeenCalledWith({
+    expect(clearTaskMock).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer t' },
-      query: { task_id: 'task-1' },
+      path: { task_id: 'task-1' },
       throwOnError: true,
     });
   });
 
-  it('does not call clearTasks when the closed tab owns no task id', async () => {
+  it('does not call clearTask when the closed tab owns no task id', async () => {
     const { result } = renderHook(
       () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE, () => ({})),
       { wrapper: makeWrapper() },
@@ -92,7 +92,7 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
       result.current.closeTab('tab-no-task');
     });
 
-    expect(clearTasksMock).not.toHaveBeenCalled();
+    expect(clearTaskMock).not.toHaveBeenCalled();
   });
 });
 
@@ -104,8 +104,8 @@ describe('useWorkspaceTabs setTabSetting', () => {
     putWorkspaceTabsMock.mockImplementation(({ body }: { body: WorkspaceTabsState }) =>
       Promise.resolve({ data: body, error: undefined }),
     );
-    clearTasksMock.mockReset();
-    clearTasksMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
+    clearTaskMock.mockReset();
+    clearTaskMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
   });
 
   it('persists a free-form tab setting through to the PUT body', async () => {

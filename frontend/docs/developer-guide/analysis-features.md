@@ -11,6 +11,12 @@ Tabbed analysis views are hosted by
 workspace's `tabs.json` sidecar through `useWorkspaceTabs` before rendering the
 active feature. Each persisted tab owns:
 
+Canonical tab-group and task-type ids live in
+`src/features/views/common/analysisIds.ts`. Tabbed wrappers, feature
+`useAnalysisFeature` configs, task-request hydration, and task-stream filtering
+should import `ANALYSIS_TAB_GROUPS` / `ANALYSIS_TASK_TYPES` instead of repeating
+string literals.
+
 - `tab_id`: the UI identity and React key for that tab;
 - `task_id`: the optional backend task/result the tab currently shows;
 - `title`: the tab label;
@@ -144,18 +150,20 @@ state.
 
 Each selected node card renders a tokenizer model selector next to the text
 column selector. Selecting a document column persists `Node.document` through
-`PUT /workspaces/nodes/{node_id}/document-column`; other document-oriented
-analysis selectors use the same endpoint instead of mutating node metadata in
-their submit routes. The tokenizer selector samples the first page of the
-selected column via `GET /workspaces/nodes/{node_id}/data`, runs MediaPipe
-Language Detector in the browser, normalizes the result to ISO 639-1, and fetches
-the backend tokenizer inventory from `GET /workspaces/tokenizer-models` when the
+`PUT /workspaces/{workspace_id}/nodes/{node_id}/document-column`; other
+document-oriented analysis selectors use the same endpoint instead of mutating
+node metadata in their submit routes. The tokenizer selector samples the first
+page of the selected column via
+`GET /workspaces/{workspace_id}/nodes/{node_id}/data`, runs MediaPipe Language
+Detector in the browser, normalizes the result to ISO 639-1, and fetches the
+backend tokenizer inventory from `GET /workspaces/tokenizer-models` when the
 dropdown opens. Models whose backend-provided `languages` include the detected
 code are rendered first in a recommended group. Choosing a model calls
-`PUT /workspaces/nodes/{node_id}/tokenization-preference`, so token frequency
-requests rely on `Node.tokenization` metadata rather than sending frontend-owned
-model maps. Choosing the placeholder model clears that column's tokenization
-preference; choosing the placeholder column clears `Node.document`. Default
+`PUT /workspaces/{workspace_id}/nodes/{node_id}/tokenization-preference`, so
+token frequency requests rely on `Node.tokenization` metadata rather than
+sending frontend-owned model maps. Choosing the placeholder model clears that
+column's tokenization preference; choosing the placeholder column clears
+`Node.document`. Default
 stop-word filling is client-side: saved ISO 639-1 language metadata is converted
 to ISO 639-3 before reading the matching `stopword` package list.
 
@@ -221,7 +229,7 @@ option. Class descriptions use the same `useTabNodeInputs` hook with the
 `classDescriptions` selector id and persist under `input_sets.classDescriptions`.
 The class-description selector and a compact class summary live in one analysis
 card. The `Add new` button calls
-`POST /api/workspaces/annotation/class-descriptions`, which creates an empty
+`POST /api/workspaces/{workspace_id}/annotation/class-descriptions`, which creates an empty
 two-column `class`/`description` data block in the active workspace and selects
 it for the class-description panel. The card shows the configured class names as
 compact badges (descriptions hidden, extras collapsed into a `+N more` badge);
@@ -230,8 +238,8 @@ hover tooltip (badges without a description render bare, with no tooltip). An
 `Edit` button opens a dialog that lists every `class`/`description` row with
 per-row inputs, a trash button to delete a class, and an `Add class` button to
 append one. The dialog fetches and saves through
-`GET /api/workspaces/annotation/class-descriptions/{node_id}` and
-`PUT /api/workspaces/annotation/class-descriptions/{node_id}`, persisting each
+`GET /api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}` and
+`PUT /api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}`, persisting each
 class/description edit on blur and each add/delete immediately (the whole node is
 rewritten). The `Edit` button stays enabled even after annotation has started so
 reviewers can amend classes on the go (it only greys out while the class list is
@@ -246,10 +254,10 @@ class-description selector only accepts tables with exactly two string columns
 
 Pressing `Start` in `Start new annotation` mode does three things in
 `handleRunAnnotation`: (1) it creates the empty string annotation column on the
-source node via `POST /api/workspaces/annotation/source/{node_id}/annotation-column`
+source node via `POST /api/workspaces/{workspace_id}/annotation/source/{node_id}/annotation-column`
 (the request name is the `New Column Name` value or its default); (2) it reparents
 the class node under the source node via
-`PUT /api/workspaces/annotation/class-descriptions/{node_id}/parent`; and (3)
+`PUT /api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}/parent`; and (3)
 after invalidating the graph/nodes/node-data queries it points the source
 annotation-column dropdown at the newly created column, switching the card from
 start-new mode into resume mode. `Resume` skips column creation and just reveals
@@ -266,7 +274,7 @@ horizontal scroll, TanStack server pagination); each annotation cell is a
 dropdown of class names from the class-description node plus a leading `None`
 option (Resume seeds the existing value, new starts blank). Picking a class
 persists that cell to the backend annotation column via
-`PUT /api/workspaces/annotation/source/{node_id}/annotation-cell` (body
+`PUT /api/workspaces/{workspace_id}/annotation/source/{node_id}/annotation-cell` (body
 `column_name`, absolute `row_index`, and `value`; `None`/blank sends `null`).
 The dropdown updates optimistically and the panel invalidates the node-data
 query on success so other views see the saved value; on failure it rolls the
@@ -292,7 +300,7 @@ throughout, since it is never gated by `isLocked`); the panel only opens once th
 run is locked so its first page fetch already sees the new column. `Close preview`
 hides the panel and unlocks the parameter panel (like manual Reset) while keeping
 the source pointed at the created column, so re-opening resumes that column and
-never recreates it. Closing also fires `/annotation/ai/preview/clear`
+never recreates it. Closing also fires `/api/workspaces/{workspace_id}/annotation/ai/preview/clear`
 (`annotateAiPreviewClear`) to drop the node's **server-side** preview session —
 the deliberate asymmetry versus a tab switch, which only unmounts the panel and
 keeps the cache so it can rehydrate — so a re-open re-classifies from scratch and
@@ -308,7 +316,7 @@ URL; saving writes API keys/custom endpoints to preferences and per-card models
 to tab settings. The provider catalogue lives in `annotation/aiProviders.ts`,
 which is pure metadata for display names, key requirements, built-in category
 mapping, and model-list support. Actual LLM traffic (preview and annotate-all)
-runs server-side under `/annotation/ai/*`; OpenRouter's public model catalogue is
+runs server-side under `/api/workspaces/{workspace_id}/annotation/ai/*`; OpenRouter's public model catalogue is
 the exception and is fetched client-side by `ModelNameCombobox` so the dropdown
 can show input/output prices from `GET https://openrouter.ai/api/v1/models`.
 The four hosted providers (OpenRouter/OpenAI/Anthropic/Google) are static;
@@ -318,7 +326,7 @@ resolve back to their category for backend requests, while custom providers use
 `fm serve`, Ollama, and LM Studio often need none). `ModelNameCombobox` renders
 the model field: OpenRouter uses the direct client fetch with pricing; other
 listable providers fetch lazily through React Query by calling the backend
-(`listAnnotationAiModels` -> `POST /annotation/ai/models`, keyed by provider +
+(`listAnnotationAiModels` -> `POST /api/workspaces/{workspace_id}/annotation/ai/models`, keyed by provider +
 base URL + key, enabled only while the popover is open and the key requirement
 is met). The list is wildcard-filtered as the user types, clicking a row fills
 the field, and the input stays free-text either way, so a custom endpoint that
@@ -363,7 +371,7 @@ custom endpoint definitions used by existing/legacy configuration surfaces.
 
 The `Preview` button runs AI annotation through the backend via
 `AnnotationAiPreviewPanel`. For the current page of the source node (20 rows per
-page) it POSTs `/annotation/ai/preview` (`annotateAiPreview`) with the source
+page) it POSTs `/api/workspaces/{workspace_id}/annotation/ai/preview` (`annotateAiPreview`) with the source
 node id, text column, class node/columns, provider id + optional custom base
 URL, API key, model, instruction, and page — and renders the structured per-row
 class predictions the backend returns (`{"labels":[...]}` aligned to the page's
@@ -397,7 +405,7 @@ survives tab switches but is cleared on backend restart.
 That store makes the panel **survive tab switches** like concordance/quotation.
 `AnnotationFeature` persists an `aiPreviewOpen` tab setting (so `isPreviewing`
 re-seeds and the panel reopens on remount), and on mount the panel fires a
-`/annotation/ai/preview/state` (`annotateAiPreviewState`) query — keyed by the
+`/api/workspaces/{workspace_id}/annotation/ai/preview/state` (`annotateAiPreviewState`) query — keyed by the
 same signature config, minus annotation column and page, and set to
 `refetchOnMount: 'always'` — that folds every genuine override back into
 `selections` inside its `queryFn`. The AI labels themselves come back through the
@@ -407,7 +415,7 @@ local `selections` map is wiped on unmount; that is why the state query force-
 refetches on mount. Leaving the tab and coming back therefore restores every
 previewed page, its labels, and any manual edits. Each prediction cell is still a
 dropdown seeded from the model's label that the user can override; changing it
-writes through to the store via `PUT /annotation/ai/preview/override`
+writes through to the store via `PUT /api/workspaces/{workspace_id}/annotation/ai/preview/override`
 (`annotateAiPreviewOverride`) so the edit persists too. When a previewed row
 already holds a value in the annotation column (previewing over an existing or
 partly filled column), that existing label is rendered struck through beside the
@@ -415,7 +423,7 @@ AI prediction dropdown, so overwriting a pre-filled cell is obvious; a freshly
 created `Start new annotation` column is empty, so nothing is struck through.
 
 The preview panel's footer also has an **Annotate All** button that persists a
-full run: it POSTs `/annotation/ai/annotate-all` (`annotateAiAll`), where the
+full run: it POSTs `/api/workspaces/{workspace_id}/annotation/ai/annotate-all` (`annotateAiAll`), where the
 backend reuses the store's cached labels for already-previewed rows and fans only
 the remainder out over concurrent batches (`asyncio.gather` under a semaphore,
 order preserved), overwrites the whole annotation column in one go via
@@ -438,7 +446,7 @@ gone on remount, so the panel asks the server (the source of truth) instead. The
 probe uses `refetchOnMount: 'always'` (re-enables on tab return), the per-page
 annotate query invalidates its key as new pages are previewed (the count climbs
 live), and Annotate All resets it to `0`. Confirming POSTs
-`/annotation/ai/detach-previewed` (`detachAiPreviewedRows`) with just the node +
+`/api/workspaces/{workspace_id}/annotation/ai/detach-previewed` (`detachAiPreviewedRows`) with just the node +
 column (no `dry_run`), and the endpoint reads the whole preview session (effective
 label = override ?? AI) — which also fixes the earlier "detach only grabs the
 current page" bug. The endpoint copies exactly those source rows into a **new
@@ -494,7 +502,13 @@ The minimum task-backed contract is:
   `onTabInputsChange` from `AnalysisTabFeatureProps`; accept `tabInputSets`
   and `onTabInputSetChange` only when the view has multiple node selectors;
 - pass `tabTaskId ?? null` as `hydrationTaskId` to `useAnalysisFeature`;
-- implement `fetchRequest` and `fetchResult` for the analysis task endpoints;
+- implement `fetchRequest` and `fetchResult` through the shared
+  `/workspaces/{workspace_id}/analysis-tasks/{task_id}/request` and
+  `/result` endpoints;
+- send task follow-up actions through the same shared task namespace:
+  `detach-options`, `detachments`, `dispersion-bins`,
+  `dispersion-detachments`, and `materializations` as applicable, with node ids
+  in the query/body and the parent task id in the path;
 - call `onTabTaskChange(taskId)` when a run assigns a backend task id;
 - call `onTabTaskChange(null)` when Clear Results removes the tab's task;
 - use `tabInputs`/`input_sets.source` as the only source-selector state,

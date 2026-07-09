@@ -90,7 +90,7 @@ export function useFileBrowserActions({
         query: { path: readmePath },
         throwOnError: true,
       });
-      const rawContent = data as string;
+      const rawContent = data;
       dispatchCitation({ type: 'loaded', content: rawContent });
     } catch (error) {
       dispatchCitation({ type: 'failed' });

@@ -1,14 +1,14 @@
-import type { QuotationEngineConfigInput, QuotationEngineType } from '@/api';
+import type { QuotationEngineConfig, QuotationEngineType } from '@/api';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface QuotationEngineSettingsFieldsProps {
   idPrefix: string;
-  engineConfig: QuotationEngineConfigInput;
+  engineConfig: QuotationEngineConfig;
   lastRemoteUrl: string;
   error?: string | null;
-  onEngineConfigChange: (config: QuotationEngineConfigInput) => void;
+  onEngineConfigChange: (config: QuotationEngineConfig) => void;
   onRemoteUrlChange: (url: string) => void;
   className?: string;
 }

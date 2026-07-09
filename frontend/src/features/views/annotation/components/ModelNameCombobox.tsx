@@ -38,6 +38,7 @@ interface ModelDropdownOption {
 }
 
 interface ModelNameComboboxProps {
+  workspaceId: string | null;
   provider: AnnotationAiProvider;
   apiKey: string;
   value: string;
@@ -143,6 +144,7 @@ function modelMatchesQuery(option: ModelDropdownOption, query: string): boolean 
 }
 
 export function ModelNameCombobox({
+  workspaceId,
   provider,
   apiKey,
   value,
@@ -164,6 +166,7 @@ export function ModelNameCombobox({
   const modelsQuery = useQuery<ModelDropdownOption[]>({
     queryKey: [
       'annotation-ai-models',
+      workspaceId ?? '',
       provider.id,
       provider.requestProviderId,
       provider.baseUrl ?? '',
@@ -171,7 +174,9 @@ export function ModelNameCombobox({
     ],
     queryFn: async () => {
       if (listsOpenRouterDirectly) return fetchOpenRouterModels();
+      if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await listAnnotationAiModels({
+        path: { workspace_id: workspaceId },
         body: {
           provider_id: provider.requestProviderId,
           base_url: provider.baseUrl ?? null,
@@ -181,7 +186,7 @@ export function ModelNameCombobox({
       });
       return (data.models ?? []).map((modelId) => ({ id: modelId }));
     },
-    enabled: open && listingEnabled,
+    enabled: open && listingEnabled && (listsOpenRouterDirectly || Boolean(workspaceId)),
     staleTime: 5 * 60 * 1000,
     retry: false,
   });

@@ -1,9 +1,9 @@
 /**
- * Zustand store barrel.
+ * UI store barrel.
  *
- * Import stores from `@/stores` rather than individual files so consumers
- * don't leak implementation details (slice names, file layout). Types are
- * re-exported alongside their stores.
+ * Used by: layout/routing code that needs the active-view store and `ViewType`
+ * without importing the UI store module directly. Other stores are imported
+ * from their owning modules until they are intentionally promoted here.
  */
 
 export { useUIStore } from './uiStore';

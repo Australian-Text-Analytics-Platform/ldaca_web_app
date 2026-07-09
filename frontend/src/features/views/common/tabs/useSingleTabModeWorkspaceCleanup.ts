@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { clearTasks, getWorkspaceTabs, putWorkspaceTabs } from '@/api';
+import { clearTask, getWorkspaceTabs, putWorkspaceTabs } from '@/api';
 import type { WorkspaceTabsState } from '@/api';
 import { EMPTY_TABS_STATE, getTabs, keepFirstTabInState } from './tabStateOps';
 import { workspaceTabsQueryKey } from './useWorkspaceTabs';
@@ -60,9 +60,9 @@ async function collapseWorkspaceTabsToFirst(
   const savedState = saved ?? next;
 
   for (const taskId of removedTaskIds) {
-    void clearTasks({
+    void clearTask({
       headers,
-      query: { task_id: taskId },
+      path: { task_id: taskId },
       throwOnError: true,
     }).catch((error: unknown) => {
       console.warn(`[analysis-tabs] Failed to clear task ${taskId} on single-tab cleanup:`, error);

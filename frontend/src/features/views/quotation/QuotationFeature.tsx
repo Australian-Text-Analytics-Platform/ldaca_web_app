@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { quotationTaskRequest, quotationTaskResult } from '@/api';
 import type {
   QuotationAnalysisResponse,
   AnalysisTabInput,
-  QuotationEngineConfigInput,
+  QuotationEngineConfig,
 } from '@/api';
 
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
@@ -29,9 +28,11 @@ import {
   useAnalysisFeature,
   executeAnalysisRerun,
 } from '../common';
+import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
+import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { useQuotationContextPreference } from './hooks/useQuotationContextPreference';
@@ -66,6 +67,23 @@ interface QuotationFeatureProps {
   onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
 }
 
+/**
+ * Narrows task/action union responses to terminal quotation table results.
+ * Used by: QuotationFeature fetch/search callbacks because generated quotation
+ * endpoints may return action-status payloads while a task is still running,
+ * but the analysis lifecycle only accepts result tables.
+ */
+function isQuotationAnalysisResponse(value: unknown): value is QuotationAnalysisResponse {
+  return (
+    value !== null &&
+    value !== undefined &&
+    typeof value === 'object' &&
+    Array.isArray((value as { columns?: unknown }).columns) &&
+    'pagination' in value &&
+    'sorting' in value
+  );
+}
+
 function QuotationFeature({
   tabId,
   tabTaskId,
@@ -97,7 +115,7 @@ function QuotationFeature({
     onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
-    analysisType: 'quotation_analysis',
+    analysisType: ANALYSIS_TAB_GROUPS.quotation,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     taskId: tabTaskId ?? null,
@@ -192,8 +210,8 @@ function QuotationFeature({
     stopTask,
     isStopping,
   } = useAnalysisFeature<QuotationAnalysisResponse>({
-    analysisType: 'quotation_analysis',
-    taskType: 'quotation',
+    analysisType: ANALYSIS_TAB_GROUPS.quotation,
+    taskType: ANALYSIS_TASK_TYPES.quotation,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
@@ -204,22 +222,24 @@ function QuotationFeature({
     // Loads the latest quotation result for polling and task resumption.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
-      const { data } = await quotationTaskResult({
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      const data = await getAnalysisTaskResult<QuotationAnalysisResponse>(
+        currentWorkspaceId,
+        taskId,
         headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      );
+      return isQuotationAnalysisResponse(data) ? data : null;
     },
     // Retrieves the submitted quotation request so hydration can restore engine and selection state.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
-      const { data } = await quotationTaskRequest({
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskRequest(
+        ANALYSIS_TAB_GROUPS.quotation,
+        currentWorkspaceId,
+        taskId,
         headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      );
     },
     // Applies freshly fetched results to the active node table after lifecycle polling finishes.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
@@ -262,7 +282,7 @@ function QuotationFeature({
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
       const column = (requestData.column || '') as string;
       if (!nodeId) return;
-      hydrateEngineConfig((requestData.engine as QuotationEngineConfigInput | null) ?? null);
+      hydrateEngineConfig((requestData.engine as QuotationEngineConfig | null) ?? null);
       if (!tabInputs || tabInputs.length === 0) {
         applyInputsFromSelections([{ nodeId, column }]);
       }
@@ -400,7 +420,10 @@ function QuotationFeature({
     lock: {
       getAuthHeaders,
       resolveTaskId,
-      quotationSearch,
+      quotationSearch: async (nodeId, request) => {
+        const response = await quotationSearch(nodeId, request);
+        return isQuotationAnalysisResponse(response) ? response : null;
+      },
       detachQuotation,
       materializeQuotation,
     },
@@ -411,6 +434,7 @@ function QuotationFeature({
   }, [persistContextLengthPreference]);
 
   useQuotationMaterializeLifecycle({
+    workspaceId: currentWorkspaceId,
     materializeTaskIds,
     setNodeMaterializing,
     setMaterializeTaskIds,
@@ -421,7 +445,9 @@ function QuotationFeature({
   });
 
   const { openDetachDialog, detachDialog } = useQuotationDetachDialog({
+    workspaceId: currentWorkspaceId,
     activeSelections,
+    resolveTaskId,
     getAuthHeaders,
     handleDetach,
     materializedPaths,

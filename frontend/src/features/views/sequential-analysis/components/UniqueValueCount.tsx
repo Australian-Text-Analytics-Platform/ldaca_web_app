@@ -22,7 +22,7 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
     queryFn: async () => {
       const { data: response } = await getColumnUniqueValues({
         headers: getAuthHeaders(),
-        path: { column_name: columnName, node_id: nodeId },
+        path: { workspace_id: workspaceId, column_name: columnName, node_id: nodeId },
         throwOnError: true,
       });
       return response;

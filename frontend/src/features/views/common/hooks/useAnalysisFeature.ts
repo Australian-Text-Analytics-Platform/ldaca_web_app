@@ -525,7 +525,7 @@ export function useAnalysisFeature<TResult = unknown>(
     try {
       await cancelTask({
         headers: cfg.getAuthHeaders(),
-        query: { task_id: taskId },
+        path: { task_id: taskId },
         throwOnError: true,
       });
       setIsRunning(false);

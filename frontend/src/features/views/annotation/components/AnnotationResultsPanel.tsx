@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { getAnnotationClassDescriptions, getNodeData, setAnnotationCell } from '@/api';
+import {
+  getAnnotationClassDescriptions,
+  getNodeDataByWorkspaceId,
+  setAnnotationCell,
+} from '@/api';
 import {
   Select,
   SelectContent,
@@ -93,9 +97,10 @@ export function AnnotationResultsPanel({
   // it showed before the change so optimistic UI never diverges from storage.
   const setCellMutation = useMutation({
     mutationFn: async (vars: { rowPosition: number; value: string; previous: string }) => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await setAnnotationCell({
         headers: getAuthHeaders(),
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, node_id: nodeId },
         body: {
           column_name: annotationColumn,
           row_index: vars.rowPosition,
@@ -127,9 +132,10 @@ export function AnnotationResultsPanel({
     ),
     enabled: Boolean(workspaceId),
     queryFn: async () => {
-      const { data } = await getNodeData({
+      if (!workspaceId) throw new Error('Missing workspace ID');
+      const { data } = await getNodeDataByWorkspaceId({
         headers: getAuthHeaders(),
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, node_id: nodeId },
         query: { page: pagination.pageIndex + 1, page_size: pagination.pageSize },
         throwOnError: true,
       });
@@ -150,9 +156,10 @@ export function AnnotationResultsPanel({
         : ['annotation', 'result-classes', 'disabled'],
     enabled: canLoadClasses,
     queryFn: async () => {
+      if (!workspaceId || !classNodeId) throw new Error('Missing class node');
       const { data } = await getAnnotationClassDescriptions({
         headers: getAuthHeaders(),
-        path: { node_id: classNodeId ?? '' },
+        path: { workspace_id: workspaceId, node_id: classNodeId },
         query: { class_column: classColumn ?? '', description_column: descriptionColumn ?? '' },
         throwOnError: true,
       });

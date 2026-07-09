@@ -7,15 +7,13 @@
  * Rendered by: ViewRouter via the ``analysis`` entry in VIEW_COMPONENTS.
  */
 import { AnalysisTabsHost } from '../common/tabs/AnalysisTabsHost';
+import { ANALYSIS_TAB_GROUPS } from '../common/analysisIds';
 import SequentialAnalysisFeature from './SequentialAnalysisFeature';
-
-/** Tab-group namespace for sequential-analysis tabs (matches the backend analysis type). */
-const SEQUENTIAL_ANALYSIS_TAB_GROUP = 'sequential_analysis';
 
 function SequentialAnalysisTabbedFeature() {
   return (
     <AnalysisTabsHost
-      tabGroup={SEQUENTIAL_ANALYSIS_TAB_GROUP}
+      tabGroup={ANALYSIS_TAB_GROUPS.sequential}
       Feature={SequentialAnalysisFeature}
     />
   );

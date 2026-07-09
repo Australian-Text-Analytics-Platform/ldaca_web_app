@@ -1,8 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { updateQuotationTaskResult } from '@/api';
+import { analysisTaskPreferences, analysisTaskResultQuery } from '@/api';
 import type {
   QuotationAnalysisResponse,
-  QuotationRequestInput,
+  QuotationRequest,
   QuotationResultQuery,
   QuotationDetachRequest,
   QuotationMaterializeRequest,
@@ -13,7 +13,6 @@ import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from
 import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
 
 const DEFAULT_PAGE_SIZE = 50;
-type QuotationRequest = QuotationRequestInput;
 
 /** Extracts the most useful backend error detail for quotation dialogs. */
 /**
@@ -73,13 +72,13 @@ interface QuotationLock {
   quotationSearch: (
     nodeId: string,
     request: QuotationRequest,
-  ) => Promise<QuotationAnalysisResponse>;
+  ) => Promise<QuotationAnalysisResponse | null>;
   detachQuotation: (
-    nodeId: string,
+    taskId: string,
     request: QuotationDetachRequest,
   ) => Promise<AnalysisTaskActionResponse>;
   materializeQuotation?: (
-    nodeId: string,
+    taskId: string,
     request: QuotationMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
 }
@@ -169,10 +168,10 @@ export function useQuotationTaskFlow({
     if (!currentWorkspaceId) return;
     const taskId = await resolveTaskId();
     if (!taskId) return;
-    await updateQuotationTaskResult({
-      body: { context_length: value, update_only: true },
+    await analysisTaskPreferences({
+      body: { context_length: value },
       headers: getAuthHeaders(),
-      path: { task_id: taskId },
+      path: { workspace_id: currentWorkspaceId, task_id: taskId },
       throwOnError: true,
     });
   };
@@ -226,6 +225,9 @@ export function useQuotationTaskFlow({
 
     try {
       const result = await quotationSearch(nodeId, requestPayload);
+      if (!result) {
+        return null;
+      }
       const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
       onTaskIdAssigned?.(assignedTaskId);
       applyContextLengthPreferenceFromResult(result);
@@ -274,12 +276,13 @@ export function useQuotationTaskFlow({
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return null;
-      const { data: response } = await updateQuotationTaskResult({
+      const { data } = await analysisTaskResultQuery({
         body: payload,
         headers: getAuthHeaders(),
-        path: { task_id: taskId },
+        path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
+      const response = data as QuotationAnalysisResponse;
       if (!('columns' in response)) return null;
       applyContextLengthPreferenceFromResult(response);
       updateResultState(nodeId, column, response);
@@ -398,11 +401,21 @@ export function useQuotationTaskFlow({
     if (!selection?.column) return;
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
     try {
+      const explicitSelectedColumns = selectedColumns ?? [];
+      if (explicitSelectedColumns.length === 0) {
+        showErrorDialog('Select at least one column to add to workspace.');
+        return;
+      }
+      const parentTaskId = await resolveTaskId();
+      if (!parentTaskId) {
+        showErrorDialog('No quotation task to detach.');
+        return;
+      }
       const enginePayload = buildEngineRequest();
       if (!enginePayload) {
         return;
       }
-      await detachQuotation(nodeId, {
+      await detachQuotation(parentTaskId, {
         node_id: nodeId,
         column: selection.column,
         new_node_name: buildDetachNodeName(resolveNodeLabel(nodeId), '_quotation'),
@@ -410,9 +423,7 @@ export function useQuotationTaskFlow({
           enginePayload.type === 'remote'
             ? { type: 'remote', url: enginePayload.url }
             : { type: 'local' },
-        ...(selectedColumns && selectedColumns.length > 0
-          ? { selected_columns: selectedColumns }
-          : {}),
+        selected_columns: explicitSelectedColumns,
         ...(materializedPath ? { materialized_path: materializedPath } : {}),
       });
     } catch (e: unknown) {
@@ -450,8 +461,8 @@ export function useQuotationTaskFlow({
         });
         return;
       }
-      const resp = await materializeQuotation(nodeId, {
-        parent_task_id: parentTaskId,
+      const resp = await materializeQuotation(parentTaskId, {
+        node_id: nodeId,
         column: selection.column,
         engine:
           enginePayload.type === 'remote'

@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef } from 'react';
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
+import type { NodeInfo } from '@/lib/nodeInfo';
 import {
   DEFAULT_TOPIC_SIZE_VALUE,
   createTopicModelingParameterState,
@@ -22,7 +23,9 @@ export type { CorpusSample };
 
 interface UseTopicModelingParametersArgs {
   panelSelectedNodes: WorkspaceNodeLike[];
+  panelNodeIds: string[];
   panelNodeIdsKey: string;
+  nodeInfoCache: Record<string, NodeInfo>;
 }
 
 export interface UseTopicModelingParametersResult {
@@ -48,8 +51,8 @@ export interface UseTopicModelingParametersResult {
   resetAfterClear: () => void;
 }
 
-const nodeDocumentCount = (node: WorkspaceNodeLike): number => {
-  const firstShapeValue = node.shape?.[0];
+const nodeDocumentCount = (nodeInfo: NodeInfo | undefined): number => {
+  const firstShapeValue = nodeInfo?.shape?.[0];
   return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
     ? firstShapeValue
     : 0;
@@ -70,7 +73,9 @@ const nodeDocumentCount = (node: WorkspaceNodeLike): number => {
  */
 export function useTopicModelingParameters({
   panelSelectedNodes,
+  panelNodeIds,
   panelNodeIdsKey,
+  nodeInfoCache,
 }: UseTopicModelingParametersArgs): UseTopicModelingParametersResult {
   const [parameterState, dispatchParameters] = useReducer(
     topicModelingParameterReducer,
@@ -87,14 +92,19 @@ export function useTopicModelingParameters({
     representativeWordsCountUserSet,
   } = parameterState;
   const skipNextNodeDefaultRef = useRef(false);
+  const lastDefaultNodeIdsKeyRef = useRef<string | null>(null);
   // Keeps saved sampling from being overwritten when task hydration arrives before node ids resolve.
   const preserveHydratedSamplingNodeIdsKeyRef = useRef<string | null>(null);
 
-  const nodeDocCounts = panelSelectedNodes.slice(0, 2).map(nodeDocumentCount);
+  const nodeDocCounts = panelNodeIds
+    .slice(0, 2)
+    .map((nodeId) => nodeDocumentCount(nodeInfoCache[nodeId]));
+  const nodeDocCountsKey = nodeDocCounts.join('|');
   const defaultCorpusSamples = () => nodeDocCounts.map(defaultCorpusSample);
 
   useEffect(() => {
     const samples = defaultCorpusSamples();
+    const nodeIdsChanged = lastDefaultNodeIdsKeyRef.current !== panelNodeIdsKey;
     void Promise.resolve().then(() => {
       if (skipNextNodeDefaultRef.current) {
         skipNextNodeDefaultRef.current = false;
@@ -110,10 +120,14 @@ export function useTopicModelingParameters({
         preserveHydratedSamplingNodeIdsKeyRef.current = null;
         return;
       }
+      if (!nodeIdsChanged && corpusSamplesUserSet) {
+        return;
+      }
+      lastDefaultNodeIdsKeyRef.current = panelNodeIdsKey;
       dispatchParameters({ type: 'applyNodeDefaultSamples', samples });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelNodeIdsKey]);
+  }, [panelNodeIdsKey, nodeDocCountsKey, corpusSamplesUserSet]);
 
   /** Updates one corpus sampling row and marks sampling as explicitly edited. */
   // Called by: TopicModelingParameterPanel because the sampling controls edit sparse per-corpus percentage patches.

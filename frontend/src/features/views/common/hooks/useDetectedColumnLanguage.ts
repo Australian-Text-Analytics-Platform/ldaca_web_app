@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getNodeData } from '@/api';
+import { getNodeDataByWorkspaceId } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import { queryKeys } from '@/lib/queryKeys';
 import { collectDocumentColumnText } from '../components/tokenizerModelSelectorUtils';
@@ -52,9 +52,9 @@ export function useDetectedColumnLanguage({
     staleTime: 60_000,
     /** Called by: TanStack Query to fetch sample rows for language detection. */
     queryFn: async () => {
-      const { data } = await getNodeData({
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- queryFn only runs when canFetchSample guarantees nodeId is set
-        path: { node_id: nodeId! },
+      const { data } = await getNodeDataByWorkspaceId({
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- queryFn only runs when canFetchSample guarantees workspaceId/nodeId are set
+        path: { workspace_id: workspaceId!, node_id: nodeId! },
         query: { page: 1, page_size: LANGUAGE_SAMPLE_PAGE_SIZE },
         headers: getAuthHeaders(),
         throwOnError: true,

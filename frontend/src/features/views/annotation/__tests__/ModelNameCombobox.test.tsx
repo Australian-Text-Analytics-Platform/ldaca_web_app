@@ -85,6 +85,7 @@ function Harness({
   const [value, setValue] = useState('');
   return (
     <ModelNameCombobox
+      workspaceId="workspace-1"
       provider={resolveForTest(providerId)}
       apiKey={apiKey}
       value={value}

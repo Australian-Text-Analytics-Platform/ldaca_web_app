@@ -9,7 +9,7 @@ import type {
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
-import { buildWorkspaceNodeMap, deriveNodeLabel, getNodeKey } from '../../utils/nodeMetadata';
+import { deriveNodeLabel, getNodeKey } from '../../utils/nodeMetadata';
 import {
   buildPolarsExpressionRequest,
   createPolarsExpressionDraftState,
@@ -26,10 +26,8 @@ export {
 } from './polarsExpressionDraftState';
 
 export interface PolarsExpressionSubTabProps {
-  selectedNodeId: string | null;
   selectedNodes: WorkspaceNodeLike[];
-  workspaceNodes: WorkspaceNodeLike[];
-  isLoading: { nodeData: boolean; graph: boolean; operations: boolean };
+  isLoading: { operations: boolean };
   onAlert: (message: string) => void;
   polarsExpressionPreview: (
     nodeId: string,
@@ -56,20 +54,15 @@ const DEFAULT_PALETTE = ['#2563eb'];
  */
 export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const {
-    selectedNodeId,
     selectedNodes,
-    workspaceNodes,
     onAlert,
     polarsExpressionPreview,
     polarsExpressionApply,
     refreshNodeSchema,
   } = props;
 
-  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
-  const effectiveNode =
-    takeMostRecent(selectedNodes, 1)[0] ??
-    (selectedNodeId ? (workspaceNodeMap.get(selectedNodeId) ?? null) : null);
-  const nodeId = effectiveNode ? getNodeKey(effectiveNode, selectedNodeId ?? '') || null : null;
+  const effectiveNode = takeMostRecent(selectedNodes, 1)[0] ?? null;
+  const nodeId = effectiveNode ? getNodeKey(effectiveNode) || null : null;
 
   const [draftState, dispatchDraft] = useReducer(
     polarsExpressionDraftReducer,

@@ -29,12 +29,8 @@ export interface FilterSubTabProps {
   selectedNodeId: string | null;
   selectedNode: WorkspaceNodeLike | null;
   selectedNodes: WorkspaceNodeLike[];
-  nodeData: {
-    columns?: string[];
-    dtypes?: Record<string, string>;
-  } | null;
+  columnOptions: ConditionColumnOption[];
   currentWorkspaceId: string | null;
-  workspaceNodes: WorkspaceNodeLike[];
   filterNode: (nodeId: string, request: FilterRequest) => Promise<void>;
   filterPreview: (
     nodeId: string,
@@ -47,8 +43,6 @@ export interface FilterSubTabProps {
     pagination: PreviewPagination | null;
   }>;
   isLoading: {
-    nodeData: boolean;
-    graph: boolean;
     operations: boolean;
   };
   onAlert: (message: string) => void;
@@ -101,7 +95,6 @@ export interface UseFilterSubTabSectionsResult {
   schemaState: {
     hasSelection: boolean;
     hasSchema: boolean;
-    isSchemaLoading: boolean;
     isConfigDisabled: boolean;
   };
   conditionBuilder: FilterConditionBuilderConfig;
@@ -136,9 +129,8 @@ export const useFilterSubTabSections = (
     selectedNodeId,
     selectedNode,
     selectedNodes,
-    nodeData,
+    columnOptions,
     currentWorkspaceId,
-    workspaceNodes,
     filterNode,
     filterPreview,
     isLoading,
@@ -177,41 +169,20 @@ export const useFilterSubTabSections = (
     getAuthHeaders,
   });
 
-  const availableColumns = (() => {
-    const columns: ConditionColumnOption[] = [];
-    const dtypes =
-      nodeData?.dtypes && typeof nodeData.dtypes === 'object'
-        ? (nodeData.dtypes as Record<string, string | undefined>)
-        : undefined;
-
-    if (Array.isArray(nodeData?.columns) && dtypes) {
-      nodeData.columns.forEach((colName: string) => {
-        const rawDataType = dtypes[colName] ?? 'unknown';
-        const normalizedDataType = normalizeTypeName(rawDataType);
-        columns.push({ name: colName, dataType: normalizedDataType });
-      });
-    } else if (dtypes) {
-      Object.entries(dtypes).forEach(([colName, rawType]) => {
-        const normalizedDataType = normalizeTypeName(rawType ?? 'unknown');
-        columns.push({ name: colName, dataType: normalizedDataType });
-      });
-    } else if (selectedNode?.schema) {
-      Object.keys(selectedNode.schema).forEach((colName) => {
-        columns.push({ name: colName, dataType: 'string' });
-      });
-    }
-
-    return columns;
-  })();
+  const availableColumns = columnOptions
+    .filter((option) => option.name.length > 0)
+    .map((option) => ({
+      ...option,
+      dataType: normalizeTypeName(option.dataType || 'unknown'),
+    }));
 
   const hasSelection = Boolean(selectedNodeId);
   const hasSchema = availableColumns.length > 0;
-  const isSchemaLoading = hasSelection && !hasSchema && (isLoading.nodeData || isLoading.graph);
   const isConfigDisabled = !hasSelection || !hasSchema;
 
   const selectionPanelModel = buildSingleNodeSelectionPanelModel({
     nodeId: selectedNodeId,
-    workspaceNodes,
+    selectedNode,
   });
   const newNodeName = newNodeNameState.nodeId === selectedNodeId ? newNodeNameState.value : '';
   const setNewNodeName = (value: string) => {
@@ -259,6 +230,7 @@ export const useFilterSubTabSections = (
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
   } = useNodePreviewWithRawFallback<FilterRequest>({
+    workspaceId: currentWorkspaceId,
     nodeId: selectedNodeId,
     operationPayload,
     operationFetch: filterPreview,
@@ -430,7 +402,7 @@ export const useFilterSubTabSections = (
     try {
       const { data: describeData } = await describeColumn({
         headers: getAuthHeaders(),
-        path: { column_name: column, node_id: selectedNodeId },
+        path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
         throwOnError: true,
       });
 
@@ -488,7 +460,7 @@ export const useFilterSubTabSections = (
     try {
       const { data: describeData } = await describeColumn({
         headers: getAuthHeaders(),
-        path: { column_name: column, node_id: selectedNodeId },
+        path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
         throwOnError: true,
       });
 
@@ -608,7 +580,6 @@ export const useFilterSubTabSections = (
     schemaState: {
       hasSelection,
       hasSchema,
-      isSchemaLoading,
       isConfigDisabled,
     },
     conditionBuilder: {

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useForm, useStore } from '@tanstack/react-form';
 import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '@/api';
 import type {
   NodeColumnSelection,
@@ -9,7 +8,6 @@ import type { PreviewPagination, PreviewRow } from '../../types';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import {
   buildSingleNodeSelectionPanelModel,
-  buildWorkspaceNodeMap,
   deriveNodeLabel,
 } from '../../utils/nodeMetadata';
 import { buildSlicePayload, deriveSliceFormModel, type SamplingMode } from './sliceFormModel';
@@ -26,10 +24,10 @@ interface SliceOperationResult {
 }
 
 export interface SliceSubTabProps {
+  currentWorkspaceId: string | null;
   selectedNodeId: string | null;
   selectedNode: WorkspaceNodeLike | null;
   selectedNodes: WorkspaceNodeLike[];
-  workspaceNodes: WorkspaceNodeLike[];
   sliceNode: (nodeId: string, request: SliceRequestPayload) => Promise<SliceOperationResult>;
   slicePreview: (
     nodeId: string,
@@ -157,17 +155,19 @@ const DEFAULT_SLICE_FORM_VALUES: SliceFormValues = {
  */
 export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult => {
   const {
+    currentWorkspaceId,
     selectedNodeId,
     selectedNode,
     selectedNodes,
-    workspaceNodes,
     sliceNode,
     slicePreview,
     isLoading,
     onAlert,
   } = props;
 
-  const sliceForm = useForm({ defaultValues: DEFAULT_SLICE_FORM_VALUES });
+  const [formValues, setFormValues] = useState<SliceFormValues>(() => ({
+    ...DEFAULT_SLICE_FORM_VALUES,
+  }));
   const {
     mode,
     offsetInput,
@@ -176,70 +176,77 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     randomSeedInput,
     noRandomSeed,
     newNodeName,
-    // useSelector is not exported by the installed @tanstack/react-form version.
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-  } = useStore(sliceForm.store, (state) => state.values);
+  } = formValues;
   const [inlineErrorState, setInlineErrorState] = useState<ScopedInlineError | null>(null);
   const [isSlicing, setIsSlicing] = useState(false);
   const [lastResultState, setLastResultState] = useState<ScopedSliceHistory | null>(null);
 
   /**
-   * Adapts the segmented mode control to the form store used by slice consumers.
+   * Updates the local Sample Rows form without pulling in a form library for
+   * simple string/boolean fields.
+   * Called by: useSliceSubTab field controllers and blur handlers because the
+   * hook owns the form state consumed by preview and apply payloads.
+   */
+  const setFormField = <Field extends keyof SliceFormValues>(
+    field: Field,
+    value: SliceFormValues[Field],
+  ) => {
+    setFormValues((current) =>
+      Object.is(current[field], value) ? current : { ...current, [field]: value },
+    );
+  };
+
+  /**
+   * Adapts the segmented mode control to the local form state used by slice consumers.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setMode = (value: SamplingMode) => {
-    sliceForm.setFieldValue('mode', value);
+    setFormField('mode', value);
   };
   /**
    * Updates the zero-based offset input for preview and apply payload construction.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setOffsetInput = (value: string) => {
-    sliceForm.setFieldValue('offsetInput', value);
+    setFormField('offsetInput', value);
   };
   /**
    * Updates the row-count input consumed by range validation and preview payloads.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setLengthInput = (value: string) => {
-    sliceForm.setFieldValue('lengthInput', value);
+    setFormField('lengthInput', value);
   };
   /**
    * Updates the sample-size input used by random sampling validation.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setSampleSizeInput = (value: string) => {
-    sliceForm.setFieldValue('sampleSizeInput', value);
+    setFormField('sampleSizeInput', value);
   };
   /**
    * Updates the optional random seed field passed to sampling requests.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setRandomSeedInput = (value: string) => {
-    sliceForm.setFieldValue('randomSeedInput', value);
+    setFormField('randomSeedInput', value);
   };
   /**
    * Toggles seed omission so random samples can remain intentionally unseeded.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setNoRandomSeed = (value: boolean) => {
-    sliceForm.setFieldValue('noRandomSeed', value);
+    setFormField('noRandomSeed', value);
   };
   /**
    * Updates the optional node name consumed when adding the sampled node.
    * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setNewNodeName = (value: string) => {
-    sliceForm.setFieldValue('newNodeName', value);
+    setFormField('newNodeName', value);
   };
 
-  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
-
-  const activeNode = (() => {
-    if (selectedNode) return selectedNode;
-    if (!selectedNodeId) return null;
-    return workspaceNodeMap.get(selectedNodeId) ?? null;
-  })();
+  const activeNode = selectedNode;
 
   const selectedNodeLabel = (() => {
     if (!selectedNodeId) return '';
@@ -255,7 +262,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const selectionPanelModel = buildSingleNodeSelectionPanelModel({
     nodeId: selectedNodeId,
-    workspaceNodes,
     selectedNode: activeNode,
   });
 
@@ -343,6 +349,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
   } = useNodePreviewWithRawFallback<SliceRequestPayload>({
+    workspaceId: currentWorkspaceId,
     nodeId: selectedNodeId,
     operationPayload,
     operationFetch: slicePreview,
@@ -361,9 +368,9 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     if (lengthInput.trim().length === 0) return;
     if (lengthNumber === null || !Number.isInteger(lengthNumber)) return;
     if (lengthNumber < 1) {
-      sliceForm.setFieldValue('lengthInput', '1');
+      setFormField('lengthInput', '1');
     } else if (nodeRowCount !== null && lengthNumber > nodeRowCount) {
-      sliceForm.setFieldValue('lengthInput', String(nodeRowCount));
+      setFormField('lengthInput', String(nodeRowCount));
     }
   };
 
@@ -379,7 +386,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       Number.isInteger(sampleSizeNumber) &&
       sampleSizeNumber >= nodeRowCount
     ) {
-      sliceForm.setFieldValue('sampleSizeInput', String(nodeRowCount));
+      setFormField('sampleSizeInput', String(nodeRowCount));
     }
   };
 

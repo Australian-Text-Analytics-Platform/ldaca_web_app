@@ -46,8 +46,8 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
         end: normalizeEdge(range.end),
       };
     } else {
-      const fallback = condition.value;
-      value = fallback ?? '';
+      const currentValue = condition.value;
+      value = currentValue ?? '';
     }
 
     const payload: FilterCondition = {

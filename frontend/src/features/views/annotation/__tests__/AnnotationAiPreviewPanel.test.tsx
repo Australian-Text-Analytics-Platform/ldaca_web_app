@@ -9,7 +9,7 @@ import { AnnotationAiPreviewPanel } from '../components/AnnotationAiPreviewPanel
 // them. All LLM traffic now runs server-side under /annotation/ai/*, so the
 // panel only calls our generated SDK — there is no browser SDK left to stub.
 const mocks = vi.hoisted(() => ({
-  getNodeData: vi.fn(),
+  getNodeDataByWorkspaceId: vi.fn(),
   getAnnotationClassDescriptions: vi.fn(),
   annotateAiPreview: vi.fn(),
   annotateAiPreviewState: vi.fn(),
@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/api', () => ({
-  getNodeData: mocks.getNodeData,
+  getNodeDataByWorkspaceId: mocks.getNodeDataByWorkspaceId,
   getAnnotationClassDescriptions: mocks.getAnnotationClassDescriptions,
   annotateAiPreview: mocks.annotateAiPreview,
   annotateAiPreviewState: mocks.annotateAiPreviewState,
@@ -65,7 +65,7 @@ beforeEach(() => {
   window.HTMLElement.prototype.releasePointerCapture = vi.fn();
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
-  mocks.getNodeData.mockResolvedValue({
+  mocks.getNodeDataByWorkspaceId.mockResolvedValue({
     data: {
       data: [{ text: 'I love it' }, { text: 'I hate it' }],
       pagination: { total_rows: 2 },
@@ -162,7 +162,7 @@ describe('AnnotationAiPreviewPanel', () => {
   });
 
   it('shows an empty-state message when the source page has no rows', async () => {
-    mocks.getNodeData.mockResolvedValue({
+    mocks.getNodeDataByWorkspaceId.mockResolvedValue({
       data: { data: [], pagination: { total_rows: 0 } },
     });
 
@@ -174,7 +174,7 @@ describe('AnnotationAiPreviewPanel', () => {
 
   it('strikes through an existing label beside the AI prediction, but not for empty cells', async () => {
     // First row already carries a stored label; second row is blank.
-    mocks.getNodeData.mockResolvedValue({
+    mocks.getNodeDataByWorkspaceId.mockResolvedValue({
       data: {
         data: [
           { text: 'I love it', label: 'Negative' },
@@ -210,10 +210,13 @@ describe('AnnotationAiPreviewPanel', () => {
     await user.click(annotateAll);
 
     expect(mocks.annotateAiAll).toHaveBeenCalledTimes(1);
-    const args = mocks.annotateAiAll.mock.calls[0]?.[0] as { body: Record<string, unknown> };
+    const args = mocks.annotateAiAll.mock.calls[0]?.[0] as {
+      body: Record<string, unknown>;
+      path: Record<string, unknown>;
+    };
+    expect(args.path).toEqual({ workspace_id: 'ws-1', node_id: 'node-1' });
     expect(args.body).toEqual(
       expect.objectContaining({
-        node_id: 'node-1',
         text_column: 'text',
         annotation_column: 'label',
         provider_id: 'openrouter',
@@ -247,9 +250,10 @@ describe('AnnotationAiPreviewPanel', () => {
     // The real detach call (not a dry-run probe) carries only the node + column —
     // the server owns the previewed-row set, so no per-row labels are shipped.
     const realCall = mocks.detachAiPreviewedRows.mock.calls
-      .map((call) => call[0] as { body: Record<string, unknown> })
+      .map((call) => call[0] as { body: Record<string, unknown>; path: Record<string, unknown> })
       .find((arg) => arg.body.dry_run !== true);
-    expect(realCall?.body).toEqual({ node_id: 'node-1', annotation_column: 'label' });
+    expect(realCall?.path).toEqual({ workspace_id: 'ws-1', node_id: 'node-1' });
+    expect(realCall?.body).toEqual({ annotation_column: 'label' });
   });
 
   it('keeps Detach disabled when the server probe reports no previewed rows', async () => {
@@ -292,8 +296,10 @@ describe('AnnotationAiPreviewPanel', () => {
     });
     const args = mocks.annotateAiPreviewOverride.mock.calls[0]?.[0] as {
       body: Record<string, unknown>;
+      path: Record<string, unknown>;
     };
-    expect(args.body).toEqual({ node_id: 'node-1', row_index: 1, label: 'Positive' });
+    expect(args.path).toEqual({ workspace_id: 'ws-1', node_id: 'node-1', row_index: 1 });
+    expect(args.body).toEqual({ label: 'Positive' });
   });
 
   it('sends a null override when the user clears a cell to None', async () => {
@@ -312,9 +318,11 @@ describe('AnnotationAiPreviewPanel', () => {
     });
     const args = mocks.annotateAiPreviewOverride.mock.calls[0]?.[0] as {
       body: Record<string, unknown>;
+      path: Record<string, unknown>;
     };
     // The "None" pick is an explicit null override (still beats the model label).
-    expect(args.body).toEqual({ node_id: 'node-1', row_index: 0, label: null });
+    expect(args.path).toEqual({ workspace_id: 'ws-1', node_id: 'node-1', row_index: 0 });
+    expect(args.body).toEqual({ label: null });
   });
 
   it('rehydrates AI labels and overrides from the server session on mount', async () => {

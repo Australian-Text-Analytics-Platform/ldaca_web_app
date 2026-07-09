@@ -135,9 +135,11 @@ but persists inputs per `(workspaceId, subtab)` in `preprocessingInputsStore`
 instead of `tabs.json`. `DataPreprocessingFeature` owns that state and passes a
 single `renderNodeInputsPanel` slot into each subtab; the subtab renders it at
 the top of its parameter card so preprocessing follows the same layout as the
-functional analysis tabs. The selected input node's schema is fetched by node id
-from `GET /workspaces/nodes/{node_id}/data`, so preprocessing does not depend
-on graph selection to populate column controls.
+functional analysis tabs. The shared input selector hydrates selected-node
+column metadata through the batched node-info query
+(`POST /workspaces/{workspace_id}/nodes:batchGet` with body
+`{ "nodes": [...] }`), then passes resolved column options into subtabs so
+Filter does not fetch a data page just to populate schema controls.
 
 The Polars expression subtab is the only preprocessing path that needs
 CodeMirror. Keep it behind the lazy `PolarsExpressionSubTab` boundary in
@@ -164,7 +166,7 @@ empty-column selection state, or id fallback rules locally.
 
 The Slice subtab keeps numeric parsing, validation copy, preview readiness, and
 slice/random-sample payload shaping in `slice/hooks/sliceFormModel.ts`.
-`useSliceSubTab` should stay focused on form-store wiring, preview fetching, and
+`useSliceSubTab` should stay focused on local form state, preview fetching, and
 the apply mutation. Reuse `deriveSliceFormModel()` when adding Sample Rows UI
 state so preview and Add to Workspace continue to share the same request rules.
 

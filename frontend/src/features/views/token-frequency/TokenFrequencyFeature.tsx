@@ -1,11 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
-import { tokenFrequenciesTaskRequest, tokenFrequenciesTaskResult } from '@/api';
 import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 
-import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest, useLastRunRequest } from '../common';
+import {
+  DEFAULT_TOKEN_LIMIT,
+  parseAnalysisNodeRequest,
+  useLastRunRequest,
+} from '../common';
+import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
@@ -121,7 +126,7 @@ const TokenFrequencyFeature = ({
 
   const isActiveTab = currentView === 'token-frequency';
   const { serverRequest } = useLastRunRequest({
-    analysisType: 'token_frequencies',
+    analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     taskId: tabTaskId ?? null,
@@ -139,8 +144,8 @@ const TokenFrequencyFeature = ({
     stopTask,
     setLocalTaskId,
   } = useAnalysisFeature<TokenFrequencyResponse>({
-    analysisType: 'token_frequencies',
-    taskType: 'token_frequencies',
+    analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
+    taskType: ANALYSIS_TASK_TYPES.tokenFrequencies,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
@@ -151,22 +156,19 @@ const TokenFrequencyFeature = ({
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
-      const { data } = await tokenFrequenciesTaskResult({
-        headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskResult<TokenFrequencyResponse>(currentWorkspaceId, taskId, headers);
     },
     /** Fetches the saved task request so a reopened task can restore panel state. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
-      const { data } = await tokenFrequenciesTaskRequest({
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskRequest(
+        ANALYSIS_TAB_GROUPS.tokenFrequencies,
+        currentWorkspaceId,
+        taskId,
         headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      );
     },
     /** Pushes fetched task results into guarded component state. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -258,10 +260,10 @@ const TokenFrequencyFeature = ({
     // then apply any live overrides the user has made in this session.
     return deriveTokenizerModelsByNode(
       effectiveNodeColumnSelections,
-      panelSelectedNodes,
+      nodeInputs.nodeInfoCache,
       liveTokenizerModelsByNode,
     );
-  }, [effectiveNodeColumnSelections, panelSelectedNodes, liveTokenizerModelsByNode]);
+  }, [effectiveNodeColumnSelections, nodeInputs.nodeInfoCache, liveTokenizerModelsByNode]);
 
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,

@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { topicModelingTaskRequest, topicModelingTaskResult } from '@/api';
 import type { AnalysisTabInput, TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
@@ -16,9 +15,11 @@ import {
   useSafeResult,
   executeAnalysisRerun,
 } from '../common';
+import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
+import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
@@ -82,7 +83,7 @@ function TopicModelingFeature({
     onTabInputsChange?.(nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
-    analysisType: 'topic_modeling',
+    analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     taskId: tabTaskId ?? null,
@@ -129,7 +130,9 @@ function TopicModelingFeature({
     resetAfterClear,
   } = useTopicModelingParameters({
     panelSelectedNodes,
+    panelNodeIds,
     panelNodeIdsKey,
+    nodeInfoCache: nodeInputs.nodeInfoCache,
   });
   const {
     hoveredTopicId,
@@ -161,8 +164,8 @@ function TopicModelingFeature({
     setLocalTaskId,
     banner: topicWaitingBanner,
   } = useAnalysisFeature<TopicModelingResponse>({
-    analysisType: 'topic_modeling',
-    taskType: 'topic_modeling',
+    analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
+    taskType: ANALYSIS_TASK_TYPES.topicModeling,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
@@ -173,22 +176,19 @@ function TopicModelingFeature({
     // Loads the latest topic-modeling result for polling and task resumption.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
-      const { data } = await topicModelingTaskResult({
-        headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskResult<TopicModelingResponse>(currentWorkspaceId, taskId, headers);
     },
     // Retrieves the submitted request so hydration can restore parameter and lock state.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
-      const { data } = await topicModelingTaskRequest({
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskRequest(
+        ANALYSIS_TAB_GROUPS.topicModeling,
+        currentWorkspaceId,
+        taskId,
         headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      );
     },
     // Applies freshly fetched task results and surfaces failed/successful status messages.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.

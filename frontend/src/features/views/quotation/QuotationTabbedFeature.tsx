@@ -6,13 +6,11 @@
  * Rendered by: ViewRouter via the ``quotation`` entry in VIEW_COMPONENTS.
  */
 import { AnalysisTabsHost } from '../common/tabs/AnalysisTabsHost';
+import { ANALYSIS_TAB_GROUPS } from '../common/analysisIds';
 import QuotationFeature from './QuotationFeature';
 
-/** Tab-group namespace for quotation tabs (matches the backend analysis type). */
-const QUOTATION_TAB_GROUP = 'quotation_analysis';
-
 function QuotationTabbedFeature() {
-  return <AnalysisTabsHost tabGroup={QUOTATION_TAB_GROUP} Feature={QuotationFeature} />;
+  return <AnalysisTabsHost tabGroup={ANALYSIS_TAB_GROUPS.quotation} Feature={QuotationFeature} />;
 }
 
 export default QuotationTabbedFeature;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { QuotationEngineConfigInput } from '@/api';
+import type { QuotationEngineConfig } from '@/api';
 import { normalizeRemoteUrl } from '../quotationRemoteUrl';
 
 export type QuotationEngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
@@ -15,14 +15,14 @@ type QuotationResolvedEnginePayload =
     };
 
 export interface UseQuotationEngineSettingsResult {
-  engineConfig: QuotationEngineConfigInput;
+  engineConfig: QuotationEngineConfig;
   lastRemoteUrl: string;
   engineError: string | null;
   resolvedEnginePayload: QuotationResolvedEnginePayload;
   engineReady: boolean;
-  setTaskEngineConfig: (config: QuotationEngineConfigInput) => void;
+  setTaskEngineConfig: (config: QuotationEngineConfig) => void;
   updateRemoteUrl: (url: string) => void;
-  hydrateEngineConfig: (config: QuotationEngineConfigInput | null | undefined) => void;
+  hydrateEngineConfig: (config: QuotationEngineConfig | null | undefined) => void;
   buildEngineRequest: () => QuotationEngineRequestPayload | null;
 }
 
@@ -39,13 +39,13 @@ export interface UseQuotationEngineSettingsResult {
  * payloads, and surface validation errors for the parameter form.
  */
 export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
-  const [engineConfig, setEngineConfig] = useState<QuotationEngineConfigInput>({ type: 'local' });
+  const [engineConfig, setEngineConfig] = useState<QuotationEngineConfig>({ type: 'local' });
   const [lastRemoteUrl, setLastRemoteUrl] = useState('');
   const [engineError, setEngineError] = useState<string | null>(null);
 
   /** Applies a task engine config from direct UI selection or hydration. */
   // Called by: QuotationEngineSettingsFields and task hydration because engine settings belong to a single quotation tab/run.
-  const setTaskEngineConfig = (config: QuotationEngineConfigInput) => {
+  const setTaskEngineConfig = (config: QuotationEngineConfig) => {
     setEngineConfig(config);
     if (config.type === 'remote' && config.url) {
       setLastRemoteUrl(config.url);
@@ -57,13 +57,15 @@ export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
   // Called by: QuotationEngineSettingsFields endpoint input because inactive remote URLs should still be remembered when users switch away and back.
   const updateRemoteUrl = (url: string) => {
     setLastRemoteUrl(url);
-    setEngineConfig((current) => (current.type === 'remote' ? { type: 'remote', url } : current));
+    setEngineConfig((current: QuotationEngineConfig) =>
+      current.type === 'remote' ? { type: 'remote', url } : current,
+    );
     setEngineError(null);
   };
 
   /** Restores engine config from a saved quotation request. */
   // Called by: QuotationFeature task hydration because reloaded tabs should reopen with the backend-stored engine choice.
-  const hydrateEngineConfig = (config: QuotationEngineConfigInput | null | undefined) => {
+  const hydrateEngineConfig = (config: QuotationEngineConfig | null | undefined) => {
     if (config?.type === 'remote') {
       const trimmed = (config.url ?? '').trim();
       if (!trimmed.length) return;

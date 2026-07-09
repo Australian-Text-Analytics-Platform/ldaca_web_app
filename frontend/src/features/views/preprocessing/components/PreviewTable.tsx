@@ -100,14 +100,7 @@ export function PreviewTable({
     setDetailOpen,
     openDetail: openRowDetail,
   } = useRowDetailDialog();
-  const columnsToRender =
-    columns.length > 0
-      ? columns
-      : // data rows come from the API; keep the explicit null guard before Object.keys.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        data.length > 0 && typeof data[0] === 'object' && data[0] !== null
-        ? Object.keys(data[0])
-        : [];
+  const columnsToRender = columns;
   const tableColSpan = Math.max(columnsToRender.length, 1);
   const currentPage = pagination?.page ?? page;
   const displayTotalPages = pagination?.total_pages ?? Math.max(1, currentPage);

@@ -113,7 +113,7 @@ describe('useAnalysisFeature', () => {
 
     expect(cancelTaskMock).toHaveBeenCalledWith({
       headers,
-      query: { task_id: 'task-1' },
+      path: { task_id: 'task-1' },
       throwOnError: true,
     });
   });

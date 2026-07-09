@@ -1,8 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { quotationTaskRequest } from '@/api';
 import { useMaterializeLifecycle } from '../../common/hooks/useMaterializeLifecycle';
+import { getAnalysisTaskRequest } from '../../common/analysisTasksApi';
+import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
 
 interface UseQuotationMaterializeLifecycleParams {
+  workspaceId: string | null | undefined;
   materializeTaskIds: Record<string, string>;
   setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
   setMaterializeTaskIds: Dispatch<SetStateAction<Record<string, string>>>;
@@ -27,6 +29,7 @@ interface UseQuotationMaterializeLifecycleParams {
  * result controls, and reset page size to the default occurrence-row page.
  */
 export function useQuotationMaterializeLifecycle({
+  workspaceId,
   materializeTaskIds,
   setNodeMaterializing,
   setMaterializeTaskIds,
@@ -40,12 +43,13 @@ export function useQuotationMaterializeLifecycle({
     try {
       const headers = getAuthHeaders();
       const parentTaskId = await resolveTaskId();
-      if (parentTaskId) {
-        const { data: requestPayload } = await quotationTaskRequest({
+      if (workspaceId && parentTaskId) {
+        const requestPayload = await getAnalysisTaskRequest(
+          ANALYSIS_TAB_GROUPS.quotation,
+          workspaceId,
+          parentTaskId,
           headers,
-          path: { task_id: parentTaskId },
-          throwOnError: true,
-        });
+        );
         const requestObject = (requestPayload as Record<string, unknown> | null) ?? {};
         applyMaterializedRequest(
           nodeId,

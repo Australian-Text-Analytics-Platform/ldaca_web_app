@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { concordanceTaskRequest, concordanceTaskResult } from '@/api';
 import type { ConcordanceAnalysisResponse } from '@/api';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,7 +16,9 @@ import {
   useSafeResult,
   executeAnalysisRerun,
 } from '../common';
+import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
+import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import type { AnalysisTabInput } from '@/api';
@@ -89,11 +89,6 @@ function ConcordanceFeature({
   } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
-  const { getColumnInfos } = useNodeColumnInfos({
-    workspaceId: currentWorkspaceId,
-    nodes: selectedNodes,
-  });
-
   const { getAuthHeaders } = useAuth();
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
@@ -115,6 +110,8 @@ function ConcordanceFeature({
     availableNodes,
     canAddMore,
     graphSelectedIds,
+    getColumnInfos,
+    nodeInfoCache,
   } = useTabNodeInputs({
     tabInputs,
     onTabInputsChange,
@@ -147,7 +144,7 @@ function ConcordanceFeature({
   });
   // Last-run request, used only to compute the Run vs Re-run button state.
   const { serverRequest } = useLastRunRequest({
-    analysisType: 'concordance_analysis',
+    analysisType: ANALYSIS_TAB_GROUPS.concordance,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     taskId: tabTaskId ?? null,
@@ -228,6 +225,7 @@ function ConcordanceFeature({
     isBlockMaterialised,
     getMaterializedBinsForKey,
   } = useConcordanceResultViewModel({
+    workspaceId: currentWorkspaceId,
     results,
     concordanceTaskId,
     panelSelectedNodes,
@@ -285,7 +283,7 @@ function ConcordanceFeature({
     clearTokenizerModel,
   } = useConcordanceTokenizerMode({
     effectiveNodeColumnSelections: nodeColumnSelections,
-    panelSelectedNodes,
+    nodeInfoCache,
   });
 
   const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } =
@@ -337,8 +335,8 @@ function ConcordanceFeature({
     stopTask,
     isStopping,
   } = useAnalysisFeature<ConcordanceAnalysisResponse>({
-    analysisType: 'concordance_analysis',
-    taskType: 'concordance',
+    analysisType: ANALYSIS_TAB_GROUPS.concordance,
+    taskType: ANALYSIS_TASK_TYPES.concordance,
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
@@ -350,22 +348,23 @@ function ConcordanceFeature({
     /** Fetches a completed concordance task result for polling and hydration. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchResult: async (taskId, headers) => {
-      const { data } = await concordanceTaskResult({
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskResult<ConcordanceAnalysisResponse>(
+        currentWorkspaceId,
+        taskId,
         headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      );
     },
     /** Fetches the saved request so hydration can restore parameters and materialized state. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
     fetchRequest: async (taskId, headers) => {
-      const { data } = await concordanceTaskRequest({
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisTaskRequest(
+        ANALYSIS_TAB_GROUPS.concordance,
+        currentWorkspaceId,
+        taskId,
         headers,
-        path: { task_id: taskId },
-        throwOnError: true,
-      });
-      return data;
+      );
     },
     /** Copies freshly fetched task results into the feature's safe-result state. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
@@ -512,6 +511,8 @@ function ConcordanceFeature({
 
   const { openDetachDialog, openDispersionDetachDialog, detachDialog, dispersionDetachDialog } =
     useConcordanceDetachDialogs({
+      workspaceId: currentWorkspaceId,
+      resolveTaskId,
       getAuthHeaders,
       handleDetach,
       handleDispersionDetach,
@@ -558,6 +559,7 @@ function ConcordanceFeature({
   // Materialize lifecycle: terminal-state task watcher, task-id ref reset,
   // and `analysis_materialized` SSE consumer. See hook for details.
   const { resetProcessedEvents } = useConcordanceMaterializedEvents({
+    workspaceId: currentWorkspaceId,
     concordanceTaskId,
     materializeTaskIds,
     materializedEvents,

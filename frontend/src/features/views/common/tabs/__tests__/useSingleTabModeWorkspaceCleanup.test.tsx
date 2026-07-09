@@ -7,16 +7,16 @@ import type { WorkspaceTabsState } from '@/api';
 import { useSingleTabModeWorkspaceCleanup } from '../useSingleTabModeWorkspaceCleanup';
 import { workspaceTabsQueryKey } from '../useWorkspaceTabs';
 
-const { getWorkspaceTabsMock, putWorkspaceTabsMock, clearTasksMock } = vi.hoisted(() => ({
+const { getWorkspaceTabsMock, putWorkspaceTabsMock, clearTaskMock } = vi.hoisted(() => ({
   getWorkspaceTabsMock: vi.fn(),
   putWorkspaceTabsMock: vi.fn(),
-  clearTasksMock: vi.fn(),
+  clearTaskMock: vi.fn(),
 }));
 
 vi.mock('@/api/generated/sdk.gen', () => ({
   getWorkspaceTabs: getWorkspaceTabsMock,
   putWorkspaceTabs: putWorkspaceTabsMock,
-  clearTasks: clearTasksMock,
+  clearTask: clearTaskMock,
 }));
 
 const workspaceTabsState: WorkspaceTabsState = {
@@ -56,8 +56,8 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
     putWorkspaceTabsMock.mockImplementation(({ body }: { body: WorkspaceTabsState }) =>
       Promise.resolve({ data: body, error: undefined }),
     );
-    clearTasksMock.mockReset();
-    clearTasksMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
+    clearTaskMock.mockReset();
+    clearTaskMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
   });
 
   it('collapses every workspace tab group to its first tab and clears removed tasks', async () => {
@@ -98,16 +98,16 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
     await waitFor(() => {
       expect(queryClient.getQueryData(workspaceTabsQueryKey('workspace-1'))).toEqual(expectedState);
     });
-    expect(clearTasksMock).toHaveBeenCalledWith({
+    expect(clearTaskMock).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer t' },
-      query: { task_id: 'task-remove-a' },
+      path: { task_id: 'task-remove-a' },
       throwOnError: true,
     });
-    expect(clearTasksMock).toHaveBeenCalledWith({
+    expect(clearTaskMock).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer t' },
-      query: { task_id: 'task-remove-b' },
+      path: { task_id: 'task-remove-b' },
       throwOnError: true,
     });
-    expect(clearTasksMock).toHaveBeenCalledTimes(2);
+    expect(clearTaskMock).toHaveBeenCalledTimes(2);
   });
 });

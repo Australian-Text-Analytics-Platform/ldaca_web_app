@@ -1,7 +1,7 @@
 import { useReducer, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 
-import { concordanceDetachOptions } from '@/api';
+import { analysisTaskDetachOptions } from '@/api';
 import type { DetachDialogNodeOption } from '../../common/components/DetachColumnsDialog';
 import { useDetachColumnsState } from '../../common/hooks/useDetachColumnsState';
 import {
@@ -47,6 +47,8 @@ interface OpenDispersionOptions {
 }
 
 interface UseConcordanceDetachDialogsArgs {
+  workspaceId: string | null;
+  resolveTaskId: () => Promise<string | null>;
   getAuthHeaders: AuthHeadersGetter;
   handleDetach: PerHitDetachHandler;
   handleDispersionDetach: DispersionDetachHandler;
@@ -66,15 +68,17 @@ const CONC_DEFAULT_DETACH_COLS = new Set<string>([
  * Flow: call the generated detach-options endpoint per node with the selected text column, unwrap response nodes, and return a flat dialog-option list.
  */
 const loadDetachNodeOptions = async (
+  workspaceId: string,
+  taskId: string,
   nodes: ConcordanceDetachTarget[],
   getAuthHeaders: AuthHeadersGetter,
 ): Promise<DetachDialogNodeOption[]> => {
   const responses = await Promise.all(
     nodes.map((node) =>
-      concordanceDetachOptions({
+      analysisTaskDetachOptions({
         headers: getAuthHeaders(),
-        path: { node_id: node.nodeId },
-        query: { column: node.column },
+        path: { workspace_id: workspaceId, task_id: taskId },
+        query: { node_id: node.nodeId, column: node.column },
         throwOnError: true,
       }).then(({ data }) => data),
     ),
@@ -142,6 +146,8 @@ const resolveBooleanAction = (value: SetStateAction<boolean>, current: boolean):
  * that dialog's transient state.
  */
 export function useConcordanceDetachDialogs({
+  workspaceId,
+  resolveTaskId,
   getAuthHeaders,
   handleDetach,
   handleDispersionDetach,
@@ -193,7 +199,10 @@ export function useConcordanceDetachDialogs({
     dispatchDialog({ type: 'perHitRequested', nodes });
 
     try {
-      const options = await loadDetachNodeOptions(nodes, getAuthHeaders);
+      if (!workspaceId) throw new Error('No workspace selected');
+      const taskId = await resolveTaskId();
+      if (!taskId) throw new Error('No concordance task to detach');
+      const options = await loadDetachNodeOptions(workspaceId, taskId, nodes, getAuthHeaders);
       setSelectedDetachColumns(selectDefaultConcordanceColumns(options));
       dispatchDialog({ type: 'perHitOpened', options });
     } catch (error) {
@@ -244,7 +253,15 @@ export function useConcordanceDetachDialogs({
     });
 
     try {
-      const loadedOptions = await loadDetachNodeOptions(nodes, getAuthHeaders);
+      if (!workspaceId) throw new Error('No workspace selected');
+      const taskId = await resolveTaskId();
+      if (!taskId) throw new Error('No concordance task to detach');
+      const loadedOptions = await loadDetachNodeOptions(
+        workspaceId,
+        taskId,
+        nodes,
+        getAuthHeaders,
+      );
       const dispersionOptions = toDispersionDetachOptions(loadedOptions);
       setSelectedDispersionColumns(emptySelectionForOptions(dispersionOptions));
       dispatchDialog({ type: 'dispersionOpened', options: dispersionOptions });

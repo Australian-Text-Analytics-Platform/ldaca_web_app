@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { queryKeys } from '@/lib/queryKeys';
+import { ANALYSIS_TASK_TYPES } from '@/features/views/common/analysisIds';
 import type { TaskItem } from '@/stores/analysisStore';
 import {
   type TaskEventPayload,
@@ -71,11 +72,11 @@ const buildTaskMap = (tasks: TaskItem[] = []) => {
   return map;
 };
 
-const TAB_ASSOCIATED_TASK_TYPES = new Set([
-  'token_frequencies',
-  'concordance',
-  'topic_modeling',
-  'quotation',
+const TAB_ASSOCIATED_TASK_TYPES = new Set<string>([
+  ANALYSIS_TASK_TYPES.tokenFrequencies,
+  ANALYSIS_TASK_TYPES.concordance,
+  ANALYSIS_TASK_TYPES.topicModeling,
+  ANALYSIS_TASK_TYPES.quotation,
 ]);
 
 const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
@@ -338,7 +339,7 @@ export const useWorkspaceTaskInbox = (
         break;
       }
       case 'analysis_save_failed': {
-        if (payload.task_type === 'topic_modeling') {
+        if (payload.task_type === ANALYSIS_TASK_TYPES.topicModeling) {
           // Empty/missing message falls back to a generic label, so `||` is intentional.
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           setTransientError(payload.message || 'Analysis save failed');

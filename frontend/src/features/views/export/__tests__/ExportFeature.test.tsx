@@ -17,8 +17,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
     selectedNodes: [
       {
         id: 'node-1',
-        label: 'Node One',
-        data: { nodeName: 'Node One' },
+        name: 'Node One',
       },
     ],
   }),
@@ -174,9 +173,9 @@ describe('ExportFeature', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
-    expect(fetchMock.mock.calls[0]?.[0]).toContain('/workspaces/export?');
-    expect(fetchMock.mock.calls[0]?.[0]).toContain('format=parquet');
-    expect(fetchMock.mock.calls[0]?.[0]).not.toContain('format=csv');
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'http://api.test/api/workspaces/ws-1/export?node_ids=node-1&format=parquet',
+    );
 
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('download', 'Node One.parquet');

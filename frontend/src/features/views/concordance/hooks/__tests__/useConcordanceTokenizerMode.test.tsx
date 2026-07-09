@@ -15,12 +15,13 @@ describe('useConcordanceTokenizerMode', () => {
       ({ liveModel }: { liveModel?: string }) =>
         useConcordanceTokenizerMode({
           effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-          panelSelectedNodes: [
-            {
+          nodeInfoCache: {
+            'node-a': {
               id: 'node-a',
+              name: 'Node A',
               tokenizer_models: liveModel ? { text: liveModel } : {},
             },
-          ],
+          },
         }),
       { initialProps: {} },
     );
@@ -39,12 +40,13 @@ describe('useConcordanceTokenizerMode', () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-        panelSelectedNodes: [
-          {
+        nodeInfoCache: {
+          'node-a': {
             id: 'node-a',
+            name: 'Node A',
             tokenizer_models: { text: 'native:plain_words_en' },
           },
-        ],
+        },
       }),
     );
     await flushDeferredState();
@@ -63,12 +65,13 @@ describe('useConcordanceTokenizerMode', () => {
       ({ hasModel }: { hasModel: boolean }) =>
         useConcordanceTokenizerMode({
           effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-          panelSelectedNodes: [
-            {
+          nodeInfoCache: {
+            'node-a': {
               id: 'node-a',
+              name: 'Node A',
               tokenizer_models: hasModel ? { text: 'native:plain_words_en' } : {},
             },
-          ],
+          },
         }),
       { initialProps: { hasModel: true } },
     );
@@ -89,7 +92,7 @@ describe('useConcordanceTokenizerMode', () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-        panelSelectedNodes: [{ id: 'node-a' }],
+        nodeInfoCache: { 'node-a': { id: 'node-a', name: 'Node A' } },
       }),
     );
 

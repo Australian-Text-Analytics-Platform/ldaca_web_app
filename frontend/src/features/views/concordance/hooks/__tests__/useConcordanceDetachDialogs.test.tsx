@@ -1,16 +1,17 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { concordanceDetachOptions } from '@/api';
+import { analysisTaskDetachOptions } from '@/api';
 import { useConcordanceDetachDialogs } from '../useConcordanceDetachDialogs';
 
 vi.mock('@/api', () => ({
-  concordanceDetachOptions: vi.fn(),
+  analysisTaskDetachOptions: vi.fn(),
 }));
 
-const mockedConcordanceDetachOptions = vi.mocked(concordanceDetachOptions);
+const mockedAnalysisTaskDetachOptions = vi.mocked(analysisTaskDetachOptions);
 
 const getAuthHeaders = vi.fn(() => ({ Authorization: 'Bearer test-token' }));
+const resolveTaskId = vi.fn(() => Promise.resolve('task-1'));
 const handleDetach = vi.fn(
   (
     _nodeId: string,
@@ -37,6 +38,8 @@ const handleDispersionDetach = vi.fn(
 );
 
 const defaultArgs = {
+  workspaceId: 'workspace-1',
+  resolveTaskId,
   getAuthHeaders,
   handleDetach,
   handleDispersionDetach,
@@ -47,7 +50,8 @@ const defaultArgs = {
 describe('useConcordanceDetachDialogs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedConcordanceDetachOptions.mockResolvedValue({
+    resolveTaskId.mockResolvedValue('task-1');
+    mockedAnalysisTaskDetachOptions.mockResolvedValue({
       data: {
         state: 'successful',
         message: 'ok',
@@ -82,10 +86,10 @@ describe('useConcordanceDetachDialogs', () => {
       ]);
     });
 
-    expect(mockedConcordanceDetachOptions).toHaveBeenCalledWith({
+    expect(mockedAnalysisTaskDetachOptions).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer test-token' },
-      path: { node_id: 'node-1' },
-      query: { column: 'text' },
+      path: { workspace_id: 'workspace-1', task_id: 'task-1' },
+      query: { node_id: 'node-1', column: 'text' },
       throwOnError: true,
     });
     expect(result.current.detachDialog.open).toBe(true);

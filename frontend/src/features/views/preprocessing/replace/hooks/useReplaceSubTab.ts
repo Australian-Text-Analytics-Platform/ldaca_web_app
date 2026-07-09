@@ -5,7 +5,7 @@ import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils
 import { type FilterPreviewResponse, type ReplaceApplyResponse, type ReplaceRequest } from '@/api';
 import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
-import { buildWorkspaceNodeMap, getNodeKey } from '../../utils/nodeMetadata';
+import { getNodeKey } from '../../utils/nodeMetadata';
 import {
   buildReplaceRequest,
   resolveReplaceOutputColumnName,
@@ -14,13 +14,10 @@ import {
 } from './replaceRequestModel';
 
 export interface ReplaceSubTabProps {
-  selectedNodeId: string | null;
+  currentWorkspaceId: string | null;
   selectedColumn?: string;
   selectedNodes: WorkspaceNodeLike[];
-  workspaceNodes: WorkspaceNodeLike[];
   isLoading: {
-    nodeData: boolean;
-    graph: boolean;
     operations: boolean;
   };
   onAlert: (message: string) => void;
@@ -43,27 +40,20 @@ export interface ReplaceSubTabProps {
  */
 export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const {
-    selectedNodeId,
+    currentWorkspaceId,
     selectedColumn: inputSelectedColumn = '',
     selectedNodes,
-    workspaceNodes,
     isLoading,
     onAlert,
     replaceTextPreview,
     replaceText,
     refreshNodeSchema,
   } = props;
-  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
-  const effectiveNodes = (() => {
-    if (selectedNodes.length > 0) return takeMostRecent(selectedNodes, 1);
-    if (!selectedNodeId) return [];
-    const fallback = workspaceNodeMap.get(selectedNodeId);
-    return fallback ? [fallback] : [];
-  })();
+  const effectiveNodes = takeMostRecent(selectedNodes, 1);
 
   const activeNode = effectiveNodes[0] ?? null;
-  const activeNodeId = activeNode ? getNodeKey(activeNode, 'node-0') : null;
+  const activeNodeId = activeNode ? getNodeKey(activeNode) : null;
   const stringColumns = activeNode
     ? mapColumnsToInfo(activeNode)
         .filter((column) => column.dataType === 'string')
@@ -109,6 +99,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     setPage: setPreviewPage,
     setPageSize: setPreviewPageSize,
   } = useNodePreviewWithRawFallback<ReplaceRequest>({
+    workspaceId: currentWorkspaceId,
     nodeId: activeNodeId,
     operationPayload,
     operationFetch: replaceTextPreview,
@@ -116,8 +107,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     enabled: hasSelection,
   });
 
-  const controlsDisabled =
-    !hasSelection || isLoading.nodeData || isLoading.operations || applyLoading;
+  const controlsDisabled = !hasSelection || isLoading.operations || applyLoading;
   const canApply = Boolean(
     activeNodeId && selectedColumn && pattern.length > 0 && !applyLoading && !previewError,
   );

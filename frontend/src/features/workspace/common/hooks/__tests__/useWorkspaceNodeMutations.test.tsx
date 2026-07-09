@@ -12,34 +12,31 @@ const workspaceSdkMock = vi.hoisted(() => ({
   cloneNode: vi.fn(),
   concatNodes: vi.fn(),
   concatNodesPreview: vi.fn(),
+  createAnalysisTaskDetachment: vi.fn(),
+  createAnalysisTaskDispersionDetachment: vi.fn(),
+  createAnalysisTaskMaterialization: vi.fn(),
   createWorkspace: vi.fn(),
   deleteNode: vi.fn(),
   deleteNodeColumn: vi.fn(),
-  deleteWorkspace: vi.fn(),
-  detachConcordance: vi.fn(),
-  detachConcordanceDispersion: vi.fn(),
-  detachQuotation: vi.fn(),
+  deleteWorkspaceById: vi.fn(),
   filterNode: vi.fn(),
   filterPreview: vi.fn(),
   getQuotation: vi.fn(),
   joinNodes: vi.fn(),
   listWorkspaces: vi.fn(),
-  materializeConcordance: vi.fn(),
-  materializeQuotation: vi.fn(),
   polarsExpressionApply: vi.fn(),
   polarsExpressionPreview: vi.fn(),
-  renameWorkspace: vi.fn(),
   redoNodeOperation: vi.fn(),
   renameNodeColumn: vi.fn(),
   replaceApply: vi.fn(),
   replacePreview: vi.fn(),
-  saveWorkspace: vi.fn(),
-  setCurrentWorkspace: vi.fn(),
+  saveWorkspaceById: vi.fn(),
+  setMyCurrentWorkspace: vi.fn(),
   sliceNode: vi.fn(),
   slicePreview: vi.fn(),
   undoNodeOperation: vi.fn(),
   updateNodeName: vi.fn(),
-  updateWorkspaceDescription: vi.fn(),
+  updateWorkspaceById: vi.fn(),
 }));
 
 /** Hoisted node-info mock isolates schema refresh behavior from network I/O. */
@@ -257,7 +254,7 @@ describe('useWorkspaceNodeMutations', () => {
   describe('setCurrentWorkspace', () => {
     it('writes the new id to the selectionStore setter and clears node selection', async () => {
       const queryClient = createTestClient();
-      workspaceSdkMock.setCurrentWorkspace.mockResolvedValue({
+      workspaceSdkMock.setMyCurrentWorkspace.mockResolvedValue({
         data: { state: 'successful', id: 'ws-2' },
         error: undefined,
       });
@@ -276,9 +273,9 @@ describe('useWorkspaceNodeMutations', () => {
         await result.current.actions.setCurrentWorkspace('ws-2');
       });
 
-      expect(workspaceSdkMock.setCurrentWorkspace).toHaveBeenCalledWith({
+      expect(workspaceSdkMock.setMyCurrentWorkspace).toHaveBeenCalledWith({
+        body: { workspace_id: 'ws-2' },
         headers: { Authorization: 'Bearer test' },
-        query: { workspace_id: 'ws-2' },
         throwOnError: true,
       });
       expect(setCurrentWorkspaceId).toHaveBeenCalledWith('ws-2');
@@ -291,7 +288,7 @@ describe('useWorkspaceNodeMutations', () => {
       const queryClient = createTestClient();
       const setCurrentWorkspaceId = mkSetWorkspaceId();
       const clearSelection = mkClearSelection();
-      workspaceSdkMock.deleteWorkspace.mockResolvedValue({
+      workspaceSdkMock.deleteWorkspaceById.mockResolvedValue({
         data: { id: 'ws-1' },
         error: undefined,
       });
@@ -312,6 +309,11 @@ describe('useWorkspaceNodeMutations', () => {
         await result.current.actions.deleteWorkspace('ws-1');
       });
 
+      expect(workspaceSdkMock.deleteWorkspaceById).toHaveBeenCalledWith({
+        headers: { Authorization: 'Bearer test' },
+        path: { workspace_id: 'ws-1' },
+        throwOnError: true,
+      });
       expect(setCurrentWorkspaceId).toHaveBeenCalledWith(null);
       expect(clearSelection).toHaveBeenCalled();
     });
@@ -325,7 +327,7 @@ describe('useWorkspaceNodeMutations', () => {
       await expect(result.current.actions.deleteWorkspace('   ')).rejects.toThrow(
         /workspaceId is required/,
       );
-      expect(workspaceSdkMock.deleteWorkspace).not.toHaveBeenCalled();
+      expect(workspaceSdkMock.deleteWorkspaceById).not.toHaveBeenCalled();
     });
   });
 
@@ -387,7 +389,7 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('castColumn', () => {
-    it('invalidates the workspace graph + node-data + node-schema keys on success', async () => {
+    it('invalidates the workspace graph + node-data + node-info keys on success', async () => {
       const queryClient = createTestClient();
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
       workspaceSdkMock.castNode.mockResolvedValue({ data: {}, error: undefined });
@@ -403,7 +405,7 @@ describe('useWorkspaceNodeMutations', () => {
       expect(workspaceSdkMock.castNode).toHaveBeenCalledWith({
         body: { column: 'col_a', target_type: 'integer', format: undefined },
         headers: { Authorization: 'Bearer test' },
-        path: { node_id: 'node-1' },
+        path: { workspace_id: 'ws-1', node_id: 'node-1' },
         throwOnError: true,
       });
 
@@ -412,9 +414,20 @@ describe('useWorkspaceNodeMutations', () => {
         expect.arrayContaining([
           { queryKey: ['workspaces', 'ws-1', 'graph'] },
           expect.objectContaining({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'data'] }),
-          { queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'schema'] },
         ]),
       );
+      const nodeInfoInvalidation = invalidatedKeys.find(
+        (options): options is { predicate: (query: { queryKey: readonly unknown[] }) => boolean } =>
+          typeof options === 'object' && 'predicate' in options,
+      );
+      expect(nodeInfoInvalidation).toBeDefined();
+      if (!nodeInfoInvalidation) throw new Error('node-info invalidation was not recorded');
+      const { predicate } = nodeInfoInvalidation;
+      expect(predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'info'] })).toBe(true);
+      expect(
+        predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'info', 'batch', 'node-1'] }),
+      ).toBe(true);
+      expect(predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-2', 'info'] })).toBe(false);
     });
   });
 
@@ -458,12 +471,12 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('combined-node mutations', () => {
-    it('selects the node_id returned by joinNodes', async () => {
+    it('selects the id returned by joinNodes', async () => {
       const queryClient = createTestClient();
       const setSelectedNodes = mkSetSelectedNodes();
       const clearSelection = mkClearSelection();
       workspaceSdkMock.joinNodes.mockResolvedValue({
-        data: { node_id: 'joined-node' },
+        data: { id: 'joined-node' },
         error: undefined,
       });
 
@@ -488,6 +501,7 @@ describe('useWorkspaceNodeMutations', () => {
 
       expect(workspaceSdkMock.joinNodes).toHaveBeenCalledWith({
         headers: { Authorization: 'Bearer test' },
+        path: { workspace_id: 'ws-1' },
         query: {
           left_node_id: 'left-node',
           right_node_id: 'right-node',
@@ -530,6 +544,7 @@ describe('useWorkspaceNodeMutations', () => {
           deduplicate: true,
         },
         headers: { Authorization: 'Bearer test' },
+        path: { workspace_id: 'ws-1' },
         throwOnError: true,
       });
       expect(clearSelection).toHaveBeenCalled();
@@ -553,32 +568,37 @@ describe('useWorkspaceNodeMutations', () => {
           node_id: 'node-1',
           column: 'c',
           search_word: 'w',
+          selected_columns: ['c'],
         }),
       ).toThrow(/No workspace selected/);
-      expect(workspaceSdkMock.detachConcordance).not.toHaveBeenCalled();
+      expect(workspaceSdkMock.createAnalysisTaskDetachment).not.toHaveBeenCalled();
     });
 
     it('detachConcordance forwards through generated SDK and invalidates the workspace graph', async () => {
       const queryClient = createTestClient();
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-      workspaceSdkMock.detachConcordance.mockResolvedValue({ data: {}, error: undefined });
+      workspaceSdkMock.createAnalysisTaskDetachment.mockResolvedValue({
+        data: {},
+        error: undefined,
+      });
 
       const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
         wrapper: wrapWithClient(queryClient),
       });
 
       await act(async () => {
-        await result.current.actions.detachConcordance('node-1', {
+        await result.current.actions.detachConcordance('task-1', {
           node_id: 'node-1',
           column: 'c',
           search_word: 'w',
+          selected_columns: ['c'],
         });
       });
 
-      expect(workspaceSdkMock.detachConcordance).toHaveBeenCalledWith({
-        body: { node_id: 'node-1', column: 'c', search_word: 'w' },
+      expect(workspaceSdkMock.createAnalysisTaskDetachment).toHaveBeenCalledWith({
+        body: { node_id: 'node-1', column: 'c', search_word: 'w', selected_columns: ['c'] },
         headers: { Authorization: 'Bearer test' },
-        path: { node_id: 'node-1' },
+        path: { workspace_id: 'ws-1', task_id: 'task-1' },
         throwOnError: true,
       });
 
@@ -588,17 +608,13 @@ describe('useWorkspaceNodeMutations', () => {
       );
     });
 
-    it('quotationSearch forwards through generated SDK without requiring a workspace', async () => {
-      // quotationSearch (and the materialize variants) deliberately don't
-      // call ensureWorkspaceSelected — the backend route is node-scoped, so
-      // a node id is enough.
+    it('quotationSearch forwards through generated SDK with the active workspace', async () => {
       const queryClient = createTestClient();
       workspaceSdkMock.getQuotation.mockResolvedValue({ data: { rows: [] }, error: undefined });
 
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { currentWorkspaceId: null })),
-        { wrapper: wrapWithClient(queryClient) },
-      );
+      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
+        wrapper: wrapWithClient(queryClient),
+      });
 
       await act(async () => {
         await result.current.actions.quotationSearch('node-1', { column: 'c' });
@@ -607,7 +623,7 @@ describe('useWorkspaceNodeMutations', () => {
       expect(workspaceSdkMock.getQuotation).toHaveBeenCalledWith({
         body: { column: 'c' },
         headers: { Authorization: 'Bearer test' },
-        path: { node_id: 'node-1' },
+        path: { workspace_id: 'ws-1', node_id: 'node-1' },
         throwOnError: true,
       });
     });

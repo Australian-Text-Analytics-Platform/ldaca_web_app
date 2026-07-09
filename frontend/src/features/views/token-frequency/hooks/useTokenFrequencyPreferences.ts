@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
-import { updateTokenFrequenciesTaskResult } from '@/api';
+import { analysisTaskPreferences } from '@/api';
 import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
@@ -144,10 +144,10 @@ export const useTokenFrequencyPreferences = ({
       }
       if (Object.keys(payload).length === 0) return;
 
-      await updateTokenFrequenciesTaskResult({
+      await analysisTaskPreferences({
         body: payload,
         headers: getAuthHeaders(),
-        path: { task_id: taskId },
+        path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
     },

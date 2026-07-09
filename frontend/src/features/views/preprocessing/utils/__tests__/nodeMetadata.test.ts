@@ -14,7 +14,7 @@ describe('nodeMetadata', () => {
     expect(
       buildSingleNodeSelectionPanelModel({
         nodeId: 'node-1',
-        workspaceNodes: [node],
+        selectedNode: node,
       }),
     ).toEqual({
       selectedNodes: [node],
@@ -29,7 +29,6 @@ describe('nodeMetadata', () => {
     expect(
       buildSingleNodeSelectionPanelModel({
         nodeId: 'missing-node',
-        workspaceNodes: [],
       }),
     ).toMatchObject({
       selectedNodes: [],
@@ -49,7 +48,7 @@ describe('nodeMetadata', () => {
     expect(
       buildSingleNodeSelectionPanelModel({
         nodeId: 'backend-node-1',
-        workspaceNodes: [node],
+        selectedNode: node,
       }),
     ).toMatchObject({
       selectedNodes: [node],

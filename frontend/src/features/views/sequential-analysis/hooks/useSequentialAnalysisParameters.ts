@@ -1,11 +1,11 @@
 import { useCallback, useReducer } from 'react';
 
-import type { SequentialAnalysisRequestInput } from '@/api';
+import type { SequentialAnalysisRequest } from '@/api';
 import { normalizeStringArray, normalizeUnknownStringArray } from '../../common';
 
-export type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
+export type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 export type SequentialCustomIntervalUnit = NonNullable<
-  SequentialAnalysisRequestInput['custom_interval_unit']
+  SequentialAnalysisRequest['custom_interval_unit']
 >;
 
 export interface SequentialHydratedParams {

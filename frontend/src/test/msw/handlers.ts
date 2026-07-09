@@ -11,7 +11,9 @@ const apiPath = (path: string): string => {
 };
 
 export const handlers = [
-  http.get(apiPath('/config/'), () => HttpResponse.json(configResponse())),
+  http.get(apiPath('/runtime-config'), () => HttpResponse.json(configResponse())),
   http.get(apiPath('/preferences/'), () => HttpResponse.json(preferencesResponse())),
-  http.get(apiPath('/workspaces/nodes/:node_id/data'), () => HttpResponse.json(nodeDataResponse())),
+  http.get(apiPath('/workspaces/:workspace_id/nodes/:node_id/data'), () =>
+    HttpResponse.json(nodeDataResponse()),
+  ),
 ];

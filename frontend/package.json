@@ -51,7 +51,6 @@
     "@radix-ui/react-tooltip": "^1.2.9",
     "@react-oauth/google": "^0.13.5",
     "@sentry/react": "^10.57.0",
-    "@tanstack/react-form": "^1.33.0",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-query-devtools": "^5.101.0",
     "@tanstack/react-router": "^1.170.15",

@@ -16,8 +16,8 @@ export const queryKeys = {
   /** All workspace-related queries (broad invalidation). */
   workspaces: ['workspaces'] as const,
 
-  /** The currently active workspace ID (written directly to the cache). */
-  currentWorkspace: ['workspaces', 'current'] as const,
+  /** Authenticated user's selected workspace id. */
+  currentWorkspace: ['users', 'me', 'current-workspace'] as const,
 
   /** Nodes list for a workspace; invalidated after graph-changing workspace mutations. */
   /** Consumed by: TanStack Query hooks and invalidation helpers because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
@@ -68,20 +68,19 @@ export const queryKeys = {
       descriptionColumn,
     ] as const,
 
-  /** Lightweight schema cache for panels that only need columns/types, not full node info. */
-  /** Consumed by: TanStack Query hooks and invalidation helpers because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
-  nodeSchema: (workspaceId: string, nodeId: string) =>
-    ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
-
   /**
-   * Full backend node info (`GET /workspaces/nodes/:id`) — schema, columns,
-   * shape, undo/redo flags. Replaces the previous `lib/nodeInfoCache.ts`
-   * parallel cache. `nodeSchema` lives separately so it can be invalidated
-   * without dropping the heavier full-info payload.
+   * Full backend node info — schema, columns, shape, undo/redo flags.
+   * Replaces the previous `lib/nodeInfoCache.ts` parallel cache and is also
+   * the source of truth for schema-only readers.
    */
   /** Consumed by: TanStack Query hooks and invalidation helpers because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
   nodeInfo: (workspaceId: string, nodeId: string) =>
     ['workspaces', workspaceId, 'nodes', nodeId, 'info'] as const,
+
+  /** Batched backend node info for selectors that need metadata for several nodes at once. */
+  /** Consumed by: TanStack Query hooks and invalidation helpers because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
+  nodeInfos: (workspaceId: string, nodeIds: string[]) =>
+    ['workspaces', workspaceId, 'nodes', 'info', 'batch', ...nodeIds] as const,
 
   tokenizerModels: ['workspaces', 'tokenizer-models'] as const,
 

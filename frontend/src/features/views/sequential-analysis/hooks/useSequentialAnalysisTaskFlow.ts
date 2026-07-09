@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
-import { runSequentialAnalysis, updateSequentialAnalysisTaskResult } from '@/api';
-import type { SequentialAnalysisRequestInput } from '@/api';
+import { analysisTaskPreferences, runSequentialAnalysis } from '@/api';
+import type { SequentialAnalysisRequest } from '@/api';
 import { type ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId } from '../../common';
 import {
@@ -10,7 +10,6 @@ import {
   type SequentialAnalysisDatum,
 } from './sequentialChartModel';
 
-type SequentialAnalysisRequest = SequentialAnalysisRequestInput;
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
@@ -204,7 +203,7 @@ export function useSequentialAnalysisTaskFlow({
       const { data: result } = await runSequentialAnalysis({
         body: request,
         headers,
-        path: { node_id: nodeIdForAnalysis },
+        path: { workspace_id: currentWorkspaceId, node_id: nodeIdForAnalysis },
         throwOnError: true,
       });
       const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
@@ -269,10 +268,10 @@ export function useSequentialAnalysisTaskFlow({
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return;
-      await updateSequentialAnalysisTaskResult({
+      await analysisTaskPreferences({
         body: { chart_type: value },
         headers,
-        path: { task_id: taskId },
+        path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
     } catch (error) {

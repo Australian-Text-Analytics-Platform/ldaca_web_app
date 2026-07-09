@@ -1,8 +1,8 @@
-import type { SequentialAnalysisRequestInput } from '@/api';
+import type { SequentialAnalysisRequest } from '@/api';
 
-type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
+type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<
-  SequentialAnalysisRequestInput['custom_interval_unit']
+  SequentialAnalysisRequest['custom_interval_unit']
 >;
 
 const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [

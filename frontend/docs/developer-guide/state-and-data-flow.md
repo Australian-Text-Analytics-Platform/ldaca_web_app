@@ -2,15 +2,14 @@
 
 ## API Client
 
-`src/api/http.ts` is the legacy low-level HTTP wrapper. It builds query strings,
-handles JSON and `FormData`, applies timeouts, and normalizes failures into
-`ApiError`. New feature code should call generated hey-api SDK functions or
-generated TanStack Query helpers instead of using `fetch` or handwritten
-endpoint facades.
+Feature code calls the backend through generated hey-api SDK functions or
+generated TanStack Query helpers. Raw `fetch` is reserved for browser/Tauri
+streaming cases such as file downloads, and those paths should still share
+generated endpoint types where practical.
 
-`src/api/env.ts` resolves the base URL in this order: explicit override,
-Tauri-injected `window.__BACKEND_URL__`, Vite environment, backend-injected
-base path, local dev backend port, then same-origin.
+`src/lib/backend/env.ts` resolves the `/api` base URL in this order: explicit
+override, Tauri-injected `window.__BACKEND_URL__`, Vite environment,
+backend-injected base path, local dev backend port, then same-origin.
 
 `openapi.config.ts` configures hey-api from
 `openapi/ldaca-wordflow.openapi.json`. Regenerate the schema and generated SDK
@@ -27,6 +26,15 @@ generated files. `src/lib/backend/**` is reserved for runtime infrastructure
 such as environment resolution and generated client configuration; backend
 request and response contracts should come through `@/api`.
 
+Workspace graph, node-info, node-data, and workspace metadata calls should use
+the generated explicit-workspace endpoints when `currentWorkspaceId` is
+available. Treat `currentWorkspaceId` as frontend selection state and a cache
+key component, not as permission to call hidden-current workspace routes for
+workspace-scoped data.
+Startup hydration and workspace switching use
+`GET/PUT /api/users/me/current-workspace`; that endpoint stores user UI
+selection only and should not become a data-read shortcut.
+
 MSW test infrastructure lives under `src/test/msw/` and is enabled from
 `src/test/setup.ts`. Add endpoint handlers or per-test `server.use(...)`
 overrides for generated-client tests instead of mocking generated modules.
@@ -34,8 +42,8 @@ overrides for generated-client tests instead of mocking generated modules.
 ## TanStack Query
 
 `providers/QueryProvider.tsx` creates a singleton `QueryClient`. Server state
-belongs in TanStack Query: workspace lists, graph data, node pages, schemas,
-file trees, and analysis result fetches.
+belongs in TanStack Query: workspace lists, lightweight graph data, full
+node-info metadata, node pages, file trees, and analysis result fetches.
 
 Mutation hooks invalidate the relevant query keys after backend changes. Avoid
 duplicating server state into Zustand unless it is needed for UI interaction.
@@ -79,7 +87,11 @@ out of sync.
 `hooks/useAuth.ts` is the React-facing auth hook. It delegates to `authStore`,
 processes redirect tokens, ensures refresh timers, and exposes headers for API
 calls. `authStore` coalesces concurrent bootstrap requests to avoid duplicate
-auth probes during startup.
+auth probes during startup. It reads public auth-mode metadata through generated
+`getRuntimeConfig` (`GET /api/runtime-config`) before fetching `/api/auth/`.
+Working-directory changes use generated `updateAdminConfig`
+(`PATCH /api/admin/config`) from the settings dialog path because mutating the
+data root is an admin-scoped server setting, not bootstrap metadata.
 
 ## Preferences
 

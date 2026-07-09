@@ -71,6 +71,9 @@ const nodeInputsFixture = (): UseTabNodeInputsResult =>
     graphSelectedIds: [],
     workspaceId: 'workspace-1',
     recentPresets: [],
+    nodeInfoCache: {},
+    getColumnInfos: vi.fn(() => []),
+    getNodeInfo: vi.fn(() => undefined),
   });
 
 const baseProps = {

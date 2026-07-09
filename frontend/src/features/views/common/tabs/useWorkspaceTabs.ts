@@ -15,7 +15,7 @@
  */
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { clearTasks, getWorkspaceTabs, putWorkspaceTabs } from '@/api';
+import { clearTask, getWorkspaceTabs, putWorkspaceTabs } from '@/api';
 import type { AnalysisTab, AnalysisTabInput, WorkspaceTabsState } from '@/api';
 import {
   EMPTY_TABS_STATE,
@@ -188,9 +188,9 @@ export function useWorkspaceTabs(
         // Fire-and-forget: the tab is already removed optimistically, so a
         // failed cleanup must not block the UI. A miss just leaves a harmless
         // orphan task for later garbage collection; log it for diagnosis.
-        void clearTasks({
+        void clearTask({
           headers: getAuthHeaders(),
-          query: { task_id: taskId },
+          path: { task_id: taskId },
           throwOnError: true,
         }).catch((error: unknown) => {
           console.warn(`[${analysisType}] Failed to clear task ${taskId} on tab close:`, error);

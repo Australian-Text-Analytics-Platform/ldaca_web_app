@@ -1,6 +1,6 @@
 import { useState, type SetStateAction } from 'react';
 
-import { quotationDetachOptions } from '@/api';
+import { analysisTaskDetachOptions } from '@/api';
 import type { DetachDialogNodeOption } from '../../common/components/DetachColumnsDialog';
 import type { NodeColumnSelection } from '../../common';
 import { useDetachColumnsState } from '../../common/hooks/useDetachColumnsState';
@@ -14,7 +14,9 @@ type QuotationDetachHandler = (
 ) => Promise<void> | void;
 
 interface UseQuotationDetachDialogArgs {
+  workspaceId: string | null;
   activeSelections: NodeColumnSelection[];
+  resolveTaskId: () => Promise<string | null>;
   getAuthHeaders: AuthHeadersGetter;
   handleDetach: QuotationDetachHandler;
   materializedPaths: Record<string, string>;
@@ -46,7 +48,9 @@ function emptySelectionForOptions(options: DetachDialogNodeOption[]): Record<str
  * and materialized path, then reset the dialog-local pending state.
  */
 export function useQuotationDetachDialog({
+  workspaceId,
   activeSelections,
+  resolveTaskId,
   getAuthHeaders,
   handleDetach,
   materializedPaths,
@@ -79,14 +83,17 @@ export function useQuotationDetachDialog({
    * empty source-column selections, then show the dialog or report the error.
    */
   const openDetachDialog = async (nodeId: string) => {
+    if (!workspaceId) return;
     const selection = activeSelections.find((item) => item.nodeId === nodeId);
     if (!selection?.column) return;
 
     try {
-      const { data: response } = await quotationDetachOptions({
+      const taskId = await resolveTaskId();
+      if (!taskId) throw new Error('No quotation task to detach');
+      const { data: response } = await analysisTaskDetachOptions({
         headers: getAuthHeaders(),
-        path: { node_id: nodeId },
-        query: { column: selection.column },
+        path: { workspace_id: workspaceId, task_id: taskId },
+        query: { node_id: nodeId, column: selection.column },
         throwOnError: true,
       });
       const nodes = response.data?.nodes ?? [];

@@ -1,4 +1,4 @@
-import { getNodeData } from '@/api';
+import { getNodeDataByWorkspaceId } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {
@@ -23,16 +23,19 @@ const normaliseResponse = (response: RawishResponse | null | undefined) => ({
 });
 
 interface PreviewRequest<P> {
+  workspaceId: string;
   nodeId: string;
   payload: P | null;
 }
 
 export interface UseNodePreviewWithRawFallbackOptions<P> {
+  /** Currently-active workspace id, or null if no workspace is selected. */
+  workspaceId: string | null;
   /** Currently-active node id, or null if no selection. */
   nodeId: string | null;
   /**
    * The operation-specific payload. When `null`, the hook falls back to
-   * `getNodeData` so the user always sees source rows even before they've
+   * node-data endpoint so the user always sees source rows even before they've
    * configured a valid operation.
    */
   operationPayload: P | null;
@@ -61,7 +64,7 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
  *
  * Replaces ~5 hand-rolled copies of: request shape with `payload: null`,
  * a manual signature builder with `disabled`/`::raw`/`::<json>` branches,
- * and a fetcher that branches on `payload === null` to call `getNodeData`.
+ * and a fetcher that branches on `payload === null` to call node-data.
  * Used by: useFilterSubTabSections hook, useAggregateSubTab hook, useSliceSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
  * Flow: call preprocessing preview first, fall back to raw node preview when no request is
  * ready, and expose one preview state shape to callers.
@@ -70,6 +73,7 @@ export const useNodePreviewWithRawFallback = <P>(
   opts: UseNodePreviewWithRawFallbackOptions<P>,
 ): UsePreprocessingPreviewResult => {
   const {
+    workspaceId,
     nodeId,
     operationPayload,
     operationFetch,
@@ -80,17 +84,17 @@ export const useNodePreviewWithRawFallback = <P>(
   const { getAuthHeaders } = useAuth();
 
   const request: PreviewRequest<P> | null =
-    enabled && nodeId ? { nodeId, payload: operationPayload } : null;
+    enabled && workspaceId && nodeId ? { workspaceId, nodeId, payload: operationPayload } : null;
 
   let signature = `${signaturePrefix}-preview-disabled`;
   if (request?.payload) {
     try {
-      signature = `${request.nodeId}::${JSON.stringify(request.payload)}`;
+      signature = `${request.workspaceId}::${request.nodeId}::${JSON.stringify(request.payload)}`;
     } catch {
-      signature = `${request.nodeId}::unserialisable`;
+      signature = `${request.workspaceId}::${request.nodeId}::unserialisable`;
     }
   } else if (request) {
-    signature = `${request.nodeId}::raw`;
+    signature = `${request.workspaceId}::${request.nodeId}::raw`;
   }
 
   return usePreprocessingPreview<PreviewRequest<P>>({
@@ -104,9 +108,9 @@ export const useNodePreviewWithRawFallback = <P>(
       if (req.payload) {
         return normaliseResponse(await operationFetch(req.nodeId, req.payload, page, pageSize));
       }
-      const { data } = await getNodeData({
+      const { data } = await getNodeDataByWorkspaceId({
         headers: getAuthHeaders(),
-        path: { node_id: req.nodeId },
+        path: { workspace_id: req.workspaceId, node_id: req.nodeId },
         query: { page, page_size: pageSize },
         throwOnError: true,
       });

@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { calculateTokenFrequencies } from '@/api';
-import type { TokenFrequencyRequestInput, TokenFrequencyResponse } from '@/api';
+import type { TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 import {
   resolveTokenFrequencyNodeContext,
   type TokenFrequencyAnalysisParams,
 } from '@/features/views/token-frequency/tokenFrequencyHelpers';
 import { extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
+import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
 import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
-
-type TokenFrequencyRequest = TokenFrequencyRequestInput;
 
 interface AnalysisState {
   currentWorkspaceId: string | null;
@@ -98,7 +97,7 @@ export const useTokenFrequencyTaskFlow = ({
   // overwriting an existing concordance search.
   const { createTab: createConcordanceTab } = useWorkspaceTabs(
     currentWorkspaceId,
-    'concordance_analysis',
+    ANALYSIS_TAB_GROUPS.concordance,
     getAuthHeaders,
   );
 
@@ -156,6 +155,7 @@ export const useTokenFrequencyTaskFlow = ({
       const { data: response } = await calculateTokenFrequencies({
         body: request,
         headers: getAuthHeaders(),
+        path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
       setResultsSafely(response);

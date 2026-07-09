@@ -1,12 +1,8 @@
 import type { TaskItem } from '@/stores/analysisStore';
 import type { AnalysisTaskStatus } from '@/features/views/common/useAnalysisTaskStatus';
+import type { CanonicalAnalysisTaskType } from '../analysisIds';
 
-export type CanonicalAnalysisTaskType =
-  | 'topic_modeling'
-  | 'token_frequencies'
-  | 'sequential_analysis'
-  | 'concordance'
-  | 'quotation';
+export type { CanonicalAnalysisTaskType };
 
 export interface NodePaginationState {
   currentPage: number;

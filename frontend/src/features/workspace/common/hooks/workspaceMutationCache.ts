@@ -1,11 +1,11 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
-import { type WorkspaceGraphResponse } from '@/api';
 import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { queryKeys } from '@/lib/queryKeys';
 
 export interface NodeCacheInvalidationOptions {
   includeNodeInfo?: boolean;
   includeData?: boolean;
+  /** Invalidates node info because the info endpoint is the schema source of truth. */
   includeSchema?: boolean;
 }
 
@@ -56,12 +56,11 @@ export const invalidateWorkspaceSummaries = (queryClient: QueryClient) => {
 };
 
 /**
- * Invalidates node-level data/schema caches alongside the owning graph.
+ * Invalidates node-level data/info caches alongside the owning graph.
  * Used by: workspace mutation success handlers for operations that can rewrite
  * a node's table data, schema, or cached node-info metadata.
  * Flow: skip when no workspace/node id is available, optionally clear the
- * node-info query, then invalidate graph/data/schema queries requested by the
- * caller.
+ * node-info query, then invalidate graph/data queries requested by the caller.
  */
 export const invalidateNodeWorkspaceQueries = (
   queryClient: QueryClient,
@@ -70,7 +69,7 @@ export const invalidateNodeWorkspaceQueries = (
   options: NodeCacheInvalidationOptions = {},
 ) => {
   if (!workspaceId || !nodeId) return;
-  if (options.includeNodeInfo) {
+  if (options.includeNodeInfo || options.includeSchema) {
     invalidateNodeInfoQuery(queryClient, workspaceId, nodeId);
   }
   invalidateWorkspaceGraphQuery(queryClient, workspaceId);
@@ -79,26 +78,4 @@ export const invalidateNodeWorkspaceQueries = (
       queryKey: queryKeys.nodeData(workspaceId, nodeId),
     });
   }
-  if (options.includeSchema) {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.nodeSchema(workspaceId, nodeId),
-    });
-  }
-};
-
-/**
- * Reads the current graph snapshot as ordered node ids.
- * Used by: join/concat mutations before they clear selection, so the success
- * path can infer which node was created when the backend response does not
- * include an id.
- */
-export const readWorkspaceGraphNodeIds = (
-  queryClient: QueryClient,
-  workspaceId: string | null | undefined,
-) => {
-  if (!workspaceId) return [];
-  const graph = queryClient.getQueryData<WorkspaceGraphResponse>(
-    queryKeys.workspaceGraph(workspaceId),
-  );
-  return (graph?.nodes ?? []).map((node) => node.id);
 };

@@ -17,13 +17,13 @@ const mockPolarsExpressionApply = vi.fn();
 const mockReplacePreview = vi.fn();
 const mockReplaceText = vi.fn();
 const mockRefreshNodeSchema = vi.fn();
-const mockGetNodeData = vi.hoisted(() => vi.fn());
+const mockGetNodeDataByWorkspaceId = vi.hoisted(() => vi.fn());
 
 const mockSelectedNode = {
   id: 'node-1',
   name: 'Corpus',
   columns: ['Body', 'Count'],
-  dtypes: {
+  schema: {
     Body: 'Utf8',
     Count: 'Int64',
   },
@@ -34,7 +34,7 @@ vi.mock('@/api/generated/sdk.gen', async (importOriginal) => {
   const actual = await importOriginal<typeof SdkGen>();
   return {
     ...actual,
-    getNodeData: mockGetNodeData,
+    getNodeDataByWorkspaceId: mockGetNodeDataByWorkspaceId,
   };
 });
 
@@ -46,8 +46,8 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
 }));
 
 /**
- * Mounts preprocessing with a QueryClient because the input-node schema query
- * now loads independently from graph selection state.
+ * Mounts preprocessing with a QueryClient because preview fallback hooks use
+ * query state while exercising the subtab behavior.
  */
 const renderPreprocessingFeature = () => {
   const queryClient = new QueryClient({
@@ -66,17 +66,9 @@ const renderPreprocessingFeature = () => {
 
 /**
  * Waits until the Filter tab has consumed the active preprocessing input
- * node's schema query, then returns the filter tabpanel.
+ * node's resolved column metadata, then returns the filter tabpanel.
  */
 const waitForFilterSchema = async () => {
-  await waitFor(() => {
-    expect(mockGetNodeData).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: { node_id: 'node-1' },
-        query: { page: 1, page_size: 1 },
-      }),
-    );
-  });
   const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
   await waitFor(() => {
     expect(within(filterPanel).getAllByRole('combobox')[0]).toBeEnabled();
@@ -96,16 +88,9 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  // Provides table schema data so subtab controls can render column choices.
+  // Provides the active workspace and nodes expected by the preprocessing shell.
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceData: () => ({
-    nodeData: {
-      columns: ['Body', 'Count'],
-      dtypes: {
-        Body: 'Utf8',
-        Count: 'Int64',
-      },
-    },
     currentWorkspaceId: 'ws-1',
     nodes: [mockSelectedNode],
   }),
@@ -198,17 +183,13 @@ vi.mock('@/components/help/InfoIcon', () => ({
 describe('DataPreprocessingFeature replace tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetNodeData.mockResolvedValue({
+    mockGetNodeDataByWorkspaceId.mockResolvedValue({
       data: {
         columns: ['Body', 'Count'],
-        dtypes: {
-          Body: 'Utf8',
-          Count: 'Int64',
-        },
         data: [{ Body: 'candidate tweet', Count: 1 }],
         pagination: {
           page: 1,
-          page_size: 1,
+          page_size: 10,
           total_rows: 1,
           total_pages: 1,
         },
@@ -216,10 +197,6 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
     mockFilterPreview.mockResolvedValue({
       columns: ['Body', 'Count'],
-      dtypes: {
-        Body: 'Utf8',
-        Count: 'Int64',
-      },
       data: [{ Body: 'candidate tweet', Count: 1 }],
       pagination: {
         page: 1,
@@ -231,10 +208,6 @@ describe('DataPreprocessingFeature replace tab', () => {
     mockFilterNode.mockResolvedValue(undefined);
     mockSlicePreview.mockResolvedValue({
       columns: ['Body', 'Count'],
-      dtypes: {
-        Body: 'Utf8',
-        Count: 'Int64',
-      },
       data: [{ Body: 'Invoice 1', Count: 1 }],
       pagination: {
         page: 1,
@@ -251,10 +224,6 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
     mockReplacePreview.mockResolvedValue({
       columns: ['Body', 'Count'],
-      dtypes: {
-        Body: 'Utf8',
-        Count: 'Int64',
-      },
       data: [{ Body: 'Invoice #', Count: 1 }],
       pagination: {
         page: 1,
@@ -309,20 +278,11 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
   });
 
-  it('shows one preprocessing input panel and loads filter schema for the added input node', async () => {
+  it('shows one preprocessing input panel and uses input node metadata for filter schema', async () => {
     renderPreprocessingFeature();
 
     expect(screen.getAllByText('Preprocessing Inputs (1/1)')).toHaveLength(1);
     expect(screen.queryByText(/Selected Data Blocks/)).not.toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(mockGetNodeData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: { node_id: 'node-1' },
-          query: { page: 1, page_size: 1 },
-        }),
-      );
-    });
 
     const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
     await waitFor(() => {
@@ -333,6 +293,14 @@ describe('DataPreprocessingFeature replace tab', () => {
       ).not.toBeInTheDocument();
     });
     expect(within(filterPanel).getAllByRole('combobox').length).toBeGreaterThan(0);
+    expect(
+      mockGetNodeDataByWorkspaceId.mock.calls.some(
+        ([options]) =>
+          options?.path?.node_id === 'node-1' &&
+          options?.query?.page === 1 &&
+          options?.query?.page_size === 1,
+      ),
+    ).toBe(false);
   });
 
   it('shows the Sample tab and submits a random sample request', async () => {

@@ -2,12 +2,11 @@ import { useMemo } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
 import {
   createWorkspace,
-  deleteWorkspace,
+  deleteWorkspaceById,
   listWorkspaces,
-  renameWorkspace,
-  saveWorkspace,
-  setCurrentWorkspace,
-  updateWorkspaceDescription,
+  saveWorkspaceById,
+  setMyCurrentWorkspace,
+  updateWorkspaceById,
 } from '@/api';
 import { ApiError } from '@/lib/apiError';
 import { queryKeys } from '@/lib/queryKeys';
@@ -52,9 +51,9 @@ export const useWorkspaceManagementMutations = ({
 
   const setCurrentWorkspaceOnServer = async (workspaceId: string | null) => {
     const setCurrent = () =>
-      setCurrentWorkspace({
+      setMyCurrentWorkspace({
+        body: { workspace_id: workspaceId },
         headers: authHeaders,
-        query: workspaceId === null ? undefined : { workspace_id: workspaceId },
         throwOnError: true,
       });
 
@@ -145,9 +144,9 @@ export const useWorkspaceManagementMutations = ({
       if (!workspaceId.trim()) {
         throw new Error('workspaceId is required');
       }
-      return deleteWorkspace({
+      return deleteWorkspaceById({
         headers: authHeaders,
-        query: { workspace_id: workspaceId },
+        path: { workspace_id: workspaceId },
         throwOnError: true,
       }).then(({ data }) => data);
     },
@@ -171,8 +170,12 @@ export const useWorkspaceManagementMutations = ({
 
   const saveWorkspaceMutation = useMutation({
     mutationFn: () => {
-      ensureWorkspaceSelected();
-      return saveWorkspace({ headers: authHeaders, throwOnError: true }).then(({ data }) => data);
+      const workspaceId = ensureWorkspaceSelected();
+      return saveWorkspaceById({
+        headers: authHeaders,
+        path: { workspace_id: workspaceId },
+        throwOnError: true,
+      }).then(({ data }) => data);
     },
     onMutate: () => {
       startOperation('saveWorkspace');
@@ -188,10 +191,11 @@ export const useWorkspaceManagementMutations = ({
 
   const updateWorkspaceNameMutation = useMutation({
     mutationFn: (newName: string) => {
-      ensureWorkspaceSelected();
-      return renameWorkspace({
+      const workspaceId = ensureWorkspaceSelected();
+      return updateWorkspaceById({
+        body: { name: newName },
         headers: authHeaders,
-        query: { new_name: newName },
+        path: { workspace_id: workspaceId },
         throwOnError: true,
       }).then(({ data }) => data);
     },
@@ -210,10 +214,11 @@ export const useWorkspaceManagementMutations = ({
 
   const updateWorkspaceDescriptionMutation = useMutation({
     mutationFn: (description: string) => {
-      ensureWorkspaceSelected();
-      return updateWorkspaceDescription({
+      const workspaceId = ensureWorkspaceSelected();
+      return updateWorkspaceById({
+        body: { description },
         headers: authHeaders,
-        query: { description },
+        path: { workspace_id: workspaceId },
         throwOnError: true,
       }).then(({ data }) => data);
     },

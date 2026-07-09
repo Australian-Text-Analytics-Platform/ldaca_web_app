@@ -6,6 +6,7 @@ import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
 } from '@/features/views/common/nodeSelectionTypes';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
   JoinPreviewRequestPayload,
@@ -17,7 +18,6 @@ import { JOIN_TYPE_OPTIONS } from '../../types';
 import {
   buildWorkspaceNodeMap,
   deriveNodeLabel,
-  extractNodeColumns,
   getNodeKey,
 } from '../../utils/nodeMetadata';
 import { dedupeNodeIds, takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
@@ -30,6 +30,7 @@ export interface JoinSubTabProps {
   selectedNodeColumns: Record<string, string>;
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeLike[];
+  getColumnInfos: (node: WorkspaceNodeLike) => ColumnInfo[];
   joinNodes: (
     leftNodeId: string,
     rightNodeId: string,
@@ -155,6 +156,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     selectedNodeColumns,
     currentWorkspaceId,
     workspaceNodes,
+    getColumnInfos,
     joinNodes,
     isLoading,
     onAlert,
@@ -187,7 +189,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
    */
   const getNodeColumnsForJoin = (nodeId: string): string[] => {
     const node = workspaceNodeMap.get(nodeId);
-    return extractNodeColumns(node);
+    return node ? getColumnInfos(node).map((column) => column.name) : [];
   };
 
   /**
@@ -329,8 +331,12 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     page: number;
     pageSize: number;
   }) => {
+    if (!currentWorkspaceId) {
+      throw new Error('No workspace selected');
+    }
     const { data: response } = await joinNodesPreview({
       headers: getAuthHeaders(),
+      path: { workspace_id: currentWorkspaceId },
       query: {
         left_node_id: request.leftNodeId,
         right_node_id: request.rightNodeId,
@@ -371,20 +377,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     signature: joinPreviewSignature,
     fetcher: joinPreviewFetcher,
   });
-
-  const joinPreviewColumnsToRender = (() => {
-    if (joinPreviewColumns.length > 0) return joinPreviewColumns;
-    if (
-      joinPreviewData.length > 0 &&
-      typeof joinPreviewData[0] === 'object' &&
-      // preview rows come from the API; keep the explicit null guard.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      joinPreviewData[0] !== null
-    ) {
-      return Object.keys(joinPreviewData[0]);
-    }
-    return [];
-  })();
 
   /**
    * Updates preview rows-per-page for the join preview table.
@@ -530,7 +522,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     joinConfigReady,
     joinConfigIssues,
     preview: {
-      columns: joinPreviewColumnsToRender,
+      columns: joinPreviewColumns,
       data: joinPreviewData,
       pagination: joinPreviewPagination,
       loading: joinPreviewLoading,

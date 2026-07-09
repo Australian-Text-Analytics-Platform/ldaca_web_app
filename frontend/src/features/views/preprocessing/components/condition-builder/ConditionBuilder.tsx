@@ -34,9 +34,7 @@ export interface ConditionBuilderProps<Condition extends ConditionBuilderItem> {
   ) => void;
   disabled?: boolean;
   hasSelection: boolean;
-  isSchemaLoading?: boolean;
   noSelectionMessage?: string;
-  schemaLoadingMessage?: string;
   noSchemaMessage?: string;
   renderValueInput: (condition: Condition, disabled: boolean) => React.ReactNode;
   renderConditionMetadata?: (condition: Condition, disabled: boolean) => React.ReactNode;
@@ -47,7 +45,6 @@ export interface ConditionBuilderProps<Condition extends ConditionBuilderItem> {
 
 const defaultMessages = {
   noSelection: 'Select a data block to configure conditions.',
-  schemaLoading: 'Retrieving column metadata…',
   noSchema: 'No schema information is available yet for this data block.',
 };
 
@@ -74,9 +71,7 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
     onConditionChange,
     disabled = false,
     hasSelection,
-    isSchemaLoading = false,
     noSelectionMessage = defaultMessages.noSelection,
-    schemaLoadingMessage = defaultMessages.schemaLoading,
     noSchemaMessage = defaultMessages.noSchema,
     renderValueInput,
     renderConditionMetadata,
@@ -129,10 +124,6 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
       {!hasSelection ? (
         <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
           {noSelectionMessage}
-        </div>
-      ) : isSchemaLoading ? (
-        <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-          {schemaLoadingMessage}
         </div>
       ) : !availableColumns.length ? (
         <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">

@@ -2,24 +2,36 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
+import type { NodeInfo } from '@/lib/nodeInfo';
 import {
   DEFAULT_TOPIC_SIZE_VALUE,
   useTopicModelingParameters,
 } from '../useTopicModelingParameters';
 
 const nodes = (...counts: number[]): WorkspaceNodeLike[] =>
-  counts.map((count, index) => ({
+  counts.map((_count, index) => ({
     id: `node-${String(index + 1)}`,
     name: `Node ${String(index + 1)}`,
-    shape: [count, 3],
   }));
+
+const nodeIds = (...counts: number[]) => counts.map((_, index) => `node-${String(index + 1)}`);
+
+const nodeInfoCache = (...counts: number[]): Record<string, NodeInfo> =>
+  Object.fromEntries(
+    counts.map((count, index) => {
+      const id = `node-${String(index + 1)}`;
+      return [id, { id, name: `Node ${String(index + 1)}`, shape: [count, 3] as NodeInfo['shape'] }];
+    }),
+  );
 
 describe('useTopicModelingParameters', () => {
   it('derives default corpus sampling from selected node sizes', async () => {
     const { result } = renderHook(() =>
       useTopicModelingParameters({
         panelSelectedNodes: nodes(8000, 80),
+        panelNodeIds: nodeIds(8000, 80),
         panelNodeIdsKey: 'node-1|node-2',
+        nodeInfoCache: nodeInfoCache(8000, 80),
       }),
     );
 
@@ -38,7 +50,9 @@ describe('useTopicModelingParameters', () => {
     const { result } = renderHook(() =>
       useTopicModelingParameters({
         panelSelectedNodes: nodes(8000),
+        panelNodeIds: nodeIds(8000),
         panelNodeIdsKey: 'node-1',
+        nodeInfoCache: nodeInfoCache(8000),
       }),
     );
 
@@ -76,7 +90,9 @@ describe('useTopicModelingParameters', () => {
     const { result } = renderHook(() =>
       useTopicModelingParameters({
         panelSelectedNodes: nodes(10000, 5000),
+        panelNodeIds: nodeIds(10000, 5000),
         panelNodeIdsKey: 'node-1|node-2',
+        nodeInfoCache: nodeInfoCache(10000, 5000),
       }),
     );
 
@@ -110,7 +126,10 @@ describe('useTopicModelingParameters', () => {
       }) =>
         useTopicModelingParameters({
           panelSelectedNodes,
+          panelNodeIds: panelNodeIdsKey ? panelNodeIdsKey.split('|') : [],
           panelNodeIdsKey,
+          nodeInfoCache:
+            panelNodeIdsKey === 'node-1' ? nodeInfoCache(10000) : {},
         }),
       {
         initialProps: {

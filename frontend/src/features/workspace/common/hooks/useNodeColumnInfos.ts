@@ -1,11 +1,10 @@
-import { useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   type ColumnInfo,
   mapColumnsToInfo,
 } from '@/features/workspace/data-view/utils/columnTypes';
-import { nodeInfoQueryOptions } from '@/lib/nodeInfo';
+import { type NodeInfo, nodeInfosQueryOptions } from '@/lib/nodeInfo';
 
 export type NodeLike = Record<string, unknown> & {
   id?: string;
@@ -32,25 +31,28 @@ const resolveNodeId = (node: NodeLike | null | undefined, fallbackIndex: number)
 
 export interface UseNodeColumnInfosResult {
   columnInfoCache: Record<string, ColumnInfo[]>;
+  /** Full node-info responses keyed by node id for metadata beyond columns. */
+  nodeInfoCache: Record<string, NodeInfo>;
   /**
    * Returns cached column infos for the provided node. Falls back to basic
    * mapping if the cache has not been hydrated yet, ensuring the selector
    * always renders something while the typed schema is loading.
    */
   getColumnInfos: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
+  /** Returns the cached node-info response for consumers that need shape or tokenizer metadata. */
+  getNodeInfo: (node: NodeLike | null | undefined, idx?: number) => NodeInfo | undefined;
   /** True while one or more schemas are being fetched. */
   isLoading: boolean;
 }
 
 /**
  * Fetch typed column info for a set of workspace nodes. Backed by
- * `useQueries` against the shared `nodeInfo` query — request dedup,
- * caching, and invalidation flow through the TanStack client used
- * everywhere else in the app.
+ * one batched node-info query — request dedup, caching, and invalidation flow
+ * through the TanStack client used everywhere else in the app.
  */
 /**
  * Used by: add-node-as-needed input hooks and analysis feature screens because the hook needs local steps to normalize inputs before exposing stable state to consumers.
- * Flow: resolve node ids, issue node-info queries, build a typed column cache, then return a fallback-aware getter and loading flag.
+ * Flow: resolve node ids, issue one batch node-info query, build typed metadata caches, then return fallback-aware getters and loading flag.
  */
 export const useNodeColumnInfos = (params: {
   workspaceId?: string | null;
@@ -64,25 +66,25 @@ export const useNodeColumnInfos = (params: {
     .map((node, idx) => resolveNodeId(node, idx))
     .filter((id): id is string => !!id);
 
-  const queryEnabled = enabled && Boolean(workspaceId);
-  const results = useQueries({
-    queries: nodeIds.map((nodeId) => ({
-      ...nodeInfoQueryOptions({ workspaceId: workspaceId ?? '', nodeId, getAuthHeaders }),
-      enabled: queryEnabled && !!nodeId && !!workspaceId,
-      staleTime: 60_000,
-    })),
+  const queryEnabled = enabled && Boolean(workspaceId) && nodeIds.length > 0;
+  const nodeInfosQuery = useQuery({
+    ...nodeInfosQueryOptions({ workspaceId: workspaceId ?? '', nodeIds, getAuthHeaders }),
+    enabled: queryEnabled,
+    staleTime: 60_000,
   });
 
-  const columnInfoCache = useMemo(() => {
-    const cache: Record<string, ColumnInfo[]> = {};
-    nodeIds.forEach((nodeId, idx) => {
-      const data = results[idx]?.data;
-      if (data) {
-        cache[nodeId] = mapColumnsToInfo(data);
-      }
-    });
-    return cache;
-  }, [nodeIds, results]);
+  const nodeInfoCache: Record<string, NodeInfo> = {};
+  for (const nodeInfo of nodeInfosQuery.data ?? []) {
+    nodeInfoCache[nodeInfo.id] = nodeInfo;
+  }
+
+  const columnInfoCache: Record<string, ColumnInfo[]> = {};
+  nodeIds.forEach((nodeId) => {
+    const data = nodeInfoCache[nodeId];
+    if (data) {
+      columnInfoCache[nodeId] = mapColumnsToInfo(data);
+    }
+  });
 
   /** Returns typed cached columns when available, otherwise derives from the node snapshot. */
   /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
@@ -96,7 +98,14 @@ export const useNodeColumnInfos = (params: {
     return mapColumnsToInfo(node);
   };
 
-  const isLoading = results.some((result) => result.isFetching);
+  /** Returns cached node metadata for consumers that need full node-info fields. */
+  /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+  const getNodeInfo = (node: NodeLike | null | undefined, idx = 0): NodeInfo | undefined => {
+    const nodeId = resolveNodeId(node, idx);
+    return nodeId ? nodeInfoCache[nodeId] : undefined;
+  };
 
-  return { columnInfoCache, getColumnInfos, isLoading };
+  const isLoading = nodeInfosQuery.isFetching;
+
+  return { columnInfoCache, nodeInfoCache, getColumnInfos, getNodeInfo, isLoading };
 };

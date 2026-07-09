@@ -1,15 +1,15 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { concordanceTaskDispersionBins } from '@/api';
+import { analysisTaskDispersionBins } from '@/api';
 import type { ConcordanceAnalysisResponse } from '@/api';
 import { useConcordanceResultViewModel } from '../useConcordanceResultViewModel';
 
 vi.mock('@/api', () => ({
-  concordanceTaskDispersionBins: vi.fn(),
+  analysisTaskDispersionBins: vi.fn(),
 }));
 
-const mockedConcordanceTaskDispersionBins = vi.mocked(concordanceTaskDispersionBins);
+const mockedAnalysisTaskDispersionBins = vi.mocked(analysisTaskDispersionBins);
 
 const getAuthHeaders = vi.fn(() => ({ Authorization: 'Bearer test-token' }));
 
@@ -47,6 +47,7 @@ const makeResult = (): ConcordanceAnalysisResponse =>
   }) as unknown as ConcordanceAnalysisResponse;
 
 const defaultArgs = {
+  workspaceId: 'workspace-1',
   results: makeResult(),
   concordanceTaskId: 'task-1',
   panelSelectedNodes: [
@@ -63,7 +64,7 @@ const defaultArgs = {
 describe('useConcordanceResultViewModel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedConcordanceTaskDispersionBins.mockResolvedValue({
+    mockedAnalysisTaskDispersionBins.mockResolvedValue({
       data: {
         bin_count: 100,
         node_id: 'node-1',
@@ -86,9 +87,9 @@ describe('useConcordanceResultViewModel', () => {
     });
 
     await waitFor(() => {
-      expect(mockedConcordanceTaskDispersionBins).toHaveBeenCalledWith({
+      expect(mockedAnalysisTaskDispersionBins).toHaveBeenCalledWith({
         headers: { Authorization: 'Bearer test-token' },
-        path: { task_id: 'task-1' },
+        path: { workspace_id: 'workspace-1', task_id: 'task-1' },
         query: { node_id: 'node-1' },
         throwOnError: true,
       });
@@ -117,7 +118,7 @@ describe('useConcordanceResultViewModel', () => {
 
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
-    expect(mockedConcordanceTaskDispersionBins).not.toHaveBeenCalled();
+    expect(mockedAnalysisTaskDispersionBins).not.toHaveBeenCalled();
     expect(result.current.getMaterializedBinsForKey('node-1')).toBeUndefined();
   });
 });

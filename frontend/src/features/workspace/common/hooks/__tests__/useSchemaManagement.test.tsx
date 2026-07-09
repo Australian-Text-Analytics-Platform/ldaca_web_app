@@ -10,6 +10,34 @@ vi.mock('@/lib/nodeInfo', async (importOriginal) => {
   return {
     ...actual,
     fetchNodeInfo: fetchNodeInfoMock,
+    fetchNodeInfos: (args: {
+      workspaceId: string;
+      nodeIds: string[];
+      getAuthHeaders?: () => Record<string, string>;
+    }) =>
+      Promise.all(
+        args.nodeIds.map(async (nodeId) => ({
+          id: nodeId,
+          ...((await fetchNodeInfoMock({
+            workspaceId: args.workspaceId,
+            nodeId,
+            getAuthHeaders: args.getAuthHeaders,
+          })) as Record<string, unknown>),
+        })),
+      ),
+    nodeInfoQueryOptions: (args: {
+      workspaceId: string;
+      nodeId: string;
+      getAuthHeaders?: () => Record<string, string>;
+    }) => ({
+      queryKey: ['workspaces', args.workspaceId, 'nodes', args.nodeId, 'info'] as const,
+      queryFn: () =>
+        fetchNodeInfoMock({
+          workspaceId: args.workspaceId,
+          nodeId: args.nodeId,
+          getAuthHeaders: args.getAuthHeaders,
+        }),
+    }),
   };
 });
 
@@ -160,29 +188,16 @@ describe('createNodeSnapshots', () => {
     fetchNodeInfoMock.mockReset();
   });
 
-  it('returns an empty-snapshot stand-in when a single fetch fails, preserving order for the rest', async () => {
+  it('rejects when a node-info fetch fails instead of submitting an empty stand-in', async () => {
     fetchNodeInfoMock
       .mockResolvedValueOnce({ name: 'OK', columns: ['x'], schema: {} })
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValueOnce({ name: 'Also OK', columns: ['y'], schema: {} });
 
     const queryClient = new QueryClient();
-    const snapshots = await createNodeSnapshots(
-      'ws-1',
-      ['n1', 'n2', 'n3'],
-      () => ({}),
-      queryClient,
-    );
-
-    expect(snapshots).toHaveLength(3);
-    expect(snapshots[0]?.name).toBe('OK');
-    expect(snapshots[1]).toEqual({
-      id: 'n2',
-      name: 'n2',
-      columns: [],
-      schema: {},
-    });
-    expect(snapshots[2]?.name).toBe('Also OK');
+    await expect(
+      createNodeSnapshots('ws-1', ['n1', 'n2', 'n3'], () => ({}), queryClient),
+    ).rejects.toThrow('boom');
   });
 });
 
@@ -191,7 +206,7 @@ describe('useSchemaManagement', () => {
     fetchNodeInfoMock.mockReset();
   });
 
-  describe('availableColumns fallback chain', () => {
+  describe('availableColumns', () => {
     it('uses currentSchema once the query resolves', async () => {
       fetchNodeInfoMock.mockResolvedValue({
         schema: { col_a: 'integer', col_b: 'string' },
@@ -216,7 +231,7 @@ describe('useSchemaManagement', () => {
       });
     });
 
-    it('falls back to nodeData.columns + dtypes when no schema query is available', () => {
+    it('returns no columns when no node-info query is available', () => {
       const { result } = renderWithClient(() =>
         useSchemaManagement({
           nodeId: null,
@@ -225,43 +240,10 @@ describe('useSchemaManagement', () => {
           /** Keeps the hook signature complete while bypassing remote schema queries. */
           /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
-          nodeData: {
-            columns: ['a', 'b'],
-            dtypes: { a: 'integer', b: 'string' },
-          },
         }),
       );
 
-      expect(result.current.availableColumns).toEqual([
-        { name: 'a', dataType: 'integer' },
-        { name: 'b', dataType: 'string' },
-      ]);
-    });
-
-    it('falls back to selectedNode.data.schema (array form) when nodeData is absent', () => {
-      const { result } = renderWithClient(() =>
-        useSchemaManagement({
-          nodeId: null,
-          isLocked: false,
-          workspaceId: undefined,
-          /** Keeps auth available while the test uses selected-node schema fallback data. */
-          /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-          getAuthHeaders: () => ({}),
-          selectedNode: {
-            data: {
-              schema: [
-                { name: 'a', js_type: 'integer' },
-                { name: 'b', js_type: 'string' },
-              ],
-            },
-          },
-        }),
-      );
-
-      expect(result.current.availableColumns).toEqual([
-        { name: 'a', dataType: 'integer' },
-        { name: 'b', dataType: 'string' },
-      ]);
+      expect(result.current.availableColumns).toEqual([]);
     });
   });
 
@@ -333,28 +315,30 @@ describe('useSchemaManagement', () => {
   });
 
   describe('getColumnsByType', () => {
-    it('filters availableColumns by a single type or a list of types', () => {
+    it('filters node-info columns by a single type or a list of types', async () => {
+      fetchNodeInfoMock.mockResolvedValue({
+        schema: { a: 'integer', b: 'string', c: 'integer' },
+      });
+
       const { result } = renderWithClient(() =>
         useSchemaManagement({
-          nodeId: null,
+          nodeId: 'node-1',
           isLocked: false,
-          workspaceId: undefined,
-          /** Keeps auth plumbing present while testing type filtering over local data. */
+          workspaceId: 'ws-1',
+          /** Keeps auth plumbing present while testing type filtering over node-info data. */
           /** Called by: the hook under test through the mocked auth store because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
           getAuthHeaders: () => ({}),
-          nodeData: {
-            columns: ['a', 'b', 'c'],
-            dtypes: { a: 'integer', b: 'string', c: 'integer' },
-          },
         }),
       );
 
-      expect(result.current.getColumnsByType('integer')).toEqual([
-        { name: 'a', dataType: 'integer' },
-        { name: 'c', dataType: 'integer' },
-      ]);
-      expect(result.current.getColumnsByType(['string', 'integer'])).toHaveLength(3);
-      expect(result.current.getColumnsByType('boolean')).toEqual([]);
+      await waitFor(() => {
+        expect(result.current.getColumnsByType('integer')).toEqual([
+          { name: 'a', dataType: 'integer' },
+          { name: 'c', dataType: 'integer' },
+        ]);
+        expect(result.current.getColumnsByType(['string', 'integer'])).toHaveLength(3);
+        expect(result.current.getColumnsByType('boolean')).toEqual([]);
+      });
     });
   });
 

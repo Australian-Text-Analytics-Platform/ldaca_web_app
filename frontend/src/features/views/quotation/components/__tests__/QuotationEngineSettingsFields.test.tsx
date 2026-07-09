@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { QuotationEngineConfigInput } from '@/api';
+import type { QuotationEngineConfig } from '@/api';
 import { QuotationEngineSettingsFields } from '../QuotationEngineSettingsFields';
 
 describe('QuotationEngineSettingsFields', () => {
@@ -12,7 +12,7 @@ describe('QuotationEngineSettingsFields', () => {
     const onRemoteUrlChange = vi.fn();
 
     function Harness() {
-      const [engineConfig, setEngineConfig] = useState<QuotationEngineConfigInput>({
+      const [engineConfig, setEngineConfig] = useState<QuotationEngineConfig>({
         type: 'local',
       });
       const [lastRemoteUrl, setLastRemoteUrl] = useState('https://saved.example/quotation');

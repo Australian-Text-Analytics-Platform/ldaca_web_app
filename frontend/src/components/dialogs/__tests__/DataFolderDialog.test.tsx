@@ -9,8 +9,8 @@ import { queryKeys } from '@/lib/queryKeys';
 const refreshAuth = vi.fn();
 /** Workspace reset mock used to verify changing data roots unloads the active workspace first. */
 const setCurrentWorkspace = vi.fn();
-/** Used by: the generated SDK module factory to inspect backend config update payloads because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-const updateConfig = vi.fn();
+/** Used by: the generated SDK module factory to inspect admin config update payloads because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+const updateAdminConfig = vi.fn();
 
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), {
@@ -21,8 +21,8 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/api/generated/sdk.gen', () => ({
-  /** Used by: the generated SDK module mock to assert DataFolderDialog updateConfig calls because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
-  updateConfig: (...args: unknown[]) => updateConfig(...args),
+  /** Used by: the generated SDK module mock to assert DataFolderDialog updateAdminConfig calls because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  updateAdminConfig: (...args: unknown[]) => updateAdminConfig(...args),
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
@@ -55,7 +55,9 @@ describe('DataFolderDialog', () => {
     vi.clearAllMocks();
     refreshAuth.mockResolvedValue(undefined);
     setCurrentWorkspace.mockResolvedValue(undefined);
-    updateConfig.mockResolvedValue({ data: { data_root: '/tmp/updated', multi_user_mode: false } });
+    updateAdminConfig.mockResolvedValue({
+      data: { data_root: '/tmp/updated', multi_user_mode: false },
+    });
   });
 
   it('unloads the active workspace before changing directories and refreshes workspace and file lists after', async () => {
@@ -84,15 +86,15 @@ describe('DataFolderDialog', () => {
     });
 
     expect(setCurrentWorkspace).toHaveBeenCalledWith(null);
-    expect(updateConfig).toHaveBeenCalledWith({
+    expect(updateAdminConfig).toHaveBeenCalledWith({
       body: { data_root: '/tmp/updated' },
       throwOnError: true,
     });
 
     expect(setCurrentWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(
-      updateConfig.mock.invocationCallOrder[0]!,
+      updateAdminConfig.mock.invocationCallOrder[0]!,
     );
-    expect(updateConfig.mock.invocationCallOrder[0]!).toBeLessThan(
+    expect(updateAdminConfig.mock.invocationCallOrder[0]!).toBeLessThan(
       refreshAuth.mock.invocationCallOrder[0]!,
     );
 

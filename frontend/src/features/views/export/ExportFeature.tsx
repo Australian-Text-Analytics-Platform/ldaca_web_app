@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
-import type { WorkspaceNodeInfo as GraphNode } from '@/api';
+import type { WorkspaceGraphNode as GraphNode } from '@/api';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { getApiBase } from '@/lib/backend/env';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -20,6 +19,7 @@ import { saveBlob } from '@/lib/download';
 import { isTauri } from '@/lib/isTauri';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
+import { buildExportNodesDownloadUrl } from './exportDownloadUrl';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -77,40 +77,15 @@ function ExportFeature() {
   const [exporting, setExporting] = useState(false);
   const [downloadingIds, setDownloadingIds] = useState<Record<string, DownloadStatus>>({});
 
-  const nodeIds = selectedNodes.map((n: GraphNode, idx: number) => {
-    const data = n.data as Record<string, unknown> | undefined;
-    // Id aliases come from WorkspaceNodeInfo's `unknown` index signature; the
-    // chain always resolves to a string id at runtime, so assert string.
-    return (
-      n.id ||
-      ((n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${String(idx)}`) as string)
-    );
-  });
+  const nodeIds = selectedNodes.map((node: GraphNode) => node.id);
 
   // Best-effort helpers for node display
   /**
    * Called by: ExportFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
-   * Flow: read node id/name from graph and data aliases, format optional shape dimensions, then return the compact export display model.
+   * Flow: read node id/name from the lightweight graph summary, then return the compact export display model.
    */
   const toDisplay = (n: GraphNode) => {
-    const data = n.data as Record<string, unknown> | undefined;
-    // Id/name aliases come from the `unknown` index signature; they resolve to
-    // strings at runtime, so assert string instead of stringifying objects.
-    const id = n.id || ((n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? '') as string);
-    const name = (data?.nodeName ?? data?.label ?? n.label ?? n.name) as string;
-    const shapeArr = Array.isArray(data?.shape)
-      ? (data.shape as (number | string | null | undefined)[])
-      : null;
-    // Formats unknown row/column dimensions for compact node summaries.
-    /**
-     * Called by: toDisplay as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
-     */
-    const formatDimension = (value: number | string | null | undefined) =>
-      typeof value === 'number' || typeof value === 'string' ? value : '?';
-    const shape = shapeArr
-      ? `${String(formatDimension(shapeArr[0]))} × ${String(formatDimension(shapeArr[1]))}`
-      : null;
-    return { id, name, shape };
+    return { id: n.id, name: n.name || n.id };
   };
 
   // On Windows, both WebView2's native fetch and tauri-plugin-http drop
@@ -169,9 +144,10 @@ function ExportFeature() {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
     setExporting(true);
     try {
-      const params = new URLSearchParams({ node_ids: nodeIds.join(','), format });
-      const apiBase = getApiBase();
-      const url = `${apiBase}/workspaces/export?` + params.toString();
+      const url = buildExportNodesDownloadUrl({
+        path: { workspace_id: currentWorkspaceId },
+        query: { node_ids: nodeIds.join(','), format },
+      });
       const headers = getAuthHeaders();
       const multiple = nodeIds.length > 1;
       const ext = multiple ? 'zip' : getDownloadExtension(format);
@@ -217,9 +193,10 @@ function ExportFeature() {
     if (!id) return;
     setDownloadingIds((s) => ({ ...s, [id]: 'downloading' }));
     try {
-      const params = new URLSearchParams({ node_ids: id, format });
-      const apiBase = getApiBase();
-      const url = `${apiBase}/workspaces/export?` + params.toString();
+      const url = buildExportNodesDownloadUrl({
+        path: { workspace_id: currentWorkspaceId },
+        query: { node_ids: id, format },
+      });
       const headers = getAuthHeaders();
       const ext = getDownloadExtension(format);
       const filename = `${name || id}.${ext}`;
@@ -284,9 +261,6 @@ function ExportFeature() {
                   >
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-foreground">{info.name}</p>
-                      {info.shape && (
-                        <p className="text-muted-foreground text-xs">Shape: {info.shape}</p>
-                      )}
                     </div>
                     <Button
                       size="sm"

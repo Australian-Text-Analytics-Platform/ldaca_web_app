@@ -57,6 +57,9 @@ vi.mock('../../common/nodeInputs', () => ({
     canAddMore: true,
     graphSelectedIds: [],
     workspaceId: 'ws-1',
+    nodeInfoCache: { 'node-1': { id: 'node-1', name: 'Node 1' } },
+    getColumnInfos: vi.fn(() => [{ name: 'text', dataType: 'string' }]),
+    getNodeInfo: vi.fn(() => ({ id: 'node-1', name: 'Node 1' })),
   }),
 }));
 

@@ -2,12 +2,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { getNodeData, getTokenizerModels } from '@/api';
+import { getNodeDataByWorkspaceId, getTokenizerModels } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import TokenizerModelSelector from '../TokenizerModelSelector';
 
 vi.mock('@/api/generated/sdk.gen', () => ({
-  getNodeData: vi.fn(),
+  getNodeDataByWorkspaceId: vi.fn(),
   getTokenizerModels: vi.fn(),
 }));
 
@@ -64,7 +64,7 @@ describe('TokenizerModelSelector', () => {
         value: vi.fn(),
       });
     }
-    vi.mocked(getNodeData).mockResolvedValue({
+    vi.mocked(getNodeDataByWorkspaceId).mockResolvedValue({
       data: {
         data: [
           { text: 'This is a short English document.' },

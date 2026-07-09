@@ -58,7 +58,7 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
 
   return {
     previewData: data?.preview ?? [],
-    columns: data?.columns ?? (data?.preview[0] ? Object.keys(data.preview[0]) : []),
+    columns: data?.columns ?? [],
     totalRows: data?.total_rows ?? 0,
     // file_type is a required non-empty backend type identifier; '' should fall back to null
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing

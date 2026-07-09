@@ -2,9 +2,9 @@ import { type Dispatch, type SetStateAction } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const quotationTaskRequestMock = vi.hoisted(() => vi.fn());
-vi.mock('@/api', () => ({
-  quotationTaskRequest: quotationTaskRequestMock,
+const getAnalysisTaskRequestMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../common/analysisTasksApi', () => ({
+  getAnalysisTaskRequest: getAnalysisTaskRequestMock,
 }));
 
 const useMaterializeLifecycleMock = vi.hoisted(() => vi.fn());
@@ -31,6 +31,7 @@ const renderLifecycle = (
   overrides: Partial<Parameters<typeof useQuotationMaterializeLifecycle>[0]> = {},
 ) => {
   const props = {
+    workspaceId: 'workspace-1',
     materializeTaskIds: { 'node-1': 'materialize-task-1' },
     setNodeMaterializing: mkSetBoolMap(),
     setMaterializeTaskIds: mkSetTaskMap(),
@@ -53,7 +54,7 @@ const renderLifecycle = (
 
 describe('useQuotationMaterializeLifecycle', () => {
   beforeEach(() => {
-    quotationTaskRequestMock.mockReset();
+    getAnalysisTaskRequestMock.mockReset();
     useMaterializeLifecycleMock.mockReset();
   });
 
@@ -74,11 +75,9 @@ describe('useQuotationMaterializeLifecycle', () => {
   });
 
   it('refreshes materialized request metadata and resets page size on success', async () => {
-    quotationTaskRequestMock.mockResolvedValue({
-      data: {
-        materialized_path: '/tmp/quotations.parquet',
-        materialize_summary: { recordCount: 3 },
-      },
+    getAnalysisTaskRequestMock.mockResolvedValue({
+      materialized_path: '/tmp/quotations.parquet',
+      materialize_summary: { recordCount: 3 },
     });
 
     const applyMaterializedRequest = vi.fn();
@@ -92,11 +91,12 @@ describe('useQuotationMaterializeLifecycle', () => {
       await lifecycleArgs.onTerminalSuccess?.('node-1', 'materialize-task-1');
     });
 
-    expect(quotationTaskRequestMock).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer token' },
-      path: { task_id: 'parent-task-1' },
-      throwOnError: true,
-    });
+    expect(getAnalysisTaskRequestMock).toHaveBeenCalledWith(
+      'quotation_analysis',
+      'workspace-1',
+      'parent-task-1',
+      { Authorization: 'Bearer token' },
+    );
     expect(applyMaterializedRequest).toHaveBeenCalledWith('node-1', '/tmp/quotations.parquet', {
       recordCount: 3,
     });
@@ -114,7 +114,7 @@ describe('useQuotationMaterializeLifecycle', () => {
       await lifecycleArgs.onTerminalSuccess?.('node-1', 'materialize-task-1');
     });
 
-    expect(quotationTaskRequestMock).not.toHaveBeenCalled();
+    expect(getAnalysisTaskRequestMock).not.toHaveBeenCalled();
     expect(handlePageSizeChange).toHaveBeenCalledWith(20);
   });
 });

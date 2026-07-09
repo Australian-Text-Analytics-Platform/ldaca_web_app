@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   updateAnnotationClassDescriptions: vi.fn(),
   setAnnotationClassParent: vi.fn(),
   setAnnotationCell: vi.fn(),
-  getNodeData: vi.fn(),
+  getNodeDataByWorkspaceId: vi.fn(),
   annotateAiPreview: vi.fn(),
   annotateAiPreviewState: vi.fn(),
   annotateAiPreviewOverride: vi.fn(),
@@ -43,7 +43,7 @@ vi.mock('@/api', () => ({
   updateAnnotationClassDescriptions: mocks.updateAnnotationClassDescriptions,
   setAnnotationClassParent: mocks.setAnnotationClassParent,
   setAnnotationCell: mocks.setAnnotationCell,
-  getNodeData: mocks.getNodeData,
+  getNodeDataByWorkspaceId: mocks.getNodeDataByWorkspaceId,
   annotateAiPreview: mocks.annotateAiPreview,
   annotateAiPreviewState: mocks.annotateAiPreviewState,
   annotateAiPreviewOverride: mocks.annotateAiPreviewOverride,
@@ -145,6 +145,9 @@ const sourceNodeInputs = (
   workspaceId: 'workspace-1',
   recentPresets: [],
   ...overrides,
+  nodeInfoCache: overrides.nodeInfoCache ?? {},
+  getColumnInfos: overrides.getColumnInfos ?? vi.fn(() => []),
+  getNodeInfo: overrides.getNodeInfo ?? vi.fn(() => undefined),
 });
 
 const classNodeInputs = (
@@ -187,6 +190,9 @@ const classNodeInputs = (
   workspaceId: 'workspace-1',
   recentPresets: [],
   ...overrides,
+  nodeInfoCache: overrides.nodeInfoCache ?? {},
+  getColumnInfos: overrides.getColumnInfos ?? vi.fn(() => []),
+  getNodeInfo: overrides.getNodeInfo ?? vi.fn(() => undefined),
 });
 
 // AI-mode example selector. Defaults to one string node so the example
@@ -231,6 +237,9 @@ const exampleNodeInputs = (
   workspaceId: 'workspace-1',
   recentPresets: [],
   ...overrides,
+  nodeInfoCache: overrides.nodeInfoCache ?? {},
+  getColumnInfos: overrides.getColumnInfos ?? vi.fn(() => []),
+  getNodeInfo: overrides.getNodeInfo ?? vi.fn(() => undefined),
 });
 
 function nodeInputRequestsStore(
@@ -352,7 +361,7 @@ describe('AnnotationFeature', () => {
         schema: { text: 'String', existing_annotation: 'String', annotation: 'String' },
       },
     });
-    mocks.getNodeData.mockResolvedValue({
+    mocks.getNodeDataByWorkspaceId.mockResolvedValue({
       data: {
         columns: ['text', 'existing_annotation'],
         data: [{ text: 'hello world', existing_annotation: 'support' }],
@@ -515,7 +524,7 @@ describe('AnnotationFeature', () => {
 
     expect(mocks.setAnnotationClassParent).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { node_id: 'classes-node' },
+        path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
         body: { parent_node_id: 'source-node' },
       }),
     );
@@ -533,7 +542,7 @@ describe('AnnotationFeature', () => {
 
     expect(mocks.createAnnotationColumn).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { node_id: 'source-node' },
+        path: { workspace_id: 'workspace-1', node_id: 'source-node' },
         body: { column_name: 'annotation' },
       }),
     );
@@ -574,7 +583,7 @@ describe('AnnotationFeature', () => {
 
   it('shows paginated annotation results instead of a preview', async () => {
     const user = userEvent.setup();
-    mocks.getNodeData.mockImplementation(
+    mocks.getNodeDataByWorkspaceId.mockImplementation(
       ({ query }: { query?: { page?: number; page_size?: number } }) =>
         Promise.resolve({
           data: {
@@ -608,7 +617,7 @@ describe('AnnotationFeature', () => {
 
     await user.click(within(resultsPanel).getByRole('link', { name: 'Go to next page' }));
 
-    expect(mocks.getNodeData).toHaveBeenCalledWith(
+    expect(mocks.getNodeDataByWorkspaceId).toHaveBeenCalledWith(
       expect.objectContaining({
         query: expect.objectContaining({ page: 2, page_size: 50 }),
       }),
@@ -640,7 +649,7 @@ describe('AnnotationFeature', () => {
     // Clearing persists a null cell to the resumed annotation column.
     expect(mocks.setAnnotationCell).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { node_id: 'source-node' },
+        path: { workspace_id: 'workspace-1', node_id: 'source-node' },
         body: { column_name: 'existing_annotation', row_index: 0, value: null },
       }),
     );
@@ -650,7 +659,7 @@ describe('AnnotationFeature', () => {
     const user = userEvent.setup();
     // Seed the row with an empty annotation so picking a class is a real change
     // (re-selecting the already-seeded value would not fire onValueChange).
-    mocks.getNodeData.mockResolvedValue({
+    mocks.getNodeDataByWorkspaceId.mockResolvedValue({
       data: {
         columns: ['text', 'existing_annotation'],
         data: [{ text: 'hello world', existing_annotation: '' }],
@@ -679,7 +688,7 @@ describe('AnnotationFeature', () => {
     ).toHaveTextContent('support');
     expect(mocks.setAnnotationCell).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { node_id: 'source-node' },
+        path: { workspace_id: 'workspace-1', node_id: 'source-node' },
         body: { column_name: 'existing_annotation', row_index: 0, value: 'support' },
       }),
     );
@@ -708,6 +717,7 @@ describe('AnnotationFeature', () => {
 
     expect(mocks.createAnnotationClassDescriptions).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer test' },
+      path: { workspace_id: 'workspace-1' },
       throwOnError: true,
     });
     expect(onTabInputSetChange).toHaveBeenCalledWith('classDescriptions', [
@@ -742,7 +752,7 @@ describe('AnnotationFeature', () => {
 
     expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer test' },
-      path: { node_id: 'classes-node' },
+      path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       body: {
         class_column: 'class',
         description_column: 'description',
@@ -806,7 +816,7 @@ describe('AnnotationFeature', () => {
 
     expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer test' },
-      path: { node_id: 'classes-node' },
+      path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       body: {
         class_column: 'class',
         description_column: 'description',
@@ -829,7 +839,7 @@ describe('AnnotationFeature', () => {
 
     expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer test' },
-      path: { node_id: 'classes-node' },
+      path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       body: {
         class_column: 'class',
         description_column: 'description',
@@ -913,13 +923,13 @@ describe('AnnotationFeature', () => {
     // column: it creates the column and reparents the class node under the source.
     expect(mocks.createAnnotationColumn).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { node_id: 'source-node' },
+        path: { workspace_id: 'workspace-1', node_id: 'source-node' },
         body: { column_name: 'annotation' },
       }),
     );
     expect(mocks.setAnnotationClassParent).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: { node_id: 'classes-node' },
+        path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
         body: { parent_node_id: 'source-node' },
       }),
     );
@@ -1027,7 +1037,9 @@ describe('AnnotationFeature', () => {
     // Closing is an explicit "done previewing", so the node's cached preview
     // session is dropped on the server (unlike a tab switch, which keeps it).
     expect(mocks.annotateAiPreviewClear).toHaveBeenCalledWith(
-      expect.objectContaining({ body: { node_id: 'source-node' } }),
+      expect.objectContaining({
+        path: { workspace_id: 'workspace-1', node_id: 'source-node' },
+      }),
     );
   });
 

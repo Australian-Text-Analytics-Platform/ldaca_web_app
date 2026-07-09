@@ -7,8 +7,8 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
+import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
 import { useFilterSubTabSections, type FilterSubTabProps } from './hooks/useFilterSubTabSections';
 import type { FilterConditionWithId } from '../types';
 
@@ -36,7 +36,7 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
     preview,
   } = useFilterSubTabSections(props);
 
-  const { hasSelection, hasSchema, isSchemaLoading } = schemaState;
+  const { hasSelection, hasSchema } = schemaState;
 
   return (
     <div className="space-y-4">
@@ -61,13 +61,7 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
         <CardContent className="space-y-4 pt-0">
           {renderNodeInputsPanel?.()}
 
-          {hasSelection && isSchemaLoading && (
-            <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-              Loading column metadata…
-            </div>
-          )}
-
-          {hasSelection && !isSchemaLoading && !hasSchema && (
+          {hasSelection && !hasSchema && (
             <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
               No schema information is available for this data block yet.
             </div>
@@ -93,9 +87,7 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
             onConditionChange={conditionBuilder.onConditionChange}
             disabled={schemaState.isConfigDisabled}
             hasSelection={hasSelection}
-            isSchemaLoading={hasSelection && isSchemaLoading}
             noSelectionMessage="Configure conditions once a data block is selected."
-            schemaLoadingMessage="Retrieving column information…"
             noSchemaMessage="No schema information is available for this data block yet."
             renderValueInput={conditionBuilder.renderValueInput}
             renderConditionMetadata={conditionBuilder.renderConditionMetadata}

@@ -27,18 +27,14 @@ import {
 import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
 import {
   buildSingleNodeSelectionPanelModel,
-  buildWorkspaceNodeMap,
   getNodeKey,
 } from '../../utils/nodeMetadata';
 import type { PreviewPagination, PreviewRow } from '../../types';
 
 export interface AggregateSubTabProps {
-  selectedNodeId: string | null;
+  currentWorkspaceId: string | null;
   selectedNodes: WorkspaceNodeLike[];
-  workspaceNodes: WorkspaceNodeLike[];
   isLoading: {
-    nodeData: boolean;
-    graph: boolean;
     operations: boolean;
   };
   onAlert: (message: string) => void;
@@ -167,9 +163,8 @@ const createTokenId = (): string => {
  */
 export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSubTabResult => {
   const {
-    selectedNodeId,
+    currentWorkspaceId,
     selectedNodes,
-    workspaceNodes,
     isLoading,
     onAlert,
     polarsExpressionPreview,
@@ -177,25 +172,12 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     refreshNodeSchema,
   } = props;
 
-  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
-
-  const effectiveNodes = (() => {
-    if (selectedNodes.length) {
-      return takeMostRecent(selectedNodes, 1);
-    }
-    if (selectedNodeId) {
-      const fallback = workspaceNodeMap.get(selectedNodeId);
-      if (fallback) {
-        return [fallback];
-      }
-    }
-    return [] as WorkspaceNodeLike[];
-  })();
+  const effectiveNodes = takeMostRecent(selectedNodes, 1);
+  const activeNode = effectiveNodes[0] ?? null;
 
   const limitedNodeId = (() => {
-    const first = effectiveNodes[0];
-    if (!first) return null;
-    return getNodeKey(first, selectedNodeId ?? '') || null;
+    if (!activeNode) return null;
+    return getNodeKey(activeNode) || null;
   })();
 
   const [expression, setExpression] = useState('');
@@ -222,13 +204,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const selectionPanelModel = buildSingleNodeSelectionPanelModel({
     nodeId: limitedNodeId,
-    workspaceNodes,
+    selectedNode: activeNode,
   });
   const effectiveSelectedNodes = selectionPanelModel.selectedNodes;
 
-  const activeNodeId = (() => {
-    return limitedNodeId ?? selectedNodeId ?? null;
-  })();
+  const activeNodeId = limitedNodeId;
 
   const hasSelection = Boolean(activeNodeId);
   const trimmedExpression = expression.trim();
@@ -339,6 +319,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     setPageSize: setPreviewPageSize,
     refresh: refreshPreview,
   } = useNodePreviewWithRawFallback<PolarsExpressionRequest>({
+    workspaceId: currentWorkspaceId,
     nodeId: activeNodeId,
     operationPayload,
     operationFetch: polarsExpressionPreview,

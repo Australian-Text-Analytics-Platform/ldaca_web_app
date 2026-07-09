@@ -6,13 +6,11 @@
  * Rendered by: ViewRouter via the ``annotation`` entry in VIEW_COMPONENTS.
  */
 import { AnalysisTabsHost } from '../common/tabs/AnalysisTabsHost';
+import { ANALYSIS_TAB_GROUPS } from '../common/analysisIds';
 import AnnotationFeature from './AnnotationFeature';
 
-/** Tab-group namespace for annotation tabs. */
-const ANNOTATION_TAB_GROUP = 'annotation';
-
 function AnnotationTabbedFeature() {
-  return <AnalysisTabsHost tabGroup={ANNOTATION_TAB_GROUP} Feature={AnnotationFeature} />;
+  return <AnalysisTabsHost tabGroup={ANALYSIS_TAB_GROUPS.annotation} Feature={AnnotationFeature} />;
 }
 
 export default AnnotationTabbedFeature;

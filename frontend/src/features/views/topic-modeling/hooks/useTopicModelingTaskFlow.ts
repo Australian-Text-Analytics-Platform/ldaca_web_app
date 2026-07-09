@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { QueryClient } from '@tanstack/react-query';
-import { detachTopicModeling, runTopicModeling, topicModelingDetachOptions } from '@/api';
+import { analysisTaskDetachOptions, createAnalysisTaskDetachment, runTopicModeling } from '@/api';
 import {
-  type TopicModelingRequestInput,
+  type TopicModelingRequest,
   type TopicModelingResponse,
   type TopicModelingDetachRequest,
+  type TopicModelingDetachResponse,
 } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { extractAndSetTaskId } from '../../common';
@@ -15,7 +16,11 @@ import { buildSamplingAutoNodeName } from '@/features/views/preprocessing/utils/
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 10;
-type TopicModelingRequest = TopicModelingRequestInput;
+
+const isTopicModelingDetachResponse = (
+  response: unknown,
+): response is TopicModelingDetachResponse =>
+  typeof response === 'object' && response !== null && 'state' in response;
 
 interface TopicModelingState {
   currentWorkspaceId: string | null;
@@ -165,6 +170,7 @@ export function useTopicModelingTaskFlow({
       const { data: res } = await runTopicModeling({
         body: req,
         headers: getAuthHeaders(),
+        path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
       const assignedTaskId = extractAndSetTaskId(res, setLocalTaskId);
@@ -201,9 +207,9 @@ export function useTopicModelingTaskFlow({
 
     try {
       setIsDetachLoading(true);
-      const { data: resp } = await topicModelingDetachOptions({
+      const { data: resp } = await analysisTaskDetachOptions({
         headers: getAuthHeaders(),
-        path: { task_id: taskId },
+        path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
       const nodes = resp.data?.nodes ?? [];
@@ -277,12 +283,15 @@ export function useTopicModelingTaskFlow({
           ? { topic_meanings_override: topicMeaningsOverride }
           : {}),
       };
-      const { data: resp } = await detachTopicModeling({
+      const { data: resp } = await createAnalysisTaskDetachment({
         body: payload,
         headers: getAuthHeaders(),
-        path: { task_id: taskId },
+        path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
+      if (!isTopicModelingDetachResponse(resp)) {
+        throw new Error('Topic detach failed');
+      }
       if (resp.state !== 'successful') {
         throw new Error(resp.message || 'Topic detach failed');
       }

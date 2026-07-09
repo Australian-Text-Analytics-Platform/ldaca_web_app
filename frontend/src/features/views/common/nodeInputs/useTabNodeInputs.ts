@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo } from 'react';
 import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
-import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
+import {
+  type NodeLike,
+  useNodeColumnInfos,
+} from '@/features/workspace/common/hooks/useNodeColumnInfos';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import type { NodeInfo } from '@/lib/nodeInfo';
 import { useUIStore } from '@/stores';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
@@ -50,6 +55,12 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
   workspaceId: string | null;
   /** Recently-used node groups, resolved against live nodes, for "Add preset". */
   recentPresets: ResolvedPreset[];
+  /** Node-info responses for the currently selected input nodes. */
+  nodeInfoCache: Record<string, NodeInfo>;
+  /** Returns cached typed columns for a selected input node, with snapshot fallback. */
+  getColumnInfos: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
+  /** Returns cached node-info metadata for a selected input node when loaded. */
+  getNodeInfo: (node: NodeLike | null | undefined, idx?: number) => NodeInfo | undefined;
 }
 
 const NO_OP = (_inputs: AnalysisTabInput[]) => {
@@ -68,11 +79,12 @@ const NO_OP = (_inputs: AnalysisTabInput[]) => {
  *
  * Flow: resolve the requested selector id from ``input_sets`` with a legacy
  * ``inputs`` fallback for ``source``, read live nodes + graph selection, fetch
- * typed columns for the already-selected nodes, delegate to ``useNodeInputs``
- * with the selector's value, then consume graph/sidebar "+" requests directly
- * by default. Multi-selector features pass ``consumeNodeInputRequests: false``
- * on every participating selector so the request stays pending and the visible
- * ``NodeInputsPanel`` instances render the dashed chooser instead.
+ * node-info metadata for the already-selected nodes, delegate to
+ * ``useNodeInputs`` with the selector's value, then consume graph/sidebar "+"
+ * requests directly by default. Multi-selector features pass
+ * ``consumeNodeInputRequests: false`` on every participating selector so the
+ * request stays pending and the visible ``NodeInputsPanel`` instances render
+ * the dashed chooser instead.
  */
 export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInputsResult {
   const {
@@ -115,7 +127,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     return allNodes.filter((node, idx) => ids.has(getNodeIdentifier(node, idx)));
   }, [allNodes, value]);
 
-  const { getColumnInfos } = useNodeColumnInfos({
+  const { getColumnInfos, getNodeInfo, nodeInfoCache } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
     nodes: selectedNodeObjs,
   });
@@ -206,5 +218,8 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     graphSelectedIds: selectedNodeIds,
     workspaceId: currentWorkspaceId ?? null,
     recentPresets,
+    nodeInfoCache,
+    getColumnInfos,
+    getNodeInfo,
   };
 }

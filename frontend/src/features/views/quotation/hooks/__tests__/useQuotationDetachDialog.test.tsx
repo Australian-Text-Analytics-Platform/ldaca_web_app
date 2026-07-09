@@ -1,16 +1,17 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { quotationDetachOptions } from '@/api';
+import { analysisTaskDetachOptions } from '@/api';
 import { useQuotationDetachDialog } from '../useQuotationDetachDialog';
 
 vi.mock('@/api', () => ({
-  quotationDetachOptions: vi.fn(),
+  analysisTaskDetachOptions: vi.fn(),
 }));
 
-const mockedQuotationDetachOptions = vi.mocked(quotationDetachOptions);
+const mockedAnalysisTaskDetachOptions = vi.mocked(analysisTaskDetachOptions);
 
 const getAuthHeaders = vi.fn(() => ({ Authorization: 'Bearer test-token' }));
+const resolveTaskId = vi.fn(() => Promise.resolve('task-1'));
 const handleDetach = vi.fn(
   (_nodeId: string, _selectedColumns: string[], _materializedPath: string | null) =>
     Promise.resolve(),
@@ -18,7 +19,9 @@ const handleDetach = vi.fn(
 const showErrorDialog = vi.fn();
 
 const defaultArgs = {
+  workspaceId: 'workspace-1',
   activeSelections: [{ nodeId: 'node-1', column: 'text' }],
+  resolveTaskId,
   getAuthHeaders,
   handleDetach,
   materializedPaths: { 'node-1': '/tmp/node-1.parquet' },
@@ -29,7 +32,8 @@ const defaultArgs = {
 describe('useQuotationDetachDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedQuotationDetachOptions.mockResolvedValue({
+    resolveTaskId.mockResolvedValue('task-1');
+    mockedAnalysisTaskDetachOptions.mockResolvedValue({
       data: {
         state: 'successful',
         message: 'ok',
@@ -56,10 +60,10 @@ describe('useQuotationDetachDialog', () => {
       await result.current.openDetachDialog('node-1');
     });
 
-    expect(mockedQuotationDetachOptions).toHaveBeenCalledWith({
+    expect(mockedAnalysisTaskDetachOptions).toHaveBeenCalledWith({
       headers: { Authorization: 'Bearer test-token' },
-      path: { node_id: 'node-1' },
-      query: { column: 'text' },
+      path: { workspace_id: 'workspace-1', task_id: 'task-1' },
+      query: { node_id: 'node-1', column: 'text' },
       throwOnError: true,
     });
     expect(result.current.detachDialog.open).toBe(true);
@@ -93,12 +97,12 @@ describe('useQuotationDetachDialog', () => {
       await result.current.openDetachDialog('node-1');
     });
 
-    expect(mockedQuotationDetachOptions).not.toHaveBeenCalled();
+    expect(mockedAnalysisTaskDetachOptions).not.toHaveBeenCalled();
     expect(result.current.detachDialog.open).toBe(false);
   });
 
   it('reports load failures and leaves the dialog closed', async () => {
-    mockedQuotationDetachOptions.mockRejectedValueOnce(new Error('options failed'));
+    mockedAnalysisTaskDetachOptions.mockRejectedValueOnce(new Error('options failed'));
     const { result } = renderHook(() => useQuotationDetachDialog(defaultArgs));
 
     await act(async () => {

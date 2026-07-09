@@ -8,7 +8,7 @@ import {
   annotateAiPreviewState,
   detachAiPreviewedRows,
   getAnnotationClassDescriptions,
-  getNodeData,
+  getNodeDataByWorkspaceId,
 } from '@/api';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -93,7 +93,7 @@ interface AnnotationAiPreviewPanelProps {
 
 /**
  * Server-driven AI preview of annotations: for the current page of the source
- * node, it asks the backend (`/annotation/ai/preview`) to classify that page's
+ * node, it asks the backend preview-session resource to classify that page's
  * texts and renders the structured per-row class predictions. Preview
  * predictions are transient — the backend does not persist them (unlike
  * AnnotationResultsPanel); only the "Annotate All" button writes the column.
@@ -174,9 +174,10 @@ export function AnnotationAiPreviewPanel({
     ),
     enabled: Boolean(workspaceId),
     queryFn: async () => {
-      const { data } = await getNodeData({
+      if (!workspaceId) throw new Error('Missing workspace ID');
+      const { data } = await getNodeDataByWorkspaceId({
         headers: getAuthHeaders(),
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, node_id: nodeId },
         query: { page: pagination.pageIndex + 1, page_size: pagination.pageSize },
         throwOnError: true,
       });
@@ -197,9 +198,10 @@ export function AnnotationAiPreviewPanel({
         : ['annotation', 'ai-preview-classes', 'disabled'],
     enabled: canLoadClasses,
     queryFn: async () => {
+      if (!workspaceId || !classNodeId) throw new Error('Missing class node');
       const { data } = await getAnnotationClassDescriptions({
         headers: getAuthHeaders(),
-        path: { node_id: classNodeId ?? '' },
+        path: { workspace_id: workspaceId, node_id: classNodeId },
         query: { class_column: classColumn ?? '', description_column: descriptionColumn ?? '' },
         throwOnError: true,
       });
@@ -249,10 +251,11 @@ export function AnnotationAiPreviewPanel({
     retry: false,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await annotateAiPreviewState({
         headers: getAuthHeaders(),
-        body: {
-          node_id: nodeId,
+        path: { workspace_id: workspaceId, node_id: nodeId },
+        query: {
           text_column: textColumn,
           class_node_id: classNodeId ?? '',
           class_column: classColumn ?? 'class',
@@ -295,9 +298,10 @@ export function AnnotationAiPreviewPanel({
   // Run the AI request for this page only once the texts + classes are loaded.
   // The key carries every input that changes the prediction so editing a setting
   // (or paging) issues a fresh request while prior pages stay cached. The request
-  // itself is a thin call to /annotation/ai/preview — the backend re-slices the
-  // same page, loads the authoritative class list, and dispatches the provider
-  // SDK, so the browser sends no texts/classes and holds no provider key logic.
+  // itself is a thin call to the preview-session collection — the backend
+  // re-slices the same page, loads the authoritative class list, and dispatches
+  // the provider SDK, so the browser sends no texts/classes and holds no provider
+  // key logic.
   const annotateEnabled = rows.length > 0 && classes.length > 0 && Boolean(workspaceId);
   const annotateQuery = useQuery({
     queryKey: [
@@ -330,10 +334,12 @@ export function AnnotationAiPreviewPanel({
     retry: false,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await annotateAiPreview({
         // AI batches can outlast the client's default 30s cap; give a page a
         // generous window (the backend bounds each provider request itself).
         headers: { ...getAuthHeaders(), 'x-client-timeout-ms': '120000' },
+        path: { workspace_id: workspaceId },
         body: {
           node_id: nodeId,
           text_column: textColumn,
@@ -388,9 +394,11 @@ export function AnnotationAiPreviewPanel({
     retry: false,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await detachAiPreviewedRows({
         headers: getAuthHeaders(),
-        body: { node_id: nodeId, annotation_column: annotationColumn, dry_run: true },
+        path: { workspace_id: workspaceId, node_id: nodeId },
+        body: { annotation_column: annotationColumn, dry_run: true },
         throwOnError: true,
       });
       return data.detached_rows;
@@ -404,11 +412,11 @@ export function AnnotationAiPreviewPanel({
   // gives instant feedback and a failed write just toasts without blocking the UI.
   const overrideMutation = useMutation({
     mutationFn: async (variables: { rowIndex: number; label: string }) => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
       await annotateAiPreviewOverride({
         headers: getAuthHeaders(),
+        path: { workspace_id: workspaceId, node_id: nodeId, row_index: variables.rowIndex },
         body: {
-          node_id: nodeId,
-          row_index: variables.rowIndex,
           // '' is the "None" pick — send null so the server records an explicit
           // null override (which still wins over the model label).
           label: variables.label === '' ? null : variables.label,
@@ -427,13 +435,14 @@ export function AnnotationAiPreviewPanel({
   // column shows up everywhere, and toast the labelled/total counts.
   const annotateAllMutation = useMutation({
     mutationFn: async () => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await annotateAiAll({
         // A whole-table run fans many batches out on the backend and can take
         // minutes; extend the client timeout well past the 30s default (still
         // finite so a truly hung request eventually surfaces an error).
         headers: { ...getAuthHeaders(), 'x-client-timeout-ms': '600000' },
+        path: { workspace_id: workspaceId, node_id: nodeId },
         body: {
-          node_id: nodeId,
           text_column: textColumn,
           annotation_column: annotationColumn,
           class_node_id: classNodeId ?? '',
@@ -477,15 +486,17 @@ export function AnnotationAiPreviewPanel({
   // pages, not just the one on screen — into a new child of the source node, with
   // their (possibly overridden) labels written into the annotation column. The
   // server reads the authoritative previewed-row set from its preview session, so
-  // the request carries no `rows`; the browser only names the node + column. Unlike
-  // "Annotate All" it neither calls the LLM nor touches the source. On success we
-  // refresh the graph + node list so the new child appears immediately.
+  // the request carries no `rows`; the node lives in the path and the body names
+  // only the target column. Unlike "Annotate All" it neither calls the LLM nor
+  // touches the source. On success we refresh the graph + node list so the new
+  // child appears immediately.
   const detachMutation = useMutation({
     mutationFn: async () => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await detachAiPreviewedRows({
         headers: getAuthHeaders(),
+        path: { workspace_id: workspaceId, node_id: nodeId },
         body: {
-          node_id: nodeId,
           annotation_column: annotationColumn,
         },
         throwOnError: true,

@@ -48,7 +48,15 @@ node-colour mutation.
 
 Selected node data is keyed by workspace id, node id, page, page size, sorting,
 and filters. Mutations invalidate the narrowest practical set of queries:
-graph, node data, workspace summaries, and schema/column metadata.
+graph, node data, workspace summaries, and node-info metadata.
+
+`queryKeys.workspaceGraph()` is the lightweight topology/display query. Full
+schema, column, shape, tokenizer-model, and dtype-normalization metadata comes
+from `queryKeys.nodeInfo()` / `queryKeys.nodeInfos()` via
+`POST /workspaces/{workspace_id}/nodes:batchGet` with body
+`{ "nodes": [...] }`. Analysis selectors and preprocessing subtabs should reuse `useNodeColumnInfos()`,
+`nodeInfoQueryOptions()`, or `nodeInfosQueryOptions()` instead of deriving
+metadata from graph nodes or table rows.
 
 New mutations should follow the existing invalidation helpers instead of
 manually reloading the whole app state.
@@ -56,9 +64,10 @@ manually reloading the whole app state.
 ## Graph Hooks
 
 `graph-view/hooks/useWorkspaceGraph.ts` converts backend graph payloads to
-React Flow state. It handles dagre layout, tokenization metadata,
-selection/active visual state, fresh-node highlighting, and React Flow state
-updates.
+React Flow state. It handles dagre layout, node identity/name/document/colour
+display state, undo/redo flags, selection/active visual state, fresh-node
+highlighting, and React Flow state updates. It does not own schema, column,
+shape, or tokenizer metadata; those live behind the node-info query.
 
 The graph hook uses signatures and `requestAnimationFrame` to avoid rewriting
 React Flow state on every render.

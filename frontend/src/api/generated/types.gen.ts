@@ -5,6 +5,118 @@ export type ClientOptions = {
 };
 
 /**
+ * AdminCleanupResponse
+ *
+ * Response schema for the admin session-cleanup route.
+ */
+export type AdminCleanupResponse = {
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Performed By
+     */
+    performed_by: string;
+};
+
+/**
+ * AdminConfigResponse
+ *
+ * Admin-only runtime configuration response.
+ *
+ * Used by:
+ * - admin config mutation routes and generated API clients because changing
+ * process-local configuration should return the newly effective storage root.
+ */
+export type AdminConfigResponse = {
+    /**
+     * Data Root
+     */
+    data_root: string;
+    /**
+     * Google Client Id
+     */
+    google_client_id?: string;
+    /**
+     * Multi User Mode
+     */
+    multi_user_mode: boolean;
+};
+
+/**
+ * AdminConfigUpdate
+ *
+ * Request schema for admin-only process-local runtime config updates.
+ *
+ * Used by:
+ * - admin config mutation routes because the frontend settings form only needs
+ * to change the data root.
+ */
+export type AdminConfigUpdate = {
+    /**
+     * Data Root
+     */
+    data_root: string;
+};
+
+/**
+ * AdminUserResponse
+ *
+ * Admin-visible user summary with active session count.
+ *
+ * Used by:
+ * - ``list_users`` because the admin user table returns DB-backed user rows
+ * plus a computed active-session count.
+ */
+export type AdminUserResponse = {
+    /**
+     * Active Sessions
+     */
+    active_sessions: number;
+    /**
+     * Created At
+     */
+    created_at: string | null;
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Last Login
+     */
+    last_login: string | null;
+    /**
+     * Name
+     */
+    name: string | null;
+};
+
+/**
+ * AdminUsersResponse
+ *
+ * Response schema for the admin user list route.
+ */
+export type AdminUsersResponse = {
+    /**
+     * Requested By
+     */
+    requested_by: string;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Users
+     */
+    users: Array<AdminUserResponse>;
+};
+
+/**
  * AnalysisClearResponse
  *
  * Response schema returned by API routes and consumed by generated clients for analysis clear response.
@@ -244,10 +356,6 @@ export type AnnotationAiAnnotateAllRequest = {
      */
     model: string;
     /**
-     * Node Id
-     */
-    node_id: string;
-    /**
      * Provider Id
      */
     provider_id: string;
@@ -322,10 +430,8 @@ export type AnnotationAiCustomProvider = {
  * Used by:
  * - Frontend AnnotationAiPreviewPanel's "Detach Previewed Rows" button. The rows
  * the user previewed (across every page they viewed) are read from the
- * server-side preview store, so the panel sends only the node + target column.
- * ``rows`` is optional: when omitted the server materialises exactly the stored
- * previewed rows (with their overrides applied); when supplied it takes
- * precedence, preserving the old explicit-list behaviour.
+ * server-side preview store, so the node lives in the URL and the panel sends
+ * only the target column plus optional operation settings.
  * - The same panel's Detach button *gating*: with ``dry_run`` true the endpoint
  * only probes the server session and returns how many rows would be detached
  * (``node`` is null, nothing is created). The panel calls this on mount so the
@@ -346,14 +452,6 @@ export type AnnotationAiDetachRequest = {
      * New Node Name
      */
     new_node_name?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Rows
-     */
-    rows?: Array<AnnotationAiDetachRow> | null;
 };
 
 /**
@@ -371,28 +469,6 @@ export type AnnotationAiDetachResponse = {
      */
     detached_rows: number;
     node?: WorkspaceNodeInfo | null;
-};
-
-/**
- * AnnotationAiDetachRow
- *
- * One previewed row to detach: its absolute source-row index and label.
- *
- * Used by:
- * - AnnotationAiDetachRequest as an optional client-supplied override list. The
- * authoritative previewed rows now live in the server-side preview store, so
- * the panel no longer needs to send them; this model is kept for backward
- * compatibility and lets a caller force specific row/label pairs if provided.
- */
-export type AnnotationAiDetachRow = {
-    /**
-     * Label
-     */
-    label?: string | null;
-    /**
-     * Row Index
-     */
-    row_index: number;
 };
 
 /**
@@ -460,25 +536,6 @@ export type AnnotationAiPreferences = {
 };
 
 /**
- * AnnotationAiPreviewClearRequest
- *
- * Request to drop a node's cached AI preview session.
- *
- * Used by:
- * - Frontend AnnotationAiPreviewPanel's "Close preview" action. Closing the panel
- * is an explicit "I'm done previewing" signal (unlike a tab switch, which only
- * unmounts the panel and must keep the cache so it can rehydrate). Only the node
- * is needed — the store is keyed per user+workspace+node, so the current
- * workspace resolves the rest.
- */
-export type AnnotationAiPreviewClearRequest = {
-    /**
-     * Node Id
-     */
-    node_id: string;
-};
-
-/**
  * AnnotationAiPreviewClearResponse
  *
  * Acknowledgement that the node's preview session was cleared.
@@ -498,8 +555,8 @@ export type AnnotationAiPreviewClearResponse = {
  * Used by:
  * - Frontend AnnotationAiPreviewPanel when the user changes a prediction in the
  * dropdown, so the choice survives a tab switch and is honoured by
- * detach/annotate-all. Only the row and its new label are needed — the edit
- * targets the node's single active session, so no config has to travel with it.
+ * detach/annotate-all. Only the new label is needed in the body because the
+ * session node and row index are resource identifiers in the URL.
  * A blank/whitespace ``label`` means the user picked "None" and is stored as an
  * explicit null override (which still wins over the model's label).
  */
@@ -508,14 +565,6 @@ export type AnnotationAiPreviewOverrideRequest = {
      * Label
      */
     label?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Row Index
-     */
-    row_index: number;
 };
 
 /**
@@ -617,6 +666,10 @@ export type AnnotationAiPreviewResponse = {
      * Labels
      */
     labels?: Array<string | null>;
+    /**
+     * Session Id
+     */
+    session_id: string;
 };
 
 /**
@@ -645,70 +698,6 @@ export type AnnotationAiPreviewRowState = {
      * Row Index
      */
     row_index: number;
-};
-
-/**
- * AnnotationAiPreviewStateRequest
- *
- * Config identifying which cached preview session to hydrate.
- *
- * Used by:
- * - Frontend AnnotationAiPreviewPanel on mount because the panel's per-row maps
- * (AI labels + manual overrides) live only in memory and are lost when the tab
- * unmounts; on remount it re-reads them from the server so the preview looks
- * exactly as the user left it. Carries the same prediction-affecting config as
- * the preview request so the server can confirm the cached labels still match
- * the panel's current provider/model/prompt/classes/knobs before returning them.
- */
-export type AnnotationAiPreviewStateRequest = {
-    /**
-     * Base Url
-     */
-    base_url?: string | null;
-    /**
-     * Class Column
-     */
-    class_column?: string;
-    /**
-     * Class Node Id
-     */
-    class_node_id: string;
-    /**
-     * Description Column
-     */
-    description_column?: string;
-    /**
-     * Instruction
-     */
-    instruction: string;
-    /**
-     * Model
-     */
-    model: string;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Provider Id
-     */
-    provider_id: string;
-    /**
-     * Reasoning Effort
-     */
-    reasoning_effort?: string;
-    /**
-     * Reasoning Enabled
-     */
-    reasoning_enabled?: boolean;
-    /**
-     * Temperature
-     */
-    temperature?: number;
-    /**
-     * Text Column
-     */
-    text_column: string;
 };
 
 /**
@@ -828,6 +817,55 @@ export type AnnotationSetParentRequest = {
 };
 
 /**
+ * AuthHealthEndpoints
+ *
+ * Auth endpoint index included in ``AuthHealthResponse``.
+ */
+export type AuthHealthEndpoints = {
+    /**
+     * Auth Info
+     */
+    auth_info: string;
+    /**
+     * Google Auth
+     */
+    google_auth: string;
+    /**
+     * Logout
+     */
+    logout: string;
+    /**
+     * User Details
+     */
+    user_details: string;
+};
+
+/**
+ * AuthHealthResponse
+ *
+ * Response schema for authentication subsystem health metadata.
+ *
+ * Used by:
+ * - ``auth_health`` and generated clients because unauthenticated health
+ * checks should still expose a typed response contract.
+ */
+export type AuthHealthResponse = {
+    endpoints: AuthHealthEndpoints;
+    /**
+     * Google Configured
+     */
+    google_configured: boolean;
+    /**
+     * Mode
+     */
+    mode: string;
+    /**
+     * Status
+     */
+    status: string;
+};
+
+/**
  * AuthInfoResponse
  *
  * Main auth info response - tells frontend everything it needs to know
@@ -880,6 +918,51 @@ export type AuthMethod = {
      * Enabled
      */
     enabled: boolean;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * AuthStatusResponse
+ *
+ * Response schema for the lightweight auth status route.
+ *
+ * Used by:
+ * - ``auth_status`` and generated clients because the route previously
+ * returned an untyped dict despite having a stable JSON shape.
+ */
+export type AuthStatusResponse = {
+    /**
+     * Authenticated
+     */
+    authenticated: boolean;
+    /**
+     * Data Folder
+     */
+    data_folder?: string | null;
+    user: AuthStatusUser;
+};
+
+/**
+ * AuthStatusUser
+ *
+ * Minimal authenticated-user payload for the auth status route.
+ *
+ * Used by:
+ * - ``auth_status`` because lightweight probes need identity confirmation
+ * without the full auth bootstrap response.
+ */
+export type AuthStatusUser = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Id
+     */
+    id: string;
     /**
      * Name
      */
@@ -1388,7 +1471,7 @@ export type ConcordanceDetachRequest = {
     /**
      * Selected Columns
      */
-    selected_columns?: Array<string> | null;
+    selected_columns: Array<string>;
     /**
      * Whole Word
      */
@@ -1500,6 +1583,10 @@ export type ConcordanceDispersionDetachRequest = {
      */
     new_node_name?: string | null;
     /**
+     * Node Id
+     */
+    node_id: string;
+    /**
      * Num Left Tokens
      */
     num_left_tokens?: number;
@@ -1507,10 +1594,6 @@ export type ConcordanceDispersionDetachRequest = {
      * Num Right Tokens
      */
     num_right_tokens?: number;
-    /**
-     * Parent Task Id
-     */
-    parent_task_id?: string | null;
     /**
      * Regex
      */
@@ -1526,7 +1609,7 @@ export type ConcordanceDispersionDetachRequest = {
     /**
      * Selected Columns
      */
-    selected_columns?: Array<string> | null;
+    selected_columns: Array<string>;
     /**
      * Selected Matched Texts
      */
@@ -1563,6 +1646,10 @@ export type ConcordanceMaterializeRequest = {
      */
     column: string;
     /**
+     * Node Id
+     */
+    node_id: string;
+    /**
      * Num Left Tokens
      */
     num_left_tokens?: number;
@@ -1570,10 +1657,6 @@ export type ConcordanceMaterializeRequest = {
      * Num Right Tokens
      */
     num_right_tokens?: number;
-    /**
-     * Parent Task Id
-     */
-    parent_task_id: string;
     /**
      * Regex
      */
@@ -1656,68 +1739,6 @@ export type ConcordanceNodeResult = {
 };
 
 /**
- * ConcordanceRequest
- *
- * Request payload schema for concordance runs.
- *
- * Used by:
- * - concordance route/task creation flows because they need a backend boundary that
- * validates inputs before delegating to workspace or worker state.
- * Why:
- * - Validates all search/context/pagination-related analysis inputs.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
- */
-export type ConcordanceRequest = {
-    /**
-     * Case Sensitive
-     */
-    case_sensitive?: boolean;
-    /**
-     * Materialized Paths
-     */
-    materialized_paths?: {
-        [key: string]: string;
-    } | null;
-    /**
-     * Node Columns
-     */
-    node_columns?: {
-        [key: string]: string;
-    } | null;
-    /**
-     * Node Ids
-     */
-    node_ids: Array<string>;
-    /**
-     * Num Left Tokens
-     */
-    num_left_tokens?: number;
-    /**
-     * Num Right Tokens
-     */
-    num_right_tokens?: number;
-    /**
-     * Regex
-     */
-    regex?: boolean;
-    /**
-     * Search Mode
-     */
-    search_mode?: 'regex' | 'tokens';
-    /**
-     * Search Word
-     */
-    search_word: string;
-    /**
-     * Whole Word
-     */
-    whole_word?: boolean;
-    [key: string]: unknown;
-};
-
-/**
  * ConcordanceResultQuery
  *
  * Query overrides for reading persisted concordance results.
@@ -1767,44 +1788,6 @@ export type ConcordanceResultQuery = {
      * Update Only
      */
     update_only?: boolean;
-};
-
-/**
- * ConfigResponse
- *
- * Response schema used by config routes and generated API clients.
- *
- * Used by:
- * - backend API routes because they need this unit's "Response schema used by config routes and generated API clients" behavior.
- */
-export type ConfigResponse = {
-    /**
-     * Data Root
-     */
-    data_root: string;
-    /**
-     * Google Client Id
-     */
-    google_client_id?: string;
-    /**
-     * Multi User Mode
-     */
-    multi_user_mode: boolean;
-};
-
-/**
- * ConfigUpdate
- *
- * Request schema used when the frontend updates runtime data-root settings.
- *
- * Used by:
- * - backend API routes because they need this unit's "Request schema used when the frontend updates runtime data-root settings" behavior.
- */
-export type ConfigUpdate = {
-    /**
-     * Data Root
-     */
-    data_root: string;
 };
 
 /**
@@ -1870,6 +1853,26 @@ export type CurrentWorkspaceResponse = {
      * Id
      */
     id?: string | null;
+};
+
+/**
+ * CurrentWorkspaceUpdateRequest
+ *
+ * Request body for updating the user's selected workspace pointer.
+ *
+ * Used by:
+ * - ``PUT /users/me/current-workspace`` because current workspace is UI
+ * session state owned by the authenticated user, not an implicit target
+ * selector for workspace-scoped data APIs.
+ *
+ * Flow: accept a workspace id to select that workspace, or ``null`` to clear
+ * the user's current workspace pointer.
+ */
+export type CurrentWorkspaceUpdateRequest = {
+    /**
+     * Workspace Id
+     */
+    workspace_id?: string | null;
 };
 
 /**
@@ -1940,6 +1943,35 @@ export type DtypeNormalizationChange = {
      * To Dtype
      */
     to_dtype: string;
+};
+
+/**
+ * ErrorResponse
+ *
+ * Standard error response format.
+ *
+ * Used by:
+ * - backend request/response models because they need a stable JSON contract shared by
+ * route handlers, generated clients, and tests.
+ *
+ * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
+ * return serialized values or existing domain errors to callers.
+ */
+export type ErrorResponse = {
+    /**
+     * Details
+     */
+    details?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Error
+     */
+    error: string;
+    /**
+     * Message
+     */
+    message: string;
 };
 
 /**
@@ -3098,7 +3130,7 @@ export type QuotationDetachRequest = {
      * Column
      */
     column: string;
-    engine?: QuotationEngineConfigInput | null;
+    engine?: QuotationEngineConfig | null;
     /**
      * Materialized Path
      */
@@ -3114,7 +3146,7 @@ export type QuotationDetachRequest = {
     /**
      * Selected Columns
      */
-    selected_columns?: Array<string> | null;
+    selected_columns: Array<string>;
 };
 
 /**
@@ -3130,41 +3162,8 @@ export type QuotationDetachRequest = {
  * Flow: validate incoming API fields, apply defaults or validators, and serialize route
  * responses in the shape expected by frontend clients and tests.
  */
-export type QuotationEngineConfigInput = {
+export type QuotationEngineConfig = {
     type?: QuotationEngineType;
-    /**
-     * Url
-     */
-    url?: string | null;
-};
-
-/**
- * QuotationEngineConfig
- *
- * Configuration schema for quotation extraction engines.
- *
- * Used by:
- * - `QuotationRequest` because callers need the shared shared backend behavior rule in one
- * place instead of duplicating it.
- * Why:
- * - Supports local and remote engine selection with optional model/auth fields.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
- */
-export type QuotationEngineConfigOutput = {
-    /**
-     * Api Key
-     */
-    api_key?: string | null;
-    /**
-     * Model
-     */
-    model?: string | null;
-    /**
-     * Type
-     */
-    type?: string;
     /**
      * Url
      */
@@ -3203,11 +3202,11 @@ export type QuotationMaterializeRequest = {
      * Column
      */
     column: string;
-    engine?: QuotationEngineConfigInput | null;
+    engine?: QuotationEngineConfig | null;
     /**
-     * Parent Task Id
+     * Node Id
      */
-    parent_task_id: string;
+    node_id: string;
 };
 
 /**
@@ -3238,50 +3237,6 @@ export type QuotationMetadata = {
 };
 
 /**
- * QuotationPreferenceUpdateData
- *
- * Data payload schema embedded in API responses for quotation preference update data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationPreferenceUpdateData = {
-    /**
-     * Context Length
-     */
-    context_length?: number | null;
-};
-
-/**
- * QuotationPreferenceUpdateResponse
- *
- * Response schema returned by API routes and consumed by generated clients for quotation preference update
- * response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationPreferenceUpdateResponse = {
-    data?: QuotationPreferenceUpdateData | null;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
-};
-
-/**
  * QuotationRequest
  *
  * Request schema used by API routes and generated clients for quotation request.
@@ -3294,7 +3249,7 @@ export type QuotationPreferenceUpdateResponse = {
  * Flow: validate incoming API fields, apply defaults or validators, and serialize route
  * responses in the shape expected by frontend clients and tests.
  */
-export type QuotationRequestInput = {
+export type QuotationRequest = {
     /**
      * Column
      */
@@ -3303,7 +3258,7 @@ export type QuotationRequestInput = {
      * Descending
      */
     descending?: boolean;
-    engine?: QuotationEngineConfigInput | null;
+    engine?: QuotationEngineConfig | null;
     /**
      * Page
      */
@@ -3316,57 +3271,6 @@ export type QuotationRequestInput = {
      * Sort By
      */
     sort_by?: string | null;
-};
-
-/**
- * QuotationRequest
- *
- * Request payload schema for quotation analysis.
- *
- * Used by:
- * - quotation run/update endpoints because they need a backend boundary that validates
- * inputs before delegating to workspace or worker state.
- * Why:
- * - Validates node/column/engine/paging options for quotation workflows.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
- */
-export type QuotationRequestOutput = {
-    /**
-     * Column
-     */
-    column: string;
-    /**
-     * Context Length
-     */
-    context_length?: number | null;
-    /**
-     * Descending
-     */
-    descending?: boolean | null;
-    engine?: QuotationEngineConfigOutput | null;
-    /**
-     * Materialized Path
-     */
-    materialized_path?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Page
-     */
-    page?: number | null;
-    /**
-     * Page Size
-     */
-    page_size?: number | null;
-    /**
-     * Sort By
-     */
-    sort_by?: string | null;
-    [key: string]: unknown;
 };
 
 /**
@@ -3511,6 +3415,62 @@ export type ReplaceRequest = {
      * Source Column
      */
     source_column: string;
+};
+
+/**
+ * RootResponse
+ *
+ * API root/index response for generated clients and docs.
+ *
+ * Used by:
+ * - ``root`` because the public API entrypoint returns stable service
+ * metadata while keeping the nested endpoint catalogue flexible.
+ */
+export type RootResponse = {
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Endpoints
+     */
+    endpoints: {
+        [key: string]: unknown;
+    };
+    /**
+     * Features
+     */
+    features: {
+        [key: string]: string;
+    };
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Version
+     */
+    version: string;
+};
+
+/**
+ * RuntimeConfigResponse
+ *
+ * Public response schema for frontend runtime bootstrap.
+ *
+ * Used by:
+ * - `get_runtime_config`, frontend auth bootstrap, and generated API clients
+ * because callers need auth-mode and OAuth-provider metadata before login.
+ */
+export type RuntimeConfigResponse = {
+    /**
+     * Google Client Id
+     */
+    google_client_id?: string;
+    /**
+     * Multi User Mode
+     */
+    multi_user_mode: boolean;
 };
 
 /**
@@ -3681,25 +3641,6 @@ export type SequentialAnalysisDetachResponse = {
 };
 
 /**
- * SequentialAnalysisPreferenceUpdateData
- *
- * Data payload schema embedded in API responses for sequential analysis preference update data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type SequentialAnalysisPreferenceUpdateData = {
-    /**
-     * Chart Type
-     */
-    chart_type: 'line' | 'bar' | 'area';
-};
-
-/**
  * SequentialAnalysisPreferenceUpdateRequest
  *
  * Request schema used by API routes and generated clients for sequential analysis preference update request.
@@ -3716,31 +3657,6 @@ export type SequentialAnalysisPreferenceUpdateRequest = {
      * Chart Type
      */
     chart_type?: string | null;
-};
-
-/**
- * SequentialAnalysisPreferenceUpdateResponse
- *
- * Response schema returned by API routes and consumed by generated clients for sequential analysis preference
- * update response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type SequentialAnalysisPreferenceUpdateResponse = {
-    data: SequentialAnalysisPreferenceUpdateData;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
 };
 
 /**
@@ -3796,7 +3712,7 @@ export type SequentialAnalysisPreviewResponse = {
  * Flow: validate incoming API fields, apply defaults or validators, and serialize route
  * responses in the shape expected by frontend clients and tests.
  */
-export type SequentialAnalysisRequestInput = {
+export type SequentialAnalysisRequest = {
     /**
      * Case Sensitive
      */
@@ -3837,94 +3753,6 @@ export type SequentialAnalysisRequestInput = {
      * Time Column
      */
     time_column: string;
-};
-
-/**
- * SequentialAnalysisRequest
- *
- * Request model for sequential analysis.
- *
- * Used by:
- * - sequential analysis run/update endpoints because they need a backend boundary that
- * validates inputs before delegating to workspace or worker state.
- * Why:
- * - Validates temporal grouping and binning parameters.
- *
- * Refactor note:
- * - `column_type`, `numeric_origin`, and `numeric_interval` are declared twice;
- * remove duplicated declarations to reduce schema ambiguity.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
- */
-export type SequentialAnalysisRequestOutput = {
-    /**
-     * Case Sensitive
-     *
-     * Whether group-by values are compared case-sensitively
-     */
-    case_sensitive?: boolean;
-    /**
-     * Column Type
-     *
-     * Column type (datetime or numeric)
-     */
-    column_type?: string;
-    /**
-     * Custom Interval Unit
-     *
-     * Custom datetime interval unit (seconds|minutes|hours|days|weeks)
-     */
-    custom_interval_unit?: string | null;
-    /**
-     * Custom Interval Value
-     *
-     * Custom datetime interval count (used when frequency='custom')
-     */
-    custom_interval_value?: number | null;
-    /**
-     * Frequency
-     *
-     * Frequency (daily, weekly, monthly, yearly)
-     */
-    frequency?: string;
-    /**
-     * Group By Columns
-     *
-     * Columns to group by
-     */
-    group_by_columns?: Array<string> | null;
-    /**
-     * Node Id
-     *
-     * Node ID to analyze
-     */
-    node_id?: string | null;
-    /**
-     * Numeric Interval
-     *
-     * Interval for numeric binning
-     */
-    numeric_interval?: number | null;
-    /**
-     * Numeric Origin
-     *
-     * Origin for numeric binning
-     */
-    numeric_origin?: number | null;
-    /**
-     * Sort By Time
-     *
-     * Whether to sort by time
-     */
-    sort_by_time?: boolean;
-    /**
-     * Time Column
-     *
-     * Column containing time/numeric data
-     */
-    time_column: string;
-    [key: string]: unknown;
 };
 
 /**
@@ -4340,7 +4168,7 @@ export type TokenFrequencyPreferenceUpdateRequest = {
  * Flow: validate incoming API fields, apply defaults or validators, and serialize route
  * responses in the shape expected by frontend clients and tests.
  */
-export type TokenFrequencyRequestInput = {
+export type TokenFrequencyRequest = {
     /**
      * Node Columns
      */
@@ -4369,64 +4197,6 @@ export type TokenFrequencyRequestInput = {
      * Tokenizer Model
      */
     tokenizer_model?: string | null;
-};
-
-/**
- * TokenFrequencyRequest
- *
- * Request model for token-frequency analysis.
- *
- * Used by:
- * - token-frequency run/update endpoints because they need a backend boundary that
- * validates inputs before delegating to workspace or worker state.
- * Why:
- * - Validates node selection, stop-word, and token-limit parameters.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
- */
-export type TokenFrequencyRequestOutput = {
-    /**
-     * Node Columns
-     *
-     * Map of node_id to column name
-     */
-    node_columns?: {
-        [key: string]: string;
-    } | null;
-    /**
-     * Node Ids
-     *
-     * List of node IDs to analyze (1 or 2)
-     */
-    node_ids: Array<string>;
-    /**
-     * Node Tokenizer Models
-     *
-     * Map of node_id to tokenizer model ID for raw text token-frequency analysis
-     */
-    node_tokenizer_models?: {
-        [key: string]: string;
-    } | null;
-    /**
-     * Stop Words
-     *
-     * List of stop words to exclude
-     */
-    stop_words?: Array<string> | null;
-    /**
-     * Token Limit
-     *
-     * Limit on number of tokens returned
-     */
-    token_limit?: number | null;
-    /**
-     * Tokenizer Model
-     *
-     * Tokenizer model ID used for raw text token-frequency analysis
-     */
-    tokenizer_model?: string | null;
-    [key: string]: unknown;
 };
 
 /**
@@ -4828,7 +4598,7 @@ export type TopicModelingDetachedNode = {
  * Flow: validate incoming API fields, apply defaults or validators, and serialize route
  * responses in the shape expected by frontend clients and tests.
  */
-export type TopicModelingRequestInput = {
+export type TopicModelingRequest = {
     /**
      * Min Topic Size
      */
@@ -4855,62 +4625,6 @@ export type TopicModelingRequestInput = {
      * Sample Fractions
      */
     sample_fractions?: Array<number | null> | null;
-};
-
-/**
- * TopicModelingRequest
- *
- * Request model for topic-modeling analysis.
- *
- * Used by:
- * - topic-modeling run/update endpoints because they need a backend boundary that
- * validates inputs before delegating to workspace or worker state.
- * Why:
- * - Validates node selection and clustering configuration inputs.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
- */
-export type TopicModelingRequestOutput = {
-    /**
-     * Min Topic Size
-     *
-     * HDBSCAN minimum cluster size: the smallest group of chunks that counts as a topic. The number of topics is whatever HDBSCAN yields for this value (the only native topic-count control).
-     */
-    min_topic_size?: number;
-    /**
-     * Node Columns
-     *
-     * Map of node_id to column name
-     */
-    node_columns?: {
-        [key: string]: string;
-    } | null;
-    /**
-     * Node Ids
-     *
-     * List of node IDs to analyze
-     */
-    node_ids: Array<string>;
-    /**
-     * Random Seed
-     *
-     * Random seed used for reproducible topic-modeling runs
-     */
-    random_seed?: number;
-    /**
-     * Representative Words Count
-     *
-     * Number of representative words to keep per topic
-     */
-    representative_words_count?: number;
-    /**
-     * Sample Fractions
-     *
-     * One sampling fraction (0 < f ≤ 1) per corpus in node_ids order. None for a corpus means no sampling. Sampling uses random_seed.
-     */
-    sample_fractions?: Array<number | null> | null;
-    [key: string]: unknown;
 };
 
 /**
@@ -5274,6 +4988,61 @@ export type WorkspaceGraphEdge = {
 };
 
 /**
+ * WorkspaceGraphNode
+ *
+ * Lightweight node summary used by workspace graph/topology responses.
+ *
+ * Used by:
+ * - workspace graph routes and generated frontend graph/list clients because
+ * graph rendering needs node identity and display/action state, while full
+ * schema metadata belongs to ``WorkspaceNodeInfo`` through the collection
+ * node-info route.
+ *
+ * Flow: serialize only graph-facing fields so the graph endpoint does not
+ * collect or duplicate per-node schema, columns, shape, tokenizer, or
+ * dtype-normalization metadata.
+ */
+export type WorkspaceGraphNode = {
+    /**
+     * Can Redo
+     */
+    can_redo?: boolean | null;
+    /**
+     * Can Undo
+     */
+    can_undo?: boolean | null;
+    /**
+     * Child Ids
+     */
+    child_ids?: Array<string>;
+    /**
+     * Color
+     */
+    color?: string | null;
+    /**
+     * Document
+     */
+    document?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Operation
+     */
+    operation?: string | null;
+    /**
+     * Parent Ids
+     */
+    parent_ids?: Array<string>;
+    [key: string]: unknown;
+};
+
+/**
  * WorkspaceGraphResponse
  *
  * Response schema returned by API routes and consumed by generated clients for workspace graph response.
@@ -5293,7 +5062,7 @@ export type WorkspaceGraphResponse = {
     /**
      * Nodes
      */
-    nodes: Array<WorkspaceNodeInfo>;
+    nodes: Array<WorkspaceGraphNode>;
     [key: string]: unknown;
 };
 
@@ -5342,6 +5111,34 @@ export type WorkspaceInfo = {
      * Total Nodes
      */
     total_nodes: number;
+};
+
+/**
+ * WorkspaceNodeCreateRequest
+ *
+ * Request body for creating a workspace node from a user data file.
+ *
+ * Used by:
+ * - `add_node_to_workspace` because node creation changes workspace state and
+ * should carry creation inputs in a JSON body rather than query parameters.
+ */
+export type WorkspaceNodeCreateRequest = {
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Mode
+     *
+     * How to treat the file: currently only 'LazyFrame' is supported; files are staged as parquet and reloaded lazily.
+     */
+    mode?: string;
+    /**
+     * Sheet Name
+     *
+     * Optional Excel sheet name to load when the source file is a workbook.
+     */
+    sheet_name?: string | null;
 };
 
 /**
@@ -5424,6 +5221,44 @@ export type WorkspaceNodeInfo = {
 };
 
 /**
+ * WorkspaceNodeInfoRequest
+ *
+ * Request schema for fetching node-info metadata for one or many nodes.
+ *
+ * Used by:
+ * - the workspace node-info collection route and generated frontend clients
+ * because graph responses carry only lightweight topology while schema,
+ * columns, shape, and tokenizer metadata are fetched on demand.
+ *
+ * Flow: validate the requested node id list, preserving caller order so the
+ * response can line up with the submitted ids.
+ */
+export type WorkspaceNodeInfoRequest = {
+    /**
+     * Nodes
+     */
+    nodes?: Array<string>;
+};
+
+/**
+ * WorkspaceNodeInfoResponse
+ *
+ * Response schema for collection-level workspace node-info metadata.
+ *
+ * Used by:
+ * - the workspace node-info collection route and generated frontend clients
+ * because single-node and batch metadata reads share one typed contract.
+ *
+ * Flow: serialize the requested node-info payloads in request order.
+ */
+export type WorkspaceNodeInfoResponse = {
+    /**
+     * Nodes
+     */
+    nodes: Array<WorkspaceNodeInfo>;
+};
+
+/**
  * WorkspaceNodeReorderRequest
  *
  * Request body for persisting a new workspace node order.
@@ -5440,25 +5275,6 @@ export type WorkspaceNodeReorderRequest = {
      * Ordered Ids
      */
     ordered_ids: Array<string>;
-};
-
-/**
- * WorkspaceNodesResponse
- *
- * Response schema returned by API routes and consumed by generated clients for workspace nodes response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
- */
-export type WorkspaceNodesResponse = {
-    /**
-     * Nodes
-     */
-    nodes: Array<WorkspaceNodeInfo>;
 };
 
 /**
@@ -5562,6 +5378,29 @@ export type WorkspaceTaskStartResponse = {
 };
 
 /**
+ * WorkspaceUpdateRequest
+ *
+ * Request body for updating explicit workspace metadata.
+ *
+ * Used by:
+ * - ``PATCH /workspaces/{workspace_id}`` because callers should name the
+ * target workspace in the URL and send mutable metadata in the body.
+ *
+ * Flow: accept partial name/description updates so route handlers can apply
+ * only the fields the caller intentionally supplied.
+ */
+export type WorkspaceUpdateRequest = {
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
  * WorkspaceUploadResponse
  *
  * Response schema returned by API routes and consumed by generated clients for workspace upload response.
@@ -5588,12 +5427,51 @@ export type RootData = {
     url: '/api';
 };
 
+export type RootErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type RootError = RootErrors[keyof RootErrors];
+
 export type RootResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: RootResponse;
 };
+
+export type RootResponse2 = RootResponses[keyof RootResponses];
 
 export type AdminCleanupData = {
     body?: never;
@@ -5610,9 +5488,41 @@ export type AdminCleanupData = {
 
 export type AdminCleanupErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type AdminCleanupError = AdminCleanupErrors[keyof AdminCleanupErrors];
@@ -5621,8 +5531,73 @@ export type AdminCleanupResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AdminCleanupResponse;
 };
+
+export type AdminCleanupResponse2 = AdminCleanupResponses[keyof AdminCleanupResponses];
+
+export type UpdateAdminConfigData = {
+    body: AdminConfigUpdate;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/admin/config';
+};
+
+export type UpdateAdminConfigErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type UpdateAdminConfigError = UpdateAdminConfigErrors[keyof UpdateAdminConfigErrors];
+
+export type UpdateAdminConfigResponses = {
+    /**
+     * Successful Response
+     */
+    200: AdminConfigResponse;
+};
+
+export type UpdateAdminConfigResponse = UpdateAdminConfigResponses[keyof UpdateAdminConfigResponses];
 
 export type ListUsersData = {
     body?: never;
@@ -5639,9 +5614,41 @@ export type ListUsersData = {
 
 export type ListUsersErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ListUsersError = ListUsersErrors[keyof ListUsersErrors];
@@ -5650,8 +5657,10 @@ export type ListUsersResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AdminUsersResponse;
 };
+
+export type ListUsersResponse = ListUsersResponses[keyof ListUsersResponses];
 
 export type GetAuthInfoData = {
     body?: never;
@@ -5668,9 +5677,41 @@ export type GetAuthInfoData = {
 
 export type GetAuthInfoErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetAuthInfoError = GetAuthInfoErrors[keyof GetAuthInfoErrors];
@@ -5710,19 +5751,44 @@ export type CilogonCallbackData = {
 
 export type CilogonCallbackErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type CilogonCallbackError = CilogonCallbackErrors[keyof CilogonCallbackErrors];
-
-export type CilogonCallbackResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
 
 export type CilogonLoginData = {
     body?: never;
@@ -5731,12 +5797,42 @@ export type CilogonLoginData = {
     url: '/api/auth/cilogon/login';
 };
 
-export type CilogonLoginResponses = {
+export type CilogonLoginErrors = {
     /**
-     * Successful Response
+     * Bad request
      */
-    200: unknown;
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
+
+export type CilogonLoginError = CilogonLoginErrors[keyof CilogonLoginErrors];
 
 export type GoogleAuthData = {
     body: GoogleIn;
@@ -5747,9 +5843,41 @@ export type GoogleAuthData = {
 
 export type GoogleAuthErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GoogleAuthError = GoogleAuthErrors[keyof GoogleAuthErrors];
@@ -5772,19 +5900,44 @@ export type GoogleAuthCallbackData = {
 
 export type GoogleAuthCallbackErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GoogleAuthCallbackError = GoogleAuthCallbackErrors[keyof GoogleAuthCallbackErrors];
-
-export type GoogleAuthCallbackResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
 
 export type AuthHealthData = {
     body?: never;
@@ -5793,12 +5946,51 @@ export type AuthHealthData = {
     url: '/api/auth/health';
 };
 
+export type AuthHealthErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type AuthHealthError = AuthHealthErrors[keyof AuthHealthErrors];
+
 export type AuthHealthResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AuthHealthResponse;
 };
+
+export type AuthHealthResponse2 = AuthHealthResponses[keyof AuthHealthResponses];
 
 export type LogoutData = {
     body?: never;
@@ -5815,9 +6007,41 @@ export type LogoutData = {
 
 export type LogoutErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type LogoutError = LogoutErrors[keyof LogoutErrors];
@@ -5826,8 +6050,10 @@ export type LogoutResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: MessageResponse;
 };
+
+export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
 
 export type GetCurrentUserInfoData = {
     body?: never;
@@ -5844,9 +6070,41 @@ export type GetCurrentUserInfoData = {
 
 export type GetCurrentUserInfoErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetCurrentUserInfoError = GetCurrentUserInfoErrors[keyof GetCurrentUserInfoErrors];
@@ -5875,9 +6133,41 @@ export type AuthStatusData = {
 
 export type AuthStatusErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type AuthStatusError = AuthStatusErrors[keyof AuthStatusErrors];
@@ -5886,49 +6176,80 @@ export type AuthStatusResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: AuthStatusResponse;
 };
 
-export type GetConfigData = {
+export type AuthStatusResponse2 = AuthStatusResponses[keyof AuthStatusResponses];
+
+export type DeleteFileData = {
     body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
     path?: never;
-    query?: never;
-    url: '/api/config/';
+    query: {
+        /**
+         * Path
+         *
+         * Path relative to the user's data directory
+         */
+        path: string;
+    };
+    url: '/api/files/';
 };
 
-export type GetConfigResponses = {
+export type DeleteFileErrors = {
     /**
-     * Successful Response
+     * Bad request
      */
-    200: ConfigResponse;
-};
-
-export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
-
-export type UpdateConfigData = {
-    body: ConfigUpdate;
-    path?: never;
-    query?: never;
-    url: '/api/config/';
-};
-
-export type UpdateConfigErrors = {
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type UpdateConfigError = UpdateConfigErrors[keyof UpdateConfigErrors];
+export type DeleteFileError = DeleteFileErrors[keyof DeleteFileErrors];
 
-export type UpdateConfigResponses = {
+export type DeleteFileResponses = {
     /**
      * Successful Response
      */
-    200: ConfigResponse;
+    200: MessageResponse;
 };
 
-export type UpdateConfigResponse = UpdateConfigResponses[keyof UpdateConfigResponses];
+export type DeleteFileResponse = DeleteFileResponses[keyof DeleteFileResponses];
 
 export type GetUserFilesData = {
     body?: never;
@@ -5945,9 +6266,41 @@ export type GetUserFilesData = {
 
 export type GetUserFilesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetUserFilesError = GetUserFilesErrors[keyof GetUserFilesErrors];
@@ -5962,6 +6315,76 @@ export type GetUserFilesResponses = {
 };
 
 export type GetUserFilesResponse = GetUserFilesResponses[keyof GetUserFilesResponses];
+
+export type DownloadFileData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query: {
+        /**
+         * Path
+         *
+         * Path relative to the user's data directory
+         */
+        path: string;
+    };
+    url: '/api/files/content';
+};
+
+export type DownloadFileErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type DownloadFileError = DownloadFileErrors[keyof DownloadFileErrors];
+
+export type DownloadFileResponses = {
+    /**
+     * Binary file download.
+     */
+    200: Blob | File;
+};
+
+export type DownloadFileResponse = DownloadFileResponses[keyof DownloadFileResponses];
 
 export type CreateFolderData = {
     body: CreateFolderRequest;
@@ -5978,9 +6401,41 @@ export type CreateFolderData = {
 
 export type CreateFolderErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type CreateFolderError = CreateFolderErrors[keyof CreateFolderErrors];
@@ -6013,9 +6468,41 @@ export type ImportLdacaDatasetData = {
 
 export type ImportLdacaDatasetErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ImportLdacaDatasetError = ImportLdacaDatasetErrors[keyof ImportLdacaDatasetErrors];
@@ -6044,9 +6531,41 @@ export type ImportSampleDataData = {
 
 export type ImportSampleDataErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ImportSampleDataError = ImportSampleDataErrors[keyof ImportSampleDataErrors];
@@ -6059,6 +6578,76 @@ export type ImportSampleDataResponses = {
 };
 
 export type ImportSampleDataResponse2 = ImportSampleDataResponses[keyof ImportSampleDataResponses];
+
+export type GetFileInfoData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query: {
+        /**
+         * Path
+         *
+         * Path relative to the user's data directory
+         */
+        path: string;
+    };
+    url: '/api/files/info';
+};
+
+export type GetFileInfoErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type GetFileInfoError = GetFileInfoErrors[keyof GetFileInfoErrors];
+
+export type GetFileInfoResponses = {
+    /**
+     * Successful Response
+     */
+    200: FileInfoResponse;
+};
+
+export type GetFileInfoResponse = GetFileInfoResponses[keyof GetFileInfoResponses];
 
 export type ListLdacaFeaturedCollectionsData = {
     body?: never;
@@ -6079,9 +6668,41 @@ export type ListLdacaFeaturedCollectionsData = {
 
 export type ListLdacaFeaturedCollectionsErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ListLdacaFeaturedCollectionsError = ListLdacaFeaturedCollectionsErrors[keyof ListLdacaFeaturedCollectionsErrors];
@@ -6114,9 +6735,41 @@ export type SearchLdacaCollectionsData = {
 
 export type SearchLdacaCollectionsErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type SearchLdacaCollectionsError = SearchLdacaCollectionsErrors[keyof SearchLdacaCollectionsErrors];
@@ -6145,9 +6798,41 @@ export type MoveFileData = {
 
 export type MoveFileErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type MoveFileError = MoveFileErrors[keyof MoveFileErrors];
@@ -6176,9 +6861,41 @@ export type UnifiedFilePreviewData = {
 
 export type UnifiedFilePreviewErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type UnifiedFilePreviewError = UnifiedFilePreviewErrors[keyof UnifiedFilePreviewErrors];
@@ -6214,19 +6931,53 @@ export type GetRawFileData = {
 
 export type GetRawFileErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetRawFileError = GetRawFileErrors[keyof GetRawFileErrors];
 
 export type GetRawFileResponses = {
     /**
-     * Successful Response
+     * Raw UTF-8 file content.
      */
-    200: unknown;
+    200: string;
 };
+
+export type GetRawFileResponse = GetRawFileResponses[keyof GetRawFileResponses];
 
 export type GetSampleDataCatalogueData = {
     body?: never;
@@ -6243,9 +6994,41 @@ export type GetSampleDataCatalogueData = {
 
 export type GetSampleDataCatalogueErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetSampleDataCatalogueError = GetSampleDataCatalogueErrors[keyof GetSampleDataCatalogueErrors];
@@ -6281,19 +7064,53 @@ export type GetSampleDataReadmeData = {
 
 export type GetSampleDataReadmeErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetSampleDataReadmeError = GetSampleDataReadmeErrors[keyof GetSampleDataReadmeErrors];
 
 export type GetSampleDataReadmeResponses = {
     /**
-     * Successful Response
+     * README markdown text from the sample-data catalogue.
      */
-    200: unknown;
+    200: string;
 };
+
+export type GetSampleDataReadmeResponse = GetSampleDataReadmeResponses[keyof GetSampleDataReadmeResponses];
 
 export type ListFilesTasksData = {
     body?: never;
@@ -6310,9 +7127,41 @@ export type ListFilesTasksData = {
 
 export type ListFilesTasksErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ListFilesTasksError = ListFilesTasksErrors[keyof ListFilesTasksErrors];
@@ -6350,9 +7199,41 @@ export type ClearFilesTasksData = {
 
 export type ClearFilesTasksErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ClearFilesTasksError = ClearFilesTasksErrors[keyof ClearFilesTasksErrors];
@@ -6381,9 +7262,41 @@ export type UploadFileData = {
 
 export type UploadFileErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type UploadFileError = UploadFileErrors[keyof UploadFileErrors];
@@ -6396,112 +7309,6 @@ export type UploadFileResponses = {
 };
 
 export type UploadFileResponse = UploadFileResponses[keyof UploadFileResponses];
-
-export type DeleteFileData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Filename
-         */
-        filename: string;
-    };
-    query?: never;
-    url: '/api/files/{filename}';
-};
-
-export type DeleteFileErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DeleteFileError = DeleteFileErrors[keyof DeleteFileErrors];
-
-export type DeleteFileResponses = {
-    /**
-     * Successful Response
-     */
-    200: MessageResponse;
-};
-
-export type DeleteFileResponse = DeleteFileResponses[keyof DeleteFileResponses];
-
-export type DownloadFileData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Filename
-         */
-        filename: string;
-    };
-    query?: never;
-    url: '/api/files/{filename}';
-};
-
-export type DownloadFileErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DownloadFileError = DownloadFileErrors[keyof DownloadFileErrors];
-
-export type DownloadFileResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type GetFileInfoData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Filename
-         */
-        filename: string;
-    };
-    query?: never;
-    url: '/api/files/{filename}/info';
-};
-
-export type GetFileInfoErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetFileInfoError = GetFileInfoErrors[keyof GetFileInfoErrors];
-
-export type GetFileInfoResponses = {
-    /**
-     * Successful Response
-     */
-    200: FileInfoResponse;
-};
-
-export type GetFileInfoResponse = GetFileInfoResponses[keyof GetFileInfoResponses];
 
 export type GetPreferencesData = {
     body?: never;
@@ -6518,9 +7325,41 @@ export type GetPreferencesData = {
 
 export type GetPreferencesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetPreferencesError = GetPreferencesErrors[keyof GetPreferencesErrors];
@@ -6549,9 +7388,41 @@ export type UpdatePreferencesData = {
 
 export type UpdatePreferencesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type UpdatePreferencesError = UpdatePreferencesErrors[keyof UpdatePreferencesErrors];
@@ -6564,6 +7435,59 @@ export type UpdatePreferencesResponses = {
 };
 
 export type UpdatePreferencesResponse = UpdatePreferencesResponses[keyof UpdatePreferencesResponses];
+
+export type GetRuntimeConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/runtime-config';
+};
+
+export type GetRuntimeConfigErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type GetRuntimeConfigError = GetRuntimeConfigErrors[keyof GetRuntimeConfigErrors];
+
+export type GetRuntimeConfigResponses = {
+    /**
+     * Successful Response
+     */
+    200: RuntimeConfigResponse;
+};
+
+export type GetRuntimeConfigResponse = GetRuntimeConfigResponses[keyof GetRuntimeConfigResponses];
 
 export type ListTasksData = {
     body?: never;
@@ -6580,9 +7504,41 @@ export type ListTasksData = {
 
 export type ListTasksErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ListTasksError = ListTasksErrors[keyof ListTasksErrors];
@@ -6595,78 +7551,6 @@ export type ListTasksResponses = {
 };
 
 export type ListTasksResponse = ListTasksResponses[keyof ListTasksResponses];
-
-export type CancelTaskData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    url: '/api/tasks/cancel';
-};
-
-export type CancelTaskErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type CancelTaskError = CancelTaskErrors[keyof CancelTaskErrors];
-
-export type CancelTaskResponses = {
-    /**
-     * Successful Response
-     */
-    200: TaskCancelActionResponse;
-};
-
-export type CancelTaskResponse = CancelTaskResponses[keyof CancelTaskResponses];
-
-export type ClearTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    url: '/api/tasks/clear';
-};
-
-export type ClearTasksErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ClearTasksError = ClearTasksErrors[keyof ClearTasksErrors];
-
-export type ClearTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: TaskClearActionResponse;
-};
-
-export type ClearTasksResponse = ClearTasksResponses[keyof ClearTasksResponses];
 
 export type StreamTasksData = {
     body?: never;
@@ -6688,19 +7572,315 @@ export type StreamTasksData = {
 
 export type StreamTasksErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type StreamTasksError = StreamTasksErrors[keyof StreamTasksErrors];
 
 export type StreamTasksResponses = {
     /**
+     * Server-sent task update event stream.
+     */
+    200: string;
+};
+
+export type StreamTasksResponse = StreamTasksResponses[keyof StreamTasksResponses];
+
+export type ClearTaskData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/tasks/{task_id}';
+};
+
+export type ClearTaskErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type ClearTaskError = ClearTaskErrors[keyof ClearTaskErrors];
+
+export type ClearTaskResponses = {
+    /**
      * Successful Response
      */
-    200: unknown;
+    200: TaskClearActionResponse;
 };
+
+export type ClearTaskResponse = ClearTaskResponses[keyof ClearTaskResponses];
+
+export type CancelTaskData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/tasks/{task_id}/cancel';
+};
+
+export type CancelTaskErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type CancelTaskError = CancelTaskErrors[keyof CancelTaskErrors];
+
+export type CancelTaskResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskCancelActionResponse;
+};
+
+export type CancelTaskResponse = CancelTaskResponses[keyof CancelTaskResponses];
+
+export type GetMyCurrentWorkspaceData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/users/me/current-workspace';
+};
+
+export type GetMyCurrentWorkspaceErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type GetMyCurrentWorkspaceError = GetMyCurrentWorkspaceErrors[keyof GetMyCurrentWorkspaceErrors];
+
+export type GetMyCurrentWorkspaceResponses = {
+    /**
+     * Successful Response
+     */
+    200: CurrentWorkspaceResponse;
+};
+
+export type GetMyCurrentWorkspaceResponse = GetMyCurrentWorkspaceResponses[keyof GetMyCurrentWorkspaceResponses];
+
+export type SetMyCurrentWorkspaceData = {
+    body: CurrentWorkspaceUpdateRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/users/me/current-workspace';
+};
+
+export type SetMyCurrentWorkspaceErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type SetMyCurrentWorkspaceError = SetMyCurrentWorkspaceErrors[keyof SetMyCurrentWorkspaceErrors];
+
+export type SetMyCurrentWorkspaceResponses = {
+    /**
+     * Successful Response
+     */
+    200: SetCurrentWorkspaceResponse;
+};
+
+export type SetMyCurrentWorkspaceResponse = SetMyCurrentWorkspaceResponses[keyof SetMyCurrentWorkspaceResponses];
 
 export type ListWorkspacesData = {
     body?: never;
@@ -6717,9 +7897,41 @@ export type ListWorkspacesData = {
 
 export type ListWorkspacesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ListWorkspacesError = ListWorkspacesErrors[keyof ListWorkspacesErrors];
@@ -6750,9 +7962,41 @@ export type CreateWorkspaceData = {
 
 export type CreateWorkspaceErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type CreateWorkspaceError = CreateWorkspaceErrors[keyof CreateWorkspaceErrors];
@@ -6766,224 +8010,7 @@ export type CreateWorkspaceResponses = {
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
-export type AnnotateAiAllData = {
-    body: AnnotationAiAnnotateAllRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/annotation/ai/annotate-all';
-};
-
-export type AnnotateAiAllErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AnnotateAiAllError = AnnotateAiAllErrors[keyof AnnotateAiAllErrors];
-
-export type AnnotateAiAllResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiAnnotateAllResponse;
-};
-
-export type AnnotateAiAllResponse = AnnotateAiAllResponses[keyof AnnotateAiAllResponses];
-
-export type DetachAiPreviewedRowsData = {
-    body: AnnotationAiDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/annotation/ai/detach-previewed';
-};
-
-export type DetachAiPreviewedRowsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DetachAiPreviewedRowsError = DetachAiPreviewedRowsErrors[keyof DetachAiPreviewedRowsErrors];
-
-export type DetachAiPreviewedRowsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiDetachResponse;
-};
-
-export type DetachAiPreviewedRowsResponse = DetachAiPreviewedRowsResponses[keyof DetachAiPreviewedRowsResponses];
-
-export type ListAnnotationAiModelsData = {
-    body: AnnotationAiModelsRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/annotation/ai/models';
-};
-
-export type ListAnnotationAiModelsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ListAnnotationAiModelsError = ListAnnotationAiModelsErrors[keyof ListAnnotationAiModelsErrors];
-
-export type ListAnnotationAiModelsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiModelsResponse;
-};
-
-export type ListAnnotationAiModelsResponse = ListAnnotationAiModelsResponses[keyof ListAnnotationAiModelsResponses];
-
-export type AnnotateAiPreviewData = {
-    body: AnnotationAiPreviewRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/annotation/ai/preview';
-};
-
-export type AnnotateAiPreviewErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AnnotateAiPreviewError = AnnotateAiPreviewErrors[keyof AnnotateAiPreviewErrors];
-
-export type AnnotateAiPreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewResponse;
-};
-
-export type AnnotateAiPreviewResponse = AnnotateAiPreviewResponses[keyof AnnotateAiPreviewResponses];
-
-export type AnnotateAiPreviewClearData = {
-    body: AnnotationAiPreviewClearRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/annotation/ai/preview/clear';
-};
-
-export type AnnotateAiPreviewClearErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AnnotateAiPreviewClearError = AnnotateAiPreviewClearErrors[keyof AnnotateAiPreviewClearErrors];
-
-export type AnnotateAiPreviewClearResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewClearResponse;
-};
-
-export type AnnotateAiPreviewClearResponse = AnnotateAiPreviewClearResponses[keyof AnnotateAiPreviewClearResponses];
-
-export type AnnotateAiPreviewOverrideData = {
-    body: AnnotationAiPreviewOverrideRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/annotation/ai/preview/override';
-};
-
-export type AnnotateAiPreviewOverrideErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AnnotateAiPreviewOverrideError = AnnotateAiPreviewOverrideErrors[keyof AnnotateAiPreviewOverrideErrors];
-
-export type AnnotateAiPreviewOverrideResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewOverrideResponse;
-};
-
-export type AnnotateAiPreviewOverrideResponse = AnnotateAiPreviewOverrideResponses[keyof AnnotateAiPreviewOverrideResponses];
-
-export type AnnotateAiPreviewStateData = {
-    body: AnnotationAiPreviewStateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/annotation/ai/preview/state';
-};
-
-export type AnnotateAiPreviewStateErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AnnotateAiPreviewStateError = AnnotateAiPreviewStateErrors[keyof AnnotateAiPreviewStateErrors];
-
-export type AnnotateAiPreviewStateResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewStateResponse;
-};
-
-export type AnnotateAiPreviewStateResponse = AnnotateAiPreviewStateResponses[keyof AnnotateAiPreviewStateResponses];
-
-export type CreateAnnotationClassDescriptionsData = {
+export type GetTokenizerModelsData = {
     body?: never;
     headers?: {
         /**
@@ -6993,28 +8020,123 @@ export type CreateAnnotationClassDescriptionsData = {
     };
     path?: never;
     query?: never;
-    url: '/api/workspaces/annotation/class-descriptions';
+    url: '/api/workspaces/tokenizer-models';
 };
 
-export type CreateAnnotationClassDescriptionsErrors = {
+export type GetTokenizerModelsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type CreateAnnotationClassDescriptionsError = CreateAnnotationClassDescriptionsErrors[keyof CreateAnnotationClassDescriptionsErrors];
+export type GetTokenizerModelsError = GetTokenizerModelsErrors[keyof GetTokenizerModelsErrors];
 
-export type CreateAnnotationClassDescriptionsResponses = {
+export type GetTokenizerModelsResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceNodeInfo;
+    200: TokenizerModelsResponse;
 };
 
-export type CreateAnnotationClassDescriptionsResponse = CreateAnnotationClassDescriptionsResponses[keyof CreateAnnotationClassDescriptionsResponses];
+export type GetTokenizerModelsResponse = GetTokenizerModelsResponses[keyof GetTokenizerModelsResponses];
 
-export type GetAnnotationClassDescriptionsData = {
+export type UploadWorkspaceZipData = {
+    body: BodyUploadWorkspaceZip;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces/upload';
+};
+
+export type UploadWorkspaceZipErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type UploadWorkspaceZipError = UploadWorkspaceZipErrors[keyof UploadWorkspaceZipErrors];
+
+export type UploadWorkspaceZipResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceUploadResponse;
+};
+
+export type UploadWorkspaceZipResponse = UploadWorkspaceZipResponses[keyof UploadWorkspaceZipResponses];
+
+export type DeleteWorkspaceByIdData = {
     body?: never;
     headers?: {
         /**
@@ -7024,43 +8146,288 @@ export type GetAnnotationClassDescriptionsData = {
     };
     path: {
         /**
-         * Node Id
+         * Workspace Id
          */
-        node_id: string;
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}';
+};
+
+export type DeleteWorkspaceByIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type DeleteWorkspaceByIdError = DeleteWorkspaceByIdErrors[keyof DeleteWorkspaceByIdErrors];
+
+export type DeleteWorkspaceByIdResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceActionResponse;
+};
+
+export type DeleteWorkspaceByIdResponse = DeleteWorkspaceByIdResponses[keyof DeleteWorkspaceByIdResponses];
+
+export type GetWorkspaceByIdData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}';
+};
+
+export type GetWorkspaceByIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type GetWorkspaceByIdError = GetWorkspaceByIdErrors[keyof GetWorkspaceByIdErrors];
+
+export type GetWorkspaceByIdResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceInfo;
+};
+
+export type GetWorkspaceByIdResponse = GetWorkspaceByIdResponses[keyof GetWorkspaceByIdResponses];
+
+export type UpdateWorkspaceByIdData = {
+    body: WorkspaceUpdateRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}';
+};
+
+export type UpdateWorkspaceByIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type UpdateWorkspaceByIdError = UpdateWorkspaceByIdErrors[keyof UpdateWorkspaceByIdErrors];
+
+export type UpdateWorkspaceByIdResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceInfo;
+};
+
+export type UpdateWorkspaceByIdResponse = UpdateWorkspaceByIdResponses[keyof UpdateWorkspaceByIdResponses];
+
+export type AnalysisTaskDetachOptionsData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Task Id
+         */
+        task_id: string;
     };
     query?: {
         /**
-         * Class Column
+         * Node Id
          */
-        class_column?: string;
+        node_id?: string | null;
         /**
-         * Description Column
+         * Column
          */
-        description_column?: string;
+        column?: string | null;
     };
-    url: '/api/workspaces/annotation/class-descriptions/{node_id}';
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/detach-options';
 };
 
-export type GetAnnotationClassDescriptionsErrors = {
+export type AnalysisTaskDetachOptionsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type GetAnnotationClassDescriptionsError = GetAnnotationClassDescriptionsErrors[keyof GetAnnotationClassDescriptionsErrors];
+export type AnalysisTaskDetachOptionsError = AnalysisTaskDetachOptionsErrors[keyof AnalysisTaskDetachOptionsErrors];
 
-export type GetAnnotationClassDescriptionsResponses = {
+export type AnalysisTaskDetachOptionsResponses = {
     /**
+     * Response Analysis Task Detach Options
+     *
      * Successful Response
      */
-    200: AnnotationClassDescriptionsPayload;
+    200: TopicModelingDetachOptionsResponse | ConcordanceDetachOptionsResponse | QuotationDetachOptionsResponse;
 };
 
-export type GetAnnotationClassDescriptionsResponse = GetAnnotationClassDescriptionsResponses[keyof GetAnnotationClassDescriptionsResponses];
+export type AnalysisTaskDetachOptionsResponse = AnalysisTaskDetachOptionsResponses[keyof AnalysisTaskDetachOptionsResponses];
 
-export type UpdateAnnotationClassDescriptionsData = {
-    body: AnnotationClassDescriptionsPayload;
+export type CreateAnalysisTaskDetachmentData = {
+    /**
+     * Request
+     */
+    body: SequentialAnalysisDetachRequest | TopicModelingDetachRequest | ConcordanceDetachRequest | QuotationDetachRequest;
     headers?: {
         /**
          * Authorization
@@ -7069,172 +8436,71 @@ export type UpdateAnnotationClassDescriptionsData = {
     };
     path: {
         /**
-         * Node Id
+         * Workspace Id
          */
-        node_id: string;
+        workspace_id: string;
+        /**
+         * Task Id
+         */
+        task_id: string;
     };
     query?: never;
-    url: '/api/workspaces/annotation/class-descriptions/{node_id}';
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/detachments';
 };
 
-export type UpdateAnnotationClassDescriptionsErrors = {
+export type CreateAnalysisTaskDetachmentErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type UpdateAnnotationClassDescriptionsError = UpdateAnnotationClassDescriptionsErrors[keyof UpdateAnnotationClassDescriptionsErrors];
+export type CreateAnalysisTaskDetachmentError = CreateAnalysisTaskDetachmentErrors[keyof CreateAnalysisTaskDetachmentErrors];
 
-export type UpdateAnnotationClassDescriptionsResponses = {
+export type CreateAnalysisTaskDetachmentResponses = {
     /**
+     * Response Create Analysis Task Detachment
+     *
      * Successful Response
      */
-    200: AnnotationClassDescriptionsPayload;
+    200: SequentialAnalysisDetachResponse | TopicModelingDetachResponse | AnalysisTaskActionResponse;
 };
 
-export type UpdateAnnotationClassDescriptionsResponse = UpdateAnnotationClassDescriptionsResponses[keyof UpdateAnnotationClassDescriptionsResponses];
+export type CreateAnalysisTaskDetachmentResponse = CreateAnalysisTaskDetachmentResponses[keyof CreateAnalysisTaskDetachmentResponses];
 
-export type SetAnnotationClassParentData = {
-    body: AnnotationSetParentRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/annotation/class-descriptions/{node_id}/parent';
-};
-
-export type SetAnnotationClassParentErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SetAnnotationClassParentError = SetAnnotationClassParentErrors[keyof SetAnnotationClassParentErrors];
-
-export type SetAnnotationClassParentResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type SetAnnotationClassParentResponse = SetAnnotationClassParentResponses[keyof SetAnnotationClassParentResponses];
-
-export type SetAnnotationCellData = {
-    body: AnnotationSetCellRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/annotation/source/{node_id}/annotation-cell';
-};
-
-export type SetAnnotationCellErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SetAnnotationCellError = SetAnnotationCellErrors[keyof SetAnnotationCellErrors];
-
-export type SetAnnotationCellResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type SetAnnotationCellResponse = SetAnnotationCellResponses[keyof SetAnnotationCellResponses];
-
-export type CreateAnnotationColumnData = {
-    body: AnnotationCreateColumnRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/annotation/source/{node_id}/annotation-column';
-};
-
-export type CreateAnnotationColumnErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type CreateAnnotationColumnError = CreateAnnotationColumnErrors[keyof CreateAnnotationColumnErrors];
-
-export type CreateAnnotationColumnResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type CreateAnnotationColumnResponse = CreateAnnotationColumnResponses[keyof CreateAnnotationColumnResponses];
-
-export type RunConcordanceData = {
-    body: ConcordanceAnalysisRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/concordance';
-};
-
-export type RunConcordanceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type RunConcordanceError = RunConcordanceErrors[keyof RunConcordanceErrors];
-
-export type RunConcordanceResponses = {
-    /**
-     * Successful Response
-     */
-    200: ConcordanceAnalysisResponse;
-};
-
-export type RunConcordanceResponse = RunConcordanceResponses[keyof RunConcordanceResponses];
-
-export type ConcordanceTaskDispersionBinsData = {
+export type AnalysisTaskDispersionBinsData = {
     body?: never;
     headers?: {
         /**
@@ -7243,6 +8509,10 @@ export type ConcordanceTaskDispersionBinsData = {
         authorization?: string | null;
     };
     path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
         /**
          * Task Id
          */
@@ -7254,29 +8524,61 @@ export type ConcordanceTaskDispersionBinsData = {
          */
         node_id: string;
     };
-    url: '/api/workspaces/concordance/tasks/{task_id}/bins';
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/dispersion-bins';
 };
 
-export type ConcordanceTaskDispersionBinsErrors = {
+export type AnalysisTaskDispersionBinsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type ConcordanceTaskDispersionBinsError = ConcordanceTaskDispersionBinsErrors[keyof ConcordanceTaskDispersionBinsErrors];
+export type AnalysisTaskDispersionBinsError = AnalysisTaskDispersionBinsErrors[keyof AnalysisTaskDispersionBinsErrors];
 
-export type ConcordanceTaskDispersionBinsResponses = {
+export type AnalysisTaskDispersionBinsResponses = {
     /**
      * Successful Response
      */
     200: ConcordanceDispersionBinsResponse;
 };
 
-export type ConcordanceTaskDispersionBinsResponse = ConcordanceTaskDispersionBinsResponses[keyof ConcordanceTaskDispersionBinsResponses];
+export type AnalysisTaskDispersionBinsResponse = AnalysisTaskDispersionBinsResponses[keyof AnalysisTaskDispersionBinsResponses];
 
-export type ConcordanceTaskRequestData = {
-    body?: never;
+export type CreateAnalysisTaskDispersionDetachmentData = {
+    body: ConcordanceDispersionDetachRequest;
     headers?: {
         /**
          * Authorization
@@ -7284,34 +8586,220 @@ export type ConcordanceTaskRequestData = {
         authorization?: string | null;
     };
     path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
         /**
          * Task Id
          */
         task_id: string;
     };
     query?: never;
-    url: '/api/workspaces/concordance/tasks/{task_id}/request';
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/dispersion-detachments';
 };
 
-export type ConcordanceTaskRequestErrors = {
+export type CreateAnalysisTaskDispersionDetachmentErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type ConcordanceTaskRequestError = ConcordanceTaskRequestErrors[keyof ConcordanceTaskRequestErrors];
+export type CreateAnalysisTaskDispersionDetachmentError = CreateAnalysisTaskDispersionDetachmentErrors[keyof CreateAnalysisTaskDispersionDetachmentErrors];
 
-export type ConcordanceTaskRequestResponses = {
+export type CreateAnalysisTaskDispersionDetachmentResponses = {
     /**
      * Successful Response
      */
-    200: ConcordanceRequest;
+    200: AnalysisTaskActionResponse;
 };
 
-export type ConcordanceTaskRequestResponse = ConcordanceTaskRequestResponses[keyof ConcordanceTaskRequestResponses];
+export type CreateAnalysisTaskDispersionDetachmentResponse = CreateAnalysisTaskDispersionDetachmentResponses[keyof CreateAnalysisTaskDispersionDetachmentResponses];
 
-export type ConcordanceTaskResultData = {
+export type CreateAnalysisTaskMaterializationData = {
+    /**
+     * Request
+     */
+    body: ConcordanceMaterializeRequest | QuotationMaterializeRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/materializations';
+};
+
+export type CreateAnalysisTaskMaterializationErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type CreateAnalysisTaskMaterializationError = CreateAnalysisTaskMaterializationErrors[keyof CreateAnalysisTaskMaterializationErrors];
+
+export type CreateAnalysisTaskMaterializationResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnalysisTaskActionResponse;
+};
+
+export type CreateAnalysisTaskMaterializationResponse = CreateAnalysisTaskMaterializationResponses[keyof CreateAnalysisTaskMaterializationResponses];
+
+export type AnalysisTaskPreferencesData = {
+    /**
+     * Updates
+     */
+    body?: QuotationResultQuery | SequentialAnalysisPreferenceUpdateRequest | TokenFrequencyPreferenceUpdateRequest | null;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/preferences';
+};
+
+export type AnalysisTaskPreferencesErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type AnalysisTaskPreferencesError = AnalysisTaskPreferencesErrors[keyof AnalysisTaskPreferencesErrors];
+
+export type AnalysisTaskPreferencesResponses = {
+    /**
+     * Response Analysis Task Preferences
+     *
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type AnalysisTaskRequestData = {
     body?: never;
     headers?: {
         /**
@@ -7320,6 +8808,82 @@ export type ConcordanceTaskResultData = {
         authorization?: string | null;
     };
     path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/request';
+};
+
+export type AnalysisTaskRequestErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type AnalysisTaskRequestError = AnalysisTaskRequestErrors[keyof AnalysisTaskRequestErrors];
+
+export type AnalysisTaskRequestResponses = {
+    /**
+     * Response Analysis Task Request
+     *
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type AnalysisTaskResultData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
         /**
          * Task Id
          */
@@ -7354,36 +8918,65 @@ export type ConcordanceTaskResultData = {
          * Show Metadata
          */
         show_metadata?: boolean | null;
-        /**
-         * Update Only
-         */
-        update_only?: boolean;
     };
-    url: '/api/workspaces/concordance/tasks/{task_id}/result';
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/result';
 };
 
-export type ConcordanceTaskResultErrors = {
+export type AnalysisTaskResultErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type ConcordanceTaskResultError = ConcordanceTaskResultErrors[keyof ConcordanceTaskResultErrors];
+export type AnalysisTaskResultError = AnalysisTaskResultErrors[keyof AnalysisTaskResultErrors];
 
-export type ConcordanceTaskResultResponses = {
+export type AnalysisTaskResultResponses = {
     /**
-     * Response Concordance Task Result
+     * Response Analysis Task Result
      *
      * Successful Response
      */
-    200: ConcordanceAnalysisResponse | null;
+    200: unknown;
 };
 
-export type ConcordanceTaskResultResponse = ConcordanceTaskResultResponses[keyof ConcordanceTaskResultResponses];
-
-export type ConcordanceTaskResultPostData = {
-    body: ConcordanceResultQuery;
+export type AnalysisTaskResultQueryData = {
+    /**
+     * Query
+     */
+    body: ConcordanceResultQuery | QuotationResultQuery;
     headers?: {
         /**
          * Authorization
@@ -7392,138 +8985,137 @@ export type ConcordanceTaskResultPostData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Task Id
          */
         task_id: string;
     };
     query?: never;
-    url: '/api/workspaces/concordance/tasks/{task_id}/result';
+    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/result-query';
 };
 
-export type ConcordanceTaskResultPostErrors = {
+export type AnalysisTaskResultQueryErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type ConcordanceTaskResultPostError = ConcordanceTaskResultPostErrors[keyof ConcordanceTaskResultPostErrors];
+export type AnalysisTaskResultQueryError = AnalysisTaskResultQueryErrors[keyof AnalysisTaskResultQueryErrors];
 
-export type ConcordanceTaskResultPostResponses = {
+export type AnalysisTaskResultQueryResponses = {
     /**
-     * Response Concordance Task Result Post
+     * Response Analysis Task Result Query
      *
      * Successful Response
      */
-    200: ConcordanceAnalysisResponse | null;
+    200: unknown;
 };
 
-export type ConcordanceTaskResultPostResponse = ConcordanceTaskResultPostResponses[keyof ConcordanceTaskResultPostResponses];
-
-export type GetCurrentWorkspaceData = {
-    body?: never;
+export type AnnotateAiPreviewData = {
+    body: AnnotationAiPreviewRequest;
     headers?: {
         /**
          * Authorization
          */
         authorization?: string | null;
     };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/current';
-};
-
-export type GetCurrentWorkspaceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetCurrentWorkspaceError = GetCurrentWorkspaceErrors[keyof GetCurrentWorkspaceErrors];
-
-export type GetCurrentWorkspaceResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentWorkspaceResponse;
-};
-
-export type GetCurrentWorkspaceResponse = GetCurrentWorkspaceResponses[keyof GetCurrentWorkspaceResponses];
-
-export type SetCurrentWorkspaceData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: {
-        /**
-         * Workspace Id
-         */
-        workspace_id?: string | null;
-    };
-    url: '/api/workspaces/current';
-};
-
-export type SetCurrentWorkspaceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SetCurrentWorkspaceError = SetCurrentWorkspaceErrors[keyof SetCurrentWorkspaceErrors];
-
-export type SetCurrentWorkspaceResponses = {
-    /**
-     * Successful Response
-     */
-    200: SetCurrentWorkspaceResponse;
-};
-
-export type SetCurrentWorkspaceResponse2 = SetCurrentWorkspaceResponses[keyof SetCurrentWorkspaceResponses];
-
-export type DeleteWorkspaceData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query: {
+    path: {
         /**
          * Workspace Id
          */
         workspace_id: string;
     };
-    url: '/api/workspaces/delete';
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions';
 };
 
-export type DeleteWorkspaceErrors = {
+export type AnnotateAiPreviewErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type DeleteWorkspaceError = DeleteWorkspaceErrors[keyof DeleteWorkspaceErrors];
+export type AnnotateAiPreviewError = AnnotateAiPreviewErrors[keyof AnnotateAiPreviewErrors];
 
-export type DeleteWorkspaceResponses = {
+export type AnnotateAiPreviewResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceActionResponse;
+    200: AnnotationAiPreviewResponse;
 };
 
-export type DeleteWorkspaceResponse = DeleteWorkspaceResponses[keyof DeleteWorkspaceResponses];
+export type AnnotateAiPreviewResponse = AnnotateAiPreviewResponses[keyof AnnotateAiPreviewResponses];
 
-export type UpdateWorkspaceDescriptionData = {
+export type AnnotateAiPreviewClearData = {
     body?: never;
     headers?: {
         /**
@@ -7531,33 +9123,979 @@ export type UpdateWorkspaceDescriptionData = {
          */
         authorization?: string | null;
     };
-    path?: never;
-    query?: {
+    path: {
         /**
-         * Description
+         * Workspace Id
          */
-        description?: string;
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
     };
-    url: '/api/workspaces/description';
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}';
 };
 
-export type UpdateWorkspaceDescriptionErrors = {
+export type AnnotateAiPreviewClearErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type UpdateWorkspaceDescriptionError = UpdateWorkspaceDescriptionErrors[keyof UpdateWorkspaceDescriptionErrors];
+export type AnnotateAiPreviewClearError = AnnotateAiPreviewClearErrors[keyof AnnotateAiPreviewClearErrors];
 
-export type UpdateWorkspaceDescriptionResponses = {
+export type AnnotateAiPreviewClearResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceInfo;
+    200: AnnotationAiPreviewClearResponse;
 };
 
-export type UpdateWorkspaceDescriptionResponse = UpdateWorkspaceDescriptionResponses[keyof UpdateWorkspaceDescriptionResponses];
+export type AnnotateAiPreviewClearResponse = AnnotateAiPreviewClearResponses[keyof AnnotateAiPreviewClearResponses];
+
+export type AnnotateAiPreviewStateData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query: {
+        /**
+         * Text Column
+         */
+        text_column: string;
+        /**
+         * Class Node Id
+         */
+        class_node_id: string;
+        /**
+         * Class Column
+         */
+        class_column?: string;
+        /**
+         * Description Column
+         */
+        description_column?: string;
+        /**
+         * Provider Id
+         */
+        provider_id: string;
+        /**
+         * Base Url
+         */
+        base_url?: string | null;
+        /**
+         * Model
+         */
+        model: string;
+        /**
+         * Instruction
+         */
+        instruction: string;
+        /**
+         * Temperature
+         */
+        temperature?: number;
+        /**
+         * Reasoning Enabled
+         */
+        reasoning_enabled?: boolean;
+        /**
+         * Reasoning Effort
+         */
+        reasoning_effort?: string;
+    };
+    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}';
+};
+
+export type AnnotateAiPreviewStateErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type AnnotateAiPreviewStateError = AnnotateAiPreviewStateErrors[keyof AnnotateAiPreviewStateErrors];
+
+export type AnnotateAiPreviewStateResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiPreviewStateResponse;
+};
+
+export type AnnotateAiPreviewStateResponse = AnnotateAiPreviewStateResponses[keyof AnnotateAiPreviewStateResponses];
+
+export type AnnotateAiAllData = {
+    body: AnnotationAiAnnotateAllRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/annotations';
+};
+
+export type AnnotateAiAllErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type AnnotateAiAllError = AnnotateAiAllErrors[keyof AnnotateAiAllErrors];
+
+export type AnnotateAiAllResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiAnnotateAllResponse;
+};
+
+export type AnnotateAiAllResponse = AnnotateAiAllResponses[keyof AnnotateAiAllResponses];
+
+export type DetachAiPreviewedRowsData = {
+    body: AnnotationAiDetachRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/detachments';
+};
+
+export type DetachAiPreviewedRowsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type DetachAiPreviewedRowsError = DetachAiPreviewedRowsErrors[keyof DetachAiPreviewedRowsErrors];
+
+export type DetachAiPreviewedRowsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiDetachResponse;
+};
+
+export type DetachAiPreviewedRowsResponse = DetachAiPreviewedRowsResponses[keyof DetachAiPreviewedRowsResponses];
+
+export type AnnotateAiPreviewOverrideData = {
+    body: AnnotationAiPreviewOverrideRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+        /**
+         * Row Index
+         */
+        row_index: number;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/rows/{row_index}';
+};
+
+export type AnnotateAiPreviewOverrideErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type AnnotateAiPreviewOverrideError = AnnotateAiPreviewOverrideErrors[keyof AnnotateAiPreviewOverrideErrors];
+
+export type AnnotateAiPreviewOverrideResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiPreviewOverrideResponse;
+};
+
+export type AnnotateAiPreviewOverrideResponse = AnnotateAiPreviewOverrideResponses[keyof AnnotateAiPreviewOverrideResponses];
+
+export type ListAnnotationAiModelsData = {
+    body: AnnotationAiModelsRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation/ai/models';
+};
+
+export type ListAnnotationAiModelsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type ListAnnotationAiModelsError = ListAnnotationAiModelsErrors[keyof ListAnnotationAiModelsErrors];
+
+export type ListAnnotationAiModelsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationAiModelsResponse;
+};
+
+export type ListAnnotationAiModelsResponse = ListAnnotationAiModelsResponses[keyof ListAnnotationAiModelsResponses];
+
+export type CreateAnnotationClassDescriptionsData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions';
+};
+
+export type CreateAnnotationClassDescriptionsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type CreateAnnotationClassDescriptionsError = CreateAnnotationClassDescriptionsErrors[keyof CreateAnnotationClassDescriptionsErrors];
+
+export type CreateAnnotationClassDescriptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type CreateAnnotationClassDescriptionsResponse = CreateAnnotationClassDescriptionsResponses[keyof CreateAnnotationClassDescriptionsResponses];
+
+export type GetAnnotationClassDescriptionsData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: {
+        /**
+         * Class Column
+         */
+        class_column?: string;
+        /**
+         * Description Column
+         */
+        description_column?: string;
+    };
+    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}';
+};
+
+export type GetAnnotationClassDescriptionsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type GetAnnotationClassDescriptionsError = GetAnnotationClassDescriptionsErrors[keyof GetAnnotationClassDescriptionsErrors];
+
+export type GetAnnotationClassDescriptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationClassDescriptionsPayload;
+};
+
+export type GetAnnotationClassDescriptionsResponse = GetAnnotationClassDescriptionsResponses[keyof GetAnnotationClassDescriptionsResponses];
+
+export type UpdateAnnotationClassDescriptionsData = {
+    body: AnnotationClassDescriptionsPayload;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}';
+};
+
+export type UpdateAnnotationClassDescriptionsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type UpdateAnnotationClassDescriptionsError = UpdateAnnotationClassDescriptionsErrors[keyof UpdateAnnotationClassDescriptionsErrors];
+
+export type UpdateAnnotationClassDescriptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationClassDescriptionsPayload;
+};
+
+export type UpdateAnnotationClassDescriptionsResponse = UpdateAnnotationClassDescriptionsResponses[keyof UpdateAnnotationClassDescriptionsResponses];
+
+export type SetAnnotationClassParentData = {
+    body: AnnotationSetParentRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}/parent';
+};
+
+export type SetAnnotationClassParentErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type SetAnnotationClassParentError = SetAnnotationClassParentErrors[keyof SetAnnotationClassParentErrors];
+
+export type SetAnnotationClassParentResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type SetAnnotationClassParentResponse = SetAnnotationClassParentResponses[keyof SetAnnotationClassParentResponses];
+
+export type SetAnnotationCellData = {
+    body: AnnotationSetCellRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation/source/{node_id}/annotation-cell';
+};
+
+export type SetAnnotationCellErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type SetAnnotationCellError = SetAnnotationCellErrors[keyof SetAnnotationCellErrors];
+
+export type SetAnnotationCellResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type SetAnnotationCellResponse = SetAnnotationCellResponses[keyof SetAnnotationCellResponses];
+
+export type CreateAnnotationColumnData = {
+    body: AnnotationCreateColumnRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/annotation/source/{node_id}/annotation-column';
+};
+
+export type CreateAnnotationColumnErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type CreateAnnotationColumnError = CreateAnnotationColumnErrors[keyof CreateAnnotationColumnErrors];
+
+export type CreateAnnotationColumnResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type CreateAnnotationColumnResponse = CreateAnnotationColumnResponses[keyof CreateAnnotationColumnResponses];
+
+export type RunConcordanceData = {
+    body: ConcordanceAnalysisRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/concordance';
+};
+
+export type RunConcordanceErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type RunConcordanceError = RunConcordanceErrors[keyof RunConcordanceErrors];
+
+export type RunConcordanceResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConcordanceAnalysisResponse;
+};
+
+export type RunConcordanceResponse = RunConcordanceResponses[keyof RunConcordanceResponses];
 
 export type StartWorkspaceDownloadData = {
     body?: never;
@@ -7567,16 +10105,53 @@ export type StartWorkspaceDownloadData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query?: never;
-    url: '/api/workspaces/download';
+    url: '/api/workspaces/{workspace_id}/download';
 };
 
 export type StartWorkspaceDownloadErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type StartWorkspaceDownloadError = StartWorkspaceDownloadErrors[keyof StartWorkspaceDownloadErrors];
@@ -7600,29 +10175,67 @@ export type DownloadWorkspaceArtifactData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Task Id
          */
         task_id: string;
     };
     query?: never;
-    url: '/api/workspaces/download/tasks/{task_id}/artifact';
+    url: '/api/workspaces/{workspace_id}/download/tasks/{task_id}/artifact';
 };
 
 export type DownloadWorkspaceArtifactErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type DownloadWorkspaceArtifactError = DownloadWorkspaceArtifactErrors[keyof DownloadWorkspaceArtifactErrors];
 
 export type DownloadWorkspaceArtifactResponses = {
     /**
-     * Successful Response
+     * Workspace ZIP artifact download.
      */
-    200: unknown;
+    200: Blob | File;
 };
+
+export type DownloadWorkspaceArtifactResponse = DownloadWorkspaceArtifactResponses[keyof DownloadWorkspaceArtifactResponses];
 
 export type ExportNodesData = {
     body?: never;
@@ -7632,7 +10245,12 @@ export type ExportNodesData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query: {
         /**
          * Node Ids
@@ -7643,26 +10261,60 @@ export type ExportNodesData = {
          */
         format?: string;
     };
-    url: '/api/workspaces/export';
+    url: '/api/workspaces/{workspace_id}/export';
 };
 
 export type ExportNodesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ExportNodesError = ExportNodesErrors[keyof ExportNodesErrors];
 
 export type ExportNodesResponses = {
     /**
-     * Successful Response
+     * Node export download. Single-node exports use the requested format; multi-node exports are returned as a ZIP archive.
      */
-    200: unknown;
+    200: Blob | File;
 };
 
-export type GetWorkspaceGraphData = {
+export type ExportNodesResponse = ExportNodesResponses[keyof ExportNodesResponses];
+
+export type GetWorkspaceGraphByIdData = {
     body?: never;
     headers?: {
         /**
@@ -7670,162 +10322,121 @@ export type GetWorkspaceGraphData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query?: never;
-    url: '/api/workspaces/graph';
+    url: '/api/workspaces/{workspace_id}/graph';
 };
 
-export type GetWorkspaceGraphErrors = {
+export type GetWorkspaceGraphByIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type GetWorkspaceGraphError = GetWorkspaceGraphErrors[keyof GetWorkspaceGraphErrors];
+export type GetWorkspaceGraphByIdError = GetWorkspaceGraphByIdErrors[keyof GetWorkspaceGraphByIdErrors];
 
-export type GetWorkspaceGraphResponses = {
+export type GetWorkspaceGraphByIdResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceGraphResponse;
 };
 
-export type GetWorkspaceGraphResponse = GetWorkspaceGraphResponses[keyof GetWorkspaceGraphResponses];
-
-export type GetWorkspaceInfoData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/info';
-};
-
-export type GetWorkspaceInfoErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetWorkspaceInfoError = GetWorkspaceInfoErrors[keyof GetWorkspaceInfoErrors];
-
-export type GetWorkspaceInfoResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceInfo;
-};
-
-export type GetWorkspaceInfoResponse = GetWorkspaceInfoResponses[keyof GetWorkspaceInfoResponses];
-
-export type RenameWorkspaceData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query: {
-        /**
-         * New Name
-         */
-        new_name: string;
-    };
-    url: '/api/workspaces/name';
-};
-
-export type RenameWorkspaceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type RenameWorkspaceError = RenameWorkspaceErrors[keyof RenameWorkspaceErrors];
-
-export type RenameWorkspaceResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceInfo;
-};
-
-export type RenameWorkspaceResponse = RenameWorkspaceResponses[keyof RenameWorkspaceResponses];
-
-export type GetWorkspaceNodesData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/nodes';
-};
-
-export type GetWorkspaceNodesErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetWorkspaceNodesError = GetWorkspaceNodesErrors[keyof GetWorkspaceNodesErrors];
-
-export type GetWorkspaceNodesResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodesResponse;
-};
-
-export type GetWorkspaceNodesResponse = GetWorkspaceNodesResponses[keyof GetWorkspaceNodesResponses];
+export type GetWorkspaceGraphByIdResponse = GetWorkspaceGraphByIdResponses[keyof GetWorkspaceGraphByIdResponses];
 
 export type AddNodeToWorkspaceData = {
-    body?: never;
+    body: WorkspaceNodeCreateRequest;
     headers?: {
         /**
          * Authorization
          */
         authorization?: string | null;
     };
-    path?: never;
-    query: {
+    path: {
         /**
-         * Filename
+         * Workspace Id
          */
-        filename: string;
-        /**
-         * Sheet Name
-         *
-         * Optional Excel sheet name to load when the source file is a workbook.
-         */
-        sheet_name?: string | null;
-        /**
-         * Mode
-         *
-         * How to treat the file: currently only 'LazyFrame' is supported; files are staged as parquet and reloaded lazily.
-         */
-        mode?: string;
+        workspace_id: string;
     };
-    url: '/api/workspaces/nodes';
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/nodes';
 };
 
 export type AddNodeToWorkspaceErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type AddNodeToWorkspaceError = AddNodeToWorkspaceErrors[keyof AddNodeToWorkspaceErrors];
@@ -7847,16 +10458,53 @@ export type ConcatNodesData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query?: never;
-    url: '/api/workspaces/nodes/concat';
+    url: '/api/workspaces/{workspace_id}/nodes/concat';
 };
 
 export type ConcatNodesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ConcatNodesError = ConcatNodesErrors[keyof ConcatNodesErrors];
@@ -7878,7 +10526,12 @@ export type ConcatNodesPreviewData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query?: {
         /**
          * Page
@@ -7889,14 +10542,46 @@ export type ConcatNodesPreviewData = {
          */
         page_size?: number;
     };
-    url: '/api/workspaces/nodes/concat/preview';
+    url: '/api/workspaces/{workspace_id}/nodes/concat/preview';
 };
 
 export type ConcatNodesPreviewErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ConcatNodesPreviewError = ConcatNodesPreviewErrors[keyof ConcatNodesPreviewErrors];
@@ -7918,7 +10603,12 @@ export type JoinNodesData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query: {
         /**
          * Left Node Id
@@ -7945,14 +10635,46 @@ export type JoinNodesData = {
          */
         new_node_name?: string | null;
     };
-    url: '/api/workspaces/nodes/join';
+    url: '/api/workspaces/{workspace_id}/nodes/join';
 };
 
 export type JoinNodesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type JoinNodesError = JoinNodesErrors[keyof JoinNodesErrors];
@@ -7974,7 +10696,12 @@ export type JoinNodesPreviewData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query: {
         /**
          * Left Node Id
@@ -8005,14 +10732,46 @@ export type JoinNodesPreviewData = {
          */
         page_size?: number;
     };
-    url: '/api/workspaces/nodes/join/preview';
+    url: '/api/workspaces/{workspace_id}/nodes/join/preview';
 };
 
 export type JoinNodesPreviewErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type JoinNodesPreviewError = JoinNodesPreviewErrors[keyof JoinNodesPreviewErrors];
@@ -8026,7 +10785,7 @@ export type JoinNodesPreviewResponses = {
 
 export type JoinNodesPreviewResponse = JoinNodesPreviewResponses[keyof JoinNodesPreviewResponses];
 
-export type ReorderWorkspaceNodesData = {
+export type ReorderWorkspaceNodesByIdData = {
     body: WorkspaceNodeReorderRequest;
     headers?: {
         /**
@@ -8034,28 +10793,65 @@ export type ReorderWorkspaceNodesData = {
          */
         authorization?: string | null;
     };
-    path?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
     query?: never;
-    url: '/api/workspaces/nodes/order';
+    url: '/api/workspaces/{workspace_id}/nodes/order';
 };
 
-export type ReorderWorkspaceNodesErrors = {
+export type ReorderWorkspaceNodesByIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type ReorderWorkspaceNodesError = ReorderWorkspaceNodesErrors[keyof ReorderWorkspaceNodesErrors];
+export type ReorderWorkspaceNodesByIdError = ReorderWorkspaceNodesByIdErrors[keyof ReorderWorkspaceNodesByIdErrors];
 
-export type ReorderWorkspaceNodesResponses = {
+export type ReorderWorkspaceNodesByIdResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceGraphResponse;
 };
 
-export type ReorderWorkspaceNodesResponse = ReorderWorkspaceNodesResponses[keyof ReorderWorkspaceNodesResponses];
+export type ReorderWorkspaceNodesByIdResponse = ReorderWorkspaceNodesByIdResponses[keyof ReorderWorkspaceNodesByIdResponses];
 
 export type DeleteNodeData = {
     body?: never;
@@ -8067,19 +10863,55 @@ export type DeleteNodeData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}';
 };
 
 export type DeleteNodeErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type DeleteNodeError = DeleteNodeErrors[keyof DeleteNodeErrors];
@@ -8093,42 +10925,6 @@ export type DeleteNodeResponses = {
 
 export type DeleteNodeResponse = DeleteNodeResponses[keyof DeleteNodeResponses];
 
-export type GetNodeInfoData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}';
-};
-
-export type GetNodeInfoErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetNodeInfoError = GetNodeInfoErrors[keyof GetNodeInfoErrors];
-
-export type GetNodeInfoResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type GetNodeInfoResponse = GetNodeInfoResponses[keyof GetNodeInfoResponses];
-
 export type CastNodeData = {
     body: CastNodeRequest;
     headers?: {
@@ -8139,19 +10935,55 @@ export type CastNodeData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/cast';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/cast';
 };
 
 export type CastNodeErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type CastNodeError = CastNodeErrors[keyof CastNodeErrors];
@@ -8175,19 +11007,55 @@ export type CloneNodeData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/clone';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/clone';
 };
 
 export type CloneNodeErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type CloneNodeError = CloneNodeErrors[keyof CloneNodeErrors];
@@ -8211,19 +11079,55 @@ export type SetNodeColorData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/color';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/color';
 };
 
 export type SetNodeColorErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type SetNodeColorError = SetNodeColorErrors[keyof SetNodeColorErrors];
@@ -8247,6 +11151,10 @@ export type DeleteNodeColumnData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8256,14 +11164,46 @@ export type DeleteNodeColumnData = {
         column_name: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/columns/{column_name}';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}';
 };
 
 export type DeleteNodeColumnErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type DeleteNodeColumnError = DeleteNodeColumnErrors[keyof DeleteNodeColumnErrors];
@@ -8287,6 +11227,10 @@ export type RenameNodeColumnData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8296,14 +11240,46 @@ export type RenameNodeColumnData = {
         column_name: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/columns/{column_name}';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}';
 };
 
 export type RenameNodeColumnErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type RenameNodeColumnError = RenameNodeColumnErrors[keyof RenameNodeColumnErrors];
@@ -8327,6 +11303,10 @@ export type DescribeColumnData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8336,14 +11316,46 @@ export type DescribeColumnData = {
         column_name: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/columns/{column_name}/describe';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}/describe';
 };
 
 export type DescribeColumnErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type DescribeColumnError = DescribeColumnErrors[keyof DescribeColumnErrors];
@@ -8367,6 +11379,10 @@ export type ColumnOperationsData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8376,14 +11392,46 @@ export type ColumnOperationsData = {
         column_name: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/columns/{column_name}/operations';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}/operations';
 };
 
 export type ColumnOperationsErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ColumnOperationsError = ColumnOperationsErrors[keyof ColumnOperationsErrors];
@@ -8407,6 +11455,10 @@ export type GetColumnUniqueValuesData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8416,14 +11468,46 @@ export type GetColumnUniqueValuesData = {
         column_name: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/columns/{column_name}/unique';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}/unique';
 };
 
 export type GetColumnUniqueValuesErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetColumnUniqueValuesError = GetColumnUniqueValuesErrors[keyof GetColumnUniqueValuesErrors];
@@ -8437,43 +11521,7 @@ export type GetColumnUniqueValuesResponses = {
 
 export type GetColumnUniqueValuesResponse = GetColumnUniqueValuesResponses[keyof GetColumnUniqueValuesResponses];
 
-export type DetachConcordanceData = {
-    body: ConcordanceDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}/concordance/detach';
-};
-
-export type DetachConcordanceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DetachConcordanceError = DetachConcordanceErrors[keyof DetachConcordanceErrors];
-
-export type DetachConcordanceResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisTaskActionResponse;
-};
-
-export type DetachConcordanceResponse = DetachConcordanceResponses[keyof DetachConcordanceResponses];
-
-export type ConcordanceDetachOptionsData = {
+export type GetNodeDataByWorkspaceIdData = {
     body?: never;
     headers?: {
         /**
@@ -8483,118 +11531,9 @@ export type ConcordanceDetachOptionsData = {
     };
     path: {
         /**
-         * Node Id
+         * Workspace Id
          */
-        node_id: string;
-    };
-    query: {
-        /**
-         * Column
-         */
-        column: string;
-    };
-    url: '/api/workspaces/nodes/{node_id}/concordance/detach-options';
-};
-
-export type ConcordanceDetachOptionsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ConcordanceDetachOptionsError = ConcordanceDetachOptionsErrors[keyof ConcordanceDetachOptionsErrors];
-
-export type ConcordanceDetachOptionsResponses = {
-    /**
-     * Successful Response
-     */
-    200: ConcordanceDetachOptionsResponse;
-};
-
-export type ConcordanceDetachOptionsResponse2 = ConcordanceDetachOptionsResponses[keyof ConcordanceDetachOptionsResponses];
-
-export type DetachConcordanceDispersionData = {
-    body: ConcordanceDispersionDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}/concordance/dispersion-detach';
-};
-
-export type DetachConcordanceDispersionErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DetachConcordanceDispersionError = DetachConcordanceDispersionErrors[keyof DetachConcordanceDispersionErrors];
-
-export type DetachConcordanceDispersionResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisTaskActionResponse;
-};
-
-export type DetachConcordanceDispersionResponse = DetachConcordanceDispersionResponses[keyof DetachConcordanceDispersionResponses];
-
-export type MaterializeConcordanceData = {
-    body: ConcordanceMaterializeRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}/concordance/materialize';
-};
-
-export type MaterializeConcordanceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type MaterializeConcordanceError = MaterializeConcordanceErrors[keyof MaterializeConcordanceErrors];
-
-export type MaterializeConcordanceResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisTaskActionResponse;
-};
-
-export type MaterializeConcordanceResponse = MaterializeConcordanceResponses[keyof MaterializeConcordanceResponses];
-
-export type GetNodeDataData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
+        workspace_id: string;
         /**
          * Node Id
          */
@@ -8630,26 +11569,58 @@ export type GetNodeDataData = {
          */
         filter_op?: string;
     };
-    url: '/api/workspaces/nodes/{node_id}/data';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/data';
 };
 
-export type GetNodeDataErrors = {
+export type GetNodeDataByWorkspaceIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
-export type GetNodeDataError = GetNodeDataErrors[keyof GetNodeDataErrors];
+export type GetNodeDataByWorkspaceIdError = GetNodeDataByWorkspaceIdErrors[keyof GetNodeDataByWorkspaceIdErrors];
 
-export type GetNodeDataResponses = {
+export type GetNodeDataByWorkspaceIdResponses = {
     /**
      * Successful Response
      */
     200: NodeDataResponse;
 };
 
-export type GetNodeDataResponse = GetNodeDataResponses[keyof GetNodeDataResponses];
+export type GetNodeDataByWorkspaceIdResponse = GetNodeDataByWorkspaceIdResponses[keyof GetNodeDataByWorkspaceIdResponses];
 
 export type SetNodeDocumentColumnData = {
     body: NodeDocumentColumnUpdateRequest;
@@ -8661,19 +11632,55 @@ export type SetNodeDocumentColumnData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/document-column';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/document-column';
 };
 
 export type SetNodeDocumentColumnErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type SetNodeDocumentColumnError = SetNodeDocumentColumnErrors[keyof SetNodeDocumentColumnErrors];
@@ -8697,19 +11704,55 @@ export type PolarsExpressionApplyData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/expression/apply';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/expression/apply';
 };
 
 export type PolarsExpressionApplyErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type PolarsExpressionApplyError = PolarsExpressionApplyErrors[keyof PolarsExpressionApplyErrors];
@@ -8733,6 +11776,10 @@ export type PolarsExpressionPreviewData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8747,14 +11794,46 @@ export type PolarsExpressionPreviewData = {
          */
         page_size?: number;
     };
-    url: '/api/workspaces/nodes/{node_id}/expression/preview';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/expression/preview';
 };
 
 export type PolarsExpressionPreviewErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type PolarsExpressionPreviewError = PolarsExpressionPreviewErrors[keyof PolarsExpressionPreviewErrors];
@@ -8778,19 +11857,55 @@ export type FilterNodeData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/filter';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/filter';
 };
 
 export type FilterNodeErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type FilterNodeError = FilterNodeErrors[keyof FilterNodeErrors];
@@ -8814,6 +11929,10 @@ export type FilterPreviewData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8828,14 +11947,46 @@ export type FilterPreviewData = {
          */
         page_size?: number;
     };
-    url: '/api/workspaces/nodes/{node_id}/filter/preview';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/filter/preview';
 };
 
 export type FilterPreviewErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type FilterPreviewError = FilterPreviewErrors[keyof FilterPreviewErrors];
@@ -8859,6 +12010,10 @@ export type UpdateNodeNameData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -8869,14 +12024,46 @@ export type UpdateNodeNameData = {
          */
         new_name: string;
     };
-    url: '/api/workspaces/nodes/{node_id}/name';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/name';
 };
 
 export type UpdateNodeNameErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type UpdateNodeNameError = UpdateNodeNameErrors[keyof UpdateNodeNameErrors];
@@ -8900,19 +12087,55 @@ export type GetNodeQueryPlanData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/query-plan';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/query-plan';
 };
 
 export type GetNodeQueryPlanErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetNodeQueryPlanError = GetNodeQueryPlanErrors[keyof GetNodeQueryPlanErrors];
@@ -8927,7 +12150,7 @@ export type GetNodeQueryPlanResponses = {
 export type GetNodeQueryPlanResponse = GetNodeQueryPlanResponses[keyof GetNodeQueryPlanResponses];
 
 export type GetQuotationData = {
-    body: QuotationRequestInput;
+    body: QuotationRequest;
     headers?: {
         /**
          * Authorization
@@ -8936,144 +12159,69 @@ export type GetQuotationData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/quotation';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/quotation';
 };
 
 export type GetQuotationErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetQuotationError = GetQuotationErrors[keyof GetQuotationErrors];
 
 export type GetQuotationResponses = {
     /**
+     * Response Get Quotation
+     *
      * Successful Response
      */
-    200: QuotationAnalysisResponse;
+    200: QuotationAnalysisResponse | AnalysisTaskActionResponse;
 };
 
 export type GetQuotationResponse = GetQuotationResponses[keyof GetQuotationResponses];
-
-export type DetachQuotationData = {
-    body: QuotationDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}/quotation/detach';
-};
-
-export type DetachQuotationErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DetachQuotationError = DetachQuotationErrors[keyof DetachQuotationErrors];
-
-export type DetachQuotationResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisTaskActionResponse;
-};
-
-export type DetachQuotationResponse = DetachQuotationResponses[keyof DetachQuotationResponses];
-
-export type QuotationDetachOptionsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query: {
-        /**
-         * Column
-         */
-        column: string;
-    };
-    url: '/api/workspaces/nodes/{node_id}/quotation/detach-options';
-};
-
-export type QuotationDetachOptionsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type QuotationDetachOptionsError = QuotationDetachOptionsErrors[keyof QuotationDetachOptionsErrors];
-
-export type QuotationDetachOptionsResponses = {
-    /**
-     * Successful Response
-     */
-    200: QuotationDetachOptionsResponse;
-};
-
-export type QuotationDetachOptionsResponse2 = QuotationDetachOptionsResponses[keyof QuotationDetachOptionsResponses];
-
-export type MaterializeQuotationData = {
-    body: QuotationMaterializeRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/nodes/{node_id}/quotation/materialize';
-};
-
-export type MaterializeQuotationErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type MaterializeQuotationError = MaterializeQuotationErrors[keyof MaterializeQuotationErrors];
-
-export type MaterializeQuotationResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisTaskActionResponse;
-};
-
-export type MaterializeQuotationResponse = MaterializeQuotationResponses[keyof MaterializeQuotationResponses];
 
 export type RedoNodeOperationData = {
     body?: never;
@@ -9085,19 +12233,55 @@ export type RedoNodeOperationData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/redo';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/redo';
 };
 
 export type RedoNodeOperationErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type RedoNodeOperationError = RedoNodeOperationErrors[keyof RedoNodeOperationErrors];
@@ -9121,19 +12305,55 @@ export type ReplaceApplyData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/replace';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/replace';
 };
 
 export type ReplaceApplyErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ReplaceApplyError = ReplaceApplyErrors[keyof ReplaceApplyErrors];
@@ -9157,6 +12377,10 @@ export type ReplacePreviewData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -9171,14 +12395,46 @@ export type ReplacePreviewData = {
          */
         page_size?: number;
     };
-    url: '/api/workspaces/nodes/{node_id}/replace/preview';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/replace/preview';
 };
 
 export type ReplacePreviewErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type ReplacePreviewError = ReplacePreviewErrors[keyof ReplacePreviewErrors];
@@ -9193,7 +12449,7 @@ export type ReplacePreviewResponses = {
 export type ReplacePreviewResponse = ReplacePreviewResponses[keyof ReplacePreviewResponses];
 
 export type RunSequentialAnalysisData = {
-    body: SequentialAnalysisRequestInput;
+    body: SequentialAnalysisRequest;
     headers?: {
         /**
          * Authorization
@@ -9202,19 +12458,55 @@ export type RunSequentialAnalysisData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/sequential-analysis';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/sequential-analysis';
 };
 
 export type RunSequentialAnalysisErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type RunSequentialAnalysisError = RunSequentialAnalysisErrors[keyof RunSequentialAnalysisErrors];
@@ -9229,7 +12521,7 @@ export type RunSequentialAnalysisResponses = {
 export type RunSequentialAnalysisResponse = RunSequentialAnalysisResponses[keyof RunSequentialAnalysisResponses];
 
 export type PreviewSequentialAnalysisData = {
-    body: SequentialAnalysisRequestInput;
+    body: SequentialAnalysisRequest;
     headers?: {
         /**
          * Authorization
@@ -9237,6 +12529,10 @@ export type PreviewSequentialAnalysisData = {
         authorization?: string | null;
     };
     path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
         /**
          * Node Id
          */
@@ -9250,14 +12546,46 @@ export type PreviewSequentialAnalysisData = {
          */
         include_data?: boolean;
     };
-    url: '/api/workspaces/nodes/{node_id}/sequential-analysis/preview';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/sequential-analysis/preview';
 };
 
 export type PreviewSequentialAnalysisErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type PreviewSequentialAnalysisError = PreviewSequentialAnalysisErrors[keyof PreviewSequentialAnalysisErrors];
@@ -9281,19 +12609,55 @@ export type GetNodeShapeData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/shape';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/shape';
 };
 
 export type GetNodeShapeErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetNodeShapeError = GetNodeShapeErrors[keyof GetNodeShapeErrors];
@@ -9317,19 +12681,55 @@ export type SliceNodeData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/slice';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/slice';
 };
 
 export type SliceNodeErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type SliceNodeError = SliceNodeErrors[keyof SliceNodeErrors];
@@ -9353,6 +12753,10 @@ export type SlicePreviewData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
@@ -9367,14 +12771,46 @@ export type SlicePreviewData = {
          */
         page_size?: number;
     };
-    url: '/api/workspaces/nodes/{node_id}/slice/preview';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/slice/preview';
 };
 
 export type SlicePreviewErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type SlicePreviewError = SlicePreviewErrors[keyof SlicePreviewErrors];
@@ -9398,19 +12834,55 @@ export type SetNodeTokenizationPreferenceData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/tokenization-preference';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/tokenization-preference';
 };
 
 export type SetNodeTokenizationPreferenceErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type SetNodeTokenizationPreferenceError = SetNodeTokenizationPreferenceErrors[keyof SetNodeTokenizationPreferenceErrors];
@@ -9434,19 +12906,55 @@ export type UndoNodeOperationData = {
     };
     path: {
         /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
          * Node Id
          */
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/nodes/{node_id}/undo';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/undo';
 };
 
 export type UndoNodeOperationErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type UndoNodeOperationError = UndoNodeOperationErrors[keyof UndoNodeOperationErrors];
@@ -9460,7 +12968,75 @@ export type UndoNodeOperationResponses = {
 
 export type UndoNodeOperationResponse = UndoNodeOperationResponses[keyof UndoNodeOperationResponses];
 
-export type QuotationTaskRequestData = {
+export type GetWorkspaceNodesInfoByIdData = {
+    body: WorkspaceNodeInfoRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/nodes:batchGet';
+};
+
+export type GetWorkspaceNodesInfoByIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type GetWorkspaceNodesInfoByIdError = GetWorkspaceNodesInfoByIdErrors[keyof GetWorkspaceNodesInfoByIdErrors];
+
+export type GetWorkspaceNodesInfoByIdResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfoResponse;
+};
+
+export type GetWorkspaceNodesInfoByIdResponse = GetWorkspaceNodesInfoByIdResponses[keyof GetWorkspaceNodesInfoByIdResponses];
+
+export type SaveWorkspaceByIdData = {
     body?: never;
     headers?: {
         /**
@@ -9470,781 +13046,63 @@ export type QuotationTaskRequestData = {
     };
     path: {
         /**
-         * Task Id
+         * Workspace Id
          */
-        task_id: string;
+        workspace_id: string;
     };
     query?: never;
-    url: '/api/workspaces/quotation/tasks/{task_id}/request';
+    url: '/api/workspaces/{workspace_id}/save';
 };
 
-export type QuotationTaskRequestErrors = {
+export type SaveWorkspaceByIdErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
     /**
      * Validation Error
      */
     422: HttpValidationError;
-};
-
-export type QuotationTaskRequestError = QuotationTaskRequestErrors[keyof QuotationTaskRequestErrors];
-
-export type QuotationTaskRequestResponses = {
     /**
-     * Successful Response
+     * Internal service error
      */
-    200: QuotationRequestOutput;
-};
-
-export type QuotationTaskRequestResponse = QuotationTaskRequestResponses[keyof QuotationTaskRequestResponses];
-
-export type QuotationTaskResultData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number | null;
-        /**
-         * Page Size
-         */
-        page_size?: number | null;
-        /**
-         * Sort By
-         */
-        sort_by?: string | null;
-        /**
-         * Descending
-         */
-        descending?: boolean | null;
-    };
-    url: '/api/workspaces/quotation/tasks/{task_id}/result';
-};
-
-export type QuotationTaskResultErrors = {
+    500: ErrorResponse;
     /**
-     * Validation Error
+     * Upstream service error
      */
-    422: HttpValidationError;
+    502: ErrorResponse;
 };
 
-export type QuotationTaskResultError = QuotationTaskResultErrors[keyof QuotationTaskResultErrors];
+export type SaveWorkspaceByIdError = SaveWorkspaceByIdErrors[keyof SaveWorkspaceByIdErrors];
 
-export type QuotationTaskResultResponses = {
-    /**
-     * Response Quotation Task Result
-     *
-     * Successful Response
-     */
-    200: QuotationAnalysisResponse | null;
-};
-
-export type QuotationTaskResultResponse = QuotationTaskResultResponses[keyof QuotationTaskResultResponses];
-
-export type UpdateQuotationTaskResultData = {
-    body: QuotationResultQuery;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/quotation/tasks/{task_id}/result';
-};
-
-export type UpdateQuotationTaskResultErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type UpdateQuotationTaskResultError = UpdateQuotationTaskResultErrors[keyof UpdateQuotationTaskResultErrors];
-
-export type UpdateQuotationTaskResultResponses = {
-    /**
-     * Response Update Quotation Task Result
-     *
-     * Successful Response
-     */
-    200: QuotationAnalysisResponse | QuotationPreferenceUpdateResponse;
-};
-
-export type UpdateQuotationTaskResultResponse = UpdateQuotationTaskResultResponses[keyof UpdateQuotationTaskResultResponses];
-
-export type SaveWorkspaceData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/save';
-};
-
-export type SaveWorkspaceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SaveWorkspaceError = SaveWorkspaceErrors[keyof SaveWorkspaceErrors];
-
-export type SaveWorkspaceResponses = {
+export type SaveWorkspaceByIdResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceActionResponse;
 };
 
-export type SaveWorkspaceResponse = SaveWorkspaceResponses[keyof SaveWorkspaceResponses];
-
-export type DetachSequentialAnalysisTaskData = {
-    body: SequentialAnalysisDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/sequential-analysis/tasks/{task_id}/detach';
-};
-
-export type DetachSequentialAnalysisTaskErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DetachSequentialAnalysisTaskError = DetachSequentialAnalysisTaskErrors[keyof DetachSequentialAnalysisTaskErrors];
-
-export type DetachSequentialAnalysisTaskResponses = {
-    /**
-     * Successful Response
-     */
-    200: SequentialAnalysisDetachResponse;
-};
-
-export type DetachSequentialAnalysisTaskResponse = DetachSequentialAnalysisTaskResponses[keyof DetachSequentialAnalysisTaskResponses];
-
-export type SequentialAnalysisTaskRequestData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/sequential-analysis/tasks/{task_id}/request';
-};
-
-export type SequentialAnalysisTaskRequestErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SequentialAnalysisTaskRequestError = SequentialAnalysisTaskRequestErrors[keyof SequentialAnalysisTaskRequestErrors];
-
-export type SequentialAnalysisTaskRequestResponses = {
-    /**
-     * Successful Response
-     */
-    200: SequentialAnalysisRequestOutput;
-};
-
-export type SequentialAnalysisTaskRequestResponse = SequentialAnalysisTaskRequestResponses[keyof SequentialAnalysisTaskRequestResponses];
-
-export type SequentialAnalysisTaskResultData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/sequential-analysis/tasks/{task_id}/result';
-};
-
-export type SequentialAnalysisTaskResultErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type SequentialAnalysisTaskResultError = SequentialAnalysisTaskResultErrors[keyof SequentialAnalysisTaskResultErrors];
-
-export type SequentialAnalysisTaskResultResponses = {
-    /**
-     * Successful Response
-     */
-    200: SequentialAnalysisResponse;
-};
-
-export type SequentialAnalysisTaskResultResponse = SequentialAnalysisTaskResultResponses[keyof SequentialAnalysisTaskResultResponses];
-
-export type UpdateSequentialAnalysisTaskResultData = {
-    /**
-     * Updates
-     */
-    body: SequentialAnalysisPreferenceUpdateRequest | null;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/sequential-analysis/tasks/{task_id}/result';
-};
-
-export type UpdateSequentialAnalysisTaskResultErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type UpdateSequentialAnalysisTaskResultError = UpdateSequentialAnalysisTaskResultErrors[keyof UpdateSequentialAnalysisTaskResultErrors];
-
-export type UpdateSequentialAnalysisTaskResultResponses = {
-    /**
-     * Successful Response
-     */
-    200: SequentialAnalysisPreferenceUpdateResponse;
-};
-
-export type UpdateSequentialAnalysisTaskResultResponse = UpdateSequentialAnalysisTaskResultResponses[keyof UpdateSequentialAnalysisTaskResultResponses];
-
-export type ClearTokenFrequenciesData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/token-frequencies';
-};
-
-export type ClearTokenFrequenciesErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ClearTokenFrequenciesError = ClearTokenFrequenciesErrors[keyof ClearTokenFrequenciesErrors];
-
-export type ClearTokenFrequenciesResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisClearResponse;
-};
-
-export type ClearTokenFrequenciesResponse = ClearTokenFrequenciesResponses[keyof ClearTokenFrequenciesResponses];
-
-export type CalculateTokenFrequenciesData = {
-    body: TokenFrequencyRequestInput;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/token-frequencies';
-};
-
-export type CalculateTokenFrequenciesErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type CalculateTokenFrequenciesError = CalculateTokenFrequenciesErrors[keyof CalculateTokenFrequenciesErrors];
-
-export type CalculateTokenFrequenciesResponses = {
-    /**
-     * Successful Response
-     */
-    200: TokenFrequencyResponse;
-};
-
-export type CalculateTokenFrequenciesResponse = CalculateTokenFrequenciesResponses[keyof CalculateTokenFrequenciesResponses];
-
-export type TokenFrequenciesTaskRequestData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/token-frequencies/tasks/{task_id}/request';
-};
-
-export type TokenFrequenciesTaskRequestErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TokenFrequenciesTaskRequestError = TokenFrequenciesTaskRequestErrors[keyof TokenFrequenciesTaskRequestErrors];
-
-export type TokenFrequenciesTaskRequestResponses = {
-    /**
-     * Successful Response
-     */
-    200: TokenFrequencyRequestOutput;
-};
-
-export type TokenFrequenciesTaskRequestResponse = TokenFrequenciesTaskRequestResponses[keyof TokenFrequenciesTaskRequestResponses];
-
-export type TokenFrequenciesTaskResultData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/token-frequencies/tasks/{task_id}/result';
-};
-
-export type TokenFrequenciesTaskResultErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TokenFrequenciesTaskResultError = TokenFrequenciesTaskResultErrors[keyof TokenFrequenciesTaskResultErrors];
-
-export type TokenFrequenciesTaskResultResponses = {
-    /**
-     * Response Token Frequencies Task Result
-     *
-     * Successful Response
-     */
-    200: TokenFrequencyResponse | null;
-};
-
-export type TokenFrequenciesTaskResultResponse = TokenFrequenciesTaskResultResponses[keyof TokenFrequenciesTaskResultResponses];
-
-export type UpdateTokenFrequenciesTaskResultData = {
-    /**
-     * Updates
-     */
-    body: TokenFrequencyPreferenceUpdateRequest | null;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/token-frequencies/tasks/{task_id}/result';
-};
-
-export type UpdateTokenFrequenciesTaskResultErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type UpdateTokenFrequenciesTaskResultError = UpdateTokenFrequenciesTaskResultErrors[keyof UpdateTokenFrequenciesTaskResultErrors];
-
-export type UpdateTokenFrequenciesTaskResultResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisClearResponse;
-};
-
-export type UpdateTokenFrequenciesTaskResultResponse = UpdateTokenFrequenciesTaskResultResponses[keyof UpdateTokenFrequenciesTaskResultResponses];
-
-export type GetTokenizerModelsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/tokenizer-models';
-};
-
-export type GetTokenizerModelsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetTokenizerModelsError = GetTokenizerModelsErrors[keyof GetTokenizerModelsErrors];
-
-export type GetTokenizerModelsResponses = {
-    /**
-     * Successful Response
-     */
-    200: TokenizerModelsResponse;
-};
-
-export type GetTokenizerModelsResponse = GetTokenizerModelsResponses[keyof GetTokenizerModelsResponses];
-
-export type ClearTopicModelingResultsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/topic-modeling';
-};
-
-export type ClearTopicModelingResultsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ClearTopicModelingResultsError = ClearTopicModelingResultsErrors[keyof ClearTopicModelingResultsErrors];
-
-export type ClearTopicModelingResultsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisClearResponse;
-};
-
-export type ClearTopicModelingResultsResponse = ClearTopicModelingResultsResponses[keyof ClearTopicModelingResultsResponses];
-
-export type RunTopicModelingData = {
-    body: TopicModelingRequestInput;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/topic-modeling';
-};
-
-export type RunTopicModelingErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type RunTopicModelingError = RunTopicModelingErrors[keyof RunTopicModelingErrors];
-
-export type RunTopicModelingResponses = {
-    /**
-     * Successful Response
-     */
-    200: TopicModelingResponse;
-};
-
-export type RunTopicModelingResponse = RunTopicModelingResponses[keyof RunTopicModelingResponses];
-
-export type DetachTopicModelingData = {
-    body: TopicModelingDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/topic-modeling/tasks/{task_id}/detach';
-};
-
-export type DetachTopicModelingErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type DetachTopicModelingError = DetachTopicModelingErrors[keyof DetachTopicModelingErrors];
-
-export type DetachTopicModelingResponses = {
-    /**
-     * Successful Response
-     */
-    200: TopicModelingDetachResponse;
-};
-
-export type DetachTopicModelingResponse = DetachTopicModelingResponses[keyof DetachTopicModelingResponses];
-
-export type TopicModelingDetachOptionsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/topic-modeling/tasks/{task_id}/detach-options';
-};
-
-export type TopicModelingDetachOptionsErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TopicModelingDetachOptionsError = TopicModelingDetachOptionsErrors[keyof TopicModelingDetachOptionsErrors];
-
-export type TopicModelingDetachOptionsResponses = {
-    /**
-     * Successful Response
-     */
-    200: TopicModelingDetachOptionsResponse;
-};
-
-export type TopicModelingDetachOptionsResponse2 = TopicModelingDetachOptionsResponses[keyof TopicModelingDetachOptionsResponses];
-
-export type TopicModelingTaskRequestData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/topic-modeling/tasks/{task_id}/request';
-};
-
-export type TopicModelingTaskRequestErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TopicModelingTaskRequestError = TopicModelingTaskRequestErrors[keyof TopicModelingTaskRequestErrors];
-
-export type TopicModelingTaskRequestResponses = {
-    /**
-     * Successful Response
-     */
-    200: TopicModelingRequestOutput;
-};
-
-export type TopicModelingTaskRequestResponse = TopicModelingTaskRequestResponses[keyof TopicModelingTaskRequestResponses];
-
-export type TopicModelingTaskResultData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/topic-modeling/tasks/{task_id}/result';
-};
-
-export type TopicModelingTaskResultErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TopicModelingTaskResultError = TopicModelingTaskResultErrors[keyof TopicModelingTaskResultErrors];
-
-export type TopicModelingTaskResultResponses = {
-    /**
-     * Successful Response
-     */
-    200: TopicModelingResponse;
-};
-
-export type TopicModelingTaskResultResponse = TopicModelingTaskResultResponses[keyof TopicModelingTaskResultResponses];
-
-export type UnloadWorkspaceData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: {
-        /**
-         * Save
-         */
-        save?: boolean;
-    };
-    url: '/api/workspaces/unload';
-};
-
-export type UnloadWorkspaceErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type UnloadWorkspaceError = UnloadWorkspaceErrors[keyof UnloadWorkspaceErrors];
-
-export type UnloadWorkspaceResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceActionResponse;
-};
-
-export type UnloadWorkspaceResponse = UnloadWorkspaceResponses[keyof UnloadWorkspaceResponses];
-
-export type UploadWorkspaceZipData = {
-    body: BodyUploadWorkspaceZip;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/upload';
-};
-
-export type UploadWorkspaceZipErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type UploadWorkspaceZipError = UploadWorkspaceZipErrors[keyof UploadWorkspaceZipErrors];
-
-export type UploadWorkspaceZipResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceUploadResponse;
-};
-
-export type UploadWorkspaceZipResponse = UploadWorkspaceZipResponses[keyof UploadWorkspaceZipResponses];
+export type SaveWorkspaceByIdResponse = SaveWorkspaceByIdResponses[keyof SaveWorkspaceByIdResponses];
 
 export type GetWorkspaceTabsData = {
     body?: never;
@@ -10266,9 +13124,41 @@ export type GetWorkspaceTabsData = {
 
 export type GetWorkspaceTabsErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type GetWorkspaceTabsError = GetWorkspaceTabsErrors[keyof GetWorkspaceTabsErrors];
@@ -10302,9 +13192,41 @@ export type PutWorkspaceTabsData = {
 
 export type PutWorkspaceTabsErrors = {
     /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
 };
 
 export type PutWorkspaceTabsError = PutWorkspaceTabsErrors[keyof PutWorkspaceTabsErrors];
@@ -10318,12 +13240,394 @@ export type PutWorkspaceTabsResponses = {
 
 export type PutWorkspaceTabsResponse = PutWorkspaceTabsResponses[keyof PutWorkspaceTabsResponses];
 
+export type ClearTokenFrequenciesData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/token-frequencies';
+};
+
+export type ClearTokenFrequenciesErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type ClearTokenFrequenciesError = ClearTokenFrequenciesErrors[keyof ClearTokenFrequenciesErrors];
+
+export type ClearTokenFrequenciesResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnalysisClearResponse;
+};
+
+export type ClearTokenFrequenciesResponse = ClearTokenFrequenciesResponses[keyof ClearTokenFrequenciesResponses];
+
+export type CalculateTokenFrequenciesData = {
+    body: TokenFrequencyRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/token-frequencies';
+};
+
+export type CalculateTokenFrequenciesErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type CalculateTokenFrequenciesError = CalculateTokenFrequenciesErrors[keyof CalculateTokenFrequenciesErrors];
+
+export type CalculateTokenFrequenciesResponses = {
+    /**
+     * Successful Response
+     */
+    200: TokenFrequencyResponse;
+};
+
+export type CalculateTokenFrequenciesResponse = CalculateTokenFrequenciesResponses[keyof CalculateTokenFrequenciesResponses];
+
+export type ClearTopicModelingResultsData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/topic-modeling';
+};
+
+export type ClearTopicModelingResultsErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type ClearTopicModelingResultsError = ClearTopicModelingResultsErrors[keyof ClearTopicModelingResultsErrors];
+
+export type ClearTopicModelingResultsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnalysisClearResponse;
+};
+
+export type ClearTopicModelingResultsResponse = ClearTopicModelingResultsResponses[keyof ClearTopicModelingResultsResponses];
+
+export type RunTopicModelingData = {
+    body: TopicModelingRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/topic-modeling';
+};
+
+export type RunTopicModelingErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type RunTopicModelingError = RunTopicModelingErrors[keyof RunTopicModelingErrors];
+
+export type RunTopicModelingResponses = {
+    /**
+     * Successful Response
+     */
+    200: TopicModelingResponse;
+};
+
+export type RunTopicModelingResponse = RunTopicModelingResponses[keyof RunTopicModelingResponses];
+
+export type UnloadWorkspaceData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: {
+        /**
+         * Save
+         */
+        save?: boolean;
+    };
+    url: '/api/workspaces/{workspace_id}/unload';
+};
+
+export type UnloadWorkspaceErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type UnloadWorkspaceError = UnloadWorkspaceErrors[keyof UnloadWorkspaceErrors];
+
+export type UnloadWorkspaceResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceActionResponse;
+};
+
+export type UnloadWorkspaceResponse = UnloadWorkspaceResponses[keyof UnloadWorkspaceResponses];
+
 export type HealthCheckData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/health';
 };
+
+export type HealthCheckErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type HealthCheckError = HealthCheckErrors[keyof HealthCheckErrors];
 
 export type HealthCheckResponses = {
     /**
@@ -10338,6 +13642,43 @@ export type StatusData = {
     query?: never;
     url: '/status';
 };
+
+export type StatusErrors = {
+    /**
+     * Bad request
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication required
+     */
+    401: ErrorResponse;
+    /**
+     * Access denied
+     */
+    403: ErrorResponse;
+    /**
+     * Resource not found
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict
+     */
+    409: ErrorResponse;
+    /**
+     * Resource no longer available
+     */
+    410: ErrorResponse;
+    /**
+     * Internal service error
+     */
+    500: ErrorResponse;
+    /**
+     * Upstream service error
+     */
+    502: ErrorResponse;
+};
+
+export type StatusError = StatusErrors[keyof StatusErrors];
 
 export type StatusResponses = {
     /**

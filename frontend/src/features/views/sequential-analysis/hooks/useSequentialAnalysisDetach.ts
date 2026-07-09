@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { detachSequentialAnalysisTask } from '@/api';
+import { createAnalysisTaskDetachment } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type { SequentialAnalysisDatum } from './sequentialChartModel';
 
@@ -114,14 +114,14 @@ export function useSequentialAnalysisDetach({
 
     setIsDetaching(true);
     try {
-      await detachSequentialAnalysisTask({
+      await createAnalysisTaskDetachment({
         body: {
           selected_periods: selectedPeriods,
           ...(visibleGroups ? { visible_groups: visibleGroups } : {}),
           new_node_name: newNodeName,
         },
         headers: getAuthHeaders(),
-        path: { task_id: taskId },
+        path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
 

@@ -50,12 +50,19 @@ export const useWorkspaceTransformMutations = ({
   endOperation,
   setOperationError,
 }: WorkspaceTransformMutationsParams) => {
+  const ensureWorkspaceSelected = () => {
+    if (!currentWorkspaceId) {
+      throw new Error('No workspace selected');
+    }
+    return currentWorkspaceId;
+  };
+
   const filterNodeMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: FilterRequestPayload }) =>
       applyFilterNode({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(() => undefined),
     onMutate: () => {
@@ -76,7 +83,7 @@ export const useWorkspaceTransformMutations = ({
       replaceApply({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -100,7 +107,7 @@ export const useWorkspaceTransformMutations = ({
       applySliceNode({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -131,7 +138,7 @@ export const useWorkspaceTransformMutations = ({
       castNode({
         body: { column, target_type: targetType, format },
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -164,7 +171,7 @@ export const useWorkspaceTransformMutations = ({
       renameNodeColumn({
         body: { new_name: newName },
         headers: authHeaders,
-        path: { column_name: column, node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected(), column_name: column, node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -187,7 +194,7 @@ export const useWorkspaceTransformMutations = ({
     mutationFn: ({ nodeId, column }: { nodeId: string; column: string }) =>
       deleteNodeColumn({
         headers: authHeaders,
-        path: { column_name: column, node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected(), column_name: column, node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -214,7 +221,7 @@ export const useWorkspaceTransformMutations = ({
         filterPreview({
           body: request,
           headers: authHeaders,
-          path: { node_id: nodeId },
+          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
           query: { page, page_size: pageSize },
           throwOnError: true,
         }).then(({ data }) => data),
@@ -224,7 +231,7 @@ export const useWorkspaceTransformMutations = ({
         slicePreview({
           body: request,
           headers: authHeaders,
-          path: { node_id: nodeId },
+          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
           query: { page, page_size: pageSize },
           throwOnError: true,
         }).then(({ data }) => data),
@@ -234,7 +241,7 @@ export const useWorkspaceTransformMutations = ({
         replacePreview({
           body: request,
           headers: authHeaders,
-          path: { node_id: nodeId },
+          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
           query: { page, page_size: pageSize },
           throwOnError: true,
         }).then(({ data }) => data),
@@ -247,7 +254,7 @@ export const useWorkspaceTransformMutations = ({
         polarsExpressionPreview({
           body: request,
           headers: authHeaders,
-          path: { node_id: nodeId },
+          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
           query: { page, page_size: pageSize },
           throwOnError: true,
         }).then(({ data }) => data),
@@ -255,7 +262,7 @@ export const useWorkspaceTransformMutations = ({
         applyPolarsExpression({
           body: request,
           headers: authHeaders,
-          path: { node_id: nodeId },
+          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
           throwOnError: true,
         }).then(({ data }) => data),
       castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>

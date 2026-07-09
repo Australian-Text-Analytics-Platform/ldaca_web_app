@@ -11,7 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { updateConfig } from '@/api';
+import { updateAdminConfig } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -129,7 +129,7 @@ export function DataFolderSettingsPanel({ onSaved, onCancel }: DataFolderSetting
         await setCurrentWorkspace(null);
       }
 
-      await updateConfig({ body: { data_root: nextPath }, throwOnError: true });
+      await updateAdminConfig({ body: { data_root: nextPath }, throwOnError: true });
       toast.success('Working directory updated');
       await refreshAuth();
       await Promise.all([

@@ -64,6 +64,7 @@ export interface AnnotationProviderConfigSave {
 }
 
 interface AnnotationProviderConfigDialogProps {
+  workspaceId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   provider: AnnotationProviderCard | null;
@@ -98,10 +99,12 @@ function makeDraftCustomProvider(id: string, name: string, baseUrl: string): Ann
  * keys/models continue to address the same card.
  */
 function AnnotationProviderConfigForm({
+  workspaceId,
   provider,
   onSave,
   onCancel,
 }: {
+  workspaceId: string | null;
   provider: AnnotationProviderCard | null;
   onSave: (config: AnnotationProviderConfigSave) => void;
   onCancel: () => void;
@@ -241,6 +244,7 @@ function AnnotationProviderConfigForm({
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="annotation-provider-model">Model</Label>
           <ModelNameCombobox
+            workspaceId={workspaceId}
             id="annotation-provider-model"
             provider={draftProvider}
             apiKey={trimmedApiKey}
@@ -263,6 +267,7 @@ function AnnotationProviderConfigForm({
 }
 
 export function AnnotationProviderConfigDialog({
+  workspaceId,
   open,
   onOpenChange,
   provider,
@@ -272,6 +277,7 @@ export function AnnotationProviderConfigDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <AnnotationProviderConfigForm
+          workspaceId={workspaceId}
           provider={provider}
           onSave={(config) => {
             onSave(config);

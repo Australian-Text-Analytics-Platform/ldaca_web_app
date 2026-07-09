@@ -1,12 +1,13 @@
 import type { TaskItem } from '@/stores/analysisStore';
+import { ANALYSIS_TASK_TYPES } from './analysisIds';
 
 const CANONICAL_TASK_TYPE_MAP = {
-  topic_modeling: 'topic_modeling',
-  token_frequencies: 'token_frequencies',
-  'token-frequency': 'token_frequencies',
-  sequential_analysis: 'sequential_analysis',
-  concordance: 'concordance',
-  quotation: 'quotation',
+  [ANALYSIS_TASK_TYPES.topicModeling]: ANALYSIS_TASK_TYPES.topicModeling,
+  [ANALYSIS_TASK_TYPES.tokenFrequencies]: ANALYSIS_TASK_TYPES.tokenFrequencies,
+  'token-frequency': ANALYSIS_TASK_TYPES.tokenFrequencies,
+  [ANALYSIS_TASK_TYPES.sequential]: ANALYSIS_TASK_TYPES.sequential,
+  [ANALYSIS_TASK_TYPES.concordance]: ANALYSIS_TASK_TYPES.concordance,
+  [ANALYSIS_TASK_TYPES.quotation]: ANALYSIS_TASK_TYPES.quotation,
 } as const;
 
 /** Called by: getTaskTypeCandidates when expanding legacy task labels because the hook needs local steps to normalize inputs before exposing stable state to consumers. */

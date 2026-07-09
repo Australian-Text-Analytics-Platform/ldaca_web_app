@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
-import { fetchNodeInfo } from '@/lib/nodeInfo';
-import { queryKeys } from '@/lib/queryKeys';
+import { fetchNodeInfo, fetchNodeInfos, nodeInfoQueryOptions, type NodeInfo } from '@/lib/nodeInfo';
 
 export interface NodeSnapshot {
   id: string;
@@ -44,6 +43,23 @@ export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
   return {};
 }
 
+/** Builds the backend node snapshot submitted by multi-node analyses. */
+/** Called by: createNodeSnapshot and createNodeSnapshots because task builders need one projection from node-info metadata to analysis payload shape. */
+function nodeSnapshotFromInfo(nodeId: string, info: NodeInfo): NodeSnapshot {
+  const name = info.name || nodeId;
+  const columns = Array.isArray(info.columns) ? info.columns : [];
+  const schema = normalizeSchemaFromInfo(info);
+  const shape = info.shape;
+
+  return {
+    id: nodeId,
+    name,
+    columns,
+    schema,
+    shape: shape ?? undefined,
+  };
+}
+
 /**
  * Creates the snapshot shape multi-node analyses submit to the backend.
  * Uses the shared TanStack node-info cache so schema consumers and mutation
@@ -58,26 +74,12 @@ export async function createNodeSnapshot(
   queryClient: QueryClient,
 ): Promise<NodeSnapshot> {
   const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId, getAuthHeaders });
-
-  const name = info.name || nodeId;
-  const columns = Array.isArray(info.columns) ? info.columns : [];
-  const schema = normalizeSchemaFromInfo(info);
-
-  const shape = info.shape;
-
-  return {
-    id: nodeId,
-    name,
-    columns,
-    schema,
-    shape: shape ?? undefined,
-  };
+  return nodeSnapshotFromInfo(nodeId, info);
 }
 
-/** Builds resilient node snapshots for multi-node analysis requests, falling back per-node on fetch failure. */
 /**
  * Used by: schema hydration helpers and schema-management tests because callers need reusable fixtures or mocks before exercising the behavior under assertion.
- * Flow: fetch snapshots concurrently, catch per-node failures, and substitute empty fallback snapshots so one bad node does not abort the batch.
+ * Flow: fetch snapshots concurrently and let node-info failures surface to the caller instead of submitting empty schema placeholders.
  */
 export async function createNodeSnapshots(
   workspaceId: string,
@@ -85,22 +87,15 @@ export async function createNodeSnapshots(
   getAuthHeaders: () => Record<string, string>,
   queryClient: QueryClient,
 ): Promise<NodeSnapshot[]> {
-  const snapshots = await Promise.all(
-    nodeIds.map(async (nodeId) => {
-      try {
-        return await createNodeSnapshot(workspaceId, nodeId, getAuthHeaders, queryClient);
-      } catch {
-        return {
-          id: nodeId,
-          name: nodeId,
-          columns: [],
-          schema: {},
-        };
-      }
-    }),
-  );
-
-  return snapshots;
+  const infos = await fetchNodeInfos({ queryClient, workspaceId, nodeIds, getAuthHeaders });
+  const infoById = new Map(infos.map((info) => [info.id, info]));
+  return nodeIds.map((nodeId) => {
+    const info = infoById.get(nodeId);
+    if (!info) {
+      throw new Error(`Node info response did not include ${nodeId}`);
+    }
+    return nodeSnapshotFromInfo(nodeId, info);
+  });
 }
 
 /** Narrows each snapshot to the selected analysis column while keeping a first-column fallback. */
@@ -152,16 +147,6 @@ interface SchemaManagementConfig {
    * Function to get auth headers
    */
   getAuthHeaders: () => Record<string, string>;
-
-  /**
-   * Optional fallback node data (from workspace selection)
-   */
-  nodeData?: Record<string, unknown>;
-
-  /**
-   * Optional fallback selected node (from workspace selection)
-   */
-  selectedNode?: Record<string, unknown>;
 }
 
 /**
@@ -172,111 +157,54 @@ interface SchemaManagementConfig {
  * - Maintaining current and locked schema states
  * - Providing effective schema (locked or current)
  * - Deriving available columns with type information
- * - Ref for accessing schema in async contexts
  *
  * @param config - Configuration object
  * @returns Schema state and utilities
  */
 /**
  * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
- * Flow: fetch live schema while unlocked, preserve locked schema during runs, merge node payload fallbacks, then expose effective schema and column options.
+ * Flow: subscribe to the canonical node-info query while unlocked, preserve locked schema during runs, then expose effective schema and column options.
  */
 export function useSchemaManagement(config: SchemaManagementConfig) {
-  const { nodeId, isLocked, workspaceId, getAuthHeaders, nodeData, selectedNode } = config;
+  const { nodeId, isLocked, workspaceId, getAuthHeaders } = config;
 
   const [currentSchema, setCurrentSchema] = useState<Record<string, string>>({});
   const [lockedSchema, setLockedSchema] = useState<Record<string, string> | null>(null);
 
-  // Ref for accessing latest schema in async effects (hydration)
-  const currentSchemaRef = useRef(currentSchema);
-  useEffect(() => {
-    currentSchemaRef.current = currentSchema;
-  }, [currentSchema]);
-
-  const queryClient = useQueryClient();
-
-  // Fetch schema via React Query so invalidation (e.g. after cast) triggers re-fetch
+  // Fetch schema via the node-info query so schema readers share the same metadata cache.
   const schemaQuery = useQuery({
-    queryKey: nodeId && workspaceId ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
-    /** Fetches schema through node-info cache so cast/preprocessing invalidations refresh column types. */
+    ...nodeInfoQueryOptions({
+      workspaceId: workspaceId ?? '',
+      nodeId: nodeId ?? '',
+      getAuthHeaders,
+    }),
+    select: normalizeSchemaFromInfo,
+    /** Fetches schema through node info so cast/preprocessing invalidations refresh column types. */
     /** Called by: TanStack Query inside useSchemaManagement because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
-    queryFn: async () => {
-      if (!workspaceId || !nodeId) return {};
-      const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId, getAuthHeaders });
-      return normalizeSchemaFromInfo(info);
-    },
     enabled: !!nodeId && !isLocked && !!workspaceId,
     staleTime: 0,
   });
 
   /* eslint-disable react-hooks/set-state-in-effect -- Syncing query data to local state; no cascading renders */
   useEffect(() => {
-    if (schemaQuery.data && Object.keys(schemaQuery.data).length > 0) {
-      setCurrentSchema(schemaQuery.data);
+    if (!nodeId || !workspaceId) {
+      setCurrentSchema({});
+      return;
     }
-  }, [schemaQuery.data]);
+    if (!isLocked) {
+      setCurrentSchema(schemaQuery.data ?? {});
+    }
+  }, [schemaQuery.data, isLocked, nodeId, workspaceId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /** Schema seen by task builders: locked while a task is running, live otherwise. */
   const effectiveSchema = isLocked ? (lockedSchema ?? currentSchema) : currentSchema;
 
-  /** Column options for parameter panels, with node payload fallbacks while schema fetches. */
-  const availableColumns = (() => {
-    // Primary: use schema if available
-    if (Object.keys(effectiveSchema).length > 0) {
-      return Object.entries(effectiveSchema).map(([name, jsType]) => ({
-        name,
-        dataType: jsType,
-      }));
-    }
-
-    // Fallback: parse from nodeData or selectedNode
-    const columns: { name: string; dataType: string }[] = [];
-    const nodeDataAny = nodeData;
-    const selectedNodeAny = selectedNode;
-
-    if (nodeDataAny?.columns && Array.isArray(nodeDataAny.columns) && nodeDataAny.dtypes) {
-      const dtypes = nodeDataAny.dtypes as Record<string, unknown>;
-      (nodeDataAny.columns as string[]).forEach((colName: string) => {
-        const rawDataType = dtypes[colName];
-        const normalizedDataType = normalizeTypeName(
-          typeof rawDataType === 'string' && rawDataType.length > 0 ? rawDataType : 'unknown',
-        );
-        columns.push({ name: colName, dataType: normalizedDataType });
-      });
-    } else if (nodeDataAny?.dtypes && typeof nodeDataAny.dtypes === 'object') {
-      const dtypes = nodeDataAny.dtypes as Record<string, unknown>;
-      Object.keys(dtypes).forEach((colName) => {
-        const rawDataType = dtypes[colName];
-        const normalizedDataType = normalizeTypeName(
-          typeof rawDataType === 'string' && rawDataType.length > 0 ? rawDataType : 'unknown',
-        );
-        columns.push({ name: colName, dataType: normalizedDataType });
-      });
-    } else if (selectedNodeAny?.data && typeof selectedNodeAny.data === 'object') {
-      const dataObj = selectedNodeAny.data as Record<string, unknown>;
-      if (dataObj.schema) {
-        // selectedNode.data.schema may be array or mapping
-        const schemaObj = Array.isArray(dataObj.schema)
-          ? Object.fromEntries(
-              (dataObj.schema as { name?: unknown; js_type?: unknown }[]).map((c) => [
-                // Backend column descriptor: name is always a string at runtime.
-                c.name as string,
-                typeof c.js_type === 'string' && c.js_type.length > 0 ? c.js_type : 'string',
-              ]),
-            )
-          : dataObj.schema;
-        Object.entries(schemaObj as Record<string, unknown>).forEach(([colName, jsType]) => {
-          columns.push({
-            name: colName,
-            dataType: typeof jsType === 'string' ? normalizeTypeName(jsType) : 'string',
-          });
-        });
-      }
-    }
-
-    return columns;
-  })();
+  /** Column options for parameter panels, derived only from canonical node info. */
+  const availableColumns = Object.entries(effectiveSchema).map(([name, jsType]) => ({
+    name,
+    dataType: jsType,
+  }));
 
   /** Lets feature panels request type-specific column subsets without duplicating filter logic. */
   /** Called by: useSchemaManagement in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
@@ -305,7 +233,6 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     lockedSchema,
     setLockedSchema,
     effectiveSchema,
-    currentSchemaRef,
 
     // Available columns
     availableColumns,

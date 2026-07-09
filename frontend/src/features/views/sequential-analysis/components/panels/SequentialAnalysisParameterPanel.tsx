@@ -14,12 +14,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import type { SequentialAnalysisRequestInput } from '@/api';
+import type { SequentialAnalysisRequest } from '@/api';
 import { UniqueValueCount } from '../UniqueValueCount';
 
-type SequentialFrequency = NonNullable<SequentialAnalysisRequestInput['frequency']>;
+type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<
-  SequentialAnalysisRequestInput['custom_interval_unit']
+  SequentialAnalysisRequest['custom_interval_unit']
 >;
 
 interface ColumnLike {

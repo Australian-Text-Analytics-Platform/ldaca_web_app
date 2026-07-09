@@ -2,12 +2,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTokenFrequencyPreferences } from '../useTokenFrequencyPreferences';
 
-const { updateTokenFrequenciesTaskResultMock } = vi.hoisted(() => ({
-  updateTokenFrequenciesTaskResultMock: vi.fn(),
+const { analysisTaskPreferencesMock } = vi.hoisted(() => ({
+  analysisTaskPreferencesMock: vi.fn(),
 }));
 
 vi.mock('@/api/generated/sdk.gen', () => ({
-  updateTokenFrequenciesTaskResult: updateTokenFrequenciesTaskResultMock,
+  analysisTaskPreferences: analysisTaskPreferencesMock,
 }));
 
 /** Provides the default hook arguments shared across preference tests. */
@@ -31,7 +31,7 @@ const baseArgs = {
 
 describe('useTokenFrequencyPreferences', () => {
   beforeEach(() => {
-    updateTokenFrequenciesTaskResultMock.mockReset();
+    analysisTaskPreferencesMock.mockReset();
   });
 
   afterEach(() => {

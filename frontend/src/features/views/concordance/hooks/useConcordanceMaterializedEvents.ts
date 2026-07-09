@@ -7,10 +7,11 @@ import {
   type RefObject,
 } from 'react';
 import { toast } from 'sonner';
-import { concordanceTaskRequest } from '@/api';
 import type { ConcordanceDispersionBinRow } from '@/api';
 import type { AnalysisMaterializedEvent } from '@/stores/analysisStore';
 import { useMaterializeLifecycle } from '../../common/hooks/useMaterializeLifecycle';
+import { getAnalysisTaskRequest } from '../../common/analysisTasksApi';
+import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
 import type { PaginationState } from './useConcordanceTaskFlow';
 
 interface MaterializeSummary {
@@ -20,6 +21,7 @@ interface MaterializeSummary {
 }
 
 interface Params {
+  workspaceId: string | null;
   concordanceTaskId: string;
   materializeTaskIds: Record<string, string>;
   materializedEvents: AnalysisMaterializedEvent[];
@@ -72,6 +74,7 @@ export interface UseConcordanceMaterializedEventsResult {
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export function useConcordanceMaterializedEvents({
+  workspaceId,
   concordanceTaskId,
   materializeTaskIds,
   materializedEvents,
@@ -103,12 +106,13 @@ export function useConcordanceMaterializedEvents({
       try {
         const headers = getAuthHeaders();
         const parentTaskId = await resolveTaskId();
-        if (parentTaskId) {
-          const { data: req } = await concordanceTaskRequest({
+        if (workspaceId && parentTaskId) {
+          const req = await getAnalysisTaskRequest(
+            ANALYSIS_TAB_GROUPS.concordance,
+            workspaceId,
+            parentTaskId,
             headers,
-            path: { task_id: parentTaskId },
-            throwOnError: true,
-          });
+          );
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- req is API-sourced; keep defensive default when the response body is null
           const reqObj = (req as Record<string, unknown>) ?? {};
           const paths =
@@ -154,6 +158,7 @@ export function useConcordanceMaterializedEvents({
       getAuthHeaders,
       resolveTaskId,
       persistResultPreferences,
+      workspaceId,
       setMaterializedPaths,
       setMaterializeSummaries,
       setGlobalPageSize,

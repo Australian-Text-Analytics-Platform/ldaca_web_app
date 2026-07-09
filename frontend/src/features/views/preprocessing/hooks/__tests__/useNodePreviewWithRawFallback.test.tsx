@@ -7,7 +7,7 @@ interface CapturedOptions {
   signature: string;
   request: unknown;
   fetcher: (params: {
-    request: { nodeId: string; payload: unknown };
+    request: { workspaceId: string; nodeId: string; payload: unknown };
     page: number;
     pageSize: number;
     signal: AbortSignal;
@@ -34,9 +34,9 @@ const useAuthMock = vi.hoisted(() =>
 );
 vi.mock('@/features/auth/hooks/useAuth', () => ({ useAuth: useAuthMock }));
 
-const getNodeDataMock = vi.hoisted(() => vi.fn());
+const getNodeDataByWorkspaceIdMock = vi.hoisted(() => vi.fn());
 vi.mock('@/api/generated/sdk.gen', () => ({
-  getNodeData: getNodeDataMock,
+  getNodeDataByWorkspaceId: getNodeDataByWorkspaceIdMock,
 }));
 
 import { useNodePreviewWithRawFallback } from '../useNodePreviewWithRawFallback';
@@ -54,7 +54,7 @@ const lastCapturedOptions = (): CapturedOptions => {
 describe('useNodePreviewWithRawFallback', () => {
   beforeEach(() => {
     usePreprocessingPreviewMock.mockReset();
-    getNodeDataMock.mockReset();
+    getNodeDataByWorkspaceIdMock.mockReset();
     usePreprocessingPreviewMock.mockReturnValue({});
   });
 
@@ -62,6 +62,7 @@ describe('useNodePreviewWithRawFallback', () => {
     it('builds a "<feature>-preview-disabled" signature with a null request when no node is selected', () => {
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: null,
           operationPayload: { regex: 'x' },
           operationFetch: vi.fn(),
@@ -74,9 +75,10 @@ describe('useNodePreviewWithRawFallback', () => {
       expect(opts.request).toBeNull();
     });
 
-    it('builds a "<nodeId>::raw" signature when a node is selected but no payload is configured', () => {
+    it('builds a "<workspaceId>::<nodeId>::raw" signature when a node is selected but no payload is configured', () => {
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: null,
           operationFetch: vi.fn(),
@@ -85,14 +87,15 @@ describe('useNodePreviewWithRawFallback', () => {
       );
 
       const opts = lastCapturedOptions();
-      expect(opts.signature).toBe('node-1::raw');
-      expect(opts.request).toEqual({ nodeId: 'node-1', payload: null });
+      expect(opts.signature).toBe('workspace-1::node-1::raw');
+      expect(opts.request).toEqual({ workspaceId: 'workspace-1', nodeId: 'node-1', payload: null });
     });
 
     it('JSON-stringifies the payload into the signature when a payload is present', () => {
       const payload = { conditions: [{ column: 'id', op: '>', value: 5 }] };
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: payload,
           operationFetch: vi.fn(),
@@ -101,13 +104,14 @@ describe('useNodePreviewWithRawFallback', () => {
       );
 
       const opts = lastCapturedOptions();
-      expect(opts.signature).toBe(`node-1::${JSON.stringify(payload)}`);
-      expect(opts.request).toEqual({ nodeId: 'node-1', payload });
+      expect(opts.signature).toBe(`workspace-1::node-1::${JSON.stringify(payload)}`);
+      expect(opts.request).toEqual({ workspaceId: 'workspace-1', nodeId: 'node-1', payload });
     });
 
     it('treats enabled=false the same as no node (disabled signature)', () => {
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: { foo: 'bar' },
           operationFetch: vi.fn(),
@@ -130,6 +134,7 @@ describe('useNodePreviewWithRawFallback', () => {
 
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: { conditions: [] },
           operationFetch,
@@ -140,20 +145,20 @@ describe('useNodePreviewWithRawFallback', () => {
       const opts = lastCapturedOptions();
       const signal = new AbortController().signal;
       const result = await opts.fetcher({
-        request: { nodeId: 'node-1', payload: { conditions: [] } },
+        request: { workspaceId: 'workspace-1', nodeId: 'node-1', payload: { conditions: [] } },
         page: 2,
         pageSize: 25,
         signal,
       });
 
       expect(operationFetch).toHaveBeenCalledWith('node-1', { conditions: [] }, 2, 25);
-      expect(getNodeDataMock).not.toHaveBeenCalled();
+      expect(getNodeDataByWorkspaceIdMock).not.toHaveBeenCalled();
       expect(result).toEqual({ data: [{ a: 1 }], columns: ['a'], pagination: null });
     });
 
-    it('falls back to getNodeData when the payload is null', async () => {
+    it('falls back to explicit node data when the payload is null', async () => {
       const operationFetch = vi.fn();
-      getNodeDataMock.mockResolvedValue({
+      getNodeDataByWorkspaceIdMock.mockResolvedValue({
         data: {
           data: [{ raw: 1 }],
           columns: ['raw'],
@@ -164,6 +169,7 @@ describe('useNodePreviewWithRawFallback', () => {
 
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: null,
           operationFetch,
@@ -174,16 +180,16 @@ describe('useNodePreviewWithRawFallback', () => {
       const opts = lastCapturedOptions();
       const signal = new AbortController().signal;
       const result = await opts.fetcher({
-        request: { nodeId: 'node-1', payload: null },
+        request: { workspaceId: 'workspace-1', nodeId: 'node-1', payload: null },
         page: 1,
         pageSize: 10,
         signal,
       });
 
       expect(operationFetch).not.toHaveBeenCalled();
-      expect(getNodeDataMock).toHaveBeenCalledWith({
+      expect(getNodeDataByWorkspaceIdMock).toHaveBeenCalledWith({
         headers: { Authorization: 'Bearer test' },
-        path: { node_id: 'node-1' },
+        path: { workspace_id: 'workspace-1', node_id: 'node-1' },
         query: { page: 1, page_size: 10 },
         throwOnError: true,
       });
@@ -205,6 +211,7 @@ describe('useNodePreviewWithRawFallback', () => {
 
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: { foo: 1 },
           operationFetch,
@@ -214,7 +221,7 @@ describe('useNodePreviewWithRawFallback', () => {
 
       const opts = lastCapturedOptions();
       const result = await opts.fetcher({
-        request: { nodeId: 'node-1', payload: { foo: 1 } },
+        request: { workspaceId: 'workspace-1', nodeId: 'node-1', payload: { foo: 1 } },
         page: 1,
         pageSize: 10,
         signal: new AbortController().signal,
@@ -228,6 +235,7 @@ describe('useNodePreviewWithRawFallback', () => {
     it('forwards an explicit debounceMs to usePreprocessingPreview', () => {
       renderHook(() =>
         useNodePreviewWithRawFallback({
+          workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: null,
           operationFetch: vi.fn(),

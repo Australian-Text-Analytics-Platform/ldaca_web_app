@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { concordanceTaskDispersionBins } from '@/api';
+import { analysisTaskDispersionBins } from '@/api';
 import type { ConcordanceAnalysisResponse, ConcordanceDispersionBinRow } from '@/api';
 import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { VIZ_PALETTE } from '../../common';
@@ -16,6 +16,7 @@ import {
 } from '../concordanceViewModels';
 
 interface Params {
+  workspaceId: string | null;
   results: ConcordanceAnalysisResponse | null;
   concordanceTaskId: string;
   panelSelectedNodes: WorkspaceNodeLike[];
@@ -59,6 +60,7 @@ interface Result {
  * - Expose tested lookup helpers and matched-text colour maps to result panels.
  */
 export function useConcordanceResultViewModel({
+  workspaceId,
   results,
   concordanceTaskId,
   panelSelectedNodes,
@@ -125,6 +127,7 @@ export function useConcordanceResultViewModel({
       (nodeId) => panelIds.has(nodeId) && !(nodeId in materializedBins),
     );
     if (missing.length === 0) return;
+    if (!workspaceId) return;
 
     let cancelled = false;
     const authHeaders = getAuthHeaders();
@@ -132,9 +135,9 @@ export function useConcordanceResultViewModel({
     void Promise.all(
       missing.map(async (nodeId) => {
         try {
-          const { data: resp } = await concordanceTaskDispersionBins({
+          const { data: resp } = await analysisTaskDispersionBins({
             headers: authHeaders,
-            path: { task_id: effectiveTaskId },
+            path: { workspace_id: workspaceId, task_id: effectiveTaskId },
             query: { node_id: nodeId },
             throwOnError: true,
           });
@@ -175,6 +178,7 @@ export function useConcordanceResultViewModel({
     materializedBins,
     panelSelectedNodes,
     getAuthHeaders,
+    workspaceId,
   ]);
 
   const allMatchedTexts =

@@ -60,6 +60,7 @@ export function usePendingWorkspaceDownloads({
         setStartingWorkspaceId(workspaceId);
         const { data: response } = await startWorkspaceDownload({
           headers: authHeaders,
+          path: { workspace_id: workspaceId },
           throwOnError: true,
         });
         // defensive against a malformed API response that omits metadata/task_id
@@ -96,10 +97,10 @@ export function usePendingWorkspaceDownloads({
         const { data } = await downloadWorkspaceArtifact({
           headers: authHeaders,
           parseAs: 'blob',
-          path: { task_id: taskId },
+          path: { workspace_id: workspaceId, task_id: taskId },
           throwOnError: true,
         });
-        const blob = data as Blob;
+        const blob = data;
         const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
         await saveBlob(blob, filename);
         notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);

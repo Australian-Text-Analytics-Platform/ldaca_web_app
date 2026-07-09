@@ -16,8 +16,8 @@ import {
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
+import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
 type ReplaceSubTabComponentProps = ReplaceSubTabProps & {

@@ -54,7 +54,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     mutationFn: (filename: string) =>
       deleteFile({
         headers: authHeaders,
-        path: { filename },
+        query: { path: filename },
         throwOnError: true,
       }),
     onSuccess: invalidateFiles,
@@ -98,10 +98,10 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
       const { data } = await downloadFile({
         headers: authHeaders,
         parseAs: 'blob',
-        path: { filename },
+        query: { path: filename },
         throwOnError: true,
       });
-      const blob = data as Blob;
+      const blob = data;
       await saveBlob(new Blob([blob]), filename);
       return true;
     } catch (error) {

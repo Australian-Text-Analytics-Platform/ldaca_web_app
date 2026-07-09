@@ -84,7 +84,7 @@ export function useFilterCategoricalOptions({
       try {
         const { data: response } = await getColumnUniqueValues({
           headers: getAuthHeaders(),
-          path: { column_name: column, node_id: selectedNodeId },
+          path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
           throwOnError: true,
         });
         // response is the typed API body; guard defensively against a null payload.

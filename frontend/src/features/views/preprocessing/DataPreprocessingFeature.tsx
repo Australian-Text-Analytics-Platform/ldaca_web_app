@@ -1,16 +1,11 @@
 import { lazy, Suspense, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
-import { getNodeData } from '@/api';
-import type { NodeDataResponse } from '@/api';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { NodeSelectionRenderArgs } from '@/features/views/common/components/NodeSelectionList';
 import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
-import { queryKeys } from '@/lib/queryKeys';
 import {
   preprocessingInputsKey,
   usePreprocessingInputsStore,
@@ -59,7 +54,6 @@ const PolarsExpressionFallback = () => (
  */
 function DataPreprocessingFeature() {
   const { currentWorkspaceId, nodes: workspaceNodes } = useWorkspaceData();
-  const { getAuthHeaders, isAuthenticated } = useAuth();
   const {
     filterNode,
     filterPreview,
@@ -102,6 +96,7 @@ function DataPreprocessingFeature() {
   const selectedNode = selectedNodes[0] ?? null;
   const selectedNodeIds = nodeInputs.resolvedNodes.map((node) => node.id);
   const selectedNodeId = selectedNodeIds[0] ?? null;
+  const selectedNodeColumnOptions = nodeInputs.resolvedNodes[0]?.columnOptions ?? [];
   const selectedNodeColumns = Object.fromEntries(
     nodeInputs.resolvedNodes.map((node) => [node.id, node.column]),
   );
@@ -113,30 +108,6 @@ function DataPreprocessingFeature() {
       return 'Join column:';
     }
     return 'Text column:';
-  };
-
-  const activeInputNodeDataQuery = useQuery({
-    queryKey: queryKeys.nodeData(currentWorkspaceId ?? '', selectedNodeId ?? '', 1, 1),
-    queryFn: async (): Promise<NodeDataResponse> => {
-      if (!currentWorkspaceId || !selectedNodeId) {
-        throw new Error('Missing preprocessing workspace or node ID');
-      }
-      const { data } = await getNodeData({
-        headers: getAuthHeaders(),
-        path: { node_id: selectedNodeId },
-        query: { page: 1, page_size: 1 },
-        throwOnError: true,
-      });
-      return data;
-    },
-    enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
-    staleTime: 30 * 1000,
-  });
-
-  const activeInputNodeData = activeInputNodeDataQuery.data ?? null;
-  const preprocessingLoading = {
-    ...isLoading,
-    nodeData: activeInputNodeDataQuery.isLoading,
   };
 
   // Gives child subtabs one shared alert surface for validation and backend errors.
@@ -239,12 +210,11 @@ function DataPreprocessingFeature() {
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
             selectedNodes={selectedNodes}
-            nodeData={activeInputNodeData}
+            columnOptions={selectedNodeColumnOptions}
             currentWorkspaceId={currentWorkspaceId}
-            workspaceNodes={workspaceNodes}
             filterNode={filterNode}
             filterPreview={filterPreview}
-            isLoading={preprocessingLoading}
+            isLoading={isLoading}
             onAlert={handleAlert}
           />
         </TabsContent>
@@ -252,13 +222,13 @@ function DataPreprocessingFeature() {
         <TabsContent value="slice" className="space-y-4">
           <SliceSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
+            currentWorkspaceId={currentWorkspaceId}
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
             selectedNodes={selectedNodes}
-            workspaceNodes={workspaceNodes}
             sliceNode={sliceNode}
             slicePreview={slicePreview}
-            isLoading={preprocessingLoading}
+            isLoading={isLoading}
             onAlert={handleAlert}
           />
         </TabsContent>
@@ -270,8 +240,9 @@ function DataPreprocessingFeature() {
             selectedNodeColumns={selectedNodeColumns}
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
+            getColumnInfos={nodeInputs.getColumnInfos}
             joinNodes={joinNodes}
-            isLoading={preprocessingLoading}
+            isLoading={isLoading}
             onAlert={handleAlert}
           />
         </TabsContent>
@@ -282,9 +253,10 @@ function DataPreprocessingFeature() {
             selectedNodeIds={selectedNodeIds}
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
+            getColumnInfos={nodeInputs.getColumnInfos}
             concatNodes={concatNodes}
             concatPreview={concatPreview}
-            isLoading={preprocessingLoading}
+            isLoading={isLoading}
             onAlert={handleAlert}
           />
         </TabsContent>
@@ -292,11 +264,10 @@ function DataPreprocessingFeature() {
         <TabsContent value="find" className="space-y-4">
           <ReplaceSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
-            selectedNodeId={selectedNodeId}
+            currentWorkspaceId={currentWorkspaceId}
             selectedColumn={selectedNodeId ? (selectedNodeColumns[selectedNodeId] ?? '') : ''}
             selectedNodes={selectedNodes}
-            workspaceNodes={workspaceNodes}
-            isLoading={preprocessingLoading}
+            isLoading={isLoading}
             onAlert={handleAlert}
             replaceTextPreview={replaceTextPreview}
             replaceText={replaceText}
@@ -307,10 +278,9 @@ function DataPreprocessingFeature() {
         <TabsContent value="aggregate" className="space-y-4">
           <AggregateSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
-            selectedNodeId={selectedNodeId}
+            currentWorkspaceId={currentWorkspaceId}
             selectedNodes={selectedNodes}
-            workspaceNodes={workspaceNodes}
-            isLoading={preprocessingLoading}
+            isLoading={isLoading}
             onAlert={handleAlert}
             polarsExpressionPreview={polarsExpressionPreview}
             polarsExpressionApply={polarsExpressionApply}
@@ -322,10 +292,8 @@ function DataPreprocessingFeature() {
           <Suspense fallback={<PolarsExpressionFallback />}>
             <PolarsExpressionSubTab
               renderNodeInputsPanel={renderNodeInputsPanel}
-              selectedNodeId={selectedNodeId}
               selectedNodes={selectedNodes}
-              workspaceNodes={workspaceNodes}
-              isLoading={preprocessingLoading}
+              isLoading={isLoading}
               onAlert={handleAlert}
               polarsExpressionPreview={polarsExpressionPreview}
               polarsExpressionApply={polarsExpressionApply}

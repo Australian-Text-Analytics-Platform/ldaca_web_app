@@ -6,13 +6,13 @@
  * Rendered by: ViewRouter via the ``topic-modeling`` entry in VIEW_COMPONENTS.
  */
 import { AnalysisTabsHost } from '../common/tabs/AnalysisTabsHost';
+import { ANALYSIS_TAB_GROUPS } from '../common/analysisIds';
 import TopicModelingFeature from './TopicModelingFeature';
 
-/** Tab-group namespace for topic-modeling tabs (matches the backend analysis type). */
-const TOPIC_MODELING_TAB_GROUP = 'topic_modeling';
-
 function TopicModelingTabbedFeature() {
-  return <AnalysisTabsHost tabGroup={TOPIC_MODELING_TAB_GROUP} Feature={TopicModelingFeature} />;
+  return (
+    <AnalysisTabsHost tabGroup={ANALYSIS_TAB_GROUPS.topicModeling} Feature={TopicModelingFeature} />
+  );
 }
 
 export default TopicModelingTabbedFeature;

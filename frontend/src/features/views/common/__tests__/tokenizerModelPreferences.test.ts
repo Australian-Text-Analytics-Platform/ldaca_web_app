@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
 import { deriveTokenizerModelsByNode } from '../tokenizerModelPreferences';
 
 describe('deriveTokenizerModelsByNode', () => {
@@ -9,15 +8,17 @@ describe('deriveTokenizerModelsByNode', () => {
       { nodeId: 'node-b', column: 'body' },
       { nodeId: 'node-c', column: '' },
     ];
-    const nodes: WorkspaceNodeLike[] = [
-      { id: 'node-a', tokenizer_models: { text: 'stored-a' } },
-      { node_id: 'node-b', tokenizer_models: { body: 'stored-b' } },
-      { id: 'node-c', tokenizer_models: { text: 'ignored' } },
-    ];
+    const nodeInfoCache = {
+      'node-a': { id: 'node-a', name: 'Node A', tokenizer_models: { text: 'stored-a' } },
+      'node-b': { id: 'node-b', name: 'Node B', tokenizer_models: { body: 'stored-b' } },
+      'node-c': { id: 'node-c', name: 'Node C', tokenizer_models: { text: 'ignored' } },
+    };
 
-    expect(deriveTokenizerModelsByNode(selections, nodes, { 'node-b': 'live-b' })).toEqual({
-      'node-a': 'stored-a',
-      'node-b': 'live-b',
-    });
+    expect(deriveTokenizerModelsByNode(selections, nodeInfoCache, { 'node-b': 'live-b' })).toEqual(
+      {
+        'node-a': 'stored-a',
+        'node-b': 'live-b',
+      },
+    );
   });
 });

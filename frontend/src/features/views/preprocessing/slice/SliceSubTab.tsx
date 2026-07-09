@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { deriveNodeLabel, getNodeDocumentColumn } from '../utils/nodeMetadata';
+import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
+import { deriveNodeLabel } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 

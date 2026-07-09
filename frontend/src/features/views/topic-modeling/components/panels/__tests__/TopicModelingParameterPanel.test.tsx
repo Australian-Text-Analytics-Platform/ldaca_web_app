@@ -66,6 +66,9 @@ const nodeInputsFixture = (selectedNodes: { id?: string; name?: string }[] = [])
   graphSelectedIds: [],
   workspaceId: 'workspace-1',
   recentPresets: [],
+  nodeInfoCache: {},
+  getColumnInfos: vi.fn(() => []),
+  getNodeInfo: vi.fn(() => undefined),
 });
 
 vi.mock('../../../../common/components/AnalysisCardLayout', () => ({

@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
-import { concordanceTaskResultPost, runConcordance } from '@/api';
+import { analysisTaskResultQuery, runConcordance } from '@/api';
 import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
@@ -57,15 +57,15 @@ interface ConcordanceLock {
   getAuthHeaders: () => Record<string, string>;
   resolveTaskId: () => Promise<string | null>;
   detachConcordance: (
-    nodeId: string,
+    taskId: string,
     request: ConcordanceDetachRequest,
   ) => Promise<AnalysisTaskActionResponse>;
   detachConcordanceDispersion: (
-    nodeId: string,
+    taskId: string,
     request: ConcordanceDispersionDetachRequest,
   ) => Promise<{ task_id?: string }>;
   materializeConcordance?: (
-    nodeId: string,
+    taskId: string,
     request: ConcordanceMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
 }
@@ -149,12 +149,13 @@ export function useConcordanceTaskFlow({
     const headers = getAuthHeaders();
     const taskId = await resolveTaskId();
     if (!taskId) return null;
-    const { data: response } = await concordanceTaskResultPost({
+    const { data } = await analysisTaskResultQuery({
       body,
       headers,
-      path: { task_id: taskId },
+      path: { workspace_id: currentWorkspaceId, task_id: taskId },
       throwOnError: true,
     });
+    const response = data as ConcordanceAnalysisResponse | null;
     if (response) {
       if (options?.mergeNodeData) {
         setResults((prev) =>
@@ -267,6 +268,7 @@ export function useConcordanceTaskFlow({
       const { data: response } = await runConcordance({
         body: request,
         headers: authHeaders,
+        path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
       setResults(response);
@@ -415,7 +417,7 @@ export function useConcordanceTaskFlow({
   /** Requests a per-hit concordance workspace node for the selected source block. */
   /**
    * Called by: useConcordanceTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
-   * Flow: require workspace and search text, build a concordance detach request with context/window/search options and optional columns/path, then clear node detaching state.
+   * Flow: require workspace and search text, build a concordance detach request with context/window/search options and explicit columns/path, then clear node detaching state.
    */
   const handleDetach = async (
     nodeId: string,
@@ -428,6 +430,16 @@ export function useConcordanceTaskFlow({
 
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
     try {
+      const explicitSelectedColumns = selectedColumns ?? [];
+      if (explicitSelectedColumns.length === 0) {
+        toast.error('Select at least one column to add to workspace.');
+        return;
+      }
+      const parentTaskId = await resolveTaskId();
+      if (!parentTaskId) {
+        toast.error('No concordance task to detach.');
+        return;
+      }
       const resolvedNodeLabel = nodeLabel && nodeLabel.trim().length > 0 ? nodeLabel : nodeId;
       const request: ConcordanceDetachRequest = {
         node_id: nodeId,
@@ -439,12 +451,10 @@ export function useConcordanceTaskFlow({
         whole_word: wholeWord,
         case_sensitive: caseSensitive,
         new_node_name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
-        ...(selectedColumns && selectedColumns.length > 0
-          ? { selected_columns: selectedColumns }
-          : {}),
+        selected_columns: explicitSelectedColumns,
         ...(materializedPath ? { materialized_path: materializedPath } : {}),
       };
-      await detachConcordance(nodeId, request);
+      await detachConcordance(parentTaskId, request);
     } catch (error) {
       console.error('Error detaching concordance:', error);
       toast.error(
@@ -482,6 +492,11 @@ export function useConcordanceTaskFlow({
     if (!currentWorkspaceId || !searchWord.trim()) return;
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
     try {
+      const explicitSelectedColumns = options.selectedColumns ?? [];
+      if (explicitSelectedColumns.length === 0) {
+        toast.error('Select at least one column to add to workspace.');
+        return;
+      }
       const resolvedLabel =
         options.nodeLabel && options.nodeLabel.trim().length > 0 ? options.nodeLabel : nodeId;
       const selectedBinsArr =
@@ -496,17 +511,13 @@ export function useConcordanceTaskFlow({
       // filter context for future reference (the workspace can otherwise lose
       // track of which dispersion-detach was scoped to which bins).
       const suffix = rangeLabel ? `_conc_aggregated_${rangeLabel}` : '_conc_aggregated';
-      // Resolve parent_task_id so the worker can publish the
-      // `analysis_materialized` event for the slow path's side-effect.
-      // Best-effort: if the lock has no task id yet, we skip it and
-      // accept that the user might need to materialise again later.
-      let parentTaskId: string | null = null;
-      try {
-        parentTaskId = await resolveTaskId();
-      } catch (resolveErr) {
-        console.warn('Failed to resolve concordance task id for dispersion detach:', resolveErr);
+      const parentTaskId = await resolveTaskId();
+      if (!parentTaskId) {
+        toast.error('No concordance task to detach.');
+        return;
       }
       const request: ConcordanceDispersionDetachRequest = {
+        node_id: nodeId,
         column,
         search_word: searchWord.trim(),
         num_left_tokens: numLeftTokens,
@@ -515,10 +526,7 @@ export function useConcordanceTaskFlow({
         whole_word: wholeWord,
         case_sensitive: caseSensitive,
         new_node_name: buildDetachNodeName(resolvedLabel, suffix),
-        ...(options.selectedColumns && options.selectedColumns.length > 0
-          ? { selected_columns: options.selectedColumns }
-          : {}),
-        ...(parentTaskId ? { parent_task_id: parentTaskId } : {}),
+        selected_columns: explicitSelectedColumns,
         ...(options.materializedPath ? { materialized_path: options.materializedPath } : {}),
         ...(selectedBinsArr
           ? { selected_bins: selectedBinsArr, total_bins: options.binCount }
@@ -530,7 +538,7 @@ export function useConcordanceTaskFlow({
             }
           : {}),
       };
-      await detachConcordanceDispersion(nodeId, request);
+      await detachConcordanceDispersion(parentTaskId, request);
       toast.success('Aggregated detach started.');
     } catch (error) {
       console.error('Error detaching aggregated concordance:', error);
@@ -563,7 +571,7 @@ export function useConcordanceTaskFlow({
     setNodeMaterializing?.((prev) => ({ ...prev, [nodeId]: true }));
     try {
       const request: ConcordanceMaterializeRequest = {
-        parent_task_id: parentTaskId,
+        node_id: nodeId,
         column,
         search_word: searchWord.trim(),
         num_left_tokens: numLeftTokens,
@@ -575,7 +583,7 @@ export function useConcordanceTaskFlow({
         // the regex flow over raw text and silently drops tokens-mode hits.
         search_mode: searchMode,
       };
-      const resp = await materializeConcordance(nodeId, request);
+      const resp = await materializeConcordance(parentTaskId, request);
       const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
       if (taskId && setMaterializeTaskIds) {
         setMaterializeTaskIds((prev) => ({ ...prev, [nodeId]: taskId }));

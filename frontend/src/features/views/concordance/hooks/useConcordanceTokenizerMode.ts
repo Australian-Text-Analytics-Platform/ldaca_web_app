@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import type { NodeInfo } from '@/lib/nodeInfo';
 import {
   deriveTokenizerModelsByNode,
   type TokenizerModelColumnSelection,
@@ -9,7 +9,7 @@ type ConcordanceSearchMode = 'regex' | 'tokens';
 
 interface UseConcordanceTokenizerModeOptions {
   effectiveNodeColumnSelections: TokenizerModelColumnSelection[];
-  panelSelectedNodes: WorkspaceNodeLike[];
+  nodeInfoCache: Record<string, NodeInfo>;
 }
 
 interface UseConcordanceTokenizerModeResult {
@@ -28,7 +28,7 @@ interface UseConcordanceTokenizerModeResult {
  */
 export function useConcordanceTokenizerMode({
   effectiveNodeColumnSelections,
-  panelSelectedNodes,
+  nodeInfoCache,
 }: UseConcordanceTokenizerModeOptions): UseConcordanceTokenizerModeResult {
   const [searchMode, setSearchMode] = useState<ConcordanceSearchMode>('regex');
   const [searchModeUserSet, setSearchModeUserSet] = useState(false);
@@ -36,7 +36,7 @@ export function useConcordanceTokenizerMode({
 
   const effectiveTokenizerModelsByNode = deriveTokenizerModelsByNode(
     effectiveNodeColumnSelections,
-    panelSelectedNodes,
+    nodeInfoCache,
     tokenizerModelsByNode,
   );
 

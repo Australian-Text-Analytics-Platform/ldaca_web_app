@@ -15,8 +15,8 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-import { getAuthInfo, getConfig, googleAuth, logout as logoutSession } from '@/api';
-import type { AuthInfoResponse, ConfigResponse } from '@/api';
+import { getAuthInfo, getRuntimeConfig, googleAuth, logout as logoutSession } from '@/api';
+import type { AuthInfoResponse, RuntimeConfigResponse } from '@/api';
 
 const AUTH_INFO_TIMEOUT_MS = 7000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -39,7 +39,7 @@ export type AuthPhase =
 
 interface AuthState {
   authInfo: AuthInfoResponse | null;
-  config: ConfigResponse | null;
+  config: RuntimeConfigResponse | null;
   phase: AuthPhase;
 }
 
@@ -143,7 +143,7 @@ export const useAuthStore = create<AuthStore>()(
       inFlight = (async () => {
         try {
           if (!get().config) {
-            const { data: config } = await getConfig({ throwOnError: true });
+            const { data: config } = await getRuntimeConfig({ throwOnError: true });
             set((state) => {
               state.config = config;
             });

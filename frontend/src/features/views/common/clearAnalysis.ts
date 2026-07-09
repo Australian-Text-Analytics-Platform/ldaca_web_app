@@ -1,4 +1,4 @@
-import { clearTasks } from '@/api';
+import { clearTask } from '@/api';
 import { collectTaskIds } from '@/features/views/common/analysisTaskUtils';
 import { lastRunRequestQueryKey, type LastRunAnalysisType } from './hooks/useLastRunRequest';
 
@@ -48,7 +48,7 @@ export async function clearAnalysis({
 
     const settled = await Promise.allSettled(
       allTaskIds.map((taskId) =>
-        clearTasks({ headers, query: { task_id: taskId }, throwOnError: true }),
+        clearTask({ headers, path: { task_id: taskId }, throwOnError: true }),
       ),
     );
 

@@ -249,12 +249,12 @@ function AnnotationClassDescriptionsEditor({
     queryKey,
     enabled: canLoad,
     queryFn: async () => {
-      if (!nodeId || !classColumn || !descriptionColumn) {
+      if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
         throw new Error('Missing class-description selection');
       }
       const { data } = await getAnnotationClassDescriptions({
         headers: getAuthHeaders(),
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, node_id: nodeId },
         query: { class_column: classColumn, description_column: descriptionColumn },
         throwOnError: true,
       });
@@ -278,7 +278,7 @@ function AnnotationClassDescriptionsEditor({
 
   const updateClassDescriptionsMutation = useMutation({
     mutationFn: async (rows: AnnotationClassDescriptionRow[]) => {
-      if (!nodeId || !classColumn || !descriptionColumn) {
+      if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
         throw new Error('Missing class-description selection');
       }
       const body = {
@@ -288,7 +288,7 @@ function AnnotationClassDescriptionsEditor({
       };
       const { data } = await updateAnnotationClassDescriptions({
         headers: getAuthHeaders(),
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, node_id: nodeId },
         body,
         throwOnError: true,
       });
@@ -796,6 +796,7 @@ function AnnotationFeature({
     try {
       const { data } = await createAnnotationClassDescriptions({
         headers: getAuthHeaders(),
+        path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
       await Promise.all([
@@ -853,6 +854,7 @@ function AnnotationFeature({
     enabled: canLoadClassCount,
     queryFn: async () => {
       if (
+        !currentWorkspaceId ||
         !classDescriptionNode?.id ||
         !classDescriptionClassColumn ||
         !classDescriptionDescriptionColumn
@@ -861,7 +863,7 @@ function AnnotationFeature({
       }
       const { data } = await getAnnotationClassDescriptions({
         headers: getAuthHeaders(),
-        path: { node_id: classDescriptionNode.id },
+        path: { workspace_id: currentWorkspaceId, node_id: classDescriptionNode.id },
         query: {
           class_column: classDescriptionClassColumn,
           description_column: classDescriptionDescriptionColumn,
@@ -928,14 +930,14 @@ function AnnotationFeature({
     try {
       await createAnnotationColumn({
         headers: getAuthHeaders(),
-        path: { node_id: sourceNode.id },
+        path: { workspace_id: currentWorkspaceId, node_id: sourceNode.id },
         body: { column_name: columnName },
         throwOnError: true,
       });
       if (classDescriptionNode) {
         await setAnnotationClassParent({
           headers: getAuthHeaders(),
-          path: { node_id: classDescriptionNode.id },
+          path: { workspace_id: currentWorkspaceId, node_id: classDescriptionNode.id },
           body: { parent_node_id: sourceNode.id },
           throwOnError: true,
         });
@@ -982,7 +984,7 @@ function AnnotationFeature({
       if (currentWorkspaceId && sourceNode) {
         void annotateAiPreviewClear({
           headers: getAuthHeaders(),
-          body: { node_id: sourceNode.id },
+          path: { workspace_id: currentWorkspaceId, node_id: sourceNode.id },
           throwOnError: true,
         }).catch((error: unknown) => {
           console.warn('[annotation] Failed to clear AI preview cache:', error);
@@ -1144,6 +1146,7 @@ function AnnotationFeature({
               {annotationMode === 'ai' ? (
                 <div className="mt-4">
                   <AnnotationAiSettings
+                    workspaceId={currentWorkspaceId ?? null}
                     provider={aiProvider}
                     onProviderChange={selectAiProvider}
                     apiKeys={annotationAiApiKeys}

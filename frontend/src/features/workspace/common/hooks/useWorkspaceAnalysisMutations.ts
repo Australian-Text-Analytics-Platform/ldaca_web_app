@@ -1,24 +1,21 @@
 import { useMemo } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
 import {
-  detachConcordance,
-  detachConcordanceDispersion,
-  detachQuotation,
+  createAnalysisTaskDetachment,
+  createAnalysisTaskDispersionDetachment,
+  createAnalysisTaskMaterialization,
   getQuotation,
-  materializeConcordance,
-  materializeQuotation,
 } from '@/api';
 import type {
+  AnalysisTaskActionResponse,
   ConcordanceDetachRequest,
   ConcordanceDispersionDetachRequest,
   ConcordanceMaterializeRequest,
   QuotationDetachRequest,
   QuotationMaterializeRequest,
-  QuotationRequestInput,
+  QuotationRequest,
 } from '@/api';
 import { invalidateWorkspaceGraphQuery } from './workspaceMutationCache';
-
-type QuotationRequest = QuotationRequestInput;
 
 interface WorkspaceAnalysisMutationsParams {
   authHeaders: Record<string, string>;
@@ -55,19 +52,20 @@ export const useWorkspaceAnalysisMutations = ({
 
   const detachConcordanceMutation = useMutation({
     mutationFn: ({
-      nodeId,
+      workspaceId,
+      taskId,
       request,
     }: {
       workspaceId: string;
-      nodeId: string;
+      taskId: string;
       request: ConcordanceDetachRequest;
     }) =>
-      detachConcordance({
+      createAnalysisTaskDetachment({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => data as AnalysisTaskActionResponse),
     onMutate: () => {
       startOperation('detachConcordance');
     },
@@ -83,17 +81,18 @@ export const useWorkspaceAnalysisMutations = ({
 
   const detachConcordanceDispersionMutation = useMutation({
     mutationFn: ({
-      nodeId,
+      workspaceId,
+      taskId,
       request,
     }: {
       workspaceId: string;
-      nodeId: string;
+      taskId: string;
       request: ConcordanceDispersionDetachRequest;
     }) =>
-      detachConcordanceDispersion({
+      createAnalysisTaskDispersionDetachment({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => ({ task_id: data.metadata?.task_id ?? undefined })),
     onMutate: () => {
@@ -110,11 +109,19 @@ export const useWorkspaceAnalysisMutations = ({
   });
 
   const materializeConcordanceMutation = useMutation({
-    mutationFn: ({ nodeId, request }: { nodeId: string; request: ConcordanceMaterializeRequest }) =>
-      materializeConcordance({
+    mutationFn: ({
+      workspaceId,
+      taskId,
+      request,
+    }: {
+      workspaceId: string;
+      taskId: string;
+      request: ConcordanceMaterializeRequest;
+    }) =>
+      createAnalysisTaskMaterialization({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -134,7 +141,7 @@ export const useWorkspaceAnalysisMutations = ({
       getQuotation({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -151,19 +158,20 @@ export const useWorkspaceAnalysisMutations = ({
 
   const detachQuotationMutation = useMutation({
     mutationFn: ({
-      nodeId,
+      workspaceId,
+      taskId,
       request,
     }: {
       workspaceId: string;
-      nodeId: string;
+      taskId: string;
       request: QuotationDetachRequest;
     }) =>
-      detachQuotation({
+      createAnalysisTaskDetachment({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => data as AnalysisTaskActionResponse),
     onMutate: () => {
       startOperation('detachQuotation');
     },
@@ -178,11 +186,19 @@ export const useWorkspaceAnalysisMutations = ({
   });
 
   const materializeQuotationMutation = useMutation({
-    mutationFn: ({ nodeId, request }: { nodeId: string; request: QuotationMaterializeRequest }) =>
-      materializeQuotation({
+    mutationFn: ({
+      workspaceId,
+      taskId,
+      request,
+    }: {
+      workspaceId: string;
+      taskId: string;
+      request: QuotationMaterializeRequest;
+    }) =>
+      createAnalysisTaskMaterialization({
         body: request,
         headers: authHeaders,
-        path: { node_id: nodeId },
+        path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: () => {
@@ -199,21 +215,25 @@ export const useWorkspaceAnalysisMutations = ({
 
   const actions = useMemo(
     () => ({
-      detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
+      detachConcordance: (taskId: string, request: ConcordanceDetachRequest) =>
         detachConcordanceMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          nodeId,
+          taskId,
           request,
         }),
-      detachConcordanceDispersion: (nodeId: string, request: ConcordanceDispersionDetachRequest) =>
+      detachConcordanceDispersion: (
+        taskId: string,
+        request: ConcordanceDispersionDetachRequest,
+      ) =>
         detachConcordanceDispersionMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          nodeId,
+          taskId,
           request,
         }),
-      materializeConcordance: (nodeId: string, request: ConcordanceMaterializeRequest) =>
+      materializeConcordance: (taskId: string, request: ConcordanceMaterializeRequest) =>
         materializeConcordanceMutation.mutateAsync({
-          nodeId,
+          workspaceId: ensureWorkspaceSelected(),
+          taskId,
           request,
         }),
       quotationSearch: (nodeId: string, request: QuotationRequest) =>
@@ -221,15 +241,16 @@ export const useWorkspaceAnalysisMutations = ({
           nodeId,
           request,
         }),
-      detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
+      detachQuotation: (taskId: string, request: QuotationDetachRequest) =>
         detachQuotationMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          nodeId,
+          taskId,
           request,
         }),
-      materializeQuotation: (nodeId: string, request: QuotationMaterializeRequest) =>
+      materializeQuotation: (taskId: string, request: QuotationMaterializeRequest) =>
         materializeQuotationMutation.mutateAsync({
-          nodeId,
+          workspaceId: ensureWorkspaceSelected(),
+          taskId,
           request,
         }),
     }),

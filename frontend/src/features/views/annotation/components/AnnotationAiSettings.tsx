@@ -30,6 +30,7 @@ import {
 } from './AnnotationProviderConfigDialog';
 
 interface AnnotationAiSettingsProps {
+  workspaceId: string | null;
   provider: AnnotationAiProviderId;
   onProviderChange: (provider: AnnotationAiProviderId, model: string) => void;
   /** Configured provider API keys from preferences, keyed by provider-card id. */
@@ -88,6 +89,7 @@ function buildConfiguredProviderCards({
 }
 
 export function AnnotationAiSettings({
+  workspaceId,
   provider,
   onProviderChange,
   apiKeys,
@@ -206,6 +208,7 @@ export function AnnotationAiSettings({
       {children}
 
       <AnnotationProviderConfigDialog
+        workspaceId={workspaceId}
         open={dialog.open}
         provider={dialog.provider}
         onOpenChange={(open) => {

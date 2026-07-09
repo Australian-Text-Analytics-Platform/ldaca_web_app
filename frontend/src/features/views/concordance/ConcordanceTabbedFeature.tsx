@@ -6,13 +6,13 @@
  * Rendered by: ViewRouter via the ``concordance`` entry in VIEW_COMPONENTS.
  */
 import { AnalysisTabsHost } from '../common/tabs/AnalysisTabsHost';
+import { ANALYSIS_TAB_GROUPS } from '../common/analysisIds';
 import { ConcordanceFeature } from './ConcordanceFeature';
 
-/** Tab-group namespace for concordance tabs (matches the backend analysis type). */
-const CONCORDANCE_TAB_GROUP = 'concordance_analysis';
-
 function ConcordanceTabbedFeature() {
-  return <AnalysisTabsHost tabGroup={CONCORDANCE_TAB_GROUP} Feature={ConcordanceFeature} />;
+  return (
+    <AnalysisTabsHost tabGroup={ANALYSIS_TAB_GROUPS.concordance} Feature={ConcordanceFeature} />
+  );
 }
 
 export default ConcordanceTabbedFeature;
