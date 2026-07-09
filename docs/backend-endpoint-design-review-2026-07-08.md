@@ -27,6 +27,36 @@ hidden active-workspace state, action-shaped paths, mutation data in query
 parameters, analysis task route drift, duplicated OpenAPI tags, and some large
 router functions that do too much orchestration.
 
+## Open TODOs
+
+No open TODOs remain from this review. New findings from the final endpoint
+rescan should be added here before implementation.
+
+## Done
+
+1. Protected runtime configuration mutation and split public bootstrap metadata
+   from admin-only process-local configuration updates.
+2. Made workspace identity explicit across workspace-scoped routes and tightened
+   route invariants around path `workspace_id` and UUID route converters.
+3. Replaced mutation query parameters with request bodies or resource-shaped
+   paths for workspace lifecycle, node creation, and task actions.
+4. Rationalized node collection reads by moving batch node metadata from
+   `PUT /nodes` to `POST /nodes:batchGet`.
+5. Standardized analysis task request, result, result-query, preference,
+   detach, materialization, and dispersion endpoints under shared task
+   resources.
+6. Reworked Annotation AI preview state into node-scoped preview-session
+   resources and removed the old action-shaped preview endpoints.
+7. Removed duplicated OpenAPI tags so child routers own endpoint grouping.
+8. Added explicit JSON response models or OpenAPI response metadata for public,
+   streaming, redirect, download, export, and admin routes.
+9. Standardized first-party application errors on the `AppError` envelope and
+   documented common error responses.
+10. Extracted workflow-heavy route bodies into domain helpers and added a route
+   depth invariant that currently finds no API route handlers over 80 lines.
+11. Removed first-party catch-all file routes in favor of query/body path
+   contracts for path-bearing file operations.
+
 ## Findings
 
 ### 1. ~~Make workspace identity explicit in workspace-scoped routes~~
@@ -200,8 +230,8 @@ Prefer resource ids in the path and mutation fields in Pydantic request models:
 Status 2026-07-08: Workspace lifecycle mutation query parameters are removed.
 Current-workspace selection uses a body on `/api/users/me/current-workspace`;
 workspace metadata and delete/save/reorder use explicit UUID resource routes.
-~~Remaining TODOs: move node creation off query parameters and convert task
-cancel/clear query parameters.~~
+The remaining node-creation and task-action query parameter follow-ups were
+completed in the next status update.
 
 Status 2026-07-09: Completed. Node creation now uses a JSON request body on
 `POST /api/workspaces/{workspace_id}/nodes`; task cancellation uses
@@ -310,8 +340,9 @@ now use the shared generated functions. Concordance and quotation body-based
 result refreshes use `POST /analysis-tasks/{task_id}/result-query`; quotation,
 sequential-analysis, and token-frequency preference updates use
 `PATCH /analysis-tasks/{task_id}/preferences`; and OpenAPI tests assert the old
-per-analysis GET/POST result/request routes stay absent. ~~Remaining TODO: move
-detach/materialize actions under shared task resources where practical.~~
+per-analysis GET/POST result/request routes stay absent. Detach and
+materialize actions were moved under shared task resources in the next status
+update.
 
 Status 2026-07-09: Task-based detach routes are now standardized.
 Sequential-analysis detach and topic-modeling detach/detach-options moved from
@@ -600,8 +631,8 @@ visible-column projection, artifact writing, multi-node ZIP packaging, sized
 `FileResponse` construction, and temp-dir cleanup to
 `node_export.export_workspace_nodes_response`. The route shrank from 97 lines
 to 28 lines, the export integration tests still pass, and
-`test_route_handler_depth.py` guards the route. ~~Remaining TODO: rescan backend
-route handlers for any newly obvious oversized or shallow endpoints.~~
+`test_route_handler_depth.py` guards the route. A backend route-handler rescan
+followed this extraction pass.
 
 Status 2026-07-09: Rescan found additional route handlers over 80 lines after
 the original extraction list was exhausted:
@@ -614,9 +645,9 @@ the original extraction list was exhausted:
 - ~~`nodes_join.py::join_nodes_preview` at 86 lines.~~
 - ~~`annotation.py::detach_ai_previewed_rows` at 84 lines.~~
 
-~~New TODO: inspect these in descending risk/order and extract domain helpers
-where the body is workflow orchestration rather than unavoidable HTTP/OAuth
-boundary code.~~
+These handlers were inspected in descending risk/order, and domain helpers were
+extracted where the body was workflow orchestration rather than unavoidable
+HTTP/OAuth boundary code.
 
 Status 2026-07-09: Continued. `detach_ai_previewed_rows` now delegates
 preview-session materialization, row-index validation, child-node creation, and
