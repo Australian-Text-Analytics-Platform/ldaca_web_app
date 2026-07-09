@@ -59,7 +59,7 @@ describe('CustomNode', () => {
       type: 'custom',
       data: {
         node: {
-          node_id: 'node-1',
+          id: 'node-1',
           name: 'sample_data/ADO/qldelection2020_candidate_tweets',
           shape: [480, 8],
           columns: [],
@@ -104,7 +104,7 @@ describe('CustomNode', () => {
       type: 'custom',
       data: {
         node: {
-          node_id: 'node-1',
+          id: 'node-1',
           name: 'Corpus',
           color: '#2563eb',
           shape: [10, 3],
@@ -140,7 +140,7 @@ describe('CustomNode', () => {
       type: 'custom',
       data: {
         node: {
-          node_id: 'node-1',
+          id: 'node-1',
           name: 'sample_data/ADO/qldelection2020_samidata_tweets',
           shape: [2380, 15],
           columns: [],
@@ -189,7 +189,7 @@ describe('CustomNode', () => {
         type="custom"
         data={{
           node: {
-            node_id: 'node-zoomed-out',
+            id: 'node-zoomed-out',
             name: 'sample_data/ADO/qldelection2020_candidate_tweets',
             shape: [480, 8],
             columns: [],
@@ -238,7 +238,7 @@ describe('CustomNode', () => {
       type: 'custom',
       data: {
         node: {
-          node_id: 'node-hide',
+          id: 'node-hide',
           name: 'sample_data/ADO/qldelection2020_candidate_tweets',
           shape: [480, 8],
           columns: [],
@@ -286,7 +286,7 @@ describe('CustomNode', () => {
         type="custom"
         data={{
           node: {
-            node_id: 'node-fresh',
+            id: 'node-fresh',
             name: 'Fresh corpus',
             shape: [10, 3],
             columns: [],

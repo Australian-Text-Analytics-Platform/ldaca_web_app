@@ -154,6 +154,11 @@ rescan should be added here before implementation.
       and mutation validation instead of inferring column names from the first
       row.
 
+26. Remove graph-node `node_id` identity alias
+    - Done 2026-07-09. React Flow `CustomNode` data now carries the generated
+      workspace node `id` directly instead of remapping it to an internal
+      `node_id` field and reading that alias for graph actions.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -167,6 +172,8 @@ column inference has been removed from typed workspace and preview table paths.
 Live workspace-node identity is now `WorkspaceNodeInfo.id`. Keep `node_id` only
 where the backend contract explicitly uses that field, such as path params,
 request bodies, `AnalysisTabInput`, and detach-option/result DTOs.
+React Flow `CustomNode` data also uses `id` directly; it no longer carries a
+frontend-only `node_id` alias.
 
 Raw frontend URL construction is limited to boundaries that need URL strings or
 external resources: health checks, document/file rendering, remote tutorial

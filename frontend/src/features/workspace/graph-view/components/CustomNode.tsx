@@ -255,8 +255,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    * Confirms deletion through the graph action passed from useWorkspaceGraph.
    */
   const handleDeleteConfirm = () => {
-    if (node.node_id) {
-      onDelete(node.node_id);
+    if (node.id) {
+      onDelete(node.id);
     }
     dispatchUi({ type: 'set-delete-confirm', showDeleteConfirm: false });
   };
@@ -279,8 +279,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleRenameSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onRename && node.node_id && newName.trim()) {
-      onRename(node.node_id, newName.trim());
+    if (onRename && node.id && newName.trim()) {
+      onRename(node.id, newName.trim());
     }
     dispatchUi({ type: 'cancel-rename' });
   };
@@ -307,8 +307,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleCopyNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (onCopy && node.node_id) {
-      onCopy(node.node_id);
+    if (onCopy && node.id) {
+      onCopy(node.id);
     }
   };
 
@@ -318,8 +318,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleUndoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (onUndo && node.node_id && node.can_undo) {
-      onUndo(node.node_id);
+    if (onUndo && node.id && node.can_undo) {
+      onUndo(node.id);
     }
   };
 
@@ -329,8 +329,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleRedoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (onRedo && node.node_id && node.can_redo) {
-      onRedo(node.node_id);
+    if (onRedo && node.id && node.can_redo) {
+      onRedo(node.id);
     }
   };
 
@@ -339,8 +339,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleCopyId = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node.node_id) {
-      void navigator.clipboard.writeText(node.node_id);
+    if (node.id) {
+      void navigator.clipboard.writeText(node.id);
       dispatchUi({ type: 'copy-id' });
       setTimeout(() => {
         dispatchUi({ type: 'copy-id-reset' });
@@ -389,7 +389,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node.node_id) onAddToSelection?.(node.node_id);
+    if (node.id) onAddToSelection?.(node.id);
   };
 
   /**
@@ -610,8 +610,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       {/* Node Body */}
       <div className="p-3 bg-white rounded-b-lg space-y-1">
         <div className="flex items-center justify-between group">
-          <div className="font-mono text-xs text-gray-500 truncate max-w-45" title={node.node_id}>
-            id: {node.node_id.substring(0, 8)}...
+          <div className="font-mono text-xs text-gray-500 truncate max-w-45" title={node.id}>
+            id: {node.id.substring(0, 8)}...
           </div>
           <button
             onClick={handleCopyId}

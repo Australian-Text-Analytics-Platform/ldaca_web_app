@@ -9,7 +9,7 @@ type NodeShape = [number | null, number | null];
 
 /** Rich node shape used by the workspace graph/table view. */
 export interface WorkspaceNode {
-  node_id: string;
+  id: string;
   name: string;
   /** Persisted per-node display colour (``#rrggbb``) from ``WorkspaceNodeInfo.color``.
    * Rendered as a left accent on the graph node card by CustomNode; ``null`` when unset. */
