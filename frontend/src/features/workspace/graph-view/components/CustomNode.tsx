@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import {
   type NodeProps,
   Handle,
@@ -7,7 +7,7 @@ import {
   useStore,
   type Node as ReactFlowNode,
 } from '@xyflow/react';
-import { Settings2, Copy, Check, Plus } from 'lucide-react';
+import { Copy, Check, Plus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,16 @@ import {
 import { type WorkspaceNode } from '@/features/workspace/data-view/types';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
+import {
+  CUSTOM_NODE_TOOLBAR_BUTTON_CLASS,
+  CustomNodeActionMenu,
+} from './CustomNodeActionMenu';
+import { CustomNodeRenameForm } from './CustomNodeRenameForm';
+import {
+  releaseToolbarOwner,
+  setActiveToolbarOwner,
+  useCustomNodeToolbarOwner,
+} from './customNodeToolbarOwner';
 
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
@@ -40,21 +50,6 @@ interface CustomNodeData extends Record<string, unknown> {
 }
 
 const COMPACT_NODE_ZOOM_THRESHOLD = 0.6;
-/**
- * Approximate rendered height (px) of the settings dropdown: five fixed rows
- * (Rename / Clone / Undo / Redo / Delete) plus borders and the trigger gap.
- * ``computeMenuPlacement`` compares this against the room below the trigger so
- * the menu can decide its vertical direction before it paints (no first-frame
- * flip flash). Keep it roughly in sync with the menu items in ``nodeToolbar``.
- */
-const NODE_MENU_ESTIMATED_HEIGHT_PX = 180;
-/**
- * Approximate rendered width (px) of the settings dropdown. Matches the menu's
- * ``min-w-36`` (9rem) floor; the labels are short so this is effectively the
- * full width. ``computeMenuPlacement`` uses it to pick the horizontal anchor so
- * a node near the graph's left edge doesn't render a menu clipped on the left.
- */
-const NODE_MENU_ESTIMATED_WIDTH_PX = 144;
 
 interface CustomNodeUiState {
   showMenu: boolean;
@@ -152,81 +147,6 @@ function customNodeUiReducer(
 }
 
 /**
- * Module-level singleton tracking which node currently owns the visible hover
- * toolbar. Because each ``CustomNode`` keeps its own hover state, this shared
- * owner is what guarantees only ONE hover toolbar is shown across the whole
- * graph: when a node claims ownership (on hover), every other node re-renders
- * and immediately hides its hover toolbar.
- *
- * Used by: CustomNode via ``useSyncExternalStore`` (read) and the
- * show/hide handlers (write).
- */
-let activeToolbarNodeId: string | null = null;
-const toolbarOwnerListeners = new Set<() => void>();
-
-/** Sets the active toolbar owner and notifies subscribed nodes. No-op when unchanged. */
-function setActiveToolbarOwner(nodeId: string | null): void {
-  if (activeToolbarNodeId === nodeId) return;
-  activeToolbarNodeId = nodeId;
-  for (const listener of toolbarOwnerListeners) listener();
-}
-
-/** Subscribes a node to owner changes; used by ``useSyncExternalStore``. */
-function subscribeToolbarOwner(listener: () => void): () => void {
-  toolbarOwnerListeners.add(listener);
-  return () => {
-    toolbarOwnerListeners.delete(listener);
-  };
-}
-
-/** Returns the current owner id; used by ``useSyncExternalStore``. */
-function getToolbarOwnerSnapshot(): string | null {
-  return activeToolbarNodeId;
-}
-
-/** Corner the settings dropdown should expand from, per axis. */
-interface NodeMenuPlacement {
-  /** true → expand upward (``bottom-9``); false → downward (``top-9``). */
-  opensUp: boolean;
-  /** true → extend right (``left-0``); false → extend left (``right-0``). */
-  opensRight: boolean;
-}
-
-/**
- * Decides which corner the settings dropdown should expand from so it stays
- * inside the graph viewport instead of being clipped at an edge.
- * Called by: CustomNode's settings ("More options") button when it opens the menu.
- * Flow: measure the trigger button, find the enclosing ``.react-flow`` pane
- * (the React Flow root, since NodeToolbar portals into ``.react-flow__renderer``
- * inside it), then for each axis compare the room on the default side against the
- * menu's estimated size. Vertically the menu defaults to opening downward and
- * flips up near the bottom edge; horizontally it defaults to extending left
- * (``right-0``) and flips to extend right (``left-0``) near the left edge. A side
- * flips only when the default side can't fit the menu AND the other side has more
- * room. Falls back to the window when no pane is found.
- */
-function computeMenuPlacement(trigger: HTMLElement): NodeMenuPlacement {
-  const buttonRect = trigger.getBoundingClientRect();
-  const paneRect = trigger.closest('.react-flow')?.getBoundingClientRect();
-  const topLimit = paneRect ? paneRect.top : 0;
-  const bottomLimit = paneRect ? paneRect.bottom : window.innerHeight;
-  const leftLimit = paneRect ? paneRect.left : 0;
-  const rightLimit = paneRect ? paneRect.right : window.innerWidth;
-
-  const spaceBelow = bottomLimit - buttonRect.bottom;
-  const spaceAbove = buttonRect.top - topLimit;
-  // Default extends left from the button's right edge; the flipped menu extends
-  // right from the button's left edge. Measure the room each direction can use.
-  const spaceLeft = buttonRect.right - leftLimit;
-  const spaceRight = rightLimit - buttonRect.left;
-
-  return {
-    opensUp: spaceBelow < NODE_MENU_ESTIMATED_HEIGHT_PX && spaceAbove > spaceBelow,
-    opensRight: spaceLeft < NODE_MENU_ESTIMATED_WIDTH_PX && spaceRight > spaceLeft,
-  };
-}
-
-/**
  * React Flow node renderer for a workspace node. Shows a compact card when zoomed
  * out, and a full card with metadata + action menu when zoomed in.
  * Rendered by: workspace/CustomNode module JSX because React Flow needs this custom node type for workspace data blocks.
@@ -269,11 +189,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   // Which node currently owns the visible hover toolbar (singleton across the
   // whole graph). When another node claims ownership, this re-renders and our
   // hover toolbar hides immediately.
-  const activeToolbarId = useSyncExternalStore(
-    subscribeToolbarOwner,
-    getToolbarOwnerSnapshot,
-    getToolbarOwnerSnapshot,
-  );
+  const activeToolbarId = useCustomNodeToolbarOwner();
 
   const nodeName = node.name || 'Loading...';
   const nodeShape = node.shape;
@@ -300,15 +216,14 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    * at once with no grace period. */
   const hideToolbar = () => {
     dispatchUi({ type: 'hide-toolbar' });
-    if (activeToolbarNodeId === id) setActiveToolbarOwner(null);
+    releaseToolbarOwner(id);
   };
 
   useEffect(
     () => () => {
-      if (activeToolbarNodeId === id) setActiveToolbarOwner(null);
+      releaseToolbarOwner(id);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run only on unmount
-    [],
+    [id],
   );
 
   // Close menu when clicking outside (capture to beat React Flow internal handlers)
@@ -486,9 +401,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   const shapeLabel = `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`;
 
-  const menuButtonClassName =
-    'relative flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
-
   /** Stops React Flow from treating side-control pointer events as node clicks/drags. */
   const stopGraphControlEvent = (e: React.SyntheticEvent) => {
     e.stopPropagation();
@@ -527,89 +439,35 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       onPointerDownCapture={stopGraphControlEvent}
       onMouseDownCapture={stopGraphControlEvent}
     >
-      <div className="relative" ref={menuRef}>
-        <button
-          type="button"
-          onPointerDown={stopGraphControlEvent}
-          onMouseDown={stopGraphControlEvent}
-          onClick={(e) => {
-            e.stopPropagation();
-            // Opening: pick the corner that keeps the menu on-screen so a node
-            // near an edge expands away from it (up near the bottom, right near
-            // the left) instead of being clipped. Closing: reset to defaults.
-            const willOpen = !showMenu;
-            const placement = willOpen ? computeMenuPlacement(e.currentTarget) : null;
-            dispatchUi({
-              type: 'set-menu',
-              showMenu: willOpen,
-              opensUp: placement?.opensUp ?? false,
-              opensRight: placement?.opensRight ?? false,
-            });
-            setActiveToolbarOwner(id);
-          }}
-          className={menuButtonClassName}
-          title="More options"
-          aria-label="Node settings"
-        >
-          <Settings2 className="h-4 w-4" />
-        </button>
-
-        {showMenu && (
-          <div
-            className={cn(
-              'absolute z-30 min-w-36 rounded-md border border-border bg-white shadow-lg',
-              // Flip anchoring so the menu grows away from whichever graph edge
-              // the node sits near: upward when there's no room below, and
-              // rightward (left-0) when there's no room to the left.
-              menuOpensUp ? 'bottom-9' : 'top-9',
-              menuOpensRight ? 'left-0' : 'right-0',
-            )}
-          >
-            <button
-              onClick={handleRenameClick}
-              className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-muted/60"
-            >
-              Rename
-            </button>
-
-            <button
-              onClick={handleCopyNode}
-              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
-            >
-              Clone
-            </button>
-
-            <button
-              onClick={handleUndoNode}
-              disabled={!node.can_undo}
-              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
-            >
-              Undo
-            </button>
-
-            <button
-              onClick={handleRedoNode}
-              disabled={!node.can_redo}
-              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
-            >
-              Redo
-            </button>
-
-            <button
-              onClick={handleDeleteClick}
-              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
-            >
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
+      <CustomNodeActionMenu
+        menuRef={menuRef}
+        showMenu={showMenu}
+        menuOpensUp={menuOpensUp}
+        menuOpensRight={menuOpensRight}
+        canUndo={node.can_undo}
+        canRedo={node.can_redo}
+        onMenuChange={(willOpen, placement) => {
+          dispatchUi({
+            type: 'set-menu',
+            showMenu: willOpen,
+            opensUp: placement?.opensUp ?? false,
+            opensRight: placement?.opensRight ?? false,
+          });
+          setActiveToolbarOwner(id);
+        }}
+        onRenameClick={handleRenameClick}
+        onCopyNode={handleCopyNode}
+        onUndoNode={handleUndoNode}
+        onRedoNode={handleRedoNode}
+        onDeleteClick={handleDeleteClick}
+        stopGraphControlEvent={stopGraphControlEvent}
+      />
       <button
         type="button"
         onPointerDown={stopGraphControlEvent}
         onMouseDown={stopGraphControlEvent}
         onClick={handleAddClick}
-        className={menuButtonClassName}
+        className={CUSTOM_NODE_TOOLBAR_BUTTON_CLASS}
         title="Add to selection"
         aria-label="Add node to selection"
       >
@@ -747,32 +605,16 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       >
         <div className="flex items-center flex-1 mr-2">
           {isRenaming ? (
-            <form onSubmit={handleRenameSubmit} className="flex-1 relative z-50">
-              <input
-                ref={renameInputRef}
-                type="text"
-                value={newName}
-                onChange={(e) => {
-                  dispatchUi({ type: 'set-rename-name', name: e.target.value });
-                }}
-                onBlur={handleRenameCancel}
-                onKeyDown={handleRenameKeyDown}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                }}
-                className="nodrag nopan relative z-50 w-full rounded border border-blue-300 bg-white px-1 py-0.5 text-sm font-bold focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                style={{
-                  fontSize: '14px',
-                  lineHeight: '1.2',
-                }}
-              />
-            </form>
+            <CustomNodeRenameForm
+              inputRef={renameInputRef}
+              value={newName}
+              onValueChange={(name) => {
+                dispatchUi({ type: 'set-rename-name', name });
+              }}
+              onSubmit={handleRenameSubmit}
+              onCancel={handleRenameCancel}
+              onKeyDown={handleRenameKeyDown}
+            />
           ) : (
             <div
               className="font-bold text-sm leading-tight overflow-hidden"

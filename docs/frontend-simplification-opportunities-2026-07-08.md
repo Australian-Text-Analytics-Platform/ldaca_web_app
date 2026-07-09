@@ -235,7 +235,17 @@ Keep the current hook boundaries because graph, transform, management, and analy
 
 This can reduce boilerplate while preserving explicit per-mutation cache invalidation.
 
-### 10. Modularize `CustomNode` without changing its interaction model
+### ~~10. Modularize `CustomNode` without changing its interaction model~~
+
+Status 2026-07-09: Implemented. `CustomNode.tsx` now delegates the graph-wide
+toolbar singleton to `customNodeToolbarOwner.ts`, menu edge-avoidance math to
+`customNodeMenuPlacement.ts`, the settings dropdown to
+`CustomNodeActionMenu.tsx`, and the inline rename control to
+`CustomNodeRenameForm.tsx`. The interaction model remains the same: one
+visible hover toolbar across the graph, fixed-size React Flow toolbar controls,
+edge-aware menu anchoring, and rename inputs isolated from graph drag/select
+events. Added focused `computeMenuPlacement` tests alongside the existing
+`CustomNode` behavior tests.
 
 Evidence:
 
