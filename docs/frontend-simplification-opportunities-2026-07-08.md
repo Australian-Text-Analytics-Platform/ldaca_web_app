@@ -253,7 +253,17 @@ Extract around those ownership boundaries:
 
 Do not simplify away the singleton owner or placement logic unless Playwright/canvas checks prove the behavior remains intact.
 
-### 11. Trim unused `components/ui/sidebar.tsx` primitives if shadcn compatibility is not a goal
+### ~~11. Trim unused `components/ui/sidebar.tsx` primitives if shadcn compatibility is not a goal~~
+
+Status 2026-07-09:
+
+Implemented. `frontend/src/components/ui/sidebar.tsx` now exports only the
+sidebar primitives used by the app shell/sidebar code and tests:
+`Sidebar`, `SidebarContent`, `SidebarFooter`, `SidebarHeader`, `SidebarInset`,
+`SidebarMenu`, `SidebarMenuButton`, `SidebarMenuItem`, `SidebarProvider`,
+`SidebarRail`, `SidebarTrigger`, and `useSidebar`. The unused group/action,
+input, separator, badge, skeleton, and submenu primitives were removed, along
+with their unused `Input`, `Separator`, and `Skeleton` imports.
 
 Evidence:
 
