@@ -136,6 +136,13 @@ rescan should be added here before implementation.
       current `aiProviderModels` map instead of the old scalar `aiModel` tab
       setting.
 
+23. Centralize task-stream URL construction
+    - Done 2026-07-09. `useWorkspaceTaskStreamClient` now uses
+      `buildTaskStreamUrl`, typed against generated `StreamTasksData`, for the
+      native `EventSource` URL. The stream client still uses raw EventSource
+      because browsers cannot attach SDK headers there, but the endpoint path
+      and `token` query shape now come from one helper.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -146,6 +153,12 @@ fallback, and language sampling for stop-word/tokenizer recommendations.
 Live workspace-node identity is now `WorkspaceNodeInfo.id`. Keep `node_id` only
 where the backend contract explicitly uses that field, such as path params,
 request bodies, `AnalysisTabInput`, and detach-option/result DTOs.
+
+Raw frontend URL construction is limited to boundaries that need URL strings or
+external resources: health checks, document/file rendering, remote tutorial
+registry reads, OpenRouter model discovery, export blob downloads, and native
+EventSource task streaming. Backend export and task-stream URL builders are
+typed against generated endpoint contracts.
 
 ## Layers Checked And Not Recommended For Flattening
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TaskItem } from '@/stores/analysisStore';
-import { getApiBase } from '@/lib/backend/env';
+import { buildTaskStreamUrl } from './taskStreamUrl';
 
 export type TaskEventPayload =
   | { type: 'tasks_snapshot'; tasks?: TaskItem[]; timestamp?: number }
@@ -48,22 +48,6 @@ const STREAM_RETRY_MAX_MS = 30000;
 const clampRetryDelay = (attempt: number) => {
   const backoff = STREAM_RETRY_BASE_MS * Math.max(1, attempt);
   return Math.min(backoff, STREAM_RETRY_MAX_MS);
-};
-
-/**
- * Build the SSE stream URL, embedding the Bearer token as a query parameter
- * when present so that native EventSource (which cannot set custom headers)
- * can authenticate.
- * Used by: local callers in workspace/useWorkspaceTaskStreamClient module.
- * Flow: start from the backend stream endpoint, extract a Bearer token from auth headers, and append it as an encoded query parameter when present.
- */
-const buildStreamUrl = (authHeaders: Record<string, string>) => {
-  const base = `${getApiBase()}/tasks/stream`;
-  const authValue = authHeaders.Authorization ?? authHeaders.authorization;
-  if (!authValue) return base;
-  const token = authValue.startsWith('Bearer ') ? authValue.slice(7) : authValue;
-  if (!token) return base;
-  return `${base}?token=${encodeURIComponent(token)}`;
 };
 
 /**
@@ -189,7 +173,7 @@ export const useWorkspaceTaskStreamClient = (
       });
 
       try {
-        const url = buildStreamUrl(getAuthHeaders());
+        const url = buildTaskStreamUrl(getAuthHeaders());
         const source = new EventSource(url, { withCredentials: true });
         es = source;
 
