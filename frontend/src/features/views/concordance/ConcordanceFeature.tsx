@@ -22,6 +22,10 @@ import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysi
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import type { AnalysisTabInput } from '@/api';
+import {
+  DEFAULT_TAB_INPUT_SET_ID,
+  type AnalysisTabInputSets,
+} from '@/features/views/common/tabs/tabStateOps';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { useConcordanceTaskFlow } from './hooks/useConcordanceTaskFlow';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
@@ -63,16 +67,16 @@ interface ConcordanceFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
-  tabInputs?: AnalysisTabInput[];
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
+  tabInputSets?: AnalysisTabInputSets;
+  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 function ConcordanceFeature({
   tabId,
   tabTaskId,
   onTabTaskChange,
-  tabInputs,
-  onTabInputsChange,
+  tabInputSets,
+  onTabInputSetChange,
 }: ConcordanceFeatureProps = {}) {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
@@ -112,8 +116,8 @@ function ConcordanceFeature({
     getColumnInfos,
     nodeInfoCache,
   } = useTabNodeInputs({
-    tabInputs,
-    onTabInputsChange,
+    tabInputSets,
+    onTabInputSetChange,
     constraints: {
       allowedDataTypes: ['string'],
       maxNodes: 2,
@@ -150,7 +154,7 @@ function ConcordanceFeature({
   });
   /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
   const applyInputsFromSelections = (sels: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(nodeInputsFromSelections(sels));
+    onTabInputSetChange?.(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(sels));
   };
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
@@ -384,14 +388,7 @@ function ConcordanceFeature({
       const req = (requestPayload as Record<string, unknown> | undefined)?.data ?? requestPayload;
       if (!req || typeof req !== 'object') return;
       const reqObj = req as Record<string, unknown>;
-      const sels = concordanceParameters.applyHydratedRequest(reqObj);
-      // Legacy migration only: a tab that ran before the add-node-as-needed
-      // model has a task_id but no persisted inputs. Seed them once from the
-      // saved request. Tabs created under the new model already carry inputs,
-      // so we never clobber the user's curated selection here.
-      if (!tabInputs || tabInputs.length === 0) {
-        applyInputsFromSelections(sels);
-      }
+      concordanceParameters.applyHydratedRequest(reqObj);
       // Combined view is a client-only synthesis and is never persisted, so
       // hydrated tasks always restore to separated; the user can re-enter
       // combined via the toggle (which re-pages both nodes on demand).

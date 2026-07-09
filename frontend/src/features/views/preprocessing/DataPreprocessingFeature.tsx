@@ -6,6 +6,7 @@ import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspa
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { NodeSelectionRenderArgs } from '@/features/views/common/components/NodeSelectionList';
 import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
+import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import {
   preprocessingInputsKey,
   usePreprocessingInputsStore,
@@ -82,8 +83,8 @@ function DataPreprocessingFeature() {
   const isMultiNodeSubtab = activeSubtab === 'join' || activeSubtab === 'concat';
   const maxInputNodes = isMultiNodeSubtab ? 12 : 1;
   const nodeInputs = useTabNodeInputs({
-    tabInputs: persistedInputs,
-    onTabInputsChange: (inputs) => {
+    tabInputSets: { [DEFAULT_TAB_INPUT_SET_ID]: persistedInputs },
+    onTabInputSetChange: (_selectorId, inputs) => {
       if (!currentWorkspaceId) return;
       setPersistedInputs(currentWorkspaceId, activeSubtab, inputs);
     },

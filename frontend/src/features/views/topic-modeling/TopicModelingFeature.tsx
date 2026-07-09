@@ -16,7 +16,7 @@ import {
   executeAnalysisRerun,
 } from '../common';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
-import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
+import { useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
@@ -32,6 +32,7 @@ import {
 } from './hooks/useTopicModelingParameters';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTopicModelingResultControls } from './hooks/useTopicModelingResultControls';
+import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabStateOps';
 
 /** Renders the topic-modeling workflow for live BERTopic runs and result exploration. */
 /**
@@ -46,24 +47,24 @@ interface TopicModelingFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
-  tabInputs?: AnalysisTabInput[];
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
+  tabInputSets?: AnalysisTabInputSets;
+  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 function TopicModelingFeature({
   tabId,
   tabTaskId,
   onTabTaskChange,
-  tabInputs,
-  onTabInputsChange,
+  tabInputSets,
+  onTabInputSetChange,
 }: TopicModelingFeatureProps = {}) {
   const { currentWorkspaceId } = useWorkspaceData();
   const { setNodeColor: persistNodeColor } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const nodeInputs = useTabNodeInputs({
-    tabInputs,
-    onTabInputsChange,
+    tabInputSets,
+    onTabInputSetChange,
     constraints: {
       allowedDataTypes: ['string'],
       maxNodes: 2,
@@ -78,9 +79,6 @@ function TopicModelingFeature({
     .map((node) => getNodeIdentifier(node))
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
-  const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(nodeInputsFromSelections(selections));
-  };
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
     workspaceId: currentWorkspaceId,
@@ -216,14 +214,6 @@ function TopicModelingFeature({
       const raw = requestPayload as Record<string, unknown> | null;
       const req = (raw?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!req) return;
-      const nodeIds: string[] = Array.isArray(req.node_ids)
-        ? (req.node_ids as string[]).slice(0, 2)
-        : [];
-      const node_columns = (req.node_columns ?? {}) as Record<string, string>;
-      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] ?? '' }));
-      if (!tabInputs || tabInputs.length === 0) {
-        applyInputsFromSelections(sels);
-      }
       hydrateParameters(req);
     },
     // Clears topic-specific result and error state after the shared lifecycle deletes results.

@@ -27,7 +27,6 @@ import {
   reorderTabsInState,
   setActiveTabInState,
   setTabInputSetInState,
-  setTabInputsInState,
   setTabSettingInState,
   setTabTaskInState,
 } from './tabStateOps';
@@ -60,8 +59,6 @@ export interface UseWorkspaceTabsResult {
   reorderTabs: (orderedTabIds: string[]) => void;
   /** Wires a tab to a task id (or clears it with null). */
   setTabTask: (tabId: string, taskId: string | null) => void;
-  /** Replaces a tab's legacy source input node set. */
-  setTabInputs: (tabId: string, inputs: AnalysisTabInput[]) => void;
   /** Replaces one named input node set for multi-selector views. */
   setTabInputSet: (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** Persists one free-form per-view setting (string→string) on a tab. */
@@ -228,13 +225,6 @@ export function useWorkspaceTabs(
     [analysisType, readState, commit],
   );
 
-  const setTabInputs = useCallback(
-    (tabId: string, inputs: AnalysisTabInput[]) => {
-      commit(setTabInputsInState(readState(), analysisType, tabId, inputs));
-    },
-    [analysisType, readState, commit],
-  );
-
   const setTabInputSet = useCallback(
     (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => {
       commit(setTabInputSetInState(readState(), analysisType, tabId, selectorId, inputs));
@@ -259,7 +249,6 @@ export function useWorkspaceTabs(
     setActiveTab,
     reorderTabs,
     setTabTask,
-    setTabInputs,
     setTabInputSet,
     setTabSetting,
   };

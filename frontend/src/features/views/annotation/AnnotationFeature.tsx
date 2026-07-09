@@ -76,8 +76,6 @@ interface AnnotationFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
-  tabInputs?: AnalysisTabInput[];
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
   tabInputSets?: AnalysisTabInputSets;
   onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** This tab's persisted free-form settings (Manual/AI mode, provider, ...). */
@@ -165,8 +163,6 @@ function AnnotationColumnPicker({
  * class-description node when requested, and load/save editable class rows.
  */
 function AnnotationFeature({
-  tabInputs,
-  onTabInputsChange,
   tabInputSets,
   onTabInputSetChange,
   tabSettings,
@@ -263,8 +259,6 @@ function AnnotationFeature({
   // the request directly.
   const sourceNodeInputs = useTabNodeInputs({
     selectorId: DEFAULT_TAB_INPUT_SET_ID,
-    tabInputs,
-    onTabInputsChange,
     tabInputSets,
     onTabInputSetChange,
     constraints: SOURCE_NODE_CONSTRAINTS,
@@ -272,7 +266,6 @@ function AnnotationFeature({
   });
   const classNodeInputs = useTabNodeInputs({
     selectorId: CLASS_DESCRIPTION_SELECTOR_ID,
-    tabInputs,
     tabInputSets,
     onTabInputSetChange,
     constraints: CLASS_DESCRIPTION_NODE_CONSTRAINTS,
@@ -282,7 +275,6 @@ function AnnotationFeature({
   // input set so it round-trips with the rest of the tab state.
   const exampleNodeInputs = useTabNodeInputs({
     selectorId: EXAMPLE_NODE_SELECTOR_ID,
-    tabInputs,
     tabInputSets,
     onTabInputSetChange,
     constraints: EXAMPLE_NODE_CONSTRAINTS,

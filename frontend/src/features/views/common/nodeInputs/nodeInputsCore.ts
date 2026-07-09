@@ -11,7 +11,7 @@
  * Used by:
  * - ``useNodeInputs`` because the hook needs deterministic resolve/validate/
  *   default-column reducers before it commits changes to its backing store
- *   (tab inputs, the preprocessing inputs store, or local state).
+ *   (tab input sets, the preprocessing inputs store, or local state).
  */
 import {
   type ColumnInfo,
@@ -74,7 +74,7 @@ export type ColumnInfoGetter = (node: WorkspaceNodeLike) => ColumnInfo[] | undef
  * Converts feature-local node/column selections into the persisted tab input shape.
  * Called by: analysis feature hydration and handoff paths that receive
  * `{nodeId, column}` selections from task requests, token-frequency handoff,
- * or generated node lists before committing them through `onTabInputsChange`.
+ * or generated node lists before committing them through `onTabInputSetChange`.
  */
 export function nodeInputsFromSelections(selections: NodeSelectionInput[]): NodeInput[] {
   return selections

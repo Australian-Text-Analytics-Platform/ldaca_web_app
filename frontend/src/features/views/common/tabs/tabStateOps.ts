@@ -13,7 +13,7 @@ import type { AnalysisTab, AnalysisTabGroup, AnalysisTabInput, WorkspaceTabsStat
 
 /** Empty default returned when a workspace has no tabs sidecar yet. */
 export const EMPTY_TABS_STATE: WorkspaceTabsState = { groups: {} };
-/** Selector id mirrored to the legacy AnalysisTab.inputs field. */
+/** Default selector id for the primary source node set. */
 export const DEFAULT_TAB_INPUT_SET_ID = 'source';
 export type AnalysisTabInputSets = NonNullable<AnalysisTab['input_sets']>;
 
@@ -57,18 +57,15 @@ export function getTabs(
 /**
  * Reads one tab-owned selector value by id.
  * Called by: AnalysisTabsHost/useTabNodeInputs to support views with more than
- * one NodeInputsPanel while preserving old sidecars that only have ``inputs``.
- * Flow: prefer an explicit ``input_sets[selectorId]`` value, then fall back to
- * the legacy ``inputs`` array only for the default ``source`` selector.
+ * one NodeInputsPanel. Flow: read the explicit ``input_sets[selectorId]`` value
+ * and return an empty list when the current tab has no such selector.
  */
 export function getTabInputSet(
-  tab: Pick<AnalysisTab, 'inputs' | 'input_sets'> | null | undefined,
+  tab: Pick<AnalysisTab, 'input_sets'> | null | undefined,
   selectorId: string = DEFAULT_TAB_INPUT_SET_ID,
 ): AnalysisTabInput[] {
   const namedInputs = tab?.input_sets?.[selectorId];
-  if (namedInputs) return namedInputs;
-  if (selectorId === DEFAULT_TAB_INPUT_SET_ID) return tab?.inputs ?? [];
-  return [];
+  return namedInputs ?? [];
 }
 
 /**
@@ -141,7 +138,6 @@ export function createTabInState(
     tab_id: tabId,
     task_id: null,
     title,
-    inputs: [],
     input_sets: { [DEFAULT_TAB_INPUT_SET_ID]: [] },
     settings: {},
   };
@@ -273,10 +269,9 @@ export function setTabTaskInState(
 
 /**
  * Replaces one named input node set (the add-node-as-needed selection).
- * Called by: useWorkspaceTabs.setTabInputSet whenever a feature has more than
- * one node selector on the same tab. The default ``source`` selector is also
- * mirrored to ``inputs`` so legacy single-selector features and old sidecar
- * readers keep seeing the same selection.
+ * Called by: useWorkspaceTabs.setTabInputSet whenever a feature changes a
+ * selector. Single-selector features use the default ``source`` set; multi-
+ * selector features add their own ids alongside it.
  */
 export function setTabInputSetInState(
   state: WorkspaceTabsState | null | undefined,
@@ -292,28 +287,9 @@ export function setTabInputSetInState(
       ...(t.input_sets ?? {}),
       [selectorId]: inputs,
     };
-    return selectorId === DEFAULT_TAB_INPUT_SET_ID
-      ? { ...t, inputs, input_sets }
-      : { ...t, input_sets };
+    return { ...t, input_sets };
   });
   return withGroup(state, analysisType, { ...group, tabs: nextTabs });
-}
-
-/**
- * Replaces a tab's legacy source input node set.
- * Called by: useWorkspaceTabs.setTabInputs whenever the user adds, removes,
- * clears, or re-columns a node in an analysis tab, and during one-time
- * hydration migration when a run-tab's inputs are derived from its task
- * request. Delegates to the named selector reducer so ``inputs`` and
- * ``input_sets.source`` stay in sync.
- */
-export function setTabInputsInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  tabId: string,
-  inputs: AnalysisTabInput[],
-): WorkspaceTabsState {
-  return setTabInputSetInState(state, analysisType, tabId, DEFAULT_TAB_INPUT_SET_ID, inputs);
 }
 
 /**

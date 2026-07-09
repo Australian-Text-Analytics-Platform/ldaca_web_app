@@ -14,7 +14,7 @@ import {
 } from './nodeInputsCore';
 
 export interface UseNodeInputsConfig {
-  /** The persisted/owned input list (tab inputs, store slice, or local state). */
+  /** The persisted/owned input list (tab input set, store slice, or local state). */
   value: NodeInput[];
   /** Commit a new input list to the backing store. */
   onChange: (next: NodeInput[]) => void;
@@ -55,10 +55,9 @@ export interface UseNodeInputsResult {
  * Backing-agnostic node-selection hook for the add-node-as-needed model.
  *
  * Owns no storage of its own: callers pass ``value``/``onChange`` bound to
- * whatever persists the inputs — an analysis tab's ``inputs`` (backend
- * tabs.json via useWorkspaceTabs), the preprocessing inputs store
- * (frontend-persisted), or plain ``useState`` (annotation class descriptions,
- * in-memory). This
+ * whatever persists the inputs — an analysis tab input set (backend tabs.json
+ * via useWorkspaceTabs), the preprocessing inputs store (frontend-persisted),
+ * or plain ``useState`` (annotation class descriptions, in-memory). This
  * keeps every view on one selection contract while letting persistence differ.
  *
  * Used by: all analysis ``*Feature`` components and preprocessing subtab hooks

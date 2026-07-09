@@ -7,7 +7,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest, useLastRunRequest } from '../common';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
-import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
+import { useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
@@ -36,6 +36,7 @@ import {
   usePersistNodeDocumentColumn,
   usePersistNodeTokenizationPreference,
 } from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
+import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabStateOps';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
@@ -54,16 +55,16 @@ interface TokenFrequencyFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
-  tabInputs?: AnalysisTabInput[];
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
+  tabInputSets?: AnalysisTabInputSets;
+  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 const TokenFrequencyFeature = ({
   tabId,
   tabTaskId,
   onTabTaskChange,
-  tabInputs,
-  onTabInputsChange,
+  tabInputSets,
+  onTabInputSetChange,
 }: TokenFrequencyFeatureProps = {}) => {
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
@@ -75,8 +76,8 @@ const TokenFrequencyFeature = ({
   const { currentWorkspace } = useWorkspaceData();
   const currentWorkspaceId = currentWorkspace?.id ?? null;
   const nodeInputs = useTabNodeInputs({
-    tabInputs,
-    onTabInputsChange,
+    tabInputSets,
+    onTabInputSetChange,
     constraints: {
       allowedDataTypes: ['string'],
       docTypeOnly: true,
@@ -86,9 +87,6 @@ const TokenFrequencyFeature = ({
   const nodeColumnSelections = nodeInputs.nodeColumnSelections;
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
-  const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(nodeInputsFromSelections(selections));
-  };
   const { selectNodes, setNodeColor: persistNodeColor } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
@@ -191,10 +189,7 @@ const TokenFrequencyFeature = ({
     onHydratedResult: (result) => {
       if (!result) return;
       const requestData = result.analysis_params ?? {};
-      const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
-      if (!tabInputs || tabInputs.length === 0) {
-        applyInputsFromSelections(selections);
-      }
+      const { nodeIds } = parseAnalysisNodeRequest(requestData, 2);
       setLastCompareNodeIds(nodeIds);
       setStudyNodeId(nodeIds[1] ?? null);
       applyTokenLimitState(
@@ -219,12 +214,6 @@ const TokenFrequencyFeature = ({
       const nodeIds: string[] = Array.isArray(reqObj.node_ids)
         ? (reqObj.node_ids as string[]).slice(0, 2)
         : [];
-      const node_columns: Record<string, string> =
-        (reqObj.node_columns as Record<string, string> | undefined) ?? {};
-      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] ?? '' }));
-      if (!tabInputs || tabInputs.length === 0) {
-        applyInputsFromSelections(sels);
-      }
       setStudyNodeId(nodeIds[1] ?? null);
     },
     /** Clears local result and selection state when the feature reset action runs. */

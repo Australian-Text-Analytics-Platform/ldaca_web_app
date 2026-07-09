@@ -26,7 +26,6 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
 import type { AnalysisTabInputSets } from './tabStateOps';
-import { DEFAULT_TAB_INPUT_SET_ID, getTabInputSet } from './tabStateOps';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 
 /**
@@ -37,10 +36,6 @@ interface AnalysisTabFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
-  /** This tab's owned input node set (add-node-as-needed selection). */
-  tabInputs?: AnalysisTabInput[];
-  /** Commit a new input node set for this tab (persists to tabs.json). */
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
   /** All named input node sets owned by this tab. */
   tabInputSets?: AnalysisTabInputSets;
   /** Commit one named input node set for this tab (persists to tabs.json). */
@@ -80,7 +75,6 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     setActiveTab,
     reorderTabs,
     setTabTask,
-    setTabInputs,
     setTabInputSet,
     setTabSetting,
   } = useWorkspaceTabs(currentWorkspaceId, tabGroup, getAuthHeaders);
@@ -129,10 +123,6 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
           tabTaskId={activeTab.task_id ?? null}
           onTabTaskChange={(taskId) => {
             setTabTask(activeTab.tab_id, taskId);
-          }}
-          tabInputs={getTabInputSet(activeTab, DEFAULT_TAB_INPUT_SET_ID)}
-          onTabInputsChange={(inputs) => {
-            setTabInputs(activeTab.tab_id, inputs);
           }}
           tabInputSets={activeTab.input_sets ?? {}}
           onTabInputSetChange={(selectorId, inputs) => {

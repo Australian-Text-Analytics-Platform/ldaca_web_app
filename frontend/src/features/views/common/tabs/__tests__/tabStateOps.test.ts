@@ -13,7 +13,6 @@ import {
   reorderTabsInState,
   setActiveTabInState,
   setTabInputSetInState,
-  setTabInputsInState,
   setTabSettingInState,
   setTabTaskInState,
 } from '../tabStateOps';
@@ -107,41 +106,43 @@ describe('tabStateOps', () => {
     expect(getTabs(state, TYPE)[0]!.task_id).toBeNull();
   });
 
-  it('creates new tabs without copying an existing tab task or inputs', () => {
+  it('creates new tabs without copying an existing tab task or input sets', () => {
     let state = createTabInState(null, TYPE, 'A', 'a').state;
     state = setTabTaskInState(state, TYPE, 'a', 'task-123');
-    state = setTabInputsInState(state, TYPE, 'a', [{ node_id: 'node-1', column: 'text' }]);
+    state = setTabInputSetInState(state, TYPE, 'a', 'source', [
+      { node_id: 'node-1', column: 'text' },
+    ]);
 
     state = createTabInState(state, TYPE, 'B', 'b').state;
 
     expect(getTabs(state, TYPE)[0]).toMatchObject({
       tab_id: 'a',
       task_id: 'task-123',
-      inputs: [{ node_id: 'node-1', column: 'text' }],
+      input_sets: { source: [{ node_id: 'node-1', column: 'text' }] },
     });
     expect(getTabs(state, TYPE)[1]).toMatchObject({
       tab_id: 'b',
       task_id: null,
-      inputs: [],
+      input_sets: { source: [] },
     });
     expect(getActiveTabId(state, TYPE)).toBe('b');
   });
 
-  it('stores multiple named input sets while keeping legacy inputs as the source selector', () => {
+  it('stores multiple named input sets without mirroring source inputs', () => {
     let state = createTabInState(null, TYPE, 'A', 'a').state;
     const sourceInputs = [{ node_id: 'source-node', column: 'text' }];
     const classInputs = [{ node_id: 'class-node', column: 'class' }];
 
-    state = setTabInputsInState(state, TYPE, 'a', sourceInputs);
+    state = setTabInputSetInState(state, TYPE, 'a', 'source', sourceInputs);
     state = setTabInputSetInState(state, TYPE, 'a', 'classDescriptions', classInputs);
 
     expect(getTabs(state, TYPE)[0]).toMatchObject({
-      inputs: sourceInputs,
       input_sets: {
         source: sourceInputs,
         classDescriptions: classInputs,
       },
     });
+    expect(getTabs(state, TYPE)[0]?.inputs).toBeUndefined();
   });
 
   it('initializes a new tab with an empty settings map', () => {
@@ -179,24 +180,17 @@ describe('tabStateOps', () => {
     expect(getTabs(next, TYPE)[0]?.settings).toEqual({});
   });
 
-  it('resolves named input sets with a legacy source fallback', () => {
-    const legacyTab = {
-      tab_id: 'legacy',
-      task_id: null,
-      title: 'Legacy',
-      inputs: [{ node_id: 'source-node', column: 'text' }],
-    };
+  it('resolves only named input sets', () => {
     const namedTab = {
-      ...legacyTab,
+      tab_id: 'named',
+      task_id: null,
+      title: 'Named',
       input_sets: {
         source: [{ node_id: 'named-source-node', column: 'text' }],
         classDescriptions: [{ node_id: 'class-node', column: 'class' }],
       },
     };
 
-    expect(getTabInputSet(legacyTab, 'source')).toEqual([
-      { node_id: 'source-node', column: 'text' },
-    ]);
     expect(getTabInputSet(namedTab, 'source')).toEqual([
       { node_id: 'named-source-node', column: 'text' },
     ]);

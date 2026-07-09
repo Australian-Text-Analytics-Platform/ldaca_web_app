@@ -11,34 +11,8 @@ Completed work is removed from the open TODO list and recorded in `Done`.
 
 ## Open TODOs
 
-### 22. Remove remaining legacy analysis payload adapters
-
-Confidence: Lower, migration-dependent
-
-Progress:
-
-- Removed one legacy detach adapter on 2026-07-09. Concordance,
-  concordance-dispersion, and quotation detach requests now require explicit
-  non-empty `selected_columns`; frontend task-flow handlers always submit the
-  dialog selection and reject empty direct calls before hitting the backend; and
-  backend workers no longer interpret omitted generated-column selections as
-  "keep all generated columns."
-
-Remaining evidence:
-
-- Quotation hydration still accepts both `node_id` and `nodeId`, and reads
-  nested or flat engine settings.
-- Sequential Analysis hydration still accepts both `node_id` and `nodeId`.
-- Task utilities still expand legacy task labels such as `token-frequency`.
-- `tabStateOps` still mirrors the default `input_sets.source` value to legacy
-  `AnalysisTab.inputs`.
-
-Recommendation:
-
-If old persisted sidecars/tasks no longer need to hydrate, remove the
-compatibility paths and keep only the current generated request/tab shapes. If
-old workspaces must keep loading, document the compatibility boundary
-explicitly so it does not spread into unrelated live-node helpers.
+No open TODOs remain from this scan. New findings from the follow-up endpoint
+rescan should be added here before implementation.
 
 ## Done
 
@@ -152,6 +126,16 @@ explicitly so it does not spread into unrelated live-node helpers.
       typed against generated export path/query types, while preserving raw
       browser/Tauri blob streaming.
 
+22. Remove remaining legacy analysis payload adapters
+    - Done 2026-07-09. Removed frontend reads/writes of the legacy
+      `AnalysisTab.inputs` mirror, switched all tab-mounted analysis features to
+      named `input_sets`, removed task-type alias expansion, removed quotation
+      `nodeId`/flat-engine hydration fallbacks, removed Sequential Analysis
+      `nodeId` comparison fallback, removed concordance `num_tokens_left/right`
+      request fallbacks, and made Annotation AI provider models depend on the
+      current `aiProviderModels` map instead of the old scalar `aiModel` tab
+      setting.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -161,17 +145,16 @@ fallback, and language sampling for stop-word/tokenizer recommendations.
 
 Live workspace-node identity is now `WorkspaceNodeInfo.id`. Keep `node_id` only
 where the backend contract explicitly uses that field, such as path params,
-request bodies, `AnalysisTabInput`, detach-option/result DTOs, and item 22's
-persisted analysis payload adapters.
+request bodies, `AnalysisTabInput`, and detach-option/result DTOs.
 
 ## Layers Checked And Not Recommended For Flattening
 
 - `WorkspaceProvider` slice contexts: the data/selection/status/action split is
   a real identity boundary for frequent consumers. Removing it would likely
   increase rerenders and coupling.
-- `useWorkspaceTabs` and `tabStateOps`: this is real sidecar persistence,
-  legacy input mirroring, and optimistic read-modify-write logic. Keep it until
-  item 22 decides the legacy `inputs` mirror can be removed.
+- `useWorkspaceTabs` and `tabStateOps`: this is real sidecar persistence and
+  optimistic read-modify-write logic. The legacy `inputs` mirror has been
+  removed; named `input_sets` are now the tab input source of truth.
 - `useAnalysisFeature`: this is shared task hydration, clear/stop handling,
   tab-owned task id resolution, and task banner state. It is not an unnecessary
   wrapper.

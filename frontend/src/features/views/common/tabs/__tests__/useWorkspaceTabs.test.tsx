@@ -27,8 +27,8 @@ function initialState(): WorkspaceTabsState {
       [ANALYSIS_TYPE]: {
         active_tab_id: 'tab-with-task',
         tabs: [
-          { tab_id: 'tab-with-task', task_id: 'task-1', title: 'A', inputs: [] },
-          { tab_id: 'tab-no-task', task_id: null, title: 'B', inputs: [] },
+          { tab_id: 'tab-with-task', task_id: 'task-1', title: 'A', input_sets: { source: [] } },
+          { tab_id: 'tab-no-task', task_id: null, title: 'B', input_sets: { source: [] } },
         ],
       },
     },

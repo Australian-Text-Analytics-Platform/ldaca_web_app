@@ -14,6 +14,11 @@ import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+const openRouterAiSettings = {
+  annotationMode: 'ai',
+  aiProvider: 'openrouter',
+  aiProviderModels: JSON.stringify({ openrouter: 'gpt-4o' }),
+};
 
 const mocks = vi.hoisted(() => ({
   createAnnotationClassDescriptions: vi.fn(),
@@ -266,8 +271,6 @@ function renderAnnotationFeature(props: Partial<ComponentProps<typeof Annotation
   return render(
     <QueryClientProvider client={queryClient}>
       <AnnotationFeature
-        tabInputs={[{ node_id: 'source-node', column: 'text' }]}
-        onTabInputsChange={vi.fn()}
         tabInputSets={{
           source: [{ node_id: 'source-node', column: 'text' }],
           classDescriptions: [{ node_id: 'classes-node', column: 'class' }],
@@ -914,7 +917,7 @@ describe('AnnotationFeature', () => {
     });
     // Start directly in AI mode with a model already chosen (persisted setting).
     renderAnnotationFeature({
-      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+      tabSettings: openRouterAiSettings,
     });
 
     await user.click(screen.getByRole('button', { name: 'Preview' }));
@@ -959,7 +962,7 @@ describe('AnnotationFeature', () => {
       annotationAiCustomProviders: [],
     });
     renderAnnotationFeature({
-      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+      tabSettings: openRouterAiSettings,
     });
 
     await user.click(screen.getByRole('button', { name: 'Preview' }));
@@ -998,7 +1001,7 @@ describe('AnnotationFeature', () => {
     mocks.getAnnotationClassDescriptions.mockResolvedValue({
       data: { class_column: 'class', description_column: 'description', rows: [] },
     });
-    renderAnnotationFeature({ tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' } });
+    renderAnnotationFeature({ tabSettings: openRouterAiSettings });
 
     const previewButton = await screen.findByRole('button', { name: 'Preview' });
     // Stays disabled after the class-count query settles on an empty list.
@@ -1013,7 +1016,7 @@ describe('AnnotationFeature', () => {
     // The default class mock returns one class ("support"), so the same runnable
     // config that was gated above now enables Preview once the query resolves.
     renderAnnotationFeature({
-      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+      tabSettings: openRouterAiSettings,
     });
 
     const previewButton = await screen.findByRole('button', { name: 'Preview' });
@@ -1027,7 +1030,7 @@ describe('AnnotationFeature', () => {
       annotationAiCustomProviders: [],
     });
     renderAnnotationFeature({
-      tabSettings: { annotationMode: 'ai', aiProvider: 'openrouter', aiModel: 'gpt-4o' },
+      tabSettings: openRouterAiSettings,
     });
 
     await user.click(screen.getByRole('button', { name: 'Preview' }));
@@ -1111,7 +1114,6 @@ describe('AnnotationFeature', () => {
       tabSettings: {
         annotationMode: 'ai',
         aiProvider: providerId,
-        aiModel: 'gpt-4o-mini',
         aiProviderModels: JSON.stringify({ [providerId]: 'gpt-4o-mini' }),
         aiPrompt: 'Classify the stance.',
       },
@@ -1138,11 +1140,10 @@ describe('AnnotationFeature', () => {
     await user.click(screen.getByRole('switch', { name: 'Toggle AI annotation mode' }));
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
 
-    // Choosing a provider card persists both the card id and its model immediately.
+    // Choosing a provider card persists the card id immediately.
     await user.click(screen.getByRole('button', { name: 'Provider' }));
     await user.click(screen.getByText('Anthropic'));
     expect(onTabSettingChange).toHaveBeenCalledWith('aiProvider', providerId);
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiModel', '');
   });
 
   it('commits provider models on save and prompt on blur', async () => {
@@ -1157,7 +1158,6 @@ describe('AnnotationFeature', () => {
     await user.type(screen.getByLabelText('API key'), 'sk-secret');
     await user.type(screen.getByLabelText('Model'), 'gpt-custom');
     await user.click(screen.getByRole('button', { name: 'Save provider' }));
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiModel', 'gpt-custom');
     expect(onTabSettingChange).toHaveBeenCalledWith(
       'aiProviderModels',
       expect.stringContaining('gpt-custom'),
@@ -1176,7 +1176,6 @@ describe('AnnotationFeature', () => {
     renderAnnotationFeature({
       tabSettings: {
         annotationMode: 'ai',
-        aiModel: 'gpt-4o',
         aiTemperature: '0.8',
         aiReasoningEnabled: 'true',
         aiReasoningEffort: 'high',
@@ -1194,7 +1193,7 @@ describe('AnnotationFeature', () => {
     const user = userEvent.setup();
     const onTabSettingChange = vi.fn();
     renderAnnotationFeature({
-      tabSettings: { annotationMode: 'ai', aiModel: 'gpt-4o' },
+      tabSettings: openRouterAiSettings,
       onTabSettingChange,
     });
 

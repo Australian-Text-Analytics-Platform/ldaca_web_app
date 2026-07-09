@@ -51,8 +51,7 @@ export const createConcordanceParameterState = (): ConcordanceParameterState => 
  * Normalizes a saved concordance request's params for diffing against live form
  * values.
  * Used by: ConcordanceFeature when deciding whether the primary action is Run,
- * Re-run, or up to date. Legacy left/right token names are still accepted
- * because older persisted tasks can carry them.
+ * Re-run, or up to date.
  */
 export function readConcordanceServerParams(
   request: Record<string, unknown>,
@@ -60,18 +59,8 @@ export function readConcordanceServerParams(
   const regex = typeof request.regex === 'boolean' ? request.regex : false;
   return {
     search_word: typeof request.search_word === 'string' ? request.search_word : '',
-    num_left_tokens:
-      typeof request.num_left_tokens === 'number'
-        ? request.num_left_tokens
-        : typeof request.num_tokens_left === 'number'
-          ? request.num_tokens_left
-          : 5,
-    num_right_tokens:
-      typeof request.num_right_tokens === 'number'
-        ? request.num_right_tokens
-        : typeof request.num_tokens_right === 'number'
-          ? request.num_tokens_right
-          : 5,
+    num_left_tokens: typeof request.num_left_tokens === 'number' ? request.num_left_tokens : 5,
+    num_right_tokens: typeof request.num_right_tokens === 'number' ? request.num_right_tokens : 5,
     regex,
     whole_word: regex ? false : typeof request.whole_word === 'boolean' ? request.whole_word : true,
     case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : false,

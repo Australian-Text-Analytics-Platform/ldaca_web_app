@@ -70,7 +70,7 @@ export interface AnalysisNodeRequestShape {
 
 /**
  * Extracts the node/column selection shape shared by multi-node analysis task
- * requests so hydration and legacy tab-input migration can reuse one parser.
+ * requests so hydration and cross-feature handoffs can reuse one parser.
  * Used by: analysis hydration because backend requests store node_ids and node_columns that must become ordered selections.
  * Flow: slice valid node_ids to the requested limit, read the node_columns map, then return node ids, column lookup, and ordered selections.
  */

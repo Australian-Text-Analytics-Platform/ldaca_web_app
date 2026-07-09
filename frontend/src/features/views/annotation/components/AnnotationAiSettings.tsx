@@ -43,7 +43,7 @@ interface AnnotationAiSettingsProps {
   onSaveProvider: (config: AnnotationProviderConfigSave) => void;
   /** Delete one configured provider card and clear any selected reference to it. */
   onDeleteProvider: (providerId: AnnotationAiProviderId) => void;
-  /** Selected model, used only as a legacy fallback for older tab settings. */
+  /** Current model for the selected provider card. */
   model: string;
   disabled?: boolean;
   /** Optional example-node selector, supplied by the parent feature. */

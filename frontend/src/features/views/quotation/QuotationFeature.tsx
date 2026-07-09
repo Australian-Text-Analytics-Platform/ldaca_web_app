@@ -25,7 +25,7 @@ import {
   executeAnalysisRerun,
 } from '../common';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
-import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
+import { useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
@@ -45,6 +45,7 @@ import { QuotationResultsPanel } from './components/QuotationResultsPanel';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
+import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabStateOps';
 
 /** Renders the quotation extraction workflow, including live runs and result materialisation. */
 /**
@@ -59,8 +60,8 @@ interface QuotationFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
-  tabInputs?: AnalysisTabInput[];
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
+  tabInputSets?: AnalysisTabInputSets;
+  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 /**
@@ -84,8 +85,8 @@ function QuotationFeature({
   tabId,
   tabTaskId,
   onTabTaskChange,
-  tabInputs,
-  onTabInputsChange,
+  tabInputSets,
+  onTabInputSetChange,
 }: QuotationFeatureProps = {}) {
   const { handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } =
     useWorkspaceSelection();
@@ -95,8 +96,8 @@ function QuotationFeature({
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'quotation';
   const nodeInputs = useTabNodeInputs({
-    tabInputs,
-    onTabInputsChange,
+    tabInputSets,
+    onTabInputSetChange,
     constraints: {
       allowedDataTypes: ['string'],
       maxNodes: 1,
@@ -107,9 +108,6 @@ function QuotationFeature({
   const setNodeColumnSelection = nodeInputs.setColumn;
   const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const activeSelections = nodeColumnSelections;
-  const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(nodeInputsFromSelections(selections));
-  };
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.quotation,
     workspaceId: currentWorkspaceId,
@@ -266,22 +264,15 @@ function QuotationFeature({
       updateResultState(nodeId, column, res);
       setHasLoaded(true);
     },
-    // Restores saved request settings, materialization metadata, and legacy tab inputs after reload.
-    // Called by: useAnalysisFeature hydration because quotation restores must reapply engine settings, selected node/column, materialized path, and context length before rendering results. Flow: unwrap request data, normalize remote engine state, restore selection/materialization, then seed inputs once when a pre-input tab is loaded.
+    // Restores saved request settings and materialization metadata after reload.
+    // Called by: useAnalysisFeature hydration because quotation restores must reapply engine settings, materialized path, and context length before rendering results. Flow: unwrap request data, normalize remote engine state, then restore materialization metadata.
     onHydratedRequest: (requestPayload) => {
       const requestData = ((requestPayload as Record<string, unknown>).data ??
         requestPayload) as Record<string, unknown> | null;
       if (!requestData) return;
-      // legacy node_id/nodeId fields are unknown strings; '' must fall through to the next source
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      const nodeId = (requestData.node_id || requestData.nodeId || '') as string;
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      const column = (requestData.column || '') as string;
+      const nodeId = typeof requestData.node_id === 'string' ? requestData.node_id : '';
       if (!nodeId) return;
       hydrateEngineConfig((requestData.engine as QuotationEngineConfig | null) ?? null);
-      if (!tabInputs || tabInputs.length === 0) {
-        applyInputsFromSelections([{ nodeId, column }]);
-      }
       setSelectedMetadataColumns([]);
       applyMaterializedRequest(
         nodeId,
@@ -322,31 +313,28 @@ function QuotationFeature({
 
   const lastRunRequest = serverRequest ?? null;
   const currentQuotationParams = {
-    engine_type: resolvedEnginePayload.type,
-    engine_url:
+    type: resolvedEnginePayload.type,
+    url:
       resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
         ? resolvedEnginePayload.normalizedUrl
         : null,
   };
   const quotationServerParams = (request: Record<string, unknown>) => {
-    const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(
+    const serverEngine = getServerEngineConfig(
       request,
       (url) => normalizeRemoteUrl(url).normalized,
     );
     return {
-      engine_type: serverEngineType,
+      type: serverEngine.type,
       // an empty remote engine URL should resolve to null
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      engine_url: serverEngineType === 'remote' ? serverEngineUrl || null : null,
+      url: serverEngine.type === 'remote' ? serverEngine.url || null : null,
     };
   };
-  const serverNodeId = lastRunRequest
-    ? // legacy node_id/nodeId fields are unknown strings; '' must fall through to the next source
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      ((lastRunRequest.node_id || lastRunRequest.nodeId || '') as string)
-    : '';
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const serverColumn = lastRunRequest ? ((lastRunRequest.column || '') as string) : '';
+  const serverNodeId =
+    lastRunRequest && typeof lastRunRequest.node_id === 'string' ? lastRunRequest.node_id : '';
+  const serverColumn =
+    lastRunRequest && typeof lastRunRequest.column === 'string' ? lastRunRequest.column : '';
   const hasLastRun = Boolean(lastRunRequest);
   const hasParamsChanged = !lastRunRequest
     ? true

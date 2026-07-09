@@ -28,14 +28,14 @@ const tab: AnalysisTab = {
   tab_id: 'tab-1',
   task_id: null,
   title: 'Analysis 1',
-  inputs: [],
+  input_sets: { source: [] },
 };
 
 const secondTab: AnalysisTab = {
   tab_id: 'tab-2',
   task_id: 'task-2',
   title: 'Analysis 2',
-  inputs: [],
+  input_sets: { source: [] },
 };
 
 function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspaceTabsResult {
@@ -49,7 +49,6 @@ function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspac
     setActiveTab: vi.fn(),
     reorderTabs: vi.fn(),
     setTabTask: vi.fn(),
-    setTabInputs: vi.fn(),
     setTabInputSet: vi.fn(),
     setTabSetting: vi.fn(),
     ...overrides,

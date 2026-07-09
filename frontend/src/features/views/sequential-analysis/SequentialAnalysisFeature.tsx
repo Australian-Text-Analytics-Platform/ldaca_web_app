@@ -41,6 +41,10 @@ import { SequentialAnalysisParameterPanel } from './components/panels/Sequential
 import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import { downloadChartAs, findSvgInContainer, type ChartImageFormat } from '@/lib/chartExport';
+import {
+  DEFAULT_TAB_INPUT_SET_ID,
+  type AnalysisTabInputSets,
+} from '@/features/views/common/tabs/tabStateOps';
 
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
@@ -58,16 +62,16 @@ interface SequentialAnalysisFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
-  tabInputs?: AnalysisTabInput[];
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
+  tabInputSets?: AnalysisTabInputSets;
+  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 const SequentialAnalysisFeature = ({
   tabId,
   tabTaskId,
   onTabTaskChange,
-  tabInputs,
-  onTabInputsChange,
+  tabInputSets,
+  onTabInputSetChange,
 }: SequentialAnalysisFeatureProps = {}) => {
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -77,8 +81,8 @@ const SequentialAnalysisFeature = ({
 
   const { getAuthHeaders } = useAuth();
   const nodeInputs = useTabNodeInputs({
-    tabInputs,
-    onTabInputsChange,
+    tabInputSets,
+    onTabInputSetChange,
     constraints: {
       allowedDataTypes: [...TIME_COMPATIBLE_TYPES],
       maxNodes: 1,
@@ -98,7 +102,7 @@ const SequentialAnalysisFeature = ({
       : undefined;
   })();
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputsChange?.(nodeInputsFromSelections(selections));
+    onTabInputSetChange?.(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.sequential,
@@ -248,12 +252,6 @@ const SequentialAnalysisFeature = ({
       try {
         const hydrated = sequentialParameters.applyHydratedRequest(req);
         const nodeIdStr = hydrated.nodeId;
-        const reqTimeColumn = hydrated.state.timeColumn;
-        if (nodeIdStr && reqTimeColumn) {
-          if (!tabInputs || tabInputs.length === 0) {
-            applyInputsFromSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
-          }
-        }
         hydratedParamsRef.current = hydrated.hydratedParams;
         if (nodeIdStr && currentWorkspaceId) {
           const info = await fetchNodeInfo({
@@ -349,9 +347,8 @@ const SequentialAnalysisFeature = ({
   } = deriveSequentialParameterValues(sequentialParameters, derivedColumnType);
 
   const lastRunRequest = serverRequest ?? null;
-  const serverNodeId = lastRunRequest
-    ? ((lastRunRequest.node_id ?? lastRunRequest.nodeId ?? '') as string)
-    : '';
+  const serverNodeId =
+    lastRunRequest && typeof lastRunRequest.node_id === 'string' ? lastRunRequest.node_id : '';
   const serverColumn = lastRunRequest ? ((lastRunRequest.time_column ?? '') as string) : '';
   const hasLastRun = Boolean(lastRunRequest);
   const hasParamsChanged = !lastRunRequest

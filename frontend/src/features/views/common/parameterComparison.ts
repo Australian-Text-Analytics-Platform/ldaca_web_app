@@ -49,10 +49,7 @@ export interface ServerEngineConfig {
   url: string | null;
 }
 
-/**
- * Reads engine settings from both nested and legacy flat request payloads so
- * quotation panels can compare current local/remote settings to the last run.
- */
+/** Reads nested engine settings from current quotation request payloads. */
 export const getServerEngineConfig = (
   request: ServerRequestLike,
   normalizeUrl?: (url: string) => string,
@@ -67,23 +64,13 @@ export const getServerEngineConfig = (
     requestEngineRecord && typeof requestEngineRecord.type === 'string'
       ? requestEngineRecord.type
       : null;
-  const typeFromRoot =
-    typeof (request as { engine_type?: unknown }).engine_type === 'string'
-      ? (request as { engine_type: string }).engine_type
-      : null;
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string engine type should fall through to the next source
-  const type = (typeFromEngine || typeFromRoot || 'local') === 'remote' ? 'remote' : 'local';
+  const type = typeFromEngine === 'remote' ? 'remote' : 'local';
 
   const urlFromEngine =
     requestEngineRecord && typeof requestEngineRecord.url === 'string'
       ? requestEngineRecord.url
       : null;
-  const urlFromRoot =
-    typeof (request as { engine_url?: unknown }).engine_url === 'string'
-      ? (request as { engine_url: string }).engine_url
-      : null;
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string engine url should fall through to the next source
-  const rawUrl = urlFromEngine || urlFromRoot;
+  const rawUrl = urlFromEngine;
 
   if (type !== 'remote' || !rawUrl) {
     return { type, url: null };

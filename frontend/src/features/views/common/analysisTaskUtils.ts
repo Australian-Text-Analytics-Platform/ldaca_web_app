@@ -1,30 +1,10 @@
 import type { TaskItem } from '@/stores/analysisStore';
-import { ANALYSIS_TASK_TYPES } from './analysisIds';
 
-const CANONICAL_TASK_TYPE_MAP = {
-  [ANALYSIS_TASK_TYPES.topicModeling]: ANALYSIS_TASK_TYPES.topicModeling,
-  [ANALYSIS_TASK_TYPES.tokenFrequencies]: ANALYSIS_TASK_TYPES.tokenFrequencies,
-  'token-frequency': ANALYSIS_TASK_TYPES.tokenFrequencies,
-  [ANALYSIS_TASK_TYPES.sequential]: ANALYSIS_TASK_TYPES.sequential,
-  [ANALYSIS_TASK_TYPES.concordance]: ANALYSIS_TASK_TYPES.concordance,
-  [ANALYSIS_TASK_TYPES.quotation]: ANALYSIS_TASK_TYPES.quotation,
-} as const;
-
-/** Called by: getTaskTypeCandidates when expanding legacy task labels because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-const normalizeTaskTypeKey = (taskType: string): string => {
-  const normalized = taskType.trim();
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- arbitrary string cast to keyof can index to undefined at runtime (no noUncheckedIndexedAccess)
-  return CANONICAL_TASK_TYPE_MAP[normalized as keyof typeof CANONICAL_TASK_TYPE_MAP] ?? normalized;
-};
-
-/** Returns all task-type aliases a UI feature should watch for one logical analysis. */
+/** Returns the canonical task type a UI feature should watch. */
 /** Used by: src/features/views/common/tasks/policies.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts, src/hooks/useAnalysisTaskStatus.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
 export const getTaskTypeCandidates = (taskType: string): string[] => {
-  const canonical = normalizeTaskTypeKey(taskType);
-  const aliases = Object.entries(CANONICAL_TASK_TYPE_MAP)
-    .filter(([, value]) => value === canonical)
-    .map(([key]) => key);
-  return Array.from(new Set([canonical, ...aliases]));
+  const normalized = taskType.trim();
+  return normalized ? [normalized] : [];
 };
 
 /** Builds a stable key for deduping repeated task-state events from task streams. */
@@ -43,7 +23,7 @@ export const normalizeTaskDedupeKey = (
 };
 
 /** Treats blank, missing, and non-string task ids as absent before API calls. */
-/** Called by: getTaskTypeCandidates and normalizeTaskDedupeKey in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Called by: normalizeTaskDedupeKey and task id collection in this module. */
 const normalizeTaskId = (value: unknown): string | null => {
   if (typeof value !== 'string') {
     return null;

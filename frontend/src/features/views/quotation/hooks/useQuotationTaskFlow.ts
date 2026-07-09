@@ -232,15 +232,7 @@ export function useQuotationTaskFlow({
       onTaskIdAssigned?.(assignedTaskId);
       applyContextLengthPreferenceFromResult(result);
       updateResultState(nodeId, column, result);
-      return {
-        column,
-        page: requestPayload.page,
-        page_size: requestPayload.page_size,
-        sort_by: requestPayload.sort_by ?? null,
-        descending: requestPayload.descending,
-        engine_type: enginePayload.type,
-        engine_url: enginePayload.type === 'remote' ? enginePayload.url : null,
-      };
+      return requestPayload;
     } catch (error: unknown) {
       console.error('Failed to fetch quotations', error);
       showErrorDialog(getErrorMessage(error));

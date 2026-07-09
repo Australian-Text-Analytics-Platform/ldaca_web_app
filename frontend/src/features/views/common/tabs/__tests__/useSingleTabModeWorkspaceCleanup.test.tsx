@@ -24,16 +24,31 @@ const workspaceTabsState: WorkspaceTabsState = {
     concordance_analysis: {
       active_tab_id: 'concordance-extra',
       tabs: [
-        { tab_id: 'concordance-first', task_id: 'task-keep-a', title: 'A1', inputs: [] },
-        { tab_id: 'concordance-extra', task_id: 'task-remove-a', title: 'A2', inputs: [] },
+        {
+          tab_id: 'concordance-first',
+          task_id: 'task-keep-a',
+          title: 'A1',
+          input_sets: { source: [] },
+        },
+        {
+          tab_id: 'concordance-extra',
+          task_id: 'task-remove-a',
+          title: 'A2',
+          input_sets: { source: [] },
+        },
       ],
     },
     token_frequencies: {
       active_tab_id: 'frequency-third',
       tabs: [
-        { tab_id: 'frequency-first', task_id: null, title: 'B1', inputs: [] },
-        { tab_id: 'frequency-second', task_id: 'task-remove-b', title: 'B2', inputs: [] },
-        { tab_id: 'frequency-third', task_id: null, title: 'B3', inputs: [] },
+        { tab_id: 'frequency-first', task_id: null, title: 'B1', input_sets: { source: [] } },
+        {
+          tab_id: 'frequency-second',
+          task_id: 'task-remove-b',
+          title: 'B2',
+          input_sets: { source: [] },
+        },
+        { tab_id: 'frequency-third', task_id: null, title: 'B3', input_sets: { source: [] } },
       ],
     },
   },
@@ -78,11 +93,25 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
       groups: {
         concordance_analysis: {
           active_tab_id: 'concordance-first',
-          tabs: [{ tab_id: 'concordance-first', task_id: 'task-keep-a', title: 'A1', inputs: [] }],
+          tabs: [
+            {
+              tab_id: 'concordance-first',
+              task_id: 'task-keep-a',
+              title: 'A1',
+              input_sets: { source: [] },
+            },
+          ],
         },
         token_frequencies: {
           active_tab_id: 'frequency-first',
-          tabs: [{ tab_id: 'frequency-first', task_id: null, title: 'B1', inputs: [] }],
+          tabs: [
+            {
+              tab_id: 'frequency-first',
+              task_id: null,
+              title: 'B1',
+              input_sets: { source: [] },
+            },
+          ],
         },
       },
     };

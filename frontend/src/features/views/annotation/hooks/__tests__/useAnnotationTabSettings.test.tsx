@@ -11,7 +11,6 @@ describe('useAnnotationTabSettings', () => {
           annotationMode: 'ai',
           aiProvider: 'provider:openai:test',
           aiProviderModels: JSON.stringify({ 'provider:openai:test': 'gpt-4o' }),
-          aiModel: 'fallback-model',
           aiPrompt: 'Classify stance.',
           aiTemperature: '0.7',
           aiReasoningEnabled: 'true',
@@ -49,7 +48,6 @@ describe('useAnnotationTabSettings', () => {
 
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiProvider', 'openrouter');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiModel', 'openai/gpt-4o');
     expect(onTabSettingChange).toHaveBeenCalledWith(
       'aiProviderModels',
       JSON.stringify({ openrouter: 'openai/gpt-4o' }),
@@ -69,13 +67,12 @@ describe('useAnnotationTabSettings', () => {
         tabSettings: {
           aiProvider: 'openrouter',
           aiProviderModels: '{broken',
-          aiModel: 'fallback-model',
         },
       }),
     );
 
     expect(result.current.aiProviderModels).toEqual({});
-    expect(result.current.aiModel).toBe('fallback-model');
+    expect(result.current.aiModel).toBe('');
     expect(warnSpy).toHaveBeenCalledWith(
       '[annotation] Ignoring malformed AI provider model setting:',
       expect.any(SyntaxError),

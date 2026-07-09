@@ -32,12 +32,8 @@ export interface ResolvedPreset {
 }
 
 export interface UseTabNodeInputsConfig {
-  /** Selector id within the active tab; defaults to the legacy source selector. */
+  /** Selector id within the active tab; defaults to the source selector. */
   selectorId?: string;
-  /** The active tab's persisted inputs (from AnalysisTabsHost). */
-  tabInputs?: AnalysisTabInput[];
-  /** Commit a new input set for the active tab (persists to tabs.json). */
-  onTabInputsChange?: (inputs: AnalysisTabInput[]) => void;
   /** All named input sets for the active tab. */
   tabInputSets?: AnalysisTabInputSets;
   /** Commit one named input set for the active tab (persists to tabs.json). */
@@ -68,17 +64,17 @@ const NO_OP = (_inputs: AnalysisTabInput[]) => {
 };
 
 /**
- * Binds an analysis tab's persisted ``inputs`` to {@link useNodeInputs}, wiring
- * in the live workspace nodes, typed column metadata, and the graph selection
- * used as the "Add from graph" source.
+ * Binds a named analysis-tab input set to {@link useNodeInputs}, wiring in the
+ * live workspace nodes, typed column metadata, and the graph selection used as
+ * the "Add from graph" source.
  *
  * Used by: the tabbed analysis-style ``*Feature`` components because each needs
  * the same plumbing (tab value/onChange + live nodes + column infos + graph
  * focus) to drive {@link NodeInputsPanel} and build run requests. Keeping it
  * here makes each feature's migration a thin call instead of repeated wiring.
  *
- * Flow: resolve the requested selector id from ``input_sets`` with a legacy
- * ``inputs`` fallback for ``source``, read live nodes + graph selection, fetch
+ * Flow: resolve the requested selector id from ``input_sets``, read live nodes
+ * + graph selection, fetch
  * node-info metadata for the already-selected nodes, delegate to
  * ``useNodeInputs`` with the selector's value, then consume graph/sidebar "+"
  * requests directly by default. Multi-selector features pass
@@ -89,8 +85,6 @@ const NO_OP = (_inputs: AnalysisTabInput[]) => {
 export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInputsResult {
   const {
     selectorId = DEFAULT_TAB_INPUT_SET_ID,
-    tabInputs,
-    onTabInputsChange,
     tabInputSets,
     onTabInputSetChange,
     constraints,
@@ -102,8 +96,8 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
 
   const allNodes = useMemo(() => nodes as WorkspaceNodeLike[], [nodes]);
   const value = useMemo(
-    () => getTabInputSet({ inputs: tabInputs, input_sets: tabInputSets }, selectorId),
-    [selectorId, tabInputs, tabInputSets],
+    () => getTabInputSet({ input_sets: tabInputSets }, selectorId),
+    [selectorId, tabInputSets],
   );
   const onChange = useCallback(
     (nextInputs: AnalysisTabInput[]) => {
@@ -111,13 +105,9 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
         onTabInputSetChange(selectorId, nextInputs);
         return;
       }
-      if (selectorId === DEFAULT_TAB_INPUT_SET_ID && onTabInputsChange) {
-        onTabInputsChange(nextInputs);
-        return;
-      }
       NO_OP(nextInputs);
     },
-    [selectorId, onTabInputSetChange, onTabInputsChange],
+    [selectorId, onTabInputSetChange],
   );
 
   // Typed columns for the already-selected nodes; getColumnInfos falls back to

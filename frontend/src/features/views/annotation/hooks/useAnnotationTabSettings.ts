@@ -62,7 +62,7 @@ export function useAnnotationTabSettings({
   const [aiModel, setAiModel] = useState(() => {
     const providerModels = parseProviderModelSetting(tabSettings?.aiProviderModels);
     const providerId = tabSettings?.aiProvider ?? '';
-    return providerModels[providerId] ?? tabSettings?.aiModel ?? '';
+    return providerModels[providerId] ?? '';
   });
 
   const persistAiProviderModels = (models: Record<string, string>) => {
@@ -74,7 +74,6 @@ export function useAnnotationTabSettings({
     setAiProviderState(id);
     setAiModel(modelForProvider);
     onTabSettingChange?.('aiProvider', id);
-    onTabSettingChange?.('aiModel', modelForProvider);
   };
 
   const [aiPrompt, setAiPrompt] = useState(() => tabSettings?.aiPrompt ?? '');

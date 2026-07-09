@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { readConcordanceServerParams, useConcordanceParameters } from '../useConcordanceParameters';
 
 describe('readConcordanceServerParams', () => {
-  it('normalizes current and legacy request fields for rerun comparison', () => {
+  it('normalizes current request fields for rerun comparison', () => {
     expect(
       readConcordanceServerParams({
         search_word: 'alpha',
-        num_tokens_left: 4,
-        num_tokens_right: 6,
+        num_left_tokens: 4,
+        num_right_tokens: 6,
         regex: false,
         whole_word: false,
         case_sensitive: true,

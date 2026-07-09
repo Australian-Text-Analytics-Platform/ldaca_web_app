@@ -31,13 +31,13 @@ vi.mock('@/stores', () => ({
 }));
 
 function RequestBridgeHarness({
-  onInputsChange,
+  onInputSetChange,
 }: {
-  onInputsChange: (inputs: AnalysisTabInput[]) => void;
+  onInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }) {
   const nodeInputs = useTabNodeInputs({
-    tabInputs: [],
-    onTabInputsChange: onInputsChange,
+    tabInputSets: { source: [] },
+    onTabInputSetChange: onInputSetChange,
     constraints: { maxNodes: 1 },
   });
 
@@ -81,16 +81,18 @@ describe('node input request bridge', () => {
   });
 
   it('consumes requests that were queued before the input panel target registered', async () => {
-    const onInputsChange = vi.fn();
+    const onInputSetChange = vi.fn();
     useNodeInputRequestsStore.setState({
       nextId: 2,
       requests: [{ id: 1, workspaceId: 'workspace-1', view: 'filter', nodeIds: ['node-a'] }],
     });
 
-    render(<RequestBridgeHarness onInputsChange={onInputsChange} />);
+    render(<RequestBridgeHarness onInputSetChange={onInputSetChange} />);
 
     await waitFor(() => {
-      expect(onInputsChange).toHaveBeenCalledWith([{ node_id: 'node-a', column: 'text' }]);
+      expect(onInputSetChange).toHaveBeenCalledWith('source', [
+        { node_id: 'node-a', column: 'text' },
+      ]);
     });
   });
 });
