@@ -56,9 +56,9 @@ export interface UseAnalysisHydrationReturn<TPreferences> {
 }
 
 /**
- * Normalizes preference field names before persisting them so older feature code
- * and backend preference payloads continue to speak the same snake_case shape.
- * Flow: copy the partial preference payload, map tokenLimit and stopWords aliases to backend snake_case fields, clamp token limits, then return the normalized object.
+ * Normalizes preference values before persisting them.
+ * Flow: copy the partial preference payload, clamp token limits, then return
+ * the normalized object.
  */
 const normalizePreferencePayload = <TPreferences extends Record<string, unknown>>(
   partial: TPreferences,
@@ -67,14 +67,6 @@ const normalizePreferencePayload = <TPreferences extends Record<string, unknown>
 
   if (typeof normalized.token_limit === 'number') {
     normalized.token_limit = clampDisplayTokenLimit(normalized.token_limit).limit;
-  } else if (typeof normalized.tokenLimit === 'number') {
-    normalized.token_limit = clampDisplayTokenLimit(normalized.tokenLimit).limit;
-    delete normalized.tokenLimit;
-  }
-
-  if (Array.isArray(normalized.stopWords) && !normalized.stop_words) {
-    normalized.stop_words = normalized.stopWords;
-    delete normalized.stopWords;
   }
 
   return normalized as TPreferences;

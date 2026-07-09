@@ -134,7 +134,9 @@ rescan should be added here before implementation.
       `nodeId` comparison fallback, removed concordance `num_tokens_left/right`
       request fallbacks, and made Annotation AI provider models depend on the
       current `aiProviderModels` map instead of the old scalar `aiModel` tab
-      setting.
+      setting. The shared hydration preference helper now only normalizes
+      current snake_case fields and no longer maps camelCase token-frequency
+      preference aliases.
 
 23. Centralize task-stream URL construction
     - Done 2026-07-09. `useWorkspaceTaskStreamClient` now uses
@@ -184,6 +186,11 @@ rescan should be added here before implementation.
       rejected instead of silently ignored, OpenAPI was regenerated, and
       generated `AnalysisTab` now requires `input_sets`/`settings`.
 
+31. Remove legacy token-frequency clear API from the generated client
+    - Done 2026-07-09. The backend no longer exposes the broad
+      `DELETE /api/workspaces/{workspace_id}/token-frequencies` endpoint, and
+      regenerated frontend API files no longer export `clearTokenFrequencies`.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -209,6 +216,11 @@ external resources: health checks, document/file rendering, remote tutorial
 registry reads, OpenRouter model discovery, export blob downloads, and native
 EventSource task streaming. Backend auth redirect, export, and task-stream URL
 builders are typed against generated endpoint contracts.
+
+Final rescan 2026-07-09: no handwritten production `page=1&page_size=1`
+metadata probes remain, `clearTokenFrequencies` is absent from the regenerated
+client, and the only handwritten `getNodeDataByWorkspaceId` calls are
+row-content flows already listed above.
 
 ## Layers Checked And Not Recommended For Flattening
 

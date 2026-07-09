@@ -131,6 +131,20 @@ describe('useSequentialAnalysisParameters', () => {
     });
   });
 
+  it('requires the current node_id request field when hydrating selection', () => {
+    const { result } = renderHook(() => useSequentialAnalysisParameters());
+    let hydrated: ReturnType<typeof result.current.applyHydratedRequest> | undefined;
+
+    act(() => {
+      hydrated = result.current.applyHydratedRequest({
+        nodeId: 'old-node',
+        time_column: 'year',
+      });
+    });
+
+    expect(hydrated?.nodeId).toBe('');
+  });
+
   it('resets only non-selection fields after clear', () => {
     const { result } = renderHook(() => useSequentialAnalysisParameters());
 

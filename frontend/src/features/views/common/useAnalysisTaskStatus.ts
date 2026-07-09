@@ -55,7 +55,7 @@ export interface AnalysisTaskStatus {
 /** Summarizes the latest task state for an analysis feature's banners and result panels. */
 /**
  * Used by: src/features/views/common/hooks/useMaterializeLifecycle.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
- * Flow: expand task-type aliases, filter and sort stored tasks by timestamp/event order, then expose active, terminal, and banner task summaries.
+ * Flow: normalize task-type inputs, filter and sort stored tasks by timestamp/event order, then expose active, terminal, and banner task summaries.
  */
 export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTaskStatus => {
   const tasks = useAnalysisStore((state) => state.tasks);

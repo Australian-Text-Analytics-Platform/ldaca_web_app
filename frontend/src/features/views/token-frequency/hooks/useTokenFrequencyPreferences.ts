@@ -161,7 +161,7 @@ export const useTokenFrequencyPreferences = ({
   );
 
   const updateResultsPreferencesLocally = useCallback(
-    (prefs: { tokenLimit?: number; stopWords?: string[] }) => {
+    (prefs: { token_limit?: number; stop_words?: string[] }) => {
       setResults((prev) => {
         if (!prev) return prev;
 
@@ -173,8 +173,8 @@ export const useTokenFrequencyPreferences = ({
           typeof prev.token_limit === 'number' && Number.isFinite(prev.token_limit)
             ? prev.token_limit
             : undefined;
-        if (prefs.tokenLimit !== undefined) {
-          nextTokenLimit = prefs.tokenLimit;
+        if (prefs.token_limit !== undefined) {
+          nextTokenLimit = prefs.token_limit;
         } else {
           nextTokenLimit = existingTokenLimit;
         }
@@ -191,7 +191,7 @@ export const useTokenFrequencyPreferences = ({
         delete analysisParams.limit;
 
         const stopWordsArray =
-          prefs.stopWords ??
+          prefs.stop_words ??
           (Array.isArray(prev.stop_words)
             ? prev.stop_words
             : Array.isArray(metadata.stop_words)
@@ -260,7 +260,7 @@ export const useTokenFrequencyPreferences = ({
     dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
     try {
       await persistTokenPreferences({ token_limit: targetLimit });
-      updateResultsPreferencesLocally({ tokenLimit: targetLimit });
+      updateResultsPreferencesLocally({ token_limit: targetLimit });
       applyTokenLimitState(targetLimit);
     } catch (error) {
       console.error('Failed to update token limit', error);
@@ -277,7 +277,7 @@ export const useTokenFrequencyPreferences = ({
     async (words: string[]) => {
       try {
         await persistTokenPreferences({ stop_words: words });
-        updateResultsPreferencesLocally({ stopWords: words });
+        updateResultsPreferencesLocally({ stop_words: words });
       } catch (error) {
         console.warn('Failed to save stop words', error);
       }
@@ -381,7 +381,7 @@ export const useTokenFrequencyPreferences = ({
     dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
     try {
       await persistTokenPreferences({ token_limit: targetLimit });
-      updateResultsPreferencesLocally({ tokenLimit: targetLimit });
+      updateResultsPreferencesLocally({ token_limit: targetLimit });
       applyTokenLimitState(targetLimit);
     } catch (error) {
       console.error('Failed to update token limit', error);

@@ -4,13 +4,17 @@
 
 This review covers the current FastAPI/OpenAPI surface in this worktree after
 the graph/node-info split and the new collection node-info endpoint. The
-generated OpenAPI schema currently exposes 118 operations:
+generated OpenAPI schema exposed 118 operations at the start of this review:
 
 - 43 `GET`
 - 52 `POST`
 - 11 `PUT`
 - 4 `PATCH`
 - 8 `DELETE`
+
+Update 2026-07-09: after removing the legacy broad token-frequency clear
+endpoint, the generated OpenAPI schema exposes 117 operations. The only count
+change is `DELETE`: 7 operations remain.
 
 The review checks the endpoint surface against industrial API design principles:
 clear resource identity, correct HTTP method semantics, explicit scoping, typed
@@ -81,6 +85,11 @@ rescan should be added here before implementation.
     without the document column. Materialized concordance artifacts now require
     the document column for grouping/binning, while display can still hide it
     when the saved request did not select it.
+20. Removed the legacy broad token-frequency clear endpoint. Token-frequency
+    result cleanup now uses the shared `DELETE /api/tasks/{task_id}` task
+    resource, OpenAPI asserts that `DELETE
+    /api/workspaces/{workspace_id}/token-frequencies` stays absent, and the
+    generated frontend client no longer exports `clearTokenFrequencies`.
 
 ## Findings
 

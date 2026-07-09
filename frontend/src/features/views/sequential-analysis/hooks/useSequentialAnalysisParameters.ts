@@ -277,7 +277,7 @@ function resolveHydratedSequentialParameters(
   hydratedParams: SequentialHydratedParams;
   columnType: 'datetime' | 'numeric';
 } {
-  const nodeId = (req.node_id ?? req.nodeId ?? '') as string;
+  const nodeId = typeof req.node_id === 'string' ? req.node_id : '';
   const timeColumn = typeof req.time_column === 'string' ? req.time_column : '';
   const columnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
   const numericOrigin =
