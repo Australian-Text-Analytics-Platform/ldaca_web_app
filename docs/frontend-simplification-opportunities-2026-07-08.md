@@ -109,8 +109,8 @@ rescan should be added here before implementation.
 18. Remove legacy workspace-node identity fallbacks
     - Done 2026-07-09 for live workspace-node helpers. Live helpers now use
       generated `WorkspaceNodeInfo.id` directly; `node_id` remains only for
-      explicit request/tab DTO contracts and the legacy adapters tracked in
-      item 22.
+      explicit request/tab DTO contracts such as `AnalysisTabInput` and
+      backend result/request payloads.
 
 19. Simplify join/concat created-node selection
     - Done 2026-07-08. Join/concat success handlers now select
