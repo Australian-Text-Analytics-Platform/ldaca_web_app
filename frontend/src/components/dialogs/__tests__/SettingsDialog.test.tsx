@@ -104,8 +104,20 @@ describe('SettingsDialog', () => {
         concordance_analysis: {
           active_tab_id: 'tab-2',
           tabs: [
-            { tab_id: 'tab-1', task_id: null, title: 'Analysis 1', inputs: [] },
-            { tab_id: 'tab-2', task_id: 'task-2', title: 'Analysis 2', inputs: [] },
+            {
+              tab_id: 'tab-1',
+              task_id: null,
+              title: 'Analysis 1',
+              input_sets: { source: [] },
+              settings: {},
+            },
+            {
+              tab_id: 'tab-2',
+              task_id: 'task-2',
+              title: 'Analysis 2',
+              input_sets: { source: [] },
+              settings: {},
+            },
           ],
         },
       },
@@ -133,8 +145,20 @@ describe('SettingsDialog', () => {
         concordance_analysis: {
           active_tab_id: 'tab-2',
           tabs: [
-            { tab_id: 'tab-1', task_id: null, title: 'Analysis 1', inputs: [] },
-            { tab_id: 'tab-2', task_id: 'task-2', title: 'Analysis 2', inputs: [] },
+            {
+              tab_id: 'tab-1',
+              task_id: null,
+              title: 'Analysis 1',
+              input_sets: { source: [] },
+              settings: {},
+            },
+            {
+              tab_id: 'tab-2',
+              task_id: 'task-2',
+              title: 'Analysis 2',
+              input_sets: { source: [] },
+              settings: {},
+            },
           ],
         },
       },
@@ -157,7 +181,15 @@ describe('SettingsDialog', () => {
       groups: {
         concordance_analysis: {
           active_tab_id: 'tab-1',
-          tabs: [{ tab_id: 'tab-1', task_id: null, title: 'Analysis 1', inputs: [] }],
+          tabs: [
+            {
+              tab_id: 'tab-1',
+              task_id: null,
+              title: 'Analysis 1',
+              input_sets: { source: [] },
+              settings: {},
+            },
+          ],
         },
       },
     };

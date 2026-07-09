@@ -68,6 +68,9 @@ rescan should be added here before implementation.
 15. Split user-facing workspace selection from the resident workspace object so
     explicit workspace-scoped route loads no longer rewrite
     `/api/users/me/current-workspace`.
+16. Removed the legacy top-level `AnalysisTab.inputs` tab-sidecar contract;
+    named `input_sets` plus `settings` are now required on each tab, and stale
+    `inputs` fields are rejected.
 
 ## Findings
 

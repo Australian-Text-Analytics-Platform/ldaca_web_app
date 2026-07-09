@@ -124,11 +124,11 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
           onTabTaskChange={(taskId) => {
             setTabTask(activeTab.tab_id, taskId);
           }}
-          tabInputSets={activeTab.input_sets ?? {}}
+          tabInputSets={activeTab.input_sets}
           onTabInputSetChange={(selectorId, inputs) => {
             setTabInputSet(activeTab.tab_id, selectorId, inputs);
           }}
-          tabSettings={activeTab.settings ?? {}}
+          tabSettings={activeTab.settings}
           onTabSettingChange={(key, value) => {
             setTabSetting(activeTab.tab_id, key, value);
           }}

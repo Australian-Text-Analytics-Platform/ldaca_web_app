@@ -29,6 +29,7 @@ const tab: AnalysisTab = {
   task_id: null,
   title: 'Analysis 1',
   input_sets: { source: [] },
+  settings: {},
 };
 
 const secondTab: AnalysisTab = {
@@ -36,6 +37,7 @@ const secondTab: AnalysisTab = {
   task_id: 'task-2',
   title: 'Analysis 2',
   input_sets: { source: [] },
+  settings: {},
 };
 
 function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspaceTabsResult {

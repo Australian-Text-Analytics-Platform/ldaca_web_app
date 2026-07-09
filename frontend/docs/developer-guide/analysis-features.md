@@ -20,10 +20,9 @@ string literals.
 - `tab_id`: the UI identity and React key for that tab;
 - `task_id`: the optional backend task/result the tab currently shows;
 - `title`: the tab label;
-- `inputs`: the add-as-needed node inputs, each with `node_id` and optional
-  `column`; this is the legacy/default `source` selector;
-- `input_sets`: named selector values for views that need more than one
-  `NodeInputsPanel`; `input_sets.source` mirrors `inputs`.
+- `input_sets`: named add-as-needed node selector values, each with `node_id`
+  and optional `column`; single-selector views use `input_sets.source`, while
+  multi-selector views add their own selector ids.
 - `settings`: a free-form `Record<string, string>` for small, view-specific
   scalar controls that are not node selectors or task ids. The Annotation tab
   uses it to persist its AI parameter panel — `annotationMode` (`manual`/`ai`),
@@ -97,12 +96,12 @@ UI for selecting data blocks, selecting the per-node column when a feature needs
 one, adding graph/recent presets, removing nodes, and clearing a tab's inputs.
 `useTabNodeInputs` binds the panel to a tab's persisted selector value and live
 workspace node metadata. Single-selector views use the default `source`
-selector, which falls back to legacy `inputs`; multi-selector views pass a
-`selectorId` and persist through `input_sets`. `nodeInputsFromSelections` is the
-shared adapter for hydration and handoff paths that receive `{nodeId, column}`
-selections and need to persist `AnalysisTabInput` records. The current graph
-selection is only a source for "Add preset" or graph-node add buttons; it is not
-the analysis input state. Graph/sidebar `+` buttons queue a workspace + active
+selector; multi-selector views pass a `selectorId` and persist through
+`input_sets`. `nodeInputsFromSelections` is the shared adapter for hydration and
+handoff paths that receive `{nodeId, column}` selections and need to persist
+`AnalysisTabInput` records. The current graph selection is only a source for
+"Add preset" or graph-node add buttons; it is not the analysis input state.
+Graph/sidebar `+` buttons queue a workspace + active
 view request in `nodeInputRequestsStore`. By default, `useTabNodeInputs`
 consumes matching requests directly into that selector. Multi-selector features
 set `consumeNodeInputRequests: false` on every participating selector, leaving
@@ -228,8 +227,8 @@ The tab still owns metadata-column visibility state.
 ## Annotation
 
 Annotation is currently a setup/editing tabbed view. Its source selector is
-backed by `input_sets.source`/`inputs` and accepts one string text column plus
-an Annotation-specific companion column picker with a `Start new annotation`
+backed by `input_sets.source` and accepts one string text column plus an
+Annotation-specific companion column picker with a `Start new annotation`
 option. Class descriptions use the same `useTabNodeInputs` hook with the
 `classDescriptions` selector id and persist under `input_sets.classDescriptions`.
 The class-description selector and a compact class summary live in one analysis
@@ -372,7 +371,7 @@ persists separately through its `exampleNodes` `input_sets` entry. API keys stay
 out of `tabs.json` and live only in preferences. Every AI control plus the mode
 switch locks once annotation has started. Settings -> AI
 (`AiProvidersPreferencesPanel`) still manages preference-level provider keys and
-custom endpoint definitions used by existing/legacy configuration surfaces.
+registered custom provider definitions.
 
 The `Preview` button runs AI annotation through the backend via
 `AnnotationAiPreviewPanel`. For the current page of the source node (20 rows per
@@ -517,8 +516,7 @@ The minimum task-backed contract is:
 - call `onTabTaskChange(taskId)` when a run assigns a backend task id;
 - call `onTabTaskChange(null)` when Clear Results removes the tab's task;
 - use `tabInputs`/`input_sets.source` as the only source-selector state,
-  seeding it from hydrated requests only for legacy tabs whose saved task
-  predates persisted inputs;
+  seeding it from hydrated task requests when opening an existing task id;
 - for small scalar controls that are not node selectors or the task id, accept
   `tabSettings`/`onTabSettingChange` and keep them as local mirror state seeded
   from `tabSettings` (write through on change for discrete inputs, commit on

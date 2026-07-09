@@ -61,7 +61,7 @@ export function getTabs(
  * and return an empty list when the current tab has no such selector.
  */
 export function getTabInputSet(
-  tab: Pick<AnalysisTab, 'input_sets'> | null | undefined,
+  tab: { input_sets?: AnalysisTabInputSets } | null | undefined,
   selectorId: string = DEFAULT_TAB_INPUT_SET_ID,
 ): AnalysisTabInput[] {
   const namedInputs = tab?.input_sets?.[selectorId];
@@ -72,14 +72,14 @@ export function getTabInputSet(
  * Reads one tab-owned free-form setting by key.
  * Called by: AnalysisTabsHost to hydrate a feature's persisted scalar
  * parameters (for example, the Annotation tab's Manual/AI mode, AI provider id,
- * model name, and prompt). Returns undefined when the tab predates ``settings``
- * or never set the key, so callers apply their own default.
+ * model name, and prompt). Returns undefined when the active tab is missing or
+ * never set the key, so callers apply their own default.
  */
 export function getTabSetting(
   tab: Pick<AnalysisTab, 'settings'> | null | undefined,
   key: string,
 ): string | undefined {
-  return tab?.settings?.[key];
+  return tab?.settings[key];
 }
 
 /**
@@ -284,7 +284,7 @@ export function setTabInputSetInState(
   const nextTabs = (group.tabs ?? []).map((t) => {
     if (t.tab_id !== tabId) return t;
     const input_sets: AnalysisTabInputSets = {
-      ...(t.input_sets ?? {}),
+      ...t.input_sets,
       [selectorId]: inputs,
     };
     return { ...t, input_sets };
@@ -309,7 +309,7 @@ export function setTabSettingInState(
 ): WorkspaceTabsState {
   const group = getGroup(state, analysisType);
   const nextTabs = (group.tabs ?? []).map((t) =>
-    t.tab_id === tabId ? { ...t, settings: { ...(t.settings ?? {}), [key]: value } } : t,
+    t.tab_id === tabId ? { ...t, settings: { ...t.settings, [key]: value } } : t,
   );
   return withGroup(state, analysisType, { ...group, tabs: nextTabs });
 }

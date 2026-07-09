@@ -10,6 +10,7 @@ const baseTab: AnalysisTab = {
   task_id: null,
   title: 'Analysis 1',
   input_sets: { source: [] },
+  settings: {},
 };
 
 // ChromeTabs uses pointer capture, which jsdom does not implement.
@@ -83,8 +84,20 @@ describe('AnalysisTabbedPanel', () => {
 
   it('reorders tabs when one is dragged past its neighbour', () => {
     const tabs: AnalysisTab[] = [
-      { tab_id: 'tab-1', task_id: null, title: 'Analysis 1', input_sets: { source: [] } },
-      { tab_id: 'tab-2', task_id: null, title: 'Analysis 2', input_sets: { source: [] } },
+      {
+        tab_id: 'tab-1',
+        task_id: null,
+        title: 'Analysis 1',
+        input_sets: { source: [] },
+        settings: {},
+      },
+      {
+        tab_id: 'tab-2',
+        task_id: null,
+        title: 'Analysis 2',
+        input_sets: { source: [] },
+        settings: {},
+      },
     ];
     const { onReorder } = renderPanel(tabs, { multiTabEnabled: true });
     const first = screen.getAllByRole('tab')[0]!;

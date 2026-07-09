@@ -178,6 +178,12 @@ rescan should be added here before implementation.
       enables `moduleDetection: "force"`, `erasableSyntaxOnly`, and
       `verbatimModuleSyntax` in `tsconfig.json`.
 
+30. Remove the legacy analysis tab `inputs` contract
+    - Done 2026-07-09. The backend tab sidecar model now accepts only named
+      `input_sets` plus `settings`; the removed top-level `inputs` mirror is
+      rejected instead of silently ignored, OpenAPI was regenerated, and
+      generated `AnalysisTab` now requires `input_sets`/`settings`.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -211,7 +217,8 @@ builders are typed against generated endpoint contracts.
   increase rerenders and coupling.
 - `useWorkspaceTabs` and `tabStateOps`: this is real sidecar persistence and
   optimistic read-modify-write logic. The legacy `inputs` mirror has been
-  removed; named `input_sets` are now the tab input source of truth.
+  removed from both frontend and backend contracts; named `input_sets` are now
+  the tab input source of truth.
 - `useAnalysisFeature`: this is shared task hydration, clear/stop handling,
   tab-owned task id resolution, and task banner state. It is not an unnecessary
   wrapper.

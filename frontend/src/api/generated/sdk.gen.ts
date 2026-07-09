@@ -2153,7 +2153,7 @@ export const runTopicModeling = <ThrowOnError extends boolean = false>(options: 
  *
  * Flow: resolve the authenticated user, pass the path workspace id to the
  * manager unload operation, and return the standard action response or
- * a not-found error when that workspace is not currently loaded.
+ * a not-found error when that workspace does not exist.
  */
 export const unloadWorkspace = <ThrowOnError extends boolean = false>(options: Options<UnloadWorkspaceData, ThrowOnError>): RequestResult<UnloadWorkspaceResponses, UnloadWorkspaceErrors, ThrowOnError> => (options.client ?? client).post<UnloadWorkspaceResponses, UnloadWorkspaceErrors, ThrowOnError>({ url: '/api/workspaces/{workspace_id}/unload', ...options });
 

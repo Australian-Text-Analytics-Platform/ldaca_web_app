@@ -169,10 +169,9 @@ export type AnalysisSorting = {
  *
  * Carries identity (``tab_id``), a pointer to the analysis result it shows
  * (``task_id``), a display ``title``, selector state, and free-form view
- * settings. ``inputs`` remains the legacy source selector for existing
- * clients. ``input_sets`` is keyed by selector id (for example, ``source`` or
- * ``classDescriptions``) so newer views can persist multiple node selectors on
- * the same tab. ``settings`` is a flat string→string map a view uses to
+ * settings. ``input_sets`` is keyed by selector id (for example, ``source``
+ * or ``classDescriptions``) so views can persist one or more node selectors
+ * on the same tab. ``settings`` is a flat string→string map a view uses to
  * round-trip lightweight scalar parameters that are not node selections — for
  * example the Annotation tab persists its Manual/AI mode, AI provider id,
  * model name, and prompt here so they survive reloads and tab switches like
@@ -187,17 +186,13 @@ export type AnalysisTab = {
     /**
      * Input Sets
      */
-    input_sets?: {
+    input_sets: {
         [key: string]: Array<AnalysisTabInput>;
     };
     /**
-     * Inputs
-     */
-    inputs?: Array<AnalysisTabInput>;
-    /**
      * Settings
      */
-    settings?: {
+    settings: {
         [key: string]: string;
     };
     /**
@@ -246,8 +241,8 @@ export type AnalysisTabGroup = {
  * model.
  *
  * Used by:
- * - `AnalysisTab.inputs`, `AnalysisTab.input_sets`, and the GET/PUT tab
- * routes because the frontend tab store round-trips this exact shape.
+ * - `AnalysisTab.input_sets` and the GET/PUT tab routes because the frontend
+ * tab store round-trips this exact shape.
  */
 export type AnalysisTabInput = {
     /**
@@ -5338,8 +5333,8 @@ export type WorkspaceSummary = {
  *
  * Full per-workspace analysis-tab state.
  *
- * API schema round-tripped by the GET/PUT ``/{workspace_id}/tabs`` routes and
- * the frontend tab store. ``groups`` is keyed by analysis type.
+ * API schema round-tripped by the GET/PUT ``/{workspace_id:uuid}/tabs`` routes
+ * and the frontend tab store. ``groups`` is keyed by analysis type.
  *
  * Used by:
  * - backend API routes, generated frontend client, and backend tests.

@@ -3276,7 +3276,7 @@ export const runTopicModelingMutation = (options?: Partial<Options<RunTopicModel
  *
  * Flow: resolve the authenticated user, pass the path workspace id to the
  * manager unload operation, and return the standard action response or
- * a not-found error when that workspace is not currently loaded.
+ * a not-found error when that workspace does not exist.
  */
 export const unloadWorkspaceMutation = (options?: Partial<Options<UnloadWorkspaceData>>): UseMutationOptions<UnloadWorkspaceResponse, UnloadWorkspaceError, Options<UnloadWorkspaceData>> => {
     const mutationOptions: UseMutationOptions<UnloadWorkspaceResponse, UnloadWorkspaceError, Options<UnloadWorkspaceData>> = {

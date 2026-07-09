@@ -86,8 +86,8 @@ Shared code used by multiple views lives in `views/common/`:
 - `common/tasks/` — task-stream and submit-envelope helpers used by analysis
   task-flow hooks.
 - `common/tabs/` — Chrome-style analysis tab host and `tabs.json` sidecar
-  bridge. Each tab owns an optional `task_id`, a legacy/default `inputs`
-  node set, and optional named `input_sets` for multi-selector views.
+  bridge. Each tab owns an optional `task_id`, required named `input_sets` for
+  node selectors, and required string `settings` for small per-view controls.
   The reusable strip lives in `src/components/tabs/`: `chromeTabsLayout.ts`
   keeps DOM-free geometry helpers, while `chromeTabsInteractionState.ts` owns
   the coupled drag-preview and inline-rename reducer state.

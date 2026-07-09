@@ -142,7 +142,7 @@ describe('tabStateOps', () => {
         classDescriptions: classInputs,
       },
     });
-    expect(getTabs(state, TYPE)[0]?.inputs).toBeUndefined();
+    expect('inputs' in (getTabs(state, TYPE)[0] ?? {})).toBe(false);
   });
 
   it('initializes a new tab with an empty settings map', () => {

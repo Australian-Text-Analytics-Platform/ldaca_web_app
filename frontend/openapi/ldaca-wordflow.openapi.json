@@ -194,7 +194,8 @@
         "type": "object"
       },
       "AnalysisTab": {
-        "description": "A single analysis tab.\n\nCarries identity (``tab_id``), a pointer to the analysis result it shows\n(``task_id``), a display ``title``, selector state, and free-form view\nsettings. ``inputs`` remains the legacy source selector for existing\nclients. ``input_sets`` is keyed by selector id (for example, ``source`` or\n``classDescriptions``) so newer views can persist multiple node selectors on\nthe same tab. ``settings`` is a flat string\u2192string map a view uses to\nround-trip lightweight scalar parameters that are not node selections \u2014 for\nexample the Annotation tab persists its Manual/AI mode, AI provider id,\nmodel name, and prompt here so they survive reloads and tab switches like\nthe node selectors do. Heavier analysis parameters still live on the\nreferenced ``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
+        "additionalProperties": false,
+        "description": "A single analysis tab.\n\nCarries identity (``tab_id``), a pointer to the analysis result it shows\n(``task_id``), a display ``title``, selector state, and free-form view\nsettings. ``input_sets`` is keyed by selector id (for example, ``source``\nor ``classDescriptions``) so views can persist one or more node selectors\non the same tab. ``settings`` is a flat string\u2192string map a view uses to\nround-trip lightweight scalar parameters that are not node selections \u2014 for\nexample the Annotation tab persists its Manual/AI mode, AI provider id,\nmodel name, and prompt here so they survive reloads and tab switches like\nthe node selectors do. Heavier analysis parameters still live on the\nreferenced ``AnalysisTask.request``.\n\nUsed by:\n- `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab\n  store round-trips this exact shape.",
         "properties": {
           "input_sets": {
             "additionalProperties": {
@@ -205,13 +206,6 @@
             },
             "title": "Input Sets",
             "type": "object"
-          },
-          "inputs": {
-            "items": {
-              "$ref": "#/components/schemas/AnalysisTabInput"
-            },
-            "title": "Inputs",
-            "type": "array"
           },
           "settings": {
             "additionalProperties": {
@@ -242,7 +236,9 @@
           }
         },
         "required": [
-          "tab_id"
+          "tab_id",
+          "input_sets",
+          "settings"
         ],
         "title": "AnalysisTab",
         "type": "object"
@@ -273,7 +269,8 @@
         "type": "object"
       },
       "AnalysisTabInput": {
-        "description": "One node selected as input for an analysis tab.\n\nPairs a workspace ``node_id`` with an optional ``column`` pick (the single\ntext/data column the analysis runs on; ``None`` until a column is chosen or\nfor views that need no column). The frontend ``useNodeInputs`` hook adds,\nremoves, and column-assigns these entries under the add-node-as-needed\nmodel.\n\nUsed by:\n- `AnalysisTab.inputs`, `AnalysisTab.input_sets`, and the GET/PUT tab\n  routes because the frontend tab store round-trips this exact shape.",
+        "additionalProperties": false,
+        "description": "One node selected as input for an analysis tab.\n\nPairs a workspace ``node_id`` with an optional ``column`` pick (the single\ntext/data column the analysis runs on; ``None`` until a column is chosen or\nfor views that need no column). The frontend ``useNodeInputs`` hook adds,\nremoves, and column-assigns these entries under the add-node-as-needed\nmodel.\n\nUsed by:\n- `AnalysisTab.input_sets` and the GET/PUT tab routes because the frontend\n  tab store round-trips this exact shape.",
         "properties": {
           "column": {
             "anyOf": [
@@ -7239,7 +7236,7 @@
         "type": "object"
       },
       "WorkspaceTabsState": {
-        "description": "Full per-workspace analysis-tab state.\n\nAPI schema round-tripped by the GET/PUT ``/{workspace_id}/tabs`` routes and\nthe frontend tab store. ``groups`` is keyed by analysis type.\n\nUsed by:\n- backend API routes, generated frontend client, and backend tests.",
+        "description": "Full per-workspace analysis-tab state.\n\nAPI schema round-tripped by the GET/PUT ``/{workspace_id:uuid}/tabs`` routes\nand the frontend tab store. ``groups`` is keyed by analysis type.\n\nUsed by:\n- backend API routes, generated frontend client, and backend tests.",
         "properties": {
           "groups": {
             "additionalProperties": {
@@ -23989,6 +23986,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "title": "Workspace Id",
               "type": "string"
             }
@@ -24126,6 +24124,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "title": "Workspace Id",
               "type": "string"
             }
@@ -24837,7 +24836,7 @@
     },
     "/api/workspaces/{workspace_id}/unload": {
       "post": {
-        "description": "Unload the explicit workspace id in the path.\n\nUsed by:\n- workspace manager clients that want to unload the active workspace while\n  keeping the target visible in the URL.\n\nFlow: resolve the authenticated user, pass the path workspace id to the\n    manager unload operation, and return the standard action response or\n    a not-found error when that workspace is not currently loaded.",
+        "description": "Unload the explicit workspace id in the path.\n\nUsed by:\n- workspace manager clients that want to unload the active workspace while\n  keeping the target visible in the URL.\n\nFlow: resolve the authenticated user, pass the path workspace id to the\n    manager unload operation, and return the standard action response or\n    a not-found error when that workspace does not exist.",
         "operationId": "unload_workspace",
         "parameters": [
           {
