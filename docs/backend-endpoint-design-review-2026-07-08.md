@@ -51,7 +51,8 @@ Evidence:
   `/api/workspaces/{workspace_id}/download/tasks/{task_id}/artifact`, and
   `/api/workspaces/{workspace_id}/unload`.
 - `GET/PUT /api/workspaces/{workspace_id}/tabs` already uses an explicit
-  workspace id, so the API has two scoping styles.
+  workspace id and now uses the same UUID-constrained route declaration as the
+  other workspace-scoped APIs.
 
 Problem:
 
@@ -120,6 +121,11 @@ Status 2026-07-09: Removed one adjacent hidden-current read from file-import
 task submission. LDaCA imports are user/file scoped rather than workspace
 graph scoped, so `/api/files/import-ldaca` now stamps worker tasks with the
 stable `"global"` scope instead of whichever workspace is selected in the UI.
+
+Status 2026-07-09: Tightened tab sidecar routes. `GET/PUT
+/api/workspaces/{workspace_id}/tabs` now declare `/{workspace_id:uuid}/tabs`
+internally, and the workspace route invariant fails if any workspace-scoped
+handler omits the UUID converter.
 
 ### 2. ~~Protect and reshape runtime config mutation~~
 
