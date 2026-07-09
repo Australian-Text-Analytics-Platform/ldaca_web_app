@@ -71,6 +71,9 @@ rescan should be added here before implementation.
 16. Removed the legacy top-level `AnalysisTab.inputs` tab-sidecar contract;
     named `input_sets` plus `settings` are now required on each tab, and stale
     `inputs` fields are rejected.
+17. Removed the dead topic-modeling worker `corpus_indices` adapter parameter;
+    corpus splitting now lives only in the payload builder that consumes
+    `corpus_sizes`.
 
 ## Findings
 
