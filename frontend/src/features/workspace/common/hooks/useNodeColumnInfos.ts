@@ -19,9 +19,9 @@ export interface UseNodeColumnInfosResult {
   /** Full node-info responses keyed by node id for metadata beyond columns. */
   nodeInfoCache: Record<string, NodeInfo>;
   /**
-   * Returns cached column infos for the provided node. Falls back to basic
-   * mapping if the cache has not been hydrated yet, ensuring the selector
-   * always renders something while the typed schema is loading.
+   * Returns cached column infos for the provided node. Falls back to any dtype
+   * evidence already present on the node snapshot; graph-only nodes usually
+   * have no column metadata until node-info has hydrated.
    */
   getColumnInfos: (node: NodeLike | null | undefined) => ColumnInfo[];
   /** Returns the cached node-info response for consumers that need shape or tokenizer metadata. */

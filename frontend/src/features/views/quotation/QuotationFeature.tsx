@@ -53,15 +53,16 @@ import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabState
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
- * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
- * task id assignment/clear back to the tab record.
+ * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
+ * id assignment/clear back to the tab record, and ``onTabInputSetChange`` owns
+ * node-input persistence for add/remove/column actions.
  */
 interface QuotationFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
   tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 /**
@@ -87,7 +88,7 @@ function QuotationFeature({
   onTabTaskChange,
   tabInputSets,
   onTabInputSetChange,
-}: QuotationFeatureProps = {}) {
+}: QuotationFeatureProps) {
   const { handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } =
     useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();

@@ -64,18 +64,18 @@ const TYPE_RULES: [(s: string) => boolean, string][] = [
 ];
 
 /**
- * Map a raw backend dtype string to a canonical UI type. Falls back to
- * `'string'` for unknown/missing input — most components render strings
- * safely, so this is the least-surprising default.
+ * Map a raw backend dtype string to a canonical UI type. Missing or
+ * unrecognized input is `unknown`; callers that need a string default should
+ * pass that default explicitly before calling this helper.
  */
-/** Used by: src/features/views/common/useNodeColumnOptions.ts, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, workspace data-view tables, and other importers. */
+/** Used by: workspace table/cast controls, preprocessing type helpers, node-info hooks, and sequential-analysis column typing. */
 export const normalizeTypeName = (type?: string | null): string => {
-  if (!type || typeof type !== 'string') return 'string';
+  if (!type || typeof type !== 'string') return 'unknown';
   const s = type.toLowerCase();
   for (const [match, label] of TYPE_RULES) {
     if (match(s)) return label;
   }
-  return 'string';
+  return 'unknown';
 };
 
 /** Reads the dtype field from whichever schema-entry shape a backend route returned. */
@@ -95,14 +95,18 @@ const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
  * merging whichever metadata shape the backend returned:
  * - `schema`: array of `{name, js_type|type|dtype}` OR object keyed by column.
  * - `dtypes`: object keyed by column.
- * - `columns`: plain string[] (types fall back to `'string'`).
+ * - `columns`: plain string[] (types are `unknown` without schema/dtype evidence).
  *
- * If multiple sources disagree we keep the earliest non-`string` answer,
- * because the generic `columns` list is the weakest evidence.
+ * If multiple sources disagree we keep the earliest concrete answer because
+ * the generic `columns` list is the weakest evidence.
  */
 /**
- * Used by: src/features/views/common/useNodeColumnOptions.ts, src/features/views/preprocessing/aggregate/hooks/useAggregateSubTab.ts, src/features/views/preprocessing/replace/hooks/useReplaceSubTab.ts and 2 other importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Used by: useNodeColumnInfos, aggregate/replace preprocessing hooks, and
+ * add-node input resolution because they need one backend-schema normalization
+ * boundary before filtering or rendering column choices.
+ * Flow: gather schema/dtypes/column names, register columns in stable order,
+ * promote unknown entries only when later dtype evidence exists, then return the
+ * normalized list.
  */
 export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
   if (!node) return [];
@@ -119,14 +123,15 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
    */
   const register = (name: unknown, rawType?: unknown) => {
     if (typeof name !== 'string' || !name) return;
-    const normalizedType = normalizeTypeName(
-      typeof rawType === 'string'
-        ? rawType
-        : rawType != null
-          ? // eslint-disable-next-line @typescript-eslint/no-base-to-string -- rawType is a backend dtype value; default coercion is intended
-            String(rawType)
-          : typeMap.get(name),
-    );
+    const normalizedType =
+      rawType == null
+        ? (typeMap.get(name) ?? 'unknown')
+        : normalizeTypeName(
+            typeof rawType === 'string'
+              ? rawType
+              : // eslint-disable-next-line @typescript-eslint/no-base-to-string -- rawType is a backend dtype value; default coercion is intended
+                String(rawType),
+          );
 
     if (!typeMap.has(name)) {
       columnOrder.push(name);
@@ -134,8 +139,8 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
       return;
     }
 
-    const existingType = typeMap.get(name) ?? 'string';
-    if (existingType === 'string' && normalizedType !== 'string') {
+    const existingType = typeMap.get(name) ?? 'unknown';
+    if (existingType === 'unknown' && normalizedType !== 'unknown') {
       typeMap.set(name, normalizedType);
     }
   };
@@ -165,14 +170,14 @@ export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
     });
   }
 
-  return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) ?? 'string' }));
+  return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) ?? 'unknown' }));
 };
 
 /**
  * Narrow `columns` to entries whose `dataType` appears in `allowedTypes`.
  * If `allowedTypes` is empty the list is returned as-is (no-op filter).
  */
-/** Used by: src/features/views/common/useNodeColumnOptions.ts, src/hooks/useAutoNodeColumns.ts. */
+/** Used by: shared column selectors and schema/type-management helpers. */
 export const filterColumnsByType = (
   columns: ColumnInfo[],
   allowedTypes: string[],

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { ConcordanceAnalysisResponse } from '@/api';
-import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
 /** Canonical task lifecycle states. */
 type TaskState =

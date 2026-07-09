@@ -17,7 +17,8 @@ export interface NodeSnapshot {
  */
 /**
  * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/hooks/__tests__/useSchemaManagement.test.tsx.
- * Flow: accept array or object schema payloads, normalize type names, and default malformed values to string columns.
+ * Flow: accept array or object schema payloads, normalize type names, and keep
+ * missing/malformed dtype values as unknown instead of assuming text columns.
  */
 export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
   const rawSchema =
@@ -28,14 +29,16 @@ export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
       (rawSchema as { name?: unknown; js_type?: unknown }[]).map((c) => [
         // Runtime values are column descriptors from the backend; name is always a string.
         c.name as string,
-        typeof c.js_type === 'string' && c.js_type.length > 0 ? c.js_type : 'string',
+        typeof c.js_type === 'string' && c.js_type.length > 0
+          ? normalizeTypeName(c.js_type)
+          : 'unknown',
       ]),
     );
   } else if (rawSchema && typeof rawSchema === 'object') {
     return Object.fromEntries(
       Object.entries(rawSchema).map(([k, v]) => [
         k,
-        typeof v === 'string' ? normalizeTypeName(v) : 'string',
+        typeof v === 'string' ? normalizeTypeName(v) : 'unknown',
       ]),
     );
   }

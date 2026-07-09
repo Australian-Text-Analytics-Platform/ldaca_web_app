@@ -108,7 +108,10 @@ set `consumeNodeInputRequests: false` on every participating selector, leaving
 the request pending so each visible `NodeInputsPanel` with add controls can show
 the dashed "Add here" chooser.
 
-Feature-specific caps are enforced through `NodeInputConstraints`:
+Feature-specific caps are enforced through `NodeInputConstraints`. Column type
+constraints only filter each selected node's column picker and default column;
+they must not block adding the node. If no matching column exists, the node
+stays selected and the picker renders empty so the user can resolve it there.
 
 - token frequency, concordance, and topic modeling allow one or two document
   nodes;
@@ -253,8 +256,10 @@ shows one run button that toggles on the source node's annotation column:
 the column is `Start new annotation`, a `New Column Name` input appears inside the
 selected source-node card; its grayed placeholder defaults to the next free
 `annotation`/`annotation_1`/... name based on the source node's columns. The
-class-description selector only accepts tables with exactly two string columns
-(`exactStringColumns: 2`); ineligible workspace adds are rejected with a toast.
+class-description selector filters its class/description dropdowns to string
+columns, but adding the node itself stays permissive; if no string columns are
+available, those dropdowns render empty until the user picks or creates suitable
+columns.
 
 Pressing `Start` in `Start new annotation` mode does three things in
 `handleRunAnnotation`: (1) it creates the empty string annotation column on the

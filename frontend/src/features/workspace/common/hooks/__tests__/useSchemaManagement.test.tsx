@@ -70,18 +70,18 @@ describe('normalizeSchemaFromInfo', () => {
     expect(normalizeSchemaFromInfo({})).toEqual({});
   });
 
-  it('flattens an array-shape schema using the `js_type` field, defaulting to string', () => {
+  it('flattens an array-shape schema using the `js_type` field', () => {
     const result = normalizeSchemaFromInfo({
       schema: [
-        { name: 'col_a', js_type: 'integer' },
-        { name: 'col_b', js_type: 'string' },
+        { name: 'col_a', js_type: 'Int64' },
+        { name: 'col_b', js_type: 'Utf8' },
         { name: 'col_no_js_type' },
       ],
     });
     expect(result).toEqual({
       col_a: 'integer',
       col_b: 'string',
-      col_no_js_type: 'string',
+      col_no_js_type: 'unknown',
     });
   });
 
@@ -97,9 +97,9 @@ describe('normalizeSchemaFromInfo', () => {
     });
   });
 
-  it('falls back to "string" when an object-shape entry holds a non-string value', () => {
+  it('keeps non-string object-shape entries unknown instead of assuming text', () => {
     const result = normalizeSchemaFromInfo({ schema: { col: 123 } });
-    expect(result).toEqual({ col: 'string' });
+    expect(result).toEqual({ col: 'unknown' });
   });
 });
 

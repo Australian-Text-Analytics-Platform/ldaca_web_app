@@ -10,7 +10,13 @@ import {
 } from '../nodeInputsCore';
 
 const stringNode = (id: string, columns: string[], extra?: Partial<WorkspaceNodeLike>) =>
-  ({ id, name: id, columns, ...extra }) as WorkspaceNodeLike;
+  ({
+    id,
+    name: id,
+    columns,
+    schema: Object.fromEntries(columns.map((column) => [column, 'String'])),
+    ...extra,
+  }) as WorkspaceNodeLike;
 
 const nodes: WorkspaceNodeLike[] = [
   stringNode('n1', ['text', 'id']),
@@ -56,23 +62,14 @@ describe('validateAdd', () => {
     expect(validateAdd('n2', current, map, { maxNodes: 1 })).toMatch(/single node/i);
   });
 
-  it('rejects when no compatible column for allowed types', () => {
-    expect(validateAdd('n3', [], map, { allowedDataTypes: ['string'] })).toMatch(/compatible/i);
+  it('allows nodes without matching columns so the picker can stay empty', () => {
+    expect(validateAdd('n3', [], map, { allowedDataTypes: ['string'] })).toBeNull();
   });
 
   it('allows a valid string node', () => {
     expect(validateAdd('n1', [], map, { allowedDataTypes: ['string'] })).toBeNull();
   });
 
-  it('accepts exactly two string columns when exactStringColumns is set', () => {
-    expect(validateAdd('n1', [], map, { exactStringColumns: 2 })).toBeNull();
-  });
-
-  it('rejects nodes that do not have exactly two string columns', () => {
-    const wide = buildNodeMap([stringNode('w', ['a', 'b', 'c'])]);
-    expect(validateAdd('w', [], wide, { exactStringColumns: 2 })).toMatch(/exactly 2 string/i);
-    expect(validateAdd('n3', [], map, { exactStringColumns: 2 })).toMatch(/exactly 2 string/i);
-  });
 });
 
 describe('defaultColumnForNode', () => {
@@ -82,6 +79,10 @@ describe('defaultColumnForNode', () => {
 
   it('falls back to first allowed column when not document-only', () => {
     expect(defaultColumnForNode(nodes[0]!, { allowedDataTypes: ['string'] })).toBe('text');
+  });
+
+  it('leaves the column empty when no allowed column exists', () => {
+    expect(defaultColumnForNode(nodes[2]!, { allowedDataTypes: ['string'] })).toBe('');
   });
 
   it('returns empty when document-only and no document column', () => {
@@ -104,5 +105,13 @@ describe('resolveNodeInputs', () => {
     const inputs: NodeInput[] = [{ node_id: 'n1', column: 'nope' }];
     const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] });
     expect(resolved[0]!.column).toBe('text');
+  });
+
+  it('resolves an added node with empty options when no allowed column exists', () => {
+    const inputs: NodeInput[] = [{ node_id: 'n3', column: null }];
+    const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] });
+
+    expect(resolved[0]!.column).toBe('');
+    expect(resolved[0]!.columnOptions).toEqual([]);
   });
 });

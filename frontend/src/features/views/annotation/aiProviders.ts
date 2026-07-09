@@ -172,19 +172,16 @@ export function buildAnnotationAiProviders(
 
 /**
  * Look up a provider by id among the built-ins plus the supplied custom defs.
- * Falls back to the first built-in (OpenRouter) so the return type stays
- * non-nullable. Used by AnnotationAiSettings to resolve the active provider.
+ * Returns null for stale or unknown ids so deleted provider cards do not
+ * silently run through a different backend.
  */
 export function resolveAnnotationAiProvider(
   id: AnnotationAiProviderId,
   customDefs: readonly AnnotationAiCustomProvider[],
-): AnnotationAiProvider {
+): AnnotationAiProvider | null {
   const configuredBuiltin = makeConfiguredBuiltinProvider(id);
   if (configuredBuiltin) return configuredBuiltin;
-  return (
-    buildAnnotationAiProviders(customDefs).find((candidate) => candidate.id === id) ??
-    ANNOTATION_AI_PROVIDERS[0]
-  );
+  return buildAnnotationAiProviders(customDefs).find((candidate) => candidate.id === id) ?? null;
 }
 
 /**

@@ -3,7 +3,7 @@ import {
   type NodeInputColumnAddonArgs,
 } from '@/features/views/common/components/NodeInputsPanel';
 import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
-import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import { Label } from '@/components/ui/label';

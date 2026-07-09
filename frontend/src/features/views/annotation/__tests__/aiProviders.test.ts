@@ -15,7 +15,11 @@ import {
 // exercise the provider catalogue and the client-side gating helpers that decide
 // when the model dropdown and the Preview button light up.
 
-const provider = (id: string) => resolveAnnotationAiProvider(id, []);
+const provider = (id: string) => {
+  const resolved = resolveAnnotationAiProvider(id, []);
+  if (!resolved) throw new Error(`Test provider did not resolve: ${id}`);
+  return resolved;
+};
 // A user-defined custom provider stands in for a saved "Custom…" endpoint.
 const customProvider = makeCustomProvider({
   id: 'custom:test',
@@ -47,12 +51,14 @@ describe('aiProviders metadata', () => {
     expect(provider('google').label).toBe('Google');
   });
 
-  it('falls back to the first provider for an unknown id', () => {
-    expect(resolveAnnotationAiProvider('nope', []).id).toBe('openrouter');
+  it('returns null for an unknown id', () => {
+    expect(resolveAnnotationAiProvider('nope', [])).toBeNull();
   });
 
   it('resolves configured built-in provider cards through their base provider id', () => {
     const resolved = resolveAnnotationAiProvider('provider:openai:test-card', []);
+    expect(resolved).not.toBeNull();
+    if (!resolved) throw new Error('Expected configured provider to resolve');
     expect(parseConfiguredBuiltinProviderId(resolved.id)).toBe('openai');
     expect(resolved.label).toBe('OpenAI');
     expect(resolved.requestProviderId).toBe('openai');
@@ -89,6 +95,8 @@ describe('makeCustomProvider / buildAnnotationAiProviders', () => {
     const resolved = resolveAnnotationAiProvider('custom:test', [
       { id: 'custom:test', name: 'My LLM', base_url: 'https://llm.example/v1' },
     ]);
+    expect(resolved).not.toBeNull();
+    if (!resolved) throw new Error('Expected custom provider to resolve');
     expect(resolved.id).toBe('custom:test');
     expect(resolved.label).toBe('My LLM');
     expect(resolved.baseUrl).toBe('https://llm.example/v1');

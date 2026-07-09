@@ -1,4 +1,4 @@
-import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
 export interface TokenFrequencyAnalysisParams {
   node_ids?: string[];

@@ -29,8 +29,10 @@ import type { AnalysisTabInputSets } from './tabStateOps';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 
 /**
- * Tab props every analysis feature accepts so a tab can drive it. All optional
- * so a feature can still render standalone (e.g. in unit tests) without a tab.
+ * Tab props every analysis feature accepts so a tab can drive it. The input
+ * writer is required because node additions must always have a real persistence
+ * owner; task/settings props stay optional for feature-level tests that do not
+ * exercise those persistence paths.
  */
 interface AnalysisTabFeatureProps {
   tabId?: string;
@@ -39,7 +41,7 @@ interface AnalysisTabFeatureProps {
   /** All named input node sets owned by this tab. */
   tabInputSets?: AnalysisTabInputSets;
   /** Commit one named input node set for this tab (persists to tabs.json). */
-  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** This tab's free-form scalar settings (Manual/AI mode, provider, ...). */
   tabSettings?: Record<string, string>;
   /** Commit one free-form scalar setting for this tab (persists to tabs.json). */

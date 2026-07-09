@@ -62,13 +62,15 @@ import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
  * viewComponents loader, ``tabId`` identifies the active tab, ``tabTaskId``
  * seeds deterministic hydration of that tab's task, and ``onTabTaskChange``
  * lets the feature report task id assignment/clear back to the tab record.
+ * ``onTabInputSetChange`` is required because node-input edits must persist
+ * through the tab's input-set owner.
  */
 interface ConcordanceFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
   tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 function ConcordanceFeature({
@@ -77,7 +79,7 @@ function ConcordanceFeature({
   onTabTaskChange,
   tabInputSets,
   onTabInputSetChange,
-}: ConcordanceFeatureProps = {}) {
+}: ConcordanceFeatureProps) {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const { selectedNodes } = useWorkspaceSelection();
@@ -154,7 +156,7 @@ function ConcordanceFeature({
   });
   /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
   const applyInputsFromSelections = (sels: { nodeId: string; column?: string | null }[]) => {
-    onTabInputSetChange?.(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(sels));
+    onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(sels));
   };
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);

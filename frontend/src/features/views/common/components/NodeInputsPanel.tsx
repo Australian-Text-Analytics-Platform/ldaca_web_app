@@ -40,7 +40,7 @@ export interface NodeInputsPanelProps {
   maxNodes?: number;
   /** Append nodes by id; returns rejections so the panel can surface reasons. */
   onAddNodes: (ids: string[]) => NodeAddRejection[];
-  /** Per-candidate add-eligibility reason (null = addable). */
+  /** Per-candidate structural add-eligibility reason (null = addable). */
   getAddRejection: (id: string) => string | null;
   /** Remove one node. */
   onRemoveNode: (id: string) => void;
@@ -78,9 +78,9 @@ export interface NodeInputsPanelProps {
 /**
  * Node-input selection panel for the add-node-as-needed model.
  *
- * Owns the Add control (graph selection + per-node dropdown, invalid candidates
- * greyed with a reason), per-node remove (x), and Clear all, on top of the
- * existing column picker rendered via NodeSelectionList.
+ * Owns the Add control (graph selection + per-node dropdown, structurally
+ * invalid candidates greyed with a reason), per-node remove (x), and Clear all,
+ * on top of the existing column picker rendered via NodeSelectionList.
  *
  * Used by: every analysis *Feature and preprocessing subtab through their
  * ``useNodeInputs`` result, so each view shares one curate-your-inputs surface
@@ -88,10 +88,12 @@ export interface NodeInputsPanelProps {
  *
  * Flow: surface add affordances bound to ``onAddNodes`` (reporting rejections
  * via toast), then render each resolved node as a removable card with its
- * column picker fed by the node's resolved ``columnOptions``. Single-selector
- * views consume graph/sidebar "+" requests directly in ``useTabNodeInputs``;
- * multi-selector views opt out there, leaving the pending request for every
- * visible panel with add controls to render as a dashed choose-target overlay.
+ * column picker fed by the node's resolved ``columnOptions``; when a feature's
+ * type filter leaves no options, the node stays selected and the picker renders
+ * empty. Single-selector views consume graph/sidebar "+" requests directly in
+ * ``useTabNodeInputs``; multi-selector views opt out there, leaving the pending
+ * request for every visible panel with add controls to render as a dashed
+ * choose-target overlay.
  */
 export function NodeInputsPanel({
   resolvedNodes,
@@ -148,9 +150,7 @@ export function NodeInputsPanel({
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length===1 guarantees index 0 exists
       toast.warning(`Couldn't add node: ${rejections[0]!.reason}`);
     } else if (rejections.length > 1) {
-      toast.warning(
-        `Couldn't add ${String(rejections.length)} nodes (incompatible or already added).`,
-      );
+      toast.warning(`Couldn't add ${String(rejections.length)} nodes (already added or full).`);
     }
   };
 
@@ -196,7 +196,7 @@ export function NodeInputsPanel({
         clearOptionValue={CLEAR_COLUMN_VALUE}
         label={label}
         disabled={disabled}
-        noColumnsMessage="No compatible column for this node"
+        noColumnsMessage="No columns available"
         onChange={(next) => {
           onColumnChange(nodeId, next === CLEAR_COLUMN_VALUE ? '' : next);
         }}

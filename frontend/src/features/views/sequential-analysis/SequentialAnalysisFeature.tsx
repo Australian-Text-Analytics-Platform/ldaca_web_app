@@ -55,15 +55,16 @@ const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
- * deterministic hydration of that tab's task, and ``onTabTaskChange`` reports
- * task id assignment/clear back to the tab record.
+ * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
+ * id assignment/clear back to the tab record, and ``onTabInputSetChange`` owns
+ * node-input persistence for add/remove/column actions.
  */
 interface SequentialAnalysisFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
   tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
 }
 
 const SequentialAnalysisFeature = ({
@@ -72,7 +73,7 @@ const SequentialAnalysisFeature = ({
   onTabTaskChange,
   tabInputSets,
   onTabInputSetChange,
-}: SequentialAnalysisFeatureProps = {}) => {
+}: SequentialAnalysisFeatureProps) => {
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -102,7 +103,7 @@ const SequentialAnalysisFeature = ({
       : undefined;
   })();
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
-    onTabInputSetChange?.(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(selections));
+    onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(selections));
   };
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.sequential,

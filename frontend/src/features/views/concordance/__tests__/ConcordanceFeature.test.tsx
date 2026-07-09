@@ -34,6 +34,11 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('../../common/nodeInputs', () => ({
+  nodeInputsFromSelections: (selections: { nodeId: string; column?: string | null }[]) =>
+    selections.map((selection) => ({
+      node_id: selection.nodeId,
+      column: selection.column ?? null,
+    })),
   /** Provides a stable per-tab node-input fixture without the workspace provider stack. */
   useTabNodeInputs: () => ({
     nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
@@ -375,6 +380,9 @@ vi.mock('../../common', async () => {
 
 import ConcordanceFeature from '../ConcordanceFeature';
 
+const renderConcordanceFeature = () =>
+  renderWithClient(<ConcordanceFeature onTabInputSetChange={vi.fn()} />);
+
 describe('ConcordanceFeature', () => {
   beforeEach(() => {
     handleSearchMock.mockClear();
@@ -391,7 +399,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('clears previous results before rerunning when clicking Re-run', () => {
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -406,7 +414,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('runs a fresh search when clicking Re-run after changing parameters', () => {
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -427,7 +435,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('defaults whole-word on and disables it when regex is enabled', () => {
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     const wholeWordCheckbox = screen.getByRole('checkbox', { name: /whole word/i });
     const regexCheckbox = screen.getByRole('checkbox', { name: /use regular expression/i });
@@ -455,7 +463,7 @@ describe('ConcordanceFeature', () => {
       timestamp: 1,
     };
 
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     await waitFor(() => {
       expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue(
@@ -499,7 +507,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     await waitFor(() => {
       expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue(
@@ -566,7 +574,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
@@ -639,7 +647,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
@@ -726,7 +734,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    renderWithClient(<ConcordanceFeature />);
+    renderConcordanceFeature();
 
     await waitFor(() => {
       expect(screen.getByText('CONC_left_context')).toBeInTheDocument();
@@ -784,7 +792,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    renderWithClient(<ConcordanceFeature />);
+    renderConcordanceFeature();
 
     expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
     // total_source_rows from the mock pagination (1) is now preferred over
@@ -822,7 +830,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = renderWithClient(<ConcordanceFeature />);
+    const { unmount } = renderConcordanceFeature();
 
     expect(
       screen.queryByRole('checkbox', { name: /bar length proportional to text length/i }),

@@ -38,18 +38,16 @@ export interface NodeSelectionInput {
 
 /** Per-view constraints that gate which nodes/columns are valid inputs. */
 export interface NodeInputConstraints {
-  /** Canonical column types the view accepts (e.g. ``['string']``). Empty = any. */
+  /**
+   * Canonical column types the view's column picker should offer
+   * (e.g. ``['string']``). Empty = any. This never blocks adding a node; an
+   * empty filtered set leaves the selected column blank for the user to resolve.
+   */
   allowedDataTypes?: string[];
   /** Maximum number of input nodes the view supports. Undefined = unbounded. */
   maxNodes?: number;
   /** When true, only a backend-declared document column is an acceptable pick. */
   docTypeOnly?: boolean;
-  /**
-   * When set, the node's full schema must contain exactly this many columns and
-   * every column must be a string. Used by the Annotation class-description
-   * selector, which only accepts two-column class/description tables.
-   */
-  exactStringColumns?: number;
 }
 
 /** A node resolved against the live workspace, ready for the selection panel. */
@@ -102,7 +100,7 @@ export function buildNodeMap(allNodes: WorkspaceNodeLike[]): Map<string, Workspa
  * Flow: prefer the typed getter, fall back to the node snapshot schema, then
  * filter by ``allowedDataTypes`` (keeping the unfiltered set only when the
  * filter would empty an otherwise non-empty list is NOT desired — an empty
- * filtered set means "no compatible column").
+ * filtered set means the column picker should render empty).
  */
 function allowedColumnsForNode(
   node: WorkspaceNodeLike,
@@ -135,18 +133,18 @@ export function defaultColumnForNode(
 }
 
 /**
- * Validates whether ``nodeId`` may be added to ``current`` under the view's
- * constraints, returning a rejection reason or null when the add is allowed.
+ * Validates whether ``nodeId`` may be structurally added to ``current``,
+ * returning a rejection reason or null when the add is allowed.
  * Called by: useNodeInputs.addNodes for each requested id so the panel can
- * grey-out / explain invalid picks instead of silently dropping them.
- * Flow: existence → duplicate → capacity → compatible-column checks.
+ * explain real add failures instead of silently dropping them.
+ * Flow: existence → duplicate → capacity. Column compatibility is deliberately
+ * not enforced here; the picker can render empty when no suitable column exists.
  */
 export function validateAdd(
   nodeId: string,
   current: NodeInput[],
   nodeMap: Map<string, WorkspaceNodeLike>,
   constraints: NodeInputConstraints,
-  getColumnInfos?: ColumnInfoGetter,
 ): string | null {
   const node = nodeMap.get(nodeId);
   if (!node) return 'Node is no longer in the workspace';
@@ -155,23 +153,6 @@ export function validateAdd(
     return constraints.maxNodes === 1
       ? 'This view accepts a single node — remove the current one first'
       : `This view accepts at most ${String(constraints.maxNodes)} nodes`;
-  }
-  const allowed = allowedColumnsForNode(node, constraints, getColumnInfos);
-  if (constraints.allowedDataTypes?.length && allowed.length === 0) {
-    const types = constraints.allowedDataTypes.join(', ');
-    return `No compatible column (needs ${types})`;
-  }
-  if (constraints.exactStringColumns != null) {
-    // Inspect the full schema (not the allowed-type filtered view) so a table
-    // with an extra non-string column is rejected rather than silently trimmed.
-    const allColumns = getColumnInfos?.(node) ?? mapColumnsToInfo(node);
-    const stringColumns = allColumns.filter((info) => info.dataType === 'string');
-    if (
-      allColumns.length !== constraints.exactStringColumns ||
-      stringColumns.length !== constraints.exactStringColumns
-    ) {
-      return `Needs exactly ${String(constraints.exactStringColumns)} string columns`;
-    }
   }
   // Note: we intentionally do NOT reject nodes that lack a backend-declared
   // document column even when ``docTypeOnly`` is set. Any node may be added;

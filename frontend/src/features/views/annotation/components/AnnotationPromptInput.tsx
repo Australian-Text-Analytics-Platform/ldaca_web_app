@@ -3,8 +3,7 @@
  *
  * Rendered by: AnnotationFeature, in the AnnotationAiSettings `children` slot
  * directly under the Example Data Block. It backs the instruction prompt that
- * will be sent to the provider alongside the text + class descriptions
- * (frontend-only for now; the backend wiring lands later).
+ * is sent to the provider alongside the text + class descriptions.
  *
  * Ghost-default UX (what the user asked for): while the field is empty the
  * default prompt shows grayed as the textarea placeholder. From there the user

@@ -195,14 +195,16 @@ translation, and extract connector handling cannot drift.
 `src/features/workspace/` contains the persistent right-side workspace surface:
 
 - `common/` provides `WorkspaceProvider`, workspace hooks, and selection utils.
-- `common/hooks/` holds column/selection hooks (`useAutoNodeColumns`,
-  `useSchemaManagement`, `useNodeColumnInfos`, etc.).
+- `common/hooks/` holds workspace column/schema hooks (`useSchemaManagement`,
+  `useNodeColumnInfos`, etc.). Analysis and preprocessing node-input ownership
+  lives under `features/views/common/nodeInputs/`, with tabbed analyses
+  persisting selections through `useWorkspaceTabs`.
 - `common/utils/` holds workspace-wide utilities (`selectionUtils`).
 - `graph-view/` maps backend graph data into React Flow nodes and edges.
 - `data-view/` renders the selected node's paginated table and column actions.
 - `data-view/hooks/` holds workspace data-table hooks (`useColumnMutations`, `useWorkspaceDataTable`). The shared server-pagination hook (`useServerTable`) and footer (`ServerPaginationFooter`) live in `features/views/common/`.
-- `data-view/utils/` holds column-type and persistence utilities (`columnTypes`,
-  `columnPersistence`).
+- `data-view/utils/` holds column-type utilities (`columnTypes`) and
+  data-view-specific helpers.
 - `task-stream/` owns the SSE client and task event integration.
 
 Workspace code should consume the slice hooks from `WorkspaceContext`, not a

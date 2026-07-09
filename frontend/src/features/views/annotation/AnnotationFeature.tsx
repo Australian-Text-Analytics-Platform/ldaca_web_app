@@ -61,7 +61,6 @@ const SOURCE_NODE_CONSTRAINTS: NodeInputConstraints = {
 const CLASS_DESCRIPTION_NODE_CONSTRAINTS: NodeInputConstraints = {
   allowedDataTypes: ['string'],
   maxNodes: 1,
-  exactStringColumns: 2,
 };
 const CLASS_DESCRIPTION_SELECTOR_ID = 'classDescriptions';
 // Optional example selector used only in AI mode: one string node whose text +
@@ -77,7 +76,7 @@ interface AnnotationFeatureProps {
   tabTaskId?: string | null;
   onTabTaskChange?: (taskId: string | null) => void;
   tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** This tab's persisted free-form settings (Manual/AI mode, provider, ...). */
   tabSettings?: Record<string, string>;
   /** Commit one persisted free-form setting for this tab (writes tabs.json). */
@@ -219,7 +218,8 @@ function AnnotationFeature({
     const nextModels = { ...aiProviderModels, [config.id]: config.model };
     persistAiProviderModels(nextModels);
     selectAiProvider(config.id, config.model);
-    const label = config.customProvider?.name ?? resolveAnnotationAiProvider(config.id, []).label;
+    const label =
+      config.customProvider?.name ?? resolveAnnotationAiProvider(config.id, [])?.label ?? config.id;
     toast.success(`Saved provider "${label}"`);
   };
 
@@ -378,7 +378,7 @@ function AnnotationFeature({
           queryKey: queryKeys.workspaceNodes(currentWorkspaceId),
         }),
       ]);
-      onTabInputSetChange?.(CLASS_DESCRIPTION_SELECTOR_ID, [{ node_id: data.id, column: 'class' }]);
+      onTabInputSetChange(CLASS_DESCRIPTION_SELECTOR_ID, [{ node_id: data.id, column: 'class' }]);
     } catch (error) {
       console.warn('[annotation] Failed to create class-description node:', error);
       toast.error('Could not create class descriptions');
@@ -440,6 +440,7 @@ function AnnotationFeature({
     classDescriptionNode && classDescriptionClassColumn && classDescriptionDescriptionColumn,
   );
   const canPreviewAi =
+    resolvedAiProvider != null &&
     Boolean(sourceNode) &&
     hasClassNodeForAi &&
     aiClassCount > 0 &&
@@ -759,7 +760,7 @@ function AnnotationFeature({
           getAuthHeaders={getAuthHeaders}
         />
       ) : null}
-      {annotationMode === 'ai' && isPreviewing && sourceNode ? (
+      {annotationMode === 'ai' && isPreviewing && sourceNode && resolvedAiProvider ? (
         <AnnotationAiPreviewPanel
           key={`${sourceNode.id}:${resolvedAnnotationColumn}:${resolvedAiProvider.id}:${aiModel}`}
           workspaceId={currentWorkspaceId ?? null}

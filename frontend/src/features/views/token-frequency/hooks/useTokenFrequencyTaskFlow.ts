@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { calculateTokenFrequencies } from '@/api';
 import type { TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
-import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
+import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import {
   resolveTokenFrequencyNodeContext,
   type TokenFrequencyAnalysisParams,

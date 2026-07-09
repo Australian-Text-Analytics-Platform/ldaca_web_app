@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   useNodeInputRequestsStore: vi.fn(),
   useRecentSelectionsStore: vi.fn(),
   useUIStore: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
@@ -36,6 +37,12 @@ vi.mock('@/stores/recentSelectionsStore', () => ({
 
 vi.mock('@/stores', () => ({
   useUIStore: mocks.useUIStore,
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    warning: mocks.toastWarning,
+  },
 }));
 
 function nodeInputRequestsStore(
@@ -132,6 +139,79 @@ describe('useTabNodeInputs', () => {
       { node_id: 'node-a', column: 'text' },
     ]);
     expect(consume).toHaveBeenCalledWith(8);
+  });
+
+  it('adds current-view graph requests even when no matching column is known yet', () => {
+    const consume = vi.fn();
+    const onTabInputSetChange = vi.fn();
+    mocks.useWorkspaceData.mockReturnValue({
+      currentWorkspaceId: 'workspace-1',
+      nodes: [
+        {
+          id: 'node-a',
+          name: 'Node A',
+          columns: [],
+        },
+      ],
+    });
+    mocks.useNodeColumnInfos.mockReturnValue({
+      getColumnInfos: () => [],
+    });
+    nodeInputRequestsStore({
+      requests: [{ id: 11, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
+      consume,
+    });
+
+    renderHook(() =>
+      useTabNodeInputs({
+        tabInputSets: { source: [] },
+        onTabInputSetChange,
+        constraints: { allowedDataTypes: ['string'], maxNodes: 1 },
+      }),
+    );
+
+    expect(onTabInputSetChange).toHaveBeenCalledWith('source', [
+      { node_id: 'node-a', column: '' },
+    ]);
+    expect(consume).toHaveBeenCalledWith(11);
+  });
+
+  it('toasts structural rejections from directly consumed graph add requests', () => {
+    const consume = vi.fn();
+    const onTabInputSetChange = vi.fn();
+    mocks.useWorkspaceData.mockReturnValue({
+      currentWorkspaceId: 'workspace-1',
+      nodes: [
+        {
+          id: 'node-a',
+          name: 'Node A',
+          columns: ['text'],
+          schema: { text: 'String' },
+        },
+        {
+          id: 'node-b',
+          name: 'Node B',
+          columns: ['text'],
+          schema: { text: 'String' },
+        },
+      ],
+    });
+    nodeInputRequestsStore({
+      requests: [{ id: 12, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-b'] }],
+      consume,
+    });
+
+    renderHook(() =>
+      useTabNodeInputs({
+        tabInputSets: { source: [{ node_id: 'node-a', column: 'text' }] },
+        onTabInputSetChange,
+        constraints: { allowedDataTypes: ['string'], maxNodes: 1 },
+      }),
+    );
+
+    expect(onTabInputSetChange).not.toHaveBeenCalled();
+    expect(mocks.toastWarning).toHaveBeenCalledWith(expect.stringContaining('single node'));
+    expect(consume).toHaveBeenCalledWith(12);
   });
 
   it('leaves current-view add requests pending when direct consumption is disabled', () => {

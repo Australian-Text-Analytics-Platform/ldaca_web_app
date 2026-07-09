@@ -11,6 +11,7 @@ import type { NodeInfo } from '@/lib/nodeInfo';
 import { useUIStore } from '@/stores';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
+import { toast } from 'sonner';
 import {
   DEFAULT_TAB_INPUT_SET_ID,
   getTabInputSet,
@@ -37,7 +38,7 @@ export interface UseTabNodeInputsConfig {
   /** All named input sets for the active tab. */
   tabInputSets?: AnalysisTabInputSets;
   /** Commit one named input set for the active tab (persists to tabs.json). */
-  onTabInputSetChange?: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** Per-view constraints (allowed column types, max nodes, document-only). */
   constraints: NodeInputConstraints;
   /** Whether graph/sidebar "+" requests should add directly to this selector. */
@@ -59,10 +60,6 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
   getNodeInfo: (node: NodeLike | null | undefined) => NodeInfo | undefined;
 }
 
-const NO_OP = (_inputs: AnalysisTabInput[]) => {
-  /* no-op fallback for an absent onChange handler */
-};
-
 /**
  * Binds a named analysis-tab input set to {@link useNodeInputs}, wiring in the
  * live workspace nodes, typed column metadata, and the graph selection used as
@@ -76,8 +73,9 @@ const NO_OP = (_inputs: AnalysisTabInput[]) => {
  * Flow: resolve the requested selector id from ``input_sets``, read live nodes
  * + graph selection, fetch
  * node-info metadata for the already-selected nodes, delegate to
- * ``useNodeInputs`` with the selector's value, then consume graph/sidebar "+"
- * requests directly by default. Multi-selector features pass
+ * ``useNodeInputs`` with the selector's value and required tab writer, then
+ * consume graph/sidebar "+" requests directly by default, reporting structural
+ * add rejections with a toast. Multi-selector features pass
  * ``consumeNodeInputRequests: false`` on every participating selector so the
  * request stays pending and the visible ``NodeInputsPanel`` instances render
  * the dashed chooser instead.
@@ -101,11 +99,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   );
   const onChange = useCallback(
     (nextInputs: AnalysisTabInput[]) => {
-      if (onTabInputSetChange) {
-        onTabInputSetChange(selectorId, nextInputs);
-        return;
-      }
-      NO_OP(nextInputs);
+      onTabInputSetChange(selectorId, nextInputs);
     },
     [selectorId, onTabInputSetChange],
   );
@@ -161,7 +155,13 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     );
     if (matching.length === 0) return;
     matching.forEach((request) => {
-      addNodes(request.nodeIds);
+      const rejections = addNodes(request.nodeIds);
+      if (rejections.length === 1) {
+        const rejection = rejections[0];
+        if (rejection) toast.warning(`Couldn't add node: ${rejection.reason}`);
+      } else if (rejections.length > 1) {
+        toast.warning(`Couldn't add ${String(rejections.length)} nodes (already added or full).`);
+      }
       consumeInputRequest(request.id);
     });
   }, [

@@ -65,9 +65,9 @@ export interface UseNodeInputsResult {
  * display model for the add-node-as-needed selection flow.
  *
  * Flow: resolve owned inputs against live nodes each render (dropping stale
- * ids), then expose mutators that validate at add-time (bounded by
- * ``maxNodes``, filtered by ``allowedDataTypes``/``docTypeOnly``) and commit
- * via ``onChange``.
+ * ids), then expose mutators that validate only structural add-time rules
+ * (existence, duplicates, max nodes) and commit via ``onChange``. Column type
+ * constraints only filter picker options/defaults; they do not block adding.
  */
 export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult {
   const { value, onChange, allNodes, constraints, getColumnInfos } = config;
@@ -100,7 +100,7 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
       const rejections: NodeAddRejection[] = [];
       const next = [...value];
       for (const id of ids) {
-        const reason = validateAdd(id, next, nodeMap, constraints, getColumnInfos);
+        const reason = validateAdd(id, next, nodeMap, constraints);
         if (reason) {
           rejections.push({ nodeId: id, reason });
           continue;
@@ -116,8 +116,8 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
   );
 
   const getAddRejection = useCallback(
-    (id: string): string | null => validateAdd(id, value, nodeMap, constraints, getColumnInfos),
-    [value, nodeMap, constraints, getColumnInfos],
+    (id: string): string | null => validateAdd(id, value, nodeMap, constraints),
+    [value, nodeMap, constraints],
   );
 
   const removeNode = useCallback(

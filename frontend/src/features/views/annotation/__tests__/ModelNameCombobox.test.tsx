@@ -40,7 +40,9 @@ function resolveForTest(providerId: string) {
       supportsModelListing: false,
     };
   }
-  return resolveAnnotationAiProvider(providerId, []);
+  const resolved = resolveAnnotationAiProvider(providerId, []);
+  if (!resolved) throw new Error(`Test provider did not resolve: ${providerId}`);
+  return resolved;
 }
 
 // Return a resolved SDK payload (matching `{ data: { models } }`) for a model id list.

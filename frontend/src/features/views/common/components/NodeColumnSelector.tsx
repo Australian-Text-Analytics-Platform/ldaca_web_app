@@ -50,15 +50,26 @@ export function NodeColumnSelector({
   triggerClassName,
   labelClassName,
 }: NodeColumnSelectorProps) {
+  const triggerAriaLabel = typeof label === 'string' ? label : undefined;
+
   if (!columns.length) {
     return (
-      <div
-        className={cn(
-          'rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive',
-          className,
+      <div className={cn('space-y-1', className)}>
+        {label && (
+          <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>
+            {label}
+          </span>
         )}
-      >
-        {noColumnsMessage}
+        <DisabledReasonTooltip reason={disabledReason} className="w-full">
+          <Select value="" onValueChange={onChange} disabled>
+            <SelectTrigger
+              aria-label={triggerAriaLabel}
+              className={cn('w-full text-sm', triggerClassName)}
+            >
+              <SelectValue placeholder={noColumnsMessage} />
+            </SelectTrigger>
+          </Select>
+        </DisabledReasonTooltip>
       </div>
     );
   }
@@ -77,7 +88,10 @@ export function NodeColumnSelector({
       )}
       <DisabledReasonTooltip reason={disabled ? disabledReason : undefined} className="w-full">
         <Select value={value} onValueChange={onChange} disabled={disabled}>
-          <SelectTrigger className={cn('w-full text-sm', triggerClassName)}>
+          <SelectTrigger
+            aria-label={triggerAriaLabel}
+            className={cn('w-full text-sm', triggerClassName)}
+          >
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
