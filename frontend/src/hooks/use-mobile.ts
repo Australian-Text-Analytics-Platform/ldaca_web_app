@@ -23,7 +23,7 @@ export const useIsMobile = (): boolean => {
     if (typeof window === 'undefined') return undefined;
     const mediaQuery = window.matchMedia(`(max-width: ${String(MOBILE_BREAKPOINT - 1)}px)`);
 
-    /** Syncs state from the MediaQueryList for both modern and legacy listener APIs. */
+    /** Syncs state from the MediaQueryList change event. */
     /** Used by: useIsMobile callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
     const handleChange = () => {
       setIsMobile(mediaQuery.matches);

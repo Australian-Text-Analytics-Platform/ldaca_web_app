@@ -1001,14 +1001,11 @@ export type BodyUploadWorkspaceZip = {
 /**
  * CastNodeInfo
  *
- * Metadata schema used by API responses to describe cast node info.
+ * Metadata returned for a completed cast operation.
  *
  * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - cast node response because the UI needs the original/resolved dtypes and
+ * effective format/strict options for feedback.
  */
 export type CastNodeInfo = {
     /**
@@ -1040,14 +1037,11 @@ export type CastNodeInfo = {
 /**
  * CastNodeRequest
  *
- * Request schema used by API routes and generated clients for cast node request.
+ * Request body for casting one node column.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - cast node route because it validates the column, target type, optional
+ * datetime format, and strict-mode flag before delegating to casting logic.
  */
 export type CastNodeRequest = {
     /**
@@ -1071,14 +1065,11 @@ export type CastNodeRequest = {
 /**
  * CastNodeResponse
  *
- * Response schema returned by API routes and consumed by generated clients for cast node response.
+ * Response returned after casting one node column.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - cast node route and generated clients because the route returns an action
+ * status plus typed cast metadata instead of a full node snapshot.
  */
 export type CastNodeResponse = {
     cast_info: CastNodeInfo;
@@ -1229,14 +1220,11 @@ export type ColumnUniqueValuesResponse = {
 /**
  * ConcatPreviewRequest
  *
- * Request schema used by API routes and generated clients for concat preview request.
+ * Request schema used by concat preview endpoints.
  *
  * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - concat preview and apply routes because both need the same node id list
+ * and deduplication flag before building aligned LazyFrames.
  */
 export type ConcatPreviewRequest = {
     /**
@@ -1252,14 +1240,11 @@ export type ConcatPreviewRequest = {
 /**
  * ConcatRequest
  *
- * Request schema used by API routes and generated clients for concat request.
+ * Request schema used when concatenation creates a persisted node.
  *
  * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - concat apply route because it extends the preview contract with an
+ * optional output node name.
  */
 export type ConcatRequest = {
     /**
@@ -2007,14 +1992,12 @@ export type FileInfoResponse = {
 /**
  * FilePreviewRequest
  *
- * Request schema used by API routes and generated clients for file preview request.
+ * Request body for previewing one user file.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - file preview route and preview helpers because they need the selected
+ * filename, pagination window, and optional format-specific payload such as
+ * an Excel sheet name.
  */
 export type FilePreviewRequest = {
     /**
@@ -2040,14 +2023,11 @@ export type FilePreviewRequest = {
 /**
  * FilePreviewResponse
  *
- * Response schema returned by API routes and consumed by generated clients for file preview response.
+ * Typed preview payload returned for supported user data files.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - file preview route and generated clients because the Data Loader needs
+ * explicit columns, preview rows, total row count, and sheet metadata.
  */
 export type FilePreviewResponse = {
     /**
@@ -2582,14 +2562,11 @@ export type MoveFileRequest = {
 /**
  * NodeActionResponse
  *
- * Response schema returned by API routes and consumed by generated clients for node action response.
+ * Response shared by node actions that do not need a full node payload.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - node delete route because the frontend only needs success state and a
+ * message after the workspace graph is invalidated.
  */
 export type NodeActionResponse = {
     /**
@@ -2704,14 +2681,11 @@ export type NodeDocumentColumnUpdateRequest = {
 /**
  * NodeOperationResponse
  *
- * Response schema returned by API routes and consumed by generated clients for node operation response.
+ * Response shared by node operations that create one child node.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - filter and slice apply routes because both return the child node id and
+ * display name after persisting a derived node.
  */
 export type NodeOperationResponse = {
     /**
@@ -3329,14 +3303,11 @@ export type RenameColumnRequest = {
 /**
  * ReplaceApplyResponse
  *
- * Response schema returned by API routes and consumed by generated clients for replace apply response.
+ * Response returned when a replace operation materializes a node column.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * - replace apply route because generated clients need the new node id,
+ * output column name, dtype, and user-facing completion message.
  */
 export type ReplaceApplyResponse = {
     /**
@@ -3367,11 +3338,11 @@ export type ReplaceApplyResponse = {
  * Request schema used by API routes and generated clients for replace request.
  *
  * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
+ * - replace node routes because replace/extract operations need one validated
+ * request body shared by preview and apply endpoints.
  *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Flow: validate the source/pattern/replacement fields and expose defaults
+ * used by the replace route helpers before they build Polars expressions.
  */
 export type ReplaceRequest = {
     /**

@@ -74,6 +74,13 @@ rescan should be added here before implementation.
 17. Removed the dead topic-modeling worker `corpus_indices` adapter parameter;
     corpus splitting now lives only in the payload builder that consumes
     `corpus_sizes`.
+18. Removed the backend model compatibility barrel. First-party code now imports
+    request/response schemas from explicit domain modules, and the generated
+    frontend client was refreshed from the updated OpenAPI schema descriptions.
+19. Removed concordance materialized-row compatibility handling for parquets
+    without the document column. Materialized concordance artifacts now require
+    the document column for grouping/binning, while display can still hide it
+    when the saved request did not select it.
 
 ## Findings
 

@@ -891,8 +891,8 @@ export const uploadWorkspaceZip = <ThrowOnError extends boolean = false>(options
  * should not depend on the backend-selected current workspace.
  *
  * Flow: let the UUID path converter reject static route names, delegate
- * deletion to the manager, and return the
- * same action response shape as the legacy query-parameter route.
+ * deletion to the manager, and return the standard workspace action
+ * response used by lifecycle mutations.
  */
 export const deleteWorkspaceById = <ThrowOnError extends boolean = false>(options: Options<DeleteWorkspaceByIdData, ThrowOnError>): RequestResult<DeleteWorkspaceByIdResponses, DeleteWorkspaceByIdErrors, ThrowOnError> => (options.client ?? client).delete<DeleteWorkspaceByIdResponses, DeleteWorkspaceByIdErrors, ThrowOnError>({ url: '/api/workspaces/{workspace_id}', ...options });
 
@@ -2112,7 +2112,7 @@ export const calculateTokenFrequencies = <ThrowOnError extends boolean = false>(
  * - Frontend clear action: `DELETE /workspaces/{id}/topic-modeling` because they need this unit's "Clear stored topic-modeling task state for a workspace" behavior.
  *
  * Why:
- * - Removes explicit topic-modeling task records for broad legacy clear actions.
+ * - Removes explicit topic-modeling task records for the requested workspace.
  */
 export const clearTopicModelingResults = <ThrowOnError extends boolean = false>(options: Options<ClearTopicModelingResultsData, ThrowOnError>): RequestResult<ClearTopicModelingResultsResponses, ClearTopicModelingResultsErrors, ThrowOnError> => (options.client ?? client).delete<ClearTopicModelingResultsResponses, ClearTopicModelingResultsErrors, ThrowOnError>({ url: '/api/workspaces/{workspace_id}/topic-modeling', ...options });
 

@@ -1170,7 +1170,7 @@
         "type": "object"
       },
       "CastNodeInfo": {
-        "description": "Metadata schema used by API responses to describe cast node info.\n\nUsed by:\n- backend request/response models because they need a stable JSON contract shared by\n  route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Metadata returned for a completed cast operation.\n\nUsed by:\n- cast node response because the UI needs the original/resolved dtypes and\n  effective format/strict options for feedback.",
         "properties": {
           "column": {
             "title": "Column",
@@ -1221,7 +1221,7 @@
         "type": "object"
       },
       "CastNodeRequest": {
-        "description": "Request schema used by API routes and generated clients for cast node request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Request body for casting one node column.\n\nUsed by:\n- cast node route because it validates the column, target type, optional\n  datetime format, and strict-mode flag before delegating to casting logic.",
         "properties": {
           "column": {
             "title": "Column",
@@ -1262,7 +1262,7 @@
         "type": "object"
       },
       "CastNodeResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for cast node response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Response returned after casting one node column.\n\nUsed by:\n- cast node route and generated clients because the route returns an action\n  status plus typed cast metadata instead of a full node snapshot.",
         "properties": {
           "cast_info": {
             "$ref": "#/components/schemas/CastNodeInfo"
@@ -1551,7 +1551,7 @@
         "type": "object"
       },
       "ConcatPreviewRequest": {
-        "description": "Request schema used by API routes and generated clients for concat preview request.\n\nUsed by:\n- backend API routes, backend request/response models, backend tests because they need a\n  stable JSON contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Request schema used by concat preview endpoints.\n\nUsed by:\n- concat preview and apply routes because both need the same node id list\n  and deduplication flag before building aligned LazyFrames.",
         "properties": {
           "deduplicate": {
             "default": true,
@@ -1574,7 +1574,7 @@
         "type": "object"
       },
       "ConcatRequest": {
-        "description": "Request schema used by API routes and generated clients for concat request.\n\nUsed by:\n- backend API routes, backend request/response models, backend tests because they need a\n  stable JSON contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Request schema used when concatenation creates a persisted node.\n\nUsed by:\n- concat apply route because it extends the preview contract with an\n  optional output node name.",
         "properties": {
           "deduplicate": {
             "default": true,
@@ -2582,7 +2582,7 @@
         "type": "object"
       },
       "FilePreviewRequest": {
-        "description": "Request schema used by API routes and generated clients for file preview request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Request body for previewing one user file.\n\nUsed by:\n- file preview route and preview helpers because they need the selected\n  filename, pagination window, and optional format-specific payload such as\n  an Excel sheet name.",
         "properties": {
           "filename": {
             "title": "Filename",
@@ -2618,7 +2618,7 @@
         "type": "object"
       },
       "FilePreviewResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for file preview response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Typed preview payload returned for supported user data files.\n\nUsed by:\n- file preview route and generated clients because the Data Loader needs\n  explicit columns, preview rows, total row count, and sheet metadata.",
         "properties": {
           "columns": {
             "items": {
@@ -3297,7 +3297,7 @@
         "type": "object"
       },
       "NodeActionResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for node action response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Response shared by node actions that do not need a full node payload.\n\nUsed by:\n- node delete route because the frontend only needs success state and a\n  message after the workspace graph is invalidated.",
         "properties": {
           "message": {
             "title": "Message",
@@ -3432,7 +3432,7 @@
         "type": "object"
       },
       "NodeOperationResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for node operation response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Response shared by node operations that create one child node.\n\nUsed by:\n- filter and slice apply routes because both return the child node id and\n  display name after persisting a derived node.",
         "properties": {
           "node_id": {
             "title": "Node Id",
@@ -4260,7 +4260,7 @@
         "type": "object"
       },
       "ReplaceApplyResponse": {
-        "description": "Response schema returned by API routes and consumed by generated clients for replace apply response.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Response returned when a replace operation materializes a node column.\n\nUsed by:\n- replace apply route because generated clients need the new node id,\n  output column name, dtype, and user-facing completion message.",
         "properties": {
           "column_name": {
             "title": "Column Name",
@@ -4301,7 +4301,7 @@
         "type": "object"
       },
       "ReplaceRequest": {
-        "description": "Request schema used by API routes and generated clients for replace request.\n\nUsed by:\n- backend API routes, backend request/response models because they need a stable JSON\n  contract shared by route handlers, generated clients, and tests.\n\nFlow: validate incoming API fields, apply defaults or validators, and serialize route\n    responses in the shape expected by frontend clients and tests.",
+        "description": "Request schema used by API routes and generated clients for replace request.\n\nUsed by:\n- replace node routes because replace/extract operations need one validated\n  request body shared by preview and apply endpoints.\n\nFlow: validate the source/pattern/replacement fields and expose defaults\n    used by the replace route helpers before they build Polars expressions.",
         "properties": {
           "connector": {
             "default": " ",
@@ -13115,7 +13115,7 @@
     },
     "/api/workspaces/{workspace_id}": {
       "delete": {
-        "description": "Delete the explicit workspace id in the path.\n\nUsed by:\n- frontend workspace manager delete actions and test cleanup because deletion\n  should not depend on the backend-selected current workspace.\n\nFlow: let the UUID path converter reject static route names, delegate\n    deletion to the manager, and return the\n    same action response shape as the legacy query-parameter route.",
+        "description": "Delete the explicit workspace id in the path.\n\nUsed by:\n- frontend workspace manager delete actions and test cleanup because deletion\n  should not depend on the backend-selected current workspace.\n\nFlow: let the UUID path converter reject static route names, delegate\n    deletion to the manager, and return the standard workspace action\n    response used by lifecycle mutations.",
         "operationId": "delete_workspace_by_id",
         "parameters": [
           {
@@ -24548,7 +24548,7 @@
     },
     "/api/workspaces/{workspace_id}/topic-modeling": {
       "delete": {
-        "description": "Clear stored topic-modeling task state for a workspace.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend clear action: `DELETE /workspaces/{id}/topic-modeling` because they need this unit's \"Clear stored topic-modeling task state for a workspace\" behavior.\n\nWhy:\n- Removes explicit topic-modeling task records for broad legacy clear actions.",
+        "description": "Clear stored topic-modeling task state for a workspace.\n\nFlow:\n- Resolve authentication and request parameters from FastAPI dependencies.\n- Delegate validation, manager calls, artifacts, or state changes to the owning helper.\n- Shape the response payload or raise the HTTP error the client should see.\n\nUsed by:\n- Frontend clear action: `DELETE /workspaces/{id}/topic-modeling` because they need this unit's \"Clear stored topic-modeling task state for a workspace\" behavior.\n\nWhy:\n- Removes explicit topic-modeling task records for the requested workspace.",
         "operationId": "clear_topic_modeling_results",
         "parameters": [
           {
