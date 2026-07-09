@@ -16,6 +16,7 @@ import type {
   QuotationRequest,
 } from '@/api';
 import { invalidateWorkspaceGraphQuery } from './workspaceMutationCache';
+import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceAnalysisMutationsParams {
   authHeaders: Record<string, string>;
@@ -49,6 +50,11 @@ export const useWorkspaceAnalysisMutations = ({
     }
     return currentWorkspaceId;
   };
+  const operationLifecycle = createWorkspaceOperationLifecycle({
+    startOperation,
+    endOperation,
+    setOperationError,
+  });
 
   const detachConcordanceMutation = useMutation({
     mutationFn: ({
@@ -66,17 +72,11 @@ export const useWorkspaceAnalysisMutations = ({
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data as AnalysisTaskActionResponse),
-    onMutate: () => {
-      startOperation('detachConcordance');
-    },
-    onSuccess: (_data, variables) => {
+    onMutate: operationLifecycle.onMutate('detachConcordance'),
+    onSuccess: operationLifecycle.onSuccess('detachConcordance', (_data, variables) => {
       invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
-      endOperation('detachConcordance');
-    },
-    onError: (error: Error) => {
-      setOperationError('detachConcordance', error.message);
-      endOperation('detachConcordance');
-    },
+    }),
+    onError: operationLifecycle.onError('detachConcordance'),
   });
 
   const detachConcordanceDispersionMutation = useMutation({
@@ -95,17 +95,14 @@ export const useWorkspaceAnalysisMutations = ({
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => ({ task_id: data.metadata?.task_id ?? undefined })),
-    onMutate: () => {
-      startOperation('detachConcordanceDispersion');
-    },
-    onSuccess: (_data, variables) => {
-      invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
-      endOperation('detachConcordanceDispersion');
-    },
-    onError: (error: Error) => {
-      setOperationError('detachConcordanceDispersion', error.message);
-      endOperation('detachConcordanceDispersion');
-    },
+    onMutate: operationLifecycle.onMutate('detachConcordanceDispersion'),
+    onSuccess: operationLifecycle.onSuccess(
+      'detachConcordanceDispersion',
+      (_data, variables) => {
+        invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
+      },
+    ),
+    onError: operationLifecycle.onError('detachConcordanceDispersion'),
   });
 
   const materializeConcordanceMutation = useMutation({
@@ -124,16 +121,9 @@ export const useWorkspaceAnalysisMutations = ({
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('materializeConcordance');
-    },
-    onSuccess: () => {
-      endOperation('materializeConcordance');
-    },
-    onError: (error: Error) => {
-      setOperationError('materializeConcordance', error.message);
-      endOperation('materializeConcordance');
-    },
+    onMutate: operationLifecycle.onMutate('materializeConcordance'),
+    onSuccess: operationLifecycle.onSuccess('materializeConcordance'),
+    onError: operationLifecycle.onError('materializeConcordance'),
   });
 
   const quotationMutation = useMutation({
@@ -144,16 +134,9 @@ export const useWorkspaceAnalysisMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('quotation');
-    },
-    onSuccess: () => {
-      endOperation('quotation');
-    },
-    onError: (error: Error) => {
-      setOperationError('quotation', error.message);
-      endOperation('quotation');
-    },
+    onMutate: operationLifecycle.onMutate('quotation'),
+    onSuccess: operationLifecycle.onSuccess('quotation'),
+    onError: operationLifecycle.onError('quotation'),
   });
 
   const detachQuotationMutation = useMutation({
@@ -172,17 +155,11 @@ export const useWorkspaceAnalysisMutations = ({
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data as AnalysisTaskActionResponse),
-    onMutate: () => {
-      startOperation('detachQuotation');
-    },
-    onSuccess: (_data, variables) => {
+    onMutate: operationLifecycle.onMutate('detachQuotation'),
+    onSuccess: operationLifecycle.onSuccess('detachQuotation', (_data, variables) => {
       invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
-      endOperation('detachQuotation');
-    },
-    onError: (error: Error) => {
-      setOperationError('detachQuotation', error.message);
-      endOperation('detachQuotation');
-    },
+    }),
+    onError: operationLifecycle.onError('detachQuotation'),
   });
 
   const materializeQuotationMutation = useMutation({
@@ -201,16 +178,9 @@ export const useWorkspaceAnalysisMutations = ({
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('materializeQuotation');
-    },
-    onSuccess: () => {
-      endOperation('materializeQuotation');
-    },
-    onError: (error: Error) => {
-      setOperationError('materializeQuotation', error.message);
-      endOperation('materializeQuotation');
-    },
+    onMutate: operationLifecycle.onMutate('materializeQuotation'),
+    onSuccess: operationLifecycle.onSuccess('materializeQuotation'),
+    onError: operationLifecycle.onError('materializeQuotation'),
   });
 
   const actions = useMemo(

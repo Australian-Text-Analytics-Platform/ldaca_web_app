@@ -207,7 +207,17 @@ await runAnalysisSubmit({
 
 Only do this if it makes two or three hooks shorter in practice. A too-generic task-flow abstraction would be worse than the current duplication.
 
-### 9. Add a small operation-lifecycle helper for workspace mutations
+### ~~9. Add a small operation-lifecycle helper for workspace mutations~~
+
+Status 2026-07-09:
+
+Implemented. `frontend/src/features/workspace/common/hooks/workspaceMutationLifecycle.ts`
+now centralizes operation start, success cleanup, and error reporting for
+workspace mutations. Graph, transform, analysis, and management mutation hooks
+use the helper while keeping their per-mutation cache invalidation, selection,
+rollback, and toast side effects local. A follow-up scan found no direct
+`startOperation`, `endOperation`, or `setOperationError` calls left in the
+workspace mutation hooks outside the helper.
 
 Evidence:
 

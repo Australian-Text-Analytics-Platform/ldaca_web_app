@@ -11,6 +11,7 @@ import {
 import { ApiError } from '@/lib/apiError';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateWorkspaceSummaries, isWorkspaceDetailQueryKey } from './workspaceMutationCache';
+import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceManagementMutationsParams {
   authHeaders: Record<string, string>;
@@ -48,6 +49,11 @@ export const useWorkspaceManagementMutations = ({
     }
     return currentWorkspaceId;
   };
+  const operationLifecycle = createWorkspaceOperationLifecycle({
+    startOperation,
+    endOperation,
+    setOperationError,
+  });
 
   const setCurrentWorkspaceOnServer = async (workspaceId: string | null) => {
     const setCurrent = () =>
@@ -78,17 +84,19 @@ export const useWorkspaceManagementMutations = ({
     { previousId: string | null }
   >({
     mutationFn: (workspaceId: string | null) => setCurrentWorkspaceOnServer(workspaceId),
-    onMutate: async (workspaceId: string | null) => {
-      startOperation('setCurrentWorkspace');
-      const previousId = currentWorkspaceId;
-      if (!workspaceId && previousId) {
-        await queryClient.cancelQueries({
-          predicate: ({ queryKey }) => isWorkspaceDetailQueryKey(queryKey, previousId),
-        });
-      }
-      return { previousId };
-    },
-    onSuccess: (_data, workspaceId, context) => {
+    onMutate: operationLifecycle.onMutate(
+      'setCurrentWorkspace',
+      async (workspaceId: string | null) => {
+        const previousId = currentWorkspaceId;
+        if (!workspaceId && previousId) {
+          await queryClient.cancelQueries({
+            predicate: ({ queryKey }) => isWorkspaceDetailQueryKey(queryKey, previousId),
+          });
+        }
+        return { previousId };
+      },
+    ),
+    onSuccess: operationLifecycle.onSuccess('setCurrentWorkspace', (_data, workspaceId, context) => {
       const previousId = context.previousId ?? null;
       const nextId = workspaceId ?? null;
       setCurrentWorkspaceId(nextId);
@@ -105,12 +113,8 @@ export const useWorkspaceManagementMutations = ({
       }
 
       void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
-      endOperation('setCurrentWorkspace');
-    },
-    onError: (error: Error) => {
-      setOperationError('setCurrentWorkspace', error.message);
-      endOperation('setCurrentWorkspace');
-    },
+    }),
+    onError: operationLifecycle.onError('setCurrentWorkspace'),
   });
 
   const createWorkspaceMutation = useMutation({
@@ -120,10 +124,8 @@ export const useWorkspaceManagementMutations = ({
         headers: authHeaders,
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('createWorkspace');
-    },
-    onSuccess: (data) => {
+    onMutate: operationLifecycle.onMutate('createWorkspace'),
+    onSuccess: operationLifecycle.onSuccess('createWorkspace', (data) => {
       const newWorkspaceId = (data.id as string | undefined) ?? null;
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
       if (newWorkspaceId) {
@@ -131,12 +133,8 @@ export const useWorkspaceManagementMutations = ({
         clearSelection();
         void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
       }
-      endOperation('createWorkspace');
-    },
-    onError: (error: Error) => {
-      setOperationError('createWorkspace', error.message);
-      endOperation('createWorkspace');
-    },
+    }),
+    onError: operationLifecycle.onError('createWorkspace'),
   });
 
   const deleteWorkspaceMutation = useMutation({
@@ -150,22 +148,19 @@ export const useWorkspaceManagementMutations = ({
         throwOnError: true,
       }).then(({ data }) => data);
     },
-    onMutate: () => {
-      startOperation('deleteWorkspace');
-    },
-    onSuccess: (data: Record<string, unknown>, workspaceId) => {
-      const deletedWorkspaceId = (data.id as string | undefined) ?? workspaceId;
-      if (currentWorkspaceId && deletedWorkspaceId === currentWorkspaceId) {
-        setCurrentWorkspaceId(null);
-        clearSelection();
-      }
-      invalidateWorkspaceSummaries(queryClient);
-      endOperation('deleteWorkspace');
-    },
-    onError: (error: Error) => {
-      setOperationError('deleteWorkspace', error.message);
-      endOperation('deleteWorkspace');
-    },
+    onMutate: operationLifecycle.onMutate('deleteWorkspace'),
+    onSuccess: operationLifecycle.onSuccess(
+      'deleteWorkspace',
+      (data: Record<string, unknown>, workspaceId) => {
+        const deletedWorkspaceId = (data.id as string | undefined) ?? workspaceId;
+        if (currentWorkspaceId && deletedWorkspaceId === currentWorkspaceId) {
+          setCurrentWorkspaceId(null);
+          clearSelection();
+        }
+        invalidateWorkspaceSummaries(queryClient);
+      },
+    ),
+    onError: operationLifecycle.onError('deleteWorkspace'),
   });
 
   const saveWorkspaceMutation = useMutation({
@@ -177,16 +172,9 @@ export const useWorkspaceManagementMutations = ({
         throwOnError: true,
       }).then(({ data }) => data);
     },
-    onMutate: () => {
-      startOperation('saveWorkspace');
-    },
-    onSuccess: () => {
-      endOperation('saveWorkspace');
-    },
-    onError: (error: Error) => {
-      setOperationError('saveWorkspace', error.message);
-      endOperation('saveWorkspace');
-    },
+    onMutate: operationLifecycle.onMutate('saveWorkspace'),
+    onSuccess: operationLifecycle.onSuccess('saveWorkspace'),
+    onError: operationLifecycle.onError('saveWorkspace'),
   });
 
   const updateWorkspaceNameMutation = useMutation({
@@ -199,17 +187,11 @@ export const useWorkspaceManagementMutations = ({
         throwOnError: true,
       }).then(({ data }) => data);
     },
-    onMutate: () => {
-      startOperation('updateWorkspaceName');
-    },
-    onSuccess: () => {
+    onMutate: operationLifecycle.onMutate('updateWorkspaceName'),
+    onSuccess: operationLifecycle.onSuccess('updateWorkspaceName', () => {
       invalidateWorkspaceSummaries(queryClient);
-      endOperation('updateWorkspaceName');
-    },
-    onError: (error: Error) => {
-      setOperationError('updateWorkspaceName', error.message);
-      endOperation('updateWorkspaceName');
-    },
+    }),
+    onError: operationLifecycle.onError('updateWorkspaceName'),
   });
 
   const updateWorkspaceDescriptionMutation = useMutation({
@@ -222,17 +204,11 @@ export const useWorkspaceManagementMutations = ({
         throwOnError: true,
       }).then(({ data }) => data);
     },
-    onMutate: () => {
-      startOperation('updateWorkspaceDescription');
-    },
-    onSuccess: () => {
+    onMutate: operationLifecycle.onMutate('updateWorkspaceDescription'),
+    onSuccess: operationLifecycle.onSuccess('updateWorkspaceDescription', () => {
       invalidateWorkspaceSummaries(queryClient);
-      endOperation('updateWorkspaceDescription');
-    },
-    onError: (error: Error) => {
-      setOperationError('updateWorkspaceDescription', error.message);
-      endOperation('updateWorkspaceDescription');
-    },
+    }),
+    onError: operationLifecycle.onError('updateWorkspaceDescription'),
   });
 
   const actions = useMemo(
@@ -242,7 +218,7 @@ export const useWorkspaceManagementMutations = ({
       createWorkspace: (name: string, description?: string) =>
         createWorkspaceMutation.mutateAsync({ name, description }),
       deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
-      saveWorkspace: () => saveWorkspaceMutation.mutateAsync(),
+      saveWorkspace: () => saveWorkspaceMutation.mutateAsync(undefined),
       renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
       updateWorkspaceDescription: (description: string) =>
         updateWorkspaceDescriptionMutation.mutateAsync(description),

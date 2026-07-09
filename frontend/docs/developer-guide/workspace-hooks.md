@@ -36,7 +36,9 @@ slice they need.
     detach, and materialize actions.
   - `workspaceMutationCache.ts`, `workspaceCreatedNodeSelection.ts`, and
     `workspaceSchemaRefresh.ts` hold shared cache, selection, and schema-refresh
-    helpers used by those groups.
+    helpers used by those groups. `workspaceMutationLifecycle.ts` builds the
+    shared TanStack mutation callbacks for starting operations, ending them on
+    success, and recording operation errors after rollback work.
 
 `useWorkspaceUiStateSync()` hydrates and persists backend-owned workspace UI
 state through `ui_state.json`; source-node visualization colours are durable

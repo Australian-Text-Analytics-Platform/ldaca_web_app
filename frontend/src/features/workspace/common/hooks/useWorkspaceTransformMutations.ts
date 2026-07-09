@@ -23,6 +23,7 @@ import {
   invalidateNodeWorkspaceQueries,
   invalidateWorkspaceGraphQuery,
 } from './workspaceMutationCache';
+import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceTransformMutationsParams {
   authHeaders: Record<string, string>;
@@ -56,6 +57,11 @@ export const useWorkspaceTransformMutations = ({
     }
     return currentWorkspaceId;
   };
+  const operationLifecycle = createWorkspaceOperationLifecycle({
+    startOperation,
+    endOperation,
+    setOperationError,
+  });
 
   const filterNodeMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: FilterRequestPayload }) =>
@@ -65,17 +71,11 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(() => undefined),
-    onMutate: () => {
-      startOperation('filterNode');
-    },
-    onSuccess: () => {
+    onMutate: operationLifecycle.onMutate('filterNode'),
+    onSuccess: operationLifecycle.onSuccess('filterNode', () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
-      endOperation('filterNode');
-    },
-    onError: (error: Error) => {
-      setOperationError('filterNode', error.message);
-      endOperation('filterNode');
-    },
+    }),
+    onError: operationLifecycle.onError('filterNode'),
   });
 
   const replaceTextMutation = useMutation({
@@ -86,20 +86,14 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('replaceText');
-    },
-    onSuccess: (_response, variables) => {
+    onMutate: operationLifecycle.onMutate('replaceText'),
+    onSuccess: operationLifecycle.onSuccess('replaceText', (_response, variables) => {
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, variables.nodeId, {
         includeData: true,
         includeSchema: true,
       });
-      endOperation('replaceText');
-    },
-    onError: (error: Error) => {
-      setOperationError('replaceText', error.message);
-      endOperation('replaceText');
-    },
+    }),
+    onError: operationLifecycle.onError('replaceText'),
   });
 
   const sliceNodeMutation = useMutation({
@@ -110,17 +104,11 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('sliceNode');
-    },
-    onSuccess: () => {
+    onMutate: operationLifecycle.onMutate('sliceNode'),
+    onSuccess: operationLifecycle.onSuccess('sliceNode', () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
-      endOperation('sliceNode');
-    },
-    onError: (error: Error) => {
-      setOperationError('sliceNode', error.message);
-      endOperation('sliceNode');
-    },
+    }),
+    onError: operationLifecycle.onError('sliceNode'),
   });
 
   const castNodeMutation = useMutation({
@@ -141,21 +129,15 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('castNode');
-    },
-    onSuccess: (_data, variables) => {
+    onMutate: operationLifecycle.onMutate('castNode'),
+    onSuccess: operationLifecycle.onSuccess('castNode', (_data, variables) => {
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, variables.nodeId, {
         includeNodeInfo: true,
         includeData: true,
         includeSchema: true,
       });
-      endOperation('castNode');
-    },
-    onError: (error: Error) => {
-      setOperationError('castNode', error.message);
-      endOperation('castNode');
-    },
+    }),
+    onError: operationLifecycle.onError('castNode'),
   });
 
   const renameColumnMutation = useMutation({
@@ -174,20 +156,14 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), column_name: column, node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('renameColumn');
-    },
-    onSuccess: (_data, variables) => {
+    onMutate: operationLifecycle.onMutate('renameColumn'),
+    onSuccess: operationLifecycle.onSuccess('renameColumn', (_data, variables) => {
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, variables.nodeId, {
         includeData: true,
         includeSchema: true,
       });
-      endOperation('renameColumn');
-    },
-    onError: (error: Error) => {
-      setOperationError('renameColumn', error.message);
-      endOperation('renameColumn');
-    },
+    }),
+    onError: operationLifecycle.onError('renameColumn'),
   });
 
   const deleteColumnMutation = useMutation({
@@ -197,20 +173,14 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), column_name: column, node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
-    onMutate: () => {
-      startOperation('deleteColumn');
-    },
-    onSuccess: (_data, variables) => {
+    onMutate: operationLifecycle.onMutate('deleteColumn'),
+    onSuccess: operationLifecycle.onSuccess('deleteColumn', (_data, variables) => {
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, variables.nodeId, {
         includeData: true,
         includeSchema: true,
       });
-      endOperation('deleteColumn');
-    },
-    onError: (error: Error) => {
-      setOperationError('deleteColumn', error.message);
-      endOperation('deleteColumn');
-    },
+    }),
+    onError: operationLifecycle.onError('deleteColumn'),
   });
 
   const actions = useMemo(
