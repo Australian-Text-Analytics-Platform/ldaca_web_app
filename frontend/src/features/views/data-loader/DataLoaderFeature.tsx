@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
@@ -27,6 +27,58 @@ import { DataLoaderDialogs } from './components/DataLoaderDialogs';
 import { SampleDataPanel } from './components/SampleDataPanel';
 import { countFilesInNode } from './utils/fileTreeHelpers';
 import { getWorkspaceId } from './utils/format';
+
+interface FileListShellProps {
+  children: ReactNode;
+  creatingFolder: boolean;
+  isDropActive: boolean;
+  empty?: boolean;
+  onCreateRootFolder: () => void;
+}
+
+/**
+ * Shared frame for the Data Loader file list.
+ *
+ * Rendered by: DataLoaderFeature for both empty and populated file-list states
+ * because those branches share the root-folder toolbar, bordered drop-state
+ * styling, and scroll-constrained frame while keeping their actual body content
+ * different.
+ */
+function FileListShell({
+  children,
+  creatingFolder,
+  isDropActive,
+  empty = false,
+  onCreateRootFolder,
+}: FileListShellProps) {
+  let stateClasses = '';
+  if (isDropActive) {
+    stateClasses = empty ? 'border-primary text-foreground' : 'border-primary';
+  } else if (empty) {
+    stateClasses = 'border-muted-foreground/60 text-muted-foreground border-dashed';
+  }
+
+  return (
+    <div
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border ${stateClasses}`}
+    >
+      <div className="border-border/60 flex items-center justify-start border-b px-2 py-1.5">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
+          onClick={onCreateRootFolder}
+          disabled={creatingFolder}
+          aria-label="Add root folder"
+          title="Add root folder"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 /**
  * Orchestrates the Data Loader tab. It exists as the feature shell that wires
@@ -401,49 +453,28 @@ function DataLoaderFeature() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading files…
                   </div>
                 ) : totalFileCount === 0 ? (
-                  <div
-                    className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border ${isFileDropActive ? 'border-primary text-foreground' : 'border-muted-foreground/60 text-muted-foreground border-dashed'}`}
+                  <FileListShell
+                    creatingFolder={creatingFolder}
+                    isDropActive={isFileDropActive}
+                    empty
+                    onCreateRootFolder={() => {
+                      openCreateFolderDialog('', 'root');
+                    }}
                   >
-                    <div className="border-border/60 flex items-center justify-start border-b px-2 py-1.5">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
-                        onClick={() => {
-                          openCreateFolderDialog('', 'root');
-                        }}
-                        disabled={creatingFolder}
-                        aria-label="Add root folder"
-                        title="Add root folder"
-                      >
-                        <FolderPlus className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
                     <div className="flex flex-1 items-start px-4 py-3 text-sm">
                       {isFileDropActive
                         ? 'Drop files here to upload them.'
                         : 'No files found. Upload a dataset to begin.'}
                     </div>
-                  </div>
+                  </FileListShell>
                 ) : (
-                  <div
-                    className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border ${isFileDropActive ? 'border-primary' : ''}`}
+                  <FileListShell
+                    creatingFolder={creatingFolder}
+                    isDropActive={isFileDropActive}
+                    onCreateRootFolder={() => {
+                      openCreateFolderDialog('', 'root');
+                    }}
                   >
-                    <div className="border-border/60 flex items-center justify-start border-b px-2 py-1.5">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
-                        onClick={() => {
-                          openCreateFolderDialog('', 'root');
-                        }}
-                        disabled={creatingFolder}
-                        aria-label="Add root folder"
-                        title="Add root folder"
-                      >
-                        <FolderPlus className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
                     <ScrollArea className="min-h-0 flex-1">
                       <div className="flex flex-col gap-0.5 p-2">
                         <FileTree
@@ -471,7 +502,7 @@ function DataLoaderFeature() {
                         />
                       </div>
                     </ScrollArea>
-                  </div>
+                  </FileListShell>
                 )}
               </div>
               <div className="text-muted-foreground flex shrink-0 flex-wrap items-center justify-between gap-3 text-xs">

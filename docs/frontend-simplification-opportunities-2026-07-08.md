@@ -333,7 +333,15 @@ If a full barrel is desired, add all public stores and migrate imports carefully
 
 ## Lower Confidence Or Opportunistic
 
-### 15. Simplify Data Loader file-list scaffolding
+### ~~15. Simplify Data Loader file-list scaffolding~~
+
+Status 2026-07-09:
+
+Implemented opportunistically. `DataLoaderFeature.tsx` now uses a local
+`FileListShell` for the shared root-folder toolbar, file-list frame, and
+drop-state styling across empty and populated file-list states. The body content
+stays inline so the feature still owns the actual empty message and `FileTree`
+workflow without creating another exported component.
 
 Evidence:
 
