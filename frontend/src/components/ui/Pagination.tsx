@@ -26,7 +26,7 @@ function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
   );
 }
 
-/** Used by: Pagination consumers to wrap page links, jump controls, and ellipses because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: Pagination consumers to wrap page links, jump controls, and ellipses. */
 function PaginationContent({ className, ...props }: React.ComponentProps<'ul'>) {
   return (
     <ul
@@ -37,7 +37,7 @@ function PaginationContent({ className, ...props }: React.ComponentProps<'ul'>) 
   );
 }
 
-/** Used by: Pagination consumers for each page link or ellipsis item because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: Pagination consumers for each page link or ellipsis item. */
 function PaginationItem({ ...props }: React.ComponentProps<'li'>) {
   return <li data-slot="pagination-item" {...props} />;
 }
@@ -201,7 +201,7 @@ export function PaginationJump({
   );
 }
 
-/** Used by: pagination footers for numeric pages and previous/next controls because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: pagination footers for numeric pages and previous/next controls. */
 function PaginationLink({ className, isActive, size = 'icon', ...props }: PaginationLinkProps) {
   return (
     <a
@@ -256,7 +256,7 @@ function PaginationNext({ className, ...props }: React.ComponentProps<typeof Pag
   );
 }
 
-/** Used by: pagination footers when compact ranges hide intermediate pages because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: pagination footers when compact ranges hide intermediate pages. */
 function PaginationEllipsis({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span

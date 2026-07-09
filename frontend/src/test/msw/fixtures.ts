@@ -1,7 +1,7 @@
 import type { NodeDataResponse, RuntimeConfigResponse, UserPreferences } from '@/api';
 
 /** Builds backend runtime-config responses for MSW handlers while letting tests override fields. */
-/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: tests in this file. */
 export const configResponse = (
   overrides: Partial<RuntimeConfigResponse> = {},
 ): RuntimeConfigResponse => ({

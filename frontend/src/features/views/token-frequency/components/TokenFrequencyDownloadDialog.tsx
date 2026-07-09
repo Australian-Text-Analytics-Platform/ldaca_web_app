@@ -35,7 +35,7 @@ interface TokenFrequencyDownloadDialogProps {
   onConfirm: (options: { format: string; includeStopWords: boolean }) => void;
 }
 
-/** Used by: TokenFrequencyDownloadDialogContent to select the initial export format for the current mode because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: TokenFrequencyDownloadDialogContent to select the initial export format for the current mode. */
 const getDefaultFormat = (mode: DownloadDialogMode) => (mode === 'wordcloud' ? 'png' : 'csv');
 
 interface TokenFrequencyDownloadDialogContentProps {
@@ -63,7 +63,7 @@ const TokenFrequencyDownloadDialogContent = ({
       ? 'Choose image format for the word cloud export.'
       : 'Choose file format for the frequency data export.';
 
-  /** Called by: TokenFrequencyDownloadDialogContent action button to confirm export options and close because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Called by: TokenFrequencyDownloadDialogContent action button to confirm export options and close. */
   const handleConfirm = (e: React.MouseEvent) => {
     e.preventDefault();
     onConfirm({ format: selectedFormat, includeStopWords });

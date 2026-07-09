@@ -192,7 +192,7 @@ function resolveMergedStopwords(
 }
 
 /** Async facade for UI actions that may later load stopword sources dynamically. */
-/** Used by: src/features/views/token-frequency/hooks/useTokenFrequencyPreferences.ts, src/lib/__tests__/loadMergedStopwords.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/features/views/token-frequency/hooks/useTokenFrequencyPreferences.ts, src/lib/__tests__/loadMergedStopwords.test.ts. */
 // eslint-disable-next-line @typescript-eslint/require-await
 export async function loadMergedStopwords(args: {
   languages: readonly (string | null | undefined)[];

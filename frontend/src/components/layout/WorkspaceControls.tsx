@@ -24,7 +24,7 @@ const MIN_BATCH_DELETE_COUNT = 1;
  * Workspace graph toolbar used above the graph pane. It centralizes workspace
  * rename, help, and batch-delete controls so the graph feature can focus on
  * node rendering and selection state.
- * Rendered by: WorkspaceView above the graph canvas because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Rendered by: WorkspaceView above the graph canvas.
  * Flow: read workspace and selection state, prepare selected-delete metadata, manage rename/delete dialogs, then render toolbar controls.
  *
  * ``onToggleCollapse`` (optional): renders the collapse/expand button in the
@@ -68,7 +68,7 @@ export function WorkspaceControls({
       .sort((a, b) => a.name.localeCompare(b.name));
   })();
 
-  /** Called by: the WorkspaceControls batch-delete confirmation action because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: the WorkspaceControls batch-delete confirmation action. */
   const handleBatchDelete = async () => {
     if (!canBatchDelete || isDeleting) return;
     setIsDeleting(true);
@@ -84,7 +84,7 @@ export function WorkspaceControls({
     }
   };
 
-  /** Called by: WorkspaceControls inline rename input blur and keyboard handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: WorkspaceControls inline rename input blur and keyboard handlers. */
   const handleRenameCommit = async () => {
     if (!isEditing) {
       return;

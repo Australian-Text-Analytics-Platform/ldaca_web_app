@@ -21,7 +21,7 @@ export interface AnalysisFeatureHeaderProps {
 /**
  * Shared header for every analytic tool's primary card. Owns the
  * title + info/help icons in a shared ``<CardHeader>`` block.
- * Used by: concordance parameter panel because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: concordance parameter panel.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function AnalysisFeatureHeader({

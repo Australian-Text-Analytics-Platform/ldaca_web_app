@@ -17,7 +17,7 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
   );
 }
 
-/** Used by: feature panels that render app-styled segmented tab controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+/** Used by: feature panels that render app-styled segmented tab controls. */
 function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
@@ -31,7 +31,7 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
   );
 }
 
-/** Used by: TabsList consumers for each selectable tab because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: TabsList consumers for each selectable tab. */
 function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger

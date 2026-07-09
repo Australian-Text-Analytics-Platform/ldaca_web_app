@@ -87,9 +87,6 @@ export const clipTextAroundSpans = (
   }
 
   // Reprojects original span coordinates into the clipped text window consumed by renderers.
-  /**
-   * Called by: clipTextAroundSpans during this analysis workflow because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
-   */
   const projectSpans = (sliceStart: number, sliceEnd: number) =>
     spans
       .map((span) => {
@@ -114,9 +111,6 @@ export const clipTextAroundSpans = (
   }
 
   // Finds the word containing or immediately before a span start boundary.
-  /**
-   * Called by: clipTextAroundSpans during this analysis workflow because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
-   */
   const findWordIndexBeforeOrAt = (pos: number) => {
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
@@ -132,9 +126,6 @@ export const clipTextAroundSpans = (
   };
 
   // Finds the word containing or immediately after a span end boundary.
-  /**
-   * Called by: clipTextAroundSpans during this analysis workflow because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
-   */
   const findWordIndexAfterOrAt = (pos: number) => {
     for (let i = 0; i < words.length; i++) {
       const word = words[i];

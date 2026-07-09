@@ -100,7 +100,7 @@ const SingleNodeWordCloud = memo(
     );
     const minFontSize = Math.max(SINGLE_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
     const maxFrequency = Math.max(1, ...words.map((w) => w.value));
-    /** Used by: SingleNodeWordCloud Wordcloud prop to scale each cloud word by frequency because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: SingleNodeWordCloud Wordcloud prop to scale each cloud word by frequency. */
     const fontSizeSetter = (datum: { value: number }) =>
       Math.max(
         minFontSize,
@@ -188,7 +188,7 @@ const TokenFrequencySingleTokenSectionInner = ({
   const isSyncingScrollRef = useRef(false);
 
   /**
-   * Called by: per-node token list scroll containers to keep rows visually aligned across cards because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Called by: per-node token list scroll containers to keep rows visually aligned across cards.
    * Flow: ignore recursive sync events, copy the source scrollTop to sibling token lists, then release the sync guard.
    */
   const handleListScroll = (sourceIndex: number) => (event: React.UIEvent<HTMLDivElement>) => {
@@ -221,7 +221,7 @@ const TokenFrequencySingleTokenSectionInner = ({
   // list display limit) across cards so ranks don't shift when filtering.
   const tokenFilterTrimmed = tokenFilter.trim();
   const tokenFilterRegex = tokenFilterTrimmed ? wildcardToRegExp(tokenFilterTrimmed) : null;
-  /** Used by: TokenFrequencySingleTokenSectionInner list rows to test visibility under the current filter because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Used by: TokenFrequencySingleTokenSectionInner list rows to test visibility under the current filter. */
   const matchesTokenFilter = (token: string): boolean => {
     if (!tokenFilterTrimmed) return true;
     if (!tokenFilterRegex) {

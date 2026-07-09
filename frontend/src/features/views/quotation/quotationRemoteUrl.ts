@@ -31,7 +31,6 @@ export const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
   const isHttpScheme = /^https?:\/\//i.test(trimmed);
 
   // Reuses URL parsing to validate candidate endpoints after optional scheme insertion.
-  // Called by: normalizeRemoteUrl for raw and scheme-prefixed URL candidates because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
   const canParse = (candidate: string) => {
     try {
       const parsed = new URL(candidate);

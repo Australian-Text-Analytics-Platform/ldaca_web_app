@@ -35,7 +35,7 @@ interface TokenizerModelSelectorProps {
 /**
  * Lets token-based analysis panels choose a tokenizer model for the selected
  * source column, using sampled text to group backend models by detected language.
- * Used by: concordance and token-frequency parameter panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: concordance and token-frequency parameter panels.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 function TokenizerModelSelector({
@@ -62,7 +62,7 @@ function TokenizerModelSelector({
     queryKey: queryKeys.tokenizerModels,
     enabled: false,
     staleTime: 10 * 60_000,
-    /** Called by: TanStack Query when the selector opens and requests model inventory because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Called by: TanStack Query when the selector opens and requests model inventory. */
     queryFn: async () => {
       const { data } = await getTokenizerModels({
         headers: getAuthHeaders(),

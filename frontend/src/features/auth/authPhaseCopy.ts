@@ -22,7 +22,7 @@ export const formatTimestamp = (value?: number | null): string | null => {
   });
 };
 
-/** Called by: authPhaseCopy status builders and RefreshStatusBanner retry copy because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: authPhaseCopy status builders and RefreshStatusBanner retry copy. */
 export const formatAttemptLabel = (attempts: number): string =>
   `${String(Math.min(attempts, REFRESH_FAILURE_THRESHOLD))}/${String(REFRESH_FAILURE_THRESHOLD)}`;
 

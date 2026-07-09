@@ -6,7 +6,7 @@ import { createClientConfig, getGeneratedApiBase } from '@/lib/backend/generated
 const originalFetch = global.fetch;
 
 /** Narrows optional generated fetch config before exercising the wrapped SDK request path. */
-/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: tests in this file. */
 const requireFetch = (fetchImpl: typeof fetch | undefined): typeof fetch => {
   if (!fetchImpl) throw new Error('Expected generated client config to provide fetch');
   return fetchImpl;

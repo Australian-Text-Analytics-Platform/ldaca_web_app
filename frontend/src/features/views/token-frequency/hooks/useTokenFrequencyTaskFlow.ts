@@ -61,7 +61,7 @@ interface UseTokenFrequencyTaskFlowParams {
 
 /** Owns submit, result hydration, and cross-feature navigation for token-frequency tasks. */
 /**
- * Used by: TokenFrequencyFeature.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Used by: TokenFrequencyFeature.tsx.
  * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
  */
 export const useTokenFrequencyTaskFlow = ({
@@ -104,7 +104,7 @@ export const useTokenFrequencyTaskFlow = ({
 
   /** Builds and submits a token-frequency request from the current selection state. */
   /**
-   * Called by: useTokenFrequencyTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: useTokenFrequencyTaskFlow through JSX event props or task lifecycle callbacks.
    * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
    */
   const handleAnalyze = async () => {

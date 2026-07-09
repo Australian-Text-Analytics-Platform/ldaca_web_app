@@ -21,7 +21,7 @@ interface ChartContextValue {
 /** Chart configuration context consumed by chart tooltip components. */
 const ChartContext = React.createContext<ChartContextValue | null>(null);
 
-/** Called by: chart tooltip render helpers that need ChartContainer config because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+/** Called by: chart tooltip render helpers that need ChartContainer config. */
 const useChartContext = () => {
   const context = React.useContext(ChartContext);
   if (!context) {
@@ -30,7 +30,7 @@ const useChartContext = () => {
   return context;
 };
 
-/** Called by: ChartContainer and ChartTooltipContent when deriving series CSS variables because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: ChartContainer and ChartTooltipContent when deriving series CSS variables. */
 const slug = (key: string) => key.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement> {

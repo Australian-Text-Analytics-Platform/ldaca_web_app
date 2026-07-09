@@ -15,7 +15,7 @@ interface Props {
 
 const DEFAULT_BAR_COLOR = '#0284c7';
 
-/** Used by: ConcordanceDispersionCell to normalize source offsets before plotting hit markers because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: ConcordanceDispersionCell to normalize source offsets before plotting hit markers. */
 const getNumericIndex = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(0, value);

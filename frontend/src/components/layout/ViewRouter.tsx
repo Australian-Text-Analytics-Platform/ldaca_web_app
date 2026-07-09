@@ -73,7 +73,7 @@ const Fallback = () => (
  * Renders the active analysis/data feature selected by the global UI store.
  * App shell routes users here so feature modules can remain lazy-loaded and
  * isolated behind a shared error boundary.
- * Rendered by: App inside the workspace content pane because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Rendered by: App inside the workspace content pane.
  */
 export function ViewRouter() {
   const currentView = useUIStore((state) => state.currentView);

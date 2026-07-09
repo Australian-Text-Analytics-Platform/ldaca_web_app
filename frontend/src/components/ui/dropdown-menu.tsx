@@ -175,7 +175,7 @@ const DropdownMenuSeparator = React.forwardRef<
 ));
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
-/** Used by: dropdown menu items that display trailing keyboard shortcut hints because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: dropdown menu items that display trailing keyboard shortcut hints. */
 const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
   return (
     <span className={cn('ml-auto text-xs tracking-widest opacity-60', className)} {...props} />

@@ -73,11 +73,11 @@ global.ResizeObserver = class ResizeObserver {
       this,
     );
   }
-  /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: tests in this file. */
   unobserve() {
     /* no-op mock */
   }
-  /** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: tests in this file. */
   disconnect() {
     /* no-op mock */
   }

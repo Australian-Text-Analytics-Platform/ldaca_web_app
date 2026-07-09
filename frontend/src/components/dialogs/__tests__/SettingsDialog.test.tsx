@@ -34,7 +34,7 @@ type PreferenceTestState = Partial<ReturnType<typeof usePreferencesStore.getStat
   analysisMultiTabEnabled: boolean;
 };
 
-/** Used by: SettingsDialog tests because each test needs a deterministic preferences store snapshot before rendering the dialog. */
+/** Resets the preferences store to a deterministic snapshot before rendering. */
 function resetPreferenceState(analysisMultiTabEnabled = false) {
   usePreferencesStore.setState({
     hiddenViews: [],

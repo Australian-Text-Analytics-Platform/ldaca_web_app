@@ -9,7 +9,7 @@ import { queryKeys } from '@/lib/queryKeys';
 const refreshAuth = vi.fn();
 /** Workspace reset mock used to verify changing data roots unloads the active workspace first. */
 const setCurrentWorkspace = vi.fn();
-/** Used by: the generated SDK module factory to inspect admin config update payloads because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: the generated SDK module factory to inspect admin config update payloads. */
 const updateAdminConfig = vi.fn();
 
 vi.mock('sonner', () => ({
@@ -21,12 +21,12 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/api/generated/sdk.gen', () => ({
-  /** Used by: the generated SDK module mock to assert DataFolderDialog updateAdminConfig calls because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: the generated SDK module mock to assert DataFolderDialog updateAdminConfig calls. */
   updateAdminConfig: (...args: unknown[]) => updateAdminConfig(...args),
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
-  /** Used by: DataFolderDialog tests to supply auth state and refresh behavior because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: DataFolderDialog tests to supply auth state and refresh behavior. */
   useAuth: () => ({
     dataFolder: '/tmp/original',
     refreshAuth,
@@ -34,7 +34,7 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  /** Used by: DataFolderDialog tests to supply the active-workspace fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: DataFolderDialog tests to supply the active-workspace fixture. */
   useWorkspaceData: () => ({
     currentWorkspaceId: 'ws-1',
   }),

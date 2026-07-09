@@ -105,12 +105,12 @@ export function TopicModelingParameterPanel({
   }));
   const topicSizeValueDraft =
     topicSizeDraft.source === topicSizeValue ? topicSizeDraft.value : String(topicSizeValue);
-  // Called by: topic-size input change handler while preserving placeholder/user-set semantics because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+  // Called by: topic-size input change handler while preserving placeholder/user-set semantics.
   const setTopicSizeValueDraft = (value: string) => {
     setTopicSizeDraft({ source: topicSizeValue, value });
   };
 
-  // Called by: topic-size input blur handler to commit bounded integer values because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+  // Called by: topic-size input blur handler to commit bounded integer values.
   const handleTopicSizeValueBlur = (event: FocusEvent<HTMLInputElement>) => {
     const raw = Number(event.currentTarget.value);
     const next = Math.max(2, isNaN(raw) ? 2 : Math.round(raw));
@@ -128,7 +128,7 @@ export function TopicModelingParameterPanel({
     representativeWordsDraft.source === representativeWordsCount
       ? representativeWordsDraft.value
       : String(representativeWordsCount);
-  // Called by: words-per-topic input change handler before validation on blur because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+  // Called by: words-per-topic input change handler before validation on blur.
   const setRepresentativeWordsCountDraft = (value: string) => {
     setRepresentativeWordsDraft({ source: representativeWordsCount, value });
   };
@@ -141,7 +141,7 @@ export function TopicModelingParameterPanel({
     ? Math.max(50, 2 * representativeWordsCountServerMax)
     : 50;
 
-  // Called by: words-per-topic input blur handler to commit within the backend-supported cap because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+  // Called by: words-per-topic input blur handler to commit within the backend-supported cap.
   const handleRepresentativeWordsCountBlur = (event: FocusEvent<HTMLInputElement>) => {
     const raw = Number(event.currentTarget.value);
     const rounded = Number.isFinite(raw) ? Math.round(raw) : 3;

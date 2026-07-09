@@ -32,7 +32,7 @@ const statusStyles: Record<
 /**
  * Shows task-store banner state above analysis results while a queued or running
  * backend task owns the next refresh for the active feature.
- * Used by: task-backed analysis feature screens because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: task-backed analysis feature screens.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 function AnalysisTaskBanner({

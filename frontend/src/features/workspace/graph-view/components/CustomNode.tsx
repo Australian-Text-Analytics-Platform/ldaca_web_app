@@ -231,8 +231,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     if (!showMenu) return;
     /**
      * Closes the node menu when a captured pointer event lands outside it.
-     * Called by: CustomNode internal event, effect, or helper flow.
-     * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
      */
     const handlePointerDown = (event: Event) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -247,8 +245,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Opens delete confirmation without letting the graph select the node.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -257,8 +253,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Confirms deletion through the graph action passed from useWorkspaceGraph.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleDeleteConfirm = () => {
     if (node.node_id) {
@@ -269,8 +263,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Starts inline rename mode from the node settings menu.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleRenameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -283,8 +275,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Submits the inline node rename form.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleRenameSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -297,8 +287,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Leaves inline rename mode without changing the node name.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleRenameCancel = () => {
     dispatchUi({ type: 'cancel-rename' });
@@ -306,8 +294,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Lets Escape cancel inline rename without graph interaction.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleRenameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -317,8 +303,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Clones the node from the settings menu.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleCopyNode = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -330,8 +314,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Runs node undo when the backend reports it is available.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleUndoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -343,8 +325,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Runs node redo when the backend reports it is available.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleRedoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -356,8 +336,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Copies the node id for debugging and user support workflows.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const handleCopyId = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -393,8 +371,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
 
   /**
    * Formats row/column counts for the node shape label.
-   * Called by: CustomNode internal event, effect, or helper flow.
-   * Why: because node rendering helpers need to map graph metadata, selection state, and action affordances into one card.
    */
   const formatShapePart = (value: number | null | undefined) =>
     typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';

@@ -35,7 +35,7 @@ export interface NodeSelectionListProps {
  * palette colour by position so chart legends and metadata slots stay
  * consistent; callers can use the render slots to place matching controls in
  * the card body.
- * Used by: NodeInputsPanel and shared node-selection tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: NodeInputsPanel and shared node-selection tests.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function NodeSelectionList({

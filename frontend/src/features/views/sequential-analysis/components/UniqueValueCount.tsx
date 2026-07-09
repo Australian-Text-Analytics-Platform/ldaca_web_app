@@ -18,7 +18,7 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.columnUniqueValues(workspaceId, nodeId, columnName),
-    // Used by: UniqueValueCount query to fetch metadata that informs group-by decisions because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+    // Used by: UniqueValueCount query to fetch metadata that informs group-by decisions.
     queryFn: async () => {
       const { data: response } = await getColumnUniqueValues({
         headers: getAuthHeaders(),

@@ -153,13 +153,13 @@ const TokenFrequencyFeature = ({
     hydrationTaskId: tabTaskId ?? null,
     resultRef,
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<TokenFrequencyResponse>(currentWorkspaceId, taskId, headers);
     },
     /** Fetches the saved task request so a reopened task can restore panel state. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
@@ -170,7 +170,7 @@ const TokenFrequencyFeature = ({
       );
     },
     /** Pushes fetched task results into guarded component state. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onResultFetched: (result) => {
       // Restore the compared node ids from the authoritative result, not just
       // the raw result blob. onResultFetched and onHydratedResult race on a
@@ -191,7 +191,7 @@ const TokenFrequencyFeature = ({
       setResultSafely(result);
     },
     /** Rehydrates controls from a persisted result when the feature reconnects to a task. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedResult: (result) => {
       if (!result) return;
       const requestData = result.analysis_params ?? {};
@@ -214,7 +214,7 @@ const TokenFrequencyFeature = ({
       }
     },
     /** Rehydrates node selections from a persisted request payload after task recovery. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedRequest: (requestPayload) => {
       const raw = requestPayload as Record<string, unknown> | null;
       const req = raw?.data ?? raw;
@@ -232,7 +232,7 @@ const TokenFrequencyFeature = ({
       setStudyNodeId(nodeIds[1] ?? null);
     },
     /** Clears local result and selection state when the feature reset action runs. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
       setResultSafely(null);
       if (options?.preserveLocalState) {
@@ -246,7 +246,7 @@ const TokenFrequencyFeature = ({
       resetPreferenceUiState();
     },
     /** Removes token-frequency tasks from the shared analysis store after local cleanup. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
     },

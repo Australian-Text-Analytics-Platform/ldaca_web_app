@@ -51,7 +51,7 @@ interface Props {
 const OVERLAY_BTN =
   'flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
-// Used by: buildTopicsCSV to escape topic labels and representative words for optional CSV export because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+// Used by: buildTopicsCSV to escape topic labels and representative words for optional CSV export.
 const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
 
 // Used by: topic-modeling chart downloads because optional CSV bundles must mirror selected-topic ordering and visible corpus columns. Flow: sort selected topics first, build topic/corpus headers, escape cells, then join rows as CSV.

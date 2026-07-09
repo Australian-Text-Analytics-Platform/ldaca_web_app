@@ -3,7 +3,7 @@
  * Generated-client wrappers and hooks throw this so UI surfaces can branch on
  * `status`/`code` without knowing which transport produced the failure.
  */
-/** Used by: src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/lib/backend/__tests__/generatedClientConfig.test.ts, src/lib/backend/generatedClientConfig.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/lib/backend/__tests__/generatedClientConfig.test.ts, src/lib/backend/generatedClientConfig.ts. */
 export class ApiError extends Error {
   status?: number;
   code?: string;

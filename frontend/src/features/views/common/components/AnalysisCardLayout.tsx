@@ -45,7 +45,7 @@ interface AnalysisCardLayoutProps {
 /**
  * Provides the shared card chrome for analysis feature panels, including help
  * affordances and consistent run/stop/clear controls.
- * Used by: analysis panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: analysis panels.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function AnalysisCardLayout({

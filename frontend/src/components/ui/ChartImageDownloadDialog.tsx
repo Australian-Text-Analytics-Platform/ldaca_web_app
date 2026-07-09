@@ -44,14 +44,14 @@ const ChartImageDownloadDialogContent = ({
     Object.fromEntries(extraOptions.map((opt) => [opt.id, opt.defaultChecked ?? false])),
   );
 
-  /** Called by: ChartImageDownloadDialogContent Download action because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: ChartImageDownloadDialogContent Download action. */
   const handleConfirm = (e: React.MouseEvent) => {
     e.preventDefault();
     onConfirm(selectedFormat, extraStates);
     onOpenChange(false);
   };
 
-  /** Called by: ChartImageDownloadDialogContent extra-option checkboxes because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: ChartImageDownloadDialogContent extra-option checkboxes. */
   const toggleExtra = (id: string, checked: boolean) => {
     setExtraStates((prev) => ({ ...prev, [id]: checked }));
   };

@@ -152,7 +152,7 @@ const CHART_MODE_LABELS: Record<ConcordanceDispersionChartMode, string> = {
 };
 
 /**
- * Used by: ConcordanceDispersionSummary axis and tooltip labels to format a bin range as a human-friendly string. For sufficiently wide bins because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: ConcordanceDispersionSummary axis and tooltip labels to format a bin range as a human-friendly string. For sufficiently wide bins.
  * (≥ 2 % each, i.e. binCount ≤ 50) we use non-overlapping integer ranges with
  * a +1 increment ("0-5%", "6-10%"). For narrower bins we fall back to
  * one-decimal fractional ranges so the labels stay accurate.
@@ -174,13 +174,13 @@ const formatBinRange = (binCenter: number, binCount: number): string => {
 
 const SOURCE_DASH_STYLES: (string | undefined)[] = [undefined, '6 4'];
 
-/** Used by: ConcordanceDispersionSummary chart axis to format ticks as relative-position percentages because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: ConcordanceDispersionSummary chart axis to format ticks as relative-position percentages. */
 const formatTickLabel = (value: number): string => {
   if (!Number.isFinite(value)) return '';
   return `${String(Math.round(value))}%`;
 };
 
-/** Used by: ConcordanceDispersionSummary legend/count derivation to split combined text/source series keys because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: ConcordanceDispersionSummary legend/count derivation to split combined text/source series keys. */
 const stripSeriesKey = (key: string): { text: string; source: string | null } => {
   const idx = key.indexOf(DISPERSION_SOURCE_DELIMITER);
   if (idx === -1) return { text: key, source: null };
@@ -544,7 +544,7 @@ export function ConcordanceDispersionSummary({
       : null;
 
   /**
-   * Called by: ConcordanceDispersionSummary download dialog to export the rendered chart because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Called by: ConcordanceDispersionSummary download dialog to export the rendered chart.
    * Flow: verify the chart SVG exists, assemble export header and legend metadata, then download the dispersion chart or show a toast error.
    */
   const handleDownload = async (format: ChartImageFormat) => {

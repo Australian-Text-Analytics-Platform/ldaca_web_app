@@ -16,7 +16,7 @@ export interface NodeSnapshot {
  * `{ column: canonicalType }` map regardless of backend wire format.
  */
 /**
- * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts, src/hooks/__tests__/useSchemaManagement.test.tsx.
  * Flow: accept array or object schema payloads, normalize type names, and default malformed values to string columns.
  */
 export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
@@ -162,7 +162,7 @@ interface SchemaManagementConfig {
  * @returns Schema state and utilities
  */
 /**
- * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/hooks/__tests__/useSchemaManagement.test.tsx because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/hooks/__tests__/useSchemaManagement.test.tsx.
  * Flow: subscribe to the canonical node-info query while unlocked, preserve locked schema during runs, then expose effective schema and column options.
  */
 export function useSchemaManagement(config: SchemaManagementConfig) {
@@ -180,7 +180,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     }),
     select: normalizeSchemaFromInfo,
     /** Fetches schema through node info so cast/preprocessing invalidations refresh column types. */
-    /** Called by: TanStack Query inside useSchemaManagement because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
+    /** Called by: TanStack Query inside useSchemaManagement. */
     enabled: !!nodeId && !isLocked && !!workspaceId,
     staleTime: 0,
   });

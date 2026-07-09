@@ -212,7 +212,7 @@ function Sidebar() {
   const visibleNavItems = NAV_ITEMS.filter(({ id }) => visibleViews.includes(id));
 
   /**
-   * Called by: Sidebar's Views section body renderer because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+   * Called by: Sidebar's Views section body renderer.
    * Flow: map visible views to sidebar buttons and disable workspace-only views until a workspace loads.
    */
   const renderViewsBody = () => (

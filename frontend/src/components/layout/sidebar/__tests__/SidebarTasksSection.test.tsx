@@ -13,7 +13,7 @@ const baseProps = {
   onReconnect: vi.fn(),
 };
 
-/** Called by: SidebarTasksSection tests that need compact task fixture rendering because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Called by: SidebarTasksSection tests that need compact task fixture rendering. */
 const renderTasks = (tasks: SidebarTaskRecord[]) =>
   render(<SidebarTasksSection {...baseProps} tasks={tasks} />);
 

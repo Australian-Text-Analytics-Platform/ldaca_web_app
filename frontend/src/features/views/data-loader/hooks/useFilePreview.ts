@@ -28,7 +28,7 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.filePreview(filename ?? '', page, pageSize, selectedSheet),
     /** Loads the current preview page only when the dialog has a filename to display. */
-    /** Called by: TanStack Query inside useFilePreview because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
+    /** Called by: TanStack Query inside useFilePreview. */
     queryFn: async () => {
       if (!filename) throw new Error('No filename provided');
       const headers = getAuthHeaders();

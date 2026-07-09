@@ -26,7 +26,7 @@ interface Props {
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
-/** Used by: TopicSelectionPanel filtering to check whether a topic is inside the current zoom domain because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: TopicSelectionPanel filtering to check whether a topic is inside the current zoom domain. */
 function isTopicInDomain(topic: TopicLike, domain: ZoomDomain): boolean {
   if (topic.x == null || topic.y == null) return true;
   return (

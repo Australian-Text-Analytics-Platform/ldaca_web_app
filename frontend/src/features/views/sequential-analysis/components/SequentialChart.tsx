@@ -35,7 +35,7 @@ const readOnlyDisabledReason = (readOnly: boolean, fallback?: string | false) =>
   return fallback || undefined;
 };
 
-// Used by: SequentialChart numeric-axis data mapping to convert row periods into Recharts x-coordinates because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+// Used by: SequentialChart numeric-axis data mapping to convert row periods into Recharts x-coordinates.
 const toNumericX = (row: SequentialAnalysisDatum): number => {
   const raw = row.period_start ?? row.time_period;
   if (typeof raw === 'number') return raw;
@@ -46,7 +46,7 @@ const toNumericX = (row: SequentialAnalysisDatum): number => {
   return Number.isNaN(asNumber) ? Number.NaN : asNumber;
 };
 
-// Used by: SequentialChart numeric x-axis config to format timestamp-like ticks as dates because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+// Used by: SequentialChart numeric x-axis config to format timestamp-like ticks as dates.
 const formatNumericTick = (value: unknown): string => {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return '';

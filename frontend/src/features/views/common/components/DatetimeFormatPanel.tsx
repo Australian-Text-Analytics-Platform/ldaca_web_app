@@ -50,7 +50,7 @@ export function DatetimeFormatPanel({ open, onClose, ...contentProps }: Datetime
  * Datetime format form used inside `DatetimeFormatPanel`. It lets users accept
  * an inferred Python `strftime` format or provide one manually before the
  * preprocessing feature submits the conversion.
- * Rendered by: DatetimeFormatPanel while the conversion dialog is open because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps.
+ * Rendered by: DatetimeFormatPanel while the conversion dialog is open.
  * Flow: infer the initial format from samples, manage custom and auto-fill state, then render cancel/auto-fill/convert controls.
  */
 function DatetimeFormatPanelContent({

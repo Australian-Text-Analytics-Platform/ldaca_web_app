@@ -12,7 +12,7 @@ const CORE_COLUMN_SET = new Set<string>(CONCORDANCE_CORE_COLUMNS);
 
 /** Normalizes concordance offsets that may arrive from local rows or server JSON. */
 /**
- * Called by: concordanceViewModels analysis helper module as a local helper in this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Called by: concordanceViewModels analysis helper module as a local helper in this analysis workflow.
  */
 const getNumericIndex = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -43,7 +43,7 @@ export const toCellText = (value: unknown): string =>
 
 /** Flattens grouped concordance hits for the standard table-oriented view. */
 /**
- * Used by: concordanceViewModels.test.ts, ConcordanceTableNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: concordanceViewModels.test.ts, ConcordanceTableNodeBlock.tsx.
  */
 export function flattenConcordanceGroups(groups: ConcordanceGroupedRow[]): ConcordanceHitRow[] {
   return groups.flatMap((group) => group);
@@ -158,7 +158,7 @@ export function buildCombinedSlice(
 
 /** Converts hit groups into one dispersion row per source document for chart consumers. */
 /**
- * Used by: concordanceViewModels.test.ts, ConcordanceDispersionNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: concordanceViewModels.test.ts, ConcordanceDispersionNodeBlock.tsx.
  */
 export function buildDispersionRows(groups: ConcordanceGroupedRow[]): ConcordanceDispersionRow[] {
   return groups.flatMap((group) => {
@@ -182,7 +182,7 @@ export function buildDispersionRows(groups: ConcordanceGroupedRow[]): Concordanc
 
 /** Reads the hidden grouped-hit payload that powers dispersion table cells and charts. */
 /**
- * Used by: ConcordanceDispersionNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: ConcordanceDispersionNodeBlock.tsx.
  */
 export function getDispersionHits(row: Record<string, unknown>): ConcordanceGroupedRow {
   return row[CONCORDANCE_COLUMN_KEYS.dispersion] as ConcordanceGroupedRow;
@@ -190,7 +190,7 @@ export function getDispersionHits(row: Record<string, unknown>): ConcordanceGrou
 
 /** Chooses the source text length used to scale dispersion positions for a row. */
 /**
- * Used by: ConcordanceDispersionNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: ConcordanceDispersionNodeBlock.tsx.
  */
 export function getDispersionTextLength(row: Record<string, unknown>, textColumn: string): number {
   const textValue = row[textColumn];
@@ -206,7 +206,7 @@ export function getDispersionTextLength(row: Record<string, unknown>, textColumn
 
 /** Scales a document's dispersion bar relative to the longest displayed source text. */
 /**
- * Used by: concordanceViewModels.test.ts, ConcordanceDispersionNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: concordanceViewModels.test.ts, ConcordanceDispersionNodeBlock.tsx.
  */
 export function getDispersionBarWidthPercent(
   row: Record<string, unknown>,
@@ -255,7 +255,7 @@ export const DISPERSION_AGGREGATE_KEY = '__dispersion_total__';
  * would visually skip empty bins instead of dropping to zero.
  */
 /**
- * Called by: concordanceViewModels analysis helper module during this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Called by: concordanceViewModels analysis helper module during this analysis workflow.
  */
 const fillEmptyBins = (bins: DispersionBinDatum[], totalsByKey: Record<string, number>): void => {
   const keys = Object.keys(totalsByKey);
@@ -274,7 +274,7 @@ export interface BuildDispersionBinsResult {
 
 /** Builds normalized hit-count bins from raw grouped rows for client-side previews. */
 /**
- * Used by: ConcordanceDispersionSummary.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: ConcordanceDispersionSummary.tsx.
  * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
  */
 export function buildDispersionBins(
@@ -675,7 +675,7 @@ export type ConcordanceDispersionChartMode = (typeof CONCORDANCE_DISPERSION_CHAR
 
 /** Guards user or persisted preferences before re-binning server dispersion data. */
 /**
- * Called by: concordanceViewModels analysis helper module during this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Called by: concordanceViewModels analysis helper module during this analysis workflow.
  */
 const isValidDisplayBinCount = (n: number): n is DispersionDisplayBinCount =>
   (DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(n);
@@ -686,7 +686,7 @@ const isValidDisplayBinCount = (n: number): n is DispersionDisplayBinCount =>
  * if it doesn't we fall back to {@link DISPERSION_DEFAULT_BIN_COUNT}.
  */
 /**
- * Used by: ConcordanceDispersionSummary.tsx, ConcordanceDispersionNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: ConcordanceDispersionSummary.tsx, ConcordanceDispersionNodeBlock.tsx.
  * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
  */
 export function buildDispersionBinsFromBinned(
@@ -746,7 +746,7 @@ export function buildDispersionBinsFromBinned(
  * chart's tooltip and the detached node name.
  */
 /**
- * Used by: useConcordanceTaskFlow.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useConcordanceTaskFlow.ts.
  * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
  */
 export function formatBinIndicesAsRangeLabel(
@@ -798,7 +798,7 @@ export function formatBinIndicesAsRangeLabel(
  * neither value is reportable so callers can suppress the suffix.
  */
 /**
- * Used by: ConcordanceTableNodeBlock.tsx, ConcordanceDispersionNodeBlock.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: ConcordanceTableNodeBlock.tsx, ConcordanceDispersionNodeBlock.tsx.
  */
 export function batchProcessedCount(
   pagination: { page_size?: number; total_source_rows?: number } | undefined,

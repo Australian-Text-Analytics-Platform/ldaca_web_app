@@ -177,7 +177,7 @@ function QuotationFeature({
 
   // Opens the shared error dialog with a fallback message for unexpected quotation failures.
   /**
-   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   * Called by: QuotationFeature during this analysis workflow.
    * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
    */
   const showErrorDialog = (message: string) => {
@@ -220,7 +220,7 @@ function QuotationFeature({
     hydrationTaskId: tabTaskId ?? null,
     resultRef: quotationResultRef,
     // Loads the latest quotation result for polling and task resumption.
-    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       const data = await getAnalysisTaskResult<QuotationAnalysisResponse>(
@@ -231,7 +231,7 @@ function QuotationFeature({
       return isQuotationAnalysisResponse(data) ? data : null;
     },
     // Retrieves the submitted quotation request so hydration can restore engine and selection state.
-    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
@@ -242,7 +242,7 @@ function QuotationFeature({
       );
     },
     // Applies freshly fetched results to the active node table after lifecycle polling finishes.
-    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onResultFetched: (result, _taskId) => {
       // defensive: the analysis lifecycle may deliver an empty result on edge cases
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -258,7 +258,7 @@ function QuotationFeature({
       setHasLoaded(true);
     },
     // Rebuilds result state from a cached task payload when the quotation tab hydrates.
-    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onHydratedResult: (resultPayload) => {
       const res = resultPayload;
       if (!res) return;
@@ -294,7 +294,7 @@ function QuotationFeature({
       );
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
-    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
       setIsClearing(false);
       setHasLoaded(false);
@@ -468,7 +468,7 @@ function QuotationFeature({
   };
 
   /**
-   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   * Called by: QuotationFeature during this analysis workflow.
    * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const effHandlePageChange = (newPage: number) => {
@@ -477,7 +477,7 @@ function QuotationFeature({
 
   // Applies page-size changes to live task results.
   /**
-   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   * Called by: QuotationFeature during this analysis workflow.
    * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const effHandlePageSizeChange = (newSize: number) => {
@@ -486,7 +486,7 @@ function QuotationFeature({
 
   // Applies column sorting to live task results.
   /**
-   * Called by: QuotationFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   * Called by: QuotationFeature during this analysis workflow.
    * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const effHandleSort = (nodeId: string, columnName: string) => {
@@ -510,17 +510,17 @@ function QuotationFeature({
           }}
           actions={{
             // Routes the Run button through live quotation execution.
-            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
             onRun: () => {
               void handleRunOrUpdate();
             },
             // Stops the active quotation task from the shared layout action.
-            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
             onStop: () => {
               void stopTask();
             },
             // Clears live quotation state and backend results from the shared layout action.
-            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+            // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
             onClear: async () => {
               if (!currentWorkspaceId) return;
               setIsClearing(true);

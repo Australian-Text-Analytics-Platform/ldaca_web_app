@@ -32,7 +32,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
-  /** Used by: WorkspaceControls tests to provide action spies because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: WorkspaceControls tests to provide action spies. */
   useWorkspaceActions: () => ({
     renameWorkspace: vi.fn(),
     deleteNode: vi.fn().mockResolvedValue(undefined),
@@ -41,7 +41,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
-  /** Used by: WorkspaceControls tests to expose the mutable selected-node fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: WorkspaceControls tests to expose the mutable selected-node fixture. */
   useWorkspaceSelection: () => ({
     selectedNodeIds: selectionState.selectedNodeIds,
   }),

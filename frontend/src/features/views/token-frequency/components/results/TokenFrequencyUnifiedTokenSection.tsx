@@ -60,7 +60,7 @@ interface TokenFrequencyUnifiedTokenSectionProps {
   tokenFilter?: string;
 }
 
-/** Used by: TokenFrequencyUnifiedTokenSectionInner to parse backend statistic values for unified-cloud scoring because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: TokenFrequencyUnifiedTokenSectionInner to parse backend statistic values for unified-cloud scoring. */
 const parseStatisticsNumericValue = (value: unknown): number => {
   if (value === null || value === undefined) return NaN;
   if (value === '+Inf') return Number.POSITIVE_INFINITY;
@@ -163,7 +163,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
 
   const maxCloudTotal = Math.max(1, ...selectedCloudStats.map((s) => s.total || 0));
 
-  /** Used by: TokenFrequencyUnifiedTokenSectionInner color blending to convert hex swatches into RGB channels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Used by: TokenFrequencyUnifiedTokenSectionInner color blending to convert hex swatches into RGB channels. */
   const hexToRgb = (hex: string) => {
     const h = hex.replace('#', '');
     return {
@@ -172,17 +172,17 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
       b: parseInt(h.substring(4, 6), 16),
     };
   };
-  /** Used by: blend to convert RGB channels back into a hex swatch for SVG text fill because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Used by: blend to convert RGB channels back into a hex swatch for SVG text fill. */
   const rgbToHex = (r: number, g: number, b: number) =>
     `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
   const colorA = hexToRgb(nodeAColor);
   const colorB = hexToRgb(nodeBColor);
   /**
-   * Used by: unified word-cloud Text fill to blend between study and reference colors because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Used by: unified word-cloud Text fill to blend between study and reference colors.
    * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const blend = (t: number) => {
-    /** Used by: blend to interpolate one RGB channel for the unified cloud gradient because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: blend to interpolate one RGB channel for the unified cloud gradient. */
     const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
     const r = Math.round(lerp(colorB.r, colorA.r, t));
     const g = Math.round(lerp(colorB.g, colorA.g, t));
@@ -225,7 +225,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     ),
   );
   const minFontSize = Math.max(UNIFIED_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
-  /** Used by: TokenFrequencyUnifiedTokenSectionInner Wordcloud prop to scale words within measured bounds because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Used by: TokenFrequencyUnifiedTokenSectionInner Wordcloud prop to scale words within measured bounds. */
   const fontSizeSetter = (datum: { value: number }) =>
     Math.max(
       minFontSize,

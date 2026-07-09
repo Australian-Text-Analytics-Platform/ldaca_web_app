@@ -17,7 +17,7 @@ const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_en
 
 // Compares period boundary values so grouped rows retain their earliest start and latest end.
 /**
- * Called by: useSequentialAnalysisTaskFlow hook during this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Called by: useSequentialAnalysisTaskFlow hook during this analysis workflow.
  * Flow: order nullish values last, compare numeric bounds directly, compare parseable dates by time, then fall back to string ordering.
  */
 const comparePeriodBounds = (left: unknown, right: unknown): number => {
@@ -90,7 +90,7 @@ interface Params {
 
 /** Builds the submit, clear, chart-type, and chart-shaping logic for sequential analysis. */
 /**
- * Used by: SequentialChart.tsx, SequentialAnalysisFeature.tsx, and related files because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Used by: SequentialChart.tsx, SequentialAnalysisFeature.tsx, and related files.
  * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
  */
 export function useSequentialAnalysisTaskFlow({
@@ -127,7 +127,7 @@ export function useSequentialAnalysisTaskFlow({
 }: Params) {
   // Validates current parameters, submits the analysis request, and locks the selected node.
   /**
-   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks.
    * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
    */
   const handleAnalyze = async () => {
@@ -245,7 +245,7 @@ export function useSequentialAnalysisTaskFlow({
 
   // Clears the active sequential-analysis result through the shared lifecycle.
   /**
-   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks.
    */
   const handleClearResults = async () => {
     await clearResults();
@@ -253,7 +253,7 @@ export function useSequentialAnalysisTaskFlow({
 
   // Persists chart-type changes onto both local result state and the stored task result.
   /**
-   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks.
    * Flow: derive display state, bind user actions, then render the analysis UI.
    */
   const handleChartTypeChange = async (value: ChartTypeOption) => {

@@ -489,7 +489,7 @@ export function ConcordanceDispersionNodeBlock({
                     (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
                       | ReadonlySet<number>
                       | undefined) ?? EMPTY_BIN_SELECTION,
-                  /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+                  /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection. */
                   onSelect: (index, shiftHeld) => {
                     onBinSelect(CONCORDANCE_COMBINED_NODE_KEY, index, shiftHeld);
                   },
@@ -502,7 +502,7 @@ export function ConcordanceDispersionNodeBlock({
                       shiftHeld,
                     );
                   },
-                  /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+                  /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection. */
                   onClear: () => {
                     onClearBinSelection(CONCORDANCE_COMBINED_NODE_KEY);
                   },
@@ -785,7 +785,7 @@ export function ConcordanceDispersionNodeBlock({
                 selectedIndices:
                   (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
                   EMPTY_BIN_SELECTION,
-                /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+                /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection. */
                 onSelect: (index, shiftHeld) => {
                   onBinSelect(nodeKey, index, shiftHeld);
                 },
@@ -793,7 +793,7 @@ export function ConcordanceDispersionNodeBlock({
                 onSelectRange: (startIndex, endIndex, shiftHeld) => {
                   onBinRangeSelect(nodeKey, startIndex, endIndex, shiftHeld);
                 },
-                /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+                /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection. */
                 onClear: () => {
                   onClearBinSelection(nodeKey);
                 },

@@ -3,12 +3,12 @@ import * as PopoverPrimitive from '@radix-ui/react-popover';
 
 import { cn } from '@/lib/utils';
 
-/** Used by: lightweight inline panels such as pagination jumps and operation pickers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: lightweight inline panels such as pagination jumps and operation pickers. */
 function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
-/** Used by: controls that open inline popover panels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: controls that open inline popover panels. */
 function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
@@ -22,7 +22,7 @@ type PopoverContentProps = React.ComponentProps<typeof PopoverPrimitive.Content>
   portalled?: boolean;
 };
 
-/** Used by: popover consumers that need app-consistent floating panel styling because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: popover consumers that need app-consistent floating panel styling. */
 function PopoverContent({
   className,
   align = 'center',
@@ -45,12 +45,12 @@ function PopoverContent({
   return portalled ? <PopoverPrimitive.Portal>{content}</PopoverPrimitive.Portal> : content;
 }
 
-/** Used by: popover consumers that position content relative to custom anchors because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: popover consumers that position content relative to custom anchors. */
 function PopoverAnchor({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />;
 }
 
-/** Used by: popover panels with title and description copy because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: popover panels with title and description copy. */
 function PopoverHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -61,12 +61,12 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-/** Used by: PopoverHeader title rows because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: PopoverHeader title rows. */
 function PopoverTitle({ className, ...props }: React.ComponentProps<'h2'>) {
   return <div data-slot="popover-title" className={cn('font-medium', className)} {...props} />;
 }
 
-/** Used by: PopoverHeader support copy because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: PopoverHeader support copy. */
 function PopoverDescription({ className, ...props }: React.ComponentProps<'p'>) {
   return (
     <p

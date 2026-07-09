@@ -30,7 +30,7 @@ const getRequestSignal = (
 };
 
 /** Adapts the app's `/api` base to hey-api's expectation of the server origin. */
-/** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts. */
 export const getGeneratedApiBase = (apiBase = getApiBase()): string =>
   apiBase.replace(/\/api\/?$/, '');
 
@@ -186,7 +186,7 @@ const createGeneratedApiFetch = (fetchImpl?: typeof fetch): typeof fetch => {
 };
 
 /** Supplies hey-api's runtime config for every generated SDK call site. */
-/** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts. */
 export const createClientConfig: CreateClientConfig = (config) => ({
   ...config,
   baseUrl: getGeneratedApiBase(config?.baseUrl),

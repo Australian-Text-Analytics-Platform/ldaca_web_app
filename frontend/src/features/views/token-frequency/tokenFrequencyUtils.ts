@@ -14,7 +14,7 @@ export interface TokenFrequencyStudyNodeOrder {
 
 /** Builds a node-id to display-name lookup from selection sources. */
 /**
- * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export const buildSelectionNameById = (
@@ -42,7 +42,7 @@ export const buildSelectionNameById = (
 
 /** Creates a stable cache key for selection display-name mappings. */
 /**
- * Used by: tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: tokenFrequencyUtils.test.ts.
  */
 export const buildSelectionNameKey = (
   selectedNodes: (NodeNameEntry | null | undefined)[],
@@ -134,7 +134,7 @@ export const resolveTokenFrequencyDisplayName = ({
 
 /** Reads the backend's persisted token display limit from all supported response locations. */
 /**
- * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts.
  */
 export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null): number | null => {
   if (!results) return null;
@@ -147,7 +147,7 @@ export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null)
 
 /** Reads the backend's persisted stop-word list from all supported response locations. */
 /**
- * Used by: tokenFrequencyUtils.test.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: tokenFrequencyUtils.test.ts.
  * Flow: check top-level, analysis_params, and metadata stop-word arrays in order, stringify entries, then return null when none exist.
  */
 export const deriveBackendStopWords = (
@@ -165,7 +165,7 @@ export const deriveBackendStopWords = (
 
 /** Builds a stable stop-word key for effects that sync backend preferences into UI state. */
 /**
- * Used by: tokenFrequencyUtils.test.ts, TokenFrequencyFeature.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: tokenFrequencyUtils.test.ts, TokenFrequencyFeature.tsx.
  */
 export const deriveBackendStopWordsKey = (results?: TokenFrequencyResponse | null): string => {
   const stopWords = deriveBackendStopWords(results);

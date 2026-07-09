@@ -9,12 +9,12 @@ interface GroupedResultsPageSizeSummaryProps<
   totalDocuments?: number;
 }
 
-/** Called by: GroupedResultsPageSizeSummary when backend totals are unavailable because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Called by: GroupedResultsPageSizeSummary when backend totals are unavailable. */
 const countGroupedResultInstances = (groups: Record<string, unknown>[][]): number => {
   return groups.reduce((total, group) => total + group.length, 0);
 };
 
-/** Called by: GroupedResultsPageSizeSummary for grouped source-document counts because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Called by: GroupedResultsPageSizeSummary for grouped source-document counts. */
 const countGroupedResultDocuments = (groups: Record<string, unknown>[][]): number => {
   return groups.length;
 };
@@ -22,7 +22,7 @@ const countGroupedResultDocuments = (groups: Record<string, unknown>[][]): numbe
 /**
  * Supplies the shared page-size summary copy for grouped analysis result tables,
  * using materialized totals when available and group counts otherwise.
- * Used by: concordance and quotation paginated grouped result tables because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: concordance and quotation paginated grouped result tables.
  * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export function GroupedResultsPageSizeSummary<Row extends Record<string, unknown>>({

@@ -13,7 +13,7 @@ describe('DocumentView (docType="tutorial")', () => {
   beforeEach(() => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      /** Called by: DocumentView test fetch mock when markdown content is requested because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+      /** Called by: DocumentView test fetch mock when markdown content is requested. */
       text: () => Promise.resolve('# Tutorial'),
     });
   });

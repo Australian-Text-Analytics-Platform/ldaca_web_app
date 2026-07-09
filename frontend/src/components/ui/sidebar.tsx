@@ -82,7 +82,7 @@ function SidebarProvider({
     }
   };
 
-  /** Called by: SidebarTrigger and provider consumers that toggle the sidebar because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: SidebarTrigger and provider consumers that toggle the sidebar. */
   const toggleSidebar = () => {
     if (isMobile) setOpenMobile((open) => !open);
     else setOpen((open) => !open);
@@ -254,7 +254,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
   );
 }
 
-/** Used by: App sidebar layouts that keep the shadcn desktop rail affordance because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: App sidebar layouts that keep the shadcn desktop rail affordance. */
 function SidebarRail({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -273,7 +273,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-/** Used by: app layouts that render main content beside an inset sidebar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+/** Used by: app layouts that render main content beside an inset sidebar. */
 function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
   return (
     <main
@@ -288,7 +288,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
   );
 }
 
-/** Used by: Sidebar to render branding and account controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+/** Used by: Sidebar to render branding and account controls. */
 function SidebarHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -300,7 +300,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-/** Used by: Sidebar to render secondary actions and working-directory controls because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+/** Used by: Sidebar to render secondary actions and working-directory controls. */
 function SidebarFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -312,7 +312,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-/** Used by: Sidebar to hold the scroll-constrained section stack because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: Sidebar to hold the scroll-constrained section stack. */
 function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -339,7 +339,7 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<'ul'>) {
   );
 }
 
-/** Used by: SidebarMenu rows to position action and badge slots because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: SidebarMenu rows to position action and badge slots. */
 function SidebarMenuItem({ className, ...props }: React.ComponentProps<'li'>) {
   return (
     <li
@@ -375,7 +375,7 @@ const sidebarMenuButtonVariants = cva(
 );
 
 /**
- * Used by: Sidebar navigation rows and action-like menu entries because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Used by: Sidebar navigation rows and action-like menu entries.
  * Flow: choose Slot or button rendering, compose CVA classes and data attrs, then optionally wrap the button in a collapsed-desktop tooltip.
  */
 function SidebarMenuButton({

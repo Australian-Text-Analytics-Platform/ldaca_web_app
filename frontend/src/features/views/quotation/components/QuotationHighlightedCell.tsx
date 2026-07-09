@@ -26,7 +26,7 @@ export interface QuotationHighlightedCellProps {
 
 const PRIORITY_ORDER: QuotationHighlightType[] = ['quote', 'speaker', 'verb'];
 
-// Used by: QuotationHighlightedCell hover rendering when multiple quotation span types overlap because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+// Used by: QuotationHighlightedCell hover rendering when multiple quotation span types overlap.
 const choosePriorityType = (types: string[]): QuotationHighlightType => {
   for (const t of PRIORITY_ORDER) {
     if (types.includes(t)) return t;
@@ -56,7 +56,7 @@ export function QuotationHighlightedCell({
   }
 
   const spans: HighlightSpan[] = [];
-  // Used by: QuotationHighlightedCell to convert backend span coordinates into clipped table-cell ranges because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+  // Used by: QuotationHighlightedCell to convert backend span coordinates into clipped table-cell ranges.
   const addSpan = (start?: unknown, end?: unknown, type?: string) => {
     if (
       type &&

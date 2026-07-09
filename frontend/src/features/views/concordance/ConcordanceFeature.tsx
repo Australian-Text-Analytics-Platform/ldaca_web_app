@@ -248,7 +248,7 @@ function ConcordanceFeature({
 
     /** Keeps dispersion column sizing synced with the rendered results viewport. */
     /**
-     * Called by: ConcordanceFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+     * Called by: ConcordanceFeature during this analysis workflow.
      */
     const updateWidth = () => {
       setResultsViewportWidth(element.clientWidth);
@@ -346,7 +346,7 @@ function ConcordanceFeature({
     hydrationTaskId: tabTaskId ?? null,
     resultRef: concordanceResultsRef,
     /** Fetches a completed concordance task result for polling and hydration. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<ConcordanceAnalysisResponse>(
@@ -356,7 +356,7 @@ function ConcordanceFeature({
       );
     },
     /** Fetches the saved request so hydration can restore parameters and materialized state. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
@@ -367,12 +367,12 @@ function ConcordanceFeature({
       );
     },
     /** Copies freshly fetched task results into the feature's safe-result state. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onResultFetched: (resultData) => {
       setResults(resultData);
     },
     /** Accepts restored result payloads from persisted analysis tasks. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onHydratedResult: (resultPayload) => {
       const res = resultPayload?.data ?? resultPayload;
       if (res) {
@@ -416,7 +416,7 @@ function ConcordanceFeature({
       resultControls.applyHydratedMaterializeSummaries(summaries);
     },
     /** Clears result-specific state while preserving local controls when requested by handoff flows. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
       setResults(null);
       resultControls.resetAfterClear();
@@ -431,7 +431,7 @@ function ConcordanceFeature({
       onTabTaskChange?.(null);
     },
     /** Keeps the global task list free of concordance task duplicates after lifecycle updates. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev) => {
         if (!Array.isArray(prev)) return prev;
@@ -439,7 +439,7 @@ function ConcordanceFeature({
       });
     },
     /** Lets the shared analysis lifecycle recognize in-flight concordance responses. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     isResultRunning: (r) => r?.state === 'running',
   });
 
@@ -667,7 +667,7 @@ function ConcordanceFeature({
       hasUnrunChanges: hasChanges,
       clearResults: handleClearResults,
       /** Starts the feature-specific concordance search after shared update checks pass. */
-      // Called by: handleRunOrUpdate through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+      // Called by: handleRunOrUpdate through its owning hook, JSX prop, or analysis lifecycle config.
       runFreshAnalysis: () => handleSearch(true, undefined, undefined, undefined, undefined, true),
     });
   };

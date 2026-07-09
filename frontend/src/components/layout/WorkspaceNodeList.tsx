@@ -83,7 +83,7 @@ function NodeRowName({ name }: { name: string }) {
   );
 }
 
-/** Called by: WorkspaceNodeList sorting and row labels because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: WorkspaceNodeList sorting and row labels. */
 const getNodeDisplayName = (node: SidebarWorkspaceNode): string =>
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall through empty-string names to the next candidate, not only null/undefined
   node.data?.nodeName || node.data?.label || node.label || node.name || node.id;
@@ -117,7 +117,7 @@ function WorkspaceNodeList({
       state.markInteracted,
   );
 
-  /** Called by: WorkspaceNodeList row click and keyboard activation handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: WorkspaceNodeList row click and keyboard activation handlers. */
   const handleToggle = (nodeId: string) => {
     markInteracted([nodeId]);
     onToggleNodeSelection(nodeId);

@@ -217,7 +217,7 @@ export const invalidateNodeInfoQuery = (
 ): void => {
   void queryClient.invalidateQueries({
     /** Limits broad invalidation to single and batched node-info records under the requested workspace. */
-    /** Called by: TanStack Query cache invalidation filtering because query callers need stable cache keys, fetchers, and invalidation targets for the request lifecycle. */
+    /** Called by: TanStack Query cache invalidation filtering. */
     predicate: (query) => {
       const key = query.queryKey;
       if (

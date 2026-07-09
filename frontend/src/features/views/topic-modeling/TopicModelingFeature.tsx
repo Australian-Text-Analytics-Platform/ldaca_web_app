@@ -173,13 +173,13 @@ function TopicModelingFeature({
     hydrationTaskId: tabTaskId ?? null,
     resultRef,
     // Loads the latest topic-modeling result for polling and task resumption.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<TopicModelingResponse>(currentWorkspaceId, taskId, headers);
     },
     // Retrieves the submitted request so hydration can restore parameter and lock state.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId, headers) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
@@ -190,7 +190,7 @@ function TopicModelingFeature({
       );
     },
     // Applies freshly fetched task results and surfaces failed/successful status messages.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onResultFetched: (resultData) => {
       setResultSafely(resultData);
       if (resultData.state === 'failed') {
@@ -200,7 +200,7 @@ function TopicModelingFeature({
       }
     },
     // Rebuilds live result state from a hydrated task payload after reload.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onHydratedResult: (resultData) => {
       if (!resultData) return;
       setResultSafely(resultData);
@@ -211,7 +211,7 @@ function TopicModelingFeature({
       }
     },
     // Restores selected nodes, columns, and topic parameters from the stored request.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
     onHydratedRequest: (requestPayload) => {
       const raw = requestPayload as Record<string, unknown> | null;
       const req = (raw?.data ?? requestPayload) as Record<string, unknown> | null;
@@ -227,7 +227,7 @@ function TopicModelingFeature({
       hydrateParameters(req);
     },
     // Clears topic-specific result and error state after the shared lifecycle deletes results.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
       setResultSafely(null);
       setError(null);
@@ -239,18 +239,18 @@ function TopicModelingFeature({
       onTabTaskChange?.(null);
     },
     // Removes completed topic tasks from the global task list after clear/delete operations.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
     },
     // Finds task ids embedded in result metadata for status recovery.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     getExtraTaskIdCandidates: () => [resultRef.current?.metadata?.task_id],
     // Finds task ids embedded in result metadata for clear operations.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     getClearTaskIdSources: () => [resultRef.current?.metadata?.task_id],
     // Treats hydrated running results as active tasks for shared banner/action state.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     isResultRunning: (r) => r?.state === 'running',
   });
 
@@ -275,7 +275,7 @@ function TopicModelingFeature({
     if (!el) return;
     // Debounces resize observer updates into a stable chart width state.
     /**
-     * Called by: TopicModelingFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+     * Called by: TopicModelingFeature during this analysis workflow.
      */
     const updateChartWidth = (width: number) => {
       const nextWidth = Math.round(width);

@@ -35,7 +35,7 @@ const FORMATS = [
 
 // Pads timestamp segments so generated export names sort consistently.
 /**
- * Called by: ExportFeature analysis panel during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+ * Called by: ExportFeature analysis panel during this analysis workflow.
  */
 const padFilenamePart = (value: number) => String(value).padStart(2, '0');
 
@@ -48,7 +48,7 @@ const buildTimestampFragment = (date: Date = new Date()) =>
 
 // Sanitizes workspace names for filenames accepted by common desktop filesystems.
 /**
- * Called by: ExportFeature analysis panel during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+ * Called by: ExportFeature analysis panel during this analysis workflow.
  */
 const toSafeArchiveLabel = (value: string) =>
   Array.from((value || 'workspace').trim())
@@ -81,7 +81,7 @@ function ExportFeature() {
 
   // Best-effort helpers for node display
   /**
-   * Called by: ExportFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   * Called by: ExportFeature during this analysis workflow.
    * Flow: read node id/name from the lightweight graph summary, then return the compact export display model.
    */
   const toDisplay = (n: GraphNode) => {
@@ -100,7 +100,7 @@ function ExportFeature() {
 
   // Invokes the Tauri-side streaming downloader used when WebView cannot carry large bodies.
   /**
-   * Called by: ExportFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   * Called by: ExportFeature during this analysis workflow.
    */
   const tauriDownloadToDisk = async (
     url: string,
@@ -116,7 +116,7 @@ function ExportFeature() {
   // surface real backend errors (e.g. Polars sink failure on Windows) in the
   // download/export failure toasts instead of a generic "Failed to ...".
   /**
-   * Called by: ExportFeature during this analysis workflow because the feature needs this step to keep workspace selection, task hydration, result state, and UI transitions aligned.
+   * Called by: ExportFeature during this analysis workflow.
    * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
    */
   const describeResponseError = async (resp: Response): Promise<string> => {

@@ -19,13 +19,13 @@ interface ErrorBoundaryProps {
  * Flow: catch child render errors into state, choose a caller fallback or the default panel, then let fallbacks reset the boundary.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  /** Called by: React when an ErrorBoundary instance is mounted around children because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: React when an ErrorBoundary instance is mounted around children. */
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
 
-  /** Called by: React after a child render error so `render` can swap to a fallback because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+  /** Called by: React after a child render error so `render` can swap to a fallback. */
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
@@ -43,7 +43,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.setState({ hasError: false, error: undefined });
   };
 
-  /** Called by: React to render either protected children or the caller-selected fallback because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+  /** Called by: React to render either protected children or the caller-selected fallback. */
   override render() {
     if (this.state.hasError) {
       const Fallback = this.props.fallback ?? DefaultErrorFallback;
@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 /**
  * Default fallback used when a caller only needs a generic recovery panel with
  * retry and reload controls.
- * Used by: ErrorBoundary when no feature-specific fallback component is passed because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Used by: ErrorBoundary when no feature-specific fallback component is passed.
  * Flow: show the error message, offer retry and reload actions, then reveal stack details only in development builds.
  */
 function DefaultErrorFallback({ error, resetError }: { error?: Error; resetError: () => void }) {

@@ -3,7 +3,7 @@
 // Returns null if not confident enough (e.g., missing year).
 
 /**
- * Used by: src/components/panels/DatetimeFormatPanel.tsx, src/utils/__tests__/datetimeFormatInfer.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/components/panels/DatetimeFormatPanel.tsx, src/utils/__tests__/datetimeFormatInfer.test.ts.
  * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
  */
 export function inferDatetimeFormat(
@@ -33,11 +33,11 @@ export function inferDatetimeFormat(
   }
 
   /** Tells later replacements whether the candidate already exposes a month token. */
-  /** Called by: inferDatetimeFormat in this utility module because the utility needs local normalization steps before returning a shared result. */
+  /** Called by: inferDatetimeFormat in this utility module. */
   const hasMonthToken = () =>
     format.includes('%m') || format.includes('%b') || format.includes('%B');
   /** Escapes regex-significant date separators before dynamic replacement rules consume them. */
-  /** Called by: inferDatetimeFormat in this utility module because the utility needs local normalization steps before returning a shared result. */
+  /** Called by: inferDatetimeFormat in this utility module. */
   const escapeSep = (s: string) => (s === '.' ? '\\.' : s);
 
   // Month and day: attempt to respect separators - replace first 2-digit group after %Y separator with %m then next with %d

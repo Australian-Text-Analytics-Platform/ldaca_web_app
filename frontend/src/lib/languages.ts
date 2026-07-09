@@ -17,7 +17,7 @@ export function normaliseIso6391LanguageCode(code: string | null | undefined): s
 
 /** Splits tokenizer models into language-matching recommendations and secondary choices. */
 /**
- * Used by: src/features/views/common/components/TokenizerModelSelector.tsx, src/lib/__tests__/languages.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/features/views/common/components/TokenizerModelSelector.tsx, src/lib/__tests__/languages.test.ts.
  * Flow: normalize the language code, return all models as secondary when unknown, otherwise partition by model language support.
  */
 export function partitionTokenizerModelsForLanguage(
@@ -34,7 +34,7 @@ export function partitionTokenizerModelsForLanguage(
 }
 
 /** Returns tokenizer models in the order selectors expect: recommended first, then the rest. */
-/** Used by: src/lib/__tests__/languages.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/lib/__tests__/languages.test.ts. */
 export function orderedTokenizerModelsForLanguage(
   models: readonly LanguageModelOption[],
   code: string | null | undefined,

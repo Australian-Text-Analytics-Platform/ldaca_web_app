@@ -23,7 +23,6 @@ const TERMINAL_STATES = new Set(['failed', 'cancelled', 'successful', 'completed
 /**
  * Normalizes missing or unfamiliar states to the earliest rank expected by the
  * stale-result guard used across analysis polling hooks.
- * Called by: isStaleAnalysisResult when comparing current and incoming task states because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
  */
 function resultStateRank(state: string | null | undefined): number {
   return state ? (RESULT_STATE_RANK[state] ?? 0) : 0;
@@ -69,7 +68,6 @@ export function useSafeResult<T extends ResultLike | null>() {
   const [result, setResult] = useState<T | null>(null);
   const resultRef = useRef<T | null>(null);
 
-  /** Called by: analysis task-flow callbacks through the setter returned from useSafeResult because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
   const setResultSafely = (newResult: T | null) => {
     if (isStaleAnalysisResult(resultRef.current, newResult)) {
       return;

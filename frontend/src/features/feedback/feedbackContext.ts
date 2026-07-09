@@ -9,7 +9,7 @@ export const SURVEY_BASE_URL = 'https://sydney.au1.qualtrics.com/jfe/form/SV_0Hr
  * Resolves the deployment label attached to survey submissions. It helps the
  * feedback form distinguish desktop builds, local development, and hosted web
  * instances without requiring callers to know environment details.
- * Called by: captureFeedbackContext when FeedbackPanel opens the survey because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Called by: captureFeedbackContext when FeedbackPanel opens the survey.
  * Flow: prefer the build deployment id, classify Tauri by platform, then label local or hosted web origins from the hostname.
  */
 const resolveDeployment = (): string => {
@@ -42,7 +42,7 @@ export interface FeedbackContext {
 /**
  * Captures app/build/view context for `FeedbackPanel` just before the survey is
  * opened, giving Qualtrics enough metadata to route feedback to the right area.
- * Called by: FeedbackPanel before building the iframe URL because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Called by: FeedbackPanel before building the iframe URL.
  * Flow: read build metadata and current view, resolve deployment, merge user-role overrides, then stamp the submission timestamp.
  */
 export const captureFeedbackContext = (

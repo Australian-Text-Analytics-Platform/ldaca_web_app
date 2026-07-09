@@ -11,7 +11,7 @@ interface AnalysisRunningStateCardProps {
 }
 
 // Backend sends started_at as time.time() (Unix seconds). Convert to ms when needed.
-/** Called by: running-state elapsed time calculations because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Called by: running-state elapsed time calculations. */
 const toMs = (v: number) => (v < 1e12 ? v * 1000 : v);
 
 /**
@@ -31,7 +31,7 @@ function useElapsedSeconds(startedAt: string | number | null | undefined): numbe
     if (!startedAt) return;
     const start = typeof startedAt === 'number' ? toMs(startedAt) : Date.parse(startedAt);
     if (isNaN(start)) return;
-    /** Called by: the interval timer and initial effect pass because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Called by: the interval timer and initial effect pass. */
     const tick = () => {
       setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
     };
@@ -45,7 +45,7 @@ function useElapsedSeconds(startedAt: string | number | null | undefined): numbe
   return elapsed;
 }
 
-/** Called by: AnalysisRunningStateCard when rendering elapsed runtime text because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Called by: AnalysisRunningStateCard when rendering elapsed runtime text. */
 function formatElapsed(seconds: number): string {
   if (seconds < 60) return `${String(seconds)}s`;
   const m = Math.floor(seconds / 60);
@@ -56,7 +56,7 @@ function formatElapsed(seconds: number): string {
 /**
  * Displays progress and elapsed time for an analysis task that is still running
  * when the feature panel renders or hydrates from task state.
- * Used by: token-frequency and topic-modeling result panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: token-frequency and topic-modeling result panels.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function AnalysisRunningStateCard({

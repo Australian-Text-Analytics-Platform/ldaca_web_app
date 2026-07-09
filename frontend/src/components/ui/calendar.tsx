@@ -35,7 +35,7 @@ function Calendar({
       )}
       captionLayout={captionLayout}
       formatters={{
-        /** Called by: DayPicker month dropdown rendering inside Calendar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+        /** Called by: DayPicker month dropdown rendering inside Calendar. */
         formatMonthDropdown: (date) => date.toLocaleString('default', { month: 'short' }),
         ...formatters,
       }}
@@ -116,7 +116,7 @@ function Calendar({
         Root: ({ className, rootRef, ...props }) => {
           return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />;
         },
-        /** Called by: DayPicker navigation and dropdown affordance rendering inside Calendar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+        /** Called by: DayPicker navigation and dropdown affordance rendering inside Calendar. */
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === 'left') {
             return <ChevronLeftIcon className={cn('size-4', className)} {...props} />;
@@ -129,7 +129,7 @@ function Calendar({
           return <ChevronDownIcon className={cn('size-4', className)} {...props} />;
         },
         DayButton: CalendarDayButton,
-        /** Called by: DayPicker week-number rendering inside Calendar because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+        /** Called by: DayPicker week-number rendering inside Calendar. */
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>

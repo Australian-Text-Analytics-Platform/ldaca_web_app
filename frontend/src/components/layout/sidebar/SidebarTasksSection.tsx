@@ -33,7 +33,7 @@ interface SidebarTasksSectionProps {
   onReconnect: () => void;
 }
 
-/** Called by: SidebarTasksSection sorting and expanded timestamp formatting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: SidebarTasksSection sorting and expanded timestamp formatting. */
 const normalizeTimestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -47,18 +47,18 @@ const normalizeTimestamp = (value: unknown): number => {
   return 0;
 };
 
-/** Called by: SidebarTasksSection expanded task detail rows because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: SidebarTasksSection expanded task detail rows. */
 const formatTimestamp = (value: unknown): string => {
   const timestamp = normalizeTimestamp(value);
   if (!timestamp) return 'Not recorded';
   return new Date(timestamp).toLocaleString();
 };
 
-/** Called by: SidebarTasksSection task sorting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: SidebarTasksSection task sorting. */
 const taskTimestamp = (task: SidebarTaskRecord): number =>
   normalizeTimestamp(task.finished_at ?? task.started_at ?? task.created_at ?? 0);
 
-/** Called by: SidebarTasksSection task sorting because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: SidebarTasksSection task sorting. */
 const taskPriority = (task: SidebarTaskRecord): number => {
   const state = (task.state ?? '').toLowerCase();
   if (PROBLEMATIC_STATES.has(state)) return 0;
@@ -67,7 +67,7 @@ const taskPriority = (task: SidebarTaskRecord): number => {
   return 3;
 };
 
-/** Called by: SidebarTasksSection row rendering and accessibility labels because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+/** Called by: SidebarTasksSection row rendering and accessibility labels. */
 const taskLabel = (task: SidebarTaskRecord): string => {
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall back to generic label when task_type is an empty string, not only null/undefined
   const typeLabel = task.task_type?.replace(/_/g, ' ') || 'task';
@@ -98,7 +98,7 @@ function SidebarTasksSection({
 
   const [expandedTaskIds, setExpandedTaskIds] = React.useState<Set<string>>(() => new Set());
 
-  /** Called by: SidebarTasksSection task row click and keyboard handlers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+  /** Called by: SidebarTasksSection task row click and keyboard handlers. */
   const toggleExpanded = (taskId: string) => {
     setExpandedTaskIds((prev) => {
       const next = new Set(prev);
@@ -111,7 +111,7 @@ function SidebarTasksSection({
     });
   };
 
-  /** Called by: SidebarTasksSection row rendering for task status icons and labels because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+  /** Called by: SidebarTasksSection row rendering for task status icons and labels. */
   const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? DEFAULT_STATUS_META;
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string error should still fall through to live connection status

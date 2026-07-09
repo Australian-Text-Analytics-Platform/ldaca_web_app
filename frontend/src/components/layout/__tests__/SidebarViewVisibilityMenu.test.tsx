@@ -11,7 +11,7 @@ import { useHintsStore } from '@/stores/hintsStore';
 const toastMock = vi.fn();
 
 vi.mock('sonner', () => ({
-  /** Used by: sidebar menu tests to assert toast feedback because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: sidebar menu tests to assert toast feedback. */
   toast: (...args: unknown[]) => toastMock(...args),
 }));
 
@@ -32,7 +32,7 @@ const authState = {
 };
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  /** Used by: Sidebar tests to provide an empty workspace graph fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: Sidebar tests to provide an empty workspace graph fixture. */
   useWorkspaceData: () => ({
     workspaces: [],
     workspaceGraph: { nodes: [] },
@@ -41,14 +41,14 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
-  /** Used by: Sidebar tests to keep node-selection state empty because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: Sidebar tests to keep node-selection state empty. */
   useWorkspaceSelection: () => ({
     selectedNodeIds: [],
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
-  /** Used by: Sidebar tests to stub child component workspace actions because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: Sidebar tests to stub child component workspace actions. */
   useWorkspaceActions: () => ({
     toggleNodeSelection: vi.fn(),
     setCurrentWorkspace: vi.fn(),
@@ -56,7 +56,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 }));
 
 vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
-  /** Used by: Sidebar tests to provide a quiet task-stream fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: Sidebar tests to provide a quiet task-stream fixture. */
   useWorkspaceTaskInbox: () => ({
     status: 'closed',
     error: null,
@@ -73,13 +73,13 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
 }));
 
 vi.mock('@/stores/analysisStore', () => ({
-  /** Used by: Sidebar tests to expose an empty analysis-task store fixture because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+  /** Used by: Sidebar tests to expose an empty analysis-task store fixture. */
   useAnalysisStore: (
     selector: (state: { tasks: []; setTasks: ReturnType<typeof vi.fn> }) => unknown,
   ) => selector({ tasks: [], setTasks: vi.fn() }),
 }));
 
-/** Called by: Sidebar view-visibility tests before querying menu behavior because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Called by: Sidebar view-visibility tests before querying menu behavior. */
 const renderSidebar = () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },

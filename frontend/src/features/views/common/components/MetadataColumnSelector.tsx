@@ -54,7 +54,7 @@ interface MetadataColumnSelectorProps {
 /**
  * Renders the shared metadata-column dropdown used by analysis result tables to
  * choose which row metadata survives in visible and combined views.
- * Used by: concordance and quotation result tables because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: concordance and quotation result tables.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function MetadataColumnSelector({
@@ -87,7 +87,7 @@ export function MetadataColumnSelector({
     selectableColumns.length > 0 &&
     selectableColumns.every((c) => normalizedSelectedColumns.includes(c));
 
-  /** Called by: MetadataColumnSelector checkbox items because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Called by: MetadataColumnSelector checkbox items. */
   const toggleColumn = (column: string, checked: boolean) => {
     if (checked) {
       onSelectedColumnsChange(normalizeMetadataColumns([...normalizedSelectedColumns, column]));

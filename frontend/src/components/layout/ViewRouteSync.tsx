@@ -5,7 +5,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { appRoute, viewSearchFor } from '@/router';
 import { useUIStore, type ViewType } from '@/stores';
 
-/** Called by: ViewRouteSync before writing store-driven view state back to the URL because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: ViewRouteSync before writing store-driven view state back to the URL. */
 const getRoutableView = ({
   currentView,
   isWorkspaceLoaded,

@@ -22,7 +22,7 @@ export interface TokensColumnMismatchNoticeProps {
 const nodeMatchesId = (node: NodeWithTokenizerModels, id: string) =>
   node.id === id;
 
-/** Called by: TokensColumnMismatchNotice to describe saved tokenizer-model columns because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Called by: TokensColumnMismatchNotice to describe saved tokenizer-model columns. */
 const collectTokenizerModelSources = (tokenizerModels: unknown): string[] => {
   if (!tokenizerModels || typeof tokenizerModels !== 'object') return [];
   return Object.keys(tokenizerModels).filter(Boolean);
@@ -36,7 +36,7 @@ const collectTokenizerModelSources = (tokenizerModels: unknown): string[] => {
  * Only inspects the first selection — analyses cap their input at one or two
  * nodes and the first is enough to detect the mismatch pattern (typically a
  * user previously cached tokens for a different column).
- * Used by: token-frequency and concordance parameter panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: token-frequency and concordance parameter panels.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function TokensColumnMismatchNotice({

@@ -106,7 +106,7 @@ let loadPromise: Promise<void> | null = null;
  * return the same in-flight (or settled) promise.
  */
 /**
- * Used by: src/App.tsx, src/tutorials/__tests__/registry.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion.
+ * Used by: src/App.tsx, src/tutorials/__tests__/registry.test.ts.
  * Flow: validate registry input, merge local and remote metadata, then expose the documentation entries to UI consumers.
  */
 export const loadRemoteRegistry = (): Promise<void> => {
@@ -146,7 +146,7 @@ export const loadRemoteRegistry = (): Promise<void> => {
 
 /** Test-only hook to drop the cached load promise so a fresh test gets a
  *  fresh remote attempt. Not exported through any barrel. */
-/** Used by: src/tutorials/__tests__/registry.test.ts because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: src/tutorials/__tests__/registry.test.ts. */
 export const __resetLoadPromiseForTests = (): void => {
   loadPromise = null;
 };

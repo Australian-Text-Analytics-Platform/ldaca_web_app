@@ -17,19 +17,19 @@ interface ColumnPersistenceContext {
 const STORAGE_PREFIX = 'ldaca:column-pref:v1';
 
 /** Selects the requested browser storage while keeping SSR/tests from touching `window`. */
-/** Called by: columnPersistence in this utility module because the utility needs local normalization steps before returning a shared result. */
+/** Called by: columnPersistence in this utility module. */
 const getStorage = (storage: ColumnPersistenceStorage = 'session'): Storage | null => {
   if (typeof window === 'undefined') return null;
   return storage === 'local' ? window.localStorage : window.sessionStorage;
 };
 
 /** Namespaces column choices by workspace and feature scope so auto-selection state cannot bleed across contexts. */
-/** Called by: columnPersistence in this utility module because the utility needs local normalization steps before returning a shared result. */
+/** Called by: columnPersistence in this utility module. */
 const buildKey = ({ workspaceId, scope }: ColumnPersistenceContext) =>
   `${STORAGE_PREFIX}:${workspaceId ?? 'global'}:${scope ?? 'default'}`;
 
 /** Keeps only concrete column-name strings from user-persisted blobs before hooks consume them. */
-/** Called by: columnPersistence in this utility module because the utility needs local normalization steps before returning a shared result. */
+/** Called by: columnPersistence in this utility module. */
 const sanitizeMap = (map: Record<string, unknown>): Record<string, string> =>
   Object.fromEntries(
     Object.entries(map).filter(([, v]) => typeof v === 'string' && v.trim().length > 0),
@@ -43,7 +43,7 @@ const sanitizeMap = (map: Record<string, unknown>): Record<string, string> =>
 const columnPersistence = {
   /** Restores all persisted column choices for `useAutoNodeColumns` at workspace/view startup. */
   /**
-   * Called by: columnPersistence in this utility module because the utility needs local normalization steps before returning a shared result.
+   * Called by: columnPersistence in this utility module.
    * Flow: resolve storage and scoped key, parse the persisted JSON blob, sanitize string entries, and fall back to an empty map on bad data.
    */
   readAll(context: ColumnPersistenceContext = {}): Record<string, string> {
@@ -62,7 +62,7 @@ const columnPersistence = {
   },
 
   /** Stores the current auto-column choices as one scoped blob and removes empty scopes. */
-  /** Called by: columnPersistence in this utility module because the utility needs local normalization steps before returning a shared result. */
+  /** Called by: columnPersistence in this utility module. */
   storeAll(context: ColumnPersistenceContext, entries: Record<string, string>): void {
     const storage = getStorage(context.storage);
     if (!storage) return;

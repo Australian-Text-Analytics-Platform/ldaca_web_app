@@ -1,7 +1,7 @@
 /**
  * Builds the sampled plain text that TokenizerModelSelector uses for language
  * detection without coupling the component to node-data response row shapes.
- * Used by: TokenizerModelSelector and tokenizer selector unit tests because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: TokenizerModelSelector and tokenizer selector unit tests.
  */
 export function collectDocumentColumnText(
   rows: Record<string, unknown>[] | undefined,

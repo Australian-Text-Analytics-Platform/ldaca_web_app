@@ -17,7 +17,7 @@ const generatedApiMock = vi.hoisted(() => ({
 vi.mock('@/api/generated/sdk.gen', () => generatedApiMock);
 
 /** Builds auth-info fixtures with backend defaults so each test overrides only its scenario. */
-/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: tests in this file. */
 const buildAuthInfo = (overrides: Partial<AuthInfoResponse> = {}): AuthInfoResponse => ({
   authenticated: true,
   user: { id: 'u-1', email: 'u@example.com', name: 'User', picture: null },
@@ -27,7 +27,7 @@ const buildAuthInfo = (overrides: Partial<AuthInfoResponse> = {}): AuthInfoRespo
 });
 
 /** Builds config fixtures for auth-mode tests without repeating generated response fields. */
-/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: tests in this file. */
 const buildConfig = (overrides: Partial<RuntimeConfigResponse> = {}): RuntimeConfigResponse =>
   ({
     multi_user_mode: true,
@@ -40,7 +40,7 @@ const buildConfig = (overrides: Partial<RuntimeConfigResponse> = {}): RuntimeCon
 // `vi.resetModules()` re-evaluates the store module → fresh store + fresh
 // locals.
 /** Imports the hook after mocks/resetModules so each test gets a fresh auth store instance. */
-/** Used by: tests in this file because the tests need reusable fixtures or mocks before exercising the behavior under assertion. */
+/** Used by: tests in this file. */
 const importUseAuth = async () => {
   const mod = await import('../useAuth');
   return mod;

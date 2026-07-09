@@ -32,7 +32,7 @@ const DOC_CONFIG: Record<DocumentType, { title: string; defaultFile: string }> =
   reference: { title: 'LDaCA References', defaultFile: 'references/index.md' },
 };
 
-/** Called by: DocumentView link handlers when resolving local markdown hrefs because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: DocumentView link handlers when resolving local markdown hrefs. */
 const normalizePath = (input: string): string => {
   const segments = input.split('/');
   const stack: string[] = [];
@@ -47,13 +47,13 @@ const normalizePath = (input: string): string => {
   return stack.join('/');
 };
 
-/** Called by: DocumentView markdown anchor rendering to identify links that should leave the modal because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+/** Called by: DocumentView markdown anchor rendering to identify links that should leave the modal. */
 const isExternalLink = (href?: string | null): boolean => {
   if (!href) return false;
   return /^(https?:)?\/\//i.test(href) || href.startsWith('mailto:') || href.startsWith('tel:');
 };
 
-/** Called by: resolveDocUrl when bundled docs need desktop/web base-path resolution because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Called by: resolveDocUrl when bundled docs need desktop/web base-path resolution. */
 const resolveLocalDocUrl = (requestedFile: string): string => {
   if (typeof window === 'undefined') {
     return requestedFile;
@@ -80,7 +80,7 @@ const resolveLocalDocUrl = (requestedFile: string): string => {
  * Resolves a requested doc file to the URL fetched by `DocumentView`.
  * Bundled files stay local for desktop/offline use, while optional remote docs
  * can be served from `VITE_DOCS_BASE_URL` without changing document links.
- * Called by: DocumentView's markdown-loading effect because the caller needs one documented boundary for the lookup, event, or state handoff step.
+ * Called by: DocumentView's markdown-loading effect.
  */
 const resolveDocUrl = (requestedFile: string): string => {
   if (BUNDLED_FILES.has(requestedFile)) {
@@ -134,7 +134,7 @@ function DocumentView({
   useEffect(() => {
     let cancelled = false;
     /**
-     * Called by: DocumentView's markdown-loading effect whenever the selected file changes because the caller needs one documented boundary for the lookup, event, or state handoff step.
+     * Called by: DocumentView's markdown-loading effect whenever the selected file changes.
      * Flow: derive the requested doc URL, fetch markdown without cache, replace build placeholders, then update content/error/loading if still mounted.
      */
     const load = async () => {
@@ -177,7 +177,7 @@ function DocumentView({
    * Flow: constrain image sizing and alt text, rewrite internal markdown anchors to viewer state, then leave external links opening safely.
    */
   const markdownComponents: Components = {
-    /** Called by: ReactMarkdown when rendering markdown image nodes inside DocumentView because the caller needs a focused rendering boundary for layout, accessibility, and state handoff steps. */
+    /** Called by: ReactMarkdown when rendering markdown image nodes inside DocumentView. */
     img: ({ node: _node, className, alt, ...props }) => {
       const mergedClassName = ['max-w-full h-auto', className].filter(Boolean).join(' ');
       const resolvedAlt = typeof alt === 'string' ? alt : '';

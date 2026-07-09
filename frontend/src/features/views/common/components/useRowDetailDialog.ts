@@ -12,7 +12,7 @@ export function useRowDetailDialog() {
   const [detailPayload, setDetailPayload] = useState<RowDetailPayload | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  /** Called by: table row click handlers returned through useRowDetailDialog because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Called by: table row click handlers returned through useRowDetailDialog. */
   const openDetail = (payload: RowDetailPayload) => {
     setDetailPayload(payload);
     setDetailOpen(true);

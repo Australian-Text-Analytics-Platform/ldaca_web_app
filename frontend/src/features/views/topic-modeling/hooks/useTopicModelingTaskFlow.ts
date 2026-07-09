@@ -67,7 +67,7 @@ interface Params {
 
 // Builds deterministic topic-result node names, including sampling context when present.
 /**
- * Used by: useTopicModelingTaskFlow.test.ts because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Used by: useTopicModelingTaskFlow.test.ts.
  */
 export const buildTopicDetachNodeName = (
   nodeLabel: string,
@@ -90,7 +90,7 @@ export const buildTopicDetachNodeName = (
 
 /** Bundles topic-modeling run and detach lifecycle handlers for the feature component. */
 /**
- * Used by: useTopicModelingTaskFlow.test.ts, autoNodeNames.ts, TopicModelingFeature.tsx because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+ * Used by: useTopicModelingTaskFlow.test.ts, autoNodeNames.ts, TopicModelingFeature.tsx.
  * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
  */
 export function useTopicModelingTaskFlow({
@@ -132,7 +132,7 @@ export function useTopicModelingTaskFlow({
 
   // Submits the topic-modeling request and restores the analysis lock for the requested nodes.
   /**
-   * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks.
    * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
    */
   const handleRun = async () => {
@@ -194,7 +194,7 @@ export function useTopicModelingTaskFlow({
 
   // Loads available detach columns before opening the topic-modeling detach dialog.
   /**
-   * Called by: useTopicModelingTaskFlow during this analysis workflow because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: useTopicModelingTaskFlow during this analysis workflow.
    * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
    */
   const openDetachDialog = async () => {
@@ -235,7 +235,7 @@ export function useTopicModelingTaskFlow({
 
   // Confirms topic detach with selected source columns and displayed representative-word overrides.
   /**
-   * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks because the task flow needs this step to build requests, submit work, persist preferences, and fold backend results into UI state.
+   * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks.
    * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
    */
   const handleDetachConfirm = async () => {

@@ -7,7 +7,6 @@ import { isNetworkError } from '@/lib/apiError';
  * "no prior task to restore" state, which is recoverable. Network errors
  * (backend restarting, offline) get logged at debug; real server errors
  * stay at warn so they remain visible without being shouty.
- * Called by: useAnalysisHydration request/result fetch fallbacks because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
  */
 const logHydrationFailure = (label: string, error: unknown) => {
   const fn = isNetworkError(error) ? console.debug : console.warn;
@@ -33,7 +32,6 @@ type MaybePromise<T> = T | Promise<T>;
 
 type Nullable<T> = T | null | undefined;
 
-/** Called by: useAnalysisHydration before returning public hydration state because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
 const toHydrationState = ({
   workspaceId: _workspaceId,
   ...state
@@ -60,7 +58,6 @@ export interface UseAnalysisHydrationReturn<TPreferences> {
 /**
  * Normalizes preference field names before persisting them so older feature code
  * and backend preference payloads continue to speak the same snake_case shape.
- * Called by: persistPreferencesSafe before invoking feature-provided persistence because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow.
  * Flow: copy the partial preference payload, map tokenLimit and stopWords aliases to backend snake_case fields, clamp token limits, then return the normalized object.
  */
 const normalizePreferencePayload = <TPreferences extends Record<string, unknown>>(
@@ -208,7 +205,6 @@ export function useAnalysisHydration<
     onHydrationError,
   ]);
 
-  /** Called by: analysis panels through the persistPreferences return value because the caller needs this analysis-specific step before continuing its request, result, display, or cleanup workflow. */
   const persistPreferencesSafe = async (partial: TPreferences) => {
     if (!persistPreferences || !workspaceId) return;
     const normalized = normalizePreferencePayload(partial);

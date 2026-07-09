@@ -122,7 +122,7 @@ const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
 /**
  * Wraps the project's Recharts usage for analysis trend/result charts so line,
  * bar, area, tooltip, and point-selection behavior stay consistent.
- * Used by: concordance dispersion and sequential analysis chart panels because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: concordance dispersion and sequential analysis chart panels.
  * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function MultiSeriesChart({
@@ -161,7 +161,7 @@ export function MultiSeriesChart({
   useEffect(() => {
     const el = plotMeasureRef.current;
     if (!el) return;
-    /** Called by: ResizeObserver and initial chart mount for overflow warnings because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Called by: ResizeObserver and initial chart mount for overflow warnings. */
     const update = () => {
       setChartPixelWidth(el.clientWidth);
     };
@@ -221,7 +221,7 @@ export function MultiSeriesChart({
     return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
   };
 
-  /** Called by: Recharts line and area series configuration because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+  /** Called by: Recharts line and area series configuration. */
   const dotFor = (s: MultiSeriesChartSeries) => {
     if (!hasSelection && !s.singlePoint) return false;
     return renderDot(s.color, !!s.singlePoint);

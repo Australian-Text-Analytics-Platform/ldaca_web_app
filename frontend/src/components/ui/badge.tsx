@@ -24,7 +24,7 @@ const badgeVariants = cva(
   },
 );
 
-/** Used by: feature UIs that need compact status labels or `asChild` badge styling because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+/** Used by: feature UIs that need compact status labels or `asChild` badge styling. */
 function Badge({
   className,
   variant,

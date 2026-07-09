@@ -12,13 +12,13 @@ export interface ZoomDomain {
 
 /** Interpolates between two hex colours for topic bubble intensity scales. */
 /**
- * Used by: useTopicModelingBubbleChart.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useTopicModelingBubbleChart.tsx.
  * Flow: parse both hex colors into RGB triples, linearly interpolate each channel by t, then return an rgb() string.
  */
 export function interpolateColor(colorA: string, colorB: string, t: number): string {
   // Parses six-character hex colours into RGB triples for interpolation.
   /**
-   * Called by: interpolateColor as a local helper in this analysis workflow because callers need the same normalization and view-model rules before rendering or testing analysis results.
+   * Called by: interpolateColor as a local helper in this analysis workflow.
    */
   const parse = (color: string): [number, number, number] => {
     const parts = color
@@ -40,7 +40,7 @@ export function interpolateColor(colorA: string, colorB: string, t: number): str
 
 /** Chooses readable text colour for chips rendered on arbitrary node colours. */
 /**
- * Used by: useTopicModelingBubbleChart.tsx because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useTopicModelingBubbleChart.tsx.
  * Flow: reject missing or non-six-digit colors to white, compute RGB luminance, then choose dark text for light fills or white text otherwise.
  */
 export function getReadableTextColor(hexColor: string): string {
@@ -58,7 +58,7 @@ export function getReadableTextColor(hexColor: string): string {
 
 /** Computes the full zoom domain needed to fit all topic points in the chart. */
 /**
- * Used by: useTopicModelingZoomBrush.ts because callers need the same normalization and view-model rules before rendering or testing analysis results.
+ * Used by: useTopicModelingZoomBrush.ts.
  * Flow: collect topic x/y coordinates, compute min/max bounds, widen flat axes with epsilon, then return the zoom domain.
  */
 export function computeZoomDomain(topics: TopicModelingTopicPoint[]): ZoomDomain | null {

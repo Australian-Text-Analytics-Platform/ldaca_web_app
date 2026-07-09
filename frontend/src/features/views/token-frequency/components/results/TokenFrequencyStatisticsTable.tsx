@@ -62,7 +62,7 @@ interface Props {
   studyColor?: string | null;
 }
 
-/** Used by: token-frequency statistics sorting helpers; parses backend statistic values, including string infinities because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: token-frequency statistics sorting helpers; parses backend statistic values, including string infinities. */
 const parseStatisticsNumericValue = (value: unknown): number => {
   if (value === null || value === undefined) return NaN;
   if (value === '+Inf') return Number.POSITIVE_INFINITY;
@@ -70,7 +70,7 @@ const parseStatisticsNumericValue = (value: unknown): number => {
   return Number(value);
 };
 
-/** Used by: TokenFrequencyStatisticsTable column cells to format compact statistic values because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: TokenFrequencyStatisticsTable column cells to format compact statistic values. */
 const formatNumber = (
   value: unknown,
   options: { decimals?: number; suffix?: string; multiplier?: number; fallback?: string } = {},
@@ -83,17 +83,17 @@ const formatNumber = (
   return `${(parsed * multiplier).toFixed(decimals)}${suffix}`;
 };
 
-/** Used by: TokenFrequencyStatisticsTable signed-LL column cell to show direction markers because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: TokenFrequencyStatisticsTable signed-LL column cell to show direction markers. */
 const formatSignedLL = (value: number): string => {
   if (!Number.isFinite(value)) return 'N/A';
   const abs = Math.abs(value).toFixed(2);
   return value >= 0 ? `+${abs}` : `-${abs}`;
 };
 
-/** Used by: enhanceRows to convert significance stars into an ordinal sort key because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: enhanceRows to convert significance stars into an ordinal sort key. */
 const significanceRank = (sig: string | undefined): number => (sig ?? '').length;
 
-/** Used by: TokenFrequencyStatisticsTable column definitions as the parent-controlled wildcard token filter because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+/** Used by: TokenFrequencyStatisticsTable column definitions as the parent-controlled wildcard token filter. */
 const tokenWildcardFilter: FilterFn<EnhancedStatisticsRow> = (row, _columnId, filterValue) => {
   const pattern = String(filterValue ?? '').trim();
   if (!pattern) return true;
@@ -114,7 +114,7 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
   columnHelper.accessor('sort_token', {
     id: 'token',
     header: 'Token',
-    /** Used by: TanStack Table token column to render the original backend token label, optionally as a concordance-launching button, because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table token column to render the original backend token label, optionally as a concordance-launching button,. */
     cell: (info) => {
       const token = info.row.original.token;
       if (!onTokenClick) {
@@ -138,36 +138,36 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
   columnHelper.accessor('sort_freq_reference', {
     id: 'freq_reference',
     header: 'OR',
-    /** Used by: TanStack Table OR column to render observed reference frequency as an integer count because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table OR column to render observed reference frequency as an integer count. */
     cell: (info) => formatNumber(info.row.original.freq_reference, { decimals: 0 }),
   }),
   columnHelper.accessor('sort_percent_reference', {
     id: 'percent_reference',
     header: '%R',
-    /** Used by: TanStack Table %R column to render reference percentage with a percent suffix because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table %R column to render reference percentage with a percent suffix. */
     cell: (info) => formatNumber(info.row.original.percent_reference, { decimals: 2, suffix: '%' }),
   }),
   columnHelper.accessor('sort_freq_study', {
     id: 'freq_study',
     header: 'OS',
-    /** Used by: TanStack Table OS column to render observed study frequency as an integer count because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table OS column to render observed study frequency as an integer count. */
     cell: (info) => formatNumber(info.row.original.freq_study, { decimals: 0 }),
   }),
   columnHelper.accessor('sort_percent_study', {
     id: 'percent_study',
     header: '%S',
-    /** Used by: TanStack Table %S column to render study percentage with a percent suffix because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table %S column to render study percentage with a percent suffix. */
     cell: (info) => formatNumber(info.row.original.percent_study, { decimals: 2, suffix: '%' }),
   }),
   columnHelper.accessor('sort_log_likelihood_llv', {
     id: 'log_likelihood_llv',
     header: 'LL',
-    /** Used by: TanStack Table LL column to render log-likelihood for the comparative token row because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table LL column to render log-likelihood for the comparative token row. */
     cell: (info) => formatNumber(info.row.original.log_likelihood_llv, { decimals: 2 }),
   }),
   columnHelper.accessor('overuse', {
     header: 'Overuse',
-    /** Used by: TanStack Table Overuse column to render direction as a compact colored badge because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table Overuse column to render direction as a compact colored badge. */
     cell: (info) => {
       const isOveruse = info.getValue();
       const cls = isOveruse ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
@@ -180,50 +180,50 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
   }),
   columnHelper.accessor('signed_ll', {
     header: 'Signed LL',
-    /** Used by: TanStack Table Signed LL column after overuse direction has been applied because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table Signed LL column after overuse direction has been applied. */
     cell: (info) => <span className="tabular-nums">{formatSignedLL(info.getValue())}</span>,
   }),
   columnHelper.accessor('sort_percent_diff', {
     id: 'percent_diff',
     header: '%DIFF',
-    /** Used by: TanStack Table %DIFF column to render percent difference as a percentage value because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table %DIFF column to render percent difference as a percentage value. */
     cell: (info) =>
       formatNumber(info.row.original.percent_diff, { decimals: 2, suffix: '%', multiplier: 100 }),
   }),
   columnHelper.accessor('sort_bayes_factor_bic', {
     id: 'bayes_factor_bic',
     header: 'Bayes',
-    /** Used by: TanStack Table Bayes column to render the Bayes factor statistic because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table Bayes column to render the Bayes factor statistic. */
     cell: (info) => formatNumber(info.row.original.bayes_factor_bic, { decimals: 2 }),
   }),
   columnHelper.accessor('sort_effect_size_ell', {
     id: 'effect_size_ell',
     header: 'ELL',
-    /** Used by: TanStack Table ELL column to render the effect-size estimate with extra precision because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table ELL column to render the effect-size estimate with extra precision. */
     cell: (info) => formatNumber(info.row.original.effect_size_ell, { decimals: 4 }),
   }),
   columnHelper.accessor('sort_relative_risk', {
     id: 'relative_risk',
     header: 'RRisk',
-    /** Used by: TanStack Table RRisk column to render relative risk for the token comparison because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table RRisk column to render relative risk for the token comparison. */
     cell: (info) => formatNumber(info.row.original.relative_risk, { decimals: 2 }),
   }),
   columnHelper.accessor('sort_log_ratio', {
     id: 'log_ratio',
     header: 'LogRatio',
-    /** Used by: TanStack Table LogRatio column to render precision suitable for directional comparison because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table LogRatio column to render precision suitable for directional comparison. */
     cell: (info) => formatNumber(info.row.original.log_ratio, { decimals: 4 }),
   }),
   columnHelper.accessor('sort_odds_ratio', {
     id: 'odds_ratio',
     header: 'OddsRatio',
-    /** Used by: TanStack Table OddsRatio column to render export-parity odds ratio values because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table OddsRatio column to render export-parity odds ratio values. */
     cell: (info) => formatNumber(info.row.original.odds_ratio, { decimals: 2 }),
   }),
   columnHelper.accessor('sort_significance', {
     id: 'significance',
     header: 'Significance',
-    /** Used by: TanStack Table Significance column to render stars as an accessibility-friendly badge because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table Significance column to render stars as an accessibility-friendly badge. */
     cell: (info) => {
       const significance = info.row.original.significance;
       const badgeClass =
@@ -248,7 +248,7 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
 ];
 
 /**
- * Used by: TokenFrequencyStatisticsTable to enrich backend statistics with sort keys and derived overuse direction because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+ * Used by: TokenFrequencyStatisticsTable to enrich backend statistics with sort keys and derived overuse direction.
  * Flow: coerce reference/study frequencies and statistics into sortable numbers, compute overuse and signed LL, then attach sort fields to each row.
  */
 const enhanceRows = (statistics: TokenFrequencyStatisticsEntry[]): EnhancedStatisticsRow[] =>
@@ -314,7 +314,7 @@ export const TokenFrequencyStatisticsTable = ({
     data,
     columns,
     state: { sorting, pagination, columnFilters },
-    /** Used by: TanStack Table sorting state to keep large tables responsive during header clicks because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules. */
+    /** Used by: TanStack Table sorting state to keep large tables responsive during header clicks. */
     onSortingChange: (updater) => {
       startTransition(() => {
         setSorting(updater);
@@ -329,7 +329,7 @@ export const TokenFrequencyStatisticsTable = ({
   });
 
   /**
-   * Called by: TokenFrequencyStatisticsTable download button to export filtered or sorted keyness rows because callers need a shared analysis UI boundary with consistent props, event forwarding, and display rules.
+   * Called by: TokenFrequencyStatisticsTable download button to export filtered or sorted keyness rows.
    * Flow: choose sorted rows, filtered rows, or full data based on table state and token filter, then delegate CSV download with the keyness label.
    */
   const handleDownload = () => {

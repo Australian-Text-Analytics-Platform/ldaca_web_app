@@ -34,7 +34,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     defaultClassName: 'h-6 w-6 text-muted-foreground',
     missingMessage: 'No anchor found for this help item.',
     getTarget: getTutorialTarget,
-    /** Called by: DocLinkIcon handleClick for tutorial-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+    /** Called by: DocLinkIcon handleClick for tutorial-key consumers. */
     openTarget: (target) => {
       useUIStore.getState().openModal('tutorial', target);
     },
@@ -45,7 +45,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     defaultClassName: 'h-6 w-6 text-blue-500',
     missingMessage: 'No anchor found for this information item.',
     getTarget: getInfoTarget,
-    /** Called by: DocLinkIcon handleClick for information-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+    /** Called by: DocLinkIcon handleClick for information-key consumers. */
     openTarget: (target) => {
       useUIStore.getState().openModal('info', target);
     },
@@ -56,7 +56,7 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     defaultClassName: 'h-6 w-6',
     missingMessage: 'No anchor found for this reference item.',
     getTarget: getReferenceTarget,
-    /** Called by: DocLinkIcon handleClick for reference-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+    /** Called by: DocLinkIcon handleClick for reference-key consumers. */
     openTarget: (target) => {
       useUIStore.getState().openModal('reference', target);
     },
@@ -68,9 +68,9 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
     missingMessage: 'No anchor found for this warning item.',
     // No registry exists for warnings yet. The store action exists; if a
     // warningRegistry is added later, swap this for getWarningTarget.
-    /** Called by: DocLinkIcon handleClick for future warning-key consumers because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+    /** Called by: DocLinkIcon handleClick for future warning-key consumers. */
     getTarget: () => null,
-    /** Called by: DocLinkIcon handleClick for future warning documentation targets because the caller needs one documented boundary for the lookup, event, or state handoff step. */
+    /** Called by: DocLinkIcon handleClick for future warning documentation targets. */
     openTarget: (target) => {
       useUIStore.getState().openModal('warning', target);
     },
