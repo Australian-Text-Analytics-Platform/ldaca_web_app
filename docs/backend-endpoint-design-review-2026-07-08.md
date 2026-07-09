@@ -65,6 +65,9 @@ rescan should be added here before implementation.
 14. Removed the workspace persistence helper fallback to hidden
     current-workspace state; callers now pass the explicit workspace object
     they resolved from the route path.
+15. Split user-facing workspace selection from the resident workspace object so
+    explicit workspace-scoped route loads no longer rewrite
+    `/api/users/me/current-workspace`.
 
 ## Findings
 
@@ -179,6 +182,16 @@ callers pass the workspace they already resolved from the path. The general
 `require_current_workspace` route helper was removed, leaving only the guarded
 download flush path that persists the currently loaded workspace when it already
 matches the requested `workspace_id`.
+
+Status 2026-07-09: Split selected workspace state from resident workspace
+loading. `WorkspaceManager` now tracks the user-facing selected workspace id
+separately from the one in-memory workspace object, `require_workspace` loads
+explicit path targets through `load_workspace()` without updating
+`/api/users/me/current-workspace`, and worker detach completion uses the same
+explicit load path. Explicit unload/delete still clear the selected id when they
+target that selected workspace; unload treats an existing, already-not-resident
+workspace as a successful no-op instead of depending on whichever workspace is
+resident.
 
 ### 2. ~~Protect and reshape runtime config mutation~~
 
