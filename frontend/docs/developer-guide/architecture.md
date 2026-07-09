@@ -63,6 +63,19 @@ inside the existing static route. The active view is mirrored through the
 validated `view` search param by `ViewRouteSync`, while `uiStore.currentView`
 remains the UI source of truth for feature rendering and sidebar behavior.
 
+## TypeScript Tooling
+
+The build uses TypeScript 7 through the `tsc` binary exposed by the
+`typescript-7` package alias. Type-aware ESLint still depends on the TypeScript
+6 programmatic compiler API, so `typescript` is intentionally aliased to
+`@typescript/typescript6`. Do not collapse these dependencies until
+`typescript-eslint` supports the TypeScript 7 API directly.
+
+`tsconfig.json` follows the modern TypeScript/Vite shape: strict mode,
+`moduleResolution: "Bundler"`, `moduleDetection: "force"`,
+`isolatedModules`, `erasableSyntaxOnly`, `verbatimModuleSyntax`,
+`noUncheckedSideEffectImports`, and `noUncheckedIndexedAccess`.
+
 ## React Compiler Rule
 
 The Vite React plugin uses React Compiler through the Babel compiler preset.

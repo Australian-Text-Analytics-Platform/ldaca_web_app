@@ -171,6 +171,13 @@ rescan should be added here before implementation.
       `label_to_node_map`; they no longer accept an extra `node_id` alias on
       selected-node objects.
 
+29. Upgrade frontend TypeScript compiler and modernize TS config
+    - Done 2026-07-09. The frontend now runs TypeScript 7.0.2 for `tsc` via
+      the `typescript-7` package alias, keeps `typescript` on the official
+      `@typescript/typescript6` compatibility API for `typescript-eslint`, and
+      enables `moduleDetection: "force"`, `erasableSyntaxOnly`, and
+      `verbatimModuleSyntax` in `tsconfig.json`.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
