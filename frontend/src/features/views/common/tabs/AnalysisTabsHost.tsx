@@ -6,13 +6,12 @@
  * Why this exists: the orchestration (load tab group → auto-create one tab on entry →
  * draw the tab bar → mount the feature keyed by the active tab) is identical
  * across concordance, token-frequency, quotation, topic-modeling,
- * sequential-analysis, and annotation. Centralizing it here means every view shares exactly the
- * same tab UI and behaviour, and each per-view wrapper shrinks to a one-liner
- * that supplies only its tab-group namespace + panel component.
+ * sequential-analysis, and annotation. Centralizing it here means every view
+ * shares exactly the same tab UI and behaviour, while viewComponents supplies
+ * only its tab-group namespace + panel component.
  *
- * Rendered by: the tabbed ``*Feature`` wrappers (one per analysis-style view),
- * which ViewRouter lazy-loads. Each wrapper passes its own ``tabGroup`` and
- * ``Feature``.
+ * Rendered by: the lazy tabbed feature loaders in `viewComponents.tsx`, which
+ * ViewRouter resolves from the active view id.
  * Flow: resolve workspace + auth, load this workspace's tab group, auto-create
  * one empty tab only when entering an empty group, render the shared tab bar
  * only when the user preference enables it, then mount ``Feature`` keyed by the
@@ -61,7 +60,7 @@ export interface AnalysisTabsHostProps {
 
 /**
  * Hosts one analysis view's tab strip and the active tab's panel.
- * Used by: the five ``*TabbedFeature`` wrappers because the tab bar and the
+ * Used by: viewComponents' tabbed feature loaders because the tab bar and the
  * keyed feature panel both need the same live tab list, active id, and mutators.
  * Flow: read tab group → ensure a tab exists → render optional bar + keyed panel.
  */

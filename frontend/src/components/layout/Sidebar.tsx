@@ -41,32 +41,9 @@ import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
-import {
-  BookOpen,
-  Circle,
-  Cog,
-  FileText,
-  Filter,
-  FolderOpen,
-  Hash,
-  type LucideIcon,
-  MessageSquare,
-  Puzzle,
-  Quote,
-  TrendingUp,
-  Upload,
-  ChevronDown,
-  Pencil,
-  Tags,
-} from 'lucide-react';
-import type { ViewType } from '@/stores';
+import { BookOpen, Circle, Cog, MessageSquare, ChevronDown, Pencil } from 'lucide-react';
+import { VIEW_DEFINITIONS, isWorkspaceRequired } from '@/features/views/viewRegistry';
 import logo from '@/logo.png';
-
-interface NavItem {
-  id: ViewType;
-  label: string;
-  icon: LucideIcon;
-}
 
 type SectionKey = 'views' | 'nodes' | 'tasks';
 
@@ -100,19 +77,6 @@ const INITIAL_SECTION_RATIOS: Record<SectionKey, number> = {
 const SECTION_MIN_HEIGHTS: Partial<Record<SectionKey, number>> = {
   tasks: TASKS_SECTION_MIN_HEIGHT,
 };
-
-/** Navigation items rendered in the Views sidebar section and routed by `ViewRouter`. */
-const NAV_ITEMS: NavItem[] = [
-  { id: 'data-loader', label: 'Data Loader', icon: FolderOpen },
-  { id: 'filter', label: 'Preprocessing', icon: Filter },
-  { id: 'token-frequency', label: 'Frequency', icon: Hash },
-  { id: 'concordance', label: 'Concordance', icon: FileText },
-  { id: 'analysis', label: 'Trends', icon: TrendingUp },
-  { id: 'topic-modeling', label: 'Topic Modeling', icon: Puzzle },
-  { id: 'quotation', label: 'Quotation', icon: Quote },
-  { id: 'annotation', label: 'Annotation', icon: Tags },
-  { id: 'export', label: 'Export', icon: Upload },
-];
 
 /**
  * Main app sidebar used by the workspace shell. It coordinates view navigation,
@@ -151,14 +115,8 @@ function Sidebar() {
 
   const { workspaceGraph } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
-  const {
-    toggleNodeSelection,
-    deleteNode,
-    copyNode,
-    renameNode,
-    undoNode,
-    redoNode,
-  } = useWorkspaceActions();
+  const { toggleNodeSelection, deleteNode, copyNode, renameNode, undoNode, redoNode } =
+    useWorkspaceActions();
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
   const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
   const togglePinnedNode = usePinnedNodesStore((state) => state.togglePinnedNode);
@@ -209,7 +167,7 @@ function Sidebar() {
   });
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
-  const visibleNavItems = NAV_ITEMS.filter(({ id }) => visibleViews.includes(id));
+  const visibleNavItems = VIEW_DEFINITIONS.filter(({ id }) => visibleViews.includes(id));
 
   /**
    * Called by: Sidebar's Views section body renderer.
@@ -218,7 +176,7 @@ function Sidebar() {
   const renderViewsBody = () => (
     <SidebarMenu>
       {visibleNavItems.map(({ id, label, icon: Icon }) => {
-        const isDisabled = !isWorkspaceLoaded && id !== 'data-loader';
+        const isDisabled = !isWorkspaceLoaded && isWorkspaceRequired(id);
         return (
           <SidebarMenuItem key={id}>
             <SidebarMenuButton
@@ -386,25 +344,25 @@ function Sidebar() {
                             <TooltipContent side="right">Edit visible views</TooltipContent>
                           </Tooltip>
                           <DropdownMenuContent align="end" className="w-56">
-                            {NAV_ITEMS.filter(({ id }) => id !== 'data-loader').map(
-                              ({ id, label }) => {
-                                const checked = visibleViews.includes(id);
-                                const isLastVisibleItem = checked && visibleViews.length === 1;
-                                return (
-                                  <DropdownMenuCheckboxItem
-                                    key={id}
-                                    checked={checked}
-                                    disabled={isLastVisibleItem}
-                                    onSelect={(event) => {
-                                      event.preventDefault();
-                                      setViewVisibility(id, !checked);
-                                    }}
-                                  >
-                                    {label}
-                                  </DropdownMenuCheckboxItem>
-                                );
-                              },
-                            )}
+                            {VIEW_DEFINITIONS.filter(
+                              ({ requiresWorkspace }) => requiresWorkspace,
+                            ).map(({ id, label }) => {
+                              const checked = visibleViews.includes(id);
+                              const isLastVisibleItem = checked && visibleViews.length === 1;
+                              return (
+                                <DropdownMenuCheckboxItem
+                                  key={id}
+                                  checked={checked}
+                                  disabled={isLastVisibleItem}
+                                  onSelect={(event) => {
+                                    event.preventDefault();
+                                    setViewVisibility(id, !checked);
+                                  }}
+                                >
+                                  {label}
+                                </DropdownMenuCheckboxItem>
+                              );
+                            })}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

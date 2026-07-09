@@ -1,7 +1,8 @@
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '@/stores/uiStore';
+import { DEFAULT_VISIBLE_VIEWS } from '@/features/views/viewIds';
+import { useUIStore } from '@/stores/uiStore';
 import { ViewRouteSync } from '../ViewRouteSync';
 
 const routeFixture = vi.hoisted(() => ({

@@ -54,11 +54,10 @@ import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
- * Tab props (optional): when rendered inside an analysis tab by
- * ConcordanceTabbedFeature, ``tabId`` identifies the active tab, ``tabTaskId``
+ * Tab props (optional): when rendered inside an analysis tab by the
+ * viewComponents loader, ``tabId`` identifies the active tab, ``tabTaskId``
  * seeds deterministic hydration of that tab's task, and ``onTabTaskChange``
- * lets the feature report task id assignment/clear back to the tab record. All
- * are absent in the legacy non-tabbed mounting, where behaviour is unchanged.
+ * lets the feature report task id assignment/clear back to the tab record.
  */
 interface ConcordanceFeatureProps {
   tabId?: string;

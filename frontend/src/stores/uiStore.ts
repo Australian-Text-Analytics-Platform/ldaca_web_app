@@ -3,6 +3,12 @@ import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import { usePreferencesStore } from './preferencesStore';
+import {
+  ALL_VIEWS,
+  DEFAULT_VIEW,
+  DEFAULT_VISIBLE_VIEWS,
+  type ViewType,
+} from '@/features/views/viewIds';
 
 enableMapSet();
 
@@ -14,32 +20,6 @@ enableMapSet();
  * Business state (workspaces, nodes, selections, analysis tasks) belongs in
  * the server cache or dedicated stores — this store is purely presentation.
  */
-
-export type ViewType =
-  | 'data-loader'
-  | 'filter'
-  | 'token-frequency'
-  | 'concordance'
-  | 'analysis'
-  | 'topic-modeling'
-  | 'quotation'
-  | 'annotation'
-  | 'export';
-
-export const ALL_VIEWS: ViewType[] = [
-  'data-loader',
-  'filter',
-  'token-frequency',
-  'concordance',
-  'analysis',
-  'topic-modeling',
-  'quotation',
-  'annotation',
-  'export',
-];
-
-/** Views shown out of the box in the sidebar. */
-export const DEFAULT_VISIBLE_VIEWS: ViewType[] = [...ALL_VIEWS];
 
 type ModalKind = 'feedback' | 'tutorial' | 'warning' | 'info' | 'reference';
 
@@ -105,7 +85,7 @@ export const useUIStore = create<UIStore>()(
   devtools(
     persist(
       immer((set) => ({
-        currentView: 'data-loader',
+        currentView: DEFAULT_VIEW,
         visibleViews: [...DEFAULT_VISIBLE_VIEWS],
         sidebarCollapsed: false,
         loadingOperations: new Set(),
@@ -145,7 +125,7 @@ export const useUIStore = create<UIStore>()(
               if (state.visibleViews.length <= 1) return;
               state.visibleViews = state.visibleViews.filter((c) => c !== view);
               if (state.currentView === view) {
-                state.currentView = state.visibleViews[0] ?? 'data-loader';
+                state.currentView = state.visibleViews[0] ?? DEFAULT_VIEW;
               }
             }
 
@@ -157,7 +137,7 @@ export const useUIStore = create<UIStore>()(
             const hiddenViews = usePreferencesStore.getState().hiddenViews;
             state.visibleViews = ALL_VIEWS.filter((v) => !hiddenViews.includes(v));
             if (!state.visibleViews.includes(state.currentView)) {
-              state.currentView = state.visibleViews[0] ?? 'data-loader';
+              state.currentView = state.visibleViews[0] ?? DEFAULT_VIEW;
             }
           }),
 

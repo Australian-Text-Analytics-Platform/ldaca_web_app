@@ -518,9 +518,8 @@ function AnnotationClassDescriptionsEditor({
  * Annotation setup panel. This redesign slice exposes source node/column
  * selection plus a class-description setup card with an inline editable table.
  *
- * Rendered by: AnnotationTabbedFeature through AnalysisTabsHost because the
- * Annotation view should share the same tabbed workflow shell as other
- * analysis-style views.
+ * Rendered by: the viewComponents tabbed loader through AnalysisTabsHost so
+ * Annotation shares the same workflow shell as other analysis-style views.
  *
  * Flow: bind both selectors to named input sets on the active tab, render
  * Annotation-specific companion column pickers, create/select a backend

@@ -12,7 +12,7 @@ import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
 import type { PendingConcordance } from '@/stores/analysisStore';
-import type { ViewType } from '@/stores/uiStore';
+import type { ViewType } from '@/features/views/viewIds';
 
 interface AnalysisState {
   currentWorkspaceId: string | null;

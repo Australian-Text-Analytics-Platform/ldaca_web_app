@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isTabbedMainView } from '../tabbedMainViews';
+import { isTabbedMainView } from '@/features/views/viewRegistry';
 
 describe('WorkspaceShell tabbed main view classification', () => {
   it('strips the shared middle-column card for Annotation like other tabbed views', () => {

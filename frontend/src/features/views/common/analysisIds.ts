@@ -1,7 +1,7 @@
 /**
  * Canonical ids shared by analysis tab sidecars, task hydration, and task-status
  * subscriptions.
- * Used by: tabbed feature wrappers, analysis feature configs, and task-stream
+ * Used by: the view registry, analysis feature configs, and task-stream
  * helpers so one logical analysis id is not repeated as unrelated literals.
  */
 export const ANALYSIS_TAB_GROUPS = {
@@ -14,10 +14,7 @@ export const ANALYSIS_TAB_GROUPS = {
 } as const;
 
 type AnalysisTabGroup = (typeof ANALYSIS_TAB_GROUPS)[keyof typeof ANALYSIS_TAB_GROUPS];
-export type LastRunAnalysisType = Exclude<
-  AnalysisTabGroup,
-  typeof ANALYSIS_TAB_GROUPS.annotation
->;
+export type LastRunAnalysisType = Exclude<AnalysisTabGroup, typeof ANALYSIS_TAB_GROUPS.annotation>;
 
 export const ANALYSIS_TASK_TYPES = {
   concordance: 'concordance',

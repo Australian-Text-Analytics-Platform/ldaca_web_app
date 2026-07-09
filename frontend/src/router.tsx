@@ -1,6 +1,6 @@
 import { Outlet, createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
 import App from './App';
-import { ALL_VIEWS, type ViewType } from './stores/uiStore';
+import { DEFAULT_VIEW, isViewType, type ViewType } from '@/features/views/viewIds';
 import { getRuntimeBasePath } from '@/lib/backend/env';
 
 const rootRoute = createRootRoute({
@@ -13,8 +13,7 @@ export interface AppSearch {
 }
 
 /** Validates `?view=` values before syncing them into UI-store navigation state. */
-export const isViewSearchValue = (value: unknown): value is ViewType =>
-  typeof value === 'string' && ALL_VIEWS.includes(value as ViewType);
+export const isViewSearchValue = (value: unknown): value is ViewType => isViewType(value);
 
 /** Drops unknown search params so shared links never navigate to unsupported views. */
 export const validateAppSearch = (search: Record<string, unknown>): AppSearch => {
@@ -23,8 +22,7 @@ export const validateAppSearch = (search: Record<string, unknown>): AppSearch =>
 };
 
 /** Omits the default data-loader view to keep canonical app URLs short. */
-export const viewSearchFor = (view: ViewType): AppSearch =>
-  view === 'data-loader' ? {} : { view };
+export const viewSearchFor = (view: ViewType): AppSearch => (view === DEFAULT_VIEW ? {} : { view });
 
 const indexRoute = createRoute({
   /** Connects the single SPA route to the shared root route. */
@@ -39,7 +37,7 @@ export const appRoute = indexRoute;
 const routeTree = rootRoute.addChildren([indexRoute]);
 
 const runtimeBasePath = typeof window !== 'undefined' ? getRuntimeBasePath() : undefined;
-const normalizedBasePath = runtimeBasePath === '' ? '/' : runtimeBasePath ?? '/';
+const normalizedBasePath = runtimeBasePath === '' ? '/' : (runtimeBasePath ?? '/');
 
 export const router = createRouter({
   routeTree,

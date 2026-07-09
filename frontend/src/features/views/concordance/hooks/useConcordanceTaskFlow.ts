@@ -46,8 +46,8 @@ interface ConcordanceActions {
   setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
   setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
   /**
-   * Notifies the owner (analysis tab wrapper) of the task id assigned by a run
-   * (or null when none). The wrapper persists it onto the tab record so the tab
+   * Notifies AnalysisTabsHost of the task id assigned by a run (or null when
+   * none). The host persists it onto the tab record so the tab
    * rehydrates the same task after reload. Optional for non-tabbed callers.
    */
   onTaskIdAssigned?: (taskId: string | null) => void;

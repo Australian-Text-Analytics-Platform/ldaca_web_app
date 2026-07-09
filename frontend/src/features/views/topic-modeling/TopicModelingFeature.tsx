@@ -35,7 +35,7 @@ import { useTopicModelingResultControls } from './hooks/useTopicModelingResultCo
 
 /** Renders the topic-modeling workflow for live BERTopic runs and result exploration. */
 /**
- * Rendered by: TopicModelingTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
+ * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds

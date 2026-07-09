@@ -7,4 +7,4 @@
  */
 
 export { useUIStore } from './uiStore';
-export type { ViewType } from './uiStore';
+export type { ViewType } from '@/features/views/viewIds';

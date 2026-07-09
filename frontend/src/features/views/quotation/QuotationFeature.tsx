@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type {
-  QuotationAnalysisResponse,
-  AnalysisTabInput,
-  QuotationEngineConfig,
-} from '@/api';
+import type { QuotationAnalysisResponse, AnalysisTabInput, QuotationEngineConfig } from '@/api';
 
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -52,7 +48,7 @@ import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocu
 
 /** Renders the quotation extraction workflow, including live runs and result materialisation. */
 /**
- * Rendered by: QuotationTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
+ * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds

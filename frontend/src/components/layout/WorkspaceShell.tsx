@@ -18,7 +18,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
-import { isTabbedMainView } from '@/components/layout/tabbedMainViews';
+import { isTabbedMainView } from '@/features/views/viewRegistry';
 
 const FeedbackPanel = lazy(() =>
   import('@/features/feedback/components/FeedbackPanel').then((m) => ({

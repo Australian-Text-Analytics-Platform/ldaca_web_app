@@ -24,9 +24,7 @@ import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunAct
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
-import {
-  useSequentialAnalysisTaskFlow,
-} from './hooks/useSequentialAnalysisTaskFlow';
+import { useSequentialAnalysisTaskFlow } from './hooks/useSequentialAnalysisTaskFlow';
 import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
 import { useSequentialResultSummary } from './hooks/useSequentialResultSummary';
 import { deriveSequentialResultVisibility } from './hooks/sequentialResultVisibility';
@@ -42,18 +40,14 @@ import { useSequentialChartControls } from './hooks/useSequentialChartControls';
 import { SequentialAnalysisParameterPanel } from './components/panels/SequentialAnalysisParameterPanel';
 import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
-import {
-  downloadChartAs,
-  findSvgInContainer,
-  type ChartImageFormat,
-} from '@/lib/chartExport';
+import { downloadChartAs, findSvgInContainer, type ChartImageFormat } from '@/lib/chartExport';
 
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
 
 /** Renders the sequential-analysis workflow for live trends and result exploration. */
 /**
- * Rendered by: SequentialAnalysisTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
+ * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
@@ -96,7 +90,9 @@ const SequentialAnalysisFeature = ({
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
   const sourceDocumentCount = (() => {
-    const firstShapeValue = activeNodeId ? nodeInputs.nodeInfoCache[activeNodeId]?.shape?.[0] : null;
+    const firstShapeValue = activeNodeId
+      ? nodeInputs.nodeInfoCache[activeNodeId]?.shape?.[0]
+      : null;
     return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
       ? firstShapeValue
       : undefined;

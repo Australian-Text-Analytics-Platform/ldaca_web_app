@@ -25,7 +25,8 @@ import {
   countTabsRemovedBySingleTabMode,
 } from '@/features/views/common/tabs/tabStateOps';
 import { workspaceTabsQueryKey } from '@/features/views/common/tabs/useWorkspaceTabs';
-import { ALL_VIEWS, type ViewType, useUIStore } from '@/stores/uiStore';
+import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
+import { useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
@@ -36,18 +37,6 @@ interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const VIEW_LABELS: Record<ViewType, string> = {
-  'data-loader': 'Data Loader',
-  filter: 'Preprocessing',
-  'token-frequency': 'Frequency',
-  concordance: 'Concordance',
-  analysis: 'Trends',
-  'topic-modeling': 'Topic Modeling',
-  quotation: 'Quotation',
-  annotation: 'Annotation',
-  export: 'Export',
-};
 
 const SETTINGS_TABS = [
   { value: 'general', label: 'General', icon: Sparkles },
@@ -368,10 +357,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   </p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {ALL_VIEWS.map((view) => {
+                  {VIEW_DEFINITIONS.map(({ id: view, label, requiresWorkspace }) => {
                     const checked = visibleViews.includes(view);
-                    const disabled =
-                      view === 'data-loader' || (checked && visibleViews.length === 1);
+                    const disabled = !requiresWorkspace || (checked && visibleViews.length === 1);
                     return (
                       <Label
                         key={view}
@@ -386,7 +374,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             setViewVisibility(view, nextChecked === true);
                           }}
                         />
-                        <span>{VIEW_LABELS[view]}</span>
+                        <span>{label}</span>
                       </Label>
                     );
                   })}

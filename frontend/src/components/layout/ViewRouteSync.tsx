@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { DEFAULT_VIEW } from '@/features/views/viewIds';
+import { isWorkspaceRequired } from '@/features/views/viewRegistry';
 import { appRoute, viewSearchFor } from '@/router';
 import { useUIStore, type ViewType } from '@/stores';
 
@@ -15,8 +17,8 @@ const getRoutableView = ({
   isWorkspaceLoaded: boolean;
   visibleViews: ViewType[];
 }): ViewType => {
-  if (!visibleViews.includes(currentView)) return 'data-loader';
-  if (!isWorkspaceLoaded && currentView !== 'data-loader') return 'data-loader';
+  if (!visibleViews.includes(currentView)) return DEFAULT_VIEW;
+  if (!isWorkspaceLoaded && isWorkspaceRequired(currentView)) return DEFAULT_VIEW;
   return currentView;
 };
 
@@ -43,7 +45,7 @@ export const ViewRouteSync = () => {
   const routeViewAllowed = Boolean(
     routeView &&
       visibleViews.includes(routeView) &&
-      (routeView === 'data-loader' || isWorkspaceLoaded),
+      (!isWorkspaceRequired(routeView) || isWorkspaceLoaded),
   );
 
   // Tracks the routeView from the previous effect run to distinguish URL-driven
@@ -69,13 +71,13 @@ export const ViewRouteSync = () => {
     // intent survives until the workspace becomes available.
     if (
       routeView &&
-      routeView !== 'data-loader' &&
+      isWorkspaceRequired(routeView) &&
       visibleViews.includes(routeView) &&
       !isWorkspaceLoaded
     ) {
       pendingRouteViewRef.current = routeView;
-      if (currentView !== 'data-loader') {
-        setCurrentView('data-loader');
+      if (currentView !== DEFAULT_VIEW) {
+        setCurrentView(DEFAULT_VIEW);
       }
       return;
     }
@@ -105,11 +107,11 @@ export const ViewRouteSync = () => {
     // ``?view=filter`` pending until the workspace is available, then adopts
     // them without a sidebar/store race back to Data Loader.
     if (!visibleViews.includes(currentView)) {
-      setCurrentView(visibleViews[0] ?? 'data-loader');
+      setCurrentView(visibleViews[0] ?? DEFAULT_VIEW);
       return;
     }
-    if (!isWorkspaceLoaded && currentView !== 'data-loader') {
-      setCurrentView('data-loader');
+    if (!isWorkspaceLoaded && isWorkspaceRequired(currentView)) {
+      setCurrentView(DEFAULT_VIEW);
       return;
     }
 

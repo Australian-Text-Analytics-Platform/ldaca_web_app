@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
-import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '@/stores/uiStore';
+import { DEFAULT_VISIBLE_VIEWS } from '@/features/views/viewIds';
+import { useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
 
 /** Toast spy used to verify sidebar menu actions surface user feedback. */

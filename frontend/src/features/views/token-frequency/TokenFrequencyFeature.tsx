@@ -4,11 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 
-import {
-  DEFAULT_TOKEN_LIMIT,
-  parseAnalysisNodeRequest,
-  useLastRunRequest,
-} from '../common';
+import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest, useLastRunRequest } from '../common';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
@@ -47,7 +43,7 @@ const UNIFIED_WORDCLOUD_HEIGHT = 340;
 
 /** Coordinates token-frequency selection, execution, and export wiring for the analysis tab. */
 /**
- * Rendered by: TokenFrequencyTabbedFeature, which mounts one instance per analysis tab and feeds it tab props.
+ * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds

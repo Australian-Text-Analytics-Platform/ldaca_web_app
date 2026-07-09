@@ -19,12 +19,8 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { getPreferences, updatePreferences } from '@/api';
-import type {
-  AnnotationAiCustomProvider,
-  UserPreferences,
-  UserPreferencesUpdate,
-} from '@/api';
-import type { ViewType } from '@/stores/uiStore';
+import type { AnnotationAiCustomProvider, UserPreferences, UserPreferencesUpdate } from '@/api';
+import type { ViewType } from '@/features/views/viewIds';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = [];
 
@@ -236,9 +232,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
          */
         addAnnotationAiCustomProvider: (provider) => {
           set((state) => {
-            const idx = state.annotationAiCustomProviders.findIndex(
-              (p) => p.id === provider.id,
-            );
+            const idx = state.annotationAiCustomProviders.findIndex((p) => p.id === provider.id);
             if (idx === -1) {
               state.annotationAiCustomProviders.push(provider);
             } else {

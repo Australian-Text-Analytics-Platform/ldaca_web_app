@@ -1,60 +1,8 @@
-import React, { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useUIStore, type ViewType } from '@/stores';
-
-/** Lazy data-loader chunk consumed by `VIEW_COMPONENTS` to keep startup lightweight. */
-const DataLoaderFeature = lazy(() => import('@/features/views/data-loader/DataLoaderFeature'));
-/** Lazy preprocessing chunk consumed by `VIEW_COMPONENTS` when the filter view is active. */
-const DataPreprocessingFeature = lazy(
-  () => import('@/features/views/preprocessing/DataPreprocessingFeature'),
-);
-/** Lazy concordance chunk consumed by `VIEW_COMPONENTS` when concordance is selected. */
-/** Points at the tabbed wrapper (ConcordanceTabbedFeature) so the concordance
- *  view renders the Chrome-style analysis tab strip as its outermost element. */
-const ConcordanceFeature = lazy(
-  () => import('@/features/views/concordance/ConcordanceTabbedFeature'),
-);
-/** Points at the tabbed wrapper (QuotationTabbedFeature) so the quotation
- *  view renders the Chrome-style analysis tab strip as its outermost element. */
-const QuotationFeature = lazy(() => import('@/features/views/quotation/QuotationTabbedFeature'));
-/** Points at the tabbed wrapper (AnnotationTabbedFeature) so the annotation
- *  view renders the shared analysis tab strip as its outermost element. */
-const AnnotationFeature = lazy(
-  () => import('@/features/views/annotation/AnnotationTabbedFeature'),
-);
-/** Points at the tabbed wrapper (TopicModelingTabbedFeature) so the topic-modeling
- *  view renders the Chrome-style analysis tab strip as its outermost element. */
-const TopicModelingFeature = lazy(
-  () => import('@/features/views/topic-modeling/TopicModelingTabbedFeature'),
-);
-/** Points at the tabbed wrapper (SequentialAnalysisTabbedFeature) so the trends
- *  view renders the Chrome-style analysis tab strip as its outermost element. */
-const SequentialAnalysisFeature = lazy(
-  () => import('@/features/views/sequential-analysis/SequentialAnalysisTabbedFeature'),
-);
-/** Lazy export chunk consumed by `VIEW_COMPONENTS` when export tools are selected. */
-const ExportFeature = lazy(() => import('@/features/views/export/ExportFeature'));
-/** Points at the tabbed wrapper (TokenFrequencyTabbedFeature) so the token-frequency
- *  view renders the Chrome-style analysis tab strip as its outermost element. */
-const TokenFrequencyFeature = lazy(
-  () => import('@/features/views/token-frequency/TokenFrequencyTabbedFeature'),
-);
-/**
- * Each feature renders only when the matching `currentView` value is set.
- * Switching views unmounts the previous feature so its hooks reset cleanly.
- */
-const VIEW_COMPONENTS: Record<ViewType, React.ComponentType> = {
-  'data-loader': DataLoaderFeature,
-  filter: DataPreprocessingFeature,
-  'token-frequency': TokenFrequencyFeature,
-  concordance: ConcordanceFeature,
-  analysis: SequentialAnalysisFeature,
-  'topic-modeling': TopicModelingFeature,
-  quotation: QuotationFeature,
-  annotation: AnnotationFeature,
-  export: ExportFeature,
-};
+import { ViewFeature } from '@/features/views/viewComponents';
+import { useUIStore } from '@/stores';
 
 /**
  * Suspense fallback used by `ViewRouter` while a feature bundle is loading.
@@ -77,12 +25,11 @@ const Fallback = () => (
  */
 export function ViewRouter() {
   const currentView = useUIStore((state) => state.currentView);
-  const FeatureComponent = VIEW_COMPONENTS[currentView];
   return (
     <div className="min-h-0 min-w-0 w-full flex-1">
       <ErrorBoundary>
         <Suspense fallback={<Fallback />}>
-          <FeatureComponent />
+          <ViewFeature view={currentView} />
         </Suspense>
       </ErrorBoundary>
     </div>

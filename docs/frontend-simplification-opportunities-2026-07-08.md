@@ -11,39 +11,6 @@ Completed work is removed from the open TODO list and recorded in `Done`.
 
 ## Open TODOs
 
-### 5. Consolidate view metadata and remove tabbed wrapper duplication
-
-Confidence: High
-
-Evidence:
-
-- `ViewType` and `ALL_VIEWS` live in `frontend/src/stores/uiStore.ts`.
-- Sidebar labels/icons are duplicated in `NAV_ITEMS` in
-  `frontend/src/components/layout/Sidebar.tsx`.
-- Settings labels are duplicated in `VIEW_LABELS` in
-  `frontend/src/components/dialogs/SettingsDialog.tsx`.
-- Lazy component mapping lives in `VIEW_COMPONENTS` in
-  `frontend/src/components/layout/ViewRouter.tsx`.
-- Tabbed-main framing is duplicated in
-  `frontend/src/components/layout/tabbedMainViews.ts`.
-- Each analysis view has a one-purpose `*TabbedFeature.tsx` wrapper that only
-  supplies `AnalysisTabsHost` with a tab group id.
-
-Recommendation:
-
-Create a small view registry split by import weight:
-
-- A light `viewIds` module exports `ViewType`, `ALL_VIEWS`, and default
-  visibility for stores/router.
-- A UI registry module maps view id to label, icon, workspace requirement,
-  tabbed-main behavior, and lazy feature loader.
-- A tabbed-feature helper wraps lazy analysis features with `AnalysisTabsHost`
-  and the configured tab group id instead of keeping six near-identical wrapper
-  files.
-
-Keep icon/lazy imports out of `uiStore` and low-level routing modules so the
-registry does not increase startup work.
-
 ### 7. Split `AnnotationFeature` around real ownership boundaries
 
 Confidence: High
@@ -127,9 +94,16 @@ explicitly so it does not spread into unrelated live-node helpers.
      `sliceFormModel.ts`; `@tanstack/react-form` was removed from
      `frontend/package.json` and `pnpm-lock.yaml`.
 
+5. Consolidate view metadata and remove tabbed wrapper duplication
+   - Done 2026-07-09. Added light `viewIds.ts` for store/router ids,
+     centralized labels/icons/workspace gating/tabbed-main flags in
+     `viewRegistry.ts`, moved lazy feature loading into the component-only
+     `viewComponents.tsx` Fast Refresh boundary, and deleted the six
+     one-purpose `*TabbedFeature.tsx` wrappers plus `tabbedMainViews.ts`.
+
 6. Centralize analysis task/tab group identifiers
    - Done 2026-07-09. `analysisIds.ts` now owns tab-group, task-type, and
-     last-run identifiers used by tab wrappers, analysis feature configs,
+     last-run identifiers used by the view registry, analysis feature configs,
      hydration, aliasing, and task-stream filtering.
 
 8. Add a narrow helper for analysis run envelopes

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useTokenFrequencyTaskFlow } from '../useTokenFrequencyTaskFlow';
 import type { PendingConcordance } from '@/stores/analysisStore';
-import type { ViewType } from '@/stores/uiStore';
+import type { ViewType } from '@/features/views/viewIds';
 
 const { calculateTokenFrequenciesMock } = vi.hoisted(() => ({
   calculateTokenFrequenciesMock: vi.fn(),
