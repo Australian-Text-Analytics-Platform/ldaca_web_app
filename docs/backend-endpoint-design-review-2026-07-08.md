@@ -59,6 +59,9 @@ rescan should be added here before implementation.
 12. Removed the remaining hidden current-workspace read from the analysis task
    factory by requiring explicit `workspace_id` whenever a task record is
    created through `TaskManager.create_task`.
+13. Removed the worker input snapshot fallback to hidden current-workspace
+    state; analysis submissions now pass the route-resolved workspace and
+    artifact directory explicitly.
 
 ## Findings
 
@@ -159,6 +162,12 @@ Status 2026-07-09: Tightened tab sidecar routes. `GET/PUT
 /api/workspaces/{workspace_id}/tabs` now declare `/{workspace_id:uuid}/tabs`
 internally, and the workspace route invariant fails if any workspace-scoped
 handler omits the UUID converter.
+
+Status 2026-07-09: Tightened worker input snapshot handoff. Analysis submission
+routes already resolve the target workspace from the path; `create_worker_input_snapshot`
+now requires that explicit workspace object and artifact directory, removes its
+`user_id` argument, and no longer falls back to
+`workspace_manager.get_current_workspace(user_id)`.
 
 ### 2. ~~Protect and reshape runtime config mutation~~
 
