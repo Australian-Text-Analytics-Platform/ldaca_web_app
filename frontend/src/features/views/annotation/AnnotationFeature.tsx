@@ -1,26 +1,12 @@
 import { useState } from 'react';
-import type { AnalysisTabInput, AnnotationClassDescriptionRow } from '@/api';
+import type { AnalysisTabInput } from '@/api';
 import {
   annotateAiPreviewClear,
   createAnnotationClassDescriptions,
   createAnnotationColumn,
-  getAnnotationClassDescriptions,
   setAnnotationClassParent,
-  updateAnnotationClassDescriptions,
 } from '@/api';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,20 +18,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { NodeInputColumnAddonArgs } from '@/features/views/common/components/NodeInputsPanel';
-import { AnnotationResultsPanel } from './components/AnnotationResultsPanel';
 import { AnnotationAiPreviewPanel } from './components/AnnotationAiPreviewPanel';
 import { AnnotationAiSettings } from './components/AnnotationAiSettings';
+import { AnnotationClassDescriptionsEditor } from './components/AnnotationClassDescriptionsEditor';
 import { AnnotationInferenceSettings } from './components/AnnotationInferenceSettings';
 import {
   AnnotationPromptInput,
   DEFAULT_ANNOTATION_PROMPT,
 } from './components/AnnotationPromptInput';
+import { AnnotationResultsPanel } from './components/AnnotationResultsPanel';
 import type { AnnotationProviderConfigSave } from './components/AnnotationProviderConfigDialog';
 import type { AnnotationAiProviderId } from './aiProviders';
 import {
@@ -53,6 +39,7 @@ import {
   parseConfiguredBuiltinProviderId,
   resolveAnnotationAiProvider,
 } from './aiProviders';
+import { useAnnotationTabSettings } from './hooks/useAnnotationTabSettings';
 import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
 import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
 import {
@@ -62,9 +49,10 @@ import {
 import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAnnotationClassDescriptions } from './hooks/useAnnotationClassDescriptions';
 
 const SOURCE_NODE_CONSTRAINTS: NodeInputConstraints = {
   allowedDataTypes: ['string'],
@@ -84,16 +72,6 @@ const EXAMPLE_NODE_CONSTRAINTS: NodeInputConstraints = {
   maxNodes: 1,
 };
 const START_NEW_ANNOTATION_VALUE = '__start_new_annotation__';
-const DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY = [
-  'workspaces',
-  'annotation',
-  'class-descriptions',
-  'disabled',
-] as const;
-// Compact card shows class-name badges; extras collapse into a "+N more" badge
-// so the card stays tight while the full list lives in the Edit dialog.
-const CLASS_NAME_PREVIEW_LIMIT = 20;
-
 interface AnnotationFeatureProps {
   tabId?: string;
   tabTaskId?: string | null;
@@ -118,22 +96,6 @@ interface ColumnPickerProps {
   disabled?: boolean;
 }
 
-interface AnnotationClassDescriptionsEditorProps {
-  workspaceId: string | null;
-  nodeId: string | null;
-  classColumn: string | null;
-  descriptionColumn: string | null;
-  getAuthHeaders: () => Record<string, string>;
-}
-
-const normalizeClassDescriptionRows = (
-  rows: AnnotationClassDescriptionRow[] | undefined,
-): AnnotationClassDescriptionRow[] =>
-  (rows ?? []).map((row) => ({
-    class: row.class ?? '',
-    description: row.description ?? '',
-  }));
-
 const resolveDescriptionColumn = (columns: string[], classColumn: string): string =>
   columns.find((column) => column === 'description') ??
   columns.find((column) => column !== classColumn) ??
@@ -152,30 +114,6 @@ const computeDefaultAnnotationColumnName = (columns: string[]): string => {
   let suffix = 1;
   while (columns.includes(`annotation_${String(suffix)}`)) suffix += 1;
   return `annotation_${String(suffix)}`;
-};
-
-/**
- * Parse a persisted tab-setting string as a provider-card model map.
- *
- * Used by: AnnotationFeature when hydrating the AI provider dropdown. The value
- * lives in tabs.json as a string map because generic tab settings are
- * Record<string,string>; malformed user-edited JSON is ignored with a warning so
- * the tab still opens and the user can save a fresh provider card.
- */
-const parseProviderModelSetting = (value: string | undefined): Record<string, string> => {
-  if (!value) return {};
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    const models: Record<string, string> = {};
-    for (const [key, model] of Object.entries(parsed)) {
-      if (typeof model === 'string') models[key] = model;
-    }
-    return models;
-  } catch (error) {
-    console.warn('[annotation] Ignoring malformed AI provider model setting:', error);
-    return {};
-  }
 };
 
 /**
@@ -216,305 +154,6 @@ function AnnotationColumnPicker({
 }
 
 /**
- * Compact class summary plus an Edit dialog for the selected Annotation class node.
- *
- * Used by: AnnotationFeature's class-description card because users need to see
- * the configured classes at a glance and edit them (add/rename/delete) before
- * running annotation, without the descriptions cluttering the card.
- *
- * Flow: fetch the selected two-column payload, render the class names as compact
- * badges, and expose an "Edit" button that opens a dialog. The dialog keeps an
- * editable local draft of class/description rows, persists each change on blur
- * (and on add/delete), and invalidates the workspace node data cache so other
- * table views observe the rewritten node. The Edit trigger stays enabled even
- * after annotation starts so reviewers can amend classes on the go.
- */
-function AnnotationClassDescriptionsEditor({
-  workspaceId,
-  nodeId,
-  classColumn,
-  descriptionColumn,
-  getAuthHeaders,
-}: AnnotationClassDescriptionsEditorProps) {
-  const queryClient = useQueryClient();
-  const [draftRows, setDraftRows] = useState<AnnotationClassDescriptionRow[] | null>(null);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const canLoad = Boolean(workspaceId && nodeId && classColumn && descriptionColumn);
-  const queryKey =
-    canLoad && workspaceId && nodeId && classColumn && descriptionColumn
-      ? queryKeys.annotationClassDescriptions(workspaceId, nodeId, classColumn, descriptionColumn)
-      : DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY;
-
-  const classDescriptionsQuery = useQuery({
-    queryKey,
-    enabled: canLoad,
-    queryFn: async () => {
-      if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
-        throw new Error('Missing class-description selection');
-      }
-      const { data } = await getAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        query: { class_column: classColumn, description_column: descriptionColumn },
-        throwOnError: true,
-      });
-      return data;
-    },
-  });
-
-  const savedRows = normalizeClassDescriptionRows(classDescriptionsQuery.data?.rows);
-  const editorRows = draftRows ?? savedRows;
-  // Compact card display: non-empty class names paired with their (trimmed)
-  // descriptions so each chip can show its description in a hover tooltip; capped
-  // with a "+N more" badge. Chips without a description render as plain badges.
-  const classChips = editorRows
-    .map((row) => ({
-      name: (row.class ?? '').trim(),
-      description: (row.description ?? '').trim(),
-    }))
-    .filter((chip) => chip.name.length > 0);
-  const visibleClassChips = classChips.slice(0, CLASS_NAME_PREVIEW_LIMIT);
-  const hiddenClassCount = classChips.length - visibleClassChips.length;
-
-  const updateClassDescriptionsMutation = useMutation({
-    mutationFn: async (rows: AnnotationClassDescriptionRow[]) => {
-      if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
-        throw new Error('Missing class-description selection');
-      }
-      const body = {
-        class_column: classColumn,
-        description_column: descriptionColumn,
-        rows,
-      };
-      const { data } = await updateAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        body,
-        throwOnError: true,
-      });
-      return data;
-    },
-    onSuccess: (payload) => {
-      const rows = normalizeClassDescriptionRows(payload.rows);
-      setDraftRows(rows);
-      if (workspaceId && nodeId && classColumn && descriptionColumn) {
-        queryClient.setQueryData(
-          queryKeys.annotationClassDescriptions(
-            workspaceId,
-            nodeId,
-            classColumn,
-            descriptionColumn,
-          ),
-          { ...payload, rows },
-        );
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.nodeData(workspaceId, nodeId),
-        });
-      }
-    },
-    onError: (error) => {
-      console.warn('[annotation] Failed to update class descriptions:', error);
-      toast.error('Could not update class descriptions');
-    },
-  });
-
-  const persistRows = (rows: AnnotationClassDescriptionRow[]) => {
-    if (!canLoad) return;
-    updateClassDescriptionsMutation.mutate(normalizeClassDescriptionRows(rows));
-  };
-
-  const updateDraftCell = (rowIndex: number, field: 'class' | 'description', value: string) => {
-    setDraftRows((current) =>
-      (current ?? editorRows).map((row, index) =>
-        index === rowIndex ? { ...row, [field]: value } : row,
-      ),
-    );
-  };
-
-  const persistDraftCell = (rowIndex: number, field: 'class' | 'description', value: string) => {
-    const nextRows = editorRows.map((row, index) =>
-      index === rowIndex ? { ...row, [field]: value } : row,
-    );
-    setDraftRows(nextRows);
-    persistRows(nextRows);
-  };
-
-  const handleAddClass = () => {
-    const nextRows = [...editorRows, { class: '', description: '' }];
-    setDraftRows(nextRows);
-    persistRows(nextRows);
-  };
-
-  // Delete the row at rowIndex and persist the remaining classes (the missing
-  // delete affordance this card previously lacked).
-  const handleDeleteClass = (rowIndex: number) => {
-    const nextRows = editorRows.filter((_, index) => index !== rowIndex);
-    setDraftRows(nextRows);
-    persistRows(nextRows);
-  };
-
-  if (!nodeId) {
-    return (
-      <div className="mt-4 rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-        Select a class-description node to edit classes.
-      </div>
-    );
-  }
-
-  if (classDescriptionsQuery.isError) {
-    return (
-      <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-        Could not load class descriptions.
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-5 space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-sm font-semibold">Classes</h3>
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!canLoad || classDescriptionsQuery.isLoading}
-            >
-              <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-              Edit
-            </Button>
-          </DialogTrigger>
-          <DialogContent
-            className="max-w-2xl"
-            onOpenAutoFocus={(event) => {
-              // Don't drop a cursor into the first class input on open: that
-              // would persist a redundant no-op save the moment the user clicks
-              // Add/Delete (the blur fires before the click).
-              event.preventDefault();
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Edit classes</DialogTitle>
-              <DialogDescription>
-                Add, rename, or remove annotation classes and their descriptions.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
-              {editorRows.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                  No classes yet. Use “Add class” to create one.
-                </p>
-              ) : (
-                editorRows.map((row, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <Input
-                      aria-label={`Class ${String(index + 1)}`}
-                      value={row.class ?? ''}
-                      placeholder="Class"
-                      className="w-1/3"
-                      disabled={updateClassDescriptionsMutation.isPending}
-                      onChange={(event) => {
-                        updateDraftCell(index, 'class', event.target.value);
-                      }}
-                      onBlur={(event) => {
-                        persistDraftCell(index, 'class', event.target.value);
-                      }}
-                    />
-                    <Textarea
-                      aria-label={`Description ${String(index + 1)}`}
-                      value={row.description ?? ''}
-                      rows={2}
-                      placeholder="Description"
-                      disabled={updateClassDescriptionsMutation.isPending}
-                      className="min-h-9 flex-1 resize-y"
-                      onChange={(event) => {
-                        updateDraftCell(index, 'description', event.target.value);
-                      }}
-                      onBlur={(event) => {
-                        persistDraftCell(index, 'description', event.target.value);
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete class ${String(index + 1)}`}
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        handleDeleteClass(index);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-            <DialogFooter className="sm:justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!canLoad}
-                onClick={handleAddClass}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Add class
-              </Button>
-              <DialogClose asChild>
-                <Button type="button" size="sm">
-                  Done
-                </Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {classDescriptionsQuery.isLoading ? (
-        <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-          Loading class descriptions...
-        </div>
-      ) : classChips.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-          No classes yet.
-        </div>
-      ) : (
-        <TooltipProvider delayDuration={120} skipDelayDuration={0}>
-          <div className="flex flex-wrap gap-1.5">
-            {visibleClassChips.map((chip, index) =>
-              // Only classes with a description get a hover tooltip; the trigger is
-              // a native span (asChild) so the ref/hover wiring is guaranteed even
-              // though Badge is not a forwardRef component.
-              chip.description ? (
-                <Tooltip key={`${chip.name}-${String(index)}`}>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex cursor-default">
-                      <Badge variant="secondary">{chip.name}</Badge>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs whitespace-normal break-words">
-                    {chip.description}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Badge key={`${chip.name}-${String(index)}`} variant="secondary">
-                  {chip.name}
-                </Badge>
-              ),
-            )}
-            {hiddenClassCount > 0 ? (
-              <Badge variant="outline">+{String(hiddenClassCount)} more</Badge>
-            ) : null}
-          </div>
-        </TooltipProvider>
-      )}
-    </div>
-  );
-}
-
-/**
  * Annotation setup panel. This redesign slice exposes source node/column
  * selection plus a class-description setup card with an inline editable table.
  *
@@ -539,88 +178,29 @@ function AnnotationFeature({
   const [isCreatingClassNode, setIsCreatingClassNode] = useState(false);
   const [hasRun, setHasRun] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
-  // AI-mode settings persist on the active tab (tabs.json) via
-  // onTabSettingChange, so they survive reloads and tab switches like the node
-  // selectors do. Each is mirrored into local state seeded from the persisted
-  // value — the `useState` lazy initializer reads tabSettings once per mount,
-  // and AnalysisTabsHost remounts this feature per tab (key=tab_id), so the
-  // seed re-reads when the active tab changes. Keeping a local mirror also lets
-  // the component work standalone in tests without the tab host. Mode/provider
-  // commit on change (discrete actions); provider-card models persist as a JSON
-  // map in tab settings; prompt commits on blur because it doubles as typed input.
-  // API keys live in preferences, never in tab settings.
-  const [annotationMode, setAnnotationModeState] = useState<'manual' | 'ai'>(() =>
-    tabSettings?.annotationMode === 'ai' ? 'ai' : 'manual',
-  );
-  const setAnnotationMode = (mode: 'manual' | 'ai') => {
-    setAnnotationModeState(mode);
-    onTabSettingChange?.('annotationMode', mode);
-  };
-  const [aiProviderModels, setAiProviderModelsState] = useState<Record<string, string>>(() =>
-    parseProviderModelSetting(tabSettings?.aiProviderModels),
-  );
-  const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(
-    () => tabSettings?.aiProvider ?? '',
-  );
-  const [aiModel, setAiModel] = useState(() => {
-    const providerModels = parseProviderModelSetting(tabSettings?.aiProviderModels);
-    const providerId = tabSettings?.aiProvider ?? '';
-    return providerModels[providerId] ?? tabSettings?.aiModel ?? '';
-  });
-  const persistAiProviderModels = (models: Record<string, string>) => {
-    setAiProviderModelsState(models);
-    onTabSettingChange?.('aiProviderModels', JSON.stringify(models));
-  };
-  const selectAiProvider = (id: AnnotationAiProviderId, modelForProvider: string) => {
-    setAiProviderState(id);
-    setAiModel(modelForProvider);
-    onTabSettingChange?.('aiProvider', id);
-    onTabSettingChange?.('aiModel', modelForProvider);
-  };
-  // Instruction prompt for AI annotation. Empty means "use the grayed default",
-  // which the prompt editor offers via Tab. Persisted on blur.
-  const [aiPrompt, setAiPrompt] = useState(() => tabSettings?.aiPrompt ?? '');
-  const commitAiPrompt = (prompt: string) => {
-    onTabSettingChange?.('aiPrompt', prompt);
-  };
-  // Advanced "Model Configuration" knobs (collapsed by default). Persisted like
-  // the other AI settings, but stored as strings in tabSettings (the sink is
-  // Record<string,string>) and parsed back on hydration. Defaults reproduce the
-  // backend defaults: deterministic sampling (temperature 0) and reasoning off.
-  const [aiTemperature, setAiTemperatureState] = useState<number>(() => {
-    const parsed = Number(tabSettings?.aiTemperature);
-    return Number.isFinite(parsed) ? parsed : 0;
-  });
-  const commitAiTemperature = (value: number) => {
-    setAiTemperatureState(value);
-    onTabSettingChange?.('aiTemperature', String(value));
-  };
-  const [aiReasoningEnabled, setAiReasoningEnabledState] = useState<boolean>(
-    () => tabSettings?.aiReasoningEnabled === 'true',
-  );
-  const setAiReasoningEnabled = (enabled: boolean) => {
-    setAiReasoningEnabledState(enabled);
-    onTabSettingChange?.('aiReasoningEnabled', String(enabled));
-  };
-  const [aiReasoningEffort, setAiReasoningEffortState] = useState<string>(
-    () => tabSettings?.aiReasoningEffort ?? 'medium',
-  );
-  const setAiReasoningEffort = (effort: string) => {
-    setAiReasoningEffortState(effort);
-    onTabSettingChange?.('aiReasoningEffort', effort);
-  };
-  // Whether the AI Preview panel is open. Persisted on the active tab (like the
-  // other AI settings) so leaving and returning to the tab reopens the panel; the
-  // panel then rehydrates its labels/overrides from the backend preview session.
-  // Toggled by the AI-mode footer button and hidden again on Close or when leaving
-  // AI mode. Seeded from tabSettings on mount (AnalysisTabsHost remounts per tab).
-  const [isPreviewing, setIsPreviewingState] = useState(
-    () => tabSettings?.aiPreviewOpen === 'true',
-  );
-  const setIsPreviewing = (open: boolean) => {
-    setIsPreviewingState(open);
-    onTabSettingChange?.('aiPreviewOpen', String(open));
-  };
+  // Tab-persisted AI settings live in their own hook so this feature body can
+  // focus on selector, run, and results orchestration. API keys stay in
+  // preferences, never in tab settings.
+  const {
+    annotationMode,
+    setAnnotationMode,
+    aiProviderModels,
+    persistAiProviderModels,
+    aiProvider,
+    aiModel,
+    selectAiProvider,
+    aiPrompt,
+    setAiPrompt,
+    commitAiPrompt,
+    aiTemperature,
+    commitAiTemperature,
+    aiReasoningEnabled,
+    setAiReasoningEnabled,
+    aiReasoningEffort,
+    setAiReasoningEffort,
+    isPreviewing,
+    setIsPreviewing,
+  } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
   const annotationAiApiKeys = usePreferencesStore((s) => s.annotationAiApiKeys);
   const annotationAiCustomProviders = usePreferencesStore((s) => s.annotationAiCustomProviders);
   const setAnnotationAiApiKey = usePreferencesStore((s) => s.setAnnotationAiApiKey);
@@ -825,57 +405,20 @@ function AnnotationFeature({
       ? (descriptionColumns[classDescriptionNode.id] ??
         resolveDescriptionColumn(classDescriptionColumns, classDescriptionClassColumn))
       : null;
-  // Load the class node's class/description rows so the AI Preview button can be
-  // gated on there actually being at least one class to predict into. Keyed the
-  // same way as the class-descriptions editor and the preview panel, so react-query
-  // dedupes and this adds no extra request; when a class node/columns aren't chosen
-  // the key is a stable sentinel and the (disabled) query never fetches.
-  const canLoadClassCount = Boolean(
-    currentWorkspaceId &&
-      classDescriptionNode?.id &&
-      classDescriptionClassColumn &&
-      classDescriptionDescriptionColumn,
-  );
-  const classCountQuery = useQuery({
-    queryKey:
-      canLoadClassCount &&
-      currentWorkspaceId &&
-      classDescriptionNode?.id &&
-      classDescriptionClassColumn &&
-      classDescriptionDescriptionColumn
-        ? queryKeys.annotationClassDescriptions(
-            currentWorkspaceId,
-            classDescriptionNode.id,
-            classDescriptionClassColumn,
-            classDescriptionDescriptionColumn,
-          )
-        : DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY,
-    enabled: canLoadClassCount,
-    queryFn: async () => {
-      if (
-        !currentWorkspaceId ||
-        !classDescriptionNode?.id ||
-        !classDescriptionClassColumn ||
-        !classDescriptionDescriptionColumn
-      ) {
-        throw new Error('Missing class-description selection');
-      }
-      const { data } = await getAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
-        path: { workspace_id: currentWorkspaceId, node_id: classDescriptionNode.id },
-        query: {
-          class_column: classDescriptionClassColumn,
-          description_column: classDescriptionDescriptionColumn,
-        },
-        throwOnError: true,
-      });
-      return data;
-    },
+  // Reuse the editor's class-description query for AI Preview gating. The hook
+  // owns the disabled key/fetcher/normalization, so this parent only decides
+  // whether there is at least one non-empty class name to predict into.
+  const classDescriptions = useAnnotationClassDescriptions({
+    workspaceId: currentWorkspaceId ?? null,
+    nodeId: classDescriptionNode?.id ?? null,
+    classColumn: classDescriptionClassColumn,
+    descriptionColumn: classDescriptionDescriptionColumn,
+    getAuthHeaders,
   });
   // Count only non-empty class names: an empty class node (or one whose rows are all
   // blank) offers nothing to classify into, so Preview must stay disabled until at
   // least one real class exists.
-  const aiClassCount = normalizeClassDescriptionRows(classCountQuery.data?.rows).filter(
+  const aiClassCount = classDescriptions.rows.filter(
     (row) => (row.class ?? '').trim().length > 0,
   ).length;
   // Source node drives the run action: "Start new annotation" begins a fresh

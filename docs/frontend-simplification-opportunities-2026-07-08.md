@@ -11,37 +11,6 @@ Completed work is removed from the open TODO list and recorded in `Done`.
 
 ## Open TODOs
 
-### 7. Split `AnnotationFeature` around real ownership boundaries
-
-Confidence: High
-
-Evidence:
-
-- `AnnotationFeature.tsx` is over 1,200 lines.
-- The file contains a nested `AnnotationClassDescriptionsEditor` with its own
-  query, mutation, dialog, and draft-row state.
-- The main feature owns tab-setting parsing/persistence for AI mode, provider,
-  model, prompt, temperature, and reasoning.
-- It also owns source/class/example node selectors, companion column maps,
-  start/resume/reset lifecycle, AI preview lifecycle, and rendering.
-- The AI provider card logic is already partly componentized in
-  `AnnotationAiSettings`.
-
-Recommendation:
-
-Extract only meaningful ownership units:
-
-- `useAnnotationTabSettings` or `annotationTabSettings.ts` for
-  parsing/stringifying tab settings.
-- `useAnnotationClassDescriptions` plus a separate
-  `AnnotationClassDescriptionsEditor` file, so the parent and editor share the
-  same query key/fetcher.
-- Optionally test/extract provider-card building from `AnnotationAiSettings` if
-  provider behavior keeps growing.
-
-Avoid splitting into tiny presentational wrappers. The payoff is moving state
-ownership and backend/query behavior out of the main feature shell.
-
 ### 22. Remove remaining legacy analysis payload adapters
 
 Confidence: Lower, migration-dependent
@@ -105,6 +74,15 @@ explicitly so it does not spread into unrelated live-node helpers.
    - Done 2026-07-09. `analysisIds.ts` now owns tab-group, task-type, and
      last-run identifiers used by the view registry, analysis feature configs,
      hydration, aliasing, and task-stream filtering.
+
+7. Split `AnnotationFeature` around real ownership boundaries
+   - Done 2026-07-09. Extracted tab-persisted AI settings into
+     `useAnnotationTabSettings`, moved class-description fetching and row
+     normalization into `useAnnotationClassDescriptions`, moved the compact class
+     editor/dialog into `AnnotationClassDescriptionsEditor.tsx`, and kept
+     `AnnotationFeature.tsx` focused on selector, run, preview, and result
+     orchestration. Added focused hook tests and kept the existing annotation
+     feature coverage passing.
 
 8. Add a narrow helper for analysis run envelopes
    - Done 2026-07-09. `runAnalysisTaskEnvelope.ts` now owns the shared submit

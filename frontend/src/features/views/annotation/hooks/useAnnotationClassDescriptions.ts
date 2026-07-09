@@ -1,0 +1,74 @@
+import type { AnnotationClassDescriptionRow } from '@/api';
+import { getAnnotationClassDescriptions } from '@/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { useQuery } from '@tanstack/react-query';
+
+const DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY = [
+  'workspaces',
+  'annotation',
+  'class-descriptions',
+  'disabled',
+] as const;
+
+interface UseAnnotationClassDescriptionsArgs {
+  workspaceId: string | null;
+  nodeId: string | null;
+  classColumn: string | null;
+  descriptionColumn: string | null;
+  getAuthHeaders: () => Record<string, string>;
+}
+
+export const normalizeClassDescriptionRows = (
+  rows: AnnotationClassDescriptionRow[] | undefined,
+): AnnotationClassDescriptionRow[] =>
+  (rows ?? []).map((row) => ({
+    class: row.class ?? '',
+    description: row.description ?? '',
+  }));
+
+/**
+ * Shared class-description query for Annotation setup, editing, and AI gating.
+ *
+ * Used by: AnnotationFeature to count valid AI classes and
+ * AnnotationClassDescriptionsEditor to render/edit the same class-description
+ * node. Flow: build one stable enabled/disabled query key, fetch the selected
+ * two-column class-description node when all selectors are present, and expose
+ * normalized rows so callers never branch on missing class/description fields.
+ */
+export function useAnnotationClassDescriptions({
+  workspaceId,
+  nodeId,
+  classColumn,
+  descriptionColumn,
+  getAuthHeaders,
+}: UseAnnotationClassDescriptionsArgs) {
+  const canLoad = Boolean(workspaceId && nodeId && classColumn && descriptionColumn);
+  const queryKey =
+    canLoad && workspaceId && nodeId && classColumn && descriptionColumn
+      ? queryKeys.annotationClassDescriptions(workspaceId, nodeId, classColumn, descriptionColumn)
+      : DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY;
+
+  const query = useQuery({
+    queryKey,
+    enabled: canLoad,
+    queryFn: async () => {
+      if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
+        throw new Error('Missing class-description selection');
+      }
+      const { data } = await getAnnotationClassDescriptions({
+        headers: getAuthHeaders(),
+        path: { workspace_id: workspaceId, node_id: nodeId },
+        query: { class_column: classColumn, description_column: descriptionColumn },
+        throwOnError: true,
+      });
+      return data;
+    },
+  });
+
+  return {
+    canLoad,
+    queryKey,
+    query,
+    rows: normalizeClassDescriptionRows(query.data?.rows),
+  };
+}
