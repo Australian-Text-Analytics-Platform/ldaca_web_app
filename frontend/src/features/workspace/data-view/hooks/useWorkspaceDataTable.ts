@@ -350,6 +350,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
 
   const table: WorkspaceTableProps = {
     data: nodeData.data,
+    columns: nodeData.columns,
     loading: isLoading.nodeData,
     workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,

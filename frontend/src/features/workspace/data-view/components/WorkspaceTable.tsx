@@ -43,6 +43,7 @@ const WIDE_COLUMN_SAMPLE_LIMIT = 25;
 // --- Props ---
 export interface WorkspaceTableProps {
   data: DataRow[];
+  columns: string[];
   loading?: boolean;
   workspaceId?: string;
   nodeId?: string;
@@ -74,6 +75,7 @@ export interface WorkspaceTableProps {
  */
 export function WorkspaceTable({
   data,
+  columns: responseColumns,
   loading = false,
   workspaceId,
   nodeId,
@@ -101,22 +103,15 @@ export function WorkspaceTable({
   } = useRowDetailDialog();
 
   const sanitizedData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
-
-  // We need column names to validate uniqueness inside `submitRename`, but the
-  // hook returns `columnTypes` which is itself derived from the schema fetch
-  // it manages. To break the cycle, derive `columns` from `sanitizedData`
-  // first, then fall back to whatever `columnTypes` ends up being.
-  const initialColumns = useMemo(() => {
-    // DataRow is typed non-null, but rows arrive from API/JSON so guard malformed (null) rows.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    const firstRow = sanitizedData.find((row) => row && typeof row === 'object');
-    return firstRow ? Object.keys(firstRow) : [];
-  }, [sanitizedData]);
+  const backendColumns = useMemo(
+    () => responseColumns.filter((column) => column.trim().length > 0),
+    [responseColumns],
+  );
 
   const mutations = useColumnMutations({
     workspaceId,
     nodeId,
-    columns: initialColumns,
+    columns: backendColumns,
     onCast,
     onRenameColumn,
     onDeleteColumn,
@@ -143,9 +138,9 @@ export function WorkspaceTable({
   } = mutations;
 
   const columns = useMemo(() => {
-    if (initialColumns.length > 0) return initialColumns;
+    if (backendColumns.length > 0) return backendColumns;
     return Object.keys(columnTypes);
-  }, [initialColumns, columnTypes]);
+  }, [backendColumns, columnTypes]);
 
   const wideColumns = useMemo(() => {
     const sampleRows = sanitizedData.slice(0, WIDE_COLUMN_SAMPLE_LIMIT);

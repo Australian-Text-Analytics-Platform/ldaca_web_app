@@ -148,12 +148,21 @@ rescan should be added here before implementation.
       `authRedirectUrls.ts`, typed against generated redirect endpoint data,
       instead of manually joining `getApiBase()` with `/auth/...` paths.
 
+25. Remove row-derived column fallback from workspace data table
+    - Done 2026-07-09. `WorkspaceTable` now receives `NodeDataResponse.columns`
+      from `useWorkspaceDataTable` and uses those backend columns for ordering
+      and mutation validation instead of inferring column names from the first
+      row.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
 gone. Remaining handwritten `getNodeData` calls are row-content flows:
 workspace table data, annotation preview/results rows, preprocessing raw-preview
 fallback, and language sampling for stop-word/tokenizer recommendations.
+
+Workspace data table columns now use `NodeDataResponse.columns`; row-shape
+column inference has been removed from typed workspace and preview table paths.
 
 Live workspace-node identity is now `WorkspaceNodeInfo.id`. Keep `node_id` only
 where the backend contract explicitly uses that field, such as path params,

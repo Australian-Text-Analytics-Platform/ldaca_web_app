@@ -10,6 +10,7 @@ describe('WorkspaceTable', () => {
 
     render(
       <WorkspaceTable
+        columns={['document', 'speaker', 'year']}
         data={[
           {
             document: 'This is the full document body.',
