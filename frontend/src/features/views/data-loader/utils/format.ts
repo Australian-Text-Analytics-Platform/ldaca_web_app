@@ -32,16 +32,3 @@ export const formatTimestamp = (value?: number | string | null): string => {
   }
   return date ? date.toLocaleString() : '—';
 };
-
-/**
- * Normalizes legacy/new workspace summary identifiers for code that needs a
- * single id key across cards, sorting, and actions.
- * Used by: useDataLoaderWorkspaceActions hook, WorkspaceManagerCard component, DataLoaderFeature module (rg call sites/imports).
- */
-export const getWorkspaceId = (workspace: { id?: string; unique_id?: string }): string | null => {
-  const id = workspace.id;
-  const uniqueId = workspace.unique_id;
-  if (typeof id === 'string' && id) return id;
-  if (typeof uniqueId === 'string' && uniqueId) return uniqueId;
-  return null;
-};

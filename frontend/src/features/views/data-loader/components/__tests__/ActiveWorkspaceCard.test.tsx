@@ -16,7 +16,7 @@ const workspace: WorkspaceListItem = {
   name: 'Main Workspace',
   description: 'Initial description',
   created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-02T00:00:00Z',
+  modified_at: '2024-01-02T00:00:00Z',
   workspace_size_Byte: 1024,
 };
 

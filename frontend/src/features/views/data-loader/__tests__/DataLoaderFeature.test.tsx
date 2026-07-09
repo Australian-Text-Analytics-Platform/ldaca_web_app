@@ -33,8 +33,8 @@ interface MockWorkspaceState {
     name: string;
     description: string;
     created_at: string;
-    updated_at: string;
-    dataframe_count: number;
+    modified_at: string;
+    total_nodes: number;
   }[];
   currentWorkspaceId: string | null;
   workspaceGraph: { nodes: unknown[] };
@@ -47,8 +47,8 @@ let mockWorkspaceState: MockWorkspaceState = {
       name: 'Main Workspace',
       description: 'Initial workspace description',
       created_at: '2024-01-01',
-      updated_at: '2024-01-02',
-      dataframe_count: 0,
+      modified_at: '2024-01-02',
+      total_nodes: 0,
     },
   ],
   currentWorkspaceId: 'ws-1',
@@ -257,8 +257,8 @@ describe('DataLoaderFeature citation UI', () => {
           name: 'Main Workspace',
           description: 'Initial workspace description',
           created_at: '2024-01-01',
-          updated_at: '2024-01-02',
-          dataframe_count: 0,
+          modified_at: '2024-01-02',
+          total_nodes: 0,
         },
       ],
       currentWorkspaceId: 'ws-1',
@@ -573,8 +573,8 @@ describe('DataLoaderFeature citation UI', () => {
           name: 'Main Workspace',
           description: 'Initial workspace description',
           created_at: '2024-01-01',
-          updated_at: '2024-01-02',
-          dataframe_count: 0,
+          modified_at: '2024-01-02',
+          total_nodes: 0,
         },
       ],
       currentWorkspaceId: null,

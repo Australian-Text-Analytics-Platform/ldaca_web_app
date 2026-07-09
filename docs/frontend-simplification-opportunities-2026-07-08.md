@@ -159,6 +159,12 @@ rescan should be added here before implementation.
       workspace node `id` directly instead of remapping it to an internal
       `node_id` field and reading that alias for graph actions.
 
+27. Remove legacy workspace-summary aliases in Data Loader
+    - Done 2026-07-09. Data Loader workspace cards and actions now consume
+      generated `WorkspaceSummary` fields directly (`id`, `modified_at`,
+      `total_nodes`) instead of accepting `unique_id`, `updated_at`, or
+      `dataframe_count` fallbacks.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The original production `page=1&page_size=1` preprocessing metadata misuse is
@@ -174,6 +180,8 @@ where the backend contract explicitly uses that field, such as path params,
 request bodies, `AnalysisTabInput`, and detach-option/result DTOs.
 React Flow `CustomNode` data also uses `id` directly; it no longer carries a
 frontend-only `node_id` alias.
+Data Loader workspace summaries also use generated `WorkspaceSummary` directly;
+legacy `unique_id`/`updated_at`/`dataframe_count` aliases were removed.
 
 Raw frontend URL construction is limited to boundaries that need URL strings or
 external resources: health checks, document/file rendering, remote tutorial

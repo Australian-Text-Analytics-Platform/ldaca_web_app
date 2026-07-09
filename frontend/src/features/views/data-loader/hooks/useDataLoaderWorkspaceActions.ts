@@ -6,7 +6,6 @@ import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/work
 import { queryKeys } from '@/lib/queryKeys';
 import { useUIStore } from '@/stores/uiStore';
 import type { WorkspaceSummary } from '@/api';
-import { getWorkspaceId } from '../utils/format';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -133,7 +132,7 @@ export function useDataLoaderWorkspaceActions({
    * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const openDeleteWorkspaceDialog = (workspaceId: string) => {
-    const target = workspaces.find((workspace) => getWorkspaceId(workspace) === workspaceId);
+    const target = workspaces.find((workspace) => workspace.id === workspaceId);
     setWorkspaceToDelete({ id: workspaceId, name: target?.name });
   };
 

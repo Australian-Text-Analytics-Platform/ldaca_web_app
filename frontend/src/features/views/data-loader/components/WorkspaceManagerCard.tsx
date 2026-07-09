@@ -21,14 +21,10 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { useShallow } from 'zustand/react/shallow';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import type { WorkspaceSummary } from '@/api';
-import { formatBytes, formatTimestamp, getWorkspaceId } from '../utils/format';
+import { formatBytes, formatTimestamp } from '../utils/format';
 import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
 
-export type WorkspaceListItem = Partial<WorkspaceSummary> & {
-  unique_id?: string;
-  updated_at?: string | null;
-  dataframe_count?: number;
-};
+export type WorkspaceListItem = WorkspaceSummary;
 
 export interface WorkspaceManagerCardProps {
   workspaces: WorkspaceListItem[];
@@ -147,10 +143,9 @@ export function WorkspaceManagerCard({
         ) : (
           <div className="space-y-3 overflow-y-auto pr-2">
             {workspaces.map((workspace) => {
-              const workspaceId = getWorkspaceId(workspace);
-              if (!workspaceId) return null;
+              const workspaceId = workspace.id;
               const isActive = workspaceId === currentWorkspaceId;
-              const blockCount = workspace.total_nodes ?? workspace.dataframe_count ?? 0;
+              const blockCount = workspace.total_nodes ?? 0;
               return (
                 <div
                   key={workspaceId}
@@ -183,7 +178,6 @@ export function WorkspaceManagerCard({
                         />
                       </Button>
                       {/* an empty workspace name should fall through to its id */}
-                      {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
                       <span>{workspace.name || workspaceId}</span>
                       <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
@@ -207,10 +201,8 @@ export function WorkspaceManagerCard({
                       </DropdownMenu>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {/* an empty modified_at timestamp should fall through to updated_at */}
-                      {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
-                      Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} |{' '}
-                      {blockCount} data block{blockCount === 1 ? '' : 's'} | Size{' '}
+                      Updated {formatTimestamp(workspace.modified_at)} | {blockCount} data block
+                      {blockCount === 1 ? '' : 's'} | Size{' '}
                       {formatBytes(workspace.workspace_size_Byte ?? 0)}
                     </div>
                   </div>
@@ -240,7 +232,6 @@ export function WorkspaceManagerCard({
                       variant="outline"
                       onClick={() =>
                         // an empty workspace name should fall through to its id
-                        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                         void downloads.startDownload(workspaceId, workspace.name || workspaceId)
                       }
                       disabled={

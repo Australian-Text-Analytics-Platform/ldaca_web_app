@@ -46,8 +46,8 @@ interface CreateWorkspaceFormProps {
  */
 function getActiveWorkspaceDraftKey(workspace: WorkspaceListItem) {
   return [
-    workspace.id ?? workspace.unique_id ?? '',
-    workspace.name ?? '',
+    workspace.id,
+    workspace.name,
     workspace.description ?? '',
   ].join('\n');
 }
@@ -137,7 +137,7 @@ function ActiveWorkspaceControls({
   onSave,
   onUnload,
 }: ActiveWorkspaceControlsProps) {
-  const [renameValue, setRenameValue] = useState(currentWorkspace.name ?? '');
+  const [renameValue, setRenameValue] = useState(currentWorkspace.name);
   const [descriptionValue, setDescriptionValue] = useState(currentWorkspace.description ?? '');
   const normalizedCurrentDescription = (currentWorkspace.description ?? '').trim();
   const normalizedDescriptionValue = descriptionValue.trim();
@@ -152,9 +152,7 @@ function ActiveWorkspaceControls({
           </Badge>
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
-          Updated {/* an empty modified_at timestamp should fall through to updated_at */}
-          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
-          {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size{' '}
+          Updated {formatTimestamp(currentWorkspace.modified_at)} | Size{' '}
           {formatBytes(currentWorkspace.workspace_size_Byte ?? 0)} | Created{' '}
           {formatTimestamp(currentWorkspace.created_at)}
         </div>

@@ -26,7 +26,6 @@ import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
 import { DataLoaderDialogs } from './components/DataLoaderDialogs';
 import { SampleDataPanel } from './components/SampleDataPanel';
 import { countFilesInNode } from './utils/fileTreeHelpers';
-import { getWorkspaceId } from './utils/format';
 
 interface FileListShellProps {
   children: ReactNode;
@@ -233,8 +232,8 @@ function DataLoaderFeature() {
   const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
 
   const sortedWorkspaces = workspaces.toSorted((a, b) => {
-    const aId = getWorkspaceId(a) ?? '';
-    const bId = getWorkspaceId(b) ?? '';
+    const aId = a.id;
+    const bId = b.id;
     const aFav = favoriteWorkspaces.includes(aId) ? 1 : 0;
     const bFav = favoriteWorkspaces.includes(bId) ? 1 : 0;
     if (aFav !== bFav) return bFav - aFav;
@@ -249,7 +248,7 @@ function DataLoaderFeature() {
   const totalFileCount = fileTree.reduce((sum, node) => sum + countFilesInNode(node), 0);
 
   const currentWorkspace =
-    workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) ?? null;
+    workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null;
 
   const nodeCount = workspaceGraph?.nodes.length ?? currentWorkspace?.total_nodes ?? 0;
 
