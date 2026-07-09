@@ -80,6 +80,11 @@ state machine. It handles:
 `features/views/common/tasks/useAnalysisTaskFlow.ts` connects an analysis
 tab to the task stream. It refreshes results only when the relevant task reaches
 a terminal state and the tab is active.
+`features/views/common/tasks/runAnalysisTaskEnvelope.ts` is the narrow submit
+utility for task flows that share the same running-flag, last-fetched marker,
+and task-id handoff pattern. Keep feature-specific request building, result
+normalization, detach/materialize actions, and navigation handoffs in the
+feature task-flow hook.
 
 Use the shared analysis card Stop and Clear Results actions for task lifecycle
 controls. The sidebar Task Center should not own cancellation or clearing;

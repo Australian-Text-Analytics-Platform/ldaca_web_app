@@ -7,8 +7,9 @@ import {
   resolveTokenFrequencyNodeContext,
   type TokenFrequencyAnalysisParams,
 } from '@/features/views/token-frequency/tokenFrequencyHelpers';
-import { extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
+import { type WorkspaceNodeLike } from '../../common';
 import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
+import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
@@ -128,66 +129,64 @@ export const useTokenFrequencyTaskFlow = ({
       return;
     }
 
-    lastFetchedRef.current = { taskId: null, state: null };
-    setIsRunning(true);
-    runningRef.current = true;
-    setResultsSafely(null);
+    const stopWordsArray = stopWords.trim()
+      ? stopWords
+          .split(',')
+          .map((word) => word.trim().toLowerCase())
+          .filter((word) => word.length > 0)
+      : undefined;
 
-    try {
-      const stopWordsArray = stopWords.trim()
-        ? stopWords
-            .split(',')
-            .map((word) => word.trim().toLowerCase())
-            .filter((word) => word.length > 0)
-        : undefined;
+    const nodeColumns: Record<string, string> = {};
+    effectiveNodeColumnSelections.forEach((selection) => {
+      if (selection.column) nodeColumns[selection.nodeId] = selection.column;
+    });
 
-      const nodeColumns: Record<string, string> = {};
-      effectiveNodeColumnSelections.forEach((selection) => {
-        if (selection.column) nodeColumns[selection.nodeId] = selection.column;
-      });
+    const request: TokenFrequencyRequest = {
+      node_ids: requestNodeIds,
+      node_columns: nodeColumns,
+      stop_words: stopWordsArray,
+    };
 
-      const request: TokenFrequencyRequest = {
-        node_ids: requestNodeIds,
-        node_columns: nodeColumns,
-        stop_words: stopWordsArray,
-      };
+    await runAnalysisTaskEnvelope<TokenFrequencyResponse>({
+      lastFetchedRef,
+      runningRef,
+      setIsRunning,
+      setLocalTaskId,
+      onTaskIdAssigned,
+      resetBeforeRun: () => {
+        setResultsSafely(null);
+      },
+      submit: async () => {
+        const { data: response } = await calculateTokenFrequencies({
+          body: request,
+          headers: getAuthHeaders(),
+          path: { workspace_id: currentWorkspaceId },
+          throwOnError: true,
+        });
+        return response;
+      },
+      onSuccess: (response) => {
+        setResultsSafely(response);
+        setLastCompareNodeIds(request.node_ids);
 
-      const { data: response } = await calculateTokenFrequencies({
-        body: request,
-        headers: getAuthHeaders(),
-        path: { workspace_id: currentWorkspaceId },
-        throwOnError: true,
-      });
-      setResultsSafely(response);
-
-      const assignedTaskId = extractAndSetTaskId(response, setLocalTaskId);
-      onTaskIdAssigned?.(assignedTaskId);
-
-      setLastCompareNodeIds(request.node_ids);
-
-      if (Array.isArray(response.stop_words)) {
-        const normalizedStops = response.stop_words
-          .map((word: string) => word.trim().toLowerCase())
-          .filter(Boolean);
-        setAppliedStopSet(new Set(normalizedStops));
-        setStopWords(normalizedStops.join(', '));
-      }
-
-      if (response.state === 'failed') {
-        setIsRunning(false);
-        runningRef.current = false;
-      }
-    } catch (error) {
-      console.error('Error calculating token frequencies:', error);
-      setLocalTaskId(null);
-      setResultsSafely({
-        state: 'failed',
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
-        data: null,
-      });
-      setIsRunning(false);
-      runningRef.current = false;
-    }
+        if (Array.isArray(response.stop_words)) {
+          const normalizedStops = response.stop_words
+            .map((word: string) => word.trim().toLowerCase())
+            .filter(Boolean);
+          setAppliedStopSet(new Set(normalizedStops));
+          setStopWords(normalizedStops.join(', '));
+        }
+      },
+      onError: (error) => {
+        console.error('Error calculating token frequencies:', error);
+        setLocalTaskId(null);
+        setResultsSafely({
+          state: 'failed',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          data: null,
+        });
+      },
+    });
   };
 
   // Ref-pattern so the right-click handler can read the *current* stopWords

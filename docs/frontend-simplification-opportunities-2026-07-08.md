@@ -160,7 +160,17 @@ Avoid splitting into tiny presentational wrappers. The payoff is moving state ow
 
 ## Medium Confidence
 
-### 8. Add a narrow helper for analysis run envelopes
+### ~~8. Add a narrow helper for analysis run envelopes~~
+
+Status 2026-07-09:
+
+Implemented. `frontend/src/features/views/common/tasks/runAnalysisTaskEnvelope.ts`
+now owns the shared submit envelope for token-frequency and topic-modeling
+runs: reset the last fetched marker, set running state, clear local result/error
+state through a caller callback, submit the generated API request, assign/report
+the returned task id, and release the local running flag on failed or thrown
+runs. Request construction, result shaping, detach/materialize behavior, and
+navigation handoffs stayed in the feature-specific task-flow hooks.
 
 Evidence:
 

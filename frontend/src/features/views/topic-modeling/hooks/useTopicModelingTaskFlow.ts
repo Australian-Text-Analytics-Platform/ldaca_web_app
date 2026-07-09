@@ -9,8 +9,8 @@ import {
   type TopicModelingDetachResponse,
 } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
-import { extractAndSetTaskId } from '../../common';
 import { useDetachColumnsState } from '@/features/views/common/hooks/useDetachColumnsState';
+import { runAnalysisTaskEnvelope } from '@/features/views/common/tasks/runAnalysisTaskEnvelope';
 import type { DetachDialogNodeOption } from '@/features/views/common/components/DetachColumnsDialog';
 import { buildSamplingAutoNodeName } from '@/features/views/preprocessing/utils/autoNodeNames';
 import type { NodeColumnSelection } from '@/features/workspace/common/hooks/useAutoNodeColumns';
@@ -144,52 +144,52 @@ export function useTopicModelingTaskFlow({
     }
 
     const requestNodeIds = panelNodeIds.slice(0, 2);
-    lastFetchedRef.current = { taskId: null, state: null };
-    setIsRunning(true);
-    runningRef.current = true;
-    setError(null);
-    setResultSafely(null);
+    const nodeColumns: Record<string, string> = {};
+    effectiveNodeColumnSelections.forEach((selection) => {
+      if (selection.column && requestNodeIds.includes(selection.nodeId)) {
+        nodeColumns[selection.nodeId] = selection.column;
+      }
+    });
 
-    try {
-      const nodeColumns: Record<string, string> = {};
-      effectiveNodeColumnSelections.forEach((selection) => {
-        if (selection.column && requestNodeIds.includes(selection.nodeId)) {
-          nodeColumns[selection.nodeId] = selection.column;
+    const req: TopicModelingRequest = {
+      node_ids: requestNodeIds,
+      node_columns: nodeColumns,
+      random_seed: randomSeed,
+      representative_words_count: representativeWordsCount,
+      min_topic_size: minTopicSize ?? DEFAULT_TOPIC_SIZE_VALUE,
+      ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
+    };
+
+    await runAnalysisTaskEnvelope<TopicModelingResponse>({
+      lastFetchedRef,
+      runningRef,
+      setIsRunning,
+      setLocalTaskId,
+      onTaskIdAssigned,
+      resetBeforeRun: () => {
+        setError(null);
+        setResultSafely(null);
+      },
+      submit: async () => {
+        const { data: res } = await runTopicModeling({
+          body: req,
+          headers: getAuthHeaders(),
+          path: { workspace_id: currentWorkspaceId },
+          throwOnError: true,
+        });
+        return res;
+      },
+      onSuccess: (res) => {
+        setResultSafely(res);
+
+        if (res.state !== 'successful' && res.state !== 'running') {
+          setError(res.message || 'Topic modeling failed');
         }
-      });
-
-      const req: TopicModelingRequest = {
-        node_ids: requestNodeIds,
-        node_columns: nodeColumns,
-        random_seed: randomSeed,
-        representative_words_count: representativeWordsCount,
-        min_topic_size: minTopicSize ?? DEFAULT_TOPIC_SIZE_VALUE,
-        ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
-      };
-
-      const { data: res } = await runTopicModeling({
-        body: req,
-        headers: getAuthHeaders(),
-        path: { workspace_id: currentWorkspaceId },
-        throwOnError: true,
-      });
-      const assignedTaskId = extractAndSetTaskId(res, setLocalTaskId);
-      onTaskIdAssigned?.(assignedTaskId);
-      setResultSafely(res);
-
-      if (res.state === 'failed') {
-        setIsRunning(false);
-        runningRef.current = false;
-      }
-
-      if (res.state !== 'successful' && res.state !== 'running') {
-        setError(res.message || 'Topic modeling failed');
-      }
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Error running topic modeling');
-      setIsRunning(false);
-      runningRef.current = false;
-    }
+      },
+      onError: (error) => {
+        setError(error instanceof Error ? error.message : 'Error running topic modeling');
+      },
+    });
   };
 
   // Loads available detach columns before opening the topic-modeling detach dialog.
