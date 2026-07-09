@@ -116,6 +116,11 @@ resolver now calls `require_workspace(user_id, workspace_id)` directly instead
 of reading or mutating the user's hidden current-workspace pointer before
 building result pages.
 
+Status 2026-07-09: Removed one adjacent hidden-current read from file-import
+task submission. LDaCA imports are user/file scoped rather than workspace
+graph scoped, so `/api/files/import-ldaca` now stamps worker tasks with the
+stable `"global"` scope instead of whichever workspace is selected in the UI.
+
 ### 2. ~~Protect and reshape runtime config mutation~~
 
 Confidence: High
