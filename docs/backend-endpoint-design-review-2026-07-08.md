@@ -62,6 +62,9 @@ rescan should be added here before implementation.
 13. Removed the worker input snapshot fallback to hidden current-workspace
     state; analysis submissions now pass the route-resolved workspace and
     artifact directory explicitly.
+14. Removed the workspace persistence helper fallback to hidden
+    current-workspace state; callers now pass the explicit workspace object
+    they resolved from the route path.
 
 ## Findings
 
@@ -168,6 +171,14 @@ routes already resolve the target workspace from the path; `create_worker_input_
 now requires that explicit workspace object and artifact directory, removes its
 `user_id` argument, and no longer falls back to
 `workspace_manager.get_current_workspace(user_id)`.
+
+Status 2026-07-09: Tightened workspace persistence. `update_workspace` now
+requires the resolved workspace object and no longer loads or switches the
+manager's current workspace internally; sequential-analysis detach and all other
+callers pass the workspace they already resolved from the path. The general
+`require_current_workspace` route helper was removed, leaving only the guarded
+download flush path that persists the currently loaded workspace when it already
+matches the requested `workspace_id`.
 
 ### 2. ~~Protect and reshape runtime config mutation~~
 
