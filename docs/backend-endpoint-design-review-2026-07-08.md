@@ -56,6 +56,9 @@ rescan should be added here before implementation.
    depth invariant that currently finds no API route handlers over 80 lines.
 11. Removed first-party catch-all file routes in favor of query/body path
    contracts for path-bearing file operations.
+12. Removed the remaining hidden current-workspace read from the analysis task
+   factory by requiring explicit `workspace_id` whenever a task record is
+   created through `TaskManager.create_task`.
 
 ## Findings
 
@@ -742,6 +745,37 @@ browser hooks now call the query-path SDK functions, and
 `test_openapi_response_contracts.py` guards against reintroducing catch-all file
 routes.
 
+### 12. ~~Make analysis task factory workspace identity explicit~~
+
+Confidence: High
+
+Evidence:
+
+- A follow-up endpoint/source-of-truth rescan found `TaskManager.create_task`
+  still reading `workspace_manager.get_current_workspace_id(self.user_id)` when
+  stamping new analysis task records.
+- Production workspace-scoped analysis submissions already construct
+  `AnalysisTask` directly with the route path `workspace_id`, leaving the helper
+  as a test/seeding convenience rather than an endpoint contract.
+
+Problem:
+
+Even outside HTTP route handlers, a task factory that infers workspace identity
+from mutable current-workspace state can hide regressions in tests and preserve
+the older implicit-target mental model.
+
+Recommendation:
+
+Require the caller to pass `workspace_id` explicitly whenever creating an
+analysis task record, including tests and any helper code. Keep
+current-workspace state only for the UI selection resource and manager cache
+plumbing.
+
+Status 2026-07-09: Completed. `TaskManager.create_task` now requires an
+explicit keyword-only `workspace_id`, no longer imports `workspace_manager`, and
+all direct test callers pass the route fixture or test constant they already
+assert against.
+
 ## Recommended Order
 
 1. ~~Protect `POST /api/config/` and split public runtime config from admin
@@ -758,6 +792,8 @@ routes.
    subclasses.~~
 7. ~~Deepen the largest route modules after the contracts above clarify the
    target module interfaces.~~
+8. ~~Remove the remaining hidden current-workspace read from
+   `TaskManager.create_task`.~~
 
 ## Not Flagged As Problems
 
