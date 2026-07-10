@@ -16,7 +16,6 @@ import { useAggregateBuilderDragHandlers } from './useAggregateBuilderDrag';
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import {
-  type FilterPreviewResponse,
   type PolarsExpressionRequest,
   type PolarsExpressionApplyResponse,
 } from '@/api';
@@ -24,7 +23,10 @@ import {
   mapColumnsToInfo,
   type ColumnInfo,
 } from '@/features/workspace/data-view/utils/columnTypes';
-import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
+import {
+  useNodePreviewWithRawFallback,
+  type OperationPreviewFetcher,
+} from '../../hooks/useNodePreviewWithRawFallback';
 import {
   buildSingleNodeSelectionPanelModel,
   getNodeKey,
@@ -38,12 +40,7 @@ export interface AggregateSubTabProps {
     operations: boolean;
   };
   onAlert: (message: string) => void;
-  polarsExpressionPreview: (
-    nodeId: string,
-    request: PolarsExpressionRequest,
-    page?: number,
-    pageSize?: number,
-  ) => Promise<FilterPreviewResponse>;
+  polarsExpressionPreview: OperationPreviewFetcher<PolarsExpressionRequest>;
   polarsExpressionApply: (
     nodeId: string,
     request: PolarsExpressionRequest,

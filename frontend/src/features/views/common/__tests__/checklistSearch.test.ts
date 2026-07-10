@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { matchChecklistOption } from '../checklistSearch';
 
 describe('matchChecklistOption', () => {

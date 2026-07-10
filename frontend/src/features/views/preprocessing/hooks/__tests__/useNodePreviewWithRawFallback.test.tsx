@@ -151,7 +151,14 @@ describe('useNodePreviewWithRawFallback', () => {
         signal,
       });
 
-      expect(operationFetch).toHaveBeenCalledWith('node-1', { conditions: [] }, 2, 25);
+      expect(operationFetch).toHaveBeenCalledWith({
+        workspaceId: 'workspace-1',
+        nodeId: 'node-1',
+        payload: { conditions: [] },
+        page: 2,
+        pageSize: 25,
+        signal,
+      });
       expect(getNodeDataByWorkspaceIdMock).not.toHaveBeenCalled();
       expect(result).toEqual({ data: [{ a: 1 }], columns: ['a'], pagination: null });
     });
@@ -191,6 +198,7 @@ describe('useNodePreviewWithRawFallback', () => {
         headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'workspace-1', node_id: 'node-1' },
         query: { page: 1, page_size: 10 },
+        signal,
         throwOnError: true,
       });
       expect(result).toEqual({

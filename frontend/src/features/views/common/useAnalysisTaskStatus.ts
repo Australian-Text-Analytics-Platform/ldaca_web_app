@@ -52,22 +52,43 @@ export interface AnalysisTaskStatus {
   bannerMessage?: string;
 }
 
+export interface UseAnalysisTaskStatusOptions {
+  /** Backend task types classify the workflow but never identify one run. */
+  taskTypes: string | readonly string[];
+  /** Limits status to the workspace that owns the feature or materialization. */
+  workspaceId?: string | null;
+  /**
+   * Explicit task ownership. An empty list means the owner has not started a
+   * task; omission is reserved for non-tab flows that observe a workspace/type.
+   */
+  taskIds?: readonly string[];
+}
+
 /** Summarizes the latest task state for an analysis feature's banners and result panels. */
 /**
  * Used by: src/features/views/common/hooks/useMaterializeLifecycle.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
- * Flow: normalize task-type inputs, filter and sort stored tasks by timestamp/event order, then expose active, terminal, and banner task summaries.
+ * Flow: normalize task-type inputs, restrict tasks to the requested workspace
+ * and optional owner ids, sort by timestamp/event order, then expose active,
+ * terminal, and banner task summaries.
  */
-export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTaskStatus => {
+export const useAnalysisTaskStatus = ({
+  taskTypes,
+  workspaceId,
+  taskIds,
+}: UseAnalysisTaskStatusOptions): AnalysisTaskStatus => {
   const tasks = useAnalysisStore((state) => state.tasks);
-  const candidateTypes = Array.isArray(taskType)
-    ? taskType.flatMap((value) => getTaskTypeCandidates(value))
-    : getTaskTypeCandidates(taskType);
+  const taskTypeList: readonly string[] =
+    typeof taskTypes === 'string' ? [taskTypes] : taskTypes;
+  const candidateTypes = taskTypeList.flatMap((value) => getTaskTypeCandidates(value));
   const candidateSet = new Set(candidateTypes);
+  const ownedTaskIds = taskIds === undefined ? null : new Set(taskIds);
 
   const filteredTasks = Array.isArray(tasks)
     ? tasks.filter((task) => {
         const rawType = typeof task.task_type === 'string' ? task.task_type : '';
-        return candidateSet.has(rawType);
+        if (!candidateSet.has(rawType)) return false;
+        if (workspaceId != null && task.workspace_id !== workspaceId) return false;
+        return ownedTaskIds === null || ownedTaskIds.has(task.task_id);
       })
     : ([] as TaskItem[]);
 

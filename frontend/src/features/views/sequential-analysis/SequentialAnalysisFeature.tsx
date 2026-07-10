@@ -152,8 +152,7 @@ const SequentialAnalysisFeature = ({
     getAuthHeaders,
   });
 
-  const [liveResults, resultRef, setResultSafely, setResults] =
-    useSafeResult<Record<string, unknown>>();
+  const [liveResults, resultRef, setResults] = useSafeResult<Record<string, unknown>>();
   const [hydratingSelection, setHydratingSelection] = useState(false);
   const hydratedParamsRef = useRef<SequentialHydratedParams | null>(null);
 
@@ -200,7 +199,7 @@ const SequentialAnalysisFeature = ({
       const resolvedChartType = isChartTypeOption(resultData.chart_type)
         ? resultData.chart_type
         : chartType;
-      setResultSafely({
+      setResults({
         ...resultData,
         analysis_params: {
           ...(results?.analysis_params ?? {}),
@@ -270,7 +269,7 @@ const SequentialAnalysisFeature = ({
     // Clears sequential-specific state after the shared lifecycle removes the task result.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
-      setResultSafely(null);
+      setResults(null);
       chartControls.resetAfterClear();
       if (options?.preserveLocalState) {
         return;

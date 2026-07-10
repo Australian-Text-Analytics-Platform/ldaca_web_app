@@ -1,6 +1,6 @@
 import React from 'react';
 import { getReadableTextColor, interpolateColor, type ZoomDomain } from '../topicModelingAdapters';
-import { matchChecklistOption } from '@/features/views/preprocessing/filter/utils/checklistSearch';
+import { matchChecklistOption } from '@/features/views/common/checklistSearch';
 
 interface TopicModelingTopic {
   id: number;

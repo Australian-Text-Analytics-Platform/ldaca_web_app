@@ -69,6 +69,7 @@ export function useQuotationMaterializeLifecycle({
   };
 
   useMaterializeLifecycle({
+    workspaceId,
     taskType: 'quotation_materialize',
     materializeTaskIds,
     setNodeMaterializing,

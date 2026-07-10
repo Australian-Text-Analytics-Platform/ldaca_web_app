@@ -28,6 +28,7 @@ import { SliceSubTab } from './slice/SliceSubTab';
 import { AggregateSubTab } from './aggregate/AggregateSubTab';
 import { ReplaceSubTab } from './replace/ReplaceSubTab';
 import InfoIcon from '@/components/help/InfoIcon';
+import { MAX_CONCAT_NODES, MAX_JOIN_NODES } from './types';
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
 
@@ -80,8 +81,12 @@ function DataPreprocessingFeature() {
     (state) => state.byKey[preprocessingInputKey] ?? EMPTY_PREPROCESSING_INPUTS,
   );
   const setPersistedInputs = usePreprocessingInputsStore((state) => state.setInputs);
-  const isMultiNodeSubtab = activeSubtab === 'join' || activeSubtab === 'concat';
-  const maxInputNodes = isMultiNodeSubtab ? 12 : 1;
+  const maxInputNodes =
+    activeSubtab === 'join'
+      ? MAX_JOIN_NODES
+      : activeSubtab === 'concat'
+        ? MAX_CONCAT_NODES
+        : 1;
   const nodeInputs = useTabNodeInputs({
     tabInputSets: { [DEFAULT_TAB_INPUT_SET_ID]: persistedInputs },
     onTabInputSetChange: (_selectorId, inputs) => {
@@ -293,6 +298,7 @@ function DataPreprocessingFeature() {
           <Suspense fallback={<PolarsExpressionFallback />}>
             <PolarsExpressionSubTab
               renderNodeInputsPanel={renderNodeInputsPanel}
+              currentWorkspaceId={currentWorkspaceId}
               selectedNodes={selectedNodes}
               isLoading={isLoading}
               onAlert={handleAlert}

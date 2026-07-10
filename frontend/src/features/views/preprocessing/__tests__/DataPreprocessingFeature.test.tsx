@@ -252,13 +252,19 @@ describe('DataPreprocessingFeature replace tab', () => {
     await user.type(screen.getByLabelText('Replacement'), '#');
 
     await waitFor(() => {
-      const [nodeId, payload] = mockReplacePreview.mock.calls[0] ?? [];
-      expect(nodeId).toBe('node-1');
-      expect(payload).toMatchObject({
+      const [previewRequest] = mockReplacePreview.mock.calls[0] ?? [];
+      expect(previewRequest).toMatchObject({
+        workspaceId: 'ws-1',
+        nodeId: 'node-1',
+        page: 1,
+        pageSize: 10,
+        signal: expect.any(AbortSignal),
+        payload: {
         source_column: 'Body',
         pattern: regexPattern,
         replacement: '#',
         output_column_name: 'Body',
+        },
       });
     });
 
@@ -301,6 +307,18 @@ describe('DataPreprocessingFeature replace tab', () => {
           options?.query?.page_size === 1,
       ),
     ).toBe(false);
+  });
+
+  it('uses the exact two-node join and six-node stack input caps', async () => {
+    const user = userEvent.setup();
+    renderPreprocessingFeature();
+
+    await user.click(screen.getByRole('tab', { name: 'Join' }));
+    expect(await screen.findByText('Preprocessing Inputs (1/2)')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Stack' }));
+    expect(await screen.findByText('Preprocessing Inputs (1/6)')).toBeInTheDocument();
+    expect(screen.queryByText(/Preprocessing Inputs \(1\/12\)/)).not.toBeInTheDocument();
   });
 
   it('shows the Sample tab and submits a random sample request', async () => {

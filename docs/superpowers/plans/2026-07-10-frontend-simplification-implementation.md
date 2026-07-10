@@ -81,7 +81,12 @@
 - Move shared helpers currently imported from preprocessing by topic-modeling/sequential code into a neutral common owner.
 
 **Interfaces:**
-- `useAnalysisTaskStatus` consumes `{ taskTypes, workspaceId, tabId, taskIds }` and never treats task type as unique identity.
+- Corrected contract: `useAnalysisTaskStatus` consumes
+  `{ taskTypes, workspaceId, taskIds }` and never treats task type as unique
+  identity. The backend task store has no tab id; tab ownership is represented
+  by the actual task ids persisted by the owning tab. An explicitly empty
+  `taskIds` list must not fall back to another same-type task, while non-tab
+  flows may omit `taskIds` and remain scoped by workspace and type.
 - `useSafeResult<T>` exposes one `Dispatch<SetStateAction<T | null>>`-compatible setter plus synchronized ref; no raw state setter escapes.
 - Preview request signatures contain workspace and every request-shaping field; fetchers consume request data and `AbortSignal`, not closed-over workspace state.
 - Node-input limits are supplied by the active feature: join `2`, concat `6`; no generic cap `12` overrides them.

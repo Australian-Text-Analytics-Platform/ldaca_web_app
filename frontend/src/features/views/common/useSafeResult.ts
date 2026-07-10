@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
 interface ResultLike {
   state?: string | null;
@@ -65,16 +65,27 @@ export function isStaleAnalysisResult(
  * Used by: analysis feature screens that keep live task results in React state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  */
 export function useSafeResult<T extends ResultLike | null>() {
-  const [result, setResult] = useState<T | null>(null);
+  const [result, setResultState] = useState<T | null>(null);
   const resultRef = useRef<T | null>(null);
 
-  const setResultSafely = (newResult: T | null) => {
-    if (isStaleAnalysisResult(resultRef.current, newResult)) {
+  /**
+   * Applies direct or functional result updates through the same stale-result
+   * guard, then synchronizes the imperative ref before returning to the caller.
+   * Called by: analysis feature task flows and preference/result reducers that
+   * need React Dispatch semantics without bypassing stale completion ordering.
+   */
+  const setResult: Dispatch<SetStateAction<T | null>> = (action) => {
+    const previous = resultRef.current;
+    const next =
+      typeof action === 'function'
+        ? action(previous)
+        : action;
+    if (isStaleAnalysisResult(previous, next)) {
       return;
     }
-    setResult(newResult);
-    resultRef.current = newResult;
+    resultRef.current = next;
+    setResultState(next);
   };
 
-  return [result, resultRef, setResultSafely, setResult] as const;
+  return [result, resultRef, setResult] as const;
 }

@@ -172,6 +172,7 @@ export function useConcordanceMaterializedEvents({
   }, []);
 
   useMaterializeLifecycle({
+    workspaceId,
     taskType: 'concordance_materialize',
     materializeTaskIds,
     setNodeMaterializing,

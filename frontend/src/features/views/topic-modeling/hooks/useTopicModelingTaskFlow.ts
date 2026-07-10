@@ -12,7 +12,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useDetachColumnsState } from '@/features/views/common/hooks/useDetachColumnsState';
 import { runAnalysisTaskEnvelope } from '@/features/views/common/tasks/runAnalysisTaskEnvelope';
 import type { DetachDialogNodeOption } from '@/features/views/common/components/DetachColumnsDialog';
-import { buildSamplingAutoNodeName } from '@/features/views/preprocessing/utils/autoNodeNames';
+import { buildSamplingAutoNodeName } from '@/features/views/common/samplingAutoNodeName';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
 const DEFAULT_TOPIC_SIZE_VALUE = 10;

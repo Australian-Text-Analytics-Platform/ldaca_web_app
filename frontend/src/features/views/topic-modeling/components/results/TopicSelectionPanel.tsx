@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
-import { matchChecklistOption } from '@/features/views/preprocessing/filter/utils/checklistSearch';
+import { matchChecklistOption } from '@/features/views/common/checklistSearch';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
 interface TopicLike {

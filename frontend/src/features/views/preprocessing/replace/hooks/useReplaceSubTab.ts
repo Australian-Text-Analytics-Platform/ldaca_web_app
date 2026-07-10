@@ -2,9 +2,12 @@ import { useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import { type FilterPreviewResponse, type ReplaceApplyResponse, type ReplaceRequest } from '@/api';
+import { type ReplaceApplyResponse, type ReplaceRequest } from '@/api';
 import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
-import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
+import {
+  useNodePreviewWithRawFallback,
+  type OperationPreviewFetcher,
+} from '../../hooks/useNodePreviewWithRawFallback';
 import { getNodeKey } from '../../utils/nodeMetadata';
 import {
   buildReplaceRequest,
@@ -21,12 +24,7 @@ export interface ReplaceSubTabProps {
     operations: boolean;
   };
   onAlert: (message: string) => void;
-  replaceTextPreview: (
-    nodeId: string,
-    request: ReplaceRequest,
-    page?: number,
-    pageSize?: number,
-  ) => Promise<FilterPreviewResponse>;
+  replaceTextPreview: OperationPreviewFetcher<ReplaceRequest>;
   replaceText: (nodeId: string, request: ReplaceRequest) => Promise<ReplaceApplyResponse>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }

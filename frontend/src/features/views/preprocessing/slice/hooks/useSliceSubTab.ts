@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '@/api';
+import type { SliceRequest as SliceRequestPayload } from '@/api';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
 } from '@/features/views/common/nodeSelectionTypes';
 import type { PreviewPagination, PreviewRow } from '../../types';
-import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
+import {
+  useNodePreviewWithRawFallback,
+  type OperationPreviewFetcher,
+} from '../../hooks/useNodePreviewWithRawFallback';
 import {
   buildSingleNodeSelectionPanelModel,
   deriveNodeLabel,
@@ -29,12 +32,7 @@ export interface SliceSubTabProps {
   selectedNode: WorkspaceNodeLike | null;
   selectedNodes: WorkspaceNodeLike[];
   sliceNode: (nodeId: string, request: SliceRequestPayload) => Promise<SliceOperationResult>;
-  slicePreview: (
-    nodeId: string,
-    request: SliceRequestPayload,
-    page: number,
-    pageSize: number,
-  ) => Promise<FilterPreviewResponse>;
+  slicePreview: OperationPreviewFetcher<SliceRequestPayload>;
   isLoading: {
     operations: boolean;
   };

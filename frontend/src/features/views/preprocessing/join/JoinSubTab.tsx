@@ -16,7 +16,7 @@ import {
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
+import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import { JOIN_TYPE_OPTIONS, type JoinType } from '../types';
 import { useJoinSubTab, type JoinSubTabProps } from './hooks/useJoinSubTab';
 

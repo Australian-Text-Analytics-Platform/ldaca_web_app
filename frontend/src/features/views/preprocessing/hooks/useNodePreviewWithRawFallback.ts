@@ -28,6 +28,17 @@ interface PreviewRequest<P> {
   payload: P | null;
 }
 
+export type OperationPreviewFetcher<P> = (
+  params: {
+    workspaceId: string;
+    nodeId: string;
+    payload: P;
+    page: number;
+    pageSize: number;
+    signal: AbortSignal;
+  },
+) => Promise<RawishResponse>;
+
 export interface UseNodePreviewWithRawFallbackOptions<P> {
   /** Currently-active workspace id, or null if no workspace is selected. */
   workspaceId: string | null;
@@ -40,12 +51,7 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
    */
   operationPayload: P | null;
   /** Operation-specific preview endpoint (e.g. generated `filterPreview`). */
-  operationFetch: (
-    nodeId: string,
-    payload: P,
-    page: number,
-    pageSize: number,
-  ) => Promise<RawishResponse>;
+  operationFetch: OperationPreviewFetcher<P>;
   /**
    * String prefix used when building the cache signature (e.g. `'replace'`).
    * Disambiguates between sub-tabs that might happen to JSON-stringify to
@@ -104,14 +110,24 @@ export const useNodePreviewWithRawFallback = <P>(
     // Routes complete operation payloads to the operation preview endpoint and
     // incomplete ones to raw node data so users always have rows to inspect.
     // Called by: usePreprocessingPreview option object inside useNodePreviewWithRawFallback because consumers need this callback at the object boundary instead of recreating it inline.
-    fetcher: async ({ request: req, page, pageSize }) => {
+    fetcher: async ({ request: req, page, pageSize, signal }) => {
       if (req.payload) {
-        return normaliseResponse(await operationFetch(req.nodeId, req.payload, page, pageSize));
+        return normaliseResponse(
+          await operationFetch({
+            workspaceId: req.workspaceId,
+            nodeId: req.nodeId,
+            payload: req.payload,
+            page,
+            pageSize,
+            signal,
+          }),
+        );
       }
       const { data } = await getNodeDataByWorkspaceId({
         headers: getAuthHeaders(),
         path: { workspace_id: req.workspaceId, node_id: req.nodeId },
         query: { page, page_size: pageSize },
+        signal,
         throwOnError: true,
       });
       return normaliseResponse(data);

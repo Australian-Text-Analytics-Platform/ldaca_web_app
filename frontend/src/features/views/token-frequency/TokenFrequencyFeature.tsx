@@ -94,8 +94,7 @@ const TokenFrequencyFeature = ({
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
   const setTasks = useAnalysisStore((state) => state.setTasks);
 
-  const [liveResults, resultRef, setResultSafely, setResults] =
-    useSafeResult<TokenFrequencyResponse>();
+  const [liveResults, resultRef, setResultSafely] = useSafeResult<TokenFrequencyResponse>();
   const [liveLastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
   const [liveStudyNodeId, setStudyNodeId] = useState<string | null>(null);
 
@@ -294,7 +293,7 @@ const TokenFrequencyFeature = ({
   } = useTokenFrequencyPreferences({
     currentWorkspaceId,
     results,
-    setResults,
+    setResults: setResultSafely,
     getAuthHeaders,
     resolveTokenFrequencyTaskId: resolveTaskId,
     backendTokenLimit,

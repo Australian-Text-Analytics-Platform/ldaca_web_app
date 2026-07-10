@@ -30,7 +30,7 @@ interface AnalysisResultLike {
  * `hydrationTaskId`. When that prop is present but null, the tab has not run
  * yet and must not fall back to the workspace's global current/terminal task.
  */
-const hasTabOwnedTaskId = (config: UseAnalysisFeatureConfig): boolean =>
+const hasTabOwnedTaskId = (config: object): boolean =>
   Object.prototype.hasOwnProperty.call(config, 'hydrationTaskId');
 
 export interface ClearAnalysisUiOptions {
@@ -227,7 +227,7 @@ export function useAnalysisFeature<TResult = unknown>(
     const status = taskStatusRef.current;
     const extra = cfg.getExtraTaskIdCandidates?.() ?? [];
     const cachedLastRun = readLastRunRequestCache(cfg.hydrationTaskId ?? localTaskIdRef.current);
-    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig);
+    const isTabOwnedTask = hasTabOwnedTaskId(cfg);
     const statusCandidates = isTabOwnedTask
       ? []
       : [
@@ -270,7 +270,7 @@ export function useAnalysisFeature<TResult = unknown>(
       return;
     }
 
-    const isTabOwnedTask = hasTabOwnedTaskId(cfg as UseAnalysisFeatureConfig);
+    const isTabOwnedTask = hasTabOwnedTaskId(cfg);
     const ownedTaskIds = collectTaskIds([
       cfg.hydrationTaskId,
       localTaskIdRef.current,
@@ -356,6 +356,10 @@ export function useAnalysisFeature<TResult = unknown>(
     };
   };
 
+  const ownedTaskIds = hasTabOwnedTaskId(config)
+    ? collectTaskIds([config.hydrationTaskId, localTaskId])
+    : undefined;
+
   // ---- Task flow ----
   const {
     status: taskStatus,
@@ -365,6 +369,7 @@ export function useAnalysisFeature<TResult = unknown>(
     taskType: config.taskType,
     isTabActive: config.isTabActive,
     workspaceId: config.workspaceId,
+    taskIds: ownedTaskIds,
     manualActiveTaskId: localTaskId,
     fallbackRunningBanner,
     refreshResults: handleTaskRefresh,

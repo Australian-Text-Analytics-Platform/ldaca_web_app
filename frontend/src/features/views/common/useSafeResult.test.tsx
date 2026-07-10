@@ -56,4 +56,17 @@ describe('useSafeResult', () => {
 
     expect(result.current[0]).toEqual({ state: 'running', value: 'new run' });
   });
+
+  it('supports functional updates while keeping the result ref synchronized', () => {
+    const { result } = renderHook(() => useSafeResult<ResultState>());
+
+    act(() => {
+      result.current[2]({ state: 'running', value: 'first' });
+      result.current[2]((previous) => ({ ...previous, value: 'second' }));
+    });
+
+    expect(result.current).toHaveLength(3);
+    expect(result.current[0]).toEqual({ state: 'running', value: 'second' });
+    expect(result.current[1].current).toEqual({ state: 'running', value: 'second' });
+  });
 });

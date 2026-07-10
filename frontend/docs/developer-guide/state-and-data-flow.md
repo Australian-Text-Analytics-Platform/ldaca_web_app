@@ -145,6 +145,22 @@ removes cards only when the backend reports removal, either through a snapshot,
 and Clear Results belong in the owning feature tab so backend recursive cleanup
 stays the source of truth for parent and child tasks.
 
+Analysis status is resolved by task type, workspace id, and the actual task ids
+owned by the active tab. Task type only classifies a workflow; it is not a run
+identity. The backend task store has no tab id, so an unrun tab passes an empty
+task-id list and cannot inherit a same-type task from a sibling tab. Background
+materialization flows use the same rule with their workspace id and tracked
+per-node materialize task ids.
+
+Preprocessing previews treat the complete serialized request as their identity,
+including workspace, nodes, operation payload, and paging inputs. Switching any
+of those values aborts the previous generated-SDK request, and late responses
+cannot overwrite the new preview. The active preprocessing subtab supplies its
+exact input cap to the shared selector: Join accepts two nodes, Stack accepts
+six, and single-node tools accept one. Cross-feature checklist search,
+placeholder-on-Tab, and sampling-name helpers live under `views/common/` rather
+than under preprocessing.
+
 ## Documentation Registry
 
 The help system uses a bundled registry plus optional remote registry. On app

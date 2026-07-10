@@ -1,14 +1,7 @@
-/**
- * Escapes literal text before it is embedded in a checklist-search RegExp.
- * Used by: local callers in preprocessing/checklistSearch module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
+/** Escapes literal text before it is embedded in a checklist-search RegExp. */
 const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/**
- * Detects whether a user query contains active glob wildcards. The checklist
- * search treats escaped `*` and `?` as literal characters.
- * Used by: local callers in preprocessing/checklistSearch module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
+/** Detects active glob wildcards while treating escaped `*` and `?` literally. */
 const hasUnescapedWildcard = (query: string): boolean => {
   let escaped = false;
   for (const char of query) {
@@ -27,12 +20,7 @@ const hasUnescapedWildcard = (query: string): boolean => {
   return false;
 };
 
-/**
- * Converts a small glob query into a case-insensitive whole-label RegExp.
- * Used by: local callers in preprocessing/checklistSearch module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- * Steps: escape regex metacharacters, translate glob wildcards, anchor the expression, and
- * return undefined for invalid user patterns.
- */
+/** Converts a small glob query into a case-insensitive whole-label RegExp. */
 const globToRegExp = (query: string): RegExp => {
   let pattern = '^';
   let escaped = false;
@@ -70,13 +58,7 @@ const globToRegExp = (query: string): RegExp => {
   return new RegExp(pattern, 'i');
 };
 
-/**
- * Removes escape markers from literal wildcard searches so substring matching
- * can find labels containing `*`, `?`, or `\\`.
- * Used by: local callers in preprocessing/checklistSearch module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- * Steps: scan escaped characters, keep supported literal wildcards, preserve unknown escapes,
- * and retain trailing backslashes.
- */
+/** Decodes escaped wildcard characters before literal substring matching. */
 const decodeEscapedWildcards = (query: string): string => {
   let result = '';
   let escaped = false;
@@ -108,9 +90,10 @@ const decodeEscapedWildcards = (query: string): string => {
 };
 
 /**
- * Matches one checklist label against the user's search query. The
- * FilterValueChecklist component uses it for both literal and glob searches.
- * Used by: FilterValueChecklist component, checklistSearch tests, useTopicModelingBubbleChart hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Matches a label with the shared literal/glob query language used by Filter
+ * checklists and Topic Modeling topic search.
+ * Used by: FilterValueChecklist, TopicSelectionPanel, and
+ * useTopicModelingBubbleChart so cross-feature search semantics stay aligned.
  */
 export const matchChecklistOption = (optionLabel: string, query: string): boolean => {
   const normalizedQuery = query.trim();

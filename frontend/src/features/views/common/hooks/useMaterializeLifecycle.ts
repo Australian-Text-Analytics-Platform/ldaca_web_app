@@ -11,6 +11,8 @@ const isTerminalState = (value: unknown): value is TerminalState =>
   typeof value === 'string' && TERMINAL_STATES.has(value as TerminalState);
 
 export interface UseMaterializeLifecycleParams {
+  /** Workspace that owns the tracked materialize task ids. */
+  workspaceId: string | null | undefined;
   /**
    * Task type to subscribe to via {@link useAnalysisTaskStatus}, e.g.
    * `'concordance_materialize'` or `'quotation_materialize'`.
@@ -54,6 +56,7 @@ export interface UseMaterializeLifecycleParams {
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export function useMaterializeLifecycle({
+  workspaceId,
   taskType,
   materializeTaskIds,
   setNodeMaterializing,
@@ -61,7 +64,11 @@ export function useMaterializeLifecycle({
   onTerminalSuccess,
   onTerminalFailure,
 }: UseMaterializeLifecycleParams): void {
-  const status = useAnalysisTaskStatus([taskType]);
+  const status = useAnalysisTaskStatus({
+    taskTypes: taskType,
+    workspaceId,
+    taskIds: Object.values(materializeTaskIds),
+  });
   const processedTaskIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {

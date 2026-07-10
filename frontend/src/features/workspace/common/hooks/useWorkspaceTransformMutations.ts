@@ -34,6 +34,16 @@ interface WorkspaceTransformMutationsParams {
   setOperationError: (operationId: string, error: string) => void;
 }
 
+/** Complete identity and transport context for one cancellable preprocessing preview. */
+interface WorkspaceOperationPreviewRequest<RequestPayload> {
+  workspaceId: string;
+  nodeId: string;
+  payload: RequestPayload;
+  page: number;
+  pageSize: number;
+  signal: AbortSignal;
+}
+
 /**
  * Owns preprocessing and column-edit actions exposed through WorkspaceProvider.
  * Used by: useWorkspaceNodeMutations because filter/slice/replace/expression
@@ -187,45 +197,72 @@ export const useWorkspaceTransformMutations = ({
     () => ({
       filterNode: (nodeId: string, request: FilterRequestPayload) =>
         filterNodeMutation.mutateAsync({ nodeId, request }),
-      filterPreview: (nodeId: string, request: FilterRequestPayload, page = 1, pageSize = 10) =>
+      filterPreview: ({
+        workspaceId,
+        nodeId,
+        payload,
+        page,
+        pageSize,
+        signal,
+      }: WorkspaceOperationPreviewRequest<FilterRequestPayload>) =>
         filterPreview({
-          body: request,
+          body: payload,
           headers: authHeaders,
-          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+          path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
+          signal,
           throwOnError: true,
         }).then(({ data }) => data),
       sliceNode: (nodeId: string, request: SliceRequest) =>
         sliceNodeMutation.mutateAsync({ nodeId, request }),
-      slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) =>
+      slicePreview: ({
+        workspaceId,
+        nodeId,
+        payload,
+        page,
+        pageSize,
+        signal,
+      }: WorkspaceOperationPreviewRequest<SliceRequest>) =>
         slicePreview({
-          body: request,
+          body: payload,
           headers: authHeaders,
-          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+          path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
+          signal,
           throwOnError: true,
         }).then(({ data }) => data),
       replaceText: (nodeId: string, request: ReplaceRequest) =>
         replaceTextMutation.mutateAsync({ nodeId, request }),
-      replaceTextPreview: (nodeId: string, request: ReplaceRequest, page = 1, pageSize = 10) =>
+      replaceTextPreview: ({
+        workspaceId,
+        nodeId,
+        payload,
+        page,
+        pageSize,
+        signal,
+      }: WorkspaceOperationPreviewRequest<ReplaceRequest>) =>
         replacePreview({
-          body: request,
+          body: payload,
           headers: authHeaders,
-          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+          path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
+          signal,
           throwOnError: true,
         }).then(({ data }) => data),
-      polarsExpressionPreview: (
-        nodeId: string,
-        request: PolarsExpressionRequest,
-        page = 1,
-        pageSize = 10,
-      ) =>
+      polarsExpressionPreview: ({
+        workspaceId,
+        nodeId,
+        payload,
+        page,
+        pageSize,
+        signal,
+      }: WorkspaceOperationPreviewRequest<PolarsExpressionRequest>) =>
         polarsExpressionPreview({
-          body: request,
+          body: payload,
           headers: authHeaders,
-          path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+          path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
+          signal,
           throwOnError: true,
         }).then(({ data }) => data),
       polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) =>

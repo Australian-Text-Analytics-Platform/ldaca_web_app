@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
+import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab';
 
 type ConcatSubTabComponentProps = ConcatSubTabProps & {

@@ -65,27 +65,6 @@ settled before deletion.
 
 ### Correctness-sensitive ownership seams
 
-#### C5. Identify analysis status by workspace, tab, and task
-
-- **Evidence / strength — Strong:** [useAnalysisTaskStatus.ts](../frontend/src/features/views/common/useAnalysisTaskStatus.ts#L60-L74) selects by task type, while [useAnalysisTaskFlow.ts](../frontend/src/features/views/common/tasks/useAnalysisTaskFlow.ts#L25-L76) separately knows workspace and banner task context.
-- **Recommended direction:** resolve status with workspace ID, tab ID, and task ID when available; task type should classify work, not uniquely identify an instance.
-- **Deletion test:** no consumer treats a task type alone as sufficient identity and feature hooks stop re-filtering ambiguous status.
-- **Validation:** run the same analysis in two tabs/workspaces, overlap old and new tasks, detach/clear one task, and verify banners/results remain isolated.
-
-#### C6. Make `useSafeResult` expose only the safe setter
-
-- **Evidence / strength — Strong:** [useSafeResult.ts](../frontend/src/features/views/common/useSafeResult.ts#L68-L79) updates the state/ref pair through `setResultSafely` but also returns raw `setResult`, allowing callers to bypass the ref.
-- **Recommended direction:** expose one `Dispatch<SetStateAction<T | null>>`-compatible setter that computes the next value and updates state/ref atomically while enforcing stale-result rules.
-- **Deletion test:** the raw setter is not returned and no caller can update result state without synchronizing the ref.
-- **Validation:** direct values, functional updaters, rapid task replacement, clear-after-result, and stale completion ordering.
-
-#### C7. Bind preprocessing preview signatures and cancellation to the full request
-
-- **Evidence / strength — Strong:** [useJoinSubTab.ts](../frontend/src/features/views/preprocessing/join/hooks/useJoinSubTab.ts#L296-L377) builds a join signature without workspace identity; [usePreprocessingPreview.ts](../frontend/src/features/views/preprocessing/hooks/usePreprocessingPreview.ts#L16-L157) creates an abort signal, but feature fetchers close over current workspace and do not consistently propagate that signal to the generated request.
-- **Recommended direction:** include workspace in the canonical signature/request data, make fetchers consume only that data, and carry the abort signal through the SDK transport.
-- **Deletion test:** no preview fetcher closes over current workspace and every cancellable request consumes the hook signal.
-- **Validation:** change workspace during debounce/in-flight fetch, change only join inputs, paginate while a prior request is pending, and assert aborted responses cannot win.
-
 #### C8. Own workspace-download completion above Data Loader navigation
 
 - **Evidence / strength — Strong:** [usePendingWorkspaceDownloads.ts](../frontend/src/features/views/data-loader/hooks/usePendingWorkspaceDownloads.ts#L38-L156) stores task IDs in component-local state, and [DataLoaderFeature.tsx](../frontend/src/features/views/data-loader/DataLoaderFeature.tsx) unmounts that owner when the user navigates away.
@@ -276,13 +255,6 @@ settled before deletion.
 - **Recommended direction:** let TanStack mutation ownership choose invalidation or awaited refetch once, and collapse dialogs/facades to the component that owns their state.
 - **Deletion test:** duplicate network refresh, refetch prop threading, nested shells, and unreachable alert/facade props disappear.
 - **Validation:** upload/move/delete/create-folder/import, rapid consecutive mutations, stale list recovery, dialog focus/cancel, and missing-workspace routing.
-
-#### D24. Apply exact preprocessing input limits and move shared utilities
-
-- **Evidence / strength — Strong:** a generic UI cap of 12 conflicts with join's 2-input and concat's 6-input contracts; topic/sequential code imports generic helpers owned by preprocessing. [NodeInputsPanel.tsx](../frontend/src/features/views/common/components/NodeInputsPanel.tsx), [useJoinSubTab.ts](../frontend/src/features/views/preprocessing/join/hooks/useJoinSubTab.ts), and [useConcatSubTab.ts](../frontend/src/features/views/preprocessing/concat/hooks/useConcatSubTab.ts) show the split.
-- **Recommended direction:** make the active feature's exact constraint authoritative and move genuinely cross-feature concepts to a neutral shared module.
-- **Deletion test:** no generic cap can admit an invalid feature request and no non-preprocessing feature imports a preprocessing-owned generic helper.
-- **Validation:** add/remove/reorder at 0/1/2/6/12 boundaries, queued graph inputs, direct restoration, and backend validation parity.
 
 ### Deep modularity opportunities
 
@@ -667,6 +639,37 @@ unreachable callers. Product/external-contract caveats remain where noted.
       recreation is fresh, and the zero-caller `forgetNodeIds` action was
       deleted. Focused regressions plus lint, 167 files / 782 tests, build,
       Knip, and `git diff --check` passed.
+
+36. Scope analysis status to workspace and owned task ids (C5)
+    - Done 2026-07-10. `useAnalysisTaskStatus` now treats task type as a
+      classifier and filters by workspace plus the actual task ids owned by the
+      active tab. The task store has no backend tab id; an explicitly empty
+      task-id list represents an unrun tab and cannot inherit a sibling task.
+      Materialization lifecycles use their workspace and tracked per-node task
+      ids instead of observing every same-type task globally.
+
+37. Expose only the synchronized safe result setter (C6)
+    - Done 2026-07-10. `useSafeResult` now returns one
+      `Dispatch<SetStateAction<T | null>>`-compatible setter beside state and
+      its synchronized ref. Direct values and functional updates share the
+      stale-result guard, and analysis callers can no longer bypass ref
+      synchronization through the raw React setter.
+
+38. Bind preprocessing previews to complete request identity (C7)
+    - Done 2026-07-10. Preview signatures always include the serialized request,
+      including workspace and operation-shaping fields. Join, Stack, raw
+      fallback, Filter, Sample, Find, Create, and expression fetchers consume
+      request-owned workspace data and pass the hook's `AbortSignal` through the
+      generated SDK, so workspace switches cancel old requests and stale
+      completions cannot win.
+
+39. Apply exact preprocessing limits and neutral helper ownership (D24)
+    - Done 2026-07-10. The active preprocessing subtab now supplies Join's
+      two-node cap, Stack's six-node cap, or the one-node default to the shared
+      selector. Checklist search and placeholder-on-Tab moved wholesale to
+      `views/common`, while only sampling-name construction moved out of the
+      preprocessing-specific expression/filter naming module; no compatibility
+      re-exports remain.
 
 ## Endpoint And Source-Of-Truth Notes
 

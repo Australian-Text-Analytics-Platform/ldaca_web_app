@@ -206,7 +206,7 @@ function ConcordanceFeature({
     handleClearBinSelection,
   } = useConcordanceDispersionControls();
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
-  const [liveResults, concordanceResultsRef, _setResultSafely, setResults] =
+  const [liveResults, concordanceResultsRef, setResults] =
     useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
 

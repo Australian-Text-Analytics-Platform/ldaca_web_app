@@ -159,4 +159,60 @@ describe('usePreprocessingPreview', () => {
     expect(result.current.columns).toEqual([]);
     expect(result.current.pagination).toBeNull();
   });
+
+  it('cancels an in-flight preview when workspace identity changes and ignores its stale completion', async () => {
+    vi.useFakeTimers();
+    let resolveFirst: ((value: {
+      data: { workspace: string }[];
+      columns: string[];
+      pagination: PreviewPagination;
+    }) => void) | null = null;
+    const firstResponse = new Promise<{
+      data: { workspace: string }[];
+      columns: string[];
+      pagination: PreviewPagination;
+    }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const fetcher = vi
+      .fn()
+      .mockImplementationOnce(() => firstResponse)
+      .mockResolvedValueOnce({
+        data: [{ workspace: 'workspace-2' }],
+        columns: ['workspace'],
+        pagination: pagination(1),
+      });
+
+    const { result, rerender } = renderHook(
+      ({ workspaceId }) =>
+        usePreprocessingPreview({
+          request: { workspaceId, nodeId: 'node-1' },
+          signature: 'node-1::preview',
+          debounceMs: 0,
+          fetcher,
+        }),
+      { initialProps: { workspaceId: 'workspace-1' } },
+    );
+
+    await flushPreviewTimer(0);
+    const firstSignal = fetcher.mock.calls[0]?.[0].signal as AbortSignal;
+
+    rerender({ workspaceId: 'workspace-2' });
+    await flushPreviewTimer(0);
+
+    expect(firstSignal.aborted).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(result.current.data).toEqual([{ workspace: 'workspace-2' }]);
+
+    await act(async () => {
+      resolveFirst?.({
+        data: [{ workspace: 'workspace-1' }],
+        columns: ['workspace'],
+        pagination: pagination(1),
+      });
+      await firstResponse;
+    });
+
+    expect(result.current.data).toEqual([{ workspace: 'workspace-2' }]);
+  });
 });

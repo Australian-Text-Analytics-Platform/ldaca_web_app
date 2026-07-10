@@ -36,7 +36,7 @@ export interface NodeInputsPanelProps {
   recentPresets?: ResolvedPreset[];
   /** Whether another node may be added (max-nodes gate). */
   canAddMore: boolean;
-  /** Max nodes the view accepts (for the header count). */
+  /** Exact max supplied by the active feature; the shared panel never invents a generic cap. */
   maxNodes?: number;
   /** Append nodes by id; returns rejections so the panel can surface reasons. */
   onAddNodes: (ids: string[]) => NodeAddRejection[];

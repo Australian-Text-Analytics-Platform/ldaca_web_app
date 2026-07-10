@@ -38,6 +38,8 @@ export interface UseAnalysisTaskFlowOptions {
   taskType: CanonicalAnalysisTaskType | (string & {});
   isTabActive?: boolean;
   workspaceId?: string | null;
+  /** Explicit ids owned by a tab. Omit only for workspace/type-scoped flows. */
+  taskIds?: readonly string[];
   manualActiveTaskId?: string | null;
   fallbackRunningBanner?: AnalysisTaskBannerFallbackInput;
   refreshResults?: (context: AnalysisTaskFlowRefreshContext) => Promise<void> | void;

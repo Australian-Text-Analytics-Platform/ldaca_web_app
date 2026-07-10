@@ -98,6 +98,7 @@ export interface JoinPreviewRequestPayload {
 }
 
 export interface ConcatPreviewRequestPayload {
+  workspaceId: string;
   nodeIds: string[];
   deduplicate: boolean;
 }

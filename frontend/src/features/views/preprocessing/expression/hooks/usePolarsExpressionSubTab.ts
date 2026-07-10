@@ -2,11 +2,13 @@ import { useReducer, useState } from 'react';
 
 import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
 import type {
-  FilterPreviewResponse,
   PolarsExpressionRequest,
   PolarsExpressionApplyResponse,
 } from '@/api';
-import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
+import {
+  useNodePreviewWithRawFallback,
+  type OperationPreviewFetcher,
+} from '../../hooks/useNodePreviewWithRawFallback';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
 import { deriveNodeLabel, getNodeKey } from '../../utils/nodeMetadata';
@@ -26,15 +28,11 @@ export {
 } from './polarsExpressionDraftState';
 
 export interface PolarsExpressionSubTabProps {
+  currentWorkspaceId: string | null;
   selectedNodes: WorkspaceNodeLike[];
   isLoading: { operations: boolean };
   onAlert: (message: string) => void;
-  polarsExpressionPreview: (
-    nodeId: string,
-    req: PolarsExpressionRequest,
-    page?: number,
-    pageSize?: number,
-  ) => Promise<FilterPreviewResponse>;
+  polarsExpressionPreview: OperationPreviewFetcher<PolarsExpressionRequest>;
   polarsExpressionApply: (
     nodeId: string,
     req: PolarsExpressionRequest,
@@ -54,6 +52,7 @@ const DEFAULT_PALETTE = ['#2563eb'];
  */
 export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const {
+    currentWorkspaceId,
     selectedNodes,
     onAlert,
     polarsExpressionPreview,
@@ -194,15 +193,13 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   };
 
   // Preview
-  const preview = usePreprocessingPreview({
-    request: nodeId && serializedRequest ? { nodeId, req: serializedRequest } : null,
-    enabled: !!nodeId && !!serializedRequest,
-    // Adapts the generated preview API to the shared preprocessing preview hook.
-    // Called by: usePreprocessingPreview option object inside usePolarsExpressionSubTab because consumers need this callback at the object boundary instead of recreating it inline.
-    fetcher: async ({ request, page, pageSize, signal: _signal }) => {
-      const res = await polarsExpressionPreview(request.nodeId, request.req, page, pageSize);
-      return { data: res.data, columns: res.columns, pagination: res.pagination };
-    },
+  const preview = useNodePreviewWithRawFallback({
+    workspaceId: currentWorkspaceId,
+    nodeId,
+    operationPayload: serializedRequest,
+    operationFetch: polarsExpressionPreview,
+    signaturePrefix: 'expression',
+    enabled: Boolean(nodeId && serializedRequest),
   });
 
   /**

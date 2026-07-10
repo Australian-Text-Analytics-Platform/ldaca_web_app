@@ -13,7 +13,7 @@ export interface UsePreprocessingPreviewOptions<RequestPayload, Row = PreviewRow
   request: RequestPayload | null;
   /** Whether previews should be attempted. Defaults to `true`. */
   enabled?: boolean;
-  /** Optional unique signature. Falls back to JSON.stringify(request). */
+  /** Optional operation prefix; the complete serialized request is always appended. */
   signature?: string;
   /** Debounce delay (ms) before firing the preview request. Defaults to 600ms. */
   debounceMs?: number;
@@ -72,11 +72,13 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
   const ready = Boolean(enabled && request);
   const derivedSignature = (() => {
     if (!ready || !request) return 'disabled';
-    if (signature) return signature;
     try {
-      return JSON.stringify(request);
+      const requestSignature = JSON.stringify(request);
+      return signature ? `${signature}::${requestSignature}` : requestSignature;
     } catch {
-      return 'preview-signature-unserializable';
+      return signature
+        ? `${signature}::preview-signature-unserializable`
+        : 'preview-signature-unserializable';
     }
   })();
 

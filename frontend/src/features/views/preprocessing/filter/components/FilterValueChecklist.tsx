@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { matchChecklistOption } from '../utils/checklistSearch';
+import { matchChecklistOption } from '@/features/views/common/checklistSearch';
 
 type FilterChecklistValue = string | number | boolean | null;
 

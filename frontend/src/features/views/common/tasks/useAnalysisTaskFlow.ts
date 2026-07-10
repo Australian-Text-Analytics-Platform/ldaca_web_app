@@ -25,13 +25,19 @@ export const useAnalysisTaskFlow = (
     taskType,
     isTabActive = true,
     workspaceId = null,
+    taskIds,
     manualActiveTaskId,
     fallbackRunningBanner,
     refreshResults,
   } = options;
 
   const taskTypeCandidates = getTaskTypeCandidates(taskType);
-  const status = useAnalysisTaskStatus(taskTypeCandidates);
+  const status = useAnalysisTaskStatus({
+    taskTypes: taskTypeCandidates,
+    workspaceId,
+    taskIds,
+  });
+  const taskIdsKey = taskIds?.join('\0') ?? null;
   const effectiveActiveTaskId = manualActiveTaskId ?? status.activeTaskId ?? null;
   const terminalRefreshDedupeRef = useRef<string | null>(null);
   const refreshResultsRef = useRef<typeof refreshResults>(refreshResults);
@@ -42,7 +48,7 @@ export const useAnalysisTaskFlow = (
 
   useEffect(() => {
     terminalRefreshDedupeRef.current = null;
-  }, [workspaceId]);
+  }, [workspaceId, taskIdsKey]);
 
   const resolvedFallbackBanner: AnalysisTaskBannerFallback | null = (() => {
     if (typeof fallbackRunningBanner === 'function') {

@@ -348,7 +348,7 @@ vi.mock('../../common', async () => {
         ref.current = result;
         mockSetSafeResult = setResult;
       }, [result, setResult]);
-      return [result, ref, vi.fn(), setResult];
+      return [result, ref, setResult];
     },
     /** Supplies deterministic source colours for feature tests that mock the shared analysis module. */
     useNodeColorControls: () => ({

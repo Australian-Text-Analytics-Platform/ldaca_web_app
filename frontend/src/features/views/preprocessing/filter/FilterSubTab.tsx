@@ -7,7 +7,7 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
+import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
 import { useFilterSubTabSections, type FilterSubTabProps } from './hooks/useFilterSubTabSections';
 import type { FilterConditionWithId } from '../types';

@@ -39,10 +39,11 @@ export interface ConcatSubTabProps {
   getColumnInfos: (node: WorkspaceNodeLike) => ColumnInfo[];
   concatNodes: (nodeIds: string[], newNodeName?: string, deduplicate?: boolean) => Promise<unknown>;
   concatPreview: (
-    nodeIds: string[],
-    page: number,
-    pageSize: number,
-    deduplicate?: boolean,
+    request: ConcatPreviewRequestPayload & {
+      page: number;
+      pageSize: number;
+      signal: AbortSignal;
+    },
   ) => Promise<{
     data: PreviewRow[];
     columns: string[];
@@ -313,13 +314,17 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   const concatUsedNodeIds = concatAnalysis.summaries.map((summary) => summary.nodeId);
 
   const concatPreviewRequest = (() => {
-    if (!concatAnalysis.ready) return null;
-    return { nodeIds: concatUsedNodeIds, deduplicate } satisfies ConcatPreviewRequestPayload;
+    if (!currentWorkspaceId || !concatAnalysis.ready) return null;
+    return {
+      workspaceId: currentWorkspaceId,
+      nodeIds: concatUsedNodeIds,
+      deduplicate,
+    } satisfies ConcatPreviewRequestPayload;
   })();
 
   const concatPreviewSignature = (() => {
     if (!concatPreviewRequest) return 'concat-preview-disabled';
-    return `${concatPreviewRequest.nodeIds.join('|')}|dedup=${concatPreviewRequest.deduplicate ? '1' : '0'}`;
+    return JSON.stringify(concatPreviewRequest);
   })();
 
   /**
@@ -332,12 +337,14 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     request,
     page,
     pageSize,
+    signal,
   }: {
     request: ConcatPreviewRequestPayload;
     page: number;
     pageSize: number;
+    signal: AbortSignal;
   }) => {
-    const response = await concatPreview(request.nodeIds, page, pageSize, request.deduplicate);
+    const response = await concatPreview({ ...request, page, pageSize, signal });
     // response comes from the generated API client; guard defensively against a
     // malformed/empty payload that the typed contract does not capture.
     return {

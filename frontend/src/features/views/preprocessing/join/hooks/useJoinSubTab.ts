@@ -306,13 +306,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   const joinPreviewSignature = (() => {
     if (!joinPreviewRequest) return 'join-preview-disabled';
-    return JSON.stringify({
-      leftNodeId: joinPreviewRequest.leftNodeId,
-      rightNodeId: joinPreviewRequest.rightNodeId,
-      leftOn: joinPreviewRequest.leftOn ?? null,
-      rightOn: joinPreviewRequest.rightOn ?? null,
-      joinType: joinPreviewRequest.joinType,
-    });
+    return JSON.stringify(joinPreviewRequest);
   })();
 
   /**
@@ -326,17 +320,16 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     request,
     page,
     pageSize,
+    signal,
   }: {
     request: JoinPreviewRequestPayload;
     page: number;
     pageSize: number;
+    signal: AbortSignal;
   }) => {
-    if (!currentWorkspaceId) {
-      throw new Error('No workspace selected');
-    }
     const { data: response } = await joinNodesPreview({
       headers: getAuthHeaders(),
-      path: { workspace_id: currentWorkspaceId },
+      path: { workspace_id: request.workspaceId },
       query: {
         left_node_id: request.leftNodeId,
         right_node_id: request.rightNodeId,
@@ -346,6 +339,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
         page,
         page_size: pageSize,
       },
+      signal,
       throwOnError: true,
     });
 

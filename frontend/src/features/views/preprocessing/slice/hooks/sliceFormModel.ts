@@ -1,5 +1,5 @@
 import type { SliceRequest as SliceRequestPayload } from '@/api';
-import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';
+import { buildSamplingAutoNodeName } from '@/features/views/common/samplingAutoNodeName';
 
 export type SamplingMode = 'slice' | 'random_sample';
 

@@ -13,7 +13,7 @@ import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
 import { deriveNodeLabel } from '../utils/nodeMetadata';
-import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
+import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
 type SliceSubTabComponentProps = SliceSubTabProps & {

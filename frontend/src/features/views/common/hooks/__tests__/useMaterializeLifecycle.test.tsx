@@ -47,6 +47,7 @@ interface Args {
  * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
  */
 const buildArgs = (overrides: Args = {}) => ({
+  workspaceId: 'workspace-1',
   taskType: 'concordance_materialize',
   materializeTaskIds: overrides.materializeTaskIds ?? {},
   setNodeMaterializing: overrides.setNodeMaterializing ?? mkMatBool(),

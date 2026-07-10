@@ -9,7 +9,7 @@ import {
   type MultiSeriesChartSeries,
   type MultiSeriesChartXAxisConfig,
 } from '@/features/views/common/components/MultiSeriesChart';
-import { acceptPlaceholderOnTab } from '@/features/views/preprocessing/utils/placeholderTabFill';
+import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import type {
   SequentialAnalysisDatum,
   ChartTypeOption,

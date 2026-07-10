@@ -6,15 +6,8 @@ interface PlaceholderTabFillArgs {
   setValue: (value: string) => void;
 }
 
-/**
- * Restores the caret after a placeholder is accepted without moving focus.
- * Used by: local callers in preprocessing/placeholderTabFill module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
- */
+/** Restores the caret after a placeholder is accepted without moving focus. */
 const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
-  /**
-   * Repositions the caret only if focus remains in the accepted input.
-   * Called by: scheduleCaretRestore internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-   */
   const restore = () => {
     if (document.activeElement !== input) {
       return;
@@ -31,10 +24,12 @@ const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
 };
 
 /**
- * Lets generated-name fields accept their placeholder with Tab. Preprocessing
- * forms use this so users can quickly adopt suggested output names.
- * Used by: JoinSubTab module, ConcatSubTab module, SliceSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
- * Flow: ignore modified Tab presses and non-empty fields, copy a trimmed placeholder into state, then restore the caret after React updates.
+ * Lets generated-name inputs accept a suggested placeholder on the first Tab
+ * press while preserving normal focus traversal after a value exists.
+ * Used by: preprocessing output-name fields and SequentialChart detach-name
+ * inputs because both surfaces share the same keyboard interaction.
+ * Flow: ignore modified/non-Tab keys and non-empty fields, copy the trimmed
+ * placeholder, prevent that one focus move, then restore the caret.
  */
 export const acceptPlaceholderOnTab = ({ event, value, setValue }: PlaceholderTabFillArgs) => {
   if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {

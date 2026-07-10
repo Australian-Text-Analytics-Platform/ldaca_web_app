@@ -2,7 +2,6 @@ import type { FilterConditionWithId } from '../types';
 import { isConditionComplete } from '../filter/utils/serializers';
 
 const DEFAULT_NAME_FALLBACK = 'dataset';
-const DEFAULT_SLICE_OFFSET = 0;
 
 const EXPRESSION_CONTEXT_SUFFIX: Record<
   'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg',
@@ -128,69 +127,6 @@ export const buildFilterAutoNodeName = ({
   const joinToken = logic === 'or' ? '_or_' : '_and_';
   const conditionToken = completeConditions.map(formatFilterConditionToken).join(joinToken);
   return `${base}_filtered_by_${conditionToken}`;
-};
-
-/**
- * Builds the suggested output name shown by the Sample Rows tab.
- * Used by: useTopicModelingTaskFlow hook, useSliceSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
- * Steps: normalize source labels, encode random/fraction/n-count mode details, include seed
- * when present, and trim the generated name.
- */
-export const buildSamplingAutoNodeName = ({
-  baseName,
-  mode,
-  offset,
-  length,
-  sampleSize,
-  randomSeed,
-  noRandomSeed,
-  isFullShuffle,
-}: {
-  baseName: string | null | undefined;
-  mode: 'slice' | 'random_sample';
-  offset?: number;
-  length?: number;
-  sampleSize?: number;
-  randomSeed?: number;
-  noRandomSeed?: boolean;
-  isFullShuffle?: boolean;
-}): string => {
-  const base = (baseName ?? '').trim() || DEFAULT_NAME_FALLBACK;
-
-  if (mode === 'slice') {
-    const start =
-      Number.isInteger(offset) && (offset ?? 0) >= 0 ? (offset ?? 0) : DEFAULT_SLICE_OFFSET;
-
-    if (!Number.isInteger(length) || length === undefined) {
-      return `${base}_sliced_from_${String(start)}`;
-    }
-
-    if (length <= 0) {
-      return `${base}_sliced_from_${String(start)}_length_${String(length)}`;
-    }
-
-    const end = start + length - 1;
-    return `${base}_sliced_from_${String(start)}_to_${String(end)}`;
-  }
-
-  const seedToken = noRandomSeed
-    ? '_true_random'
-    : typeof randomSeed === 'number' && Number.isInteger(randomSeed) && randomSeed >= 0
-      ? `_rs_${String(randomSeed)}`
-      : '';
-
-  if (isFullShuffle) {
-    return `${base}_shuffled${seedToken}`;
-  }
-
-  if (typeof sampleSize !== 'number' || !Number.isFinite(sampleSize) || sampleSize <= 0) {
-    return `${base}_sampled`;
-  }
-
-  const sizeToken = formatScalar(sampleSize);
-  const sampleToken = sampleSize < 1 ? `fr_${sizeToken}` : `n_${sizeToken}`;
-
-  return `${base}_sampled_${sampleToken}${seedToken}`;
 };
 
 /**

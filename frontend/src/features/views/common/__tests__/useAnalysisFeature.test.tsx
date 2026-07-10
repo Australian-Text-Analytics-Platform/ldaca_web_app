@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAnalysisFeature } from '../hooks/useAnalysisFeature';
 
-const { cancelTaskMock, clearAnalysisMock, hydrateFromServerMock } = vi.hoisted(() => ({
+const { cancelTaskMock, clearAnalysisMock, hydrateFromServerMock, taskFlowOptionsMock } = vi.hoisted(
+  () => ({
   cancelTaskMock: vi.fn(),
   clearAnalysisMock: vi.fn(),
   hydrateFromServerMock: vi.fn(() => Promise.resolve()),
-}));
+    taskFlowOptionsMock: vi.fn(),
+  }),
+);
 
 vi.mock('@tanstack/react-query', () => ({
   /** Called by: useAnalysisFeature under test when it requests a query client because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
@@ -34,20 +37,23 @@ vi.mock('../useAnalysisHydration', () => ({
 
 vi.mock('../tasks/useAnalysisTaskFlow', () => ({
   /** Called by: useAnalysisFeature under test to provide empty task-flow state because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
-  useAnalysisTaskFlow: () => ({
-    status: {
-      tasks: [],
-      activeTaskId: null,
-      runningTask: null,
-      queuedTask: null,
-      terminalTask: null,
-      successfulTask: null,
-      failedTask: null,
-      bannerMessage: null,
-    },
-    banner: null,
-    hasActiveTask: false,
-  }),
+  useAnalysisTaskFlow: (options: unknown) => {
+    taskFlowOptionsMock(options);
+    return {
+      status: {
+        tasks: [],
+        activeTaskId: null,
+        runningTask: null,
+        queuedTask: null,
+        terminalTask: null,
+        successfulTask: null,
+        failedTask: null,
+        bannerMessage: null,
+      },
+      banner: null,
+      hasActiveTask: false,
+    };
+  },
 }));
 
 describe('useAnalysisFeature', () => {
@@ -59,6 +65,7 @@ describe('useAnalysisFeature', () => {
       onCleanup(['task-1']);
     });
     hydrateFromServerMock.mockClear();
+    taskFlowOptionsMock.mockClear();
   });
 
   it('passes clear options through to onCleared cleanup handlers', async () => {
@@ -143,6 +150,35 @@ describe('useAnalysisFeature', () => {
 
     expect(fetchResult).not.toHaveBeenCalled();
     expect(onResultFetched).not.toHaveBeenCalled();
+  });
+
+  it('passes explicit empty and hydrated tab-owned task ids to task status', () => {
+    const baseConfig = {
+      analysisType: 'token_frequencies' as const,
+      taskType: 'token_frequencies',
+      workspaceId: 'workspace-1',
+      getAuthHeaders: () => ({}),
+      isTabActive: true,
+      resultRef: { current: null },
+      fetchResult: vi.fn(() => Promise.resolve(null)),
+      onResultFetched: vi.fn(),
+      onCleared: vi.fn(),
+    };
+    const { rerender } = renderHook(
+      ({ taskId }: { taskId: string | null }) =>
+        useAnalysisFeature({ ...baseConfig, hydrationTaskId: taskId }),
+      { initialProps: { taskId: null as string | null } },
+    );
+
+    expect(taskFlowOptionsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ workspaceId: 'workspace-1', taskIds: [] }),
+    );
+
+    rerender({ taskId: 'owned-task' });
+
+    expect(taskFlowOptionsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ workspaceId: 'workspace-1', taskIds: ['owned-task'] }),
+    );
   });
 
   it('fetches terminal refreshes for the task owned by the active tab', async () => {

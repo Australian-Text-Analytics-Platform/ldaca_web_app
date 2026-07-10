@@ -9,7 +9,10 @@ import type {
 import { normalizeTypeName, getOperatorsForType } from '../../utils/typeUtils';
 import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
 import { buildSingleNodeSelectionPanelModel } from '../../utils/nodeMetadata';
-import { useNodePreviewWithRawFallback } from '../../hooks/useNodePreviewWithRawFallback';
+import {
+  useNodePreviewWithRawFallback,
+  type OperationPreviewFetcher,
+} from '../../hooks/useNodePreviewWithRawFallback';
 import { buildFilterRequestPayload, isConditionComplete } from '../utils/serializers';
 import { applyFilterConditionFieldChange, createFilterCondition } from '../utils/conditionState';
 import { FilterConditionValueInput } from '../components/FilterConditionValueInput';
@@ -32,16 +35,7 @@ export interface FilterSubTabProps {
   columnOptions: ConditionColumnOption[];
   currentWorkspaceId: string | null;
   filterNode: (nodeId: string, request: FilterRequest) => Promise<void>;
-  filterPreview: (
-    nodeId: string,
-    request: FilterRequest,
-    page: number,
-    pageSize: number,
-  ) => Promise<{
-    data: PreviewRow[];
-    columns: string[];
-    pagination: PreviewPagination | null;
-  }>;
+  filterPreview: OperationPreviewFetcher<FilterRequest>;
   isLoading: {
     operations: boolean;
   };

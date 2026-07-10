@@ -35,6 +35,16 @@ interface WorkspaceGraphMutationsParams {
   setOperationError: (operationId: string, error: string) => void;
 }
 
+/** Complete identity and transport context for a cancellable stack preview. */
+interface WorkspaceConcatPreviewRequest {
+  workspaceId: string;
+  nodeIds: string[];
+  page: number;
+  pageSize: number;
+  deduplicate: boolean;
+  signal: AbortSignal;
+}
+
 /**
  * Owns node and graph mutations exposed through WorkspaceProvider actions.
  * Used by: useWorkspaceNodeMutations because graph operations share selection
@@ -352,12 +362,20 @@ export const useWorkspaceGraphMutations = ({
         }),
       concatNodes: (nodeIds: string[], newNodeName?: string, deduplicate?: boolean) =>
         concatNodesMutation.mutateAsync({ nodeIds, newNodeName, deduplicate }),
-      concatPreview: (nodeIds: string[], page = 1, pageSize = 10, deduplicate?: boolean) =>
+      concatPreview: ({
+        workspaceId,
+        nodeIds,
+        page,
+        pageSize,
+        deduplicate,
+        signal,
+      }: WorkspaceConcatPreviewRequest) =>
         concatNodesPreview({
           body: { node_ids: nodeIds, deduplicate },
           headers: authHeaders,
-          path: { workspace_id: ensureWorkspaceSelected() },
+          path: { workspace_id: workspaceId },
           query: { page, page_size: pageSize },
+          signal,
           throwOnError: true,
         }).then(({ data }) => data),
     }),
