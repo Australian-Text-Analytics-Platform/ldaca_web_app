@@ -2,6 +2,7 @@ import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useHintConditions } from '../conditions';
+import { useHintsStore } from '@/stores/hintsStore';
 
 const mockWorkspaceData = vi.hoisted(() => ({
   currentWorkspaceId: 'workspace-1',
@@ -16,14 +17,8 @@ const mockSelection = vi.hoisted(() => ({
 
 const mockUIState = vi.hoisted(() => ({
   currentView: 'filter',
-  lastUploadedFilePath: null as string | null,
-  modals: {
-    feedbackModal: false,
-    tutorialModal: false,
-    warningModal: false,
-    infoModal: false,
-    referenceModal: false,
-  },
+  feedbackOpen: false,
+  documentTarget: null as object | null,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
@@ -58,14 +53,9 @@ describe('useHintConditions', () => {
     };
     mockSelection.activeNodeId = null;
     mockUIState.currentView = 'filter';
-    mockUIState.lastUploadedFilePath = null;
-    mockUIState.modals = {
-      feedbackModal: false,
-      tutorialModal: false,
-      warningModal: false,
-      infoModal: false,
-      referenceModal: false,
-    };
+    mockUIState.feedbackOpen = false;
+    mockUIState.documentTarget = null;
+    useHintsStore.setState({ lastUploadedFilePath: null });
   });
 
   it('activates the filter node-selection hint when the filter view has workspace nodes but no selected node', () => {
@@ -86,7 +76,12 @@ describe('useHintConditions', () => {
 
   it('suppresses filter hints when any modal is open', () => {
     mockSelection.activeNodeId = 'node-1';
-    mockUIState.modals.infoModal = true;
+    mockUIState.documentTarget = {
+      kind: 'info',
+      key: 'general.overview',
+      file: 'information/general.md',
+      anchor: 'info-general-overview',
+    };
 
     const { result } = renderHook(() => useHintConditions());
 

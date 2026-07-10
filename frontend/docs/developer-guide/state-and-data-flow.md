@@ -62,8 +62,10 @@ duplicating server state into Zustand unless it is needed for UI interaction.
 The main stores are:
 
 - `authStore`: auth bootstrap, token storage, login/logout, and auth headers.
-- `uiStore`: active view, global modal intent, contextual hint state, and
-  operation loading flags.
+- `uiStore`: active view, operation loading, global feedback intent, and one
+  canonical documentation target.
+- `hintsStore`: hint enablement, permanent/session dismissals, and upload
+  follow-up context. Only enablement and permanent dismissals are persisted.
 - `selectionStore`: current workspace id, ordered selected-node membership,
   and an independent active node id. Semantic activate/reorder/remove/replace/
   toggle/clear actions own fallback behavior so graph, sidebar, and Data View
@@ -184,3 +186,24 @@ start, `loadRemoteRegistry()` synchronously applies a cached remote payload if
 available, then refreshes `${VITE_DOCS_BASE_URL}/registry.json` in the
 background. Remote entries shadow bundled entries; bundled entries keep the app
 usable offline.
+
+`documentationRegistry.ts` owns the resolved `DocumentTarget` contract: kind,
+key, file, anchor, and optional label travel together from lookup through UI
+intent to the single `DocumentModalHost` dialog. `getDocumentTarget(kind, key)`
+is the only bundled/cached/remote accessor. The registry store retains only the
+merged registry and remote metadata used by `DocsEolBanner`; refresh-attempt and
+timestamp mirrors had no consumer and were removed.
+
+The bundled registry intentionally retains the complete offline set. The 43
+entries without literal icon calls split into 18 dynamic targets (sidebar,
+analysis card/header, and hint configuration) and 25 entries retained for that
+full offline contract. `scripts/check-docs-drift.mjs` validates literal keys,
+every registered file and anchor, relative document/asset links, orphan
+documents, the tutorial index, and workflow execution.
+
+Hint eligibility and order are evaluated once in registry order by
+`hintPolicy.ts`. `HintOverlay` is the sole DOM measurement owner: one scroll
+listener, one resize listener, and one `ResizeObserver` feed the otherwise
+presentational highlight ring and bubble. Polling still discovers late-mounted
+dynamic anchors, but only requests measurement and does not reinstall those
+listeners or the observer.

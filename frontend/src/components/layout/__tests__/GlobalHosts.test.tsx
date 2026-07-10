@@ -20,7 +20,7 @@ describe('GlobalHosts', () => {
   beforeEach(() => {
     useUIStore.setState((state) => ({
       ...state,
-      modals: { ...state.modals, feedback: false },
+      feedbackOpen: false,
     }));
   });
 

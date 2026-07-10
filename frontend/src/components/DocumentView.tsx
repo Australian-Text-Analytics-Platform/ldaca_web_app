@@ -6,30 +6,23 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import logo from '../logo.png';
 import 'katex/dist/katex.min.css';
-import { BUNDLED_FILES } from '@/tutorials/bundledRegistry';
+import { BUNDLED_DOCUMENT_FILES, type DocumentTarget } from '@/tutorials/documentationRegistry';
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD, DOCS_BASE_URL } from '@/config/env';
 import { useZoom } from '@/hooks/useZoom';
 import { useDocumentAnchor } from '@/hooks/useDocumentAnchor';
 
-export interface DocumentTarget {
-  file: string;
-  anchor: string;
-  label?: string;
-}
-
-export type DocumentType = 'tutorial' | 'warning' | 'information' | 'reference';
+export type DocumentType = 'tutorial' | 'information' | 'reference';
 
 interface NavigationState {
-  propTarget: DocumentTarget | null | undefined;
-  currentTarget: DocumentTarget | null;
+  propTarget: DocumentTarget;
+  currentTarget: DocumentTarget;
 }
 
-/** Document viewer defaults keyed by modal type for help/info/reference routes. */
-const DOC_CONFIG: Record<DocumentType, { title: string; defaultFile: string }> = {
-  tutorial: { title: 'LDaCA Tutorial', defaultFile: 'tutorials/index.md' },
-  warning: { title: 'LDaCA Warnings', defaultFile: 'warnings/index.md' },
-  information: { title: 'LDaCA Information', defaultFile: 'information/index.md' },
-  reference: { title: 'LDaCA References', defaultFile: 'references/index.md' },
+/** Document viewer presentation keyed by canonical help/info/reference kind. */
+const DOC_CONFIG: Record<DocumentType, { title: string }> = {
+  tutorial: { title: 'LDaCA Tutorial' },
+  information: { title: 'LDaCA Information' },
+  reference: { title: 'LDaCA References' },
 };
 
 /** Called by: DocumentView link handlers when resolving local markdown hrefs. */
@@ -83,7 +76,7 @@ const resolveLocalDocUrl = (requestedFile: string): string => {
  * Called by: DocumentView's markdown-loading effect.
  */
 const resolveDocUrl = (requestedFile: string): string => {
-  if (BUNDLED_FILES.has(requestedFile)) {
+  if (BUNDLED_DOCUMENT_FILES.has(requestedFile)) {
     return resolveLocalDocUrl(requestedFile);
   }
   const remoteBase = DOCS_BASE_URL.trim();
@@ -101,8 +94,8 @@ const resolveDocUrl = (requestedFile: string): string => {
 /**
  * Markdown document reader used by help dialogs and standalone documentation
  * routes. It owns loading, intra-doc navigation, anchor highlighting, and zoom
- * controls so the help icons can open the same viewer for tutorials, warnings,
- * information, and references.
+ * controls so help icons can open the same viewer for tutorials, information,
+ * and references.
  * Why: all help/reference entry points need one markdown viewer that works for bundled, remote, modal, and standalone docs.
  * Flow: resolve the active document target, fetch markdown with build placeholders, sync anchors and zoom state, then render markdown navigation controls.
  */
@@ -113,7 +106,7 @@ function DocumentView({
 }: {
   docType: DocumentType;
   onClose?: () => void;
-  target?: DocumentTarget | null;
+  target: DocumentTarget;
 }) {
   const config = DOC_CONFIG[docType];
   const [content, setContent] = useState<string>('');
@@ -121,11 +114,11 @@ function DocumentView({
   const [loading, setLoading] = useState<boolean>(true);
   const [navigationState, setNavigationState] = useState<NavigationState>(() => ({
     propTarget: target,
-    currentTarget: target ?? null,
+    currentTarget: target,
   }));
   const currentTarget =
-    target && navigationState.propTarget !== target ? target : navigationState.currentTarget;
-  const activeAnchor = currentTarget?.anchor ?? null;
+    navigationState.propTarget !== target ? target : navigationState.currentTarget;
+  const activeAnchor = currentTarget.anchor;
 
   const { zoom, zoomIn, zoomOut, zoomReset } = useZoom({ keyboardShortcuts: true });
 
@@ -141,7 +134,7 @@ function DocumentView({
       setLoading(true);
       setError(null);
       try {
-        const requestedFile = currentTarget?.file ?? config.defaultFile;
+        const requestedFile = currentTarget.file;
         const url = resolveDocUrl(requestedFile);
         const resp = await fetch(url, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`HTTP ${String(resp.status)}`);
@@ -169,7 +162,7 @@ function DocumentView({
     return () => {
       cancelled = true;
     };
-  }, [currentTarget?.file, config.defaultFile]);
+  }, [currentTarget.file]);
 
   /**
    * Markdown render overrides used by `ReactMarkdown` for safe image sizing and in-modal doc links.
@@ -189,7 +182,7 @@ function DocumentView({
      * Flow: resolve relative markdown hrefs against the current file, route internal `.md` links through navigation state, and pass external links through.
      */
     a: ({ node: _node, children, href, target: linkTarget, rel, ...props }) => {
-      const baseFile = currentTarget?.file ?? config.defaultFile;
+      const baseFile = currentTarget.file;
       /**
        * Called by: the markdown anchor onClick prop to route internal links through DocumentView state because the interaction needs a single handler that validates state, runs the action, and updates feedback.
        * Flow: parse the clicked href path/hash, resolve the next markdown file, prevent default navigation, then store the next file/anchor target.
@@ -214,7 +207,12 @@ function DocumentView({
         event.preventDefault();
         setNavigationState({
           propTarget: target,
-          currentTarget: { file: nextFile, anchor: nextAnchor },
+          currentTarget: {
+            kind: currentTarget.kind,
+            key: `link:${nextFile}#${nextAnchor}`,
+            file: nextFile,
+            anchor: nextAnchor,
+          },
         });
       };
 

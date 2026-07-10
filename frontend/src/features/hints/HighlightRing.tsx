@@ -1,55 +1,16 @@
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface HighlightRingProps {
-  /** Element to highlight. Position is read once per `tick` increment. */
-  target: Element;
-  /** Increment to force re-measurement (e.g. on scroll/resize). */
-  tick: number;
+  /** Viewport-relative bounds measured by the shared hint overlay owner. */
+  rect: DOMRect;
   className?: string;
 }
 
 /**
- * A non-interactive highlight ring portalled to <body> and absolutely
- * positioned over the target element's bounding rect. Updates on scroll,
- * resize, and external `tick` changes. Pure presentational — does not own
- * lifecycle of the target.
- * Rendered by: HintsController module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
- * Flow: measure the target on every tick/resize/scroll, store viewport-relative bounds, and
- * render an overlay only while the anchor is still attached.
+ * Presentational coach-mark ring. `HintOverlay` owns measurement, observers,
+ * and viewport listeners so the ring never installs a parallel DOM lifecycle.
  */
-export function HighlightRing({ target, tick, className }: HighlightRingProps) {
-  const [rect, setRect] = useState<DOMRect | null>(null);
-
-  useEffect(() => {
-    let raf = 0;
-    /**
-     * Remeasures the highlighted target for scroll, resize, and layout changes.
-     * Called by: HighlightRing internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
-     */
-    const measure = () => {
-      raf = requestAnimationFrame(() => {
-        setRect(target.getBoundingClientRect());
-      });
-    };
-    measure();
-    window.addEventListener('scroll', measure, true);
-    window.addEventListener('resize', measure);
-    const ro = new ResizeObserver(measure);
-    ro.observe(target);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', measure, true);
-      window.removeEventListener('resize', measure);
-      ro.disconnect();
-    };
-  }, [target, tick]);
-
-  if (!rect) return null;
-
-  // Outset the ring slightly so it visually frames the target without
-  // covering its border. Pointer-events disabled so clicks pass through to
-  // the underlying control (so users can act on the highlighted button).
+export function HighlightRing({ rect, className }: HighlightRingProps) {
   const pad = 6;
   const style: React.CSSProperties = {
     position: 'fixed',

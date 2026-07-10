@@ -3,9 +3,13 @@ name: Check docs drift
 on:
   pull_request:
     paths:
+      - 'frontend/public/**'
       - 'frontend/src/**/*.ts'
       - 'frontend/src/**/*.tsx'
+      - 'frontend/src/tutorials/bundledRegistry.ts'
       - 'frontend/scripts/check-docs-drift.mjs'
+      - 'frontend/scripts/check-docs-drift.test.mjs'
+      - '.github/workflows/check-docs-drift.yml'
   workflow_dispatch:
 
 jobs:
@@ -16,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Check <Icon targetKey="…"> literals resolve to a registry entry
+      - name: Check documentation contracts and links
         working-directory: frontend
         # `--experimental-strip-types` lets us import bundledRegistry.ts
         # directly without a build step. Native on Node 22+.

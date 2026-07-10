@@ -2,18 +2,18 @@ import React from 'react';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import type { TutorialTargetKey } from '@/tutorials/tutorialRegistry';
+import type { DocumentKey } from '@/tutorials/documentationRegistry';
 
 export interface AnalysisFeatureHeaderProps {
   /** Title shown in the header — string or arbitrary node. */
   title: React.ReactNode;
   /** Tutorial-registry key for the info icon. */
-  infoKey: TutorialTargetKey | (string & {});
+  infoKey: DocumentKey<'info'>;
   /** Accessible label / tooltip body for the info icon. */
   infoLabel: string;
   infoTooltip?: string;
   /** Tutorial-registry key for the help icon. */
-  helpKey: TutorialTargetKey | (string & {});
+  helpKey: DocumentKey<'tutorial'>;
   helpLabel: string;
   helpTooltip?: string;
 }

@@ -4,7 +4,7 @@ import { uploadWorkspaceZip } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import { queryKeys } from '@/lib/queryKeys';
-import { useUIStore } from '@/stores/uiStore';
+import { useHintsStore } from '@/stores/hintsStore';
 import type { WorkspaceSummary } from '@/api';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
@@ -200,9 +200,9 @@ export function useDataLoaderWorkspaceActions({
   const handleAddFileToWorkspace = async (filename: string, selectedSheet?: string | null) => {
     await workspaceActions.createNodeFromFile(filename, selectedSheet ?? undefined);
     notify('success', `${filename} added to workspace.`);
-    const lastUploaded = useUIStore.getState().lastUploadedFilePath;
+    const lastUploaded = useHintsStore.getState().lastUploadedFilePath;
     if (lastUploaded && (lastUploaded === filename || filename.endsWith(`/${lastUploaded}`))) {
-      useUIStore.getState().setLastUploadedFilePath(null);
+      useHintsStore.getState().setLastUploadedFilePath(null);
     }
   };
 

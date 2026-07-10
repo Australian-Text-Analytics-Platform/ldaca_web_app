@@ -241,5 +241,11 @@ monolithic workspace object.
 ## Hints, Docs, And Help
 
 `src/features/hints/` and `src/tutorials/` support contextual docs. Help/info
-icons reference literal registry keys. `frontend/scripts/check-docs-drift.mjs`
-scans those literals and fails if a key is missing from the bundled registry.
+icons and dynamic analysis/hint configuration resolve through the canonical
+`DocumentTarget` contract and one `getDocumentTarget` accessor. One document
+dialog host renders tutorial, information, or reference content; there is no
+parallel warning slot. `frontend/scripts/check-docs-drift.mjs` validates
+literal keys, bundled files and anchors, relative links, reachable documents,
+and the workflow that runs the check. Contextual hint policy lives in
+`hintPolicy.ts`, transient and durable hint state share `hintsStore`, and
+`HintOverlay` shares one measurement lifecycle between ring and bubble.

@@ -1,23 +1,24 @@
 #!/usr/bin/env node
-// Drift-detection for <HelpIcon/InfoIcon/ReferenceIcon targetKey="…">
-// literals across the source. Fails the build if any literal has no
-// matching registry entry.
-//
-// Today we check against the in-bundle registry only — the bundled set
-// still mirrors the full registry. Once VITE_DOCS_BASE_URL is wired in
-// CI, fetch the deployed registry.json and check there too.
-//
-// Usage:  node frontend/scripts/check-docs-drift.mjs
+/**
+ * Verifies the complete bundled documentation contract.
+ *
+ * Used by: the docs-drift workflow and local frontend verification. Tests
+ * import the pure collectors below so missing files, anchors, relative links,
+ * and workflow wiring fail before the executable check reaches CI.
+ */
 
-import { readFile } from 'node:fs/promises';
-import { readdirSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFile, readdir } from 'node:fs/promises';
+import { dirname, extname, join, posix, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { BUNDLED_REGISTRY } from '../src/tutorials/bundledRegistry.ts';
+import { BUNDLED_REGISTRY, TUTORIAL_INDEX_TARGET } from '../src/tutorials/bundledRegistry.ts';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC_DIR = resolve(__dirname, '..', 'src');
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const FRONTEND_DIR = resolve(SCRIPT_DIR, '..');
+const REPO_DIR = resolve(FRONTEND_DIR, '..');
+const SRC_DIR = resolve(FRONTEND_DIR, 'src');
+const PUBLIC_DIR = resolve(FRONTEND_DIR, 'public');
+const WORKFLOW_FILE = resolve(REPO_DIR, '.github/workflows/check-docs-drift.yml');
 
 const COMPONENT_TO_KIND = {
   HelpIcon: 'tutorial',
@@ -30,59 +31,281 @@ const LITERAL_RE = new RegExp(
   'g',
 );
 
-const walk = (dir, acc = []) => {
-  for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name === '__tests__' || name.startsWith('.')) continue;
-    const full = join(dir, name);
-    const st = statSync(full);
-    if (st.isDirectory()) walk(full, acc);
-    else if (/\.(ts|tsx)$/.test(name) && !name.endsWith('.d.ts')) acc.push(full);
-  }
-  return acc;
-};
+const MARKDOWN_LINK_RE = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g;
+const HTML_LINK_RE = /<(?:a|img)\b[^>]*?\b(?:href|src)=["']([^"']+)["']/gi;
+const EXTERNAL_LINK_RE = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
+const PUBLIC_DOC_ROOTS = new Set(['information', 'references', 'tutorials', 'warnings']);
 
-const files = walk(SRC_DIR);
-const literals = [];
-
-for (const file of files) {
-  const text = await readFile(file, 'utf8');
-  for (const m of text.matchAll(LITERAL_RE)) {
-    literals.push({ file, component: m[1], key: m[2] });
+/** Recursively lists files in stable lexical order. */
+async function walk(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const paths = [];
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) paths.push(...(await walk(path)));
+    else paths.push(path);
   }
+  return paths;
 }
 
-const missing = [];
-const seen = new Set();
-for (const lit of literals) {
-  const kind = COMPONENT_TO_KIND[lit.component];
-  if (!BUNDLED_REGISTRY[kind][lit.key]) {
-    missing.push(lit);
+/** Extracts explicit HTML ids plus ordinary Markdown heading ids. */
+function collectAnchors(markdown) {
+  const anchors = new Set();
+  for (const match of markdown.matchAll(/\b(?:id|name)=["']([^"']+)["']/gi)) {
+    anchors.add(match[1]);
   }
-  seen.add(`${kind}:${lit.key}`);
+
+  const headingCounts = new Map();
+  for (const line of markdown.split(/\r?\n/)) {
+    const heading = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)?.[1];
+    if (!heading) continue;
+    const base = heading
+      .replace(/`([^`]*)`/g, '$1')
+      .replace(/!?\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/<[^>]+>/g, '')
+      .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-');
+    if (!base) continue;
+    const duplicateIndex = headingCounts.get(base) ?? 0;
+    headingCounts.set(base, duplicateIndex + 1);
+    anchors.add(duplicateIndex === 0 ? base : `${base}-${duplicateIndex}`);
+  }
+  return anchors;
 }
 
-if (missing.length) {
-  console.error('Found <Icon targetKey="…"> literals with no registry entry:\n');
-  for (const m of missing) {
-    const relPath = m.file.replace(`${resolve(__dirname, '..')}/`, '');
-    console.error(`  ${relPath}: ${m.component} targetKey="${m.key}"`);
-  }
-  process.exit(1);
-}
-
-// Soft warning: registry keys that no literal call site uses. These are
-// fine if accessed dynamically (e.g. HintsController), but worth knowing.
-const unusedBundled = [];
-for (const [kind, section] of Object.entries(BUNDLED_REGISTRY)) {
-  for (const key of Object.keys(section)) {
-    if (!seen.has(`${kind}:${key}`)) unusedBundled.push(`${kind}:${key}`);
-  }
-}
-if (unusedBundled.length) {
-  console.log(
-    `\nNote: ${unusedBundled.length} registry entries have no literal call site ` +
-      `(may be referenced dynamically, e.g. via HintsController).`,
+/** Returns Markdown and HTML relative links from one document. */
+function collectLinks(markdown) {
+  return [...markdown.matchAll(MARKDOWN_LINK_RE), ...markdown.matchAll(HTML_LINK_RE)].map(
+    (match) => match[1],
   );
 }
 
-console.log(`Drift check OK — ${literals.length} icon literals all resolve.`);
+function normalizeRelativeTarget(sourcePath, rawTarget) {
+  const target = rawTarget.replace(/^<|>$/g, '');
+  if (!target || EXTERNAL_LINK_RE.test(target)) return null;
+
+  const hashIndex = target.indexOf('#');
+  const rawPath = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
+  const rawAnchor = hashIndex >= 0 ? target.slice(hashIndex + 1) : '';
+  const pathWithoutQuery = rawPath.split('?')[0];
+  let decodedPath;
+  let decodedAnchor;
+  try {
+    decodedPath = decodeURIComponent(pathWithoutQuery);
+    decodedAnchor = decodeURIComponent(rawAnchor);
+  } catch {
+    return { invalid: true, rawTarget };
+  }
+
+  const firstSegment = decodedPath.split('/')[0];
+  const targetPath = decodedPath
+    ? decodedPath.startsWith('/') || PUBLIC_DOC_ROOTS.has(firstSegment)
+      ? posix.normalize(decodedPath.replace(/^\/+/, ''))
+      : posix.normalize(posix.join(posix.dirname(sourcePath), decodedPath))
+    : sourcePath;
+  return { targetPath, anchor: decodedAnchor };
+}
+
+/**
+ * Validates registered targets and every relative link in the supplied public
+ * documentation map. `availablePaths` may include binary assets that are not
+ * present in `documents`.
+ */
+export function collectDocumentationProblems({
+  registry,
+  documents,
+  availablePaths = new Set(documents.keys()),
+  extraTargets = [],
+}) {
+  const problems = [];
+  const anchorsByPath = new Map(
+    [...documents].map(([path, markdown]) => [path, collectAnchors(markdown)]),
+  );
+
+  const registeredTargets = [];
+  for (const [kind, section] of Object.entries(registry)) {
+    if (kind === 'meta') continue;
+    for (const [key, target] of Object.entries(section)) {
+      registeredTargets.push({ name: `${kind}:${key}`, target });
+    }
+  }
+  registeredTargets.push(...extraTargets);
+
+  for (const { name, target } of registeredTargets) {
+    if (!availablePaths.has(target.file)) {
+      problems.push(`${name} points to missing file ${target.file}`);
+      continue;
+    }
+    if (target.anchor && !anchorsByPath.get(target.file)?.has(target.anchor)) {
+      problems.push(`${name} points to missing anchor #${target.anchor} in ${target.file}`);
+    }
+  }
+
+  const linkedDocuments = new Map();
+  for (const [sourcePath, markdown] of [...documents].sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    const outgoingDocuments = new Set();
+    const reportedMissingPaths = new Set();
+    const reportedMissingAnchors = new Set();
+    for (const rawTarget of collectLinks(markdown)) {
+      const resolved = normalizeRelativeTarget(sourcePath, rawTarget);
+      if (!resolved) continue;
+      if ('invalid' in resolved) {
+        problems.push(`${sourcePath} contains an invalid relative link ${rawTarget}`);
+        continue;
+      }
+      if (!availablePaths.has(resolved.targetPath)) {
+        if (!reportedMissingPaths.has(resolved.targetPath)) {
+          problems.push(`${sourcePath} links to missing relative file ${resolved.targetPath}`);
+          reportedMissingPaths.add(resolved.targetPath);
+        }
+        continue;
+      }
+      if (documents.has(resolved.targetPath)) outgoingDocuments.add(resolved.targetPath);
+      if (
+        resolved.anchor &&
+        documents.has(resolved.targetPath) &&
+        !anchorsByPath.get(resolved.targetPath)?.has(resolved.anchor) &&
+        !reportedMissingAnchors.has(`${resolved.targetPath}#${resolved.anchor}`)
+      ) {
+        problems.push(
+          `${sourcePath} links to missing anchor #${resolved.anchor} in ${resolved.targetPath}`,
+        );
+        reportedMissingAnchors.add(`${resolved.targetPath}#${resolved.anchor}`);
+      }
+    }
+    linkedDocuments.set(sourcePath, outgoingDocuments);
+  }
+
+  const reachableDocuments = new Set(
+    registeredTargets.map(({ target }) => target.file).filter((path) => documents.has(path)),
+  );
+  const pendingDocuments = [...reachableDocuments];
+  while (pendingDocuments.length > 0) {
+    const sourcePath = pendingDocuments.pop();
+    for (const targetPath of linkedDocuments.get(sourcePath) ?? []) {
+      if (reachableDocuments.has(targetPath)) continue;
+      reachableDocuments.add(targetPath);
+      pendingDocuments.push(targetPath);
+    }
+  }
+  for (const path of [...documents.keys()].sort()) {
+    if (!reachableDocuments.has(path)) {
+      problems.push(`${path} is not registered or reachable from registered documentation`);
+    }
+  }
+
+  return problems;
+}
+
+/** Verifies that relevant docs changes actually trigger and execute the workflow. */
+export function collectWorkflowProblems(workflow) {
+  const problems = [];
+  if (!workflow.includes('frontend/public/**')) {
+    problems.push('workflow does not trigger for frontend/public documentation');
+  }
+  if (!workflow.includes('frontend/src/tutorials/bundledRegistry.ts')) {
+    problems.push('workflow does not trigger for the bundled registry');
+  }
+  if (!workflow.includes('frontend/scripts/check-docs-drift.test.mjs')) {
+    problems.push('workflow does not trigger for the drift validator tests');
+  }
+  if (!/run:\s*node\b[^\n]*scripts\/check-docs-drift\.mjs/.test(workflow)) {
+    problems.push('workflow does not execute scripts/check-docs-drift.mjs');
+  }
+  return problems;
+}
+
+async function collectSourceLiterals() {
+  const files = (await walk(SRC_DIR)).filter(
+    (path) => /\.(ts|tsx)$/.test(path) && !path.endsWith('.d.ts') && !path.includes('/__tests__/'),
+  );
+  const literals = [];
+  const sourceByPath = new Map();
+  for (const file of files) {
+    const text = await readFile(file, 'utf8');
+    sourceByPath.set(file, text);
+    for (const match of text.matchAll(LITERAL_RE)) {
+      literals.push({ file, component: match[1], key: match[2] });
+    }
+  }
+  return { literals, sourceByPath };
+}
+
+async function readPublicDocumentation() {
+  const files = await walk(PUBLIC_DIR);
+  const availablePaths = new Set(
+    files.map((path) => relative(PUBLIC_DIR, path).split('\\').join('/')),
+  );
+  const documents = new Map();
+  for (const file of files.filter((path) => extname(path).toLowerCase() === '.md')) {
+    documents.set(relative(PUBLIC_DIR, file).split('\\').join('/'), await readFile(file, 'utf8'));
+  }
+  return { documents, availablePaths };
+}
+
+/** Runs all source, bundled content, and workflow checks with deterministic output. */
+async function run() {
+  const { literals, sourceByPath } = await collectSourceLiterals();
+  const missingLiterals = literals.filter(({ component, key }) => {
+    const kind = COMPONENT_TO_KIND[component];
+    return !BUNDLED_REGISTRY[kind][key];
+  });
+  const { documents, availablePaths } = await readPublicDocumentation();
+  const problems = collectDocumentationProblems({
+    registry: BUNDLED_REGISTRY,
+    documents,
+    availablePaths,
+    extraTargets: [{ name: 'tutorial:index', target: TUTORIAL_INDEX_TARGET }],
+  });
+  problems.push(...collectWorkflowProblems(await readFile(WORKFLOW_FILE, 'utf8')));
+
+  if (missingLiterals.length) {
+    problems.unshift(
+      ...missingLiterals.map(
+        ({ file, component, key }) =>
+          `${relative(FRONTEND_DIR, file)}: ${component} targetKey="${key}" has no bundled entry`,
+      ),
+    );
+  }
+
+  if (problems.length) {
+    console.error('Documentation drift check failed:\n');
+    for (const problem of problems) console.error(`  ${problem}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const seenLiteralKeys = new Set(
+    literals.map(({ component, key }) => `${COMPONENT_TO_KIND[component]}:${key}`),
+  );
+  const zeroLiteralEntries = [];
+  let dynamicEntries = 0;
+  let offlineOnlyEntries = 0;
+  for (const [kind, section] of Object.entries(BUNDLED_REGISTRY)) {
+    for (const key of Object.keys(section)) {
+      if (seenLiteralKeys.has(`${kind}:${key}`)) continue;
+      zeroLiteralEntries.push(`${kind}:${key}`);
+      const usedDynamically = [...sourceByPath].some(
+        ([path, source]) => !path.endsWith('bundledRegistry.ts') && source.includes(key),
+      );
+      if (usedDynamically) dynamicEntries += 1;
+      else offlineOnlyEntries += 1;
+    }
+  }
+
+  console.log(
+    `Docs drift OK — ${literals.length} icon literals, ${documents.size} documents, ` +
+      `${availablePaths.size} public files, and ${zeroLiteralEntries.length} zero-literal entries validated.`,
+  );
+  console.log(
+    `Zero-literal classification — ${dynamicEntries} dynamic app targets; ` +
+      `${offlineOnlyEntries} retained by the full offline fallback contract.`,
+  );
+}
+
+const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
+if (import.meta.url === invokedPath) await run();

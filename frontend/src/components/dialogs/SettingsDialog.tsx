@@ -27,7 +27,6 @@ import {
 import { workspaceTabsQueryKey } from '@/features/views/common/tabs/useWorkspaceTabs';
 import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
 import { useVisibleViews } from '@/features/views/useVisibleViews';
-import { useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
@@ -60,8 +59,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { currentWorkspaceId, workspaces } = useWorkspaceData();
   const queryClient = useQueryClient();
   const visibleViews = useVisibleViews();
-  const resetSessionDismissedHints = useUIStore((state) => state.resetSessionDismissedHints);
-  const sessionDismissedHints = useUIStore((state) => state.sessionDismissedHints);
+  const sessionDismissedHints = useHintsStore((state) => state.sessionDismissedHints);
   const hintsEnabled = useHintsStore((state) => state.hintsEnabled);
   const dismissedHints = useHintsStore((state) => state.dismissedHints);
   const resetHints = useHintsStore((state) => state.resetHints);
@@ -137,7 +135,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   /** Called by: Settings hint reset button because browser-local permanent and session hint dismissals need one reset action. */
   const handleResetHints = () => {
     resetHints();
-    resetSessionDismissedHints();
     toast('All hints have been reset. Dismissed hints can appear again.');
   };
 
@@ -399,7 +396,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <div className="flex flex-wrap gap-2 text-sm">
                     <Badge variant="outline">{dismissedHints.length} dismissed</Badge>
                     <Badge variant="outline">
-                      {sessionDismissedHints.size} dismissed this session
+                      {sessionDismissedHints.length} dismissed this session
                     </Badge>
                   </div>
                   <Button type="button" variant="outline" onClick={handleResetHints}>

@@ -27,7 +27,12 @@ describe('DocumentView (docType="tutorial")', () => {
     const { rerender } = render(
       <DocumentView
         docType="tutorial"
-        target={{ file: 'tutorials/index.md', anchor: 'help-tutorial-index' }}
+        target={{
+          kind: 'tutorial',
+          key: 'index',
+          file: 'tutorials/index.md',
+          anchor: 'help-tutorial-index',
+        }}
       />,
     );
 
@@ -41,7 +46,12 @@ describe('DocumentView (docType="tutorial")', () => {
     rerender(
       <DocumentView
         docType="tutorial"
-        target={{ file: 'tutorials/index.md', anchor: 'help-tutorial-index-2' }}
+        target={{
+          kind: 'tutorial',
+          key: 'index',
+          file: 'tutorials/index.md',
+          anchor: 'help-tutorial-index-2',
+        }}
       />,
     );
 

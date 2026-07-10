@@ -6,17 +6,18 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 import { Loader2, Play, Square, Trash2 } from 'lucide-react';
+import type { DocLinkKind, DocumentKey } from '@/tutorials/documentationRegistry';
 
-interface HelpConfig {
-  targetKey: string;
+interface HelpConfig<Kind extends DocLinkKind> {
+  targetKey: DocumentKey<Kind>;
   label?: string;
   tooltip?: string;
 }
 
 interface AnalysisCardLayoutProps {
   title: React.ReactNode;
-  info?: HelpConfig;
-  help?: HelpConfig;
+  info?: HelpConfig<'info'>;
+  help?: HelpConfig<'tutorial'>;
   tone?: 'default' | 'error';
   headerActions?: React.ReactNode;
   actions?: {
@@ -32,9 +33,9 @@ interface AnalysisCardLayoutProps {
     isClearing?: boolean;
     hasResult?: boolean;
     runLabel?: string;
-    runHelp?: HelpConfig;
-    stopHelp?: HelpConfig;
-    clearHelp?: HelpConfig;
+    runHelp?: HelpConfig<'tutorial'>;
+    stopHelp?: HelpConfig<'tutorial'>;
+    clearHelp?: HelpConfig<'tutorial'>;
     extraContent?: React.ReactNode;
   };
   children: React.ReactNode;

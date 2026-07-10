@@ -16,7 +16,7 @@ function App() {
   }, []);
 
   const { ready: backendReady, error: backendError } = useBackendHealth();
-  const openModal = useUIStore((state) => state.openModal);
+  const openFeedback = useUIStore((state) => state.openFeedback);
 
   return (
     <>
@@ -34,7 +34,7 @@ function App() {
             <button
               type="button"
               onClick={() => {
-                openModal('feedback');
+                openFeedback();
               }}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >

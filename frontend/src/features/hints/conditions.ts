@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '@/stores/uiStore';
+import { useHintsStore } from '@/stores/hintsStore';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import type { HintConditionMap, HintResolverContext } from './types';
@@ -21,13 +23,13 @@ export function useHintConditions(): {
 } {
   const { currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { activeNodeId } = useWorkspaceSelection();
-  const { currentView, lastUploadedFilePath, hasAnyModalOpen } = useUIStore(
+  const { currentView, hasAnyModalOpen } = useUIStore(
     useShallow((s) => ({
       currentView: s.currentView,
-      lastUploadedFilePath: s.lastUploadedFilePath,
-      hasAnyModalOpen: Object.values(s.modals).some(Boolean),
+      hasAnyModalOpen: s.feedbackOpen || s.documentTarget !== null,
     })),
   );
+  const lastUploadedFilePath = useHintsStore((state) => state.lastUploadedFilePath);
 
   const noActiveWorkspace = !currentWorkspaceId;
   const workspaceHasNoNodes = !!currentWorkspaceId && (workspaceGraph?.nodes.length ?? 0) === 0;
@@ -68,17 +70,34 @@ export function useHintConditions(): {
   const filterNoNodeSelected = isFilterView && workspaceHasNodes && !activeNodeId;
   const filterAwaitingColumnSelection = isFilterView && !!activeNodeId;
 
-  return {
-    conditions: {
+  // Stable identities are a correctness contract for HintsController's poll
+  // effect: a measurement revision must not tear down/restart the interval.
+  const conditions = useMemo<HintConditionMap>(
+    () => ({
       'no-active-workspace': enabled && noActiveWorkspace,
       'workspace-has-no-nodes': enabled && workspaceHasNoNodes,
       'file-uploaded-not-added': enabled && fileUploadedNotAdded,
       'file-uploaded-no-workspace': enabled && fileUploadedNoWorkspace,
       'filter-no-node-selected': enabled && filterNoNodeSelected,
       'filter-awaiting-column-selection': enabled && filterAwaitingColumnSelection,
-    },
-    context: {
-      lastUploadedFilePath,
-    },
+    }),
+    [
+      enabled,
+      fileUploadedNoWorkspace,
+      fileUploadedNotAdded,
+      filterAwaitingColumnSelection,
+      filterNoNodeSelected,
+      noActiveWorkspace,
+      workspaceHasNoNodes,
+    ],
+  );
+  const context = useMemo<HintResolverContext>(
+    () => ({ lastUploadedFilePath }),
+    [lastUploadedFilePath],
+  );
+
+  return {
+    conditions,
+    context,
   };
 }

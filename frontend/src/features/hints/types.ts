@@ -47,20 +47,6 @@ export interface HintDefinition {
    * the hint should be skipped this tick. Wins over `anchorHintId` when set.
    */
   resolveAnchor?: (ctx: HintResolverContext) => Element | null;
-  /** Lower numbers show first. Defaults to 100. */
-  priority?: number;
-  /**
-   * If true, "Got it" persists dismissal forever. Otherwise the user can
-   * dismiss for the session only and the hint will reappear after reload
-   * when the condition is true again. Defaults to `true`.
-   */
-  oneShot?: boolean;
-  /** Optional CTA button label and handler shown alongside "Got it". */
-  action?: {
-    label: string;
-    /** Called when the CTA is clicked. Bubble closes after the call. */
-    run: () => void;
-  };
   /**
    * If set, the bubble shows a "Learn more" link that opens the existing
    * tutorial dialog at the given registry key.

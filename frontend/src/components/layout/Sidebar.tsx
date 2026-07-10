@@ -25,7 +25,7 @@ import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorks
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
-import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
+import { tutorialIndexTarget } from '@/tutorials/documentationRegistry';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
@@ -88,11 +88,12 @@ const SECTION_MIN_HEIGHTS: Partial<Record<SectionKey, number>> = {
  * Flow: select global/workspace/task state, wire logout/settings/dialog handlers, compute split sections and visible nav items, then render sidebar chrome.
  */
 function Sidebar() {
-  const { currentView, setCurrentView, openModal } = useUIStore(
-    useShallow(({ currentView, setCurrentView, openModal }) => ({
+  const { currentView, setCurrentView, openDocument, openFeedback } = useUIStore(
+    useShallow(({ currentView, setCurrentView, openDocument, openFeedback }) => ({
       currentView,
       setCurrentView,
-      openModal,
+      openDocument,
+      openFeedback,
     })),
   );
   const visibleViews = useVisibleViews();
@@ -448,7 +449,7 @@ function Sidebar() {
               variant="ghost"
               className="flex-1 justify-center"
               onClick={() => {
-                openModal('tutorial', tutorialIndexTarget);
+                openDocument(tutorialIndexTarget);
               }}
             >
               <BookOpen className="h-4 w-4" />
@@ -458,7 +459,7 @@ function Sidebar() {
               variant="ghost"
               className="flex-1 justify-center"
               onClick={() => {
-                openModal('feedback');
+                openFeedback();
               }}
             >
               <MessageSquare className="h-4 w-4" />

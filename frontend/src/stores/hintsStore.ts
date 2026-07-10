@@ -7,15 +7,23 @@ interface HintsState {
   dismissedHints: string[];
   /** Master toggle. When false, no hints are shown. */
   hintsEnabled: boolean;
+  /** Hints dismissed until this app session ends. Never persisted. */
+  sessionDismissedHints: string[];
+  /** Latest uploaded file used to resolve upload-follow-up hint anchors. */
+  lastUploadedFilePath: string | null;
 }
 
 interface HintsActions {
   /** Permanently dismiss a hint by id. */
   dismissHint: (id: string) => void;
-  /** Clear permanent dismissals so all eligible hints become visible again. */
+  /** Dismiss a hint until the current app session ends. */
+  dismissHintForSession: (id: string) => void;
+  /** Clear permanent and session dismissals so eligible hints can reappear. */
   resetHints: () => void;
   /** Enable or disable the entire hint system. */
   setHintsEnabled: (enabled: boolean) => void;
+  /** Track or clear the uploaded file used by upload-follow-up hints. */
+  setLastUploadedFilePath: (path: string | null) => void;
 }
 
 export type HintsStore = HintsState & HintsActions;
@@ -26,9 +34,10 @@ export const useHintsStore = create<HintsStore>()(
       immer((set) => ({
         dismissedHints: [],
         hintsEnabled: true,
+        sessionDismissedHints: [],
+        lastUploadedFilePath: null,
 
-        /** Records a permanent hint dismissal so future sessions do not show it again. */
-        /** Consumed by: useHintsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+        /** Records a permanent dismissal from `HintsController`/Settings. */
         dismissHint: (id) =>
           set((state) => {
             if (!state.dismissedHints.includes(id)) {
@@ -36,24 +45,36 @@ export const useHintsStore = create<HintsStore>()(
             }
           }),
 
-        /** Clears permanent dismissals from the settings/debug reset path. */
-        /** Consumed by: useHintsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+        /** Records a transient dismissal without expanding the persisted contract. */
+        dismissHintForSession: (id) =>
+          set((state) => {
+            if (!state.sessionDismissedHints.includes(id)) {
+              state.sessionDismissedHints.push(id);
+            }
+          }),
+
+        /** Clears permanent and session dismissals from Settings. */
         resetHints: () =>
           set((state) => {
             state.dismissedHints = [];
+            state.sessionDismissedHints = [];
           }),
 
         /** Toggles all contextual hints without deleting dismissal history. */
-        /** Consumed by: useHintsStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
         setHintsEnabled: (enabled) =>
           set((state) => {
             state.hintsEnabled = enabled;
           }),
+
+        /** Updates transient upload context consumed by dynamic hint anchors. */
+        setLastUploadedFilePath: (path) =>
+          set((state) => {
+            state.lastUploadedFilePath = path;
+          }),
       })),
       {
         name: 'ldaca-hints',
-        /** Persists only user choices, not middleware/devtools metadata. */
-        /** Consumed by: Zustand persist for useHintsStore because persisted hydration needs a stable storage contract before store state is restored. */
+        /** Persists durable choices; session dismissal/upload context resets. */
         partialize: (state) => ({
           dismissedHints: state.dismissedHints,
           hintsEnabled: state.hintsEnabled,

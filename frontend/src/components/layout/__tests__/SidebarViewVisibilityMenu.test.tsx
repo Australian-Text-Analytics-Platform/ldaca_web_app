@@ -115,24 +115,16 @@ describe('Sidebar view visibility menu', () => {
       ...state,
       currentView: 'data-loader',
       loadingOperations: new Set(),
-      modals: {
-        feedback: false,
-        tutorial: false,
-        warning: false,
-        info: false,
-        reference: false,
-      },
-      modalTargets: {
-        feedback: null,
-        tutorial: null,
-        warning: null,
-        info: null,
-        reference: null,
-      },
-      sessionDismissedHints: new Set(),
+      feedbackOpen: false,
+      documentTarget: null,
     }));
     usePreferencesStore.setState({ hiddenViews: [] });
-    useHintsStore.setState({ dismissedHints: [], hintsEnabled: true });
+    useHintsStore.setState({
+      dismissedHints: [],
+      sessionDismissedHints: [],
+      lastUploadedFilePath: null,
+      hintsEnabled: true,
+    });
     toastMock.mockReset();
   });
 
@@ -181,12 +173,9 @@ describe('Sidebar view visibility menu', () => {
 
     useHintsStore.setState({
       dismissedHints: ['preprocessing.filter.select-node'],
+      sessionDismissedHints: ['preprocessing.filter.select-column'],
       hintsEnabled: true,
     });
-    useUIStore.setState((state) => ({
-      ...state,
-      sessionDismissedHints: new Set(['preprocessing.filter.select-column']),
-    }));
 
     renderSidebar();
 
@@ -198,7 +187,7 @@ describe('Sidebar view visibility menu', () => {
     await user.click(screen.getByRole('button', { name: /reset all hints/i }));
 
     expect(useHintsStore.getState().dismissedHints).toEqual([]);
-    expect(Array.from(useUIStore.getState().sessionDismissedHints)).toEqual([]);
+    expect(useHintsStore.getState().sessionDismissedHints).toEqual([]);
     expect(toastMock).toHaveBeenCalledWith(
       'All hints have been reset. Dismissed hints can appear again.',
     );

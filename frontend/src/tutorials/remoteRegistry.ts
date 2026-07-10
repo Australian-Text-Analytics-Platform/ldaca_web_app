@@ -123,9 +123,8 @@ export const loadRemoteRegistry = (): Promise<void> => {
   }
 
   if (!baseUrl) {
-    // No remote configured — flag remote-attempted so any "still
-    // loading" UI gates resolve, and return.
-    if (!cached) useRegistryStore.getState().applyRemote(null);
+    // Bundled-only mode needs no status mirror; cached content, if present,
+    // was already applied synchronously above.
     loadPromise = Promise.resolve();
     return loadPromise;
   }
@@ -135,9 +134,6 @@ export const loadRemoteRegistry = (): Promise<void> => {
     if (fresh) {
       useRegistryStore.getState().applyRemote(fresh);
       writeCache(fresh);
-    } else if (!cached) {
-      // Mark attempted so UI can settle even when fetch failed.
-      useRegistryStore.getState().applyRemote(null);
     }
   })();
 

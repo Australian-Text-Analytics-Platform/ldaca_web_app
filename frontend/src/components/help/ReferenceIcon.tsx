@@ -1,8 +1,8 @@
 import { DocLinkIcon } from './DocLinkIcon';
-import type { ReferenceTargetKey } from '@/tutorials/referenceRegistry';
+import type { DocumentKey } from '@/tutorials/documentationRegistry';
 
 interface ReferenceIconProps {
-  targetKey: ReferenceTargetKey | (string & {});
+  targetKey: DocumentKey<'reference'>;
   label?: string;
   tooltip?: string;
   className?: string;

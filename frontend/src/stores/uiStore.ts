@@ -3,24 +3,17 @@ import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import { DEFAULT_VIEW, type ViewType } from '@/features/views/viewIds';
+import type { DocumentTarget } from '@/tutorials/documentationRegistry';
 
 enableMapSet();
 
 /**
- * Global UI state: active view, operation loading, global modal intent, and
- * contextual-hint state that lives outside individual feature components.
+ * Global UI state: active view, operation loading, feedback intent, and the
+ * currently open canonical documentation target.
  *
  * Business state (workspaces, nodes, selections, analysis tasks) belongs in
  * the server cache or dedicated stores — this store is purely presentation.
  */
-
-type ModalKind = 'feedback' | 'tutorial' | 'warning' | 'info' | 'reference';
-
-interface ModalTarget {
-  file: string;
-  anchor: string;
-  label?: string;
-}
 
 interface UIState {
   currentView: ViewType;
@@ -28,19 +21,10 @@ interface UIState {
   /** Set of in-flight operation ids. Read via `.size` / `.has` elsewhere. */
   loadingOperations: Set<string>;
 
-  /** Which global modals are open, keyed by kind. */
-  modals: Record<ModalKind, boolean>;
-  /** Target document for each modal kind (set when opening with a doc target). */
-  modalTargets: Record<ModalKind, ModalTarget | null>;
-
-  /**
-   * Path of the most recently uploaded file. Used by the contextual hints
-   * system to highlight the matching file row's "Add" button after upload.
-   */
-  lastUploadedFilePath: string | null;
-
-  /** Hints dismissed for this session only (permanent dismissals in hintsStore). */
-  sessionDismissedHints: Set<string>;
+  /** Global feedback intent stays independent from document navigation. */
+  feedbackOpen: boolean;
+  /** Exactly one help/info/reference document may be open at a time. */
+  documentTarget: DocumentTarget | null;
 }
 
 interface UIActions {
@@ -51,14 +35,11 @@ interface UIActions {
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
 
-  // Modals
-  openModal: (kind: ModalKind, target?: ModalTarget) => void;
-  closeModal: (kind: ModalKind) => void;
-
-  // Hints
-  setLastUploadedFilePath: (path: string | null) => void;
-  sessionDismissHint: (id: string) => void;
-  resetSessionDismissedHints: () => void;
+  // Global overlays
+  openFeedback: () => void;
+  closeFeedback: () => void;
+  openDocument: (target: DocumentTarget) => void;
+  closeDocument: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -69,22 +50,8 @@ export const useUIStore = create<UIStore>()(
       immer((set) => ({
         currentView: DEFAULT_VIEW,
         loadingOperations: new Set(),
-        modals: {
-          feedback: false,
-          tutorial: false,
-          warning: false,
-          info: false,
-          reference: false,
-        },
-        modalTargets: {
-          feedback: null,
-          tutorial: null,
-          warning: null,
-          info: null,
-          reference: null,
-        },
-        lastUploadedFilePath: null,
-        sessionDismissedHints: new Set<string>(),
+        feedbackOpen: false,
+        documentTarget: null,
 
         setCurrentView: (view) =>
           set((state) => {
@@ -101,33 +68,24 @@ export const useUIStore = create<UIStore>()(
             state.loadingOperations.delete(operationId);
           }),
 
-        openModal: (kind, target) =>
+        openFeedback: () =>
           set((state) => {
-            state.modals[kind] = true;
-            if (target !== undefined) {
-              state.modalTargets[kind] = target;
-            }
+            state.feedbackOpen = true;
           }),
 
-        closeModal: (kind) =>
+        closeFeedback: () =>
           set((state) => {
-            state.modals[kind] = false;
-            state.modalTargets[kind] = null;
+            state.feedbackOpen = false;
           }),
 
-        setLastUploadedFilePath: (path) =>
+        openDocument: (target) =>
           set((state) => {
-            state.lastUploadedFilePath = path;
+            state.documentTarget = target;
           }),
 
-        sessionDismissHint: (id) =>
+        closeDocument: () =>
           set((state) => {
-            state.sessionDismissedHints.add(id);
-          }),
-
-        resetSessionDismissedHints: () =>
-          set((state) => {
-            state.sessionDismissedHints = new Set<string>();
+            state.documentTarget = null;
           }),
       })),
       {

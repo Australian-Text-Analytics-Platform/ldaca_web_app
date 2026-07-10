@@ -3,7 +3,13 @@ import { useHintsStore } from '@/stores/hintsStore';
 
 describe('hintsStore', () => {
   beforeEach(() => {
-    useHintsStore.setState({ dismissedHints: [], hintsEnabled: true });
+    localStorage.clear();
+    useHintsStore.setState({
+      dismissedHints: [],
+      sessionDismissedHints: [],
+      lastUploadedFilePath: null,
+      hintsEnabled: true,
+    });
   });
 
   it('starts enabled with no dismissals', () => {
@@ -18,6 +24,8 @@ describe('hintsStore', () => {
     dismissHint('a');
     dismissHint('b');
     expect(useHintsStore.getState().dismissedHints).toEqual(['a', 'b']);
+    const persisted = JSON.parse(localStorage.getItem('ldaca-hints') ?? '{}');
+    expect(persisted.state.dismissedHints).toEqual(['a', 'b']);
   });
 
   it('resetHints clears dismissals', () => {
@@ -33,5 +41,18 @@ describe('hintsStore', () => {
     expect(useHintsStore.getState().hintsEnabled).toBe(false);
     setHintsEnabled(true);
     expect(useHintsStore.getState().hintsEnabled).toBe(true);
+  });
+
+  it('owns session dismissals and upload context without persisting them', () => {
+    const { dismissHintForSession, setLastUploadedFilePath } = useHintsStore.getState();
+    dismissHintForSession('session-only');
+    setLastUploadedFilePath('/tmp/upload.csv');
+
+    expect(useHintsStore.getState().sessionDismissedHints).toEqual(['session-only']);
+    expect(useHintsStore.getState().lastUploadedFilePath).toBe('/tmp/upload.csv');
+
+    const persisted = JSON.parse(localStorage.getItem('ldaca-hints') ?? '{}');
+    expect(persisted.state).not.toHaveProperty('sessionDismissedHints');
+    expect(persisted.state).not.toHaveProperty('lastUploadedFilePath');
   });
 });

@@ -88,20 +88,6 @@ settled before deletion.
 
 ### Deletion and simplification
 
-#### D9. Collapse documentation registry shims and impossible status paths
-
-- **Evidence / strength — Strong:** [tutorialRegistry.ts](../frontend/src/tutorials/tutorialRegistry.ts), [infoRegistry.ts](../frontend/src/tutorials/infoRegistry.ts), and [referenceRegistry.ts](../frontend/src/tutorials/referenceRegistry.ts) are thin re-exports around duplicated target/type contracts; [registryStore.ts](../frontend/src/tutorials/registryStore.ts) retains dead status fields and an always-null/no-caller warning path.
-- **Recommended direction:** keep one registry contract, delete impossible warning/status state, and strengthen docs-drift checks beyond literal existence.
-- **Deletion test:** thin registry ladders, duplicate types, and unreachable warning UI are gone while every live target still resolves.
-- **Validation:** bundled/remote/offline docs, dynamic links, missing targets, registry refresh failure, and all documentation entry surfaces.
-
-#### D10. Unify hint state, policy, and measurement ownership
-
-- **Evidence / strength — Strong:** [hintsStore.ts](../frontend/src/stores/hintsStore.ts), [HintsController.tsx](../frontend/src/features/hints/HintsController.tsx), [conditions.ts](../frontend/src/features/hints/conditions.ts), and [hintRegistry.ts](../frontend/src/features/hints/hintRegistry.ts) split durable/transient state, duplicate observers/listeners/polling, and retain unused priority, `oneShot`, and action policy.
-- **Recommended direction:** use one policy evaluator and one measurement observer; make persistence explicit and remove unsupported policy fields.
-- **Deletion test:** each DOM event/observer is registered once and every retained policy field changes behavior.
-- **Validation:** route/workspace changes, target mount/unmount, resize/scroll, dismissal persistence, ordered hints, and accessibility focus.
-
 #### D11. Consolidate canonical workspace-node and document/schema metadata
 
 - **Evidence / strength — Strong:** workspace helpers still include legacy node types, re-export ladders, duplicated document/schema utilities, and test-only builders after generated `WorkspaceNodeInfo` became canonical; examples include [selectionUtils.ts](../frontend/src/features/workspace/common/utils/selectionUtils.ts), [nodeMetadata.ts](../frontend/src/features/views/preprocessing/utils/nodeMetadata.ts), and [schemaMutations.ts](../frontend/src/features/workspace/data-view/services/schemaMutations.ts).
@@ -338,7 +324,6 @@ unreachable callers. Product/external-contract caveats remain where noted.
 | Candidate | Evidence / deletion guard |
 | --- | --- |
 | Topic minimum-size helper | Remove [minTopicSize.ts](../frontend/src/features/views/topic-modeling/components/panels/minTopicSize.ts) after its zero-import check. |
-| Tutorial registry status/warning | Remove dead fields and the impossible warning path in [registryStore.ts](../frontend/src/tutorials/registryStore.ts). |
 | Recent-selection clear | Remove the unused clear action from [recentSelectionsStore.ts](../frontend/src/stores/recentSelectionsStore.ts). |
 | `useZoom` clamp return | Remove the unused return surface from [useZoom.ts](../frontend/src/hooks/useZoom.ts), retaining live zoom behavior. |
 | Tokenizer-order/test helpers | Delete only helpers with zero production and meaningful test consumers; do not erase deliberate contract seams. |
@@ -349,9 +334,6 @@ unreachable callers. Product/external-contract caveats remain where noted.
 
 ### Worth Confirming
 
-- **Bundled documentation pruning:** 25 of 43 registry entries have no literal
-  call site, but remote/offline registries and dynamic-link contracts may still
-  require them. Confirm the product contract before deleting content.
 - **External desktop runtime environment:** confirm whether external deployments
   rely on `.env` / `.env.desktop` loading before removing it. The standard
   packager does not establish that compatibility requirement.
@@ -674,6 +656,31 @@ unreachable callers. Product/external-contract caveats remain where noted.
       mirror visibility actions, operation errors, `closeAllModals`, and
       `setModalOpen`. Every remaining UI-store field/action has a production
       consumer, with shadcn sidebar state kept in its live local provider.
+
+50. Collapse documentation registry and modal contracts (D9)
+    - Done 2026-07-10. `documentationRegistry.ts` now resolves bundled, cached,
+      and remote entries into one target carrying kind, key, file, anchor, and
+      label. Help/info/reference icons, hints, Sidebar, `uiStore`, and
+      `DocumentView` consume that contract through one accessor and one dialog
+      host; the three registry shims, parallel modal maps/slots, impossible
+      warning path, dead refresh status fields, and orphan warning/information/
+      reference index documents are gone. The 43 zero-literal entries were
+      classified as 18 live dynamic targets and 25 retained by the explicit
+      full offline fallback contract. The executable drift check now validates
+      literal keys, registered files/anchors, relative links/assets, document
+      reachability, the tutorial index, and workflow triggers/execution.
+
+51. Give contextual hints one policy, state, and measurement owner (D10)
+    - Done 2026-07-10. `hintsStore` owns permanent/session dismissals and upload
+      follow-up context while persisting only durable user choices. One pure
+      registry-order policy selects eligible anchors; unused priority,
+      `oneShot`, and action fields were removed. `HintOverlay` installs one
+      scroll listener, one resize listener, and one `ResizeObserver` shared by
+      the presentational ring and bubble; polling requests a remeasurement
+      without recreating that lifecycle. Focused tests cover ordering,
+      dismissal persistence, route/modal conditions, target changes, and
+      single observer/listener ownership. The full 190-file / 832-test suite,
+      lint, Knip, production build, docs drift, and `git diff --check` passed.
 
 ## Endpoint And Source-Of-Truth Notes
 

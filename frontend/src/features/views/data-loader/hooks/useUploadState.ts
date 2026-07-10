@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
-import { useUIStore } from '@/stores/uiStore';
+import { useHintsStore } from '@/stores/hintsStore';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -58,7 +58,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
     setUploadingFiles(true);
     let uploadedCount = 0;
     const failedFiles: string[] = [];
-    const setLastUploadedFilePath = useUIStore.getState().setLastUploadedFilePath;
+    const setLastUploadedFilePath = useHintsStore.getState().setLastUploadedFilePath;
     let lastSuccess: string | null = null;
 
     try {

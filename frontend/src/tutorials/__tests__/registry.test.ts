@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BUNDLED_REGISTRY } from '../bundledRegistry';
-import { getDocTarget } from '../getDocTarget';
+import { getDocumentTarget } from '../documentationRegistry';
 import { useRegistryStore, REGISTRY_SCHEMA_VERSION } from '../registryStore';
 import {
   __CACHE_KEY_FOR_TESTS,
@@ -19,8 +19,6 @@ const resetStore = () => {
       reference: { ...BUNDLED_REGISTRY.reference },
     },
     meta: null,
-    lastFetchedAt: null,
-    remoteAttempted: false,
   });
 };
 
@@ -35,9 +33,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('getDocTarget', () => {
+describe('getDocumentTarget', () => {
   it('returns the bundled entry for a known key', () => {
-    const target = getDocTarget('tutorial', 'ui.tool-choice');
+    const target = getDocumentTarget('tutorial', 'ui.tool-choice');
     expect(target).toMatchObject({
       file: 'tutorials/ui.md',
       anchor: 'help-ui-tool-choice',
@@ -45,9 +43,9 @@ describe('getDocTarget', () => {
   });
 
   it('returns null for an unknown key', () => {
-    expect(getDocTarget('tutorial', 'does.not.exist')).toBeNull();
-    expect(getDocTarget('info', 'nope')).toBeNull();
-    expect(getDocTarget('reference', 'nope')).toBeNull();
+    expect(getDocumentTarget('tutorial', 'does.not.exist')).toBeNull();
+    expect(getDocumentTarget('info', 'nope')).toBeNull();
+    expect(getDocumentTarget('reference', 'nope')).toBeNull();
   });
 
   it('lets a remote entry shadow a bundled one', () => {
@@ -61,14 +59,14 @@ describe('getDocTarget', () => {
       },
     });
 
-    expect(getDocTarget('tutorial', 'ui.tool-choice')).toMatchObject({
+    expect(getDocumentTarget('tutorial', 'ui.tool-choice')).toMatchObject({
       file: 'tutorials/ui-v2.md',
       anchor: 'help-ui-tool-choice-v2',
     });
   });
 
   it('lets a remote entry add a new key not present in the bundle', () => {
-    expect(getDocTarget('tutorial', 'new.feature')).toBeNull();
+    expect(getDocumentTarget('tutorial', 'new.feature')).toBeNull();
 
     useRegistryStore.getState().applyRemote({
       tutorial: {
@@ -79,7 +77,7 @@ describe('getDocTarget', () => {
       },
     });
 
-    expect(getDocTarget('tutorial', 'new.feature')).toMatchObject({
+    expect(getDocumentTarget('tutorial', 'new.feature')).toMatchObject({
       file: 'tutorials/new-feature.md',
     });
   });
@@ -94,9 +92,8 @@ describe('loadRemoteRegistry — cache only path', () => {
     await loadRemoteRegistry();
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(useRegistryStore.getState().remoteAttempted).toBe(true);
     // bundled entries still resolve
-    expect(getDocTarget('tutorial', 'ui.tool-choice')).not.toBeNull();
+    expect(getDocumentTarget('tutorial', 'ui.tool-choice')).not.toBeNull();
   });
 
   it('hydrates from cache synchronously when present', async () => {
@@ -118,7 +115,7 @@ describe('loadRemoteRegistry — cache only path', () => {
 
     await loadRemoteRegistry();
 
-    expect(getDocTarget('tutorial', 'cached.only')).toMatchObject({
+    expect(getDocumentTarget('tutorial', 'cached.only')).toMatchObject({
       file: 'tutorials/cached.md',
     });
   });
@@ -137,7 +134,7 @@ describe('loadRemoteRegistry — cache only path', () => {
 
     await loadRemoteRegistry();
 
-    expect(getDocTarget('tutorial', 'stale.entry')).toBeNull();
+    expect(getDocumentTarget('tutorial', 'stale.entry')).toBeNull();
   });
 });
 
@@ -163,7 +160,7 @@ describe('loadRemoteRegistry — network path', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(String(fetchSpy.mock.calls[0]?.[0])).toBe('https://docs.example.com/v0.3/registry.json');
 
-    expect(getDocTarget('tutorial', 'remote.only')).toMatchObject({
+    expect(getDocumentTarget('tutorial', 'remote.only')).toMatchObject({
       file: 'tutorials/remote.md',
     });
     expect(useRegistryStore.getState().meta).toMatchObject({ version: '0.3.0' });
@@ -191,10 +188,9 @@ describe('loadRemoteRegistry — network path', () => {
 
     await loadRemoteRegistry();
 
-    expect(getDocTarget('tutorial', 'cached.survives')).toMatchObject({
+    expect(getDocumentTarget('tutorial', 'cached.survives')).toMatchObject({
       file: 'tutorials/cached.md',
     });
-    expect(useRegistryStore.getState().remoteAttempted).toBe(true);
   });
 
   it('is idempotent — repeated calls reuse the in-flight promise', async () => {

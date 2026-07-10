@@ -1,8 +1,8 @@
 import { DocLinkIcon } from './DocLinkIcon';
-import type { TutorialTargetKey } from '@/tutorials/tutorialRegistry';
+import type { DocumentKey } from '@/tutorials/documentationRegistry';
 
 interface HelpIconProps {
-  targetKey: TutorialTargetKey | (string & {});
+  targetKey: DocumentKey<'tutorial'>;
   label?: string;
   tooltip?: string;
   className?: string;

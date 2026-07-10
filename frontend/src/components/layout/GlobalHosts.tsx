@@ -19,10 +19,10 @@ const FeedbackPanel = lazy(() =>
  * toast queue.
  */
 export function GlobalHosts() {
-  const { feedbackOpen, closeModal } = useUIStore(
+  const { feedbackOpen, closeFeedback } = useUIStore(
     useShallow((state) => ({
-      feedbackOpen: state.modals.feedback,
-      closeModal: state.closeModal,
+      feedbackOpen: state.feedbackOpen,
+      closeFeedback: state.closeFeedback,
     })),
   );
 
@@ -32,7 +32,7 @@ export function GlobalHosts() {
         <FeedbackPanel
           open={feedbackOpen}
           onClose={() => {
-            closeModal('feedback');
+            closeFeedback();
           }}
         />
       </Suspense>
