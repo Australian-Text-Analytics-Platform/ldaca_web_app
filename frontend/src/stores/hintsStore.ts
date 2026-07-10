@@ -3,7 +3,7 @@ import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 interface HintsState {
-  /** Hints the user has permanently dismissed via "Got it". */
+  /** Hints the user has permanently dismissed via "Don't show again". */
   dismissedHints: string[];
   /** Master toggle. When false, no hints are shown. */
   hintsEnabled: boolean;

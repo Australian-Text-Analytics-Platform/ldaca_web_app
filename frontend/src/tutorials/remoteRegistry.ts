@@ -15,9 +15,9 @@ import {
  *     On success, replace the merged registry + rewrite the cache. On
  *     failure, leave the cached payload in place and log to debug.
  *
- * Skips both steps if `VITE_DOCS_BASE_URL` is empty / unset — that's the
- * "bundled-only build" mode used in offline dev and on pre-3.10B
- * releases.
+ * Cache hydration always runs. If `VITE_DOCS_BASE_URL` is empty / unset,
+ * only the network refresh is skipped; bundled docs plus any valid cache
+ * remain available for offline builds.
  */
 
 const CACHE_KEY = 'ldaca.docs.registry.v1';

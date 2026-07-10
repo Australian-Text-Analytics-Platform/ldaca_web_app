@@ -72,6 +72,111 @@ describe('documentation drift validation', () => {
     expect(problems.some((problem) => problem.includes('example.com'))).toBe(false);
   });
 
+  it('resolves nested document links relative to the current document', () => {
+    const problems = collectDocumentationProblems({
+      registry: {
+        tutorial: {
+          current: {
+            file: 'tutorials/guides/current.md',
+            anchor: 'help-current',
+          },
+        },
+        info: {},
+        reference: {},
+      },
+      documents: new Map([
+        [
+          'tutorials/guides/current.md',
+          '<h1 id="help-current">Current</h1>\n[Next](tutorials/next.md#help-next)',
+        ],
+        ['tutorials/next.md', '<h2 id="help-next">Next</h2>'],
+      ]),
+    });
+
+    expect(problems).toContain(
+      'tutorials/guides/current.md links to missing relative file tutorials/guides/tutorials/next.md',
+    );
+  });
+
+  it('resolves leading-slash document links from the public root', () => {
+    const problems = collectDocumentationProblems({
+      registry: {
+        tutorial: {
+          current: {
+            file: 'tutorials/guides/current.md',
+            anchor: 'help-current',
+          },
+        },
+        info: {},
+        reference: {},
+      },
+      documents: new Map([
+        [
+          'tutorials/guides/current.md',
+          '<h1 id="help-current">Current</h1>\n[Next](/tutorials/next.md#help-next)',
+        ],
+        ['tutorials/next.md', '<h2 id="help-next">Next</h2>'],
+      ]),
+    });
+
+    expect(problems).toEqual([]);
+  });
+
+  it('resolves nested document images from the public root with or without a leading slash', () => {
+    const documents = new Map([
+      [
+        'tutorials/guides/current.md',
+        [
+          '<h1 id="help-current">Current</h1>',
+          '![Public asset](tutorials/assets/x.png)',
+          '<img alt="Root asset" src="/tutorials/assets/y.png">',
+          '<a href="tutorials/assets/z.png">Linked asset</a>',
+        ].join('\n'),
+      ],
+    ]);
+    const problems = collectDocumentationProblems({
+      registry: {
+        tutorial: {
+          current: {
+            file: 'tutorials/guides/current.md',
+            anchor: 'help-current',
+          },
+        },
+        info: {},
+        reference: {},
+      },
+      documents,
+      availablePaths: new Set([
+        ...documents.keys(),
+        'tutorials/assets/x.png',
+        'tutorials/assets/y.png',
+        'tutorials/assets/z.png',
+      ]),
+    });
+
+    expect(problems).toEqual([]);
+  });
+
+  it('rejects anchors that exist only as Markdown headings', () => {
+    const problems = collectDocumentationProblems({
+      registry: {
+        tutorial: {
+          heading: {
+            file: 'tutorials/heading.md',
+            anchor: 'markdown-heading',
+          },
+        },
+        info: {},
+        reference: {},
+      },
+      documents: new Map([['tutorials/heading.md', '# Markdown heading']]),
+    });
+
+    expect(problems).toContain(
+      'tutorial:heading points to missing anchor #markdown-heading in tutorials/heading.md',
+    );
+  });
+
   it('reports orphan documents outside the registered and linked graph', () => {
     const problems = collectDocumentationProblems({
       registry: {

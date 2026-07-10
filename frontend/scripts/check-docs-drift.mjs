@@ -31,10 +31,10 @@ const LITERAL_RE = new RegExp(
   'g',
 );
 
-const MARKDOWN_LINK_RE = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g;
-const HTML_LINK_RE = /<(?:a|img)\b[^>]*?\b(?:href|src)=["']([^"']+)["']/gi;
+const MARKDOWN_LINK_RE = /(!?)\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g;
+const HTML_ANCHOR_RE = /<a\b[^>]*?\bhref=["']([^"']+)["']/gi;
+const HTML_IMAGE_RE = /<img\b[^>]*?\bsrc=["']([^"']+)["']/gi;
 const EXTERNAL_LINK_RE = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
-const PUBLIC_DOC_ROOTS = new Set(['information', 'references', 'tutorials', 'warnings']);
 
 /** Recursively lists files in stable lexical order. */
 async function walk(directory) {
@@ -48,41 +48,34 @@ async function walk(directory) {
   return paths;
 }
 
-/** Extracts explicit HTML ids plus ordinary Markdown heading ids. */
+/** Extracts only anchors that the current ReactMarkdown pipeline renders. */
 function collectAnchors(markdown) {
   const anchors = new Set();
   for (const match of markdown.matchAll(/\b(?:id|name)=["']([^"']+)["']/gi)) {
     anchors.add(match[1]);
   }
-
-  const headingCounts = new Map();
-  for (const line of markdown.split(/\r?\n/)) {
-    const heading = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)?.[1];
-    if (!heading) continue;
-    const base = heading
-      .replace(/`([^`]*)`/g, '$1')
-      .replace(/!?\[([^\]]+)\]\([^)]*\)/g, '$1')
-      .replace(/<[^>]+>/g, '')
-      .replace(/[^\p{L}\p{N}\s_-]/gu, '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '-');
-    if (!base) continue;
-    const duplicateIndex = headingCounts.get(base) ?? 0;
-    headingCounts.set(base, duplicateIndex + 1);
-    anchors.add(duplicateIndex === 0 ? base : `${base}-${duplicateIndex}`);
-  }
   return anchors;
 }
 
-/** Returns Markdown and HTML relative links from one document. */
+/** Returns document anchors and images without erasing their runtime semantics. */
 function collectLinks(markdown) {
-  return [...markdown.matchAll(MARKDOWN_LINK_RE), ...markdown.matchAll(HTML_LINK_RE)].map(
-    (match) => match[1],
-  );
+  return [
+    ...[...markdown.matchAll(MARKDOWN_LINK_RE)].map((match) => ({
+      kind: match[1] ? 'image' : 'anchor',
+      rawTarget: match[2],
+    })),
+    ...[...markdown.matchAll(HTML_ANCHOR_RE)].map((match) => ({
+      kind: 'anchor',
+      rawTarget: match[1],
+    })),
+    ...[...markdown.matchAll(HTML_IMAGE_RE)].map((match) => ({
+      kind: 'image',
+      rawTarget: match[1],
+    })),
+  ];
 }
 
-function normalizeRelativeTarget(sourcePath, rawTarget) {
+function normalizeRelativeTarget(sourcePath, { kind, rawTarget }) {
   const target = rawTarget.replace(/^<|>$/g, '');
   if (!target || EXTERNAL_LINK_RE.test(target)) return null;
 
@@ -99,13 +92,19 @@ function normalizeRelativeTarget(sourcePath, rawTarget) {
     return { invalid: true, rawTarget };
   }
 
-  const firstSegment = decodedPath.split('/')[0];
+  // DocumentView intercepts only Markdown documents (plus hash-only links).
+  // Images and non-Markdown hrefs pass through to the browser and follow the
+  // public-root asset convention used by the bundled documentation.
+  const resolvedKind =
+    kind === 'image' || (decodedPath && !decodedPath.toLowerCase().endsWith('.md'))
+      ? 'asset'
+      : 'document';
   const targetPath = decodedPath
-    ? decodedPath.startsWith('/') || PUBLIC_DOC_ROOTS.has(firstSegment)
+    ? resolvedKind === 'asset' || decodedPath.startsWith('/')
       ? posix.normalize(decodedPath.replace(/^\/+/, ''))
       : posix.normalize(posix.join(posix.dirname(sourcePath), decodedPath))
     : sourcePath;
-  return { targetPath, anchor: decodedAnchor };
+  return { kind: resolvedKind, targetPath, anchor: decodedAnchor };
 }
 
 /**
@@ -150,11 +149,11 @@ export function collectDocumentationProblems({
     const outgoingDocuments = new Set();
     const reportedMissingPaths = new Set();
     const reportedMissingAnchors = new Set();
-    for (const rawTarget of collectLinks(markdown)) {
-      const resolved = normalizeRelativeTarget(sourcePath, rawTarget);
+    for (const link of collectLinks(markdown)) {
+      const resolved = normalizeRelativeTarget(sourcePath, link);
       if (!resolved) continue;
       if ('invalid' in resolved) {
-        problems.push(`${sourcePath} contains an invalid relative link ${rawTarget}`);
+        problems.push(`${sourcePath} contains an invalid relative link ${link.rawTarget}`);
         continue;
       }
       if (!availablePaths.has(resolved.targetPath)) {
@@ -164,8 +163,11 @@ export function collectDocumentationProblems({
         }
         continue;
       }
-      if (documents.has(resolved.targetPath)) outgoingDocuments.add(resolved.targetPath);
+      if (resolved.kind === 'document' && documents.has(resolved.targetPath)) {
+        outgoingDocuments.add(resolved.targetPath);
+      }
       if (
+        resolved.kind === 'document' &&
         resolved.anchor &&
         documents.has(resolved.targetPath) &&
         !anchorsByPath.get(resolved.targetPath)?.has(resolved.anchor) &&
