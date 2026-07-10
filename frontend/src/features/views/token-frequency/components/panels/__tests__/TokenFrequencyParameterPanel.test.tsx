@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TokenFrequencyParameterPanel } from '../TokenFrequencyParameterPanel';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 vi.mock('@/components/help/HelpIcon', () => ({
   // Used by: panel tests so help widgets do not add tooltip behavior to layout assertions.
@@ -31,8 +32,10 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
   NodeInputsPanel: () => <div data-testid="node-inputs-panel" />,
 }));
 
-const nodeInputsFixture = (): UseTabNodeInputsResult =>
-  ({
+const nodeInputsFixture = (): UseTabNodeInputsResult => {
+  const nodeA = projectWorkspaceNodeMetadata({ id: 'node-a', name: 'Corpus A' });
+  const nodeB = projectWorkspaceNodeMetadata({ id: 'node-b', name: 'Corpus B' });
+  return {
     inputs: [
       { node_id: 'node-a', column: 'text' },
       { node_id: 'node-b', column: 'text' },
@@ -41,22 +44,19 @@ const nodeInputsFixture = (): UseTabNodeInputsResult =>
       {
         id: 'node-a',
         name: 'Corpus A',
-        node: { id: 'node-a', name: 'Corpus A' },
+        node: nodeA,
         column: 'text',
         columnOptions: [{ name: 'text', dataType: 'string' }],
       },
       {
         id: 'node-b',
         name: 'Corpus B',
-        node: { id: 'node-b', name: 'Corpus B' },
+        node: nodeB,
         column: 'text',
         columnOptions: [{ name: 'text', dataType: 'string' }],
       },
     ],
-    selectedNodes: [
-      { id: 'node-a', name: 'Corpus A' },
-      { id: 'node-b', name: 'Corpus B' },
-    ],
+    selectedNodes: [nodeA, nodeB],
     nodeColumnSelections: [
       { nodeId: 'node-a', column: 'text' },
       { nodeId: 'node-b', column: 'text' },
@@ -74,7 +74,8 @@ const nodeInputsFixture = (): UseTabNodeInputsResult =>
     nodeInfoCache: {},
     getColumnInfos: vi.fn(() => []),
     getNodeInfo: vi.fn(() => undefined),
-  });
+  };
+};
 
 const baseProps = {
   nodeInputs: nodeInputsFixture(),
