@@ -1,42 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { NodeInput } from '../nodeInputsCore';
 import { useNodeInputs } from '../useNodeInputs';
 
 describe('useNodeInputs', () => {
-  it.each([
-    { maxNodes: 2, expectedIds: ['node-11', 'node-12'] },
-    { maxNodes: 6, expectedIds: ['node-7', 'node-8', 'node-9', 'node-10', 'node-11', 'node-12'] },
-  ])(
-    'normalizes restored inputs to the most recent $maxNodes entries and persists them',
-    ({ maxNodes, expectedIds }) => {
-      const onChange = vi.fn<(next: NodeInput[]) => void>();
-      const allNodes = Array.from({ length: 12 }, (_, index) => ({
-        id: `node-${String(index + 1)}`,
-        name: `Node ${String(index + 1)}`,
-        columns: ['text'],
-        schema: { text: 'String' },
-      }));
-      const value = allNodes.map((node) => ({ node_id: node.id, column: 'text' }));
-
-      const { result } = renderHook(() =>
-        useNodeInputs({
-          value,
-          onChange,
-          allNodes,
-          constraints: { allowedDataTypes: ['string'], maxNodes },
-        }),
-      );
-
-      expect(result.current.inputs.map((input) => input.node_id)).toEqual(expectedIds);
-      expect(result.current.resolvedNodes.map((node) => node.id)).toEqual(expectedIds);
-      expect(onChange).toHaveBeenCalledOnce();
-      expect(onChange.mock.calls[0]?.[0].map((input) => input.node_id)).toEqual(expectedIds);
-    },
-  );
-
   it.each([
     { maxNodes: 2, initialCount: 1 },
     { maxNodes: 6, initialCount: 5 },

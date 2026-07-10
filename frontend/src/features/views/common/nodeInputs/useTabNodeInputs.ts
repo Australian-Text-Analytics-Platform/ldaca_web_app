@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -70,12 +70,11 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
  * focus) to drive {@link NodeInputsPanel} and build run requests. Keeping it
  * here makes each feature's migration a thin call instead of repeated wiring.
  *
- * Flow: resolve the requested selector id from ``input_sets``, read live nodes
- * + graph selection, fetch
- * node-info metadata for the already-selected nodes, delegate to
- * ``useNodeInputs`` with the selector's value and required tab writer, then
- * consume graph/sidebar "+" requests directly by default, reporting structural
- * add rejections with a toast. Multi-selector features pass
+ * Flow: resolve the requested selector id from ``input_sets``, cap restored
+ * state once at this named owner and persist that normalization, fetch metadata
+ * only for the stable effective inputs, delegate those same inputs to
+ * ``useNodeInputs``, then consume graph/sidebar "+" requests directly by
+ * default and report structural add rejections with a toast. Multi-selector features pass
  * ``consumeNodeInputRequests: false`` on every participating selector so the
  * request stays pending and the visible ``NodeInputsPanel`` instances render
  * the dashed chooser instead.
@@ -97,19 +96,48 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     () => getTabInputSet({ input_sets: tabInputSets }, selectorId),
     [selectorId, tabInputSets],
   );
+  const maxNodes = constraints.maxNodes;
+  // This memo is an identity contract, not a render optimization: while the
+  // backing owner reconciles restored over-limit state, metadata hydration and
+  // every low-level selector callback must share one stable capped array.
+  const effectiveValue = useMemo(
+    () => (maxNodes != null && value.length > maxNodes ? value.slice(-maxNodes) : value),
+    [maxNodes, value],
+  );
   const onChange = useCallback(
     (nextInputs: AnalysisTabInput[]) => {
       onTabInputSetChange(selectorId, nextInputs);
     },
     [selectorId, onTabInputSetChange],
   );
+  const normalizationSnapshot = JSON.stringify({
+    workspaceId: currentWorkspaceId ?? null,
+    selectorId,
+    maxNodes: maxNodes ?? null,
+    inputs: value.map((input) => [input.node_id, input.column ?? null]),
+  });
+  const lastNormalizedSnapshotRef = useRef<string | null>(null);
+
+  // Triggered by restored input or owner changes. Flow: clear the dedupe marker
+  // after reconciliation, skip StrictMode/callback replays of the same content
+  // snapshot, otherwise record before issuing the single owner write.
+  useEffect(() => {
+    if (effectiveValue === value) {
+      lastNormalizedSnapshotRef.current = null;
+      return;
+    }
+    if (lastNormalizedSnapshotRef.current === normalizationSnapshot) return;
+
+    lastNormalizedSnapshotRef.current = normalizationSnapshot;
+    onChange(effectiveValue);
+  }, [effectiveValue, normalizationSnapshot, onChange, value]);
 
   // Typed columns for the already-selected nodes; getColumnInfos falls back to
   // the node snapshot for any node not in this query set (e.g. add candidates).
   const selectedNodeObjs = useMemo(() => {
-    const ids = new Set(value.map((i) => i.node_id));
+    const ids = new Set(effectiveValue.map((i) => i.node_id));
     return allNodes.filter((node) => ids.has(getNodeIdentifier(node)));
-  }, [allNodes, value]);
+  }, [allNodes, effectiveValue]);
 
   const { getColumnInfos, getNodeInfo, nodeInfoCache } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -117,7 +145,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   });
 
   const result = useNodeInputs({
-    value,
+    value: effectiveValue,
     onChange,
     allNodes,
     constraints,

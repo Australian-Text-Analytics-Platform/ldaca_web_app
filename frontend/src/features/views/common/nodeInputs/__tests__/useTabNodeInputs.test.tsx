@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
@@ -255,35 +256,140 @@ describe('useTabNodeInputs', () => {
     expect(consume).toHaveBeenCalledWith(maxNodes);
   });
 
-  it.each([2, 6])('persists restored over-limit inputs through the named tab owner at cap %i', (maxNodes) => {
+  it.each([2, 6])(
+    'normalizes cap %i once with stable identities and capped metadata under StrictMode',
+    (maxNodes) => {
+      const nodes = Array.from({ length: 12 }, (_, index) => ({
+        id: `node-${String(index + 1)}`,
+        name: `Node ${String(index + 1)}`,
+        columns: ['text'],
+        schema: { text: 'String' },
+      }));
+      const rawInputs = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
+      const tabInputSets = { source: rawInputs };
+      const constraints = { allowedDataTypes: ['string'], maxNodes };
+      const onTabInputSetChange = vi.fn();
+      mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
+
+      const { result, rerender } = renderHook(
+        () =>
+          useTabNodeInputs({
+            selectorId: 'source',
+            tabInputSets,
+            onTabInputSetChange,
+            constraints,
+            consumeNodeInputRequests: false,
+          }),
+        { wrapper: StrictMode },
+      );
+
+      const expectedIds = nodes.slice(-maxNodes).map((node) => node.id);
+      const firstInputs = result.current.inputs;
+      const firstActions = {
+        addNodes: result.current.addNodes,
+        getAddRejection: result.current.getAddRejection,
+        removeNode: result.current.removeNode,
+        clear: result.current.clear,
+        setColumn: result.current.setColumn,
+      };
+
+      rerender();
+
+      expect(result.current.inputs.map((input) => input.node_id)).toEqual(expectedIds);
+      expect(result.current.inputs).toBe(firstInputs);
+      expect(result.current.addNodes).toBe(firstActions.addNodes);
+      expect(result.current.getAddRejection).toBe(firstActions.getAddRejection);
+      expect(result.current.removeNode).toBe(firstActions.removeNode);
+      expect(result.current.clear).toBe(firstActions.clear);
+      expect(result.current.setColumn).toBe(firstActions.setColumn);
+      expect(mocks.useNodeColumnInfos).toHaveBeenCalled();
+      mocks.useNodeColumnInfos.mock.calls.forEach(([options]) => {
+        expect((options.nodes as { id: string }[]).map((node) => node.id)).toEqual(expectedIds);
+      });
+      expect(onTabInputSetChange).toHaveBeenCalledOnce();
+      expect(onTabInputSetChange.mock.calls[0]?.[0]).toBe('source');
+      expect(
+        onTabInputSetChange.mock.calls[0]?.[1].map((input: { node_id: string }) => input.node_id),
+      ).toEqual(expectedIds);
+    },
+  );
+
+  it('does not repeat normalization when only the owner callback identity changes', () => {
     const nodes = Array.from({ length: 12 }, (_, index) => ({
       id: `node-${String(index + 1)}`,
       name: `Node ${String(index + 1)}`,
       columns: ['text'],
       schema: { text: 'String' },
     }));
+    const source = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
+    const constraints = { allowedDataTypes: ['string'], maxNodes: 2 };
+    const firstOwner = vi.fn();
+    const secondOwner = vi.fn();
+    mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
+
+    const { rerender } = renderHook(
+      ({ onTabInputSetChange, source: currentSource }) =>
+        useTabNodeInputs({
+          tabInputSets: { source: currentSource },
+          onTabInputSetChange,
+          constraints,
+          consumeNodeInputRequests: false,
+        }),
+      {
+        initialProps: { onTabInputSetChange: firstOwner, source },
+        wrapper: StrictMode,
+      },
+    );
+
+    rerender({
+      onTabInputSetChange: secondOwner,
+      source: source.map((input) => ({ ...input })),
+    });
+
+    expect(firstOwner).toHaveBeenCalledOnce();
+    expect(secondOwner).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a genuinely new over-limit input snapshot', () => {
+    const nodes = Array.from({ length: 13 }, (_, index) => ({
+      id: `node-${String(index + 1)}`,
+      name: `Node ${String(index + 1)}`,
+      columns: ['text'],
+      schema: { text: 'String' },
+    }));
+    const constraints = { allowedDataTypes: ['string'], maxNodes: 2 };
     const onTabInputSetChange = vi.fn();
     mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
 
-    const { result } = renderHook(() =>
-      useTabNodeInputs({
-        selectorId: 'source',
-        tabInputSets: {
-          source: nodes.map((node) => ({ node_id: node.id, column: 'text' })),
+    const { rerender } = renderHook(
+      ({ source }) =>
+        useTabNodeInputs({
+          tabInputSets: { source },
+          onTabInputSetChange,
+          constraints,
+          consumeNodeInputRequests: false,
+        }),
+      {
+        initialProps: {
+          source: nodes.slice(0, 12).map((node) => ({ node_id: node.id, column: 'text' })),
         },
-        onTabInputSetChange,
-        constraints: { allowedDataTypes: ['string'], maxNodes },
-        consumeNodeInputRequests: false,
-      }),
+        wrapper: StrictMode,
+      },
     );
 
-    const expectedIds = nodes.slice(-maxNodes).map((node) => node.id);
-    expect(result.current.inputs.map((input) => input.node_id)).toEqual(expectedIds);
-    expect(onTabInputSetChange).toHaveBeenCalledOnce();
-    expect(onTabInputSetChange.mock.calls[0]?.[0]).toBe('source');
+    rerender({
+      source: nodes.slice(1, 13).map((node) => ({ node_id: node.id, column: 'text' })),
+    });
+
+    expect(onTabInputSetChange).toHaveBeenCalledTimes(2);
     expect(
-      onTabInputSetChange.mock.calls[0]?.[1].map((input: { node_id: string }) => input.node_id),
-    ).toEqual(expectedIds);
+      onTabInputSetChange.mock.calls.map(([, inputs]) =>
+        inputs.map((input: { node_id: string }) => input.node_id),
+      ),
+    ).toEqual([
+      ['node-11', 'node-12'],
+      ['node-12', 'node-13'],
+    ]);
   });
 
   it('leaves current-view add requests pending when direct consumption is disabled', () => {
