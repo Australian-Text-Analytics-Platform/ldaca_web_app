@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { AnalysisTabInput } from '@/api';
 import {
-  annotateAiPreviewClear,
   createAnnotationClassDescriptions,
   createAnnotationColumn,
   setAnnotationClassParent,
@@ -52,6 +51,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAnnotationClassDescriptions } from './hooks/useAnnotationClassDescriptions';
+import { useAnnotationAiPreviewSession } from './hooks/useAnnotationAiPreviewSession';
 
 const SOURCE_NODE_CONSTRAINTS: NodeInputConstraints = {
   allowedDataTypes: ['string'],
@@ -166,7 +166,6 @@ function AnnotationFeature({
   tabSettings,
   onTabSettingChange,
 }: AnnotationFeatureProps) {
-  const [annotationColumns, setAnnotationColumns] = useState<Record<string, string>>({});
   const [descriptionColumns, setDescriptionColumns] = useState<Record<string, string>>({});
   const [newColumnNames, setNewColumnNames] = useState<Record<string, string>>({});
   const [isCreatingClassNode, setIsCreatingClassNode] = useState(false);
@@ -194,6 +193,8 @@ function AnnotationFeature({
     setAiReasoningEffort,
     isPreviewing,
     setIsPreviewing,
+    annotationTargets,
+    setAnnotationTarget,
   } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
   const annotationAiApiKeys = usePreferencesStore((s) => s.annotationAiApiKeys);
   const annotationAiCustomProviders = usePreferencesStore((s) => s.annotationAiCustomProviders);
@@ -280,7 +281,7 @@ function AnnotationFeature({
   });
 
   const renderAnnotationColumnPicker = ({ nodeId, columns }: NodeInputColumnAddonArgs) => {
-    const value = annotationColumns[nodeId] ?? START_NEW_ANNOTATION_VALUE;
+    const value = annotationTargets[nodeId] ?? START_NEW_ANNOTATION_VALUE;
     return (
       <AnnotationColumnPicker
         label="Annotation Column"
@@ -292,7 +293,7 @@ function AnnotationFeature({
           ...columns.map((column) => ({ value: column, label: column })),
         ]}
         onValueChange={(next) => {
-          setAnnotationColumns((current) => ({ ...current, [nodeId]: next }));
+          setAnnotationTarget(nodeId, next);
         }}
       />
     );
@@ -316,7 +317,7 @@ function AnnotationFeature({
   };
 
   const renderNewAnnotationColumnInput = ({ nodeId, columns }: NodeInputColumnAddonArgs) => {
-    const annotationColumn = annotationColumns[nodeId] ?? START_NEW_ANNOTATION_VALUE;
+    const annotationColumn = annotationTargets[nodeId] ?? START_NEW_ANNOTATION_VALUE;
     if (annotationColumn !== START_NEW_ANNOTATION_VALUE) return null;
     const defaultName = computeDefaultAnnotationColumnName(columns);
     const inputId = `annotation-new-column-name-${nodeId}`;
@@ -413,7 +414,7 @@ function AnnotationFeature({
   // pass, while picking an existing column resumes annotating that column.
   const sourceNode = sourceNodeInputs.resolvedNodes[0] ?? null;
   const sourceAnnotationColumn = sourceNode
-    ? (annotationColumns[sourceNode.id] ?? START_NEW_ANNOTATION_VALUE)
+    ? (annotationTargets[sourceNode.id] ?? START_NEW_ANNOTATION_VALUE)
     : START_NEW_ANNOTATION_VALUE;
   const isStartNewAnnotation = sourceAnnotationColumn === START_NEW_ANNOTATION_VALUE;
   const sourceColumns = sourceNode?.columnOptions.map((option) => option.name) ?? [];
@@ -479,7 +480,7 @@ function AnnotationFeature({
         }),
       ]);
       // Switch from "Start new annotation" to resuming the new column, then lock.
-      setAnnotationColumns((current) => ({ ...current, [sourceNode.id]: columnName }));
+      setAnnotationTarget(sourceNode.id, columnName);
       setHasRun(true);
       return true;
     } catch (error) {
@@ -491,45 +492,57 @@ function AnnotationFeature({
     }
   };
 
-  // AI Preview button: open/close the preview panel. AI mode has no Resume — a
-  // single batch fills every cell — so the button is always Preview. Opening it
-  // reuses the manual Start lifecycle (handleRunAnnotation) so the first Preview
-  // for a "Start new annotation" column creates that column, reparents the class
-  // node, switches the picker into resume mode, and locks the selectors (the
-  // class Edit button stays enabled, exactly as in manual mode). The panel only
-  // opens once the run is locked so its first page fetch already sees the freshly
-  // created column. Closing the preview unlocks the parameter panel (like manual
-  // Reset): handleReset keeps the source pointed at the created column, so
-  // reopening resumes it and never recreates the column. Closing also drops the
-  // server-side preview cache for this node — unlike a tab switch (which only
-  // unmounts the panel and must keep the cache so it can rehydrate), an explicit
-  // close means the predictions are no longer wanted, so reopening re-classifies
-  // from scratch and no stale detach/annotate-all count lingers. The clear is
-  // fire-and-forget: a failed cleanup must never block closing the panel.
-  const handleToggleAiPreview = async () => {
-    if (isPreviewing) {
-      setIsPreviewing(false);
-      handleReset();
-      if (currentWorkspaceId && sourceNode) {
-        void annotateAiPreviewClear({
-          path: { workspace_id: currentWorkspaceId, node_id: sourceNode.id },
-          throwOnError: true,
-        }).catch((error: unknown) => {
-          console.warn('[annotation] Failed to clear AI preview cache:', error);
-        });
-      }
-      return;
-    }
-    const started = hasRun || (await handleRunAnnotation());
-    if (started) setIsPreviewing(true);
-  };
-
   // Reset: clear the results and unlock the setup, but keep the source node
   // pointed at the column Start created — the card returns to resume mode on
   // that same column, not to "Start new annotation". Clicking the button again
   // (now "Resume") simply re-reveals the results for that column.
   const handleReset = () => {
     setHasRun(false);
+  };
+
+  // Keep the session owner mounted even while its renderer is closed. Explicit
+  // Close clears server/client preview state, whereas a tab unmount only cancels
+  // in-flight browser requests so the backend session can hydrate on return.
+  const persistedPreviewTarget = sourceNode ? annotationTargets[sourceNode.id] : undefined;
+  const hasInvalidPersistedPreviewTarget = Boolean(
+    isPreviewing &&
+      sourceNode &&
+      !hasRun &&
+      (!persistedPreviewTarget ||
+        persistedPreviewTarget === START_NEW_ANNOTATION_VALUE ||
+        !sourceColumns.includes(persistedPreviewTarget)),
+  );
+  const aiPreviewSession = useAnnotationAiPreviewSession({
+    workspaceId: currentWorkspaceId ?? null,
+    nodeId: sourceNode?.id ?? null,
+    textColumn: sourceNode?.column ?? '',
+    annotationColumn: resolvedAnnotationColumn,
+    classNodeId: classDescriptionNode?.id ?? null,
+    classColumn: classDescriptionClassColumn,
+    descriptionColumn: classDescriptionDescriptionColumn,
+    providerId: resolvedAiProvider?.requestProviderId ?? '',
+    baseUrl: resolvedAiProvider?.baseUrl ?? null,
+    apiKey: aiApiKey,
+    model: aiModel,
+    systemPrompt: resolvedSystemPrompt,
+    temperature: aiTemperature,
+    reasoningEnabled: aiReasoningEnabled,
+    reasoningEffort: aiReasoningEffort,
+    isOpen: isPreviewing,
+    targetValid: !hasInvalidPersistedPreviewTarget,
+    onOpenChange: setIsPreviewing,
+    prepareOpen: async () => hasRun || handleRunAnnotation(),
+    onExplicitClose: handleReset,
+  });
+
+  /** Opens a prepared session or performs the explicit clear-and-unlock close. */
+  /** Passed to: the AI-mode footer button. */
+  const handleToggleAiPreview = async () => {
+    if (isPreviewing) {
+      await aiPreviewSession.commands.close();
+    } else {
+      await aiPreviewSession.commands.open();
+    }
   };
 
   return (
@@ -556,7 +569,11 @@ function AnnotationFeature({
               ) : (
                 <Button
                   type="button"
-                  disabled={!isPreviewing && (!canPreviewAi || isStarting)}
+                  disabled={
+                    isPreviewing
+                      ? !aiPreviewSession.commands.canToggle
+                      : !canPreviewAi || isStarting
+                  }
                   onClick={() => {
                     void handleToggleAiPreview();
                   }}
@@ -751,25 +768,17 @@ function AnnotationFeature({
           descriptionColumn={classDescriptionDescriptionColumn}
         />
       ) : null}
-      {annotationMode === 'ai' && isPreviewing && sourceNode && resolvedAiProvider ? (
-        <AnnotationAiPreviewPanel
-          key={`${sourceNode.id}:${resolvedAnnotationColumn}:${resolvedAiProvider.id}:${aiModel}`}
-          workspaceId={currentWorkspaceId ?? null}
-          nodeId={sourceNode.id}
-          textColumn={sourceNode.column}
-          annotationColumn={resolvedAnnotationColumn}
-          classNodeId={classDescriptionNode?.id ?? null}
-          classColumn={classDescriptionClassColumn}
-          descriptionColumn={classDescriptionDescriptionColumn}
-          providerId={resolvedAiProvider.requestProviderId}
-          baseUrl={resolvedAiProvider.baseUrl ?? null}
-          apiKey={aiApiKey}
-          model={aiModel}
-          systemPrompt={resolvedSystemPrompt}
-          temperature={aiTemperature}
-          reasoningEnabled={aiReasoningEnabled}
-          reasoningEffort={aiReasoningEffort}
-        />
+      {annotationMode === 'ai' && isPreviewing && hasInvalidPersistedPreviewTarget ? (
+        <section
+          role="alert"
+          aria-label="Invalid AI preview target"
+          className="mt-5 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive"
+        >
+          The annotation column saved for this preview is missing. Close the preview and choose an
+          existing annotation column before opening it again.
+        </section>
+      ) : annotationMode === 'ai' && isPreviewing && sourceNode && resolvedAiProvider ? (
+        <AnnotationAiPreviewPanel session={aiPreviewSession} />
       ) : null}
     </section>
   );

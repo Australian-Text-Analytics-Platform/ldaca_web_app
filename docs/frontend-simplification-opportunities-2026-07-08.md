@@ -90,20 +90,6 @@ settled before deletion.
 
 ### Deep modularity opportunities
 
-#### M1. Extract an Annotation AI preview-session boundary
-
-- **Evidence / strength — Strong:** [AnnotationAiPreviewPanel.tsx](../frontend/src/features/views/annotation/components/AnnotationAiPreviewPanel.tsx) owns query/session hydration, signatures, overrides, annotation, detach/cache/dialog/table behavior, while repeated node-page and class-description queries span adjacent annotation owners.
-- **Recommended direction:** introduce a deep `useAnnotationAiPreviewSession`-style recommendation that owns the lifecycle and exposes domain commands/state; share repeated queries without changing signatures or refetch semantics.
-- **Deletion test:** the panel becomes rendering/composition, and moving the hook back would reintroduce substantial cohesive lifecycle logic rather than a cosmetic wrapper.
-- **Validation:** hydrate/new session, signature change, override, annotate-all, detach, cache refresh, pagination, cancellation, and stale task completion.
-
-#### M2. Move Sequential result shaping into the chart model
-
-- **Evidence / strength — Strong:** [useSequentialResultSummary.ts](../frontend/src/features/views/sequential-analysis/hooks/useSequentialResultSummary.ts), [useSequentialChartControls.ts](../frontend/src/features/views/sequential-analysis/hooks/useSequentialChartControls.ts), and [SequentialChart.tsx](../frontend/src/features/views/sequential-analysis/components/SequentialChart.tsx) split substantial pure result shaping across async hooks and rendering.
-- **Recommended direction:** extend the existing pure chart-model domain to accept result inputs and return render-ready series/labels/selection metadata; hooks retain async/task ownership.
-- **Deletion test:** hooks stop rebuilding chart-domain structures and the pure model can be tested without React.
-- **Validation:** empty/single/multi-series, selection, normalization, tooltip/legend, export, resize, and malformed/partial result handling.
-
 #### M3. Normalize quotation rows and highlights once
 
 - **Evidence / strength — Strong:** [quotationResultsModel.ts](../frontend/src/features/views/quotation/quotationResultsModel.ts), [quotationHighlight.ts](../frontend/src/features/views/quotation/quotationHighlight.ts), [quotationCellText.ts](../frontend/src/features/views/quotation/quotationCellText.ts), and renderer helpers repeat row/highlight/materialization parsing.
@@ -693,6 +679,50 @@ unreachable callers. Product/external-contract caveats remain where noted.
       scan (616 files / zero cycles), comment-template/path/empty-block scans,
       and staged plus unstaged `git diff --check` passed. The separately tracked
       format baseline still reports the same 49 files.
+
+65. Extract an Annotation AI preview-session boundary (M1)
+    - Done 2026-07-11. `useAnnotationAiPreviewSession` now owns one exact
+      preview generation from open/hydration through serialized overrides,
+      page-aligned predictions, detach, annotate-all, cache removal, explicit
+      close, and close-before-reopen ordering. `AnnotationAiPreviewPanel` is a
+      renderer; manual and AI tables share `useAnnotationNodePage`, and setup,
+      editor, and preview reuse `useAnnotationClassDescriptions`. Exact
+      annotation targets persist per source node, so remounts neither guess a
+      replacement nor recreate a column; an invalid saved target can still
+      hydrate and clear its orphaned session.
+    - The upstream preview store now issues opaque generation ids and includes
+      ordered source-text content, normalized class names/descriptions, provider
+      configuration, and the target column in exact ownership. Override, clear,
+      detach, and annotate-all require that id. Stale generations and currently
+      materializing generations have distinct semantic 409 codes preserved by
+      the generated transport; explicit Close forgets only a proven stale id and
+      retries a busy/network-failed clear before reopen. Materialization claims
+      one immutable snapshot and either consumes or releases it. Paginated node
+      data exposes a stable plan revision so source mutations recheck backend
+      identity without turning page changes into new sessions.
+
+66. Move Sequential result shaping into the chart model (M2)
+    - Done 2026-07-11. The pure `sequentialChartModel.ts` now validates saved
+      parameters and rows, preserves raw period-boundary identity, aggregates
+      duplicate buckets, backfills sparse series, assigns collision-safe tuple
+      ids and deterministic colors, and returns the one render/export/selection/
+      detach domain. Null, blank, reserved-name, and delimiter-looking group
+      values stay distinct; numeric axes use declared raw coordinates; malformed
+      rows and aggregate metadata are diagnosed rather than cast or guessed.
+    - `SequentialChart`, result summary cards, chart export, and detach consume
+      that model directly. The former `useSequentialResultSummary` and
+      `sequentialResultVisibility` layers and tests are deleted, dead read-only
+      branches/aliases remain absent, generated detach types now preserve null
+      group values without a compatibility cast, and stale/all/all-hidden
+      selections cannot materialize an unintended node.
+
+    - Implementation validation: 193 frontend test files / 869 tests, lint,
+      configured Knip, production build (4,824 modules), docs drift (70
+      literals), 534 backend tests with one optional tokenizer test skipped,
+      backend type checking, focused backend Ruff checks, generated OpenAPI
+      regeneration, and staged plus unstaged `git diff --check` passed. The
+      separately tracked format baseline now reports 43 files; no Milestone 8
+      file is among them.
 
 ## Endpoint And Source-Of-Truth Notes
 

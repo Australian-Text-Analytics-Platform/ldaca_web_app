@@ -26,7 +26,8 @@ string literals.
 - `settings`: a free-form `Record<string, string>` for small, view-specific
   scalar controls that are not node selectors or task ids. The Annotation tab
   uses it to persist its AI parameter panel — `annotationMode` (`manual`/`ai`),
-  `aiProvider` (provider id), `aiModel`, and `aiPrompt`. The host passes the map
+  `aiProvider`, the `aiProviderModels` map, `aiPrompt`, inference knobs,
+  `aiPreviewOpen`, and per-source `annotationTargets`. The host passes the map
   in as `tabSettings` and a `onTabSettingChange(key, value)` writer; discrete
   controls (the Manual/AI switch, the provider dropdown) write through on change
   while free-text fields (model, prompt) commit on blur to avoid a full
@@ -313,8 +314,13 @@ never recreates it. Closing also fires `/api/workspaces/{workspace_id}/annotatio
 (`annotateAiPreviewClear`) to drop the node's **server-side** preview session —
 the deliberate asymmetry versus a tab switch, which only unmounts the panel and
 keeps the cache so it can rehydrate — so a re-open re-classifies from scratch and
-no stale detach/annotate-all count lingers. The clear is fire-and-forget: a failed
-cleanup never blocks closing the panel. The manual `AnnotationResultsPanel` is gated to `Manual` mode, so AI
+no stale detach/annotate-all count lingers. The exact annotation target is stored
+in `annotationTargets`; a remount never guesses a replacement or creates another
+column. If a persisted target was deleted, the tab shows an invalid-target alert
+and only offers Close, which can still hydrate and clear the old opaque session
+id. A failed network clear is retained and retried before the next open, while a
+rapid close/reopen waits for the old clear, so a delayed close cannot erase a new
+generation. The manual `AnnotationResultsPanel` is gated to `Manual` mode, so AI
 mode shows only the preview. Alongside the switch an
 `AnnotationAiSettings` block appears with an instance-based provider-card
 dropdown, a model field, and an optional example-node selector. The dropdown is
@@ -363,11 +369,11 @@ id) and custom providers are persisted to backend preferences through the
 preferences store (`annotationAiApiKeys` / `annotationAiCustomProviders`), which
 debounce-syncs an `annotation_ai` payload to the unified `PUT /preferences/`
 endpoint (TOML-backed, modeled by `AnnotationAiPreferences` /
-`AnnotationAiCustomProvider`). The remaining AI settings state (mode, active
-provider-card id, active model, per-card model map, and the instruction prompt)
-is local mirror state in `AnnotationFeature` that is seeded from and written back
-to the tab's `settings` map (`annotationMode`/`aiProvider`/`aiModel`/`aiPrompt`/
-`aiProviderModels`, plus the Model Configuration knobs
+`AnnotationAiCustomProvider`). `useAnnotationTabSettings` owns the remaining tab
+settings (mode, active provider-card id, per-card model map, instruction prompt,
+preview-open state, exact annotation targets, and inference knobs) and writes
+them through `onTabSettingChange` as `annotationMode`/`aiProvider`/`aiPrompt`/
+`aiProviderModels`/`aiPreviewOpen`/`annotationTargets`, plus
 `aiTemperature`/`aiReasoningEnabled`/`aiReasoningEffort`, booleans stringified as
 `'true'`/`'false'` and the temperature as `String(value)`) through
 `onTabSettingChange`, so the whole parameter panel — like the source and class
@@ -379,14 +385,24 @@ switch locks once annotation has started. Settings -> AI
 registered custom provider definitions.
 
 The `Preview` button runs AI annotation through the backend via
-`AnnotationAiPreviewPanel`. For the current page of the source node (20 rows per
-page) it POSTs `/api/workspaces/{workspace_id}/annotation/ai/preview` (`annotateAiPreview`) with the source
+`useAnnotationAiPreviewSession`; `AnnotationAiPreviewPanel` is now a renderer for
+that owner. `useAnnotationNodePage` supplies the same canonical, abortable page
+query to manual and AI tables, and `useAnnotationClassDescriptions` supplies one
+normalized class query to setup, editing, and preview gating. For the current
+source page (20 rows) the session owner POSTs
+`/api/workspaces/{workspace_id}/annotation/ai/preview` (`annotateAiPreview`) with the source
 node id, text column, class node/columns, provider id + optional custom base
-URL, API key, model, instruction, and page — and renders the structured per-row
-class predictions the backend returns (`{"labels":[...]}` aligned to the page's
-rows). The Model Configuration knobs (`temperature`, `reasoning_enabled`,
-`reasoning_effort`) ride along in both the preview and annotate-all bodies (and in
-the preview panel's React Query key), so the backend applies them per request. The backend engine (`core/annotation_ai.py`) re-slices the same page,
+URL, API key, model, instruction, target annotation column, and page. The response
+contains an opaque `session_id` plus labels aligned to the page. The Model
+Configuration knobs (`temperature`, `reasoning_enabled`, `reasoning_effort`) ride
+along in preview, state, and annotate-all contracts and in the exact client
+signature. That signature also includes workspace, source/target columns,
+`NodeDataResponse.revision`, and the current class names **and descriptions**, so
+a source-plan or description-only edit rechecks the backend generation and
+cancels the old page request. The backend's order-sensitive source-text fingerprint
+decides whether the generation is actually reusable. Every TanStack query forwards
+its abort signal to the generated client. The backend engine
+(`core/annotation_ai.py`) re-slices the same page,
 loads the authoritative class list, builds the system/user prompt, and dispatches
 the provider's **native async SDK** — `AsyncOpenAI` for `openai`-style providers
 (OpenRouter/OpenAI and OpenAI-compatible custom endpoints, distinguished only by
@@ -402,30 +418,34 @@ client-side cap.
 
 Preview predictions are **cached and persisted in the backend**, not just the
 browser. A process-lifetime preview store (`core/annotation_preview_store.py`,
-keyed by user + workspace + node) records every previewed row under a *signature*
-hashed from the prediction-affecting config only — text column, class node/
-columns, provider, base URL, model, instruction, temperature, and the reasoning
-knobs, but **not** the annotation column or page. So re-viewing a page reuses the
-stored labels (the endpoint only calls `annotate_batch` for rows it has not seen
-under the current signature — no repeat spend), and changing any
-prediction-affecting knob resets that node's rows. The store is in-memory: it
-survives tab switches but is cleared on backend restart.
+keyed by user + workspace + node) owns one current generation. Each generation
+has an opaque UUID-like `session_id`, a prediction signature, an exact target
+annotation column, and per-row model/override cells. Re-viewing a page in the
+same generation reuses labels; changing workspace/node, prediction config,
+class content, or target column creates a fresh empty generation. Every override,
+clear, detach, and annotate-all request must present the expected id. Missing or
+superseded generations return `annotation_preview_session_conflict` (409), so
+late requests cannot attach to or clear the next session. A current generation
+claimed by materialization returns `annotation_preview_session_busy` (409); the
+client retains that id and retries cleanup before reopening because a failed
+materialization can release it. The generated transport preserves this semantic
+error code on `ApiError`. The store remains in-memory: it survives tab switches
+but not a backend restart.
 
 That store makes the panel **survive tab switches** like concordance/quotation.
-`AnnotationFeature` persists an `aiPreviewOpen` tab setting (so `isPreviewing`
-re-seeds and the panel reopens on remount), and on mount the panel fires a
+`AnnotationFeature` persists `aiPreviewOpen` and the exact per-source target, so
+the same session owner reopens on remount. Once class descriptions are available,
+the owner fires a
 `/api/workspaces/{workspace_id}/annotation/ai/preview/state` (`annotateAiPreviewState`) query — keyed by the
-same signature config, minus annotation column and page, and set to
-`refetchOnMount: 'always'` — that folds every genuine override back into
-`selections` inside its `queryFn`. The AI labels themselves come back through the
-per-page annotate query's cache (its returned data, not a side effect, so a cache
-hit is enough), while the override fold has to re-run on every remount because the
-local `selections` map is wiped on unmount; that is why the state query force-
-refetches on mount. Leaving the tab and coming back therefore restores every
-previewed page, its labels, and any manual edits. Each prediction cell is still a
-dropdown seeded from the model's label that the user can override; changing it
-writes through to the store via `PUT /api/workspaces/{workspace_id}/annotation/ai/preview/override`
-(`annotateAiPreviewOverride`) so the edit persists too. When a previewed row
+same exact config **and target column**, with `refetchOnMount: 'always'`. It
+returns nullable session metadata and stored rows; hydration is render-derived,
+not a query-function side effect. The per-page query returns labels under the
+same signature. Late results are ignored after signature changes, and local
+selection/confirmed-value maps are signature scoped. Each prediction cell is a
+dropdown seeded from the effective hydrated/model label. Overrides are serialized
+per row, carry the session id, and may only target rows the backend actually
+computed; an older failed edit cannot roll back a newer choice, while the latest
+failure restores the last confirmed label. When a previewed row
 already holds a value in the annotation column (previewing over an existing or
 partly filled column), that existing label is rendered struck through beside the
 AI prediction dropdown, so overwriting a pre-filled cell is obvious; a freshly
@@ -433,15 +453,15 @@ created `Start new annotation` column is empty, so nothing is struck through.
 
 The preview panel's footer also has an **Annotate All** button that persists a
 full run: it POSTs `/api/workspaces/{workspace_id}/annotation/ai/annotate-all` (`annotateAiAll`), where the
-backend reuses the store's cached labels for already-previewed rows and fans only
-the remainder out over concurrent batches (`asyncio.gather` under a semaphore,
-order preserved), overwrites the whole annotation column in one go via
-`stage_dataframe_as_lazy` + `update_workspace`, clears the node's preview session,
-and returns the labelled/total counts. On success the panel toasts the counts,
-resets the detach-count probe to `0` (the session is now empty), and invalidates
-the node-data and workspace-graph queries so the filled column shows everywhere.
-It uses a longer `x-client-timeout-ms` since the single HTTP call can span the
-uncached batches.
+backend atomically claims the exact generation and copies its effective-row
+snapshot before any provider await. Preview, override, clear, detach, and another
+materialization conflict while claimed. The workflow reuses cached labels, fans
+only the remainder out over concurrent batches, overwrites the target column,
+then consumes the claimed generation; failure releases it. The client disables
+editing, paging, closing, and detach while materialization owns the snapshot. On
+success it closes/unlocks the preview, removes the session caches, and invalidates
+node-data and workspace queries. It uses a longer `x-client-timeout-ms` since the
+single request can span uncached batches.
 
 Beside it (to the left) is a **Detach Previewed Rows** button that materializes
 every page the user has previewed — across all viewed pages, not just the current
@@ -454,9 +474,11 @@ tab switch even though rows were previewed" bug — the browser's per-page map i
 gone on remount, so the panel asks the server (the source of truth) instead. The
 probe uses `refetchOnMount: 'always'` (re-enables on tab return), the per-page
 annotate query invalidates its key as new pages are previewed (the count climbs
-live), and Annotate All resets it to `0`. Confirming POSTs
-`/api/workspaces/{workspace_id}/annotation/ai/detach-previewed` (`detachAiPreviewedRows`) with just the node +
-column (no `dry_run`), and the endpoint reads the whole preview session (effective
+live), and Annotate All consumes it. Both dry-run and write requests carry the
+exact session id and target column. Confirming POSTs
+`/api/workspaces/{workspace_id}/annotation/ai/detach-previewed` (`detachAiPreviewedRows`),
+atomically claims the generation during the write, and reads the whole preview
+snapshot (effective
 label = override ?? AI) — which also fixes the earlier "detach only grabs the
 current page" bug. The endpoint copies exactly those source rows into a **new
 child node** of the source (via `_create_and_persist_child_node`) with the labels
@@ -492,12 +514,17 @@ Clear Results update related inputs atomically. The feature shell can focus on
 task lifecycle, schema locking, and result orchestration.
 `useSequentialChartControls` owns legend
 visibility, x-axis mode, chart export dialog state, selected periods, and
-detach naming. `sequentialChartModel.ts` owns chart types, palette fallback, and
-time-label formatting so chart presentation concerns do not live in the task
-submission hook. `sequentialChartExport.ts` owns the downloaded chart header and
-legend metadata. `sequentialResultVisibility.ts` owns hidden-series and
-selected-period count derivation so the result panel and chart export header use
-the same shown/chosen totals.
+detach naming. The pure `sequentialChartModel.ts` is the single result-domain
+boundary: it validates saved parameters and rows, preserves raw period-boundary
+identity, creates collision-safe group tuple ids (including distinct null and
+blank values), aggregates/backfills chart buckets, orders colors deterministically,
+and returns render-ready axis, tooltip, series, legend, visibility, selection,
+and detach DTOs. Malformed rows are diagnosed and excluded; stale selection
+indices cannot detach. `SequentialChart`, export metadata, and
+`useSequentialAnalysisDetach` consume that model rather than rebuilding it.
+Async task submission/persistence remains in `useSequentialAnalysisTaskFlow`,
+and `sequentialChartExport.ts` only formats the model's canonical summary and
+legend for downloads. The former result-summary and visibility hooks are gone.
 
 ## Adding A New Analysis Tab
 

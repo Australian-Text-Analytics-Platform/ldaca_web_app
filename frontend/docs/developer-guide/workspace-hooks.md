@@ -52,6 +52,10 @@ node-colour mutation.
 Selected node data is keyed by workspace id, node id, and one complete
 generated request-query object containing page, page size, sorting, filter
 column/value, and filter operator. Data View sends that same object to the SDK.
+`NodeDataResponse.revision` is a page-independent hash of the node's visible
+lazy plan. Row-index workflows such as Annotation include it in their session
+identity so a source mutation rechecks backend ownership without treating normal
+pagination as a new source.
 Mutations invalidate the narrowest practical set of queries:
 graph, node data, workspace summaries, and node-info metadata.
 

@@ -33,6 +33,7 @@ export const nodeDataResponse = (overrides: Partial<NodeDataResponse> = {}): Nod
   columns: ['text'],
   data: [{ text: 'This is an English sample document for language detection.' }],
   dtypes: { text: 'string' },
+  revision: 'test-node-revision',
   filtering: { op: 'none' },
   pagination: {
     page: 1,

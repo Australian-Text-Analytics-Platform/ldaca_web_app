@@ -88,4 +88,28 @@ describe('generatedClientConfig', () => {
       name: 'ApiError',
     } satisfies Partial<ApiError>);
   });
+
+  it('preserves the backend semantic error code on failed generated requests', async () => {
+    const config = createClientConfig({
+      baseUrl: 'http://api.test/api',
+      fetch: vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: 'annotation_preview_session_busy',
+            message: 'Annotation preview session is being materialised',
+            details: null,
+          }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    });
+
+    await expect(
+      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/preview`)),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: 'annotation_preview_session_busy',
+      message: 'Annotation preview session is being materialised',
+    } satisfies Partial<ApiError>);
+  });
 });

@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import {
-  getAnnotationClassDescriptions,
-  getNodeDataByWorkspaceId,
-  setAnnotationCell,
-} from '@/api';
+import { setAnnotationCell } from '@/api';
 import {
   Select,
   SelectContent,
@@ -22,15 +18,17 @@ import {
 } from '@/components/ui/table';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
-import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ColumnDef, PaginationState } from '@tanstack/react-table';
+import { queryKeys } from '@/lib/queryKeys';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { ColumnDef } from '@tanstack/react-table';
+import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
+import { useAnnotationNodePage, type AnnotationNodePageRow } from '../hooks/useAnnotationNodePage';
 
 const ANNOTATION_RESULT_PAGE_SIZE = 50;
 // Radix `Select` rejects an empty-string item value, so the "clear" option uses
 // a sentinel that onValueChange maps back to '' (an unset/null annotation).
 const NO_CLASS_VALUE = '__no_class__';
-type AnnotationResultRow = Record<string, unknown>;
+type AnnotationResultRow = AnnotationNodePageRow;
 
 /** Coerce an unknown cell value to display text without object stringification. */
 const cellText = (value: unknown): string => {
@@ -83,15 +81,19 @@ export function AnnotationResultsPanel({
 }: AnnotationResultsPanelProps) {
   // Per-row class overrides keyed by source row position; falls back to the source value.
   const [selections, setSelections] = useState<Record<number, string>>({});
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
+  const queryClient = useQueryClient();
+  const nodePage = useAnnotationNodePage({
+    workspaceId,
+    nodeId,
     pageSize: ANNOTATION_RESULT_PAGE_SIZE,
   });
-  const nodeDataRequest = createNodeDataRequest({
-    page: pagination.pageIndex + 1,
-    page_size: pagination.pageSize,
+  const { pagination, setPagination, query: resultsQuery, rows, rowCount } = nodePage;
+  const classDescriptions = useAnnotationClassDescriptions({
+    workspaceId,
+    nodeId: classNodeId,
+    classColumn,
+    descriptionColumn,
   });
-  const queryClient = useQueryClient();
 
   // Persist a single annotation cell to the backend column. row_index is the
   // ABSOLUTE 0-based position across the node (page offset + row), matching the
@@ -124,45 +126,6 @@ export function AnnotationResultsPanel({
     },
   });
 
-  const resultsQuery = useQuery({
-    queryKey: queryKeys.nodeData(workspaceId ?? '', nodeId, nodeDataRequest),
-    enabled: Boolean(workspaceId),
-    queryFn: async () => {
-      if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await getNodeDataByWorkspaceId({
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        query: nodeDataRequest,
-        throwOnError: true,
-      });
-      return data;
-    },
-  });
-
-  const canLoadClasses = Boolean(workspaceId && classNodeId && classColumn && descriptionColumn);
-  const classesQuery = useQuery({
-    queryKey:
-      canLoadClasses && workspaceId && classNodeId && classColumn && descriptionColumn
-        ? queryKeys.annotationClassDescriptions(
-            workspaceId,
-            classNodeId,
-            classColumn,
-            descriptionColumn,
-          )
-        : ['annotation', 'result-classes', 'disabled'],
-    enabled: canLoadClasses,
-    queryFn: async () => {
-      if (!workspaceId || !classNodeId) throw new Error('Missing class node');
-      const { data } = await getAnnotationClassDescriptions({
-        path: { workspace_id: workspaceId, node_id: classNodeId },
-        query: { class_column: classColumn ?? '', description_column: descriptionColumn ?? '' },
-        throwOnError: true,
-      });
-      return data;
-    },
-  });
-
-  const rows = (resultsQuery.data?.data ?? []) as AnnotationResultRow[];
-  const rowCount = resultsQuery.data?.pagination.total_rows ?? rows.length;
   const tableColumns: ColumnDef<AnnotationResultRow>[] = [
     { id: textColumn, accessorFn: (row) => row[textColumn] },
     { id: annotationColumn, accessorFn: (row) => row[annotationColumn] },
@@ -175,12 +138,15 @@ export function AnnotationResultsPanel({
     pageSize: pagination.pageSize,
     onPaginationChange: setPagination,
   });
-  const classOptions = (classesQuery.data?.rows ?? [])
+  const classOptions = classDescriptions.rows
     .map((row) => cellText(row.class).trim())
     .filter((name, index, all) => name.length > 0 && all.indexOf(name) === index);
 
   return (
-    <section aria-label="Annotation Results" className="mt-5 rounded-lg border bg-background/60 p-4">
+    <section
+      aria-label="Annotation Results"
+      className="mt-5 rounded-lg border bg-background/60 p-4"
+    >
       <h3 className="mb-3 text-base font-semibold">Annotations</h3>
       {resultsQuery.isLoading ? (
         <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">

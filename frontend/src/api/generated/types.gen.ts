@@ -363,6 +363,10 @@ export type AnnotationAiAnnotateAllRequest = {
      */
     reasoning_enabled?: boolean;
     /**
+     * Session Id
+     */
+    session_id: string;
+    /**
      * Temperature
      */
     temperature?: number;
@@ -447,6 +451,10 @@ export type AnnotationAiDetachRequest = {
      * New Node Name
      */
     new_node_name?: string | null;
+    /**
+     * Session Id
+     */
+    session_id: string;
 };
 
 /**
@@ -545,13 +553,13 @@ export type AnnotationAiPreviewClearResponse = {
 /**
  * AnnotationAiPreviewOverrideRequest
  *
- * One manual cell edit to persist onto the node's current preview session.
+ * One manual cell edit to persist onto an exact preview generation.
  *
  * Used by:
  * - Frontend AnnotationAiPreviewPanel when the user changes a prediction in the
  * dropdown, so the choice survives a tab switch and is honoured by
- * detach/annotate-all. Only the new label is needed in the body because the
- * session node and row index are resource identifiers in the URL.
+ * detach/annotate-all. The opaque session id prevents a delayed edit from an
+ * old panel generation from attaching to a newer session for the same node.
  * A blank/whitespace ``label`` means the user picked "None" and is stored as an
  * explicit null override (which still wins over the model's label).
  */
@@ -560,12 +568,16 @@ export type AnnotationAiPreviewOverrideRequest = {
      * Label
      */
     label?: string | null;
+    /**
+     * Session Id
+     */
+    session_id: string;
 };
 
 /**
  * AnnotationAiPreviewOverrideResponse
  *
- * Whether the edit was applied (False when no active session exists).
+ * Acknowledgement that the edit was applied to the expected generation.
  */
 export type AnnotationAiPreviewOverrideResponse = {
     /**
@@ -588,7 +600,7 @@ export type AnnotationAiPreviewRequest = {
     /**
      * Annotation Column
      */
-    annotation_column?: string;
+    annotation_column: string;
     /**
      * Api Key
      */
@@ -698,13 +710,21 @@ export type AnnotationAiPreviewRowState = {
 /**
  * AnnotationAiPreviewStateResponse
  *
- * Every stored row for the requested session (empty when config changed).
+ * Matching session identity and rows, or null metadata when none matches.
  */
 export type AnnotationAiPreviewStateResponse = {
+    /**
+     * Annotation Column
+     */
+    annotation_column: string | null;
     /**
      * Rows
      */
     rows?: Array<AnnotationAiPreviewRowState>;
+    /**
+     * Session Id
+     */
+    session_id: string | null;
 };
 
 /**
@@ -2656,6 +2676,10 @@ export type NodeDataResponse = {
     };
     filtering: NodeDataFiltering;
     pagination: PaginationInfo;
+    /**
+     * Revision
+     */
+    revision: string;
     sorting: AnalysisSorting;
 };
 
@@ -4861,17 +4885,20 @@ export type ValidationError = {
 /**
  * VisibleGroupSelection
  *
- * API schema used by routes and generated clients for visible group selection.
+ * One exact chart-series identity selected for sequential detachment.
  *
  * Used by:
- * - backend API routes because they need this unit's "API schema used by routes and generated clients for visible group selection" behavior.
+ * - ``detach_sequential_analysis`` because the chart sends the visible legend
+ * groups back to the backend so only those source rows are materialised.
+ * ``None`` is a real group value for nullable columns and compiles to
+ * ``is_null()`` in ``_build_group_filter_expression``.
  */
 export type VisibleGroupSelection = {
     /**
      * Values
      */
     values: {
-        [key: string]: string | number | number | boolean;
+        [key: string]: string | number | number | boolean | null;
     };
 };
 
@@ -9099,7 +9126,12 @@ export type AnnotateAiPreviewClearData = {
          */
         node_id: string;
     };
-    query?: never;
+    query: {
+        /**
+         * Session Id
+         */
+        session_id: string;
+    };
     url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}';
 };
 
@@ -9204,6 +9236,10 @@ export type AnnotateAiPreviewStateData = {
          * Instruction
          */
         instruction: string;
+        /**
+         * Annotation Column
+         */
+        annotation_column: string;
         /**
          * Temperature
          */

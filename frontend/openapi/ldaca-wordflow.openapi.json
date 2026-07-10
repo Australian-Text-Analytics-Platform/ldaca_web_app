@@ -423,6 +423,10 @@
             "title": "Reasoning Enabled",
             "type": "boolean"
           },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
           "temperature": {
             "default": 0.0,
             "title": "Temperature",
@@ -434,6 +438,7 @@
           }
         },
         "required": [
+          "session_id",
           "text_column",
           "annotation_column",
           "class_node_id",
@@ -514,9 +519,14 @@
               }
             ],
             "title": "New Node Name"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
           }
         },
         "required": [
+          "session_id",
           "annotation_column"
         ],
         "title": "AnnotationAiDetachRequest",
@@ -625,7 +635,7 @@
         "type": "object"
       },
       "AnnotationAiPreviewOverrideRequest": {
-        "description": "One manual cell edit to persist onto the node's current preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user changes a prediction in the\n  dropdown, so the choice survives a tab switch and is honoured by\n  detach/annotate-all. Only the new label is needed in the body because the\n  session node and row index are resource identifiers in the URL.\n  A blank/whitespace ``label`` means the user picked \"None\" and is stored as an\n  explicit null override (which still wins over the model's label).",
+        "description": "One manual cell edit to persist onto an exact preview generation.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user changes a prediction in the\n  dropdown, so the choice survives a tab switch and is honoured by\n  detach/annotate-all. The opaque session id prevents a delayed edit from an\n  old panel generation from attaching to a newer session for the same node.\n  A blank/whitespace ``label`` means the user picked \"None\" and is stored as an\n  explicit null override (which still wins over the model's label).",
         "properties": {
           "label": {
             "anyOf": [
@@ -637,13 +647,20 @@
               }
             ],
             "title": "Label"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
           }
         },
+        "required": [
+          "session_id"
+        ],
         "title": "AnnotationAiPreviewOverrideRequest",
         "type": "object"
       },
       "AnnotationAiPreviewOverrideResponse": {
-        "description": "Whether the edit was applied (False when no active session exists).",
+        "description": "Acknowledgement that the edit was applied to the expected generation.",
         "properties": {
           "ok": {
             "default": true,
@@ -658,7 +675,6 @@
         "description": "Request to AI-classify one page of a source node's texts (no persistence).\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel per visible page because the preview shows\n  the model's predictions without writing them, so the panel sends the same\n  page/page_size slice it displays and gets back one label per row.",
         "properties": {
           "annotation_column": {
-            "default": "",
             "title": "Annotation Column",
             "type": "string"
           },
@@ -744,7 +760,8 @@
           "class_node_id",
           "provider_id",
           "model",
-          "instruction"
+          "instruction",
+          "annotation_column"
         ],
         "title": "AnnotationAiPreviewRequest",
         "type": "object"
@@ -830,16 +847,42 @@
         "type": "object"
       },
       "AnnotationAiPreviewStateResponse": {
-        "description": "Every stored row for the requested session (empty when config changed).",
+        "description": "Matching session identity and rows, or null metadata when none matches.",
         "properties": {
+          "annotation_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Column"
+          },
           "rows": {
             "items": {
               "$ref": "#/components/schemas/AnnotationAiPreviewRowState"
             },
             "title": "Rows",
             "type": "array"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
           }
         },
+        "required": [
+          "session_id",
+          "annotation_column"
+        ],
         "title": "AnnotationAiPreviewStateResponse",
         "type": "object"
       },
@@ -3398,12 +3441,17 @@
           "pagination": {
             "$ref": "#/components/schemas/PaginationInfo"
           },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
           "sorting": {
             "$ref": "#/components/schemas/AnalysisSorting"
           }
         },
         "required": [
           "data",
+          "revision",
           "pagination",
           "columns",
           "dtypes",
@@ -6641,7 +6689,7 @@
         "type": "object"
       },
       "VisibleGroupSelection": {
-        "description": "API schema used by routes and generated clients for visible group selection.\n\nUsed by:\n- backend API routes because they need this unit's \"API schema used by routes and generated clients for visible group selection\" behavior.",
+        "description": "One exact chart-series identity selected for sequential detachment.\n\nUsed by:\n- ``detach_sequential_analysis`` because the chart sends the visible legend\n  groups back to the backend so only those source rows are materialised.\n  ``None`` is a real group value for nullable columns and compiles to\n  ``is_null()`` in ``_build_group_filter_expression``.",
         "properties": {
           "values": {
             "additionalProperties": {
@@ -6657,6 +6705,9 @@
                 },
                 {
                   "type": "boolean"
+                },
+                {
+                  "type": "null"
                 }
               ]
             },
@@ -15300,7 +15351,7 @@
     },
     "/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}": {
       "delete": {
-        "description": "Discard the node's cached AI preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user clicks \"Close preview\". The\n  in-memory preview store keeps a node's predictions across tab switches so the\n  panel can rehydrate, but an explicit close means those predictions are no\n  longer wanted; dropping the session frees the memory and resets the\n  detach/annotate-all counts so a later preview starts clean.\n\nFlow:\n- Resolve the path workspace (the store is keyed per user+workspace+node).\n- Clear the node's session unconditionally. Clearing is idempotent, so a missing\n  session (nothing previewed, or already cleared) is a successful no-op; the node\n  itself is not required to still exist, which is why no 404 is raised here.",
+        "description": "Discard the node's cached AI preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user clicks \"Close preview\". The\n  in-memory preview store keeps a node's predictions across tab switches so the\n  panel can rehydrate, but an explicit close means those predictions are no\n  longer wanted; dropping the session frees the memory and resets the\n  detach/annotate-all counts so a later preview starts clean.\n\nFlow:\n- Resolve the path workspace (the store is keyed per user+workspace+node).\n- Clear only the opaque generation named by the caller. A missing or superseded\n  id is a 409 conflict, so a delayed close can never delete a new preview. The\n  node itself is not required to still exist, which is why no 404 is raised.",
         "operationId": "annotate_ai_preview_clear",
         "parameters": [
           {
@@ -15319,6 +15370,15 @@
             "required": true,
             "schema": {
               "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
               "type": "string"
             }
           },
@@ -15447,7 +15507,7 @@
         ]
       },
       "get": {
-        "description": "Return the cached preview rows for a node so the panel can rehydrate.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel on mount because its per-row AI labels and\n  manual overrides are in-memory only; after a tab switch the panel re-reads\n  them here so the preview reappears exactly as the user left it.\n\nFlow:\n- Resolve the workspace + source node (404).\n- Recompute the config signature and ask the store for its rows; if the stored\n  session belongs to a different config the store returns nothing, so the panel\n  shows an empty preview and re-classifies on demand rather than displaying\n  stale labels.",
+        "description": "Return the cached preview rows for a node so the panel can rehydrate.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel on mount because its per-row AI labels and\n  manual overrides are in-memory only; after a tab switch the panel re-reads\n  them here so the preview reappears exactly as the user left it.\n\nFlow:\n- Resolve the workspace + source node (404).\n- Recompute the config signature and ask the store for its rows; if the stored\n  session belongs to a different config or target column the store returns null\n  metadata and no rows, so the panel re-classifies on demand rather than\n  displaying stale labels.",
         "operationId": "annotate_ai_preview_state",
         "parameters": [
           {
@@ -15547,6 +15607,15 @@
             "required": true,
             "schema": {
               "title": "Instruction",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "annotation_column",
+            "required": true,
+            "schema": {
+              "title": "Annotation Column",
               "type": "string"
             }
           },
@@ -16025,7 +16094,7 @@
     },
     "/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/rows/{row_index}": {
       "patch": {
-        "description": "Persist one manual cell edit onto the node's active preview session.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user changes a prediction in the\n  dropdown, so the edit survives a tab switch (it returns via the session\n  resource)\n  and is honoured by detach/annotate-all. A blank label is stored as an explicit\n  null override (the user chose \"None\"), which still wins over the model label.\n\nFlow:\n- Resolve the workspace + source node (404).\n- Write the override to the current session; ``ok=False`` when there is no active\n  session (the edit is stale \u2014 an override can only follow a preview).",
+        "description": "Persist one manual cell edit onto an exact preview generation.\n\nUsed by:\n- Frontend AnnotationAiPreviewPanel when the user changes a prediction in the\n  dropdown, so the edit survives a tab switch (it returns via the session\n  resource)\n  and is honoured by detach/annotate-all. A blank label is stored as an explicit\n  null override (the user chose \"None\"), which still wins over the model label.\n\nFlow:\n- Resolve the workspace + source node (404).\n- Write the override only when the opaque id is still current and the row has a\n  computed model result. A stale id is 409; an arbitrary unpreviewed row is 400.",
         "operationId": "annotate_ai_preview_override",
         "parameters": [
           {

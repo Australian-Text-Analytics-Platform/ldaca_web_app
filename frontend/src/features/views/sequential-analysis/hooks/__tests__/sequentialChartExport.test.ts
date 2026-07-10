@@ -1,70 +1,100 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildSequentialChartExportMetadata } from '../sequentialChartExport';
+import { buildSequentialChartModel } from '../sequentialChartModel';
 
 describe('buildSequentialChartExportMetadata', () => {
-  it('formats chart header counts and grouped legend entries', () => {
-    const metadata = buildSequentialChartExportMetadata({
-      nodeName: 'Interviews',
-      timeColumn: 'date',
-      frequencyDisplay: 'Monthly',
-      groupByColumns: ['speaker'],
+  it('reuses canonical summary, counts, and grouped legend entries', () => {
+    const fallbacks = {
+      timeColumn: '',
+      groupBy: [],
+      columnType: 'datetime' as const,
+      numericOrigin: null,
+      numericInterval: null,
+      frequency: 'daily' as const,
+      customIntervalValue: null,
+      customIntervalUnit: null,
+    };
+    const base = buildSequentialChartModel({
+      results: {
+        data: [
+          {
+            time_period: '2024-01',
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            speaker: 'Ada',
+            sequential_count: 2,
+          },
+          {
+            time_period: '2024-01',
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            speaker: 'Grace',
+            sequential_count: 3,
+          },
+        ],
+        analysis_params: {
+          time_column: 'date',
+          column_type: 'datetime',
+          frequency: 'monthly',
+          group_by_columns: ['speaker'],
+        },
+      },
+      fallbacks,
       chartType: 'area',
-      chartConfig: {
-        ada: { label: 'Ada', color: '#123456' },
-        grace: { label: 'Grace' },
-      },
-      groupKeys: ['ada', 'grace'],
-      hiddenKeys: new Set(['grace']),
-      counts: {
-        totalPointCount: 12,
-        totalDocumentCount: 30,
-        shownPointCount: 9,
-        shownDocumentCount: 20,
-        chosenPointCount: 3,
-        chosenDocumentCount: 8,
-      },
+      xAxisType: 'category',
+      hiddenKeys: new Set(),
+      selectedPeriodIndices: new Set(),
+      sourceDocumentCount: 30,
     });
+    const graceId = base.groups.find((group) => group.label === 'Grace')?.id ?? '';
+    const model = buildSequentialChartModel({
+      results: {
+        data: [
+          {
+            time_period: '2024-01',
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            speaker: 'Ada',
+            sequential_count: 2,
+          },
+          {
+            time_period: '2024-01',
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            speaker: 'Grace',
+            sequential_count: 3,
+          },
+        ],
+        analysis_params: {
+          time_column: 'date',
+          column_type: 'datetime',
+          frequency: 'monthly',
+          group_by_columns: ['speaker'],
+        },
+      },
+      fallbacks,
+      chartType: 'area',
+      xAxisType: 'category',
+      hiddenKeys: new Set([graceId]),
+      selectedPeriodIndices: new Set(),
+      sourceDocumentCount: 30,
+    });
+
+    const metadata = buildSequentialChartExportMetadata({ nodeName: 'Interviews', model });
 
     expect(metadata.header).toEqual([
       { label: 'Data Block', value: 'Interviews' },
       { label: 'Time Column', value: 'date' },
-      { label: 'Frequency', value: 'Monthly' },
-      { label: 'Total', value: '12/30' },
-      { label: 'Shown', value: '9/20' },
-      { label: 'Chosen', value: '3/8' },
+      { label: 'Frequency', value: 'monthly' },
+      { label: 'Total', value: '2/30' },
+      { label: 'Shown', value: '1/2' },
+      { label: 'Chosen', value: '0/0' },
       { label: 'Groups', value: 'speaker' },
     ]);
     expect(metadata.legend).toEqual([
-      { label: 'Ada', color: '#123456', type: 'area', hidden: false },
+      { label: 'Ada', color: '#2563eb', type: 'area', hidden: false },
       { label: 'Grace', color: '#16a34a', type: 'area', hidden: true },
-    ]);
-  });
-
-  it('falls back to ungrouped labels when no time column or grouping is selected', () => {
-    const metadata = buildSequentialChartExportMetadata({
-      nodeName: 'Rows',
-      timeColumn: '',
-      frequencyDisplay: 'Every row',
-      groupByColumns: [],
-      chartType: 'bar',
-      chartConfig: {},
-      groupKeys: ['sequential_count'],
-      hiddenKeys: new Set(),
-      counts: {
-        totalPointCount: 2,
-        totalDocumentCount: 2,
-        shownPointCount: 2,
-        shownDocumentCount: 2,
-        chosenPointCount: 0,
-        chosenDocumentCount: 0,
-      },
-    });
-
-    expect(metadata.header[1]).toEqual({ label: 'Time Column', value: '—' });
-    expect(metadata.header[6]).toEqual({ label: 'Groups', value: 'None' });
-    expect(metadata.legend).toEqual([
-      { label: 'sequential_count', color: '#2563eb', type: 'bar', hidden: false },
     ]);
   });
 });

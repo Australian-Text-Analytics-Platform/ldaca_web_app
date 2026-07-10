@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { AnnotationAiProviderId } from '../aiProviders';
 
 export type AnnotationMode = 'manual' | 'ai';
@@ -16,7 +16,10 @@ interface UseAnnotationTabSettingsArgs {
  * Record<string,string>; malformed user-edited JSON is ignored with a warning so
  * the tab still opens and the user can save a fresh provider card.
  */
-const parseProviderModelSetting = (value: string | undefined): Record<string, string> => {
+const parseStringMapSetting = (
+  value: string | undefined,
+  warning: string,
+): Record<string, string> => {
   if (!value) return {};
   try {
     const parsed: unknown = JSON.parse(value);
@@ -27,7 +30,7 @@ const parseProviderModelSetting = (value: string | undefined): Record<string, st
     }
     return models;
   } catch (error) {
-    console.warn('[annotation] Ignoring malformed AI provider model setting:', error);
+    console.warn(warning, error);
     return {};
   }
 };
@@ -54,13 +57,19 @@ export function useAnnotationTabSettings({
   };
 
   const [aiProviderModels, setAiProviderModelsState] = useState<Record<string, string>>(() =>
-    parseProviderModelSetting(tabSettings?.aiProviderModels),
+    parseStringMapSetting(
+      tabSettings?.aiProviderModels,
+      '[annotation] Ignoring malformed AI provider model setting:',
+    ),
   );
   const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(
     () => tabSettings?.aiProvider ?? '',
   );
   const [aiModel, setAiModel] = useState(() => {
-    const providerModels = parseProviderModelSetting(tabSettings?.aiProviderModels);
+    const providerModels = parseStringMapSetting(
+      tabSettings?.aiProviderModels,
+      '[annotation] Ignoring malformed AI provider model setting:',
+    );
     const providerId = tabSettings?.aiProvider ?? '';
     return providerModels[providerId] ?? '';
   });
@@ -114,6 +123,23 @@ export function useAnnotationTabSettings({
     onTabSettingChange?.('aiPreviewOpen', String(open));
   };
 
+  const [annotationTargets, setAnnotationTargets] = useState<Record<string, string>>(() =>
+    parseStringMapSetting(
+      tabSettings?.annotationTargets,
+      '[annotation] Ignoring malformed annotation-target setting:',
+    ),
+  );
+  const annotationTargetsRef = useRef(annotationTargets);
+  const setAnnotationTarget = (nodeId: string, column: string) => {
+    // A single browser event may persist multiple selector changes before React
+    // rerenders. Read the latest committed map rather than the render snapshot
+    // so each call writes a complete tabs.json value to AnalysisTabsHost.
+    const next = { ...annotationTargetsRef.current, [nodeId]: column };
+    annotationTargetsRef.current = next;
+    setAnnotationTargets(next);
+    onTabSettingChange?.('annotationTargets', JSON.stringify(next));
+  };
+
   return {
     annotationMode,
     setAnnotationMode,
@@ -133,5 +159,7 @@ export function useAnnotationTabSettings({
     setAiReasoningEffort,
     isPreviewing,
     setIsPreviewing,
+    annotationTargets,
+    setAnnotationTarget,
   };
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { createAnalysisTaskDetachment } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
-import type { SequentialAnalysisDatum } from './sequentialChartModel';
+import type { SequentialChartModel } from './sequentialChartModel';
 
 interface SequentialAnalysisDetachNode {
   id?: string;
@@ -13,18 +13,16 @@ interface SequentialAnalysisDetachParams {
   currentWorkspaceId: string | null;
   resolveTaskId: () => Promise<string | null>;
   panelSelectedNodes: SequentialAnalysisDetachNode[];
-  chartData: SequentialAnalysisDatum[];
-  results: Record<string, unknown> | null;
-  excludedGroupKeys: Set<string>;
-  selectedPeriodIndices: Set<number>;
+  model: SequentialChartModel;
   requestedNodeName: string;
   queryClient: {
     invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown>;
   };
 }
 
-/** Coordinates adding a selected sequential-analysis chart slice back into the workspace. */
 /**
+ * Coordinates adding a selected sequential-analysis chart slice back into the workspace.
+ *
  * Used by: SequentialAnalysisFeature.tsx.
  * Flow: derive visible group filters and a default node name, then expose the
  * detach action and pending state for the selected chart periods.
@@ -33,43 +31,11 @@ export function useSequentialAnalysisDetach({
   currentWorkspaceId,
   resolveTaskId,
   panelSelectedNodes,
-  chartData,
-  results,
-  excludedGroupKeys,
-  selectedPeriodIndices,
+  model,
   requestedNodeName,
   queryClient,
 }: SequentialAnalysisDetachParams) {
   const [isDetaching, setIsDetaching] = useState(false);
-
-  const rawRows = Array.isArray(results?.data) ? (results.data as Record<string, unknown>[]) : [];
-  const groupByColumns = Array.isArray(
-    (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns,
-  )
-    ? ((results?.analysis_params as Record<string, unknown>).group_by_columns as string[])
-    : [];
-
-  const visibleGroups = (() => {
-    if (!groupByColumns.length || excludedGroupKeys.size === 0) return undefined;
-
-    const dedupedVisibleGroups = new Map<string, Record<string, string | number | boolean>>();
-    rawRows.forEach((row) => {
-      const groupKey = groupByColumns
-        .map((column) => String((row[column] as string | number | undefined) ?? ''))
-        .join(' - ');
-      if (excludedGroupKeys.has(groupKey)) {
-        return;
-      }
-
-      const values = Object.fromEntries(
-        groupByColumns.map((column) => [column, row[column] ?? null]),
-      ) as Record<string, string | number | boolean>;
-      const dedupeKey = JSON.stringify(groupByColumns.map((column) => row[column] ?? null));
-      dedupedVisibleGroups.set(dedupeKey, values);
-    });
-
-    return Array.from(dedupedVisibleGroups.values()).map((values) => ({ values }));
-  })();
 
   const sourceName = panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data';
   const defaultNodeName = `${sourceName}_trend`;
@@ -82,30 +48,11 @@ export function useSequentialAnalysisDetach({
    */
   const handleDetach = async () => {
     if (!currentWorkspaceId) return;
-    if (selectedPeriodIndices.size === 0 || selectedPeriodIndices.size >= chartData.length) {
-      return;
-    }
+    if (!model.selection.canDetach) return;
 
     const taskId = await resolveTaskId();
     if (!taskId) {
       toast.error('No sequential analysis task available for add to workspace');
-      return;
-    }
-
-    const selectedPeriods = Array.from(selectedPeriodIndices)
-      .sort((left, right) => left - right)
-      .map((index) => ({
-        period_start: chartData[index]?.period_start as string | number,
-        period_end: chartData[index]?.period_end as string | number,
-      }));
-
-    if (selectedPeriods.length === 0) {
-      toast.error('Selected periods are missing boundaries for filtering');
-      return;
-    }
-
-    if (visibleGroups?.length === 0) {
-      toast.error('No visible groups remain on the chart to add to the workspace');
       return;
     }
 
@@ -116,8 +63,10 @@ export function useSequentialAnalysisDetach({
     try {
       await createAnalysisTaskDetachment({
         body: {
-          selected_periods: selectedPeriods,
-          ...(visibleGroups ? { visible_groups: visibleGroups } : {}),
+          selected_periods: model.selection.selectedPeriods,
+          ...(model.selection.visibleGroups
+            ? { visible_groups: model.selection.visibleGroups }
+            : {}),
           new_node_name: newNodeName,
         },
         path: { workspace_id: currentWorkspaceId, task_id: taskId },

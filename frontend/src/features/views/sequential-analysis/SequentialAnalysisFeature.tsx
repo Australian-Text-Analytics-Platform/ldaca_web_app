@@ -23,10 +23,12 @@ import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysi
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { useSequentialAnalysisTaskFlow } from './hooks/useSequentialAnalysisTaskFlow';
 import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
-import { useSequentialResultSummary } from './hooks/useSequentialResultSummary';
-import { deriveSequentialResultVisibility } from './hooks/sequentialResultVisibility';
 import { buildSequentialChartExportMetadata } from './hooks/sequentialChartExport';
-import { isChartTypeOption, type ChartTypeOption } from './hooks/sequentialChartModel';
+import {
+  buildSequentialChartModel,
+  isChartTypeOption,
+  type ChartTypeOption,
+} from './hooks/sequentialChartModel';
 import {
   deriveSequentialParameterValues,
   readSequentialServerParams,
@@ -46,8 +48,9 @@ import {
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
 
-/** Renders the sequential-analysis workflow for live trends and result exploration. */
 /**
+ * Renders the sequential-analysis workflow for live trends and result exploration.
+ *
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
@@ -176,11 +179,7 @@ const SequentialAnalysisFeature = ({
     // Retrieves the submitted request so hydration can restore parameters and locks.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskRequest(
-        ANALYSIS_TAB_GROUPS.sequential,
-        currentWorkspaceId,
-        taskId,
-      );
+      return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.sequential, currentWorkspaceId, taskId);
     },
     // Applies freshly fetched task results to chart state after lifecycle polling completes.
     // Reset result selection, merge the fetched payload, and adopt its chart type.
@@ -378,57 +377,44 @@ const SequentialAnalysisFeature = ({
     setTimeColumn,
   ]);
 
-  const {
-    // Toggles or range-selects chart periods for the add-to-workspace detach flow.
-    handleAnalyze,
-    handleClearResults,
-    handleChartTypeChange,
-    chartData: liveChartData,
-    groupKeys: liveGroupKeys,
-    chartConfig: liveChartConfig,
-    groupPointCounts: liveGroupPointCounts,
-  } = useSequentialAnalysisTaskFlow({
-    state: {
-      currentWorkspaceId,
-      activeNodeId,
-      nodeColumnSelections,
-      timeColumn,
-      groupByColumns,
-      frequency,
-      chartType,
-      derivedColumnType,
-      numericOriginValue,
-      numericIntervalValue,
-      numericOriginInput,
-      customIntervalValue,
-      customIntervalUnit: customIntervalUnitValue,
-      caseSensitive,
-      results,
-    },
-    actions: {
-      setIsAnalyzing,
-      setResults,
-      setChartType,
-      setLocalTaskId,
-      setNodeColumnSelections: (selections) => {
-        applyInputsFromSelections(selections);
+  const { handleAnalyze, handleClearResults, handleChartTypeChange } =
+    useSequentialAnalysisTaskFlow({
+      state: {
+        currentWorkspaceId,
+        activeNodeId,
+        nodeColumnSelections,
+        timeColumn,
+        groupByColumns,
+        frequency,
+        chartType,
+        derivedColumnType,
+        numericOriginValue,
+        numericIntervalValue,
+        numericOriginInput,
+        customIntervalValue,
+        customIntervalUnit: customIntervalUnitValue,
+        caseSensitive,
+        results,
       },
-      setTimeColumn,
-      lockCurrentSchema,
-      resolveTaskId,
-      clearResults,
-      // Persist the run's assigned task id onto the active tab so reload
-      // rehydrates the same task.
-      onTaskIdAssigned: (taskId) => {
-        if (tabId) onTabTaskChange?.(taskId);
+      actions: {
+        setIsAnalyzing,
+        setResults,
+        setChartType,
+        setLocalTaskId,
+        setNodeColumnSelections: (selections) => {
+          applyInputsFromSelections(selections);
+        },
+        setTimeColumn,
+        lockCurrentSchema,
+        resolveTaskId,
+        clearResults,
+        // Persist the run's assigned task id onto the active tab so reload
+        // rehydrates the same task.
+        onTaskIdAssigned: (taskId) => {
+          if (tabId) onTabTaskChange?.(taskId);
+        },
       },
-    },
-  });
-
-  const chartData = liveChartData;
-  const groupKeys = liveGroupKeys;
-  const chartConfig = liveChartConfig;
-  const groupPointCounts = liveGroupPointCounts;
+    });
 
   // Runs a fresh trends analysis or updates a locked task after parameter changes.
   /**
@@ -443,68 +429,39 @@ const SequentialAnalysisFeature = ({
     });
   };
 
-  const effHandleChartTypeChange = handleChartTypeChange;
-
-  const {
-    timeColumn: summaryTimeColumn,
-    groupBy: summaryGroupBy,
-    columnType: summaryColumnType,
-    numericOrigin: summaryNumericOrigin,
-    numericInterval: summaryNumericInterval,
-    frequencyDisplay: summaryFrequency,
-  } = useSequentialResultSummary(results, {
-    timeColumn,
-    groupBy: groupByColumns,
-    columnType: derivedColumnType,
-    numericOrigin: numericOriginValue ?? null,
-    numericInterval: numericIntervalValue ?? null,
-    frequency,
-    customIntervalValue,
-    customIntervalUnit: customIntervalUnitValue,
+  const chartModel = buildSequentialChartModel({
+    results,
+    fallbacks: {
+      timeColumn,
+      groupBy: groupByColumns,
+      columnType: derivedColumnType,
+      numericOrigin: numericOriginValue ?? null,
+      numericInterval: numericIntervalValue ?? null,
+      frequency,
+      customIntervalValue,
+      customIntervalUnit: customIntervalUnitValue,
+    },
+    chartType,
+    xAxisType,
+    hiddenKeys,
+    selectedPeriodIndices,
+    sourceDocumentCount,
   });
-
-  const rawResultRows = Array.isArray(results?.data)
-    ? (results.data as Record<string, unknown>[])
-    : [];
-
-  const canDetach =
-    selectedPeriodIndices.size > 0 &&
-    selectedPeriodIndices.size < chartData.length &&
-    groupKeys.length > 0;
+  const { summary } = chartModel;
 
   const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
     currentWorkspaceId,
     resolveTaskId,
     panelSelectedNodes,
-    chartData,
-    results,
-    excludedGroupKeys: hiddenKeys,
-    selectedPeriodIndices,
+    model: chartModel,
     requestedNodeName: detachNodeName,
     queryClient,
   });
 
-  const {
-    totalPointCount,
-    totalDocumentCount,
-    shownPointCount,
-    shownDocumentCount,
-    chosenPointCount,
-    chosenDocumentCount,
-  } = deriveSequentialResultVisibility({
-    rows: rawResultRows,
-    groupByColumns: summaryGroupBy,
-    hiddenKeys,
-    chartData,
-    selectedPeriodIndices,
-    resultTotalRecords: results?.total_records,
-    sourceDocumentCount,
-  });
-
-  const resultsSummary = summaryTimeColumn
-    ? summaryColumnType === 'numeric'
-      ? `Numeric bin counts for ${summaryTimeColumn}`
-      : `Frequency of records grouped by ${summaryTimeColumn}`
+  const resultsSummary = summary.timeColumn
+    ? summary.columnType === 'numeric'
+      ? `Numeric bin counts for ${summary.timeColumn}`
+      : `Frequency of records grouped by ${summary.timeColumn}`
     : 'Aggregated frequency over time';
 
   // Exports the rendered chart SVG with contextual title and legend metadata.
@@ -525,21 +482,7 @@ const SequentialAnalysisFeature = ({
     const nodeName = panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data';
     const { header, legend } = buildSequentialChartExportMetadata({
       nodeName,
-      timeColumn: summaryTimeColumn,
-      frequencyDisplay: summaryFrequency,
-      groupByColumns: summaryGroupBy,
-      chartType,
-      chartConfig,
-      groupKeys,
-      hiddenKeys,
-      counts: {
-        totalPointCount,
-        totalDocumentCount,
-        shownPointCount,
-        shownDocumentCount,
-        chosenPointCount,
-        chosenDocumentCount,
-      },
+      model: chartModel,
     });
     try {
       await downloadChartAs(svg, {
@@ -644,42 +587,18 @@ const SequentialAnalysisFeature = ({
       {results && (
         <SequentialAnalysisResultsPanel
           resultsSummary={resultsSummary}
-          summary={{
-            timeColumn: summaryTimeColumn,
-            groupBy: summaryGroupBy,
-            columnType: summaryColumnType,
-            numericOrigin: summaryNumericOrigin,
-            numericInterval: summaryNumericInterval,
-            frequencyDisplay: summaryFrequency,
-          }}
-          counts={{
-            total: totalPointCount,
-            totalDocuments: totalDocumentCount,
-            shown: shownPointCount,
-            shownDocuments: shownDocumentCount,
-            chosen: chosenPointCount,
-            chosenDocuments: chosenDocumentCount,
-          }}
-          chartType={chartType}
+          model={chartModel}
           onChartTypeChange={(value) => {
-            void effHandleChartTypeChange(value);
+            void handleChartTypeChange(value);
           }}
-          xAxisType={xAxisType}
           onXAxisTypeChange={setXAxisType}
           onDownloadClick={() => {
             setDownloadDialogOpen(true);
           }}
-          chartData={chartData}
-          chartConfig={chartConfig}
-          groupKeys={groupKeys}
-          groupPointCounts={groupPointCounts}
-          hiddenKeys={hiddenKeys}
-          selectedPeriodIndices={selectedPeriodIndices}
-          canDetach={canDetach}
           isDetaching={isDetaching}
           onToggleKey={chartControls.toggleKey}
           onPeriodClick={(index, shiftHeld) => {
-            chartControls.selectPeriod(index, shiftHeld, chartData.length);
+            chartControls.selectPeriod(index, shiftHeld, chartModel.chartData.length);
           }}
           onClearSelection={chartControls.clearPeriodSelection}
           detachNodeName={detachNodeName}
@@ -689,7 +608,6 @@ const SequentialAnalysisFeature = ({
             void handleDetach();
           }}
           containerRef={chartContainerRef}
-          readOnly={false}
         />
       )}
       <ChartImageDownloadDialog

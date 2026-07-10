@@ -49,13 +49,14 @@ export function useAnnotationClassDescriptions({
   const query = useQuery({
     queryKey,
     enabled: canLoad,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
         throw new Error('Missing class-description selection');
       }
       const { data } = await getAnnotationClassDescriptions({
         path: { workspace_id: workspaceId, node_id: nodeId },
         query: { class_column: classColumn, description_column: descriptionColumn },
+        signal,
         throwOnError: true,
       });
       return data;

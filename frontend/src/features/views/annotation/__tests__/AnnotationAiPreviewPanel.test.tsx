@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AnnotationAiPreviewPanel } from '../components/AnnotationAiPreviewPanel';
+import { useAnnotationAiPreviewSession } from '../hooks/useAnnotationAiPreviewSession';
 
 // Hoisted spies for the data + AI backend calls so the factories can reference
 // them. All LLM traffic now runs server-side under /annotation/ai/*, so the
@@ -37,22 +38,34 @@ vi.mock('sonner', () => ({
 /** Wrap the panel in a fresh QueryClient (retries off) with the standard props. */
 const renderPanel = (props?: { annotationColumn?: string }) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const Harness = () => {
+    const session = useAnnotationAiPreviewSession({
+      workspaceId: 'ws-1',
+      nodeId: 'node-1',
+      textColumn: 'text',
+      annotationColumn: props?.annotationColumn ?? 'label',
+      classNodeId: 'class-node',
+      classColumn: 'class',
+      descriptionColumn: 'description',
+      providerId: 'openrouter',
+      baseUrl: null,
+      apiKey: 'sk-test',
+      model: 'gpt-4o',
+      systemPrompt: 'Classify.',
+      temperature: 0,
+      reasoningEnabled: false,
+      reasoningEffort: 'medium',
+      isOpen: true,
+      targetValid: true,
+      onOpenChange: vi.fn(),
+      prepareOpen: () => Promise.resolve(true),
+      onExplicitClose: vi.fn(),
+    });
+    return <AnnotationAiPreviewPanel session={session} />;
+  };
   return render(
     <QueryClientProvider client={client}>
-      <AnnotationAiPreviewPanel
-        workspaceId="ws-1"
-        nodeId="node-1"
-        textColumn="text"
-        annotationColumn={props?.annotationColumn ?? 'label'}
-        classNodeId="class-node"
-        classColumn="class"
-        descriptionColumn="description"
-        providerId="openrouter"
-        baseUrl={null}
-        apiKey="sk-test"
-        model="gpt-4o"
-        systemPrompt="Classify."
-      />
+      <Harness />
     </QueryClientProvider>,
   );
 };
@@ -86,13 +99,17 @@ beforeEach(() => {
   });
   // Default hydration: no prior server session, so the panel starts empty and
   // relies on the per-page annotate query to populate predictions.
-  mocks.annotateAiPreviewState.mockResolvedValue({ data: { rows: [] } });
+  mocks.annotateAiPreviewState.mockResolvedValue({
+    data: { session_id: null, annotation_column: null, rows: [] },
+  });
   mocks.annotateAiPreviewOverride.mockResolvedValue({ data: { ok: true } });
 });
 
 describe('AnnotationAiPreviewPanel', () => {
   it('renders the page texts with backend predictions seeded into the dropdowns', async () => {
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
 
     renderPanel();
 
@@ -101,8 +118,8 @@ describe('AnnotationAiPreviewPanel', () => {
 
     const rowOne = await screen.findByRole('combobox', { name: 'AI class for row 1' });
     const rowTwo = screen.getByRole('combobox', { name: 'AI class for row 2' });
-    expect(rowOne).toHaveTextContent('Positive');
-    expect(rowTwo).toHaveTextContent('Negative');
+    await within(rowOne).findByText('Positive');
+    await within(rowTwo).findByText('Negative');
 
     // One backend request for the whole page, carrying the node + provider config
     // (the backend re-slices the page and owns the class list, so no texts here).
@@ -127,7 +144,9 @@ describe('AnnotationAiPreviewPanel', () => {
   });
 
   it('lets the user override a prediction locally without re-requesting', async () => {
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     const user = userEvent.setup();
 
     renderPanel();
@@ -152,7 +171,9 @@ describe('AnnotationAiPreviewPanel', () => {
 
     expect(await screen.findByText('401 Incorrect API key')).toBeInTheDocument();
 
-    mocks.annotateAiPreview.mockResolvedValueOnce({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValueOnce({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     const rowOne = await screen.findByRole('combobox', { name: 'AI class for row 1' });
@@ -182,7 +203,9 @@ describe('AnnotationAiPreviewPanel', () => {
         pagination: { total_rows: 2 },
       },
     });
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
 
     renderPanel({ annotationColumn: 'label' });
 
@@ -200,7 +223,9 @@ describe('AnnotationAiPreviewPanel', () => {
   });
 
   it('runs Annotate All against the backend and toasts the labelled count', async () => {
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     const user = userEvent.setup();
 
     renderPanel();
@@ -226,7 +251,9 @@ describe('AnnotationAiPreviewPanel', () => {
   });
 
   it('detaches the previewed rows into a child node via a confirmation dialog', async () => {
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     const user = userEvent.setup();
 
     renderPanel();
@@ -252,14 +279,19 @@ describe('AnnotationAiPreviewPanel', () => {
       .map((call) => call[0] as { body: Record<string, unknown>; path: Record<string, unknown> })
       .find((arg) => arg.body.dry_run !== true);
     expect(realCall?.path).toEqual({ workspace_id: 'ws-1', node_id: 'node-1' });
-    expect(realCall?.body).toEqual({ annotation_column: 'label' });
+    expect(realCall?.body).toEqual({
+      session_id: 'session-1',
+      annotation_column: 'label',
+    });
   });
 
   it('keeps Detach disabled when the server probe reports no previewed rows', async () => {
     // Simulates returning to the tab with a cleared/empty session: the dry-run probe
     // reports 0, so the button stays disabled even though the panel just remounted
     // (the local page map is gone, but the server session is the source of truth).
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     mocks.detachAiPreviewedRows.mockResolvedValue({ data: { node: null, detached_rows: 0 } });
 
     renderPanel();
@@ -278,7 +310,9 @@ describe('AnnotationAiPreviewPanel', () => {
   });
 
   it('persists a local override to the backend preview session', async () => {
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     const user = userEvent.setup();
 
     renderPanel();
@@ -298,11 +332,13 @@ describe('AnnotationAiPreviewPanel', () => {
       path: Record<string, unknown>;
     };
     expect(args.path).toEqual({ workspace_id: 'ws-1', node_id: 'node-1', row_index: 1 });
-    expect(args.body).toEqual({ label: 'Positive' });
+    expect(args.body).toEqual({ session_id: 'session-1', label: 'Positive' });
   });
 
   it('sends a null override when the user clears a cell to None', async () => {
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     const user = userEvent.setup();
 
     renderPanel();
@@ -321,19 +357,35 @@ describe('AnnotationAiPreviewPanel', () => {
     };
     // The "None" pick is an explicit null override (still beats the model label).
     expect(args.path).toEqual({ workspace_id: 'ws-1', node_id: 'node-1', row_index: 0 });
-    expect(args.body).toEqual({ label: null });
+    expect(args.body).toEqual({ session_id: 'session-1', label: null });
   });
 
   it('rehydrates AI labels and overrides from the server session on mount', async () => {
     // The per-page annotate query would return these too, but delay it so the
     // assertion clearly reflects the hydration payload seeding the dropdowns.
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['Positive', 'Negative'] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['Positive', 'Negative'] },
+    });
     mocks.annotateAiPreviewState.mockResolvedValue({
       data: {
+        session_id: 'session-1',
+        annotation_column: 'label',
         rows: [
-          { row_index: 0, ai: 'Positive', override: null, has_override: false, effective: 'Positive' },
+          {
+            row_index: 0,
+            ai: 'Positive',
+            override: null,
+            has_override: false,
+            effective: 'Positive',
+          },
           // Row 1 was AI-labelled "Positive" but the user overrode it to "Negative".
-          { row_index: 1, ai: 'Positive', override: 'Negative', has_override: true, effective: 'Negative' },
+          {
+            row_index: 1,
+            ai: 'Positive',
+            override: 'Negative',
+            has_override: true,
+            effective: 'Negative',
+          },
         ],
       },
     });

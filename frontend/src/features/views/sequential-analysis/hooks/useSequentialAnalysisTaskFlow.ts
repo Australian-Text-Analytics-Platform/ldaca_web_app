@@ -1,44 +1,11 @@
 import { toast } from 'sonner';
 import { analysisTaskPreferences, runSequentialAnalysis } from '@/api';
 import type { SequentialAnalysisRequest } from '@/api';
-import { type ChartConfig } from '@/components/ui/chart';
 import { extractAndSetTaskId } from '../../common/extractTaskId';
-import {
-  getSequentialPaletteColor,
-  isChartTypeOption,
-  type ChartTypeOption,
-  type SequentialAnalysisDatum,
-} from './sequentialChartModel';
+import { isChartTypeOption, type ChartTypeOption } from './sequentialChartModel';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
-
-const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_end']);
-
-// Compares period boundary values so grouped rows retain their earliest start and latest end.
-/**
- * Called while coalescing chart rows that share the same time-period label.
- * Flow: order nullish values last, compare numeric bounds directly, compare parseable dates by time, then fall back to string ordering.
- */
-const comparePeriodBounds = (left: unknown, right: unknown): number => {
-  if (left === right) return 0;
-  if (left === undefined || left === null) return 1;
-  if (right === undefined || right === null) return -1;
-
-  if (typeof left === 'number' && typeof right === 'number') {
-    return left - right;
-  }
-
-  const leftTime = new Date(left as string | number).getTime();
-  const rightTime = new Date(right as string | number).getTime();
-  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime)) {
-    return leftTime - rightTime;
-  }
-
-  return String((left as string | number | boolean | null | undefined) ?? '').localeCompare(
-    String((right as string | number | boolean | null | undefined) ?? ''),
-  );
-};
 
 interface SequentialAnalysisState {
   currentWorkspaceId: string | null;
@@ -83,11 +50,13 @@ interface Params {
   actions: SequentialAnalysisActions;
 }
 
-/** Builds the submit, clear, chart-type, and chart-shaping logic for sequential analysis. */
 /**
+ * Builds the submit, clear, and chart-type persistence logic for sequential analysis.
+ *
  * Used by: `SequentialAnalysisFeature`.
- * Flow: validate and submit the analysis request, shape the returned rows for
- * charting, clear the active result, and persist chart-type preferences.
+ * Flow: validate and submit the analysis request, clear the active result, and
+ * persist chart-type preferences. Pure result shaping belongs to
+ * `buildSequentialChartModel`.
  */
 export function useSequentialAnalysisTaskFlow({
   state: {
@@ -268,135 +237,9 @@ export function useSequentialAnalysisTaskFlow({
     }
   };
 
-  const chartData = (() => {
-    if (!results?.data || !Array.isArray(results.data)) return [];
-
-    const groupingColumns = (results.analysis_params as Record<string, unknown> | undefined)
-      ?.group_by_columns;
-    const effectiveGroupColumns = Array.isArray(groupingColumns)
-      ? groupingColumns
-      : groupByColumns.length
-        ? groupByColumns
-        : [];
-
-    if (effectiveGroupColumns.length === 0) {
-      return results.data.map((item: Record<string, unknown>) => ({
-        ...item,
-        time_period:
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty formatted label must fall through to the raw period
-          (item.time_period_formatted as string | undefined) ||
-          (item.time_period as string | undefined),
-        sequential_count: item.sequential_count,
-      }));
-    }
-
-    const timeMap = new Map<string, SequentialAnalysisDatum>();
-    const allGroupKeys = new Set<string>();
-    results.data.forEach((item: Record<string, unknown>) => {
-      /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty formatted/raw labels must fall through to the '' default */
-      const timePeriod =
-        (item.time_period_formatted as string | undefined) ||
-        (item.time_period as string | undefined) ||
-        '';
-      /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
-      const groupKey = effectiveGroupColumns
-        .map((col: string) => String((item[col] as string | number | undefined) ?? ''))
-        .join(' - ');
-      allGroupKeys.add(groupKey);
-      if (!timeMap.has(timePeriod)) {
-        timeMap.set(timePeriod, {
-          time_period: timePeriod,
-          period_start: item.period_start,
-          period_end: item.period_end,
-        });
-      }
-      const timeEntry = timeMap.get(timePeriod);
-      if (timeEntry) {
-        if (comparePeriodBounds(item.period_start, timeEntry.period_start) < 0) {
-          timeEntry.period_start = item.period_start;
-        }
-        if (comparePeriodBounds(item.period_end, timeEntry.period_end) > 0) {
-          timeEntry.period_end = item.period_end;
-        }
-        timeEntry[groupKey] = item.sequential_count;
-      }
-    });
-
-    // Backfill 0 for any (group, time) cell the worker omitted. Sequential
-    // analysis is a count over text events: a group with no occurrences
-    // in a period is genuinely "zero", not "unknown". Without this the
-    // chart renders `undefined` cells as null and breaks lines/areas at
-    // every gap — especially visible in the linear-axis mode where gap
-    // distances are proportional to time.
-    timeMap.forEach((entry) => {
-      allGroupKeys.forEach((key) => {
-        if (entry[key] === undefined) {
-          entry[key] = 0;
-        }
-      });
-    });
-
-    return Array.from(timeMap.values()).sort((a, b) => {
-      const aTime = String((a.time_period as string | number | undefined) ?? '');
-      const bTime = String((b.time_period as string | number | undefined) ?? '');
-      return aTime.localeCompare(bTime);
-    });
-  })();
-
-  const groupKeys = (() => {
-    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)
-      ?.group_by_columns;
-    const effectiveGroupColumns = Array.isArray(groupingColumns)
-      ? groupingColumns
-      : groupByColumns.length
-        ? groupByColumns
-        : [];
-
-    if (!effectiveGroupColumns.length || !chartData.length) return ['sequential_count'];
-
-    const keys = new Set<string>();
-    chartData.forEach((item: Record<string, unknown>) => {
-      Object.keys(item).forEach((key) => {
-        if (!NON_SERIES_CHART_KEYS.has(key)) keys.add(key);
-      });
-    });
-    return Array.from(keys);
-  })();
-
-  const chartConfig = (() => {
-    if (!groupKeys.length || (groupKeys.length === 1 && groupKeys[0] === 'sequential_count')) {
-      return {
-        sequential_count: { label: 'Sequential Count', color: getSequentialPaletteColor(0) },
-      };
-    }
-    return groupKeys.reduce<ChartConfig>((acc, key, index) => {
-      acc[key] = { label: key, color: getSequentialPaletteColor(index) };
-      return acc;
-    }, {});
-  })();
-
-  const groupPointCounts = (() => {
-    if (!chartData.length) return {} as Record<string, number>;
-    const counts: Record<string, number> = {};
-    chartData.forEach((row) => {
-      const typedRow = row as Record<string, unknown>;
-      groupKeys.forEach((key) => {
-        const value = typedRow[key];
-        if (value !== undefined && value !== null) {
-          counts[key] = (counts[key] ?? 0) + 1;
-        }
-      });
-    });
-    return counts;
-  })();
-
   return {
     handleAnalyze,
     handleClearResults,
     handleChartTypeChange,
-    chartData,
-    groupKeys,
-    chartConfig,
-    groupPointCounts,
   };
 }

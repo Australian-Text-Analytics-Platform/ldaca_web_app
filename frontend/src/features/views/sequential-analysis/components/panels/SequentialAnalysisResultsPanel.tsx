@@ -12,44 +12,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { SequentialChart, type SequentialXAxisType } from '../SequentialChart';
-import type { ChartTypeOption } from '../../hooks/sequentialChartModel';
-
-interface ResultsSummary {
-  timeColumn: string;
-  groupBy: string[];
-  columnType: 'datetime' | 'numeric';
-  numericOrigin: number | null;
-  numericInterval: number | null;
-  frequencyDisplay: string;
-}
-
-interface PointCounts {
-  total: number;
-  totalDocuments: number;
-  shown: number;
-  shownDocuments: number;
-  chosen: number;
-  chosenDocuments: number;
-}
+import { SequentialChart } from '../SequentialChart';
+import type {
+  ChartTypeOption,
+  SequentialChartModel,
+  SequentialXAxisType,
+} from '../../hooks/sequentialChartModel';
 
 export interface SequentialAnalysisResultsPanelProps {
   resultsSummary: string;
-  summary: ResultsSummary;
-  counts: PointCounts;
-  chartType: ChartTypeOption;
+  model: SequentialChartModel;
   onChartTypeChange: (value: ChartTypeOption) => void;
-  xAxisType: SequentialXAxisType;
   onXAxisTypeChange: (value: SequentialXAxisType) => void;
   onDownloadClick: () => void;
 
-  chartData: Record<string, unknown>[];
-  chartConfig: Record<string, { label?: string; color?: string }>;
-  groupKeys: string[];
-  groupPointCounts: Record<string, number>;
-  hiddenKeys: Set<string>;
-  selectedPeriodIndices: Set<number>;
-  canDetach: boolean;
   isDetaching: boolean;
   onToggleKey: (key: string) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
@@ -59,32 +35,20 @@ export interface SequentialAnalysisResultsPanelProps {
   onDetachNodeNameChange: (value: string) => void;
   onDetach: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
-  /** Read-only flag forwarded to <SequentialChart> to gate the detach-to-workspace control. */
-  readOnly?: boolean;
 }
 
 /**
- * Rendered by: SequentialAnalysisFeature. Trends and Sequence results card: summary stat grid + chart + detach.
- * controls. Extracted from SequentialAnalysisFeature.tsx — receives the
- * derived summary values from `useSequentialResultSummary` plus the chart
- * machinery from `useSequentialAnalysisTaskFlow` as props.
+ * Rendered by: `SequentialAnalysisFeature` as the Trends result card. It reads
+ * summary, counts, chart, legend, and selection metadata from one canonical
+ * `SequentialChartModel`, while keeping chart-type/axis interactions and async
+ * detach commands outside the pure model.
  */
 export function SequentialAnalysisResultsPanel({
   resultsSummary,
-  summary,
-  counts,
-  chartType,
+  model,
   onChartTypeChange,
-  xAxisType,
   onXAxisTypeChange,
   onDownloadClick,
-  chartData,
-  chartConfig,
-  groupKeys,
-  groupPointCounts,
-  hiddenKeys,
-  selectedPeriodIndices,
-  canDetach,
   isDetaching,
   onToggleKey,
   onPeriodClick,
@@ -94,8 +58,8 @@ export function SequentialAnalysisResultsPanel({
   onDetachNodeNameChange,
   onDetach,
   containerRef,
-  readOnly = false,
 }: SequentialAnalysisResultsPanelProps) {
+  const { summary, counts } = model;
   return (
     <Card className="mt-6">
       <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -112,7 +76,7 @@ export function SequentialAnalysisResultsPanel({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Chart Type</span>
           <Select
-            value={chartType}
+            value={model.chartType}
             onValueChange={(value) => {
               onChartTypeChange(value as ChartTypeOption);
             }}
@@ -131,7 +95,7 @@ export function SequentialAnalysisResultsPanel({
             <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground/70" aria-hidden="true" />
           </span>
           <Select
-            value={xAxisType}
+            value={model.xAxisType}
             onValueChange={(value) => {
               onXAxisTypeChange(value as SequentialXAxisType);
             }}
@@ -139,7 +103,7 @@ export function SequentialAnalysisResultsPanel({
             <SelectTrigger
               className="w-35 text-sm"
               title={
-                xAxisType === 'number'
+                model.xAxisType === 'number'
                   ? 'Linear axis: time positions are spaced proportionally. Periods with no data appear as visible gaps — accurate but can look sparse for irregular series.'
                   : 'Categorical axis: every recorded period is given equal width. Missing periods are hidden, which makes dense series easier to read but can mask gaps in time.'
               }
@@ -188,7 +152,7 @@ export function SequentialAnalysisResultsPanel({
               Total
             </span>
             <div className="mt-1 text-base font-semibold text-foreground">
-              {`${String(counts.total)}/${String(counts.totalDocuments)}`}
+              {`${String(counts.totalPointCount)}/${String(counts.totalDocumentCount)}`}
             </div>
           </div>
           <div className="rounded-md border border-border/60 p-3">
@@ -196,7 +160,7 @@ export function SequentialAnalysisResultsPanel({
               Shown
             </span>
             <div className="mt-1 text-base font-semibold text-foreground">
-              {`${String(counts.shown)}/${String(counts.shownDocuments)}`}
+              {`${String(counts.shownPointCount)}/${String(counts.shownDocumentCount)}`}
             </div>
           </div>
           <div className="rounded-md border border-border/60 p-3">
@@ -204,7 +168,7 @@ export function SequentialAnalysisResultsPanel({
               Chosen
             </span>
             <div className="mt-1 text-base font-semibold text-foreground">
-              {`${String(counts.chosen)}/${String(counts.chosenDocuments)}`}
+              {`${String(counts.chosenPointCount)}/${String(counts.chosenDocumentCount)}`}
             </div>
           </div>
           <div className="rounded-md border border-border/60 p-3">
@@ -218,15 +182,7 @@ export function SequentialAnalysisResultsPanel({
         </div>
 
         <SequentialChart
-          chartType={chartType}
-          xAxisType={xAxisType}
-          chartData={chartData}
-          chartConfig={chartConfig}
-          groupKeys={groupKeys}
-          groupPointCounts={groupPointCounts}
-          hiddenKeys={hiddenKeys}
-          selectedPeriodIndices={selectedPeriodIndices}
-          canDetach={canDetach}
+          model={model}
           isDetaching={isDetaching}
           onToggleKey={onToggleKey}
           onPeriodClick={onPeriodClick}
@@ -236,7 +192,6 @@ export function SequentialAnalysisResultsPanel({
           onDetachNodeNameChange={onDetachNodeNameChange}
           onDetach={onDetach}
           containerRef={containerRef}
-          readOnly={readOnly}
         />
       </CardContent>
     </Card>

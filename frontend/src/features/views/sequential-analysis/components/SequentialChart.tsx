@@ -1,71 +1,15 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Loader2, Plus } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import type { ChartConfig } from '@/components/ui/chart';
-import {
-  MultiSeriesChart,
-  type MultiSeriesChartSeries,
-  type MultiSeriesChartXAxisConfig,
-} from '@/features/views/common/components/MultiSeriesChart';
+import { Input } from '@/components/ui/input';
+import { MultiSeriesChart } from '@/features/views/common/components/MultiSeriesChart';
 import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
-import type {
-  SequentialAnalysisDatum,
-  ChartTypeOption,
-} from '../hooks/sequentialChartModel';
-import { getSequentialPaletteColor, formatSequentialTimeLabel } from '../hooks/sequentialChartModel';
-
-export type SequentialXAxisType = 'category' | 'number';
-
-// Numeric x values derived from period_start: datetime columns produce
-// epoch-ms timestamps (≥ ~10^11 for any plausible year), while numeric
-// columns produce ordinary integers. Use the magnitude to decide whether
-// to format as a date or a raw number.
-const TIMESTAMP_HEURISTIC_THRESHOLD = 1e11;
-
-const NUMERIC_X_KEY = '__x_numeric__';
-const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
-
-const readOnlyDisabledReason = (readOnly: boolean, fallback?: string | false) => {
-  if (readOnly) return READ_ONLY_DISABLED_REASON;
-  // A falsy fallback ('' or false) intentionally collapses to undefined here, so
-  // logical-OR (not nullish) is required.
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  return fallback || undefined;
-};
-
-// Used by: SequentialChart numeric-axis data mapping to convert row periods into Recharts x-coordinates.
-const toNumericX = (row: SequentialAnalysisDatum): number => {
-  const raw = row.period_start ?? row.time_period;
-  if (typeof raw === 'number') return raw;
-  if (raw == null) return Number.NaN;
-  const parsed = new Date(raw as string | number).getTime();
-  if (!Number.isNaN(parsed)) return parsed;
-  const asNumber = Number(raw);
-  return Number.isNaN(asNumber) ? Number.NaN : asNumber;
-};
-
-// Used by: SequentialChart numeric x-axis config to format timestamp-like ticks as dates.
-const formatNumericTick = (value: unknown): string => {
-  const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n)) return '';
-  if (Math.abs(n) >= TIMESTAMP_HEURISTIC_THRESHOLD) {
-    return formatSequentialTimeLabel(n);
-  }
-  return String(n);
-};
+import type { SequentialChartModel } from '../hooks/sequentialChartModel';
 
 interface SequentialChartProps {
-  chartType: ChartTypeOption;
-  xAxisType?: SequentialXAxisType;
-  chartData: SequentialAnalysisDatum[];
-  chartConfig: ChartConfig;
-  groupKeys: string[];
-  groupPointCounts: Record<string, number>;
-  hiddenKeys: Set<string>;
-  selectedPeriodIndices: Set<number>;
-  canDetach: boolean;
+  model: SequentialChartModel;
   isDetaching: boolean;
   onToggleKey: (key: string) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
@@ -75,25 +19,19 @@ interface SequentialChartProps {
   onDetachNodeNameChange: (value: string) => void;
   onDetach: () => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
-  /** Read-only flag that disables Add to Workspace and the new-node-name input while leaving chart exploration controls active. */
-  readOnly?: boolean;
 }
 
 const CHART_HEIGHT_PX = 400;
 
 /**
- * Rendered by: SequentialAnalysisResultsPanel to show the chart and detach/selection controls.
+ * Renders the chart and interaction controls from a canonical Sequential model.
+ *
+ * Rendered by: `SequentialAnalysisResultsPanel`. The pure model already owns
+ * row/axis/series/legend shaping; this component only binds Recharts selection,
+ * legend clicks, resize container identity, and detach controls.
  */
 export function SequentialChart({
-  chartType,
-  xAxisType = 'category',
-  chartData,
-  chartConfig,
-  groupKeys,
-  groupPointCounts,
-  hiddenKeys,
-  selectedPeriodIndices,
-  canDetach,
+  model,
   isDetaching,
   onToggleKey,
   onPeriodClick,
@@ -103,176 +41,75 @@ export function SequentialChart({
   onDetachNodeNameChange,
   onDetach,
   containerRef,
-  readOnly = false,
 }: SequentialChartProps) {
-  const toggleKey = onToggleKey;
-  const visibleKeys = groupKeys.filter((key) => !hiddenKeys.has(key));
-  const hasSelection = selectedPeriodIndices.size > 0;
-  const useNumericAxis = xAxisType === 'number';
-  const chartDataForAxis = useMemo(() => {
-    if (!useNumericAxis) return chartData;
-    return chartData.map((row) => ({ ...row, [NUMERIC_X_KEY]: toNumericX(row) }));
-  }, [useNumericAxis, chartData]);
-
-  if (!groupKeys.length) {
-    return (
-      <div ref={containerRef}>
-        <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
-          No groups meet the current minimum group size.
-        </div>
-        <div className="mt-4 flex flex-col gap-3 px-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full sm:w-auto"
-            disabled={!hasSelection || isDetaching}
-            onClick={onClearSelection}
-          >
-            Clear Selection
-          </Button>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[22rem] sm:flex-row sm:items-center sm:justify-end">
-            <div className="flex w-full items-center gap-2 sm:max-w-md">
-              <label
-                className="shrink-0 text-sm font-medium text-muted-foreground"
-                htmlFor="sequential-new-node-name"
-              >
-                New data block name
-              </label>
-              <Input
-                id="sequential-new-node-name"
-                value={detachNodeName}
-                onChange={(event) => {
-                  onDetachNodeNameChange(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  acceptPlaceholderOnTab({
-                    event,
-                    value: detachNodeName,
-                    setValue: onDetachNodeNameChange,
-                  });
-                }}
-                placeholder={detachNodeNamePlaceholder}
-                disabled={isDetaching || readOnly}
-                aria-label="New data block name"
-                className="min-w-0 flex-1"
-              />
-            </div>
-            <DisabledReasonTooltip
-              reason={
-                readOnly
-                  ? READ_ONLY_DISABLED_REASON
-                  : 'No groups meet the current minimum group size — adjust the filter to enable selecting periods.'
-              }
-            >
-              <Button
-                type="button"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled
-                onClick={onDetach}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add to Workspace ({selectedPeriodIndices.size})
-              </Button>
-            </DisabledReasonTooltip>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!chartData.length) {
+  // A refreshed result can invalidate indices held by the interaction hook.
+  // Keep Clear enabled for that stale state even though the model deliberately
+  // excludes invalid indices from rendering and detachment.
+  const hasSelection = model.selection.selectedCount > 0 || model.selection.hasInvalidSelection;
+  if (!model.chartData.length) {
     return (
       <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
-        No sequential analysis data available. Adjust your configuration and try again.
+        {model.status === 'malformed'
+          ? 'The sequential analysis result is malformed and has no chartable rows.'
+          : 'No sequential analysis data available. Adjust your configuration and try again.'}
       </div>
     );
   }
-
-  const series: MultiSeriesChartSeries[] = visibleKeys.map((key, idx) => {
-    const color = String(chartConfig[key]?.color ?? getSequentialPaletteColor(idx));
-    const label = chartConfig[key]?.label ?? key;
-    return {
-      key,
-      color,
-      label,
-      singlePoint: (groupPointCounts[key] ?? chartData.length) <= 1,
-    };
-  });
-
-  const xKey = useNumericAxis ? NUMERIC_X_KEY : 'time_period';
-  const xAxisConfig: MultiSeriesChartXAxisConfig = useNumericAxis
-    ? {
-        type: 'number',
-        domain: ['dataMin', 'dataMax'],
-        // Recharts defaults `tickCount` to 5 on a number axis, which is too
-        // sparse for the typical Trends span (multi-year corpora). Aim for
-        // ~10 round-number ticks; `minTickGap=20` still drops ticks on
-        // narrow charts so they can't overlap.
-        tickCount: 10,
-        tickFormatter: formatNumericTick,
-        angle: -45,
-        height: 100,
-        minTickGap: 20,
-      }
-    : { angle: -45, height: 100, minTickGap: 20 };
 
   return (
     <div ref={containerRef}>
+      {model.status === 'malformed' ? (
+        <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+          Some malformed result rows were ignored ({String(model.diagnostics.length)} issue
+          {model.diagnostics.length === 1 ? '' : 's'}).
+        </div>
+      ) : null}
       <MultiSeriesChart
-        data={chartDataForAxis}
-        xKey={xKey}
-        series={series}
-        chartType={chartType}
-        xAxis={xAxisConfig}
+        data={model.axisData}
+        xKey={model.xKey}
+        series={model.series}
+        chartType={model.chartType}
+        xAxis={model.xAxis}
         margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
         height={CHART_HEIGHT_PX}
         tooltip={{
           shadcn: true,
           className: 'min-w-50',
-          indicator: chartType === 'line' ? 'line' : 'dot',
-          labelFormatter: (useNumericAxis ? formatNumericTick : formatSequentialTimeLabel) as never,
+          indicator: model.tooltip.indicator,
+          labelFormatter: model.tooltip.labelFormatter as never,
         }}
-        selection={{
-          selectedIndices: selectedPeriodIndices,
-          onSelect: onPeriodClick,
-        }}
+        selection={{ selectedIndices: model.selection.selectedIndices, onSelect: onPeriodClick }}
         interactive
       />
       <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
-        {groupKeys.map((key) => {
-          const color = chartConfig[key]?.color ?? '#8884d8';
-          // An empty series label intentionally falls through to the series key,
-          // so logical-OR (not nullish) is required.
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-          const label = chartConfig[key]?.label || key;
-          const isHidden = hiddenKeys.has(key);
+        {model.groups.map((group) => {
+          const isHidden = group.hidden;
           return (
             <button
-              key={key}
+              key={group.id}
               type="button"
               className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 transition-opacity hover:bg-muted/60"
               style={{ opacity: isHidden ? 0.4 : 1 }}
               onClick={() => {
-                toggleKey(key);
+                onToggleKey(group.id);
               }}
               aria-pressed={!isHidden}
-              aria-label={isHidden ? `Show ${label}` : `Hide ${label}`}
+              aria-label={isHidden ? `Show ${group.label}` : `Hide ${group.label}`}
             >
-              {chartType === 'line' ? (
+              {model.chartType === 'line' ? (
                 <div className="flex items-center">
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                  <div className="h-0.5 w-3" style={{ backgroundColor: color }} />
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
+                  <div className="h-0.5 w-3" style={{ backgroundColor: group.color }} />
+                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
                 </div>
               ) : (
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: group.color }} />
               )}
               <span
                 className="text-sm font-medium text-muted-foreground"
                 style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
               >
-                {label}
+                {group.label}
               </span>
             </button>
           );
@@ -296,10 +133,7 @@ export function SequentialChart({
             >
               New data block name
             </label>
-            <DisabledReasonTooltip
-              reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}
-              className="min-w-0 flex-1"
-            >
+            <DisabledReasonTooltip className="min-w-0 flex-1">
               <Input
                 id="sequential-new-node-name"
                 value={detachNodeName}
@@ -314,7 +148,7 @@ export function SequentialChart({
                   });
                 }}
                 placeholder={detachNodeNamePlaceholder}
-                disabled={isDetaching || readOnly}
+                disabled={isDetaching}
                 aria-label="New data block name"
                 className="min-w-0 flex-1"
               />
@@ -322,20 +156,16 @@ export function SequentialChart({
           </div>
           <DisabledReasonTooltip
             reason={
-              isDetaching
+              isDetaching || model.selection.canDetach
                 ? undefined
-                : readOnlyDisabledReason(
-                    readOnly,
-                    !canDetach &&
-                      'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.',
-                  )
+                : 'Click periods on the chart (shift-click to extend) to pick a subset to add as a new data block.'
             }
           >
             <Button
               type="button"
               size="sm"
               className="w-full sm:w-auto"
-              disabled={!canDetach || isDetaching || readOnly}
+              disabled={!model.selection.canDetach || isDetaching}
               onClick={onDetach}
             >
               {isDetaching ? (
@@ -346,7 +176,7 @@ export function SequentialChart({
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace ({selectedPeriodIndices.size})
+                  Add to Workspace ({model.selection.selectedCount})
                 </>
               )}
             </Button>

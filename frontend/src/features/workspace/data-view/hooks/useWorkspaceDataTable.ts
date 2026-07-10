@@ -57,6 +57,7 @@ const DEFAULT_NODE_TABLE_REQUEST = createNodeDataRequest({ page: 1, page_size: 2
 
 const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
   data: [],
+  revision: '',
   pagination: {
     page: 0,
     page_size: 20,

@@ -144,7 +144,8 @@ const parseErrorResponse = async (response: Response): Promise<ApiError> => {
     `HTTP ${String(response.status)}`;
   /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
-  return new ApiError(message, { status: response.status, detail });
+  const code = typeof parsed?.error === 'string' ? parsed.error : undefined;
+  return new ApiError(message, { status: response.status, code, detail });
 };
 
 /**

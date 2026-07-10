@@ -1146,9 +1146,9 @@ export const annotateAiPreview = <ThrowOnError extends boolean = false>(options:
  *
  * Flow:
  * - Resolve the path workspace (the store is keyed per user+workspace+node).
- * - Clear the node's session unconditionally. Clearing is idempotent, so a missing
- * session (nothing previewed, or already cleared) is a successful no-op; the node
- * itself is not required to still exist, which is why no 404 is raised here.
+ * - Clear only the opaque generation named by the caller. A missing or superseded
+ * id is a 409 conflict, so a delayed close can never delete a new preview. The
+ * node itself is not required to still exist, which is why no 404 is raised.
  */
 export const annotateAiPreviewClear = <ThrowOnError extends boolean = false>(options: Options<AnnotateAiPreviewClearData, ThrowOnError>): RequestResult<AnnotateAiPreviewClearResponses, AnnotateAiPreviewClearErrors, ThrowOnError> => (options.client ?? client).delete<AnnotateAiPreviewClearResponses, AnnotateAiPreviewClearErrors, ThrowOnError>({ url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}', ...options });
 
@@ -1165,9 +1165,9 @@ export const annotateAiPreviewClear = <ThrowOnError extends boolean = false>(opt
  * Flow:
  * - Resolve the workspace + source node (404).
  * - Recompute the config signature and ask the store for its rows; if the stored
- * session belongs to a different config the store returns nothing, so the panel
- * shows an empty preview and re-classifies on demand rather than displaying
- * stale labels.
+ * session belongs to a different config or target column the store returns null
+ * metadata and no rows, so the panel re-classifies on demand rather than
+ * displaying stale labels.
  */
 export const annotateAiPreviewState = <ThrowOnError extends boolean = false>(options: Options<AnnotateAiPreviewStateData, ThrowOnError>): RequestResult<AnnotateAiPreviewStateResponses, AnnotateAiPreviewStateErrors, ThrowOnError> => (options.client ?? client).get<AnnotateAiPreviewStateResponses, AnnotateAiPreviewStateErrors, ThrowOnError>({ url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}', ...options });
 
@@ -1245,7 +1245,7 @@ export const detachAiPreviewedRows = <ThrowOnError extends boolean = false>(opti
 /**
  * Annotate Ai Preview Override
  *
- * Persist one manual cell edit onto the node's active preview session.
+ * Persist one manual cell edit onto an exact preview generation.
  *
  * Used by:
  * - Frontend AnnotationAiPreviewPanel when the user changes a prediction in the
@@ -1256,8 +1256,8 @@ export const detachAiPreviewedRows = <ThrowOnError extends boolean = false>(opti
  *
  * Flow:
  * - Resolve the workspace + source node (404).
- * - Write the override to the current session; ``ok=False`` when there is no active
- * session (the edit is stale — an override can only follow a preview).
+ * - Write the override only when the opaque id is still current and the row has a
+ * computed model result. A stale id is 409; an arbitrary unpreviewed row is 400.
  */
 export const annotateAiPreviewOverride = <ThrowOnError extends boolean = false>(options: Options<AnnotateAiPreviewOverrideData, ThrowOnError>): RequestResult<AnnotateAiPreviewOverrideResponses, AnnotateAiPreviewOverrideErrors, ThrowOnError> => (options.client ?? client).patch<AnnotateAiPreviewOverrideResponses, AnnotateAiPreviewOverrideErrors, ThrowOnError>({
     url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/rows/{row_index}',

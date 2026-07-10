@@ -52,6 +52,7 @@ describe('useAnnotationClassDescriptions', () => {
     expect(mocks.getAnnotationClassDescriptions).toHaveBeenCalledWith({
       path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       query: { class_column: 'class', description_column: 'description' },
+      signal: expect.any(AbortSignal),
       throwOnError: true,
     });
     expect(result.current.rows).toEqual([

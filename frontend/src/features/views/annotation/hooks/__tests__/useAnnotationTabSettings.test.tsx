@@ -16,6 +16,7 @@ describe('useAnnotationTabSettings', () => {
           aiReasoningEnabled: 'true',
           aiReasoningEffort: 'high',
           aiPreviewOpen: 'true',
+          annotationTargets: JSON.stringify({ 'source-node': 'annotation' }),
         },
       }),
     );
@@ -29,6 +30,7 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.aiReasoningEnabled).toBe(true);
     expect(result.current.aiReasoningEffort).toBe('high');
     expect(result.current.isPreviewing).toBe(true);
+    expect(result.current.annotationTargets).toEqual({ 'source-node': 'annotation' });
   });
 
   it('writes discrete setting changes through to the tab sink', () => {
@@ -44,6 +46,7 @@ describe('useAnnotationTabSettings', () => {
       result.current.setAiReasoningEnabled(true);
       result.current.setAiReasoningEffort('low');
       result.current.setIsPreviewing(true);
+      result.current.setAnnotationTarget('source-node', 'existing_annotation');
     });
 
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
@@ -57,6 +60,32 @@ describe('useAnnotationTabSettings', () => {
     expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEnabled', 'true');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEffort', 'low');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiPreviewOpen', 'true');
+    expect(onTabSettingChange).toHaveBeenCalledWith(
+      'annotationTargets',
+      JSON.stringify({ 'source-node': 'existing_annotation' }),
+    );
+  });
+
+  it('retains every target when two selectors persist before React rerenders', () => {
+    const onTabSettingChange = vi.fn();
+    const { result } = renderHook(() => useAnnotationTabSettings({ onTabSettingChange }));
+
+    act(() => {
+      result.current.setAnnotationTarget('source-one', 'label_one');
+      result.current.setAnnotationTarget('source-two', 'label_two');
+    });
+
+    expect(result.current.annotationTargets).toEqual({
+      'source-one': 'label_one',
+      'source-two': 'label_two',
+    });
+    expect(onTabSettingChange).toHaveBeenLastCalledWith(
+      'annotationTargets',
+      JSON.stringify({
+        'source-one': 'label_one',
+        'source-two': 'label_two',
+      }),
+    );
   });
 
   it('ignores malformed persisted provider-model maps', () => {

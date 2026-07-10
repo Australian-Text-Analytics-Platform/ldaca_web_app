@@ -385,8 +385,12 @@ describe('AnnotationFeature', () => {
         filtering: {},
       },
     });
-    mocks.annotateAiPreview.mockResolvedValue({ data: { labels: ['support'] } });
-    mocks.annotateAiPreviewState.mockResolvedValue({ data: { rows: [] } });
+    mocks.annotateAiPreview.mockResolvedValue({
+      data: { session_id: 'session-1', labels: ['support'] },
+    });
+    mocks.annotateAiPreviewState.mockResolvedValue({
+      data: { session_id: null, annotation_column: null, rows: [] },
+    });
     mocks.annotateAiPreviewOverride.mockResolvedValue({ data: { ok: true } });
     mocks.annotateAiPreviewClear.mockResolvedValue({ data: { ok: true } });
     mocks.detachAiPreviewedRows.mockResolvedValue({
@@ -995,6 +999,163 @@ describe('AnnotationFeature', () => {
     ).toBeInTheDocument();
     expect(columnPicker()).toBeDisabled();
     expect(mocks.createAnnotationColumn).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists a newly created preview target and rehydrates it without recreating the column', async () => {
+    const user = userEvent.setup();
+    const persisted: Record<string, string> = { ...openRouterAiSettings };
+    const onTabSettingChange = vi.fn((key: string, value: string) => {
+      persisted[key] = value;
+    });
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    const view = renderAnnotationFeature({
+      tabSettings: persisted,
+      onTabSettingChange,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(
+      await screen.findByRole('region', { name: 'AI Annotation Preview' }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(JSON.parse(persisted.annotationTargets ?? '{}')).toEqual({
+        'source-node': 'annotation',
+      });
+      expect(persisted.aiPreviewOpen).toBe('true');
+    });
+    view.unmount();
+
+    const hydratedSource = sourceNodeInputs();
+    const resolvedSource = hydratedSource.resolvedNodes[0]!;
+    mocks.useTabNodeInputs.mockImplementation((config: { selectorId?: string }) => {
+      if (config.selectorId === 'classDescriptions') return classNodeInputs();
+      if (config.selectorId === 'exampleNodes') return exampleNodeInputs();
+      return {
+        ...hydratedSource,
+        resolvedNodes: [
+          {
+            ...resolvedSource,
+            node: {
+              ...resolvedSource.node,
+              columns: ['text', 'existing_annotation', 'annotation'],
+              schema: {
+                text: 'String',
+                existing_annotation: 'String',
+                annotation: 'String',
+              },
+            },
+            columnOptions: [
+              ...resolvedSource.columnOptions,
+              { name: 'annotation', dataType: 'string' },
+            ],
+          },
+        ],
+      };
+    });
+    renderAnnotationFeature({ tabSettings: persisted, onTabSettingChange });
+
+    expect(
+      await screen.findByRole('region', { name: 'AI Annotation Preview' }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('Selected Data Blocks-addon')).getByRole('combobox', {
+        name: 'Annotation Column',
+      }),
+    ).toHaveTextContent('annotation');
+    expect(mocks.createAnnotationColumn).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists and rehydrates an existing preview target exactly', async () => {
+    const user = userEvent.setup();
+    const persisted: Record<string, string> = { ...openRouterAiSettings };
+    const onTabSettingChange = vi.fn((key: string, value: string) => {
+      persisted[key] = value;
+    });
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    const view = renderAnnotationFeature({ tabSettings: persisted, onTabSettingChange });
+    const targetPicker = within(screen.getByTestId('Selected Data Blocks-addon')).getByRole(
+      'combobox',
+      { name: 'Annotation Column' },
+    );
+    await user.click(targetPicker);
+    await user.click(await screen.findByRole('option', { name: 'existing_annotation' }));
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await screen.findByRole('region', { name: 'AI Annotation Preview' });
+    view.unmount();
+
+    renderAnnotationFeature({ tabSettings: persisted, onTabSettingChange });
+
+    expect(
+      await screen.findByRole('region', { name: 'AI Annotation Preview' }),
+    ).toBeInTheDocument();
+    expect(mocks.createAnnotationColumn).not.toHaveBeenCalled();
+    expect(JSON.parse(persisted.annotationTargets ?? '{}')).toEqual({
+      'source-node': 'existing_annotation',
+    });
+  });
+
+  it('surfaces a missing persisted preview target without inferring a replacement', async () => {
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    renderAnnotationFeature({
+      tabSettings: {
+        ...openRouterAiSettings,
+        aiPreviewOpen: 'true',
+        annotationTargets: JSON.stringify({ 'source-node': 'deleted_annotation' }),
+      },
+    });
+
+    expect(
+      await screen.findByRole('alert', { name: 'Invalid AI preview target' }),
+    ).toHaveTextContent('saved for this preview is missing');
+    expect(screen.queryByRole('region', { name: 'AI Annotation Preview' })).not.toBeInTheDocument();
+    expect(mocks.annotateAiPreview).not.toHaveBeenCalled();
+    expect(mocks.createAnnotationColumn).not.toHaveBeenCalled();
+  });
+
+  it('lets an invalid persisted target clear its exact hydrated session', async () => {
+    const user = userEvent.setup();
+    usePreferencesStore.setState({
+      annotationAiApiKeys: { openrouter: 'sk-test' },
+      annotationAiCustomProviders: [],
+    });
+    mocks.annotateAiPreviewState.mockResolvedValue({
+      data: {
+        session_id: 'stale-target-session',
+        annotation_column: 'deleted_annotation',
+        rows: [],
+      },
+    });
+    renderAnnotationFeature({
+      tabSettings: {
+        ...openRouterAiSettings,
+        aiPreviewOpen: 'true',
+        annotationTargets: JSON.stringify({ 'source-node': 'deleted_annotation' }),
+      },
+    });
+
+    await screen.findByRole('alert', { name: 'Invalid AI preview target' });
+    await user.click(screen.getByRole('button', { name: 'Close preview' }));
+
+    await waitFor(() => {
+      expect(mocks.annotateAiPreviewClear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: { workspace_id: 'workspace-1', node_id: 'source-node' },
+          query: { session_id: 'stale-target-session' },
+        }),
+      );
+    });
+    expect(
+      screen.queryByRole('alert', { name: 'Invalid AI preview target' }),
+    ).not.toBeInTheDocument();
   });
 
   it('disables the AI Preview button when the class node has no classes', async () => {

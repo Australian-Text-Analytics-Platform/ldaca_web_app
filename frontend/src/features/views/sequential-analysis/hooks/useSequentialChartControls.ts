@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 
-import type { SequentialXAxisType } from '../components/SequentialChart';
+import type { SequentialXAxisType } from './sequentialChartModel';
 
 /**
  * Owns chart interaction state for sequential analysis: hidden series, selected
