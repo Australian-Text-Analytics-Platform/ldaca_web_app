@@ -208,6 +208,35 @@ export const useTokenFrequencyPreferences = ({
     [setResults, maxTokenLimitInput],
   );
 
+  /**
+   * Apply one already-normalized token limit locally and persist it when live
+   * results own server preferences.
+   * Called by: typed-input validation and the programmatic list-limit handler,
+   * which differ only in how they normalize user input. This keeps persistence,
+   * optimistic result metadata, loading state, and failure copy in one path.
+   */
+  const persistAndApplyTokenLimit = async (targetLimit: number) => {
+    if (!results || targetLimit === effectiveTokenLimit) {
+      applyTokenLimitState(targetLimit);
+      return;
+    }
+
+    dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
+    try {
+      await persistTokenPreferences({ token_limit: targetLimit });
+      updateResultsPreferencesLocally({ token_limit: targetLimit });
+      applyTokenLimitState(targetLimit);
+    } catch (error) {
+      console.error('Failed to update token limit', error);
+      dispatchPreference({
+        type: 'tokenLimitErrorChanged',
+        error: 'Failed to update token limit. Please try again.',
+      });
+    } finally {
+      dispatchPreference({ type: 'tokenLimitApplyingChanged', active: false });
+    }
+  };
+
   /** Validates and persists the cloud display limit entered in the parameter UI. */
   /**
    * Called by preference handlers in `useTokenFrequencyPreferences`.
@@ -245,26 +274,7 @@ export const useTokenFrequencyPreferences = ({
 
     dispatchPreference({ type: 'tokenLimitErrorChanged', error: null });
 
-    const limitChanged = targetLimit !== effectiveTokenLimit;
-    if (!results || !limitChanged) {
-      applyTokenLimitState(targetLimit);
-      return;
-    }
-
-    dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
-    try {
-      await persistTokenPreferences({ token_limit: targetLimit });
-      updateResultsPreferencesLocally({ token_limit: targetLimit });
-      applyTokenLimitState(targetLimit);
-    } catch (error) {
-      console.error('Failed to update token limit', error);
-      dispatchPreference({
-        type: 'tokenLimitErrorChanged',
-        error: 'Failed to update token limit. Please try again.',
-      });
-    } finally {
-      dispatchPreference({ type: 'tokenLimitApplyingChanged', active: false });
-    }
+    await persistAndApplyTokenLimit(targetLimit);
   };
 
   const saveStopWordsToBackend = useCallback(
@@ -361,28 +371,7 @@ export const useTokenFrequencyPreferences = ({
       input: String(targetLimit),
       clearError: true,
     });
-    if (targetLimit === effectiveTokenLimit) {
-      applyTokenLimitState(targetLimit);
-      return;
-    }
-    if (!results) {
-      applyTokenLimitState(targetLimit);
-      return;
-    }
-    dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
-    try {
-      await persistTokenPreferences({ token_limit: targetLimit });
-      updateResultsPreferencesLocally({ token_limit: targetLimit });
-      applyTokenLimitState(targetLimit);
-    } catch (error) {
-      console.error('Failed to update token limit', error);
-      dispatchPreference({
-        type: 'tokenLimitErrorChanged',
-        error: 'Failed to update token limit. Please try again.',
-      });
-    } finally {
-      dispatchPreference({ type: 'tokenLimitApplyingChanged', active: false });
-    }
+    await persistAndApplyTokenLimit(targetLimit);
   };
 
   /** Adds a chosen language's default stop words to the existing editable list. */

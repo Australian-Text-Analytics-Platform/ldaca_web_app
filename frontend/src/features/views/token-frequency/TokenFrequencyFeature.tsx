@@ -484,8 +484,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
             onChange={(model, detectedLanguage) => {
               handleTokenizerModelChange(nodeId, column, model, detectedLanguage);
             }}
-            disabled={false}
-            disabledReason={undefined}
           />
         )}
       />

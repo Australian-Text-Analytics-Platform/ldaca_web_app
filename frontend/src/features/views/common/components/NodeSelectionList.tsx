@@ -80,8 +80,7 @@ export function NodeSelectionList({
       {nodes.map((node, index) => {
         const nodeId = derivedNodeIds[index];
         if (!nodeId) return null;
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- palette index is always in range with the '#000000' fallback
-        const fallbackColor = (palette.length ? palette[index % palette.length] : '#000000')!;
+        const fallbackColor = palette[index % palette.length] ?? '#000000';
         const color = nodeColors?.[nodeId] ?? fallbackColor;
         const title = getNodeTitle(node, nodeId, index);
         return (

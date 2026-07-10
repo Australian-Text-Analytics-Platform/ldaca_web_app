@@ -36,10 +36,10 @@
 - Consumes: the 55 findings `C1-C11`, `D1-D24`, `M1-M7`, and `B1-B13`.
 - Produces: milestone ordering, staged-diff guard, and per-milestone acceptance contract.
 
-- [ ] Verify all report links/anchors, exact strength labels, four required finding fields, and the immutable 31-entry historical `Done` block.
-- [ ] Record the branch, HEAD, staged-path list, staged content hash, frontend baseline gates, and report checks in the scratch progress ledger.
-- [ ] Run `git diff --check -- docs/frontend-simplification-opportunities-2026-07-08.md docs/superpowers/plans/2026-07-10-frontend-simplification-implementation.md`.
-- [ ] Commit only the two documentation paths with `docs: plan exhaustive frontend simplification`.
+- [x] Verify all report links/anchors, exact strength labels, four required finding fields, and the immutable 31-entry historical `Done` block.
+- [x] Record the branch, HEAD, staged-path list, staged content hash, frontend baseline gates, and report checks in the scratch progress ledger.
+- [x] Run `git diff --check -- docs/frontend-simplification-opportunities-2026-07-08.md docs/superpowers/plans/2026-07-10-frontend-simplification-implementation.md`.
+- [x] Commit only the two documentation paths with `docs: plan exhaustive frontend simplification`.
 
 ### Task 1: Canonical workspace selection, table request, graph projection, and freshness
 
@@ -61,12 +61,12 @@
 - Produces serializable node/edge presentation signatures containing every visible projected field; volatile command context is read at invocation time.
 - Produces workspace-keyed freshness state and removes unowned `forgetNodeIds`.
 
-- [ ] Add failing tests for active/non-active deletion, reorder fallback, operator-only query-key changes, graph colour/edge-label resync, workspace-switch callback freshness, and overlapping fresh-node IDs across workspaces.
-- [ ] Implement the semantic selection actions and delete table-local tab-order reconciliation.
-- [ ] Introduce the canonical table request projection and remove table query state from the selection slice and quotation fallback path.
-- [ ] Make React Flow signatures derive from the rendered serializable projection and remove duplicate empty-selection reconciliation without changing identity-sensitive drag/selection behavior.
-- [ ] Scope fresh-node baselines by workspace and delete the zero-caller action.
-- [ ] Run focused tests, full frontend milestone gates, update developer-guide state-flow docs where ownership changed, move C1-C4 to `Done`, and commit `refactor(frontend): canonicalize workspace interaction state`.
+- [x] Add failing tests for active/non-active deletion, reorder fallback, operator-only query-key changes, graph colour/edge-label resync, workspace-switch callback freshness, and overlapping fresh-node IDs across workspaces.
+- [x] Implement the semantic selection actions and delete table-local tab-order reconciliation.
+- [x] Introduce the canonical table request projection and remove table query state from the selection slice and quotation fallback path.
+- [x] Make React Flow signatures derive from the rendered serializable projection and remove duplicate empty-selection reconciliation without changing identity-sensitive drag/selection behavior.
+- [x] Scope fresh-node baselines by workspace and delete the zero-caller action.
+- [x] Run focused tests, full frontend milestone gates, update developer-guide state-flow docs where ownership changed, move C1-C4 to `Done`, and commit `refactor(frontend): canonicalize workspace interaction state`.
 
 ### Task 2: Scope analysis tasks/results and preprocessing previews
 
@@ -91,12 +91,12 @@
 - Preview request signatures contain workspace and every request-shaping field; fetchers consume request data and `AbortSignal`, not closed-over workspace state.
 - Node-input limits are supplied by the active feature: join `2`, concat `6`; no generic cap `12` overrides them.
 
-- [ ] Add failing tests for same-task-type cross-tab/workspace isolation, functional safe-result updates, stale completion, workspace-switch preview cancellation, and 2/6 input caps.
-- [ ] Implement scoped status resolution and migrate all analysis callers.
-- [ ] Replace the raw safe-result setter and migrate callers that currently bypass ref synchronization.
-- [ ] Derive preview signatures/fetchers from full request data and propagate cancellation through SDK options.
-- [ ] Move truly cross-feature helpers to neutral ownership and apply exact active-feature caps.
-- [ ] Run focused/full gates, update analysis/preprocessing developer docs, move C5-C7 and D24 to `Done`, and commit `refactor(frontend): scope analysis and preprocessing sessions`.
+- [x] Add failing tests for same-task-type cross-tab/workspace isolation, functional safe-result updates, stale completion, workspace-switch preview cancellation, and 2/6 input caps.
+- [x] Implement scoped status resolution and migrate all analysis callers.
+- [x] Replace the raw safe-result setter and migrate callers that currently bypass ref synchronization.
+- [x] Derive preview signatures/fetchers from full request data and propagate cancellation through SDK options.
+- [x] Move truly cross-feature helpers to neutral ownership and apply exact active-feature caps.
+- [x] Run focused/full gates, update analysis/preprocessing developer docs, move C5-C7 and D24 to `Done`, and commit `refactor(frontend): scope analysis and preprocessing sessions`.
 
 ### Task 3: Make Data Loader tasks, cache mutations, and dialogs single-owner
 
@@ -114,11 +114,11 @@
 - File mutations use one cache policy: mutation-owned invalidation/refetch; manual refresh remains explicit.
 - A file-preview dialog has one dialog owner and one focus/cancel lifecycle.
 
-- [ ] Add failing tests for completion after navigation, one save/toast, mutation refresh count, nested-dialog removal, and missing-workspace routing.
-- [ ] Lift pending downloads above feature unmount and remove local completion ownership.
-- [ ] Consolidate mutation cache policy and delete `refetchFiles` prop threading.
-- [ ] Remove orphan/nested dialog shells, unreachable alert state, and unused facade props.
-- [ ] Run focused/full gates, update Data Loader docs, move C8/D8/D23 to `Done`, and commit `refactor(frontend): simplify data loader ownership`.
+- [x] Add failing tests for completion after navigation, one save/toast, mutation refresh count, nested-dialog removal, and missing-workspace routing.
+- [x] Lift pending downloads above feature unmount and remove local completion ownership.
+- [x] Consolidate mutation cache policy and delete `refetchFiles` prop threading.
+- [x] Remove orphan/nested dialog shells, unreachable alert state, and unused facade props.
+- [x] Run focused/full gates, update Data Loader docs, move C8/D8/D23 to `Done`, and commit `refactor(frontend): simplify data loader ownership`.
 
 ### Task 4: Establish one app owner for auth, navigation, status, preferences, and global hosts
 
@@ -137,13 +137,13 @@
 - Preferences expose one durable projection/normalizer/equality boundary shared by persistence and transport.
 - Global feedback, docs banner, and toaster each mount once.
 
-- [ ] Add tests proving ordinary SDK calls receive generated config auth without manual headers and auth lifecycle starts once.
-- [ ] Derive visible views and remove mirrored visibility actions/effects.
-- [ ] Delete workspace error maps with no reader while preserving mutation feedback/loading cleanup.
-- [ ] Implement the canonical preference codec/projection/equality path.
-- [ ] Remove collapsed/last-ratio residue and dead UI-store methods/actions after caller proof.
-- [ ] Consolidate global hosts and update ownership comments/docs.
-- [ ] Run focused/full gates, move D1-D7 to `Done`, and commit `refactor(frontend): consolidate app state ownership`.
+- [x] Add tests proving ordinary SDK calls receive generated config auth without manual headers and auth lifecycle starts once.
+- [x] Derive visible views and remove mirrored visibility actions/effects.
+- [x] Delete workspace error maps with no reader while preserving mutation feedback/loading cleanup.
+- [x] Implement the canonical preference codec/projection/equality path.
+- [x] Remove collapsed/last-ratio residue and dead UI-store methods/actions after caller proof.
+- [x] Consolidate global hosts and update ownership comments/docs.
+- [x] Run focused/full gates, move D1-D7 to `Done`, and commit `refactor(frontend): consolidate app state ownership`.
 
 ### Task 5: Consolidate documentation and hint contracts
 
@@ -160,10 +160,10 @@
 - Docs drift validation checks target files, anchors, relative links, and workflow triggers, not only literal keys.
 - One hints store persists only durable dismissal state; one measurement owner installs shared observers/listeners; retained policy fields must affect behavior.
 
-- [ ] Add failing docs-drift tests for missing files/anchors/relative links and failing hint tests for duplicate measurement/listener ownership.
-- [ ] Collapse registry shims/types, delete impossible warning/dead status paths, and classify 25 zero-literal bundled entries by actual dynamic/offline contract before pruning.
-- [ ] Consolidate hint durable/transient state and DOM measurement; remove unused priority/oneShot/action policy.
-- [ ] Run focused/full gates and docs-drift check, move D9-D10 plus resolved documentation confirmation notes to `Done`, and commit `refactor(frontend): consolidate docs and hint contracts`.
+- [x] Add failing docs-drift tests for missing files/anchors/relative links and failing hint tests for duplicate measurement/listener ownership.
+- [x] Collapse registry shims/types, delete impossible warning/dead status paths, and classify 25 zero-literal bundled entries by actual dynamic/offline contract before pruning.
+- [x] Consolidate hint durable/transient state and DOM measurement; remove unused priority/oneShot/action policy.
+- [x] Run focused/full gates and docs-drift check, move D9-D10 plus resolved documentation confirmation notes to `Done`, and commit `refactor(frontend): consolidate docs and hint contracts`.
 
 ### Task 6: Remove compatibility types, wrappers, hidden exports, and dead internal surfaces
 
@@ -181,12 +181,12 @@
 - Feature owners render `DetachColumnsDialog` directly with domain labels/options.
 - Configured Knip runs without the blanket UI ignore; only imported UI primitives are exported.
 
-- [ ] Write/adjust behavior tests before deleting wrappers/helpers; replace helper-only tests with rendered owner tests where appropriate.
-- [ ] Consolidate node metadata and sidebar contracts, removing legacy/fallback shapes.
-- [ ] Inline/delete shallow detach wrappers, topic mirrors, impossible read-only branches, and verified zero-callers.
-- [ ] Remove the UI Knip exclusion, prune unused export modifiers, confirm clean-install PostCSS ownership, and remove the direct dependency only if the toolchain proves it unnecessary.
-- [ ] Sweep narrow return fields/exports one owner at a time with caller proof; retain deliberate pure-model test seams.
-- [ ] Run focused/full gates, move D11-D18/B6 to `Done`, and commit `refactor(frontend): remove compatibility and dead surfaces`.
+- [x] Write/adjust behavior tests before deleting wrappers/helpers; replace helper-only tests with rendered owner tests where appropriate.
+- [x] Consolidate node metadata and sidebar contracts, removing legacy/fallback shapes.
+- [x] Inline/delete shallow detach wrappers, topic mirrors, impossible read-only branches, and verified zero-callers.
+- [x] Remove the UI Knip exclusion, prune unused export modifiers, confirm clean-install PostCSS ownership, and remove the direct dependency only if the toolchain proves it unnecessary.
+- [x] Sweep narrow return fields/exports one owner at a time with caller proof; retain deliberate pure-model test seams.
+- [x] Run focused/full gates, move D11-D18/B6 to `Done`, and commit `refactor(frontend): remove compatibility and dead surfaces`.
 
 ### Task 7: Break the route cycle and remove compiler-safe structural residue
 
@@ -202,12 +202,12 @@
 - Manual memoization remains only where identity is a correctness/third-party contract.
 - Internal feature code imports direct owning modules instead of a broad common barrel.
 
-- [ ] Add route tests for cold deep links, invalid/pending workspace, replace/push, and back/forward before moving imports.
-- [ ] Extract the dependency-light search contract and prove the cycle is gone.
-- [ ] Run the structured comment/caller audit and replace/remove every named placeholder with verified ownership notes.
-- [ ] Remove only high-confidence local memo/callback wrappers; retain and document identity-sensitive ones.
-- [ ] Replace broad common-barrel imports with direct imports and run the cycle/export scans.
-- [ ] Run full gates, move D19-D22 to `Done`, and commit `refactor(frontend): simplify routing and local boundaries`.
+- [x] Add route tests for cold deep links, invalid/pending workspace, replace/push, and back/forward before moving imports.
+- [x] Extract the dependency-light search contract and prove the cycle is gone.
+- [x] Run the structured comment/caller audit and replace/remove every named placeholder with verified ownership notes.
+- [x] Remove only high-confidence local memo/callback wrappers; retain and document identity-sensitive ones.
+- [x] Replace broad common-barrel imports with direct imports and run the cycle/export scans.
+- [x] Run full gates, move D19-D22 to `Done`, and commit `refactor(frontend): simplify routing and local boundaries`.
 
 ### Task 8: Deepen Annotation and Sequential domain modules
 
@@ -221,10 +221,10 @@
 - `useAnnotationAiPreviewSession` owns session identity, hydration, signatures, overrides, queries, mutation commands, detach/cache lifecycle, and stale completion; the panel renders returned domain state/commands.
 - `buildSequentialChartModel(input)` is pure and returns render-ready series, labels, selection metadata, and explicit empty/error state; hooks retain task/query ownership.
 
-- [ ] Characterize current annotation session/refetch semantics and Sequential chart outputs with failing extraction tests.
-- [ ] Extract the deep annotation session and shared node-page/class-description queries without adding pass-through wrappers.
-- [ ] Move pure Sequential shaping into the chart model and simplify hooks/renderers.
-- [ ] Run focused/full gates, update analysis developer docs, move M1-M2 to `Done`, and commit `refactor(frontend): deepen annotation and sequential domains`.
+- [x] Characterize current annotation session/refetch semantics and Sequential chart outputs with failing extraction tests.
+- [x] Extract the deep annotation session and shared node-page/class-description queries without adding pass-through wrappers.
+- [x] Move pure Sequential shaping into the chart model and simplify hooks/renderers.
+- [x] Run focused/full gates, update analysis developer docs, move M1-M2 to `Done`, and commit `refactor(frontend): deepen annotation and sequential domains`.
 
 ### Task 9: Canonicalize Quotation/Concordance domains and analysis host contracts
 
@@ -240,11 +240,11 @@
 - Concordance exposes a deep results-session hook/context plus cohesive combined/table, dispersion, and source/materialization pure modules; it does not replace prop lists with an opaque bag.
 - Analysis host captures workspace/tab commands in closures and passes a canonical minimal feature contract.
 
-- [ ] Add characterization tests for quotation Unicode/overlapping spans/palette/materialization and Concordance combined/dispersion/session behavior.
-- [ ] Normalize quotation payloads once and delete renderer fallback parsing.
-- [ ] Extract Concordance session ownership and split the 803-line model by domain, sharing only real node-shell/model/scroll behavior.
-- [ ] Consolidate six feature host interfaces and remove optional tab-ID guards.
-- [ ] Run focused/full gates, update analysis docs, move M3-M5 to `Done`, and commit `refactor(frontend): canonicalize analysis result domains`.
+- [x] Add characterization tests for quotation Unicode/overlapping spans/palette/materialization and Concordance combined/dispersion/session behavior.
+- [x] Normalize quotation payloads once and delete renderer fallback parsing.
+- [x] Extract Concordance session ownership and split the 803-line model by domain, sharing only real node-shell/model/scroll behavior.
+- [x] Consolidate six feature host interfaces and remove optional tab-ID guards.
+- [x] Run focused/full gates, update analysis docs, move M3-M5 to `Done`, and commit `refactor(frontend): canonicalize analysis result domains`.
 
 ### Task 10: Make optional and user-triggered bundles genuinely optional
 
@@ -260,12 +260,12 @@
 - Optional Sentry is accessed only through one adapter and loaded only when configured; Google provider mounts only for Google auth; Settings is a lazy dialog boundary.
 - Distributable builds either omit source maps or upload hidden maps and exclude them from backend/Tauri artifacts. This plan selects omission unless an existing release integration proves upload is required.
 
-- [ ] Add lazy-loading/provider tests and capture baseline chunk/map/CSS artifacts.
-- [ ] Implement dynamic stopword loading and real loading/error behavior.
-- [ ] Localize optional Sentry/Google/Settings ownership without weakening pre-root/render error handling.
-- [ ] Disable distributable public maps and inspect backend/Tauri package contents.
-- [ ] Compare Lightning CSS and esbuild outputs/representative visuals; remove the explicit override/direct esbuild only if equivalence is proven.
-- [ ] Run full gates and artifact inspection, move B1-B3/B13 and resolved policy notes to `Done`, and commit `perf(frontend): defer optional frontend bundles`.
+- [x] Add lazy-loading/provider tests and capture baseline chunk/map/CSS artifacts.
+- [x] Implement dynamic stopword loading and real loading/error behavior.
+- [x] Localize optional Sentry/Google/Settings ownership without weakening pre-root/render error handling.
+- [x] Disable distributable public maps and inspect backend/Tauri package contents.
+- [x] Compare Lightning CSS and esbuild outputs/representative visuals; remove the explicit override/direct esbuild only if equivalence is proven.
+- [x] Run full gates and artifact inspection, move B1-B3/B13 and resolved policy notes to `Done`, and commit `perf(frontend): defer optional frontend bundles`.
 
 ### Task 11: Make frontend maintenance gates executable and generator-resistant
 
@@ -283,12 +283,12 @@
 - Vite/OpenAPI configs belong to a Node/tooling TS+ESLint project.
 - One version target registry drives bump/check; verification covers Cargo.lock and expected release tag.
 
-- [ ] Replace generated module mocks with the real `@/api` client plus request-level MSW; verify regenerated SDK filenames do not affect tests.
-- [ ] Remove private npm publication/CLI residue while retaining workspace name/version.
-- [ ] Add the aggregate check and PR CI contract; include config lint/type coverage.
-- [ ] Resolve the format baseline in a dedicated mechanical commit boundary, then make format part of the executable contract if it remains non-mutating.
-- [ ] Consolidate version targets and add lock/tag mismatch fixtures.
-- [ ] Run clean install where dependencies changed, full frontend gates, docs/version checks, move B4/B5/B7-B10 to `Done`, and commit the functional milestone(s) with the format-only commit kept separate.
+- [x] Replace generated module mocks with the real `@/api` client plus request-level MSW; verify regenerated SDK filenames do not affect tests.
+- [x] Remove private npm publication/CLI residue while retaining workspace name/version.
+- [x] Add the aggregate check and PR CI contract; include config lint/type coverage.
+- [x] Resolve the format baseline in a dedicated mechanical commit boundary, then make format part of the executable contract if it remains non-mutating.
+- [x] Consolidate version targets and add lock/tag mismatch fixtures.
+- [x] Run clean install where dependencies changed, full frontend gates, docs/version checks, move B4/B5/B7-B10 to `Done`, and commit the functional milestone(s) with the format-only commit kept separate.
 
 ### Task 12: Align desktop development, workflow, and runtime preparation
 
@@ -304,12 +304,12 @@
 - One repository command owns Python 3.14t runtime preparation; workflows retain platform setup and validation.
 - Capabilities/dependencies expose only live opener/dialog/filesystem/native commands; dead HTTP/global/window-webview/port/input surfaces are absent.
 
-- [ ] Add config/script tests for port and runtime-preparation contracts.
-- [ ] Align dev command/port and remove npm drift.
-- [ ] Consolidate runtime preparation across package scripts and macOS/Windows workflows.
-- [ ] Delete verified retired workflow/Tauri surfaces and stale docs; preserve live capabilities.
-- [ ] Search external/repository producers of `.env`/`.env.desktop`; remove runtime loading and `dotenvy` only when the search plus package contract proves no supported consumer.
-- [ ] Run frontend gates, workflow/config checks, decoupled Rust checks, move C9/C10 linkage/B11/B12 to `Done`, and commit `build(desktop): align runtime preparation contracts`.
+- [x] Add config/script tests for port and runtime-preparation contracts.
+- [x] Align dev command/port and remove npm drift.
+- [x] Consolidate runtime preparation across package scripts and macOS/Windows workflows.
+- [x] Delete verified retired workflow/Tauri surfaces and stale docs; preserve live capabilities.
+- [x] Search external/repository producers of `.env`/`.env.desktop`; remove runtime loading and `dotenvy` only when the search plus package contract proves no supported consumer.
+- [x] Run frontend gates, workflow/config checks, decoupled Rust checks, move C9/C10 linkage/B11/B12 to `Done`, and commit `build(desktop): align runtime preparation contracts`.
 
 ### Task 13: Resolve packaged runtime layout and split the Tauri shell
 
@@ -325,12 +325,12 @@
 - `BackendProcess` owns a child directly behind one Tauri-managed mutex; shutdown is idempotent and returns `Result`, with no production `unwrap`.
 - Core Rust unit tests compile without the generated `backend-runtime`; actual packaging still requires/stages it.
 
-- [ ] Add Rust/Node/Python contract tests for relative layout, relocation, corrupt/missing manifest, process double-close, timeout, tree termination, and native download.
-- [ ] Make packager/stager emit one relative manifest and delete absolute rewrites/repeated runtime scans.
-- [ ] Extract cohesive Rust modules and simplify child/mutex/error ownership, preserving platform fallbacks until covered.
-- [ ] Decouple unit test/clippy configuration from generated resources while retaining the packaging gate.
-- [ ] Validate a relocated staged bundle on available platforms and make CI execute the production resolver/environment.
-- [ ] Run affected Python type/tests, Node/frontend gates, Rust fmt/test/clippy, staged runtime/package smoke, move C11/M6/M7 to `Done`, and commit `refactor(desktop): resolve and modularize runtime layout`.
+- [x] Add Rust/Node/Python contract tests for relative layout, relocation, corrupt/missing manifest, process double-close, timeout, tree termination, and native download.
+- [x] Make packager/stager emit one relative manifest and delete absolute rewrites/repeated runtime scans.
+- [x] Extract cohesive Rust modules and simplify child/mutex/error ownership, preserving platform fallbacks until covered.
+- [x] Decouple unit test/clippy configuration from generated resources while retaining the packaging gate.
+- [x] Validate a relocated staged bundle on available platforms and make CI execute the production resolver/environment.
+- [x] Run affected Python type/tests, Node/frontend gates, Rust fmt/test/clippy, staged runtime/package smoke, move C11/M6/M7 to `Done`, and commit `refactor(desktop): resolve and modularize runtime layout`.
 
 ### Task 14: Prove complete implementation
 
@@ -343,9 +343,9 @@
 **Interfaces:**
 - Produces an empty `Open TODOs` finding set, a complete dated `Done` ledger for all 55 findings, and a reviewed commit range.
 
-- [ ] Re-read every original finding and map it to code, tests, docs, commit, and a dated `Done` entry; treat missing/indirect evidence as incomplete.
-- [ ] Run configured and no-UI-exclusion Knip, import-cycle scan, clone/export/dependency checks, docs-drift, version/tag/lock fixtures, format, lint, all frontend tests, production build, and `git diff --check`.
-- [ ] Run affected backend/Python gates and the now-decoupled Rust fmt/test/clippy plus staged runtime validation.
-- [ ] Verify the user's pre-existing staged work remains present and was not accidentally absorbed into milestone commits.
-- [ ] Dispatch a whole-branch review, fix every Critical/Important result, re-run covering tests, and repeat review until clean.
-- [ ] Commit final report/verification corrections as `docs: complete frontend simplification audit` and use the finishing-development-branch workflow.
+- [x] Re-read every original finding and map it to code, tests, docs, commit, and a dated `Done` entry; treat missing/indirect evidence as incomplete.
+- [x] Run configured and no-UI-exclusion Knip, import-cycle scan, clone/export/dependency checks, docs-drift, version/tag/lock fixtures, format, lint, all frontend tests, production build, and `git diff --check`.
+- [x] Run affected backend/Python gates and the now-decoupled Rust fmt/test/clippy plus staged runtime validation.
+- [x] Verify the user's pre-existing staged work remains present and was not accidentally absorbed into milestone commits.
+- [x] Dispatch a whole-branch review, fix every Critical/Important result, re-run covering tests, and repeat review until clean.
+- [x] Commit final report/verification corrections as `docs: complete frontend simplification audit` and use the finishing-development-branch workflow.

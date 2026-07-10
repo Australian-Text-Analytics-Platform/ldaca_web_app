@@ -530,7 +530,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           selectAllDetachColumns={selectAllDetachColumns}
           deselectAllDetachColumns={deselectAllDetachColumns}
           handleDetachConfirm={handleDetachConfirm}
-          readOnly={false}
         />
       )}
     </div>

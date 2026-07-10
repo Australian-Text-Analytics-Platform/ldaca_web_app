@@ -3,7 +3,6 @@ import { Loader2, Plus } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Input } from '@/components/ui/input';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
@@ -222,57 +221,53 @@ export function QuotationResultsPanel({
                 )
               }
             >
-              <DisabledReasonTooltip reason={undefined}>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    onMaterialize(nodeId);
-                  }}
-                  disabled={
-                    Boolean(nodeMaterializing[nodeId]) ||
-                    materialized ||
-                    Boolean(nodeDetaching[nodeId])
-                  }
-                  className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                  title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
-                >
-                  {nodeMaterializing[nodeId] ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing…
-                    </>
-                  ) : materialized ? (
-                    <>Processed</>
-                  ) : (
-                    <>Process All</>
-                  )}
-                </Button>
-              </DisabledReasonTooltip>
-              <DisabledReasonTooltip reason={undefined}>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => {
-                    onOpenDetachDialog(nodeId);
-                  }}
-                  disabled={Boolean(nodeDetaching[nodeId])}
-                  className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                >
-                  {nodeDetaching[nodeId] ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Adding to Workspace…
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add to Workspace
-                    </>
-                  )}
-                </Button>
-              </DisabledReasonTooltip>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  onMaterialize(nodeId);
+                }}
+                disabled={
+                  Boolean(nodeMaterializing[nodeId]) ||
+                  materialized ||
+                  Boolean(nodeDetaching[nodeId])
+                }
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
+              >
+                {nodeMaterializing[nodeId] ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing…
+                  </>
+                ) : materialized ? (
+                  <>Processed</>
+                ) : (
+                  <>Process All</>
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  onOpenDetachDialog(nodeId);
+                }}
+                disabled={Boolean(nodeDetaching[nodeId])}
+                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+              >
+                {nodeDetaching[nodeId] ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding to Workspace…
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace
+                  </>
+                )}
+              </Button>
             </QuotationNodeBlock>
           );
         })}

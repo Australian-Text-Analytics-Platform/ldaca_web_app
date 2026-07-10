@@ -1,15 +1,12 @@
 import React from 'react';
 import type { DetachNodeOption, TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { Button } from '@/components/ui/button';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { DetachColumnsDialog } from '@/features/views/common/components/DetachColumnsDialog';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
-
-const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
 
 interface Props {
   topicWaitingBanner: {
@@ -56,8 +53,6 @@ interface Props {
   selectAllDetachColumns: () => void;
   deselectAllDetachColumns: () => void;
   handleDetachConfirm: () => Promise<void> | void;
-  /** Read-only flag that disables Add to Workspace and exact-topic re-aggregation while leaving chart exploration controls active. */
-  readOnly?: boolean;
 }
 
 /**
@@ -101,7 +96,6 @@ export function TopicModelingResultsPanel({
   selectAllDetachColumns,
   deselectAllDetachColumns,
   handleDetachConfirm,
-  readOnly = false,
 }: Props) {
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
   const runningMessage =
@@ -174,35 +168,30 @@ export function TopicModelingResultsPanel({
                     <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
                   </div>
                   <div className="hidden lg:block" />
-                  <DisabledReasonTooltip
-                    reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}
+                  <Button
+                    type="button"
+                    size="sm"
                     className="w-full shrink-0 lg:w-auto"
+                    onClick={() => void openDetachDialog()}
+                    disabled={isDetachLoading || isDetaching}
                   >
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="w-full shrink-0 lg:w-auto"
-                      onClick={() => void openDetachDialog()}
-                      disabled={isDetachLoading || isDetaching || readOnly}
-                    >
-                      {isDetachLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Preparing Add to Workspace…
-                        </>
-                      ) : selectedTopicIds.size > 0 ? (
-                        <>
-                          <Plus className="mr-2 h-4 w-4" />
-                          {`Add to Workspace (${String(selectedTopicIds.size)} topics)`}
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add to Workspace (all)
-                        </>
-                      )}
-                    </Button>
-                  </DisabledReasonTooltip>
+                    {isDetachLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Preparing Add to Workspace…
+                      </>
+                    ) : selectedTopicIds.size > 0 ? (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {`Add to Workspace (${String(selectedTopicIds.size)} topics)`}
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add to Workspace (all)
+                      </>
+                    )}
+                  </Button>
                 </div>
               }
             />

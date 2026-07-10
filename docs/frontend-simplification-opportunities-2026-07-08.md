@@ -14,9 +14,9 @@ The goal is still deletion and simpler ownership, but the scan also records
 correctness-sensitive seams and deep modules that should be improved without
 flattening intentional architecture.
 
-This is a report-only backlog. Every proposed action or future interface below
-is a **recommendation**, not a public API or type change made by this refresh.
-Completed work remains in `Done` exactly as originally recorded.
+This began as a report-only backlog. The implementation pass is now complete:
+the original recommendations, follow-up findings, and final residue sweep are
+recorded in `Done`; no proposal should be read as an unimplemented public API.
 
 ## Audit Method And Evidence Baseline
 
@@ -28,33 +28,35 @@ did not decide architecture by itself:
   experiments.
 - Traced the route import graph and other import cycles, plus dependency and
   export usage from both package metadata and call sites.
-- Ran configured Knip and a second Knip pass without the blanket UI exclusion,
-  then classified hits as production dead code, test seams, generated ownership,
-  or product-contract questions.
-- Ran clone detection over handwritten sources and inspected the production
-  bundle and source maps for duplicated work and optional-code weight.
+- Ran configured Knip and a pass without the former blanket UI exclusion. The
+  final configuration itself now includes shared UI, so those scopes are
+  equivalent.
+- Ran clone detection over handwritten production sources (tests and generated
+  code excluded) and inspected the production bundle and absence of source maps
+  for duplicated work and optional-code weight.
 - Followed state and query ownership end-to-end across stores, providers,
   TanStack Query keys/fetchers, React Flow reconciliation, analysis task streams,
   and Data Loader navigation.
 - Followed Tauri packaging from Python runtime preparation through staging,
   resource configuration, Rust runtime discovery, process launch, and desktop
-  workflows. Rust source validation was not inferred from a build that stopped
-  before compiling the shell.
+  workflows, then built and launched the final macOS app resource. Rust source
+  validation is independently decoupled from generated runtime contents.
 
-### 2026-07-10 Evidence Snapshot
+### 2026-07-11 Completion Snapshot
 
 | Check | Current baseline |
 | --- | --- |
-| Configured Knip | Passed. |
-| Frontend lint | Passed. |
-| Frontend tests | 163 test files and 772 tests passed. |
-| Production build | Passed; 4,826 modules transformed; main entry 520.13 kB raw / 160.66 kB gzip. |
-| Documentation drift | Passed for 70 literal targets. |
-| Version check | All five configured sources agreed on 0.6.0, but the check missed `Cargo.lock` and release-tag drift. |
-| `git diff --check` | Passed for the audited tree. |
-| Clone scan | 28 clones across 365 files, about 1.06% duplicated tokens / 0.84% duplicated lines. |
-| Format check | Currently reports 49 files. This is recorded debt, not a passing gate. |
-| Tauri test/clippy | Could not reach useful source validation: the ignored generated runtime resource and stale/coupled lock/resource contracts stop the build first. |
+| Configured Knip / shared UI | Passed; generated API is the only source exclusion. |
+| Frontend format, lint, and type checks | Passed for application and tooling configuration. |
+| Frontend tests | 198 test files and 892 tests passed. |
+| Production build | Passed; 4,823 modules transformed; main entry 540.23 kB raw / 168.08 kB gzip; no source maps emitted. |
+| Documentation drift | Passed for 70 icon literals, 20 documents, 83 public files, and 43 zero-literal entries. |
+| Version and release identity | Six registered sources agree on 0.6.0; Cargo lock and exact-tag fixtures passed. |
+| Handwritten import cycles | 627 files processed with zero cycles; the one generated-client cycle remains generator-owned. |
+| Production clone scan | 15 clones across 392 files at the 10-line / 80-token threshold; 0.48% duplicated lines / 0.60% tokens. The retained pairs have distinct UI/domain contracts. |
+| Backend | Type check passed; 534 tests passed and one network-gated tokenizer test skipped. |
+| Tauri | Cargo format, seven unit tests, strict Clippy, final-bundle import probe, macOS app build, and live packaged `/health` smoke passed. |
+| `git diff --check` | Passed for the branch and protected staged work. |
 
 ## Open TODOs
 
@@ -720,8 +722,8 @@ implementation backlog.
       type checks, Knip, production build, docs drift, six-source version and
       tag fixtures, runtime-preparation/desktop config fixtures, Cargo metadata
       and formatting, strict-port collision rejection, and diff checks. Cargo
-      source compilation now advances to the known generated-resource gate,
-      which C11/M6/M7 remove in the next milestone.
+      source compilation advanced to the then-known generated-resource gate;
+      C11/M6/M7 removed it in Milestone 12.
 
 84. Validate packaged Python through production resolution (C11)
     - Done 2026-07-11. The packager emits schema-1 relative interpreter,
@@ -765,6 +767,18 @@ implementation backlog.
       runtime preparation, unchanged-manifest relocation, a successful macOS
       app bundle, production imports from that bundle, and a live packaged-app
       health check all passed.
+
+88. Remove final constant-prop and empty-wrapper residue
+    - Done 2026-07-11 during the completion audit. Topic Modeling no longer
+      carries an impossible read-only prop/reason/disabled branch; Quotation no
+      longer wraps two buttons in disabled-reason hosts whose reason was always
+      `undefined`; Concordance and Token Frequency no longer pass redundant
+      false/undefined tokenizer props. The stopword ambient type now describes
+      the dynamic language-export map instead of unused named APIs, and palette
+      fallback no longer needs a non-null assertion. The two token-limit entry
+      paths now share one persistence/result/loading/error owner instead of
+      cloning the same async block. All 892 frontend tests still pass after
+      these deletions.
 
 ## Endpoint And Source-Of-Truth Notes
 
@@ -822,42 +836,42 @@ The 2026-07-09 cleanup remains the starting contract for this refresh:
   hosts are now consolidated separately at the app boundary.
 - **Identity-sensitive memoization:** retain memoization around React Flow,
   TanStack Table, Recharts/d3, context values, and effect/listener identities.
-  React Compiler does not remove third-party identity contracts; only the narrow
-  local candidates in D21 should be tested.
+  React Compiler does not remove third-party identity contracts; D21 removed
+  the narrow compiler-owned local candidates and regression-tested the rest.
 - **API barrel and generated-code boundary:** retain `@/api` as the handwritten
-  application seam and generated code as generator-owned output. Direct internal
-  imports in tests are cleanup targets, but generated files should not be
-  manually simplified.
+  application seam and generated code as generator-owned output. Application
+  tests now mock `@/api` plus MSW rather than generated internals; generated
+  files should not be manually simplified.
 - **React Compiler Vite/Babel bridge:** retain it. The compiler integration is a
   build contract, not residue from manual memoization.
 - **Runtime-config classic-script ordering:** retain the classic bootstrap script
   before the module entry so the API/backend base exists before module
   evaluation in web and desktop packages.
 - **Tauri runtime staging concept:** retain a prepared Python resource, but make
-  its layout contract singular and testable. Also retain the native large-file
-  download path, PID reaping and runtime-search fallbacks until production-path
-  tests cover their startup/crash cases, `build.rs` because Tauri requires it,
-  and Vite's relative asset base for backend/desktop static loading.
+  its layout contract singular and testable. Retain the native large-file
+  download path, PID reaping, exact platform resource candidates, `build.rs`
+  because Tauri requires resource preparation, and Vite's relative asset base
+  for backend/desktop static loading. Recursive runtime scans and interpreter
+  fallbacks are gone.
 - **Live Tauri plugins:** retain opener, dialog, and filesystem plugins. Source
-  tracing found real consumers; only unused HTTP/global/window-webview surfaces
-  are deletion candidates.
+  tracing found real consumers; unused HTTP/global/window-webview surfaces are
+  gone.
 - **Existing deep/lazy boundaries:** retain CodeMirror, MediaPipe,
   `DocumentView`/`WorkspaceView`, analysis feature chunks, and split-layout
   primitives. Bundle/import tracing shows these defer meaningful work or own
   reusable behavior rather than serving as cosmetic wrappers.
 
-## Suggested Verification By Change Type
+## Completed Verification By Change Type
 
-- Run the focused validation scenarios written under each finding first, then
-  the repository's frontend lint, tests, build, and Knip gates. Do not use this
-  report refresh as evidence that a future implementation passed those gates.
+- Focused validation scenarios were run with the implementing milestones, then
+  the repository-wide format, lint, application/tooling types, tests, Knip,
+  production build, docs, version, cycle, clone, and diff checks were repeated.
 - Any backend/API contract change additionally needs backend type/tests and
   OpenAPI/client regeneration; generated files remain generator-owned.
-- Tauri changes need clean-checkout Rust source checks that do not depend on a
-  generated runtime, plus staged/relocated bundle tests on macOS and Windows for
-  packaging behavior.
+- Tauri source tests and Clippy no longer depend on a generated runtime. The
+  shared production resolver/environment was exercised against staged and final
+  macOS bundle resources; Windows CI runs the same ignored probe after bundling.
 - Release and source-map changes need artifact inspection and policy-specific
   workflow checks, not only a successful frontend build.
-- Broad deletion/comment passes should repeat dependency/export/cycle checks and
-  targeted caller verification, preserving deliberate test seams and the
-  retained layers above.
+- Broad deletion/comment passes repeated dependency/export/cycle checks and
+  targeted caller verification while preserving the deliberate seams above.
