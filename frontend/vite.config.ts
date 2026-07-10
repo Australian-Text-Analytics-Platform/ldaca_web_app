@@ -71,8 +71,9 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    cssMinify: 'esbuild',
-    sourcemap: true,
+    // Distributable web/backend/Tauri artifacts omit source maps because no
+    // release upload pipeline consumes them; this keeps sources out of shipped bundles.
+    sourcemap: false,
     outDir: 'build',
     emptyOutDir: true,
   },

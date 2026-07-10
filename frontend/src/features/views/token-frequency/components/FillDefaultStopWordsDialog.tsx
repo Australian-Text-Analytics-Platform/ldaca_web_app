@@ -28,7 +28,7 @@ interface FillDefaultStopWordsDialogProps {
   /** True while the chosen stoplist is being loaded into the editor. */
   isLoading: boolean;
   /** Loads default stop words for the picked ISO 639-1 language. */
-  onFill: (language: string) => void;
+  onFill: (language: string) => Promise<void>;
 }
 
 /**
@@ -62,6 +62,7 @@ function FillDefaultStopWordsDialog({
   // parent remounts this component when the dialog opens (via `key`), so the
   // override resets to null automatically without a reset effect.
   const [picked, setPicked] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // The dropdown shows the user's explicit pick when present, otherwise the
   // detected guess (only if it maps to a supported stoplist). Deriving the
@@ -72,10 +73,15 @@ function FillDefaultStopWordsDialog({
       : '';
   const selected = picked ?? guessed;
 
-  const handleFill = () => {
+  const handleFill = async () => {
     if (!selected) return;
-    onFill(selected);
-    onOpenChange(false);
+    setLoadError(null);
+    try {
+      await onFill(selected);
+      onOpenChange(false);
+    } catch {
+      setLoadError('Could not load the default stop words. Check your connection and try again.');
+    }
   };
 
   return (
@@ -104,6 +110,11 @@ function FillDefaultStopWordsDialog({
               ))}
             </SelectContent>
           </Select>
+          {loadError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {loadError}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
           <Button
@@ -116,7 +127,13 @@ function FillDefaultStopWordsDialog({
           >
             Cancel
           </Button>
-          <Button type="button" onClick={handleFill} disabled={isLoading || !selected}>
+          <Button
+            type="button"
+            onClick={() => {
+              void handleFill();
+            }}
+            disabled={isLoading || !selected}
+          >
             {isLoading ? 'Adding…' : 'Add'}
           </Button>
         </DialogFooter>

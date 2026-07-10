@@ -20,8 +20,6 @@
  *   (post-trim, preserving original case so e.g. ``Inc`` and ``inc``
  *   stay distinct — matching how the existing textarea treats words).
  */
-import * as stopwordLists from 'stopword';
-
 interface MergedStopwordsLanguageGroup {
   /** Normalised ISO 639-1 language code resolved from node metadata. */
   language: string;
@@ -39,8 +37,6 @@ export interface MergedStopwordsResult {
 }
 
 type StopwordExports = Record<string, unknown>;
-
-const stopwordExports = stopwordLists as StopwordExports;
 
 interface StopwordLanguageMetadata {
   /** Export key used by the third-party stopword package. */
@@ -124,21 +120,39 @@ const normaliseLanguageCode = (raw: string): string =>
 const stopwordCodeByIso6391 = new Map<string, string>(
   STOPWORD_LANGUAGE_METADATA.map(({ iso6391, stopwordCode }) => [iso6391, stopwordCode]),
 );
+const supportedStopwordCodes = new Set<string>(
+  STOPWORD_LANGUAGE_METADATA.map(({ stopwordCode }) => stopwordCode),
+);
 
-const hasStopwordExport = (code: string): boolean => Array.isArray(stopwordExports[code]);
+let stopwordModulePromise: Promise<StopwordExports> | null = null;
+
+/**
+ * Loads the user-triggered stopword implementation once. A failed chunk load
+ * clears the same promise so a later retry can recover after connectivity or
+ * desktop-resource availability changes; there is no parallel list cache.
+ */
+const loadStopwordModule = (): Promise<StopwordExports> => {
+  stopwordModulePromise ??= import('stopword')
+    .then((module) => module as StopwordExports)
+    .catch((error: unknown) => {
+      stopwordModulePromise = null;
+      throw error;
+    });
+  return stopwordModulePromise;
+};
 
 /** Maps ISO 639-1/639-3 inputs to the third-party stopword package's export keys. */
 /** Called by: `resolveMergedStopwords` for each requested language. */
 const resolveStopwordLanguageCode = (language: string): string | null => {
   const normalised = normaliseLanguageCode(language);
   if (!normalised) return null;
-  if (normalised.length === 3 && hasStopwordExport(normalised)) return normalised;
+  if (normalised.length === 3 && supportedStopwordCodes.has(normalised)) return normalised;
   return stopwordCodeByIso6391.get(normalised) ?? null;
 };
 
 /** Reads one stopword export while treating unsupported package keys as an empty list. */
 /** Called by: merged-list construction and supported-language filtering. */
-const getStopwordList = (stopwordCode: string): string[] => {
+const getStopwordList = (stopwordExports: StopwordExports, stopwordCode: string): string[] => {
   const list = stopwordExports[stopwordCode];
   if (!Array.isArray(list)) return [];
   return list.map((word) => String(word).trim()).filter(Boolean);
@@ -148,9 +162,7 @@ const getStopwordList = (stopwordCode: string): string[] => {
 /**
  * Called by: the exported async facade below.
  */
-function resolveMergedStopwords(
-  languages: readonly (string | null | undefined)[],
-): MergedStopwordsResult {
+function resolveRequestedLanguages(languages: readonly (string | null | undefined)[]) {
   const seen = new Set<string>();
   const ordered: { language: string; stopwordLanguage: string }[] = [];
   for (const candidate of languages) {
@@ -161,15 +173,17 @@ function resolveMergedStopwords(
     seen.add(stopwordLanguage);
     ordered.push({ language, stopwordLanguage });
   }
+  return ordered;
+}
 
-  if (ordered.length === 0) {
-    return { byLanguage: [], merged: [] };
-  }
-
+function resolveMergedStopwords(
+  ordered: { language: string; stopwordLanguage: string }[],
+  stopwordExports: StopwordExports,
+): MergedStopwordsResult {
   const byLanguage: MergedStopwordsLanguageGroup[] = ordered.map(
     ({ language, stopwordLanguage }) => ({
       language,
-      words: getStopwordList(stopwordLanguage),
+      words: getStopwordList(stopwordExports, stopwordLanguage),
     }),
   );
 
@@ -186,13 +200,14 @@ function resolveMergedStopwords(
   return { byLanguage, merged };
 }
 
-/** Async facade for UI actions that may later load stopword sources dynamically. */
+/** Loads and merges stopwords only after a supported user choice requires the chunk. */
 /** Used by: Token Frequency preferences, `FillDefaultStopWordsDialog`, and stopword tests. */
-// eslint-disable-next-line @typescript-eslint/require-await
 export async function loadMergedStopwords(args: {
   languages: readonly (string | null | undefined)[];
 }): Promise<MergedStopwordsResult> {
-  return resolveMergedStopwords(args.languages);
+  const ordered = resolveRequestedLanguages(args.languages);
+  if (ordered.length === 0) return { byLanguage: [], merged: [] };
+  return resolveMergedStopwords(ordered, await loadStopwordModule());
 }
 
 /** A stopword language offered in the "Add Default" picker. */
@@ -208,13 +223,12 @@ export interface SupportedStopwordLanguage {
  * {iso6391, name} sorted by name. Used by: FillDefaultStopWordsDialog to
  * populate its language dropdown so users pick a stoplist case-by-case instead
  * of relying on a stored per-column language.
- * Flow: read the curated metadata for supported stopword exports, verify the
- * current package still has the export, then return display-ready labels.
+ * Flow: return the curated display metadata without requesting the stopword
+ * implementation chunk; package/export validation happens when the user loads
+ * the selected list.
  */
 export function listSupportedStopwordLanguages(): SupportedStopwordLanguage[] {
-  return STOPWORD_LANGUAGE_METADATA.filter(
-    ({ stopwordCode }) => getStopwordList(stopwordCode).length > 0,
-  )
-    .map(({ iso6391, name }) => ({ iso6391, name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return STOPWORD_LANGUAGE_METADATA.map(({ iso6391, name }) => ({ iso6391, name })).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 }

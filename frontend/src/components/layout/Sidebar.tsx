@@ -27,7 +27,6 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { tutorialIndexTarget } from '@/tutorials/documentationRegistry';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import WorkspaceNodeList from '@/components/layout/WorkspaceNodeList';
 import { NodeActionsToolbar, NodePinButton } from '@/components/layout/NodeActionsToolbar';
@@ -46,6 +45,12 @@ import { VIEW_DEFINITIONS, isWorkspaceRequired } from '@/features/views/viewRegi
 import { useVisibleViews } from '@/features/views/useVisibleViews';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import logo from '@/logo.png';
+
+const SettingsDialog = React.lazy(() =>
+  import('@/components/dialogs/SettingsDialog').then(({ SettingsDialog }) => ({
+    default: SettingsDialog,
+  })),
+);
 
 type SectionKey = 'views' | 'nodes' | 'tasks';
 
@@ -468,7 +473,11 @@ function Sidebar() {
         </div>
       </SidebarFooter>
 
-      <SettingsDialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen} />
+      {isSettingsDialogOpen ? (
+        <React.Suspense fallback={null}>
+          <SettingsDialog open onOpenChange={setIsSettingsDialogOpen} />
+        </React.Suspense>
+      ) : null}
       <SidebarRail />
     </SidebarRoot>
   );

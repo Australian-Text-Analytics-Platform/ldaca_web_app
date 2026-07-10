@@ -544,9 +544,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
         nodeId={fillDefaultTarget.nodeId}
         column={fillDefaultTarget.column}
         isLoading={isLoadingStopWords}
-        onFill={(language) => {
-          void handleAddDefaultStopWords(language);
-        }}
+        onFill={handleAddDefaultStopWords}
       />
     </div>
   );

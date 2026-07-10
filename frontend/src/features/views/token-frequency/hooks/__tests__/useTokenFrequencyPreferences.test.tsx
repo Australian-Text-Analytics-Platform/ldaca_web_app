@@ -43,16 +43,15 @@ describe('useTokenFrequencyPreferences', () => {
     });
   });
 
-  it('does not add default stop words when no language is chosen', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it('rejects an empty language before starting a stopword load', async () => {
     const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
-    await act(async () => {
-      await result.current.handleAddDefaultStopWords('');
-    });
+    await expect(result.current.handleAddDefaultStopWords('')).rejects.toThrow(
+      'Default stop words require a language selection',
+    );
 
     expect(result.current.stopWords).toBe('');
-    expect(consoleError).toHaveBeenCalledWith('Default stop words require a language selection');
+    expect(result.current.isLoadingStopWords).toBe(false);
   });
 
   it('appends a second language without dropping the first', async () => {

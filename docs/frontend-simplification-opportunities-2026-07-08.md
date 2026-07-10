@@ -106,27 +106,6 @@ settled before deletion.
 
 ### Build, dependency, and maintenance improvements
 
-#### B1. Load stopwords only after the user asks for them
-
-- **Evidence / strength — Strong:** the static stopword package contributes 65 modules and about 208k source characters to a roughly 224.76 kB chunk even though the feature is user-triggered; [loadMergedStopwords.ts](../frontend/src/lib/loadMergedStopwords.ts) is already the natural async boundary.
-- **Recommended direction:** complete that boundary with a dynamic import and keep compact language metadata separate if it is needed eagerly.
-- **Deletion test:** the stopword implementation leaves the initial graph and appears in a lazy chunk without duplicating language data.
-- **Validation:** first/subsequent loads, multiple languages, missing language, offline desktop, recommendation flows, build chunk inspection, and loading/error UX.
-
-#### B2. Choose an explicit distributable source-map policy
-
-- **Evidence / strength — Strong:** the production output contains 67 maps totaling about 15 MiB versus about 11.7 MiB non-map output (about 56.2% of the build), and [vite.config.ts](../frontend/vite.config.ts) emits maps that packaging copies into backend resources without an upload step.
-- **Recommended direction:** decide among disabled maps or hidden maps uploaded to the error service and excluded from packages; this is a release/security policy, not dead-code deletion.
-- **Deletion test:** distributable artifacts contain only policy-approved maps and no unused map-copy weight.
-- **Validation:** browser and Tauri stack traces, Sentry symbolication if chosen, backend package contents, desktop installers, and release size.
-
-#### B3. Localize optional Sentry, Google, and Settings ownership
-
-- **Evidence / strength — Worth exploring:** [sentry.ts](../frontend/src/lib/sentry.ts), [ErrorBoundary.tsx](../frontend/src/components/ErrorBoundary.tsx), and [index.tsx](../frontend/src/index.tsx#L6-L54) leave about 24 Sentry modules in the entry despite optional DSN and mount Google globally; [SettingsDialog.tsx](../frontend/src/components/dialogs/SettingsDialog.tsx) is another candidate lazy boundary.
-- **Recommended direction:** explore an optional Sentry boundary, localize Google provider to Google auth, and lazy-load Settings without making error capture or login timing fragile.
-- **Deletion test:** optional provider code leaves the main entry when disabled and no duplicate providers/configuration appear.
-- **Validation:** DSN on/off, pre-root and render errors, Google-only/CILogon-only/no-auth deployments, redirect callback, first Settings open, and chunk failure.
-
 #### B4. Remove private npm publication and CLI residue
 
 - **Evidence / strength — Strong:** [package.json](../frontend/package.json#L6-L31) still has `bin`, `files`, and `prepublishOnly`; [bin/cli.js](../frontend/bin/cli.js), [.npmignore](../frontend/.npmignore), and [publishing.md](../frontend/docs/reference/publishing.md) describe a package no workflow publishes.
@@ -183,13 +162,6 @@ settled before deletion.
 - **Deletion test:** manifests/workflows contain no permission/dependency/input/global with zero consumers, and live native commands retain least privilege.
 - **Validation:** workflow dispatch/release, capability-denial smoke, open/save dialogs, external links, filesystem access, native download, and runtime-config backend URL.
 
-#### B13. Treat Vite 8 residue as a measured cleanup
-
-- **Evidence / strength — Worth exploring:** [vite.config.ts](../frontend/vite.config.ts#L70-L76) explicitly selects esbuild CSS minification although Vite 8 defaults to Lightning CSS, and [package.json](../frontend/package.json#L125-L135) retains direct esbuild; the React Compiler bridge remains intentional.
-- **Recommended direction:** compare emitted CSS and representative visuals before removing the override/dependency; ignore low-value redundant defaults unless they obscure a real contract.
-- **Deletion test:** the override/direct dependency can disappear with equivalent supported CSS and no extra compatibility layer.
-- **Validation:** bundle diff, CSS size/order, Tailwind output, browser/Tauri visual smoke, animations/themes, and full production build.
-
 ### Direct Deletion Wins
 
 These are compact implementation candidates with confirmed zero-callers or
@@ -205,11 +177,9 @@ unreachable callers. Product/external-contract caveats remain where noted.
 - **External desktop runtime environment:** confirm whether external deployments
   rely on `.env` / `.env.desktop` loading before removing it. The standard
   packager does not establish that compatibility requirement.
-- **Vite 8 CSS minifier:** remove the explicit esbuild choice only after output
-  and visual comparison; keep the React Compiler Vite/Babel bridge.
-- **Release/source-map/signing policy:** source maps, tag rules, signing identity,
-  and bundle targets are policy decisions. Record the chosen policy rather than
-  calling these surfaces dead code.
+- **Release/signing policy:** tag rules, signing identity, and bundle targets are
+  policy decisions. Record the chosen policy rather than calling these surfaces
+  dead code.
 
 ## Done
 
@@ -747,6 +717,47 @@ unreachable callers. Product/external-contract caveats remain where noted.
       every newly added or substantively rewritten Milestone 9 file passes the
       formatter, while the four touched baseline files remain in the existing
       format-debt set scheduled under B9.
+
+70. Load stopwords only after the user asks for them (B1)
+    - Done 2026-07-11. Compact language-picker metadata remains eager, but
+      `loadMergedStopwords` imports the package behind one shared promise only
+      after a supported choice. Concurrent and repeated requests reuse the
+      module; a failed chunk clears the promise for a later retry. The feature
+      rejects empty or missing lists, and the dialog closes only on success,
+      keeping an accessible retry message visible for offline/chunk failures.
+    - Production inspection moved the package into a distinct 117.33 kB lazy
+      chunk and reduced `TokenFrequencyFeature` from about 225.09 kB to 108.21
+      kB without duplicating the curated picker metadata.
+
+71. Omit source maps from distributable artifacts (B2)
+    - Done 2026-07-11. Vite now explicitly disables production source maps.
+      There is no release upload/symbolication consumer, so backend and Tauri
+      packaging no longer copy roughly 15 MiB of unused maps or ship frontend
+      source text. Production artifact inspection found zero `.map` files.
+
+72. Localize optional Sentry, Google, and Settings ownership (B3)
+    - Done 2026-07-11. The error-monitoring adapter dynamically imports Sentry
+      only for a configured DSN, buffers pre-root browser errors during SDK
+      initialization, and is the sole capture surface used by React error
+      boundaries. Google OAuth and client-id resolution now live in the lazy
+      Google login module, so CILogon and no-auth paths never mount its provider.
+      Sidebar Settings is rendered through a lazy dialog boundary only after
+      the user opens it.
+    - DSN-off, pre-root, caught-render, CILogon-only, Google-only, first Settings
+      open, and production chunk boundaries have focused or existing coverage.
+
+73. Remove the measured Vite 8 CSS residue (B13)
+    - Done 2026-07-11. The forced esbuild CSS minifier and direct esbuild
+      development dependency are removed; Vite 8's default CSS path produced
+      the same three stylesheet surfaces with smaller emitted files (143.26,
+      28.48, and 15.28 kB versus 143.79, 28.93, and 15.86 kB). The React
+      Compiler Babel bridge remains because it is an active semantic contract.
+
+    - Milestone 10 implementation validation: 197 frontend test files / 887
+      tests, focused optional-boundary tests,
+      TypeScript and targeted lint, two production builds, zero emitted source
+      maps, explicit lazy stopword/Google/Settings/Sentry chunks, CSS output
+      comparison, and staged plus unstaged `git diff --check`.
 
 ## Endpoint And Source-Of-Truth Notes
 

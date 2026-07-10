@@ -2,11 +2,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { analysisTaskPreferences } from '@/api';
 import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
-import {
-  clampDisplayTokenLimit,
-  DEFAULT_TOKEN_LIMIT,
-  toFiniteNumber,
-} from '../../common/utils';
+import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common/utils';
 import {
   formatStopWords,
   mergeStopWordsText,
@@ -154,12 +150,7 @@ export const useTokenFrequencyPreferences = ({
         throwOnError: true,
       });
     },
-    [
-      persistEnabled,
-      currentWorkspaceId,
-      resolveTokenFrequencyTaskId,
-      maxTokenLimitInput,
-    ],
+    [persistEnabled, currentWorkspaceId, resolveTokenFrequencyTaskId, maxTokenLimitInput],
   );
 
   const updateResultsPreferencesLocally = useCallback(
@@ -299,14 +290,11 @@ export const useTokenFrequencyPreferences = ({
     saveStopWordsToBackendRef.current = saveStopWordsToBackend;
   }, [saveStopWordsToBackend]);
 
-  const applyStopSetFromText = useCallback(
-    (text: string) => {
-      const words = parseStopWordsText(text);
-      dispatchPreference({ type: 'stopWordsApplied', words });
-      void saveStopWordsToBackendRef.current(words);
-    },
-    [],
-  );
+  const applyStopSetFromText = useCallback((text: string) => {
+    const words = parseStopWordsText(text);
+    dispatchPreference({ type: 'stopWordsApplied', words });
+    void saveStopWordsToBackendRef.current(words);
+  }, []);
 
   /** Sorts the current stop-word text so users can review and export a stable list. */
   /**
@@ -409,8 +397,7 @@ export const useTokenFrequencyPreferences = ({
    */
   const handleAddDefaultStopWords = async (language: string) => {
     if (!language) {
-      console.error('Default stop words require a language selection');
-      return;
+      throw new Error('Default stop words require a language selection');
     }
     dispatchPreference({ type: 'stopWordsLoadingChanged', active: true });
     try {
@@ -418,12 +405,12 @@ export const useTokenFrequencyPreferences = ({
         languages: [language],
       });
       if (merged.length === 0) {
-        console.error('Default stop words returned an empty list');
-        return;
+        throw new Error('Default stop words returned an empty list');
       }
       applyStopSetFromText(formatStopWords(mergeStopWordsText(stopWords, merged)));
     } catch (error) {
       console.error('Error getting default stop words:', error);
+      throw error;
     } finally {
       dispatchPreference({ type: 'stopWordsLoadingChanged', active: false });
     }

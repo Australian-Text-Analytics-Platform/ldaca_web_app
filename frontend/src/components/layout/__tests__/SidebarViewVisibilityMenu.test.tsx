@@ -178,7 +178,7 @@ describe('Sidebar view visibility menu', () => {
     renderSidebar();
 
     await user.click(screen.getByRole('button', { name: /open settings/i }));
-    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /quotation/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: /hints/i }));

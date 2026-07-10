@@ -1,7 +1,9 @@
+import { lazy, Suspense } from 'react';
 import logo from '@/logo.png';
 import CILogonLogin from '@/features/auth/components/CILogonLogin';
-import GoogleLogin from '@/features/auth/components/GoogleLogin';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+const GoogleLogin = lazy(() => import('@/features/auth/components/GoogleLogin'));
 
 interface LoginScreenProps {
   isLoading?: boolean;
@@ -40,7 +42,11 @@ export function LoginScreen({ isLoading, error, authMethods = [] }: LoginScreenP
         <ErrorBoundary>
           <div className="flex justify-center pt-2">
             {hasCILogon && <CILogonLogin isLoading={isLoading} error={error} />}
-            {hasGoogle && !hasCILogon && <GoogleLogin isLoading={isLoading} error={error} />}
+            {hasGoogle && !hasCILogon && (
+              <Suspense fallback={<span className="text-sm text-muted-foreground">Loading…</span>}>
+                <GoogleLogin isLoading={isLoading} error={error} />
+              </Suspense>
+            )}
           </div>
         </ErrorBoundary>
       </div>

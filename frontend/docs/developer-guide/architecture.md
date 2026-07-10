@@ -14,12 +14,15 @@ runtime difference is API base discovery:
 - desktop mode reads `window.__BACKEND_URL__`, injected by Tauri before React
   boots.
 
-`src/index.tsx` initializes the app, loads Google OAuth config from injected
-globals or environment, and renders the TanStack Router. `src/router.tsx` keeps
-the single static route required by backend and Tauri packaging, but validates
-the `view` search param so URLs can deep-link to a workspace view without
-requiring path-based server fallback. `src/App.tsx` waits for backend health
-and auth bootstrap before mounting the workspace shell.
+`src/index.tsx` starts optional error monitoring and renders the TanStack
+Router. Sentry is dynamically imported only when a DSN is configured, with
+pre-root browser failures buffered during initialization. Google OAuth and its
+runtime/build client-id resolution are owned by the lazy Google login module,
+so CILogon and no-auth deployments do not load or mount Google. `src/router.tsx`
+keeps the single static route required by backend and Tauri packaging, but
+validates the `view` search param so URLs can deep-link to a workspace view
+without requiring path-based server fallback. `src/App.tsx` waits for backend
+health and auth bootstrap before mounting the workspace shell.
 
 ## Main Layers
 

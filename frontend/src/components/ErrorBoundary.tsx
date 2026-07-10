@@ -1,5 +1,5 @@
 import { Component, type ReactNode, type ComponentType } from 'react';
-import * as Sentry from '@sentry/react';
+import { captureException } from '@/lib/sentry';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   /** Called by: React error recovery to expose stack details for developers and send to Sentry for production monitoring. */
   override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error Boundary caught an error:', error, errorInfo);
-    Sentry.captureException(error, {
+    captureException(error, {
       contexts: { react: errorInfo as unknown as Record<string, unknown> },
     });
   }
