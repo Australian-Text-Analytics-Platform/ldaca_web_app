@@ -69,7 +69,8 @@ falls back to `index.html` for SPA routes.
 - runs `uv sync --frozen --no-dev --no-editable --link-mode copy
   --managed-python` from `backend/` into the runtime venv,
 - copies the platform libpython when needed,
-- writes `runtime-manifest.json`.
+- writes `runtime-manifest.json` schema 1 with relative interpreter,
+  Python-home, and site-packages paths.
 
 `pnpm prepare:backend-runtime` calls the repository's one runtime preparation
 script, which owns the `3.14t` selector, clean non-editable package build, and
@@ -77,16 +78,16 @@ Tauri staging step. Release and `desktop:dev` use this same contract so the
 staged runtime is self-contained. Native compile reuse should come from uv,
 Cargo, maturin, and sccache caches rather than a separate dev-only runtime mode.
 
-`frontend/scripts/stage-backend-runtime.mjs` copies that runtime into
-`frontend/src-tauri/backend-runtime`, rewrites manifest paths to relative
-values, adjusts `pyvenv.cfg`, and adds Windows DLL search support.
+`frontend/scripts/stage-backend-runtime.mjs` validates and copies that runtime
+into `frontend/src-tauri/backend-runtime` without rewriting its manifest. It
+adds only Windows DLL search support, then validates the relocated copy again.
 
-The Rust launcher in `frontend/src-tauri/src/main.rs` resolves the staged
-runtime from bundle resources, executable-relative fallbacks, or explicit
-environment overrides. It launches `python -m ldaca_wordflow.cli --backend`,
-sets `LDACA_BACKEND_RUNTIME`, `LDACA_BACKEND_PYTHON`, `PYTHONHOME`, and
-`PYTHONPATH`, injects the chosen localhost URL into the webview, and owns
-backend shutdown.
+The Rust runtime module resolves a complete manifest root from bundle resources,
+exact executable-relative paths, or `LDACA_BACKEND_RUNTIME`. It resolves the
+three manifest paths once, launches
+`python -m ldaca_wordflow.cli --backend` with that exact interpreter,
+`PYTHONHOME`, and `PYTHONPATH`, injects the chosen localhost URL into the
+webview, and owns idempotent backend shutdown behind one Tauri state mutex.
 
 ## CI Release Flow
 
@@ -99,5 +100,12 @@ with submodules checked out, then delegates platform builds to:
 Both platform workflows install Node, Rust stable for Tauri, Rust nightly for
 `polars-source-utils`, uv, and sccache; invoke the shared runtime preparation
 command; build the desktop app; and validate that the bundled Python can import
-`ldaca_wordflow`, `polars_text`, and `polars_source_utils`. The release workflow
-then uploads MSI and DMG assets to the GitHub release.
+`ldaca_wordflow`, `polars_text`, and `polars_source_utils` through the same Rust
+manifest resolver and environment builder used by production launch. The
+release workflow then uploads MSI and DMG assets to the GitHub release.
+
+The distribution policy is explicit: the default Windows bundle target is MSI;
+the macOS workflow requests app and DMG bundles and uses ad-hoc identity `-`
+because certificate signing and notarization are not configured. Exact
+`v<version>` tags are enforced before release jobs. Changing signing identity or
+bundle targets is therefore a release-policy change, not dead-code cleanup.

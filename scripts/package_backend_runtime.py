@@ -161,6 +161,56 @@ def find_runtime_python(runtime_root: Path, runtime_python_dir: Path) -> Path:
     )
 
 
+def find_runtime_python_home(runtime_root: Path) -> Path:
+    """Return the managed CPython home consumed by the desktop launcher.
+
+    Used by :func:`write_runtime_manifest` after ``uv sync``. The directory
+    must contain the standard-library encodings package so a partial or stale
+    managed-Python download cannot become a valid desktop contract.
+    """
+    managed_dir = runtime_root / "managed-python"
+    for candidate in managed_dir.glob("cpython-*"):
+        if (candidate / "Lib" / "encodings").is_dir():
+            return candidate
+        if any((candidate / "lib").glob("python3.*/encodings")):
+            return candidate
+    raise RuntimeError(f"Unable to locate managed Python home inside {managed_dir}")
+
+
+def find_runtime_site_packages(runtime_python_dir: Path) -> Path:
+    """Return the venv site-packages directory used by the packaged backend.
+
+    Called by :func:`write_runtime_manifest` so Rust never needs to infer the
+    platform-specific venv layout at application startup.
+    """
+    windows_site_packages = runtime_python_dir / "Lib" / "site-packages"
+    if windows_site_packages.is_dir():
+        return windows_site_packages
+
+    for candidate in (runtime_python_dir / "lib").glob("python3.*/site-packages"):
+        if candidate.is_dir():
+            return candidate
+    raise RuntimeError(
+        f"Unable to locate site-packages inside {runtime_python_dir}"
+    )
+
+
+def relative_runtime_path(path: Path, runtime_root: Path) -> str:
+    """Serialize one runtime-owned path as a portable POSIX relative path.
+
+    Used only when emitting the runtime manifest. Rejecting paths outside the
+    runtime prevents checkout or build-machine locations from leaking into a
+    bundle that is expected to survive relocation.
+    """
+    try:
+        relative = path.resolve().relative_to(runtime_root.resolve())
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Runtime path {path} is outside runtime root {runtime_root}"
+        ) from exc
+    return relative.as_posix()
+
+
 def assert_runtime_python_is_relocatable(python_bin: Path, output_dir: Path) -> None:
     """Fail fast if runtime Python points outside the shipped runtime directory."""
     if python_bin.is_symlink():
@@ -239,7 +289,12 @@ def write_runtime_manifest(
     python_bin: Path,
     python_version: str,
 ) -> None:
-    """Write a small manifest for debugging shipped runtime contents."""
+    """Write the authoritative relative layout consumed by Tauri.
+
+    Called after environment synchronization. The launcher resolves these
+    three paths against the relocated ``backend-runtime`` root and does no
+    interpreter, Python-home, or site-packages scanning of its own.
+    """
     try:
         git_sha = run(
             ["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, capture_output=True
@@ -247,10 +302,15 @@ def write_runtime_manifest(
     except Exception:
         git_sha = "unknown"
 
+    python_home = find_runtime_python_home(output_dir)
+    site_packages = find_runtime_site_packages(output_dir / "python")
     manifest = {
+        "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "python_version": python_version,
-        "python_executable": str(python_bin),
+        "python_executable": relative_runtime_path(python_bin, output_dir),
+        "python_home": relative_runtime_path(python_home, output_dir),
+        "site_packages": relative_runtime_path(site_packages, output_dir),
         "git_sha": git_sha,
         "install_method": "uv-sync",
     }

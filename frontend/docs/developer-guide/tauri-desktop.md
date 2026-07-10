@@ -12,8 +12,14 @@ Desktop configuration lives in `frontend/src-tauri/`:
   `backend-runtime` resource inclusion.
 - `Cargo.toml`: Rust dependencies for Tauri, plugins, Tokio, reqwest, and
   process/runtime helpers.
-- `src/main.rs`: backend runtime resolution, backend launch, native commands,
-  and shutdown.
+- `src/main.rs`: five-line native entrypoint.
+- `src/lib.rs`: Tauri assembly and the single process owner.
+- `src/runtime.rs`: manifest parsing and exact resource-root resolution.
+- `src/backend_process.rs`: port selection, launch environment, and idempotent
+  child ownership.
+- `src/platform.rs`: process-tree termination, stale-pid reaping, and platform
+  flags.
+- `src/download.rs`: native streamed downloads and filename/path ownership.
 
 The staged backend runtime is created outside Tauri by root packaging scripts.
 `pnpm prepare:backend-runtime` is the only packaging-and-staging command used by
@@ -23,17 +29,21 @@ frontend through `pnpm dev:tauri` on the strict `127.0.0.1:3001` contract from
 
 ## Backend Runtime Resolution
 
-`main.rs` first checks explicit environment overrides:
+`runtime.rs` first checks the one explicit runtime-root override:
 
-- `LDACA_BACKEND_PYTHON`
 - `LDACA_BACKEND_RUNTIME`
-- `LDACA_BACKEND_LAUNCHER`
 
-Without overrides it looks for `backend-runtime/runtime-manifest.json` in
-bundle resources, executable-relative resource folders, and debug development
-fallbacks. The launcher prefers the managed Python interpreter shipped inside
-the runtime instead of venv stub launchers because packaged venv metadata can
-contain build-machine paths.
+The override must contain a valid manifest; it is not silently ignored. Without
+it, resolution checks the exact `backend-runtime` bundle resource,
+executable-relative platform location, and debug development runtime. There is
+no recursive resource scan or interpreter inference.
+
+`runtime-manifest.json` schema 1 is the sole layout contract. The Python
+packager writes portable relative `python_executable`, `python_home`, and
+`site_packages` paths. Rust rejects absolute, escaping, missing, corrupt, or
+unknown-schema layouts, resolves the three paths once against the selected
+resource root, and passes that result to launch and package validation. Staging
+copies the manifest unchanged.
 
 ## Backend Launch
 
@@ -43,15 +53,16 @@ At startup Tauri:
 2. chooses an available port from `8001` to `8010`,
 3. injects `window.__BACKEND_URL__` into the webview,
 4. launches `python -m ldaca_wordflow.cli --backend`,
-5. sets runtime environment variables for Python relocatability,
+5. sets `PYTHONHOME`, `PYTHONPATH`, and runtime variables from the manifest,
 6. records a pidfile,
 7. lets the React app perform `/health` polling.
 
 On Unix, the backend is launched in its own process group. On Windows, it is
 launched in a new process group without a visible console in release builds.
-Process environment variables remain valid explicit launcher overrides; staged
-`.env` and `.env.desktop` compatibility files are not part of the runtime
-contract and are not parsed.
+Ordinary process environment remains available to backend settings. Staged
+`.env`, `.env.desktop`, launcher-path, and interpreter-path compatibility
+contracts are not parsed; only `LDACA_BACKEND_RUNTIME` can select another
+complete manifest root.
 
 ## Native Commands
 
@@ -73,3 +84,18 @@ Close requests are intercepted once. Tauri prevents immediate close, shuts down
 the backend in a background thread, deletes the pidfile, then closes the
 window. Unix sends SIGTERM to the process group and escalates to SIGKILL after
 a timeout. Windows uses `taskkill /F /T` to terminate the process tree.
+
+## Source And Package Validation
+
+`cargo test` and `cargo clippy` compile without generated
+`src-tauri/backend-runtime` contents. The build script suppresses resource
+copying only when that ignored resource is absent; Tauri's
+`beforeBuildCommand` independently rejects packaging unless the staged manifest
+and all three paths are valid. Rust tests cover relocation, corrupt and missing
+manifests, repeated shutdown, timeout escalation, descendant termination,
+filename collisions, and a streamed HTTP download.
+
+After bundling, macOS and Windows workflows set `LDACA_TEST_RUNTIME_ROOT` to the
+final resource directory and run the ignored Rust package probe. It uses the
+production manifest resolver and command-environment builder to import the
+backend and both compiled extensions; CI no longer guesses a venv launcher.

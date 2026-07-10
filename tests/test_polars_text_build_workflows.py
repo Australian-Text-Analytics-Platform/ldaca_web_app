@@ -71,8 +71,9 @@ def test_desktop_workflows_use_sccache_for_rust_builds() -> None:
         assert "sccache --show-stats" in text
 
 
-def test_stage_backend_runtime_windows_dll_copy_uses_resolved_managed_python_dir() -> None:
+def test_stage_backend_runtime_windows_dll_copy_uses_manifest_python_home() -> None:
     script = _read(REPO_ROOT / "frontend" / "scripts" / "stage-backend-runtime.mjs")
 
-    assert "path.join(cpythonDir, dll)" not in script
-    assert "path.join(managedCpythonDir, dll)" in script
+    assert "findManagedCpythonDir" not in script
+    assert "path.join(layout.python_home, dll)" in script
+    assert "pyvenv.cfg" not in script

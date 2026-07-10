@@ -1,0 +1,230 @@
+use serde::Deserialize;
+use std::error::Error;
+use std::fs;
+use std::io;
+use std::path::{Component, Path, PathBuf};
+use tauri::{path::BaseDirectory, AppHandle, Manager};
+
+const DEV_BACKEND_RUNTIME: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../dist-tauri/backend-runtime"
+);
+const BUNDLE_RUNTIME_DIR: &str = "backend-runtime";
+const RUNTIME_MANIFEST: &str = "runtime-manifest.json";
+
+#[derive(Debug, Deserialize)]
+struct RuntimeManifest {
+    schema_version: u32,
+    python_executable: String,
+    python_home: String,
+    site_packages: String,
+}
+
+/// Fully resolved packaged-Python layout used by backend launch and validation.
+///
+/// Constructed only by [`BackendRuntime::from_root`]. All fields originate in
+/// one relative manifest and are resolved once against the runtime resource
+/// root, so consumers never repeat platform directory scans.
+#[derive(Debug)]
+pub(crate) struct BackendRuntime {
+    pub(crate) root: PathBuf,
+    pub(crate) python: PathBuf,
+    pub(crate) python_home: PathBuf,
+    pub(crate) site_packages: PathBuf,
+}
+
+impl BackendRuntime {
+    /// Parse and validate an authoritative runtime manifest.
+    ///
+    /// Used by [`locate_backend_runtime`] and unit tests. Validation rejects
+    /// absolute, escaping, missing, or unsupported layouts before a process is
+    /// spawned, which makes relocation failures explicit at the boundary.
+    pub(crate) fn from_root(root: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
+        let root = strip_unc_prefix(root.as_ref());
+        let manifest_path = root.join(RUNTIME_MANIFEST);
+        let bytes = fs::read(&manifest_path).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("Cannot read {}: {error}", manifest_path.display()),
+            )
+        })?;
+        let manifest: RuntimeManifest = serde_json::from_slice(&bytes).map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid {}: {error}", manifest_path.display()),
+            )
+        })?;
+        if manifest.schema_version != 1 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Unsupported runtime manifest schema {}",
+                    manifest.schema_version
+                ),
+            )
+            .into());
+        }
+
+        Ok(Self {
+            python: resolve_manifest_path(&root, "python_executable", &manifest.python_executable)?,
+            python_home: resolve_manifest_path(&root, "python_home", &manifest.python_home)?,
+            site_packages: resolve_manifest_path(&root, "site_packages", &manifest.site_packages)?,
+            root,
+        })
+    }
+}
+
+fn resolve_manifest_path(root: &Path, field: &str, value: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let path = Path::new(value);
+    let portable = !value.is_empty()
+        && !value.contains('\\')
+        && !path.is_absolute()
+        && path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)));
+    if !portable {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Runtime manifest {field} must be a portable relative path"),
+        )
+        .into());
+    }
+    let resolved = strip_unc_prefix(&root.join(path));
+    if !resolved.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "Runtime manifest {field} does not exist: {}",
+                resolved.display()
+            ),
+        )
+        .into());
+    }
+    Ok(resolved)
+}
+
+/// Resolve the runtime root from one explicit override or exact bundle paths.
+///
+/// Called during Tauri setup. An explicit `LDACA_BACKEND_RUNTIME` is strict;
+/// otherwise the bundle resource, executable-adjacent platform locations, and
+/// the debug source runtime are tried without recursive scans or interpreter
+/// inference.
+pub(crate) fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn Error>> {
+    if let Some(root) = std::env::var_os("LDACA_BACKEND_RUNTIME") {
+        return BackendRuntime::from_root(PathBuf::from(root));
+    }
+
+    let mut candidates = Vec::new();
+    if let Ok(path) = app
+        .path()
+        .resolve(BUNDLE_RUNTIME_DIR, BaseDirectory::Resource)
+    {
+        candidates.push(path);
+    }
+    if let Ok(executable) = std::env::current_exe() {
+        if let Some(executable_dir) = executable.parent() {
+            candidates.push(executable_dir.join(BUNDLE_RUNTIME_DIR));
+            if let Some(contents_dir) = executable_dir.parent() {
+                candidates.push(contents_dir.join("Resources").join(BUNDLE_RUNTIME_DIR));
+            }
+        }
+    }
+    if cfg!(debug_assertions) {
+        candidates.push(PathBuf::from(DEV_BACKEND_RUNTIME));
+    }
+
+    for candidate in candidates {
+        if candidate.join(RUNTIME_MANIFEST).is_file() {
+            return BackendRuntime::from_root(candidate);
+        }
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "Backend runtime not found. Run `pnpm prepare:backend-runtime` and ensure the bundle contains backend-runtime.",
+    )
+    .into())
+}
+
+/// Remove Windows extended path prefixes before forwarding paths to Python.
+///
+/// Used by manifest resolution because some Python libraries join paths with
+/// forward slashes, which the extended Win32 prefix rejects. Other platforms
+/// return the input unchanged.
+fn strip_unc_prefix(path: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    if let Some(value) = path.to_str() {
+        if let Some(rest) = value.strip_prefix(r"\\?\UNC\") {
+            return PathBuf::from(format!(r"\\{rest}"));
+        }
+        if let Some(rest) = value.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+    }
+    path.to_path_buf()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn fixture_root(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock must follow Unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("ldaca-runtime-{name}-{nonce}"))
+    }
+
+    fn write_layout(root: &Path) {
+        let python = root.join("managed-python/cpython-test/bin/python3");
+        let home = root.join("managed-python/cpython-test");
+        let site_packages = root.join("python/lib/python3.14t/site-packages");
+        fs::create_dir_all(python.parent().expect("python parent")).expect("python dir");
+        fs::write(&python, b"fixture").expect("python fixture");
+        fs::create_dir_all(&home).expect("home dir");
+        fs::create_dir_all(&site_packages).expect("site packages");
+        fs::write(
+            root.join(RUNTIME_MANIFEST),
+            r#"{"schema_version":1,"python_executable":"managed-python/cpython-test/bin/python3","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14t/site-packages"}"#,
+        )
+        .expect("manifest");
+    }
+
+    #[test]
+    fn relative_layout_survives_relocation() {
+        let original = fixture_root("original");
+        write_layout(&original);
+        let relocated = fixture_root("relocated");
+        fs::rename(&original, &relocated).expect("relocate runtime");
+
+        let runtime = BackendRuntime::from_root(&relocated).expect("valid runtime");
+
+        assert_eq!(runtime.root, relocated);
+        assert!(runtime.python.starts_with(&runtime.root));
+        assert!(runtime.python_home.starts_with(&runtime.root));
+        assert!(runtime.site_packages.starts_with(&runtime.root));
+        fs::remove_dir_all(&runtime.root).expect("remove fixture");
+    }
+
+    #[test]
+    fn missing_corrupt_and_escaping_manifests_fail_at_resolution() {
+        let root = fixture_root("invalid");
+        fs::create_dir_all(&root).expect("fixture root");
+        assert!(BackendRuntime::from_root(&root).is_err());
+
+        fs::write(root.join(RUNTIME_MANIFEST), b"{").expect("corrupt manifest");
+        assert!(BackendRuntime::from_root(&root).is_err());
+
+        write_layout(&root);
+        fs::write(
+            root.join(RUNTIME_MANIFEST),
+            r#"{"schema_version":1,"python_executable":"../python","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14t/site-packages"}"#,
+        )
+        .expect("escaping manifest");
+        let error = BackendRuntime::from_root(&root).expect_err("escape must fail");
+        assert!(error.to_string().contains("portable relative path"));
+        fs::remove_dir_all(root).expect("remove fixture");
+    }
+}

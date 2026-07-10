@@ -35,7 +35,17 @@ describe('desktop configuration contracts', () => {
     const main = read('frontend/src-tauri/src/main.rs');
 
     expect(capability).not.toMatch(/core:(?:window|webview):|http:default/);
-    expect(cargo).not.toMatch(/tauri-plugin-http|dotenvy|^serde(?:_json)?\s*=/m);
+    expect(cargo).not.toMatch(/tauri-plugin-http|dotenvy/);
     expect(main).not.toMatch(/tauri_plugin_http|__BACKEND_PORT__|load_runtime_env/);
+  });
+
+  it('gates packaging on a valid staged runtime without coupling source checks', () => {
+    const tauri = JSON.parse(read('frontend/src-tauri/tauri.conf.json'));
+    const buildScript = read('frontend/src-tauri/build.rs');
+
+    expect(tauri.build.beforeBuildCommand).toContain(
+      'stage-backend-runtime.mjs --validate-only',
+    );
+    expect(buildScript).toContain('"bundle":{"resources":[]}');
   });
 });

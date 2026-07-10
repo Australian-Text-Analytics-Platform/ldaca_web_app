@@ -119,10 +119,12 @@ jobs:
 
           test -d "$runtime_path"
           test -f "$runtime_path/runtime-manifest.json"
-          test -f "$runtime_path/python/lib/libpython3.14.dylib"
+          test -f "$runtime_path/python/lib/libpython3.14t.dylib"
 
-          # Ensure embedded Python can initialize stdlib and import bundled packages.
-          "$runtime_path/python/bin/python3" -c "import encodings, ldaca_wordflow, polars_source_utils, polars_text, sys; print(sys.version)"
+          # Exercise the same manifest resolver and environment builder used by launch.
+          LDACA_TEST_RUNTIME_ROOT="$runtime_path" \
+            cargo test --manifest-path src-tauri/Cargo.toml \
+            packaged_runtime_matches_launcher_environment -- --ignored
 
           echo "Bundled runtime validation succeeded: $runtime_path"
 

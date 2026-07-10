@@ -131,14 +131,13 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           $runtimeDir = "frontend\src-tauri\target\$env:TAURI_PROFILE\backend-runtime"
-          $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
-
           if (-not (Test-Path (Join-Path $runtimeDir "runtime-manifest.json"))) {
             Write-Error "runtime-manifest.json missing from bundled runtime"
             exit 1
           }
 
-          & $pythonExe -c "import encodings, ldaca_wordflow, polars_source_utils, polars_text, sys; print(sys.version)"
+          $env:LDACA_TEST_RUNTIME_ROOT = (Resolve-Path $runtimeDir).Path
+          cargo test --manifest-path frontend/src-tauri/Cargo.toml packaged_runtime_matches_launcher_environment -- --ignored
 
       - name: Show sccache stats
         if: always()

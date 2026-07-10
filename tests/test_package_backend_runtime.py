@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import tomllib
 from pathlib import Path
 
@@ -86,6 +87,61 @@ def test_backend_runtime_lets_uv_venv_manage_python_install() -> None:
     assert "VIRTUAL_ENV" not in script
 
 
+def test_runtime_manifest_owns_a_relative_relocatable_layout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_package_backend_runtime_module()
+    runtime_root = tmp_path / "build" / "backend-runtime"
+    python_home = runtime_root / "managed-python" / "cpython-3.14-test"
+    python_bin = python_home / "bin" / "python3"
+    site_packages = runtime_root / "python" / "lib" / "python3.14t" / "site-packages"
+    (python_home / "lib" / "python3.14t" / "encodings").mkdir(parents=True)
+    python_bin.parent.mkdir(parents=True, exist_ok=True)
+    python_bin.touch()
+    site_packages.mkdir(parents=True)
+
+    class GitResult:
+        stdout = "test-sha\n"
+
+    monkeypatch.setattr(module, "run", lambda *args, **kwargs: GitResult())
+
+    module.write_runtime_manifest(
+        output_dir=runtime_root,
+        python_bin=python_bin,
+        python_version="3.14t",
+    )
+
+    manifest = json.loads((runtime_root / "runtime-manifest.json").read_text())
+    assert manifest["schema_version"] == 1
+    assert manifest["python_executable"] == (
+        "managed-python/cpython-3.14-test/bin/python3"
+    )
+    assert manifest["python_home"] == "managed-python/cpython-3.14-test"
+    assert manifest["site_packages"] == "python/lib/python3.14t/site-packages"
+    assert not any(str(tmp_path) in str(value) for value in manifest.values())
+
+    relocated_root = tmp_path / "relocated" / "backend-runtime"
+    relocated_root.parent.mkdir()
+    __import__("shutil").copytree(runtime_root, relocated_root)
+    relocated_manifest = json.loads(
+        (relocated_root / "runtime-manifest.json").read_text()
+    )
+    for key in ["python_executable", "python_home", "site_packages"]:
+        assert (relocated_root / relocated_manifest[key]).exists()
+
+
+def test_relative_runtime_path_rejects_build_machine_paths(tmp_path: Path) -> None:
+    module = _load_package_backend_runtime_module()
+    runtime_root = tmp_path / "runtime"
+    runtime_root.mkdir()
+    outside = tmp_path / "outside" / "python"
+    outside.parent.mkdir()
+    outside.touch()
+
+    with pytest.raises(RuntimeError, match="outside runtime root"):
+        module.relative_runtime_path(outside, runtime_root)
+
+
 def test_frontend_desktop_dev_uses_packaged_runtime_path() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     package_json = __import__("json").loads(
@@ -93,10 +149,11 @@ def test_frontend_desktop_dev_uses_packaged_runtime_path() -> None:
     )
     scripts = package_json["scripts"]
 
-    assert "--clean" in scripts["package:backend-runtime"]
-    assert "package:backend-runtime:dev" not in scripts
-    assert "prepare:backend-runtime:dev" not in scripts
+    assert scripts["prepare:backend-runtime"] == (
+        "node ../scripts/prepare-backend-runtime.mjs"
+    )
     assert scripts["desktop:dev"].startswith("pnpm prepare:backend-runtime")
+    assert not any(name.startswith("package:backend-runtime") for name in scripts)
 
 
 def test_root_workspace_uses_local_backend_source() -> None:

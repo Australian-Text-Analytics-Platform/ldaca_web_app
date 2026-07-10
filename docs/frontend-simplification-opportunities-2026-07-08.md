@@ -2,7 +2,8 @@
 
 > Refreshed 2026-07-10. This keeps the original 2026-07-08 report date and the
 > completed-work history below while replacing the exhausted first-pass TODO
-> list with the broader follow-up audit.
+> list with the broader follow-up audit. Implementation ledger last updated
+> 2026-07-11.
 
 ## Scope
 
@@ -57,54 +58,9 @@ did not decide architecture by itself:
 
 ## Open TODOs
 
-Findings are ordered by risk and leverage within each group. `Strong` means the
-evidence already supports implementation planning; `Worth exploring` means the
-direction is promising but needs comparison or a bounded spike; `Worth
-confirming` means a product, release, or external-consumer contract must be
-settled before deletion.
-
-### Correctness-sensitive ownership seams
-
-#### C11. Validate packaged Python exactly as production resolves it
-
-- **Evidence / strength — Strong:** [package_backend_runtime.py](../scripts/package_backend_runtime.py#L236-L259), [stage-backend-runtime.mjs](../frontend/scripts/stage-backend-runtime.mjs#L67-L109), and [main.rs](../frontend/src-tauri/src/main.rs#L366-L637) disagree about the runtime path contract; staging describes a relative `pyvenv.cfg` home but writes an absolute staging path, while desktop workflows execute different interpreter paths.
-- **Recommended direction:** validate the same resolved interpreter, `PYTHONHOME`, `PYTHONPATH`, and environment that production launches, from a relocated bundle rather than the source staging tree.
-- **Deletion test:** CI-specific interpreter guesses and the absolute-path rewrite are replaced by one consumed runtime-layout contract.
-- **Validation:** relocate a staged bundle on macOS/Windows, launch health and representative imports, verify no checkout paths leak, and compare CI resolution to Rust launch resolution.
-
-### Deletion and simplification
-
-### Deep modularity opportunities
-
-#### M6. Split `main.rs` into deep internal modules
-
-- **Evidence / strength — Strong:** [main.rs](../frontend/src-tauri/src/main.rs#L126-L1156) combines runtime resolution, backend process/environment/port lifecycle, native download, platform behavior, and Tauri assembly; nested mutex/optional-child ownership obscures shutdown invariants.
-- **Recommended direction:** keep a thin assembly entrypoint and extract runtime, backend-process, platform, and download modules; simplify to one process owner and testable lifecycle transitions.
-- **Deletion test:** each module owns substantial cohesive behavior and `main.rs` becomes assembly rather than a collection of forwarding wrappers.
-- **Validation:** startup failure, port collision, double-close, graceful timeout, process-tree termination, app exit, macOS/Windows resolution, and large native download.
-
-#### M7. Resolve the Tauri runtime-layout contract once
-
-- **Evidence / strength — Strong:** [package_backend_runtime.py](../scripts/package_backend_runtime.py#L236-L259) writes `python_executable`, [stage-backend-runtime.mjs](../frontend/scripts/stage-backend-runtime.mjs#L67-L96) reparses/rewrites it, and [main.rs](../frontend/src-tauri/src/main.rs#L210-L519) ignores the value and rescans layout.
-- **Recommended direction:** either consume a relative manifest as the runtime contract or declare it diagnostic and delete path rewrites; resolve interpreter/home/site-packages once.
-- **Deletion test:** repeated scans and manifest-field rewrites are gone, with one authoritative layout result passed to launch/validation.
-- **Validation:** packaged and development layouts, relocated bundle, missing/corrupt manifest, free-threaded interpreter, site-packages imports, and both desktop platforms.
-
-### Build, dependency, and maintenance improvements
-
-### Direct Deletion Wins
-
-These are compact implementation candidates with confirmed zero-callers or
-unreachable callers. Product/external-contract caveats remain where noted.
-
-| Candidate | Evidence / deletion guard |
-| --- | --- |
-
-### Worth Confirming
-
-- **Release/signing policy:** tag rules, signing identity, and bundle targets are
-  policy decisions. Record the chosen policy rather than calling these surfaces
-  dead code.
+None. Every audited finding and the release-policy confirmation is recorded in
+`Done`. The preserved-boundary section remains negative evidence rather than an
+implementation backlog.
 
 ## Done
 
@@ -749,14 +705,15 @@ unreachable callers. Product/external-contract caveats remain where noted.
       gone. A pure command-model test guards ordering and arguments.
 
 83. Delete retired workflow and Tauri surfaces (B12)
-    - Done 2026-07-11. Unconsumed `build-notes`, plugin HTTP, direct serde and
-      dotenv dependencies, global Tauri injection, broad window/webview/HTTP
+    - Done 2026-07-11. Unconsumed `build-notes`, plugin HTTP, then-unused serde
+      and dotenv dependencies, global Tauri injection, broad window/webview/HTTP
       capabilities, and `__BACKEND_PORT__` are removed. Repository and packager
       tracing found no staged `.env` producer; the ignored root secret file is
       a development input, not a packaged-runtime contract, so implicit
       `.env`/`.env.desktop` loading was deleted while explicit process
       environment overrides remain. Opener, dialog, downloads filesystem,
-      native streaming, and backend URL injection remain live.
+      native streaming, and backend URL injection remain live. Serde was later
+      reintroduced with a concrete M7 owner: strict typed manifest parsing.
 
     - Milestone 11 implementation validation: the unified frontend contract
       passed with 198 test files / 891 tests, formatting, lint, source/tooling
@@ -765,6 +722,49 @@ unreachable callers. Product/external-contract caveats remain where noted.
       and formatting, strict-port collision rejection, and diff checks. Cargo
       source compilation now advances to the known generated-resource gate,
       which C11/M6/M7 remove in the next milestone.
+
+84. Validate packaged Python through production resolution (C11)
+    - Done 2026-07-11. The packager emits schema-1 relative interpreter,
+      Python-home, and site-packages paths; staging validates and copies the
+      manifest unchanged. Both desktop workflows now run an ignored Rust probe
+      against the final bundle resource, sharing the production resolver and
+      command-environment builder instead of invoking guessed venv launchers.
+      On macOS the real 3.14t runtime was packaged, staged, bundled into an app,
+      imported `ldaca_wordflow`, `polars_text`, and `polars_source_utils`, then
+      launched to a healthy `/health` response from the final app resource.
+
+85. Split the Tauri shell into cohesive modules (M6)
+    - Done 2026-07-11. The former 1,113-line `main.rs` is a five-line entrypoint.
+      `lib.rs` owns assembly and one `Mutex<Option<BackendProcess>>`, while
+      `runtime.rs`, `backend_process.rs`, `platform.rs`, and `download.rs` own
+      their respective domains. Shutdown returns `Result`, is idempotent, and
+      contains no production lock unwrap. Rust tests cover repeated close,
+      graceful timeout escalation, descendant process-group termination,
+      filename collisions, and an actual streamed HTTP download.
+
+86. Resolve the Tauri runtime layout once (M7)
+    - Done 2026-07-11. Rust strictly parses one relative manifest and resolves
+      its three paths once against an exact runtime root. Recursive resource
+      scans, managed-Python/venv scans, `pyvenv.cfg` rewriting, manifest
+      rewriting, launcher inference, and separate interpreter overrides are
+      gone. Missing, corrupt, escaping, absolute, unknown-schema, and relocated
+      layouts have Python, Node, and Rust contract coverage. Cargo test and
+      Clippy compile without ignored generated resources; Tauri packaging has
+      an independent pre-build manifest gate.
+
+87. Record the release/signing policy decision
+    - Done 2026-07-11. The release guide now records exact `v<version>` tag
+      enforcement, MSI as the default Windows target, explicit app/DMG output
+      on macOS, and ad-hoc `-` identity because certificate signing and
+      notarization are not configured. These are intentional policy surfaces,
+      not deletion candidates.
+
+    - Milestone 12 implementation validation: Python and Node layout fixtures,
+      198 frontend test files / 892 tests, seven Rust unit tests plus one ignored
+      packaged-runtime probe, Cargo formatting and strict Clippy, a real 3.14t
+      runtime preparation, unchanged-manifest relocation, a successful macOS
+      app bundle, production imports from that bundle, and a live packaged-app
+      health check all passed.
 
 ## Endpoint And Source-Of-Truth Notes
 
