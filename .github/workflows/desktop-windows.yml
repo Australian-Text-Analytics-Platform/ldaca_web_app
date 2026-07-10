@@ -3,10 +3,6 @@ name: Desktop Windows Build
 on:
   workflow_call:
     inputs:
-      build-notes:
-        description: "Optional note about this build"
-        required: false
-        type: string
       debug:
         description: "Build with --debug (keeps Windows console + WebView2 devtools)"
         required: false
@@ -19,10 +15,6 @@ on:
         default: ""
   workflow_dispatch:
     inputs:
-      build-notes:
-        description: "Optional note about this build"
-        required: false
-        type: string
       debug:
         description: "Build with --debug (keeps Windows console + WebView2 devtools)"
         required: false
@@ -101,7 +93,6 @@ jobs:
       - name: Install uv CLI
         uses: astral-sh/setup-uv@v8.2.0
         with:
-          python-version: "3.14t"
           enable-cache: true
           cache-python: true
           cache-dependency-glob: |
@@ -115,19 +106,12 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile
 
-      - name: Package backend runtime
-        shell: pwsh
-        run: |
-          Set-StrictMode -Version Latest
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          uv run --no-project --python 3.14t python scripts/package_backend_runtime.py --clean --python-version 3.14t
-
-      - name: Stage backend runtime for Tauri
+      - name: Prepare backend runtime
         shell: pwsh
         working-directory: frontend
         run: |
           Set-StrictMode -Version Latest
-          pnpm stage:backend-runtime
+          pnpm prepare:backend-runtime
 
       - name: Build Tauri desktop application
         shell: pwsh

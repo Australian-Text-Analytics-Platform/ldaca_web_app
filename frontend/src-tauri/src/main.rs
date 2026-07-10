@@ -542,37 +542,9 @@ where
     });
 }
 
-fn load_runtime_env(
-    runtime_dir: &Path,
-) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
-    let mut values = HashMap::new();
-    for filename in [".env", ".env.desktop"] {
-        let env_path = runtime_dir.join(filename);
-        if env_path.exists() {
-            parse_env_file(&env_path, &mut values)?;
-        }
-    }
-    Ok(values)
-}
-
-fn parse_env_file(
-    path: &Path,
-    dest: &mut HashMap<String, String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let iter = dotenvy::from_path_iter(path)?;
-    for entry in iter {
-        let (key, value) = entry?;
-        dest.insert(key, value);
-    }
-    Ok(())
-}
-
-fn determine_server_host(env_overrides: &HashMap<String, String>) -> String {
-    env_overrides
-        .get("SERVER_HOST")
-        .cloned()
-        .or_else(|| env_overrides.get("LDACA_SERVER_HOST").cloned())
-        .or_else(|| std::env::var("SERVER_HOST").ok())
+fn determine_server_host() -> String {
+    std::env::var("SERVER_HOST")
+        .ok()
         .or_else(|| std::env::var("LDACA_SERVER_HOST").ok())
         .unwrap_or_else(|| BACKEND_HOST.to_string())
 }
@@ -580,7 +552,6 @@ fn determine_server_host(env_overrides: &HashMap<String, String>) -> String {
 fn spawn_backend_process(
     runtime: &BackendRuntime,
     backend_port: u16,
-    env_overrides: &HashMap<String, String>,
 ) -> io::Result<BackendProcessHandle> {
     let runtime_root = &runtime.root;
     let runtime_python = &runtime.python;
@@ -594,7 +565,6 @@ fn spawn_backend_process(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    command.envs(env_overrides.iter());
     command.env("PYTHONUNBUFFERED", "1");
     command.env("BACKEND_PORT", backend_port.to_string());
     command.env("LDACA_BACKEND_PORT", backend_port.to_string());
@@ -643,13 +613,11 @@ fn spawn_backend_process(
         );
     }
 
-    let host_value = determine_server_host(env_overrides);
+    let host_value = determine_server_host();
     command.env("SERVER_HOST", host_value.clone());
     command.env("LDACA_SERVER_HOST", host_value);
 
-    if std::env::var("LDACA_CONFIG_PROFILE").is_err()
-        && !env_overrides.contains_key("LDACA_CONFIG_PROFILE")
-    {
+    if std::env::var("LDACA_CONFIG_PROFILE").is_err() {
         command.env("LDACA_CONFIG_PROFILE", "desktop");
     }
 
@@ -780,10 +748,8 @@ fn pick_unique_download_path(dir: &Path, filename: &str) -> PathBuf {
 /// Stream a URL into the user's Downloads folder via the Rust HTTP client.
 ///
 /// JS calls this instead of `fetch + resp.blob() + writeFile` so the
-/// response body never crosses the WebView2 / Tauri IPC boundary — that
-/// path drops large cross-origin responses on Windows even with
-/// tauri-plugin-http (the body round-trips through IPC and gets reset
-/// mid-transfer for >10MB downloads).
+/// response body never crosses the WebView2 / Tauri IPC boundary, which is
+/// unreliable for large cross-origin downloads on Windows.
 ///
 /// Returns the absolute path that was written.
 #[tauri::command]
@@ -825,13 +791,7 @@ async fn download_to_downloads(
 
     let mut file = tokio::fs::File::create(&target_path)
         .await
-        .map_err(|e| {
-            format!(
-                "Failed to create file {}: {}",
-                target_path.display(),
-                e
-            )
-        })?;
+        .map_err(|e| format!("Failed to create file {}: {}", target_path.display(), e))?;
 
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
@@ -904,7 +864,9 @@ fn pidfile_path() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     {
         let home = std::env::var_os("HOME")?;
-        base = PathBuf::from(home).join("Library").join("Application Support");
+        base = PathBuf::from(home)
+            .join("Library")
+            .join("Application Support");
     }
     #[cfg(target_os = "linux")]
     {
@@ -1049,7 +1011,6 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_http::init())
         .manage(backend_state)
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
@@ -1068,18 +1029,14 @@ fn main() {
             window.eval(&format!(
                 r#"
                 window.__BACKEND_URL__ = "{backend_url}";
-                window.__BACKEND_PORT__ = {backend_port};
                 console.log('[Tauri] Backend URL injected:', window.__BACKEND_URL__);
-                console.log('[Tauri] Backend port injected:', window.__BACKEND_PORT__);
                 "#,
-                backend_url = backend_url,
-                backend_port = backend_port
+                backend_url = backend_url
             ))?;
 
             let app_handle = app.handle();
             let runtime = locate_backend_runtime(&app_handle)?;
-            let runtime_env = load_runtime_env(&runtime.root)?;
-            let process = spawn_backend_process(&runtime, backend_port, &runtime_env)?;
+            let process = spawn_backend_process(&runtime, backend_port)?;
             let backend_pid = process.pid();
             write_pidfile(backend_pid);
             let state: State<BackendState> = app.state();

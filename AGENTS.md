@@ -114,10 +114,10 @@ and test/mock comments so they stay accurate.
 
 ## Cutting A Release
 
-Five files carry an independently-stamped version and **must** agree before tagging — pip wheel metadata, npm package, Tauri bundler, Rust crate, and the workspace pyproject. Drift between them is what shipped the v0.4.3 "desktop says 0.4.2 / pip says 0.4.3" bug.
+Six registered version surfaces **must** agree before tagging — pip wheel metadata, npm package, Tauri bundler, Rust crate, the Tauri Cargo lock entry, and the workspace pyproject. Drift between them is what shipped the v0.4.3 "desktop says 0.4.2 / pip says 0.4.3" bug.
 
-1. `pnpm bump-version <semver>` from repo root rewrites all five in one pass. Don't edit version strings by hand.
-2. `pnpm check-versions` confirms they match; it's also wired as a pre-build gate in `.github/workflows/release.yml` so a tag push with drift never reaches the desktop builders.
+1. `pnpm bump-version <semver>` from repo root rewrites all six from one shared registry. Don't edit version strings by hand.
+2. `pnpm check-versions` confirms they match; the release workflow additionally checks exact `v<version>` tag identity before desktop builds.
 3. `pnpm deploy_frontend_to_backend` after the bump — `VITE_APP_VERSION` is baked into the FE bundle at build time, so the bundle inside `backend/src/ldaca_wordflow/resources/frontend/build/` needs refreshing too.
 4. Commit, tag `vX.Y.Z` on `v0.4`, push the tag → release.yml fires → desktop assets + PyPI publish.
 

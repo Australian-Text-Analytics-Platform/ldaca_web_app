@@ -65,20 +65,6 @@ settled before deletion.
 
 ### Correctness-sensitive ownership seams
 
-#### C9. Use one Tauri development command and port contract
-
-- **Evidence / strength — Strong:** [tauri.conf.json](../frontend/src-tauri/tauri.conf.json#L6-L9) invokes npm and waits on port 3001, while [vite.config.ts](../frontend/vite.config.ts#L44-L51), [.env.example](../frontend/.env.example#L8-L12), and repository scripts use port 3000 and pnpm.
-- **Recommended direction:** make Tauri call the repository's pnpm-owned dev command and derive the dev URL from the same port contract.
-- **Deletion test:** the independent npm/3001 path disappears without adding another port adapter.
-- **Validation:** clean `pnpm desktop:dev` startup, default and custom ports, readiness waiting, and desktop-to-backend connectivity.
-
-#### C10. Make release version checks cover lock and tag identity
-
-- **Evidence / strength — Strong:** [bump-version.mjs](../scripts/bump-version.mjs#L28-L93) and [check-versions.mjs](../scripts/check-versions.mjs#L18-L46) duplicate target registries; the current five-source 0.6.0 check misses `Cargo.lock`, and [release.yml](../.github/workflows/release.yml#L32-L48) does not prove the tag matches the stamped version.
-- **Recommended direction:** share one version target registry and validate `Cargo.lock` plus expected release tag/version equality.
-- **Deletion test:** one duplicated target list is removed and a stale lock or mismatched tag fails before desktop jobs.
-- **Validation:** fixtures for source drift, lock drift, `vX.Y.Z` mismatch, manual dispatch, prerelease handling, and the normal bump path.
-
 #### C11. Validate packaged Python exactly as production resolves it
 
 - **Evidence / strength — Strong:** [package_backend_runtime.py](../scripts/package_backend_runtime.py#L236-L259), [stage-backend-runtime.mjs](../frontend/scripts/stage-backend-runtime.mjs#L67-L109), and [main.rs](../frontend/src-tauri/src/main.rs#L366-L637) disagree about the runtime path contract; staging describes a relative `pyvenv.cfg` home but writes an absolute staging path, while desktop workflows execute different interpreter paths.
@@ -106,27 +92,6 @@ settled before deletion.
 
 ### Build, dependency, and maintenance improvements
 
-#### B10. Consolidate the release-version registry
-
-- **Evidence / strength — Strong:** this is the maintenance counterpart of C10: [bump-version.mjs](../scripts/bump-version.mjs) and [check-versions.mjs](../scripts/check-versions.mjs) duplicate ownership and omit lock/tag assertions.
-- **Recommended direction:** make one data registry drive bump and verification, with Cargo lock and tag checks at release time.
-- **Deletion test:** adding a versioned source requires one registry change and all release surfaces are covered automatically.
-- **Validation:** unit fixtures plus `pnpm bump-version` in a disposable tree, `pnpm check-versions`, lock regeneration, and tagged/manual workflows.
-
-#### B11. Consolidate Python runtime-preparation commands
-
-- **Evidence / strength — Strong:** Python 3.14t selection and packaging commands are duplicated across [package.json](../frontend/package.json#L100-L105), [desktop-macos.yml](../.github/workflows/desktop-macos.yml#L94-L142), and [desktop-windows.yml](../.github/workflows/desktop-windows.yml#L101-L157).
-- **Recommended direction:** let one repository script own runtime preparation/version; workflows retain platform setup and artifact verification only.
-- **Deletion test:** duplicated command strings/selectors disappear from workflows without hiding platform-specific signing/bundling.
-- **Validation:** local macOS preparation, Windows workflow shell behavior, cached/clean runs, free-threaded Python, staged manifest, and desktop builds.
-
-#### B12. Delete retired workflow and Tauri surfaces
-
-- **Evidence / strength — Strong:** zero-callers include `build-notes` in [desktop-macos.yml](../.github/workflows/desktop-macos.yml#L6-L22) / [desktop-windows.yml](../.github/workflows/desktop-windows.yml#L6-L32), Tauri HTTP plugin/direct serde dependencies in [Cargo.toml](../frontend/src-tauri/Cargo.toml), global/window-webview permissions in [default.json](../frontend/src-tauri/capabilities/default.json), and dead `__BACKEND_PORT__` injection in [main.rs](../frontend/src-tauri/src/main.rs#L1068-L1077). External runtime-environment compatibility remains a separate confirmation item below.
-- **Recommended direction:** remove those surfaces and stale config docs while preserving live opener, dialog, and filesystem capabilities; confirm external `.env` compatibility separately below.
-- **Deletion test:** manifests/workflows contain no permission/dependency/input/global with zero consumers, and live native commands retain least privilege.
-- **Validation:** workflow dispatch/release, capability-denial smoke, open/save dialogs, external links, filesystem access, native download, and runtime-config backend URL.
-
 ### Direct Deletion Wins
 
 These are compact implementation candidates with confirmed zero-callers or
@@ -134,13 +99,9 @@ unreachable callers. Product/external-contract caveats remain where noted.
 
 | Candidate | Evidence / deletion guard |
 | --- | --- |
-| Retired Tauri/workflow surfaces | Remove HTTP plugin, direct serde, global/window-webview permissions, `__BACKEND_PORT__`, and `build-notes`; keep live opener/dialog/filesystem. |
 
 ### Worth Confirming
 
-- **External desktop runtime environment:** confirm whether external deployments
-  rely on `.env` / `.env.desktop` loading before removing it. The standard
-  packager does not establish that compatibility requirement.
 - **Release/signing policy:** tag rules, signing identity, and bundle targets are
   policy decisions. Record the chosen policy rather than calling these surfaces
   dead code.
@@ -758,6 +719,52 @@ unreachable callers. Product/external-contract caveats remain where noted.
       milestone rewrites). Generated, build, and vendor content remain outside
       the configured `src/` surface. `format:check` now passes without mutation
       and is the first gate in the shared frontend `check` contract.
+
+79. Use one Tauri development command and port contract (C9)
+    - Done 2026-07-11. Tauri now invokes the pnpm-owned `dev:tauri` command and
+      waits on its exact `127.0.0.1:3001` URL. Vite binds `0.0.0.0:3001` with
+      `--strictPort`, so an occupied port fails immediately instead of silently
+      moving while Tauri waits elsewhere. The general web dev command remains
+      independently configurable on its normal port.
+
+80. Cover Cargo lock and release-tag identity (C10)
+    - Done 2026-07-11. Release verification now includes the local Tauri package
+      entry in `Cargo.lock` and accepts an expected release tag that must be
+      exactly `v<stamped version>`. The stale 0.5.0 lock entry was regenerated
+      to 0.6.0; matching, mismatched, malformed, empty manual-dispatch, and
+      prerelease parsing have executable fixtures.
+
+81. Consolidate the release-version registry (B10)
+    - Done 2026-07-11. `version-targets.mjs` is the sole six-surface registry
+      consumed by bump and check commands, including extraction and replacement
+      for Cargo manifest/lock. Adding a version source no longer requires two
+      synchronized script edits, and the shared frontend check runs the live
+      registry plus its Node test fixtures.
+
+82. Consolidate Python runtime preparation (B11)
+    - Done 2026-07-11. `prepare-backend-runtime.mjs` owns the one `3.14t`
+      selector, clean packager invocation, and staging sequence. Local desktop
+      scripts and both platform workflows invoke `pnpm prepare:backend-runtime`;
+      the two lower-level package scripts and duplicated workflow commands are
+      gone. A pure command-model test guards ordering and arguments.
+
+83. Delete retired workflow and Tauri surfaces (B12)
+    - Done 2026-07-11. Unconsumed `build-notes`, plugin HTTP, direct serde and
+      dotenv dependencies, global Tauri injection, broad window/webview/HTTP
+      capabilities, and `__BACKEND_PORT__` are removed. Repository and packager
+      tracing found no staged `.env` producer; the ignored root secret file is
+      a development input, not a packaged-runtime contract, so implicit
+      `.env`/`.env.desktop` loading was deleted while explicit process
+      environment overrides remain. Opener, dialog, downloads filesystem,
+      native streaming, and backend URL injection remain live.
+
+    - Milestone 11 implementation validation: the unified frontend contract
+      passed with 198 test files / 891 tests, formatting, lint, source/tooling
+      type checks, Knip, production build, docs drift, six-source version and
+      tag fixtures, runtime-preparation/desktop config fixtures, Cargo metadata
+      and formatting, strict-port collision rejection, and diff checks. Cargo
+      source compilation now advances to the known generated-resource gate,
+      which C11/M6/M7 remove in the next milestone.
 
 ## Endpoint And Source-Of-Truth Notes
 

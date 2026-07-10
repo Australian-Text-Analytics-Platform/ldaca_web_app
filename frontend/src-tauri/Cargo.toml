@@ -12,13 +12,10 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-dotenvy = "0.15"
 # Used by the `download_to_downloads` Tauri command to fetch large export
 # bodies from the local backend and stream them to disk. Bypassing the JS
-# fetch / plugin-http body path avoids the WebView2 + IPC reliability
-# issues we hit on Windows for >10MB responses.
+# fetch body path avoids WebView2 + IPC reliability issues on Windows for
+# responses larger than 10 MB.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 futures-util = "0.3"
 tokio = { version = "1", features = ["fs", "io-util"] }
@@ -27,7 +24,6 @@ tokio = { version = "1", features = ["fs", "io-util"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-http = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

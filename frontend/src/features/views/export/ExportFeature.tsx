@@ -89,13 +89,10 @@ function ExportFeature() {
     return { id: n.id, name: n.name || n.id };
   };
 
-  // On Windows, both WebView2's native fetch and tauri-plugin-http drop
-  // large cross-origin response bodies — backend returns 200, but the body
-  // never fully reaches JS (WebView2 chokes on Range/large responses;
-  // plugin-http's IPC channel resets mid-transfer for >10MB blobs). To
-  // bypass both paths we expose a Rust Tauri command (`download_to_downloads`)
-  // that uses reqwest to stream the URL straight to the user's Downloads
-  // folder. The body never crosses the WebView2 / IPC boundary.
+  // On Windows, large cross-origin response bodies do not reliably reach JS
+  // through WebView2. The Rust `download_to_downloads` command uses reqwest to
+  // stream directly to Downloads so the body never crosses the WebView2 / IPC
+  // boundary.
   // The web build keeps the original fetch + blob + saveBlob path.
   const isDesktopApp = isTauri();
 

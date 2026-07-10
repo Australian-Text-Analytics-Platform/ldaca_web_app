@@ -53,6 +53,10 @@ unused-export/dependency guard, not a replacement for build, tests, or lint.
 The app uses React Compiler, so routine manual memoization is not part of the
 normal development style.
 
+The non-mutating command is the same frontend acceptance contract used by pull
+requests: formatting, source and tooling-config lint/type checks, tests, Knip,
+production build, documentation drift, and release-version contract tests.
+
 ## Backend Checks
 
 Run backend tests from `backend/`, not from the repository root:
@@ -120,6 +124,3 @@ base resolver reads the injected `window.__BACKEND_URL__` in desktop mode.
 `pnpm desktop:dev` uses the same packaged-runtime path as desktop builds. Build
 speedups should come from uv, Cargo, maturin, and sccache configuration rather
 than a separate dev-only runtime mode.
-This non-mutating command is the same frontend acceptance contract used by pull
-requests: formatting, source and tooling-config lint/type checks, tests, Knip,
-production build, and documentation drift.

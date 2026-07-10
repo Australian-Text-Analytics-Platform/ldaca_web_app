@@ -1,73 +1,55 @@
 #!/usr/bin/env node
-// Asserts every version-bearing file in this repo agrees on the same
-// semver. Wired into release.yml as a pre-build gate so a tag-and-push
-// cannot ship an inconsistent set of artifacts (the v0.4.3 footgun).
-//
-// Exit codes:
-//   0 — all versions match
-//   1 — drift detected
-//   2 — a target file has no recognisable version field
+/** Verifies registered versions, the Tauri lock entry, and optional release tag. */
 
-import { readFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const scriptDir = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(scriptDir, '..')
+import { VERSION_TARGETS, versionFromReleaseTag } from './version-targets.mjs';
 
-// Keep this list in lockstep with bump-version.mjs::TARGETS.
-const TARGETS = [
-    {
-        label: 'workspace pyproject.toml',
-        path: 'pyproject.toml',
-        extract: (src) => src.match(/^version\s*=\s*"([^"]+)"/m)?.[1],
-    },
-    {
-        label: 'backend/pyproject.toml',
-        path: 'backend/pyproject.toml',
-        extract: (src) => src.match(/^version\s*=\s*"([^"]+)"/m)?.[1],
-    },
-    {
-        label: 'frontend/package.json',
-        path: 'frontend/package.json',
-        extract: (src) => src.match(/"version"\s*:\s*"([^"]+)"/)?.[1],
-    },
-    {
-        label: 'frontend/src-tauri/Cargo.toml',
-        path: 'frontend/src-tauri/Cargo.toml',
-        extract: (src) =>
-            src.match(/\[package\][\s\S]*?\n\s*version\s*=\s*"([^"]+)"/)?.[1],
-    },
-    {
-        label: 'frontend/src-tauri/tauri.conf.json',
-        path: 'frontend/src-tauri/tauri.conf.json',
-        extract: (src) => src.match(/"version"\s*:\s*"([^"]+)"/)?.[1],
-    },
-]
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const tagFlagIndex = process.argv.indexOf('--tag');
+const releaseTag = tagFlagIndex >= 0 ? process.argv[tagFlagIndex + 1] : null;
 
-const widest = Math.max(...TARGETS.map((t) => t.label.length))
+if (tagFlagIndex >= 0 && releaseTag === undefined) {
+    console.error('Usage: node scripts/check-versions.mjs [--tag v<semver>]');
+    process.exit(2);
+}
 
-const seen = []
-let missing = false
-for (const t of TARGETS) {
-    const src = await readFile(resolve(repoRoot, t.path), 'utf8')
-    const v = t.extract(src)
-    if (!v) {
-        console.error(`x ${t.label.padEnd(widest)}  no version field at ${t.path}`)
-        missing = true
-        continue
+const widest = Math.max(...VERSION_TARGETS.map(({ label }) => label.length));
+const seen = [];
+let missing = false;
+
+for (const target of VERSION_TARGETS) {
+    const source = await readFile(resolve(repoRoot, target.path), 'utf8');
+    const version = target.extract(source);
+    if (!version) {
+        console.error(`x ${target.label.padEnd(widest)}  no version field at ${target.path}`);
+        missing = true;
+        continue;
     }
-    seen.push({ label: t.label, version: v })
-    console.log(`  ${t.label.padEnd(widest)}  ${v}`)
-}
-if (missing) process.exit(2)
-
-const distinct = [...new Set(seen.map((s) => s.version))]
-if (distinct.length === 1) {
-    console.log(`\nAll versions match (${distinct[0]}).`)
-    process.exit(0)
+    seen.push({ label: target.label, version });
+    console.log(`  ${target.label.padEnd(widest)}  ${version}`);
 }
 
-console.error(`\nVersion drift: ${distinct.join(' / ')}`)
-console.error(`Run \`pnpm bump-version <semver>\` to realign.`)
-process.exit(1)
+if (missing) process.exit(2);
+
+const distinct = [...new Set(seen.map(({ version }) => version))];
+if (distinct.length !== 1) {
+    console.error(`\nVersion drift: ${distinct.join(' / ')}`);
+    console.error('Run `pnpm bump-version <semver>` to realign.');
+    process.exit(1);
+}
+
+try {
+    const taggedVersion = versionFromReleaseTag(releaseTag);
+    if (taggedVersion && taggedVersion !== distinct[0]) {
+        console.error(`\nRelease tag ${releaseTag} does not match version ${distinct[0]}.`);
+        process.exit(1);
+    }
+} catch (error) {
+    console.error(`\n${error instanceof Error ? error.message : String(error)}`);
+    process.exit(2);
+}
+
+console.log(`\nAll versions match (${distinct[0]}).${releaseTag ? ` Tag ${releaseTag} matches.` : ''}`);

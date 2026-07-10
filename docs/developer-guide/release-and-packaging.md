@@ -2,12 +2,14 @@
 
 ## Version Stamping
 
-Five files carry release versions and must agree before tagging:
+Six registered surfaces carry or lock the release version and must agree before
+tagging:
 
 - `pyproject.toml`
 - `backend/pyproject.toml`
 - `frontend/package.json`
 - `frontend/src-tauri/Cargo.toml`
+- `frontend/src-tauri/Cargo.lock` (the local package entry)
 - `frontend/src-tauri/tauri.conf.json`
 
 Use the root script instead of editing version strings by hand:
@@ -17,8 +19,10 @@ pnpm bump-version <semver>
 pnpm check-versions
 ```
 
-`scripts/check-versions.mjs` is also wired into the desktop release workflow,
-so a tagged release with drift fails before desktop builds start.
+Both commands consume `scripts/version-targets.mjs`; adding a version surface
+requires one registry change. `scripts/check-versions.mjs` is wired into the
+desktop release workflow, so manifest/lock drift or a tag that is not exactly
+`v<version>` fails before desktop builds start.
 
 ## Source Mode Versus Package Mode
 
@@ -67,10 +71,11 @@ falls back to `index.html` for SPA routes.
 - copies the platform libpython when needed,
 - writes `runtime-manifest.json`.
 
-Release, desktop-package, and `desktop:dev` scripts pass `--clean` and use
-non-editable installs so the staged runtime is self-contained. Native compile
-reuse should come from uv, Cargo, maturin, and sccache caches rather than a
-separate dev-only runtime mode.
+`pnpm prepare:backend-runtime` calls the repository's one runtime preparation
+script, which owns the `3.14t` selector, clean non-editable package build, and
+Tauri staging step. Release and `desktop:dev` use this same contract so the
+staged runtime is self-contained. Native compile reuse should come from uv,
+Cargo, maturin, and sccache caches rather than a separate dev-only runtime mode.
 
 `frontend/scripts/stage-backend-runtime.mjs` copies that runtime into
 `frontend/src-tauri/backend-runtime`, rewrites manifest paths to relative
@@ -85,14 +90,14 @@ backend shutdown.
 
 ## CI Release Flow
 
-`.github/workflows/release.yml` runs `node scripts/check-versions.mjs` with
-submodules checked out, then delegates platform builds to:
+`.github/workflows/release.yml` checks the registry, Cargo lock, and release tag
+with submodules checked out, then delegates platform builds to:
 
 - `.github/workflows/desktop-windows.yml`
 - `.github/workflows/desktop-macos.yml`
 
 Both platform workflows install Node, Rust stable for Tauri, Rust nightly for
-`polars-source-utils`, uv, and sccache; package the backend runtime; stage it for
-Tauri; build the desktop app; and validate that the bundled Python can import
+`polars-source-utils`, uv, and sccache; invoke the shared runtime preparation
+command; build the desktop app; and validate that the bundled Python can import
 `ldaca_wordflow`, `polars_text`, and `polars_source_utils`. The release workflow
 then uploads MSI and DMG assets to the GitHub release.

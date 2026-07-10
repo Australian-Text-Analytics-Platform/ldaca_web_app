@@ -3,10 +3,6 @@ name: Desktop macOS Build (Apple Silicon)
 on:
   workflow_call:
     inputs:
-      build-notes:
-        description: "Optional note about this build"
-        required: false
-        type: string
       ref:
         description: "Git ref to build"
         required: false
@@ -14,10 +10,6 @@ on:
         default: ""
   workflow_dispatch:
     inputs:
-      build-notes:
-        description: "Optional note about this build"
-        required: false
-        type: string
       ref:
         description: "Optional Git ref to build (branch, tag, or SHA)"
         required: false
@@ -94,7 +86,6 @@ jobs:
       - name: Install uv CLI
         uses: astral-sh/setup-uv@v8.2.0
         with:
-          python-version: "3.14t"
           enable-cache: true
           cache-python: true
           cache-dependency-glob: |
@@ -107,16 +98,10 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile
 
-      - name: Package backend runtime
-        shell: bash
-        run:
-          uv run --no-project --python 3.14t python scripts/package_backend_runtime.py
-          --clean --python-version 3.14t
-
-      - name: Stage backend runtime for Tauri
+      - name: Prepare backend runtime
         shell: bash
         working-directory: frontend
-        run: pnpm stage:backend-runtime
+        run: pnpm prepare:backend-runtime
 
       - name: Build Tauri desktop application
         shell: bash

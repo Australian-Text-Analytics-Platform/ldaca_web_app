@@ -8,7 +8,8 @@
 
 **Answer:**
 
-- `FRONTEND_PORT` — sets the dev server port.
+- `FRONTEND_PORT` — sets the normal web dev/preview port. Tauri development has
+  a fixed strict `127.0.0.1:3001` contract so its configured URL cannot drift.
 
 ## Runtime variables
 

@@ -44,15 +44,16 @@ jobs:
           # mirrors them.
           submodules: recursive
 
-      - name: Check that all 5 version-bearing files agree
-        run: node scripts/check-versions.mjs
+      - name: Check version, lock, and release-tag identity
+        env:
+          EXPECTED_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.publish_release && inputs.release_tag || '' }}
+        run: node scripts/check-versions.mjs --tag "$EXPECTED_RELEASE_TAG"
 
   build-windows:
     name: Build Windows MSI
     needs: verify-versions
     uses: ./.github/workflows/desktop-windows.yml
     with:
-      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}
       debug: false
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
@@ -61,7 +62,6 @@ jobs:
     needs: verify-versions
     uses: ./.github/workflows/desktop-macos.yml
     with:
-      build-notes: ${{ github.event_name == 'workflow_dispatch' && format('Manual desktop build for {0}', inputs.ref) || format('Automated desktop release build for {0}', github.ref_name) }}
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
   publish-release:

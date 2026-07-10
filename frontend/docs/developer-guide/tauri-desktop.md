@@ -16,6 +16,10 @@ Desktop configuration lives in `frontend/src-tauri/`:
   and shutdown.
 
 The staged backend runtime is created outside Tauri by root packaging scripts.
+`pnpm prepare:backend-runtime` is the only packaging-and-staging command used by
+local desktop scripts and both platform workflows. Tauri development starts the
+frontend through `pnpm dev:tauri` on the strict `127.0.0.1:3001` contract from
+`tauri.conf.json`.
 
 ## Backend Runtime Resolution
 
@@ -37,8 +41,7 @@ At startup Tauri:
 
 1. reaps stale backend pids from previous crashed runs,
 2. chooses an available port from `8001` to `8010`,
-3. injects `window.__BACKEND_URL__` and `window.__BACKEND_PORT__` into the
-   webview,
+3. injects `window.__BACKEND_URL__` into the webview,
 4. launches `python -m ldaca_wordflow.cli --backend`,
 5. sets runtime environment variables for Python relocatability,
 6. records a pidfile,
@@ -46,6 +49,9 @@ At startup Tauri:
 
 On Unix, the backend is launched in its own process group. On Windows, it is
 launched in a new process group without a visible console in release builds.
+Process environment variables remain valid explicit launcher overrides; staged
+`.env` and `.env.desktop` compatibility files are not part of the runtime
+contract and are not parsed.
 
 ## Native Commands
 
@@ -55,6 +61,11 @@ launched in a new process group without a visible console in release builds.
 folder with Rust `reqwest`. This avoids large response bodies crossing the
 WebView/Tauri IPC boundary, which is unreliable for large downloads on some
 Windows setups.
+
+The webview exposes only the live opener, dialog, and downloads-folder
+filesystem permissions. Native commands perform backend HTTP streaming and
+window setup directly, so no JavaScript HTTP plugin, global Tauri object, or
+extra window/webview capability is enabled.
 
 ## Shutdown
 
