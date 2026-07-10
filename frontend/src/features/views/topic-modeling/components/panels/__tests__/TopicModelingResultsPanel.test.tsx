@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -99,7 +100,10 @@ describe('TopicModelingResultsPanel', () => {
     expect(screen.getByText('Topics (1)')).toBeInTheDocument();
   });
 
-  it('owns the topic detach dialog copy directly', () => {
+  it('owns the topic detach dialog copy and handler wiring directly', async () => {
+    const user = userEvent.setup();
+    const toggleDetachColumn = vi.fn();
+    const handleDetachConfirm = vi.fn();
     render(
       <TooltipProvider>
         <TopicModelingResultsPanel
@@ -113,10 +117,23 @@ describe('TopicModelingResultsPanel', () => {
             },
           ]}
           selectedDetachColumns={{ 'node-1': ['TOPIC_topic'] }}
+          toggleDetachColumn={toggleDetachColumn}
+          handleDetachConfirm={handleDetachConfirm}
         />
       </TooltipProvider>,
     );
 
     expect(screen.getByRole('heading', { name: 'Detach Topic Results' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Select the columns to include with the detached topic results. The topic columns are selected by default; untick any you don't need.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'document' }));
+    expect(toggleDetachColumn).toHaveBeenCalledWith('node-1', 'document', true);
+
+    await user.click(screen.getByRole('button', { name: 'Add to Workspace' }));
+    expect(handleDetachConfirm).toHaveBeenCalledOnce();
   });
 });

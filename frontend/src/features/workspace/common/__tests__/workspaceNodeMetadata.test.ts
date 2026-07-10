@@ -3,10 +3,10 @@ import type { WorkspaceGraphNode, WorkspaceNodeInfo } from '@/api';
 import { projectWorkspaceNodeMetadata } from '../workspaceNodeMetadata';
 
 describe('projectWorkspaceNodeMetadata', () => {
-  it('merges graph interaction state with canonical node-info metadata', () => {
+  it('keeps the live graph name when hydrated node info still has the pre-rename name', () => {
     const graphNode: WorkspaceGraphNode = {
       id: 'node-1',
-      name: 'Graph name',
+      name: 'Renamed graph node',
       color: '#2563eb',
       document: 'graph_text',
       can_undo: true,
@@ -14,7 +14,7 @@ describe('projectWorkspaceNodeMetadata', () => {
     };
     const nodeInfo: WorkspaceNodeInfo = {
       id: 'node-1',
-      name: 'Canonical name',
+      name: 'Stale pre-rename name',
       color: '#dc2626',
       document: 'document',
       columns: ['document', 'year'],
@@ -25,7 +25,7 @@ describe('projectWorkspaceNodeMetadata', () => {
 
     expect(projectWorkspaceNodeMetadata(graphNode, nodeInfo)).toEqual({
       id: 'node-1',
-      name: 'Canonical name',
+      name: 'Renamed graph node',
       color: '#dc2626',
       document: 'document',
       columns: ['document', 'year'],

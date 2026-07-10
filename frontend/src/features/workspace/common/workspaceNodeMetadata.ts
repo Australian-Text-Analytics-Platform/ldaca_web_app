@@ -23,15 +23,16 @@ export interface WorkspaceNodeMetadata {
  * the one handwritten workspace-node model used by feature code.
  *
  * Used by: `useTabNodeInputs`, after its batched node-info request resolves.
- * Graph state owns current action availability; node info owns columns, schema,
- * document preference, shape, tokenizer metadata, and the canonical label.
+ * Graph state owns current identity and action availability; node info owns
+ * columns, schema, document preference, shape, and tokenizer metadata. This
+ * keeps a stale hydrated node-info response from masking a newer graph rename.
  */
 export const projectWorkspaceNodeMetadata = (
   graphNode: WorkspaceGraphNode,
   nodeInfo?: WorkspaceNodeInfo,
 ): WorkspaceNodeMetadata => ({
   id: graphNode.id,
-  name: nodeInfo?.name ?? graphNode.name,
+  name: graphNode.name,
   color: nodeInfo?.color ?? graphNode.color ?? null,
   document: nodeInfo?.document ?? graphNode.document ?? null,
   columns: nodeInfo?.columns ?? [],

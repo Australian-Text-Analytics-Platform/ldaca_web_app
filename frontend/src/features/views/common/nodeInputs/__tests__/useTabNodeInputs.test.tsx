@@ -176,6 +176,77 @@ describe('useTabNodeInputs', () => {
     expect(consume).toHaveBeenCalledWith(11);
   });
 
+  it('hydrates an add-before-metadata input into a usable document selection', () => {
+    const onTabInputSetChange = vi.fn();
+    let metadataHydrated = false;
+    mocks.useWorkspaceData.mockReturnValue({
+      currentWorkspaceId: 'workspace-1',
+      nodes: [{ id: 'node-a', name: 'Node A' }],
+    });
+    mocks.useNodeColumnInfos.mockImplementation(() => {
+      const nodeInfo = metadataHydrated
+        ? {
+            id: 'node-a',
+            name: 'Node A',
+            document: 'document',
+            columns: ['document', 'speaker'],
+            schema: { document: 'String', speaker: 'String' },
+            tokenizer_models: { document: 'native:plain_words_en' },
+          }
+        : undefined;
+      return {
+        getColumnInfos: () =>
+          nodeInfo
+            ? [
+                { name: 'document', dataType: 'string' },
+                { name: 'speaker', dataType: 'string' },
+              ]
+            : [],
+        getNodeInfo: () => nodeInfo,
+        nodeInfoCache: nodeInfo ? { 'node-a': nodeInfo } : {},
+      };
+    });
+    const consume = vi.fn();
+    nodeInputRequestsStore({
+      requests: [{ id: 13, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
+      consume,
+    });
+
+    const { result, rerender } = renderHook(
+      ({ source, consumeRequests }) =>
+        useTabNodeInputs({
+          tabInputSets: { source },
+          onTabInputSetChange,
+          constraints: { allowedDataTypes: ['string'], maxNodes: 1, docTypeOnly: true },
+          consumeNodeInputRequests: consumeRequests,
+        }),
+      {
+        initialProps: {
+          source: [] as { node_id: string; column: string }[],
+          consumeRequests: true,
+        },
+      },
+    );
+
+    expect(onTabInputSetChange).toHaveBeenCalledWith('source', [{ node_id: 'node-a', column: '' }]);
+    expect(consume).toHaveBeenCalledWith(13);
+
+    metadataHydrated = true;
+    rerender({
+      source: [{ node_id: 'node-a', column: '' }],
+      consumeRequests: false,
+    });
+
+    expect(result.current.selectedNodes[0]).toMatchObject({
+      id: 'node-a',
+      name: 'Node A',
+      document: 'document',
+      columns: ['document', 'speaker'],
+      tokenizerModels: { document: 'native:plain_words_en' },
+    });
+    expect(result.current.nodeColumnSelections).toEqual([{ nodeId: 'node-a', column: 'document' }]);
+  });
+
   it('toasts structural rejections from directly consumed graph add requests', () => {
     const consume = vi.fn();
     const onTabInputSetChange = vi.fn();

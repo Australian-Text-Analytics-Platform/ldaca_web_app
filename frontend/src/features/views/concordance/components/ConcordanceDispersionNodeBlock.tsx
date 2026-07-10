@@ -65,7 +65,6 @@ export interface ConcordanceDispersionNodeBlockProps {
   selectedNodes: WorkspaceGraphNode[];
   panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
-  labelToNodeId: Record<string, string> | null;
 
   // Colors (combined view)
   sourceColorMap: Record<string, string>;
@@ -148,7 +147,6 @@ export function ConcordanceDispersionNodeBlock({
   selectedNodes,
   panelSelectedNodes,
   effectiveNodeColumnSelections,
-  labelToNodeId,
   sourceColorMap,
   defaultPalette,
   nodePagination,
@@ -186,7 +184,7 @@ export function ConcordanceDispersionNodeBlock({
   setCombinedPage,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
-  const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
+  const detachNodeId = actualNodeId;
   const canDetach = Boolean(detachNodeId) && detachNodeId !== CONCORDANCE_COMBINED_NODE_KEY;
 
   // Per-matched-text totals + selection-scoped sub-totals, published up
@@ -715,7 +713,9 @@ export function ConcordanceDispersionNodeBlock({
             `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
           }
           onRowClick={(row) => {
-            handleRowClick(row, actualNodeId || requestNodeId, column, getDispersionHits(row));
+            if (actualNodeId && column) {
+              handleRowClick(row, actualNodeId, column, getDispersionHits(row));
+            }
           }}
         />
       </AnalysisTableFrame>

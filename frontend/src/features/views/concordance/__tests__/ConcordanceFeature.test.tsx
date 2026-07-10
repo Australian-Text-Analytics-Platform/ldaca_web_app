@@ -19,6 +19,25 @@ const handleSearchMock = vi.fn();
 const clearResultsMock = vi.fn(async () => {
   /* mock: resolves immediately */
 });
+const detachDialogMocks = vi.hoisted(() => ({
+  render: vi.fn(),
+  openTable: vi.fn(),
+  openDispersion: vi.fn(),
+  table: {
+    onOpenChange: vi.fn(),
+    toggleDetachColumn: vi.fn(),
+    selectAllDetachColumns: vi.fn(),
+    deselectAllDetachColumns: vi.fn(),
+    handleDetachConfirm: vi.fn(),
+  },
+  dispersion: {
+    onOpenChange: vi.fn(),
+    toggleDetachColumn: vi.fn(),
+    selectAllDetachColumns: vi.fn(),
+    deselectAllDetachColumns: vi.fn(),
+    handleDetachConfirm: vi.fn(),
+  },
+}));
 let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
 let mockPendingConcordance: Record<string, unknown> | null = null;
 let mockHydrationState = { status: 'idle' as const, lastHydratedAt: 1 };
@@ -296,6 +315,34 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
   },
 }));
 
+vi.mock('../hooks/useConcordanceDetachDialogs', () => ({
+  useConcordanceDetachDialogs: () => ({
+    openDetachDialog: detachDialogMocks.openTable,
+    openDispersionDetachDialog: detachDialogMocks.openDispersion,
+    detachDialog: {
+      open: false,
+      isDetaching: false,
+      detachNodeOptions: [],
+      selectedDetachColumns: {},
+      ...detachDialogMocks.table,
+    },
+    dispersionDetachDialog: {
+      open: false,
+      isDetaching: false,
+      detachNodeOptions: [],
+      selectedDetachColumns: {},
+      ...detachDialogMocks.dispersion,
+    },
+  }),
+}));
+
+vi.mock('../../common/components/DetachColumnsDialog', () => ({
+  DetachColumnsDialog: (props: Record<string, unknown>) => {
+    detachDialogMocks.render(props);
+    return null;
+  },
+}));
+
 vi.mock('../../common', async () => {
   const ReactModule = await import('react');
   return {
@@ -384,10 +431,38 @@ describe('ConcordanceFeature', () => {
     mockHydrationState = { status: 'idle', lastHydratedAt: 1 };
     mockInitialResult = null;
     mockSetSafeResult = null;
+    detachDialogMocks.render.mockClear();
     // eslint-disable-next-line @typescript-eslint/require-await -- mock must match async interface
     clearResultsMock.mockImplementation(async () => {
       mockSetSafeResult?.(null);
     });
+  });
+
+  it('owns table and dispersion detach copy and forwards each dialog handler set', () => {
+    const { unmount } = renderConcordanceFeature();
+
+    const calls = detachDialogMocks.render.mock.calls.map(([props]) => props);
+    const table = calls.find((props) => props.title === 'Detach Concordance Results');
+    const dispersion = calls.find(
+      (props) => props.title === 'Add aggregated concordance to workspace',
+    );
+
+    expect(table).toEqual(
+      expect.objectContaining({
+        description:
+          'Select optional source columns to include alongside the concordance results. Required output columns stay checked automatically.',
+        ...detachDialogMocks.table,
+      }),
+    );
+    expect(dispersion).toEqual(
+      expect.objectContaining({
+        description:
+          'The detached data block always includes the per-document extract, matched-text list, and L1/R1 contexts as list columns. Optionally include the document column and any source metadata columns. The document column is selected by default — uncheck to omit it.',
+        ...detachDialogMocks.dispersion,
+      }),
+    );
+
+    unmount();
   });
 
   it('clears previous results before rerunning when clicking Re-run', () => {

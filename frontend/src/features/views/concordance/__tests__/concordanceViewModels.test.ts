@@ -16,6 +16,7 @@ import {
   getMaterializedBinsForConcordanceKey,
   isConcordanceBlockMaterialized,
   normalizeConcordanceLabelToNodeMap,
+  resolveConcordanceResultBlock,
 } from '../concordanceViewModels';
 import type { ConcordanceNodeResult } from '@/api';
 
@@ -160,6 +161,35 @@ describe('materialized concordance key helpers', () => {
     expect(getConcordanceNodeIdsForKey('Left result label', selectedNodes, labelToNodeId)).toEqual([
       'node-1',
     ]);
+  });
+
+  it('leaves an unknown result key unbound when selected-node order changes', () => {
+    expect(
+      resolveConcordanceResultBlock(
+        'Unknown result label',
+        [...selectedNodes].reverse(),
+        [
+          { nodeId: 'node-1', column: 'left_text' },
+          { nodeId: 'node-2', column: 'right_text' },
+        ],
+        labelToNodeId,
+      ),
+    ).toEqual({ node: undefined, nodeId: '', column: '' });
+  });
+
+  it('leaves a stale label-map target unbound when its node is no longer selected', () => {
+    expect(
+      resolveConcordanceResultBlock(
+        'Stale result label',
+        [...selectedNodes].reverse(),
+        [
+          { nodeId: 'node-1', column: 'left_text' },
+          { nodeId: 'node-2', column: 'right_text' },
+          { nodeId: 'deleted-node', column: 'stale_text' },
+        ],
+        { 'Stale result label': 'deleted-node' },
+      ),
+    ).toEqual({ node: undefined, nodeId: '', column: '' });
   });
 
   it('reports a result block materialized only when every backing node has a path', () => {

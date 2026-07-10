@@ -45,7 +45,6 @@ export interface ConcordanceTableNodeBlockProps {
   selectedNodes: WorkspaceGraphNode[];
   panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
-  labelToNodeId: Record<string, string> | null;
 
   // Colors (combined view)
   sourceColorMap: Record<string, string>;
@@ -321,7 +320,6 @@ function PerNodeConcordanceTable({
   selectedNodes,
   panelSelectedNodes,
   effectiveNodeColumnSelections,
-  labelToNodeId,
   nodePagination,
   globalPageSize,
   onPageSizeChange,
@@ -337,8 +335,7 @@ function PerNodeConcordanceTable({
   openDetachDialog,
 }: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
-  const effectiveNodeId = actualNodeId || requestNodeId;
-  const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
+  const detachNodeId = actualNodeId;
   const canDetach = Boolean(detachNodeId) && detachNodeId !== CONCORDANCE_COMBINED_NODE_KEY;
 
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
@@ -548,7 +545,7 @@ function PerNodeConcordanceTable({
             `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
           }
           onRowClick={(row) => {
-            handleRowClick(row, effectiveNodeId, column);
+            if (actualNodeId && column) handleRowClick(row, actualNodeId, column);
           }}
         />
       </AnalysisTableFrame>

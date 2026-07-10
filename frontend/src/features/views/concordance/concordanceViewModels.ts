@@ -488,6 +488,28 @@ export function resolveConcordanceNodeIdForKey(
 }
 
 /**
+ * Binds one separated result block to its canonical selected node and column.
+ * Used by: ConcordanceResultsPanel so result-object order never becomes an
+ * implicit node identity contract. Unknown keys deliberately remain unbound;
+ * the panel may still use their raw key for display and pagination only.
+ */
+export function resolveConcordanceResultBlock<T extends ConcordanceNodeIdentity>(
+  nodeKey: string,
+  selectedNodes: T[],
+  selections: { nodeId: string; column: string }[],
+  labelToNodeId: Record<string, string> | null,
+): { node: T | undefined; nodeId: string; column: string } {
+  const resolvedNodeId = resolveConcordanceNodeIdForKey(nodeKey, selectedNodes, labelToNodeId);
+  const node = resolvedNodeId
+    ? selectedNodes.find((candidate) => candidate.id === resolvedNodeId)
+    : undefined;
+  if (!node) return { node: undefined, nodeId: '', column: '' };
+
+  const column = selections.find((selection) => selection.nodeId === node.id)?.column ?? '';
+  return { node, nodeId: node.id, column };
+}
+
+/**
  * Resolves a rendered concordance result block to every source node id behind it.
  * Used by: ConcordanceFeature and materialized dispersion helpers so the
  * combined view can require/process all backing nodes while separated blocks

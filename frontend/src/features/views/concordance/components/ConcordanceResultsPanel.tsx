@@ -9,6 +9,7 @@ import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspac
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
 import {
   CONCORDANCE_COMBINED_NODE_KEY,
+  resolveConcordanceResultBlock,
   type ConcordanceDispersionChartMode,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
@@ -348,29 +349,18 @@ export function ConcordanceResultsPanel({
                 .map(([nodeName, nodeData]) => {
                   const keyedOrder = Object.keys(results.data);
                   const approxIndex = keyedOrder.indexOf(nodeName);
-                  let node = panelSelectedNodes.find(
-                    (candidate: WorkspaceNodeMetadata) => candidate.name === nodeName,
+                  const {
+                    node,
+                    nodeId: resolvedNodeId,
+                    column,
+                  } = resolveConcordanceResultBlock(
+                    nodeName,
+                    panelSelectedNodes,
+                    effectiveNodeColumnSelections,
+                    labelToNodeId,
                   );
-                  node ??= panelSelectedNodes.find((n: WorkspaceNodeMetadata) => n.id === nodeName);
-                  node ??= panelSelectedNodes.find(
-                    (n: WorkspaceNodeMetadata) => n.name === nodeName,
-                  );
-                  const mappedNodeId = labelToNodeId?.[nodeName];
-                  if (!node && mappedNodeId) {
-                    node = panelSelectedNodes.find(
-                      (n: WorkspaceNodeMetadata) => n.id === mappedNodeId,
-                    );
-                  }
-                  node ??= panelSelectedNodes[approxIndex];
-
-                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string id must fall back to the mapped id, then ''
-                  const resolvedNodeId = node?.id || mappedNodeId || '';
                   const paginationKey = resolvedNodeId || nodeName;
                   const requestNodeId = resolvedNodeId || nodeName;
-                  const selection = effectiveNodeColumnSelections.find(
-                    (sel) => sel.nodeId === resolvedNodeId,
-                  );
-                  const column = selection?.column ?? '';
 
                   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
                   const nodeDisplayName = node?.name || nodeName;
@@ -381,7 +371,7 @@ export function ConcordanceResultsPanel({
                     defaultPalette[approxIndex % defaultPalette.length];
 
                   const blockContext = {
-                    nodeId: node?.id ?? '',
+                    nodeId: resolvedNodeId,
                     paginationKey,
                     requestNodeId,
                     column,
@@ -398,7 +388,6 @@ export function ConcordanceResultsPanel({
                     selectedNodes,
                     panelSelectedNodes,
                     effectiveNodeColumnSelections,
-                    labelToNodeId,
                     sourceColorMap,
                     defaultPalette,
                     nodePagination,
