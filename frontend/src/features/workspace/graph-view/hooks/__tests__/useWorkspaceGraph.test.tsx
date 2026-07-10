@@ -96,6 +96,34 @@ describe('useWorkspaceGraph', () => {
     expect(result.current.edges[0]?.label).toBe('second label');
   });
 
+  it('preserves a dragged position while refreshing node and edge presentation', () => {
+    const { result, rerender } = renderHook(() => useWorkspaceGraph());
+    const draggedPosition = { x: 420, y: 315 };
+
+    act(() => {
+      result.current.handleNodesChange([
+        {
+          id: 'node-1',
+          type: 'position',
+          position: draggedPosition,
+          dragging: true,
+        },
+      ]);
+    });
+    expect(result.current.nodes[0]?.position).toEqual(draggedPosition);
+
+    useWorkspaceDataMock.mockReturnValue({
+      currentWorkspaceId: 'workspace-a',
+      workspaceGraph: makeGraph('#0000ff', 'second label'),
+    });
+    rerender();
+
+    expect(result.current.nodes[0]?.position).toEqual(draggedPosition);
+    expect(result.current.nodes[0]?.dragging).toBe(true);
+    expect((result.current.nodes[0]?.data as unknown as TestNodeData).node.color).toBe('#0000ff');
+    expect(result.current.edges[0]?.label).toBe('second label');
+  });
+
   it('reads the workspace at invocation time for cached graph commands', () => {
     const { result, rerender } = renderHook(() => useWorkspaceGraph());
     const cachedAddCommand = (result.current.nodes[0]?.data as unknown as TestNodeData)

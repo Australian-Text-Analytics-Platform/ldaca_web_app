@@ -132,6 +132,29 @@ const edgePresentationFor = (edge: Edge) => ({
 });
 
 /**
+ * Merges incoming backend presentation into React Flow-owned node state.
+ * Used by: the presentation reconciliation effect after a node signature
+ * change. Existing ids retain their dragged position, selection, measurement,
+ * and drag state; new ids use the incoming dagre layout and removed ids drop
+ * out because the incoming list defines membership and order.
+ */
+const reconcileProjectedNodes = (existingNodes: Node[], incomingNodes: Node[]): Node[] => {
+  const existingById = new Map(existingNodes.map((node) => [node.id, node]));
+  return incomingNodes.map((incomingNode) => {
+    const existingNode = existingById.get(incomingNode.id);
+    if (!existingNode) return incomingNode;
+    return {
+      ...existingNode,
+      ...incomingNode,
+      position: existingNode.position,
+      selected: existingNode.selected,
+      measured: existingNode.measured,
+      dragging: existingNode.dragging,
+    };
+  });
+};
+
+/**
  * Builds the React Flow view model consumed by `WorkspaceGraphFeature`.
  * Used by: `WorkspaceGraphFeature`, whose React Flow shell needs backend graph
  * data, semantic selection handlers, and node commands in one view model.
@@ -368,13 +391,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const newNodesSignature = JSON.stringify(initialNodes.map(nodePresentationFor));
   const currentEdgesSignature = JSON.stringify(edges.map(edgePresentationFor));
   const newEdgesSignature = JSON.stringify(initialEdges.map(edgePresentationFor));
+  const nodesPresentationChanged = newNodesSignature !== currentNodesSignature;
+  const edgesPresentationChanged = newEdgesSignature !== currentEdgesSignature;
 
   const updateRafRef = useRef<number | null>(null);
   useEffect(() => {
-    if (
-      newNodesSignature === currentNodesSignature &&
-      newEdgesSignature === currentEdgesSignature
-    ) {
+    if (!nodesPresentationChanged && !edgesPresentationChanged) {
       return;
     }
 
@@ -383,8 +405,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     }
 
     updateRafRef.current = requestAnimationFrame(() => {
-      setNodes(initialNodes);
-      setEdges(initialEdges);
+      if (nodesPresentationChanged) {
+        setNodes((existingNodes) => reconcileProjectedNodes(existingNodes, initialNodes));
+      }
+      if (edgesPresentationChanged) {
+        setEdges(initialEdges);
+      }
     });
 
     return () => {
@@ -395,10 +421,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   }, [
     currentEdgesSignature,
     currentNodesSignature,
+    edgesPresentationChanged,
     initialEdges,
     initialNodes,
     newEdgesSignature,
     newNodesSignature,
+    nodesPresentationChanged,
     setEdges,
     setNodes,
   ]);

@@ -74,10 +74,7 @@ export const useSelectionStore = create<SelectionStore>()(
       /** Used by data-table tab activation to focus a member without reordering tabs. */
       activateNode: (nodeId) => {
         set((state) => {
-          if (!nodeId) return;
-          if (!state.selectedNodeIds.includes(nodeId)) {
-            state.selectedNodeIds.push(nodeId);
-          }
+          if (!nodeId || !state.selectedNodeIds.includes(nodeId)) return;
           state.activeNodeId = nodeId;
         });
       },

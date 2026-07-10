@@ -58,4 +58,16 @@ describe('useSelectionStore', () => {
       selectedNodeIds: ['node-c', 'node-a', 'node-b'],
     });
   });
+
+  it('does not add or reorder membership when activating an absent node', () => {
+    const store = useSelectionStore.getState();
+    store.replaceSelectedNodes(['node-a', 'node-b'], 'node-a');
+
+    store.activateNode('node-missing');
+
+    expect(useSelectionStore.getState()).toMatchObject({
+      activeNodeId: 'node-a',
+      selectedNodeIds: ['node-a', 'node-b'],
+    });
+  });
 });
