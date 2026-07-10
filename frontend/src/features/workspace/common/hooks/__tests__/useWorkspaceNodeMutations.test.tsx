@@ -86,7 +86,9 @@ const wrapWithClient = (client: QueryClient) => {
 // Narrowly-typed mock factories so the args object satisfies
 // WorkspaceNodeMutationsParams without `as any` casts.
 type SetWorkspaceIdSpy = ReturnType<typeof vi.fn> & ((workspaceId: string | null) => void);
-type SetSelectedNodesSpy = ReturnType<typeof vi.fn> & ((nodeIds: string[]) => void);
+type ReplaceSelectedNodesSpy = ReturnType<typeof vi.fn> &
+  ((nodeIds: string[], activeNodeId?: string | null) => void);
+type RemoveNodeSpy = ReturnType<typeof vi.fn> & ((nodeId: string) => void);
 type ClearSelectionSpy = ReturnType<typeof vi.fn> & (() => void);
 type OperationFnSpy = ReturnType<typeof vi.fn> & ((operationId: string) => void);
 type OperationErrorSpy = ReturnType<typeof vi.fn> & ((operationId: string, error: string) => void);
@@ -102,7 +104,8 @@ const mkSetWorkspaceId = () => vi.fn() as unknown as SetWorkspaceIdSpy;
  * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
-const mkSetSelectedNodes = () => vi.fn() as unknown as SetSelectedNodesSpy;
+const mkReplaceSelectedNodes = () => vi.fn() as unknown as ReplaceSelectedNodesSpy;
+const mkRemoveNode = () => vi.fn() as unknown as RemoveNodeSpy;
 /**
  * Creates a typed selection-clear spy for hook args.
  * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
@@ -125,9 +128,9 @@ const mkOperationError = () => vi.fn() as unknown as OperationErrorSpy;
 interface BuildArgs {
   authHeaders?: Record<string, string>;
   currentWorkspaceId?: string | null;
-  selectedNodeId?: string | null;
   setCurrentWorkspaceId?: SetWorkspaceIdSpy;
-  setSelectedNodes?: SetSelectedNodesSpy;
+  removeNode?: RemoveNodeSpy;
+  replaceSelectedNodes?: ReplaceSelectedNodesSpy;
   clearSelection?: ClearSelectionSpy;
   startOperation?: OperationFnSpy;
   endOperation?: OperationFnSpy;
@@ -149,9 +152,9 @@ const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => (
   currentWorkspaceId: ('currentWorkspaceId' in overrides ? overrides.currentWorkspaceId : 'ws-1') as
     | string
     | null,
-  selectedNodeId: overrides.selectedNodeId ?? null,
   setCurrentWorkspaceId: overrides.setCurrentWorkspaceId ?? mkSetWorkspaceId(),
-  setSelectedNodes: overrides.setSelectedNodes ?? mkSetSelectedNodes(),
+  removeNode: overrides.removeNode ?? mkRemoveNode(),
+  replaceSelectedNodes: overrides.replaceSelectedNodes ?? mkReplaceSelectedNodes(),
   clearSelection: overrides.clearSelection ?? mkClearSelection(),
   queryClient,
   startOperation: overrides.startOperation ?? mkOperationFn(),
@@ -432,48 +435,32 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('deleteNode', () => {
-    it('clears selection only when the deleted node was the selected one', async () => {
+    it('removes active and non-active deleted nodes through the same semantic action', async () => {
       const queryClient = createTestClient();
-      const clearSelection = mkClearSelection();
+      const removeNode = mkRemoveNode();
       workspaceSdkMock.deleteNode.mockResolvedValue({ data: {}, error: undefined });
 
-      const { result, rerender } = renderHook(
-        (props: ReturnType<typeof buildHookArgs>) => useWorkspaceNodeMutations(props),
-        {
-          wrapper: wrapWithClient(queryClient),
-          initialProps: buildHookArgs(queryClient, {
-            selectedNodeId: 'node-1',
-            clearSelection,
-          }),
-        },
+      const { result } = renderHook(
+        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { removeNode })),
+        { wrapper: wrapWithClient(queryClient) },
       );
 
       await act(async () => {
         await result.current.actions.deleteNode('node-1');
       });
-      expect(clearSelection).toHaveBeenCalledTimes(1);
-
-      // Re-render with a different selected node — deleting an unrelated node
-      // must NOT touch selection.
-      const clearSelection2 = vi.fn();
-      rerender(
-        buildHookArgs(queryClient, {
-          selectedNodeId: 'node-1',
-          clearSelection: clearSelection2,
-        }),
-      );
-
       await act(async () => {
         await result.current.actions.deleteNode('node-other');
       });
-      expect(clearSelection2).not.toHaveBeenCalled();
+
+      expect(removeNode).toHaveBeenNthCalledWith(1, 'node-1');
+      expect(removeNode).toHaveBeenNthCalledWith(2, 'node-other');
     });
   });
 
   describe('combined-node mutations', () => {
     it('selects the id returned by joinNodes', async () => {
       const queryClient = createTestClient();
-      const setSelectedNodes = mkSetSelectedNodes();
+      const replaceSelectedNodes = mkReplaceSelectedNodes();
       const clearSelection = mkClearSelection();
       workspaceSdkMock.joinNodes.mockResolvedValue({
         data: { id: 'joined-node' },
@@ -483,7 +470,7 @@ describe('useWorkspaceNodeMutations', () => {
       const { result } = renderHook(
         () =>
           useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { clearSelection, setSelectedNodes }),
+            buildHookArgs(queryClient, { clearSelection, replaceSelectedNodes }),
           ),
         { wrapper: wrapWithClient(queryClient) },
       );
@@ -513,12 +500,12 @@ describe('useWorkspaceNodeMutations', () => {
         throwOnError: true,
       });
       expect(clearSelection).toHaveBeenCalled();
-      expect(setSelectedNodes).toHaveBeenCalledWith(['joined-node']);
+      expect(replaceSelectedNodes).toHaveBeenCalledWith(['joined-node'], 'joined-node');
     });
 
     it('selects the id returned by concatNodes', async () => {
       const queryClient = createTestClient();
-      const setSelectedNodes = mkSetSelectedNodes();
+      const replaceSelectedNodes = mkReplaceSelectedNodes();
       const clearSelection = mkClearSelection();
       workspaceSdkMock.concatNodes.mockResolvedValue({
         data: { id: 'concat-node' },
@@ -528,7 +515,7 @@ describe('useWorkspaceNodeMutations', () => {
       const { result } = renderHook(
         () =>
           useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { clearSelection, setSelectedNodes }),
+            buildHookArgs(queryClient, { clearSelection, replaceSelectedNodes }),
           ),
         { wrapper: wrapWithClient(queryClient) },
       );
@@ -548,7 +535,7 @@ describe('useWorkspaceNodeMutations', () => {
         throwOnError: true,
       });
       expect(clearSelection).toHaveBeenCalled();
-      expect(setSelectedNodes).toHaveBeenCalledWith(['concat-node']);
+      expect(replaceSelectedNodes).toHaveBeenCalledWith(['concat-node'], 'concat-node');
     });
   });
 

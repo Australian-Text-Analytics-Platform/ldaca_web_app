@@ -15,7 +15,7 @@ interface Params {
     selections: NodeColumnSelection[],
     options?: { replace?: boolean },
   ) => void;
-  selectNodes: (ids: string[]) => void;
+  replaceSelectedNodes: (ids: string[], activeNodeId?: string | null) => void;
 }
 
 export interface UseConcordancePendingHandoffResult {
@@ -52,7 +52,7 @@ export function useConcordancePendingHandoff({
   selectedNodes,
   setSearchWord,
   setNodeColumnSelections,
-  selectNodes,
+  replaceSelectedNodes,
 }: Params): UseConcordancePendingHandoffResult {
   const [queuedPendingConcordance, setQueuedPendingConcordance] =
     useState<PendingConcordance | null>(pendingConcordance);
@@ -111,7 +111,7 @@ export function useConcordancePendingHandoff({
           effectiveTargetIds.some((id, index) => id !== currentIds[index]);
         if (needsSync) {
           try {
-            selectNodes(effectiveTargetIds);
+            replaceSelectedNodes(effectiveTargetIds, effectiveTargetIds.at(-1));
           } catch (error) {
             console.warn('Failed to sync workspace selection from pending concordance:', error);
           }
@@ -155,7 +155,7 @@ export function useConcordancePendingHandoff({
     hydrationState.lastHydratedAt,
     selectedNodes,
     setNodeColumnSelections,
-    selectNodes,
+    replaceSelectedNodes,
     setSearchWord,
   ]);
 

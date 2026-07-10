@@ -7,7 +7,8 @@ import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
 /**
  * Orchestrates core state, queries, and mutations into the single internal
  * workspace model fanned out by `WorkspaceProvider`.
- * Used by: WorkspaceContext module, WorkspaceProvider module, useWorkspaceQueries hook (rg call sites/imports) because provider slices need one composed workspace model.
+ * Used by: `WorkspaceProvider`, which fans the composed workspace model into
+ * data, selection, status, and action contexts.
  * Flow: core, query, mutation, and UI-sync hooks combine backend data with local selection before provider contexts expose the slices.
  */
 export const useWorkspaceInternal = () => {
@@ -19,17 +20,14 @@ export const useWorkspaceInternal = () => {
     isAuthenticated,
     currentWorkspaceId,
     setCurrentWorkspaceId,
-    selectedNodeId,
+    activeNodeId,
     selectedNodeIds,
-    selectNode,
-    setSelectedNodes,
-    toggleNodeSelection,
+    activateNode,
+    reorderSelectedNodes,
+    removeNode,
+    replaceSelectedNodes,
+    toggleNode,
     clearSelection,
-    getPaginationForNode,
-    handlePageChange,
-    handlePageSizeChange,
-    handleSortingChange,
-    handleFilterChange,
     loadingOperationCount,
     operationErrorsRecord,
     startOperation,
@@ -44,7 +42,6 @@ export const useWorkspaceInternal = () => {
     nodes,
     selectedNode,
     selectedNodes,
-    nodeData,
     queryLoadingState,
     queryErrorState,
     currentWorkspaceIdFromQuery,
@@ -53,9 +50,8 @@ export const useWorkspaceInternal = () => {
     authHeaders,
     isAuthenticated,
     currentWorkspaceId,
-    selectedNodeId,
+    activeNodeId,
     selectedNodeIds,
-    getPaginationForNode,
   });
 
   // The `current.get` server query is treated as a one-shot bootstrap that
@@ -94,9 +90,9 @@ export const useWorkspaceInternal = () => {
   const { actions: nodeActions } = useWorkspaceNodeMutations({
     authHeaders,
     currentWorkspaceId,
-    selectedNodeId,
     setCurrentWorkspaceId,
-    setSelectedNodes,
+    removeNode,
+    replaceSelectedNodes,
     clearSelection,
     queryClient,
     startOperation,
@@ -106,12 +102,21 @@ export const useWorkspaceInternal = () => {
 
   const selectionActions = useMemo(
     () => ({
-      selectNode,
-      selectNodes: setSelectedNodes,
-      toggleNodeSelection,
+      activateNode,
+      reorderSelectedNodes,
+      removeNode,
+      replaceSelectedNodes,
+      toggleNode,
       clearSelection,
     }),
-    [selectNode, setSelectedNodes, toggleNodeSelection, clearSelection],
+    [
+      activateNode,
+      reorderSelectedNodes,
+      removeNode,
+      replaceSelectedNodes,
+      toggleNode,
+      clearSelection,
+    ],
   );
 
   const actions = useMemo(
@@ -147,17 +152,11 @@ export const useWorkspaceInternal = () => {
     nodes,
     selectedNode,
     selectedNodes,
-    selectedNodeId,
+    activeNodeId,
     selectedNodeIds,
     workspaceGraph,
-    nodeData,
     isLoading,
     errors,
     actions,
-    handlePageChange,
-    handlePageSizeChange,
-    handleSortingChange,
-    handleFilterChange,
-    getPaginationForNode,
   };
 };

@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { useUIStore } from '@/stores/uiStore';
-import { type PaginationMap, type PaginationState, createDefaultPagination } from './types';
 
 /**
  * Reads the selection store fields the workspace feature owns.
@@ -15,12 +14,14 @@ const useSelectionSlice = () =>
     useShallow((state) => ({
       currentWorkspaceId: state.currentWorkspaceId,
       setCurrentWorkspaceId: state.setCurrentWorkspaceId,
-      selectedNodeId: state.selectedNodeId,
+      activeNodeId: state.activeNodeId,
       selectedNodeIds: state.selectedNodeIds,
-      selectNode: state.selectNode,
-      setSelectedNodes: state.setSelectedNodes,
-      toggleNodeSelection: state.toggleNodeSelection,
-      clearAllSelections: state.clearAllSelections,
+      activateNode: state.activateNode,
+      reorderSelectedNodes: state.reorderSelectedNodes,
+      removeNode: state.removeNode,
+      replaceSelectedNodes: state.replaceSelectedNodes,
+      toggleNode: state.toggleNode,
+      clearSelection: state.clearSelection,
     })),
   );
 
@@ -41,141 +42,42 @@ const useUISlice = () =>
   );
 
 /**
- * Core workspace wiring: bundles auth, current-workspace id, selection, and
- * per-node pagination. `currentWorkspaceId` lives in `selectionStore`, so this
- * hook just re-exposes the slice. Pagination stays as local state because it's tightly coupled to `selectedNodeId` lifecycle and
- * shouldn't persist across workspaces.
- * Used by: selectionStore module, useWorkspaceInternal hook, useWorkspaceInternal tests (rg call sites/imports).
- * Flow: auth and selection slices are read first, then pagination handlers update the active node's server-table state.
+ * Core workspace wiring for auth, current-workspace identity, semantic node
+ * selection, and operation status. Data-view request state is intentionally
+ * absent: `useWorkspaceDataTable` owns its per-node pagination/sort/filter
+ * lifecycle and server query.
+ * Used by: `useWorkspaceInternal`, which supplies these client-state inputs to
+ * query and mutation hooks before building provider slices.
+ * Flow: read the auth and selection stores, clear selection at workspace
+ * boundaries, and expose stable auth/operation inputs to workspace queries and
+ * mutations.
  */
 export const useWorkspaceCore = () => {
   const { getAuthHeaders, isAuthenticated } = useAuth();
   const {
     currentWorkspaceId,
     setCurrentWorkspaceId,
-    selectedNodeId,
+    activeNodeId,
     selectedNodeIds,
-    selectNode,
-    setSelectedNodes,
-    toggleNodeSelection,
-    clearAllSelections,
+    activateNode,
+    reorderSelectedNodes,
+    removeNode,
+    replaceSelectedNodes,
+    toggleNode,
+    clearSelection,
   } = useSelectionSlice();
   const ui = useUISlice();
 
-  const [pagination, setPaginationState] = useState<PaginationMap>({});
-
-  // useCallback'd so the WorkspaceProvider selection slice (which exposes
-  // these to every component that reads `useWorkspaceSelection`) stays
-  // referentially stable across renders. setPaginationState is stable
-  // (React useState setter), so updatePagination has no real deps;
-  // downstream handlers depend only on stable refs + selectedNodeId.
-  const updatePagination = useCallback(
-    (nodeId: string, updater: (existing: PaginationState) => PaginationState) => {
-      setPaginationState((prev) => {
-        const existing = prev[nodeId] ?? createDefaultPagination();
-        const next = updater(existing);
-        if (next === existing) return prev;
-        return { ...prev, [nodeId]: next };
-      });
-    },
-    [],
-  );
-
-  const updateCurrentPage = useCallback(
-    (nodeId: string, page: number) => {
-      updatePagination(nodeId, (existing) =>
-        existing.currentPage === page ? existing : { ...existing, currentPage: page },
-      );
-    },
-    [updatePagination],
-  );
-
-  const updatePageSize = useCallback(
-    (nodeId: string, pageSize: number) => {
-      updatePagination(nodeId, (existing) =>
-        existing.pageSize === pageSize && existing.currentPage === 1
-          ? existing
-          : { ...existing, pageSize, currentPage: 1 },
-      );
-    },
-    [updatePagination],
-  );
-
-  const getPaginationForNode = useCallback(
-    (nodeId?: string | null) =>
-      (nodeId ? pagination[nodeId] : undefined) ?? createDefaultPagination(),
-    [pagination],
-  );
-
-  // Reset pagination + selection when the workspace changes. First render is
+  // Reset selection when the workspace changes. First render is
   // skipped (previous ref starts as null) so we don't clobber the caller's
   // freshly-chosen workspace.
   const previousWorkspaceIdRef = useRef<string | null>(null);
-  /* eslint-disable react-hooks/set-state-in-effect -- Resetting selection/pagination on workspace change; guarded by ref comparison */
   useEffect(() => {
     const previous = previousWorkspaceIdRef.current;
     if (previous === currentWorkspaceId) return;
-    if (previous !== null) clearAllSelections();
-    setPaginationState({});
+    if (previous !== null) clearSelection();
     previousWorkspaceIdRef.current = currentWorkspaceId;
-  }, [clearAllSelections, currentWorkspaceId]);
-
-  // Initialize pagination for newly selected nodes (lazy).
-  useEffect(() => {
-    if (!selectedNodeId || pagination[selectedNodeId]) return;
-    setPaginationState((prev) =>
-      prev[selectedNodeId] ? prev : { ...prev, [selectedNodeId]: createDefaultPagination() },
-    );
-  }, [pagination, selectedNodeId]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  /** Updates the current selected node's server-side page. */
-  const handlePageChange = useCallback(
-    (page: number) => {
-      if (selectedNodeId) updateCurrentPage(selectedNodeId, page);
-    },
-    [selectedNodeId, updateCurrentPage],
-  );
-  /** Updates the current selected node's page size and resets to page one. */
-  const handlePageSizeChange = useCallback(
-    (pageSize: number) => {
-      if (selectedNodeId) updatePageSize(selectedNodeId, pageSize);
-    },
-    [selectedNodeId, updatePageSize],
-  );
-
-  /** Stores server-side sort state for the selected node. */
-  const handleSortingChange = useCallback(
-    (sortBy: string | undefined, descending: boolean | undefined) => {
-      if (!selectedNodeId) return;
-      updatePagination(selectedNodeId, (existing) => ({
-        ...existing,
-        sortBy,
-        descending,
-        currentPage: 1,
-      }));
-    },
-    [selectedNodeId, updatePagination],
-  );
-
-  /** Stores server-side filter state for the selected node. */
-  const handleFilterChange = useCallback(
-    (
-      filterColumn: string | undefined,
-      filterValue: string | undefined,
-      filterOp: string | undefined,
-    ) => {
-      if (!selectedNodeId) return;
-      updatePagination(selectedNodeId, (existing) => ({
-        ...existing,
-        filterColumn,
-        filterValue,
-        filterOp,
-        currentPage: 1,
-      }));
-    },
-    [selectedNodeId, updatePagination],
-  );
+  }, [clearSelection, currentWorkspaceId]);
 
   // Memoize authHeaders so the (~25) downstream mutation closures and
   // the four-slice WorkspaceProvider context don't see a new object
@@ -199,21 +101,14 @@ export const useWorkspaceCore = () => {
     currentWorkspaceId,
     setCurrentWorkspaceId,
 
-    selectedNodeId,
+    activeNodeId,
     selectedNodeIds,
-    selectNode,
-    setSelectedNodes,
-    toggleNodeSelection,
-    clearSelection: clearAllSelections,
-
-    pagination,
-    getPaginationForNode,
-    updateCurrentPage,
-    updatePageSize,
-    handlePageChange,
-    handlePageSizeChange,
-    handleSortingChange,
-    handleFilterChange,
+    activateNode,
+    reorderSelectedNodes,
+    removeNode,
+    replaceSelectedNodes,
+    toggleNode,
+    clearSelection,
 
     loadingOperationCount: ui.loadingOperations.size,
     operationErrorsRecord,

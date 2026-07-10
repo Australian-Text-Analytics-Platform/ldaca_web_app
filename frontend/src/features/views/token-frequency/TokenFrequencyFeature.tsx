@@ -88,7 +88,7 @@ const TokenFrequencyFeature = ({
   const nodeColumnSelections = nodeInputs.nodeColumnSelections;
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
-  const { selectNodes, setNodeColor: persistNodeColor } = useWorkspaceActions();
+  const { replaceSelectedNodes, setNodeColor: persistNodeColor } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
@@ -348,7 +348,7 @@ const TokenFrequencyFeature = ({
       getAuthHeaders,
     },
     navigation: {
-      selectNodes,
+      replaceSelectedNodes,
       setPendingConcordance,
       setCurrentView,
       applyStopSetFromText,

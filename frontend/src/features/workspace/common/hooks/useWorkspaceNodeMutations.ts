@@ -9,9 +9,9 @@ import { useWorkspaceTransformMutations } from './useWorkspaceTransformMutations
 interface WorkspaceNodeMutationsParams {
   authHeaders: Record<string, string>;
   currentWorkspaceId: string | null;
-  selectedNodeId: string | null;
   setCurrentWorkspaceId: (workspaceId: string | null) => void;
-  setSelectedNodes: (nodeIds: string[]) => void;
+  removeNode: (nodeId: string) => void;
+  replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
   clearSelection: () => void;
   queryClient: QueryClient;
   startOperation: (operationId: string) => void;
@@ -23,15 +23,16 @@ interface WorkspaceNodeMutationsParams {
  * Builds the workspace action surface from generated API mutations. The
  * provider exposes these methods to data-loader, graph, data-view, and analysis
  * features.
- * Used by: WorkspaceProvider module, useWorkspaceInternal hook, useWorkspaceInternal tests (rg call sites/imports) because workspace contexts need one generated-API mutation facade.
+ * Used by: `useWorkspaceInternal`, which composes generated-API mutations with
+ * semantic selection actions for the provider action slice.
  * Flow: provider injects auth and selection state, actions call generated SDK mutations, then lifecycle handlers update operation state, selection, and caches.
  */
 export const useWorkspaceNodeMutations = ({
   authHeaders,
   currentWorkspaceId,
-  selectedNodeId,
   setCurrentWorkspaceId,
-  setSelectedNodes,
+  removeNode,
+  replaceSelectedNodes,
   clearSelection,
   queryClient,
   startOperation,
@@ -52,8 +53,8 @@ export const useWorkspaceNodeMutations = ({
   const { actions: graphActions } = useWorkspaceGraphMutations({
     authHeaders,
     currentWorkspaceId,
-    selectedNodeId,
-    setSelectedNodes,
+    removeNode,
+    replaceSelectedNodes,
     clearSelection,
     queryClient,
     startOperation,

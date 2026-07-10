@@ -11,7 +11,7 @@ const mockWorkspaceData = vi.hoisted(() => ({
 }));
 
 const mockSelection = vi.hoisted(() => ({
-  selectedNodeId: null as string | null,
+  activeNodeId: null as string | null,
 }));
 
 const mockUIState = vi.hoisted(() => ({
@@ -56,7 +56,7 @@ describe('useHintConditions', () => {
     mockWorkspaceData.workspaceGraph = {
       nodes: [{ id: 'node-1', data: { name: 'Corpus' } }],
     };
-    mockSelection.selectedNodeId = null;
+    mockSelection.activeNodeId = null;
     mockUIState.currentView = 'filter';
     mockUIState.lastUploadedFilePath = null;
     mockUIState.modals = {
@@ -76,7 +76,7 @@ describe('useHintConditions', () => {
   });
 
   it('activates the filter column-selection hint when a node is selected in the filter view', () => {
-    mockSelection.selectedNodeId = 'node-1';
+    mockSelection.activeNodeId = 'node-1';
 
     const { result } = renderHook(() => useHintConditions());
 
@@ -85,7 +85,7 @@ describe('useHintConditions', () => {
   });
 
   it('suppresses filter hints when any modal is open', () => {
-    mockSelection.selectedNodeId = 'node-1';
+    mockSelection.activeNodeId = 'node-1';
     mockUIState.modals.infoModal = true;
 
     const { result } = renderHook(() => useHintConditions());

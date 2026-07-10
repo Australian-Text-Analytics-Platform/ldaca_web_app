@@ -115,7 +115,7 @@ function Sidebar() {
 
   const { workspaceGraph } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
-  const { toggleNodeSelection, deleteNode, copyNode, renameNode, undoNode, redoNode } =
+  const { toggleNode, deleteNode, copyNode, renameNode, undoNode, redoNode } =
     useWorkspaceActions();
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
   const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
@@ -146,7 +146,7 @@ function Sidebar() {
    */
   const handleAddToSelection = (nodeId: string) => {
     requestNodeInputAdd(currentWorkspaceId, useUIStore.getState().currentView, nodeId);
-    markInteracted([nodeId]);
+    if (currentWorkspaceId) markInteracted(currentWorkspaceId, [nodeId]);
   };
 
   const isConnected = taskStreamStatus === 'open';
@@ -386,9 +386,10 @@ function Sidebar() {
                         {key === 'views' && renderViewsBody()}
                         {key === 'nodes' && (
                           <WorkspaceNodeList
+                            workspaceId={currentWorkspaceId}
                             nodes={nodes}
                             selectedNodeIds={selectedNodeIds}
-                            onToggleNodeSelection={toggleNodeSelection}
+                            onToggleNodeSelection={toggleNode}
                             renderPinnedRowAction={(node: SidebarWorkspaceNode) => (
                               <NodePinButton
                                 node={getToolbarNode(node)}

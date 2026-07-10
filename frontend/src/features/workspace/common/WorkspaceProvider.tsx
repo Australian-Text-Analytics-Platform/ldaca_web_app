@@ -30,7 +30,6 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       currentWorkspaceId: ws.currentWorkspaceId,
       nodes: ws.nodes,
       workspaceGraph: ws.workspaceGraph,
-      nodeData: ws.nodeData,
     }),
     [
       ws.workspaces,
@@ -38,7 +37,6 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       ws.currentWorkspaceId,
       ws.nodes,
       ws.workspaceGraph,
-      ws.nodeData,
     ],
   );
 
@@ -46,24 +44,14 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     () => ({
       selectedNode: ws.selectedNode,
       selectedNodes: ws.selectedNodes,
-      selectedNodeId: ws.selectedNodeId,
+      activeNodeId: ws.activeNodeId,
       selectedNodeIds: ws.selectedNodeIds,
-      handlePageChange: ws.handlePageChange,
-      handlePageSizeChange: ws.handlePageSizeChange,
-      handleSortingChange: ws.handleSortingChange,
-      handleFilterChange: ws.handleFilterChange,
-      getPaginationForNode: ws.getPaginationForNode,
     }),
     [
       ws.selectedNode,
       ws.selectedNodes,
-      ws.selectedNodeId,
+      ws.activeNodeId,
       ws.selectedNodeIds,
-      ws.handlePageChange,
-      ws.handlePageSizeChange,
-      ws.handleSortingChange,
-      ws.handleFilterChange,
-      ws.getPaginationForNode,
     ],
   );
 

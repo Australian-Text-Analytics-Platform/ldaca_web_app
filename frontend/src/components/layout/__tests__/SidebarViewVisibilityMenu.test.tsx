@@ -51,7 +51,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Used by: Sidebar tests to stub child component workspace actions. */
   useWorkspaceActions: () => ({
-    toggleNodeSelection: vi.fn(),
+    toggleNode: vi.fn(),
     setCurrentWorkspace: vi.fn(),
   }),
 }));

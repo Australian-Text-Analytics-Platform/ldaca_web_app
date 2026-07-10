@@ -26,8 +26,8 @@ import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle'
 interface WorkspaceGraphMutationsParams {
   authHeaders: Record<string, string>;
   currentWorkspaceId: string | null;
-  selectedNodeId: string | null;
-  setSelectedNodes: (nodeIds: string[]) => void;
+  removeNode: (nodeId: string) => void;
+  replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
   clearSelection: () => void;
   queryClient: QueryClient;
   startOperation: (operationId: string) => void;
@@ -47,8 +47,8 @@ interface WorkspaceGraphMutationsParams {
 export const useWorkspaceGraphMutations = ({
   authHeaders,
   currentWorkspaceId,
-  selectedNodeId,
-  setSelectedNodes,
+  removeNode,
+  replaceSelectedNodes,
   clearSelection,
   queryClient,
   startOperation,
@@ -123,9 +123,7 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => data),
     onMutate: operationLifecycle.onMutate('deleteNode'),
     onSuccess: operationLifecycle.onSuccess('deleteNode', (_, { nodeId }) => {
-      if (selectedNodeId === nodeId) {
-        clearSelection();
-      }
+      removeNode(nodeId);
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
         includeData: true,
       });
@@ -237,7 +235,7 @@ export const useWorkspaceGraphMutations = ({
       clearSelection();
     }),
     onSuccess: operationLifecycle.onSuccess('joinNodes', (createdNode: NodeInfoResponse) => {
-      setSelectedNodes([createdNode.id]);
+      replaceSelectedNodes([createdNode.id], createdNode.id);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
     }),
     onError: operationLifecycle.onError('joinNodes'),
@@ -263,7 +261,7 @@ export const useWorkspaceGraphMutations = ({
       clearSelection();
     }),
     onSuccess: operationLifecycle.onSuccess('concatNodes', (createdNode: NodeInfoResponse) => {
-      setSelectedNodes([createdNode.id]);
+      replaceSelectedNodes([createdNode.id], createdNode.id);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
     }),
     onError: operationLifecycle.onError('concatNodes'),

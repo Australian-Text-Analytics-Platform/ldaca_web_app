@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/table';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
-import { queryKeys } from '@/lib/queryKeys';
+import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef, PaginationState } from '@tanstack/react-table';
 import type { AnnotationClassOption } from '../aiProviders';
@@ -164,21 +164,20 @@ export function AnnotationAiPreviewPanel({
     pageIndex: 0,
     pageSize: AI_PREVIEW_PAGE_SIZE,
   });
+  const nodeDataRequest = createNodeDataRequest({
+    page: pagination.pageIndex + 1,
+    page_size: pagination.pageSize,
+  });
 
   const nodeDataQuery = useQuery({
-    queryKey: queryKeys.nodeData(
-      workspaceId ?? '',
-      nodeId,
-      pagination.pageIndex + 1,
-      pagination.pageSize,
-    ),
+    queryKey: queryKeys.nodeData(workspaceId ?? '', nodeId, nodeDataRequest),
     enabled: Boolean(workspaceId),
     queryFn: async () => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await getNodeDataByWorkspaceId({
         headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
-        query: { page: pagination.pageIndex + 1, page_size: pagination.pageSize },
+        query: nodeDataRequest,
         throwOnError: true,
       });
       return data;

@@ -8,10 +8,10 @@ import { immer } from 'zustand/middleware/immer';
  * `currentWorkspaceId` is the canonical "which workspace is open" pointer;
  * the server `current.get` query only bootstraps this store.
  *
- * `selectedNodeId` is the "focused" node (drives the data table / detail
- * panels); `selectedNodeIds` is the tab strip, ordered left-to-right. Every
- * mutator keeps the two node fields in sync so components can read either
- * without an extra derivation step.
+ * `activeNodeId` is the focused node that drives single-node surfaces;
+ * `selectedNodeIds` is ordered membership for the tab strip and multi-node
+ * tools. Semantic actions keep the active pointer valid without treating tab
+ * activation as a reorder or collapsing multi-selection.
  *
  * Graph-level selection (React Flow, multi-select pagination, etc.) lives
  * with those feature components — don't add it back here.
@@ -19,7 +19,7 @@ import { immer } from 'zustand/middleware/immer';
 
 interface SelectionState {
   currentWorkspaceId: string | null;
-  selectedNodeId: string | null;
+  activeNodeId: string | null;
   selectedNodeIds: string[];
 }
 
@@ -31,75 +31,126 @@ interface SelectionActions {
    * just rehydrate the same workspace don't clobber selection.
    */
   setCurrentWorkspaceId: (workspaceId: string | null) => void;
-  /** Replace the single focused node; also resets the tab strip. */
-  selectNode: (nodeId: string | null) => void;
-  /** Replace the tab strip; focus follows the rightmost (most recent) entry. */
-  setSelectedNodes: (nodeIds: string[]) => void;
-  /** Toggle a node in the tab strip; toggled-on nodes become the focused one. */
-  toggleNodeSelection: (nodeId: string) => void;
-  clearAllSelections: () => void;
+  /** Focus a selected node without changing ordered membership. */
+  activateNode: (nodeId: string) => void;
+  /** Reorder selected nodes while retaining every current member. */
+  reorderSelectedNodes: (nodeIds: string[]) => void;
+  /** Remove one member and choose the nearest remaining tab when it was active. */
+  removeNode: (nodeId: string) => void;
+  /** Replace ordered membership and choose an explicit valid active node. */
+  replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
+  /** Toggle membership; newly-added nodes become active. */
+  toggleNode: (nodeId: string) => void;
+  /** Clear ordered membership and the active pointer. */
+  clearSelection: () => void;
 }
 
 type SelectionStore = SelectionState & SelectionActions;
+
+/**
+ * Normalizes node membership before selection actions commit it.
+ * Used by: `replaceSelectedNodes` and `reorderSelectedNodes`, whose callers can
+ * receive repeated ids from graph/list input aggregation or drag payloads.
+ * Flow: discard empty ids, keep first occurrence order, and return one stable
+ * membership list for the store transition.
+ */
+const uniqueNodeIds = (nodeIds: readonly string[]): string[] =>
+  nodeIds.filter((nodeId, index) => Boolean(nodeId) && nodeIds.indexOf(nodeId) === index);
 
 export const useSelectionStore = create<SelectionStore>()(
   devtools(
     immer((set) => ({
       currentWorkspaceId: null,
-      selectedNodeId: null,
+      activeNodeId: null,
       selectedNodeIds: [],
 
-      /** Updates the active workspace pointer while leaving node selection reset to callers. */
-      /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+      /** Used by workspace bootstrap and management mutations to change the active workspace. */
       setCurrentWorkspaceId: (workspaceId) => {
         set((state) => {
           state.currentWorkspaceId = workspaceId;
         });
       },
 
-      /** Focuses one node and collapses the tab strip to that node. */
-      /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-      selectNode: (nodeId) => {
+      /** Used by data-table tab activation to focus a member without reordering tabs. */
+      activateNode: (nodeId) => {
         set((state) => {
-          state.selectedNodeId = nodeId;
-          state.selectedNodeIds = nodeId ? [nodeId] : [];
-        });
-      },
-
-      /** Replaces the selected-node tab strip after multi-select or reordering flows. */
-      /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-      setSelectedNodes: (nodeIds) => {
-        set((state) => {
-          state.selectedNodeIds = nodeIds;
-          state.selectedNodeId = nodeIds.at(-1) ?? null;
-        });
-      },
-
-      /** Toggles a node into/out of the tab strip while keeping focus on the newest visible node. */
-      /**
-       * Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
-       * Flow: add unseen node ids and focus them, or remove existing ids and move focus to the rightmost remaining selection.
-       */
-      toggleNodeSelection: (nodeId) => {
-        set((state) => {
-          const idx = state.selectedNodeIds.indexOf(nodeId);
-          if (idx === -1) {
+          if (!nodeId) return;
+          if (!state.selectedNodeIds.includes(nodeId)) {
             state.selectedNodeIds.push(nodeId);
-            state.selectedNodeId = nodeId;
+          }
+          state.activeNodeId = nodeId;
+        });
+      },
+
+      /**
+       * Used by the data-table tab strip after drag-and-drop.
+       * Flow: accept the caller's order for known members, append any omitted
+       * current members, and leave the independent active pointer unchanged.
+       */
+      reorderSelectedNodes: (nodeIds) => {
+        set((state) => {
+          const selected = new Set(state.selectedNodeIds);
+          const orderedKnown = uniqueNodeIds(nodeIds).filter((nodeId) => selected.has(nodeId));
+          const omitted = state.selectedNodeIds.filter((nodeId) => !orderedKnown.includes(nodeId));
+          state.selectedNodeIds = [...orderedKnown, ...omitted];
+        });
+      },
+
+      /**
+       * Used by successful delete mutations and tab-close controls.
+       * Flow: remove membership; when the removed node was active, prefer the
+       * tab that moved into its index and otherwise the previous final tab.
+       */
+      removeNode: (nodeId) => {
+        set((state) => {
+          const index = state.selectedNodeIds.indexOf(nodeId);
+          if (index === -1) return;
+          state.selectedNodeIds.splice(index, 1);
+          if (state.activeNodeId === nodeId) {
+            state.activeNodeId =
+              state.selectedNodeIds[index] ?? state.selectedNodeIds[index - 1] ?? null;
+          }
+        });
+      },
+
+      /** Used by graph/list selection replacement and created-node success flows. */
+      replaceSelectedNodes: (nodeIds, activeNodeId) => {
+        set((state) => {
+          const selectedNodeIds = uniqueNodeIds(nodeIds);
+          state.selectedNodeIds = selectedNodeIds;
+          state.activeNodeId =
+            activeNodeId && selectedNodeIds.includes(activeNodeId)
+              ? activeNodeId
+              : (selectedNodeIds.at(-1) ?? null);
+        });
+      },
+
+      /**
+       * Used by graph and sidebar row clicks for membership selection.
+       * Flow: delegate removal semantics for an existing id, otherwise append
+       * the new member and make it active.
+       */
+      toggleNode: (nodeId) => {
+        set((state) => {
+          if (!nodeId) return;
+          const index = state.selectedNodeIds.indexOf(nodeId);
+          if (index === -1) {
+            state.selectedNodeIds.push(nodeId);
+            state.activeNodeId = nodeId;
             return;
           }
-          state.selectedNodeIds.splice(idx, 1);
-          if (state.selectedNodeId === nodeId) {
-            state.selectedNodeId = state.selectedNodeIds[state.selectedNodeIds.length - 1] ?? null;
+          state.selectedNodeIds.splice(index, 1);
+          if (state.activeNodeId === nodeId) {
+            state.activeNodeId =
+              state.selectedNodeIds[index] ?? state.selectedNodeIds[index - 1] ?? null;
           }
         });
       },
 
-      /** Clears focus and multi-node selection when the workspace or graph context resets. */
-      /** Consumed by: useSelectionStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-      clearAllSelections: () => {
+      /** Used by workspace switches and preprocessing mutations that reset selection. */
+      clearSelection: () => {
         set((state) => {
-          state.selectedNodeId = null;
+          state.activeNodeId = null;
           state.selectedNodeIds = [];
         });
       },

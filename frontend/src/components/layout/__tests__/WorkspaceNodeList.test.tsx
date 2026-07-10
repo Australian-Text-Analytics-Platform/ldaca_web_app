@@ -42,6 +42,7 @@ describe('WorkspaceNodeList', () => {
 
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={nodes}
         selectedNodeIds={[]}
         onToggleNodeSelection={onToggleNodeSelection}
@@ -65,6 +66,7 @@ describe('WorkspaceNodeList', () => {
   it('paints a left accent from the node color while keeping the label legible', () => {
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={[{ id: 'node-1', color: '#2563eb', data: { nodeName: 'Corpus' } }]}
         onToggleNodeSelection={vi.fn()}
       />,
@@ -80,6 +82,7 @@ describe('WorkspaceNodeList', () => {
   it('renders no accent style for a node without a color', () => {
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={[{ id: 'node-1', data: { nodeName: 'Corpus' } }]}
         onToggleNodeSelection={vi.fn()}
       />,
@@ -93,6 +96,7 @@ describe('WorkspaceNodeList', () => {
     usePinnedNodesStore.getState().togglePinnedNode('node-3');
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={orderedNodes}
         selectedNodeIds={['node-2', 'node-3']}
         onToggleNodeSelection={vi.fn()}
@@ -106,6 +110,7 @@ describe('WorkspaceNodeList', () => {
     const user = userEvent.setup();
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={orderedNodes}
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
@@ -135,6 +140,7 @@ describe('WorkspaceNodeList', () => {
     usePinnedNodesStore.getState().togglePinnedNode('node-2');
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={orderedNodes}
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
@@ -177,6 +183,7 @@ describe('WorkspaceNodeList', () => {
   it('lets hover-revealed row actions receive pointer clicks', () => {
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={orderedNodes}
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
@@ -198,6 +205,7 @@ describe('WorkspaceNodeList', () => {
   it('right-aligns long data-block names and fades the left edge for leading actions', () => {
     render(
       <WorkspaceNodeList
+        workspaceId="workspace-1"
         nodes={[{ id: 'node-long', data: { nodeName: longNodeName } }]}
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}

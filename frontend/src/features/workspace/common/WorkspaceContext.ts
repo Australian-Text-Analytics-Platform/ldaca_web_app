@@ -9,19 +9,13 @@ export interface WorkspaceDataSlice {
   currentWorkspaceId: WorkspaceInternal['currentWorkspaceId'];
   nodes: WorkspaceInternal['nodes'];
   workspaceGraph: WorkspaceInternal['workspaceGraph'];
-  nodeData: WorkspaceInternal['nodeData'];
 }
 
 export interface WorkspaceSelectionSlice {
   selectedNode: WorkspaceInternal['selectedNode'];
   selectedNodes: WorkspaceInternal['selectedNodes'];
-  selectedNodeId: WorkspaceInternal['selectedNodeId'];
+  activeNodeId: WorkspaceInternal['activeNodeId'];
   selectedNodeIds: WorkspaceInternal['selectedNodeIds'];
-  handlePageChange: WorkspaceInternal['handlePageChange'];
-  handlePageSizeChange: WorkspaceInternal['handlePageSizeChange'];
-  handleSortingChange: WorkspaceInternal['handleSortingChange'];
-  handleFilterChange: WorkspaceInternal['handleFilterChange'];
-  getPaginationForNode: WorkspaceInternal['getPaginationForNode'];
 }
 
 export interface WorkspaceStatusSlice {

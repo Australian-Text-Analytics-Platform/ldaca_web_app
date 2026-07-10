@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +31,7 @@ interface CoreOverrides {
   isAuthenticated?: boolean;
   currentWorkspaceId?: string | null;
   setCurrentWorkspaceId?: ReturnType<typeof vi.fn>;
-  selectedNodeId?: string | null;
+  activeNodeId?: string | null;
   selectedNodeIds?: string[];
   loadingOperationCount?: number;
   operationErrorsRecord?: Record<string, string>;
@@ -44,7 +44,6 @@ interface QueriesOverrides {
   nodes?: unknown[];
   selectedNode?: unknown;
   selectedNodes?: unknown[];
-  nodeData?: unknown;
   queryLoadingState?: Record<string, boolean>;
   queryErrorState?: Record<string, string | null>;
   currentWorkspaceIdFromQuery?: string | null | undefined;
@@ -62,17 +61,14 @@ const buildCoreReturn = (overrides: CoreOverrides = {}) => ({
   isAuthenticated: overrides.isAuthenticated ?? true,
   currentWorkspaceId: overrides.currentWorkspaceId ?? null,
   setCurrentWorkspaceId: overrides.setCurrentWorkspaceId ?? vi.fn(),
-  selectedNodeId: overrides.selectedNodeId ?? null,
+  activeNodeId: overrides.activeNodeId ?? null,
   selectedNodeIds: overrides.selectedNodeIds ?? [],
-  selectNode: vi.fn(),
-  setSelectedNodes: vi.fn(),
-  toggleNodeSelection: vi.fn(),
+  activateNode: vi.fn(),
+  reorderSelectedNodes: vi.fn(),
+  removeNode: vi.fn(),
+  replaceSelectedNodes: vi.fn(),
+  toggleNode: vi.fn(),
   clearSelection: vi.fn(),
-  getPaginationForNode: vi.fn(),
-  handlePageChange: vi.fn(),
-  handlePageSizeChange: vi.fn(),
-  handleSortingChange: vi.fn(),
-  handleFilterChange: vi.fn(),
   loadingOperationCount: overrides.loadingOperationCount ?? 0,
   operationErrorsRecord: overrides.operationErrorsRecord ?? {},
   startOperation: vi.fn(),
@@ -93,7 +89,6 @@ const buildQueriesReturn = (overrides: QueriesOverrides = {}) => ({
   nodes: overrides.nodes ?? [],
   selectedNode: overrides.selectedNode ?? null,
   selectedNodes: overrides.selectedNodes ?? [],
-  nodeData: overrides.nodeData ?? null,
   queryLoadingState: overrides.queryLoadingState ?? {},
   queryErrorState: overrides.queryErrorState ?? {},
   currentWorkspaceIdFromQuery: overrides.currentWorkspaceIdFromQuery,
@@ -347,18 +342,13 @@ describe('useWorkspaceInternal', () => {
   });
 
   describe('passthrough fields', () => {
-    it('exposes pagination + selection fields from core and queries', () => {
-      const handlePageChange = vi.fn();
-      const handleFilterChange = vi.fn();
-      useWorkspaceCoreMock.mockReturnValue({
-        ...buildCoreReturn({ currentWorkspaceId: 'ws-A', selectedNodeId: 'node-A' }),
-        handlePageChange,
-        handleFilterChange,
-      });
+    it('exposes active selection fields from core and graph data from queries', () => {
+      useWorkspaceCoreMock.mockReturnValue(
+        buildCoreReturn({ currentWorkspaceId: 'ws-A', activeNodeId: 'node-A' }),
+      );
       useWorkspaceQueriesMock.mockReturnValue(
         buildQueriesReturn({
           workspaceGraph: { nodes: [{ id: 'node-A' }] },
-          nodeData: { rows: [], pagination: null },
           selectedNode: { id: 'node-A' },
         }),
       );
@@ -366,15 +356,8 @@ describe('useWorkspaceInternal', () => {
 
       const { result } = renderInternal();
       expect(result.current.currentWorkspaceId).toBe('ws-A');
-      expect(result.current.selectedNodeId).toBe('node-A');
+      expect(result.current.activeNodeId).toBe('node-A');
       expect(result.current.workspaceGraph).toEqual({ nodes: [{ id: 'node-A' }] });
-      expect(result.current.handlePageChange).toBe(handlePageChange);
-      expect(result.current.handleFilterChange).toBe(handleFilterChange);
-
-      act(() => {
-        result.current.handlePageChange(2);
-      });
-      expect(handlePageChange).toHaveBeenCalledWith(2);
     });
   });
 });

@@ -19,10 +19,12 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
+import { useSelectionStore } from '@/stores/selectionStore';
 import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 
 const EDGE_STROKE = '#0f172a';
+const EMPTY_FRESH_IDS = new Set<string>();
 /** Registers the React Flow node renderer used for workspace graph nodes. */
 const nodeTypes = { customNode: CustomNode } as const;
 
@@ -59,9 +61,80 @@ export interface WorkspaceGraphViewModel {
   };
 }
 
+interface ProjectedNodeData {
+  node?: {
+    id?: string;
+    name?: string;
+    color?: string | null;
+    shape?: unknown;
+    columns?: unknown;
+    preview?: unknown;
+    is_text_data?: boolean;
+    data_type?: string;
+    can_undo?: boolean;
+    can_redo?: boolean;
+    document?: string | null;
+    document_column?: string | null;
+    column_schema?: unknown;
+  };
+  isFresh?: boolean;
+}
+
+/**
+ * Projects every backend/freshness field rendered by `CustomNode` into a
+ * serializable change signature.
+ * Used by: `useWorkspaceGraph` reconciliation, where React Flow keeps its own
+ * node state and must only be replaced when rendered backend presentation
+ * changes. Drag position and selection are intentionally excluded because
+ * React Flow owns position and the dedicated selection effect owns selection.
+ */
+const nodePresentationFor = (node: Node) => {
+  const data = node.data as ProjectedNodeData;
+  return {
+    id: node.id,
+    type: node.type,
+    hidden: node.hidden,
+    selectable: node.selectable,
+    connectable: node.connectable,
+    node: {
+      id: data.node?.id ?? null,
+      name: data.node?.name ?? null,
+      color: data.node?.color ?? null,
+      shape: data.node?.shape ?? null,
+      columns: data.node?.columns ?? null,
+      preview: data.node?.preview ?? null,
+      is_text_data: data.node?.is_text_data ?? false,
+      data_type: data.node?.data_type ?? null,
+      can_undo: data.node?.can_undo ?? false,
+      can_redo: data.node?.can_redo ?? false,
+      document: data.node?.document ?? null,
+      document_column: data.node?.document_column ?? null,
+      column_schema: data.node?.column_schema ?? null,
+    },
+    isFresh: data.isFresh ?? false,
+  };
+};
+
+/**
+ * Projects every rendered React Flow edge field into a serializable signature.
+ * Used by: graph reconciliation so label/style changes refresh an existing
+ * edge even when its source and target topology are unchanged.
+ */
+const edgePresentationFor = (edge: Edge) => ({
+  id: edge.id,
+  source: edge.source,
+  target: edge.target,
+  type: edge.type,
+  animated: edge.animated,
+  label: edge.label ?? null,
+  hidden: edge.hidden,
+  style: edge.style ?? null,
+});
+
 /**
  * Builds the React Flow view model consumed by `WorkspaceGraphFeature`.
- * Used by: WorkspaceGraphFeature component, CustomNode component (rg call sites/imports) because the graph shell needs backend graph data converted to React Flow state.
+ * Used by: `WorkspaceGraphFeature`, whose React Flow shell needs backend graph
+ * data, semantic selection handlers, and node commands in one view model.
  * Flow: workspace graph data is laid out and converted into React Flow nodes (selected/unselected state + fresh-node markers) before handlers update selection and navigation.
  */
 export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
@@ -74,9 +147,18 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     renameNode,
     undoNode,
     redoNode,
-    toggleNodeSelection,
+    toggleNode,
     clearSelection,
   } = useWorkspaceActions();
+
+  // React Flow owns node-data identity between hook renders, so command
+  // adapters stay stable while reading the latest provider actions from this
+  // ref. The effect refreshes the ref after workspace/action changes without
+  // making command context part of the serializable presentation signature.
+  const graphCommandsRef = useRef({ deleteNode, copyNode, renameNode, undoNode, redoNode });
+  useEffect(() => {
+    graphCommandsRef.current = { deleteNode, copyNode, renameNode, undoNode, redoNode };
+  }, [copyNode, deleteNode, redoNode, renameNode, undoNode]);
 
   /** Deletes a graph node through workspace actions. */
   const handleDelete = useCallback(
@@ -84,9 +166,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId) {
         return;
       }
-      void deleteNode(nodeId);
+      void graphCommandsRef.current.deleteNode(nodeId);
     },
-    [deleteNode],
+    [],
   );
 
   /** Renames a graph node through workspace actions. */
@@ -95,9 +177,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId || !newName.trim()) {
         return;
       }
-      void renameNode(nodeId, newName.trim());
+      void graphCommandsRef.current.renameNode(nodeId, newName.trim());
     },
-    [renameNode],
+    [],
   );
 
   /** Clones a graph node through workspace actions. */
@@ -106,9 +188,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId) {
         return;
       }
-      void copyNode(nodeId);
+      void graphCommandsRef.current.copyNode(nodeId);
     },
-    [copyNode],
+    [],
   );
 
   /** Applies an undo operation to a graph node. */
@@ -117,9 +199,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId) {
         return;
       }
-      void undoNode(nodeId);
+      void graphCommandsRef.current.undoNode(nodeId);
     },
-    [undoNode],
+    [],
   );
 
   /** Applies a redo operation to a graph node. */
@@ -128,9 +210,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (!nodeId) {
         return;
       }
-      void redoNode(nodeId);
+      void graphCommandsRef.current.redoNode(nodeId);
     },
-    [redoNode],
+    [],
   );
 
   // "Fresh" = nodes that appeared mid-session (detach / join / stack /
@@ -138,7 +220,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   // graph marks them with a red "new" dot so the user can find them in
   // a busy workspace. ``observeNodeIds`` is called from a useEffect
   // below so the side-effect doesn't fire inside useMemo.
-  const freshIds = useFreshNodesStore((state) => state.freshIds);
+  const freshIds = useFreshNodesStore(
+    (state) =>
+      (currentWorkspaceId
+        ? state.freshnessByWorkspace.get(currentWorkspaceId)?.freshIds
+        : undefined) ?? EMPTY_FRESH_IDS,
+  );
   // Zustand store actions are stable closures and never rely on `this`, so
   // selecting them directly is safe despite unbound-method.
   // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -157,7 +244,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
    * closed over. React Flow caches each node's ``data`` (including this
    * callback) in its own internal state, and the graph's node-sync effect only
    * pushes fresh node data when a *visible* field changes (see
-   * ``nodeSignatureFor``). A plain view switch changes no visible field, so a
+   * serializable presentation signature). A plain view switch changes no
+   * visible field, so a
    * captured ``currentView`` would stay frozen at whatever view was active when
    * the nodes were last synced — tagging the request with the wrong view so no
    * mounted analysis consumer matches it and the "+" silently does nothing.
@@ -167,18 +255,19 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     (nodeId: string) => {
       if (!nodeId) return;
       const activeView = useUIStore.getState().currentView;
-      requestNodeInputAdd(currentWorkspaceId, activeView, nodeId);
-      markInteracted([nodeId]);
+      const workspaceId = useSelectionStore.getState().currentWorkspaceId;
+      requestNodeInputAdd(workspaceId, activeView, nodeId);
+      if (workspaceId) markInteracted(workspaceId, [nodeId]);
     },
-    [requestNodeInputAdd, currentWorkspaceId, markInteracted],
+    [requestNodeInputAdd, markInteracted],
   );
   const currentGraphNodeIds = useMemo(
     () => (workspaceGraph?.nodes ?? []).map((n: GraphNode) => n.id),
     [workspaceGraph],
   );
   useEffect(() => {
-    observeNodeIds(currentGraphNodeIds);
-  }, [currentGraphNodeIds, observeNodeIds]);
+    if (currentWorkspaceId) observeNodeIds(currentWorkspaceId, currentGraphNodeIds);
+  }, [currentGraphNodeIds, currentWorkspaceId, observeNodeIds]);
 
   const initialNodes = useMemo(() => {
     if (!workspaceGraph?.nodes) {
@@ -275,51 +364,16 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
 
-  const currentNodeIds = nodes.map((node: Node) => node.id).join(',');
-  const currentEdgeIds = edges.map((edge: Edge) => `${edge.source}-${edge.target}`).join(',');
-  const newNodeIds = initialNodes.map((node: Node) => node.id).join(',');
-  const newEdgeIds = initialEdges.map((edge: Edge) => `${edge.source}-${edge.target}`).join(',');
-
-  /** Pull the fields the signature tracks. Node freshness lives at
-   * ``data.isFresh`` so the "new" dot appears/clears correctly; the rest
-   * are visible metadata fields that should drive a re-render when they
-   * change. */
-  interface NodeDataSignatureShape {
-    node?: {
-      data_type?: string;
-      document_column?: string;
-      name?: string;
-      can_undo?: boolean;
-      can_redo?: boolean;
-    };
-    isFresh?: boolean;
-  }
-  /**
-   * Encodes visible node fields so React Flow state refreshes when they change.
-   * Called by: useWorkspaceGraph internal event, effect, or helper flow.
-   * Why: because the graph hook needs helpers that bridge backend graph data, React Flow events, and workspace selection state.
-   * Flow: collect visible metadata, visual state, and freshness into one string used for change detection.
-   */
-  const nodeSignatureFor = (node: Node): string => {
-    const nd = node.data as NodeDataSignatureShape;
-    const dt = nd.node?.data_type ?? 'unknown';
-    const docc = nd.node?.document_column ?? '';
-    const name = nd.node?.name ?? '';
-    const canUndo = nd.node?.can_undo ? '1' : '0';
-    const canRedo = nd.node?.can_redo ? '1' : '0';
-    const freshToken = nd.isFresh ? '1' : '0';
-    return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}:${freshToken}`;
-  };
-
-  const currentNodesSignature = nodes.map(nodeSignatureFor).join(',');
-  const newNodesSignature = initialNodes.map(nodeSignatureFor).join(',');
+  const currentNodesSignature = JSON.stringify(nodes.map(nodePresentationFor));
+  const newNodesSignature = JSON.stringify(initialNodes.map(nodePresentationFor));
+  const currentEdgesSignature = JSON.stringify(edges.map(edgePresentationFor));
+  const newEdgesSignature = JSON.stringify(initialEdges.map(edgePresentationFor));
 
   const updateRafRef = useRef<number | null>(null);
   useEffect(() => {
     if (
-      newNodeIds === currentNodeIds &&
-      newEdgeIds === currentEdgeIds &&
-      newNodesSignature === currentNodesSignature
+      newNodesSignature === currentNodesSignature &&
+      newEdgesSignature === currentEdgesSignature
     ) {
       return;
     }
@@ -339,13 +393,11 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       }
     };
   }, [
-    currentEdgeIds,
-    currentNodeIds,
+    currentEdgesSignature,
     currentNodesSignature,
     initialEdges,
     initialNodes,
-    newEdgeIds,
-    newNodeIds,
+    newEdgesSignature,
     newNodesSignature,
     setEdges,
     setNodes,
@@ -362,18 +414,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         },
       })),
     );
-  }, [selectedNodeIds, setNodes]);
-
-  useEffect(() => {
-    if (selectedNodeIds.length === 0) {
-      setNodes((existing) =>
-        existing.map((node: Node) => ({
-          ...node,
-          selected: false,
-          data: { ...node.data, isMultiSelected: false },
-        })),
-      );
-    }
   }, [selectedNodeIds, setNodes]);
 
   /** Keeps React Flow select changes aligned with the app selection store. */
@@ -406,14 +446,15 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       event.preventDefault();
       event.stopPropagation();
       if (node.id) {
-        toggleNodeSelection(node.id);
+        toggleNode(node.id);
         // A click counts as "I've seen this" — clear the fresh-node
         // highlight even if the resulting selection toggle didn't
         // actually fire (e.g. parent disabled clicks).
-        markInteracted([node.id]);
+        const workspaceId = useSelectionStore.getState().currentWorkspaceId;
+        if (workspaceId) markInteracted(workspaceId, [node.id]);
       }
     },
-    [toggleNodeSelection, markInteracted],
+    [toggleNode, markInteracted],
   );
 
   /** No-op connection handler because graph edges are backend-derived. */

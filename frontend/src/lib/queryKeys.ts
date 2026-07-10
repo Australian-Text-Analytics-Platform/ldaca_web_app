@@ -1,3 +1,29 @@
+import type { GetNodeDataByWorkspaceIdData } from '@/api';
+
+type GeneratedNodeDataQuery = NonNullable<GetNodeDataByWorkspaceIdData['query']>;
+
+export type NodeDataRequest = Required<GeneratedNodeDataQuery>;
+
+/**
+ * Builds the complete generated node-data query shape used by both the SDK
+ * request and TanStack cache identity.
+ * Used by: Data View plus node-page consumers such as annotation and language
+ * detection, which must not let omitted defaults create cache aliases.
+ * Flow: apply backend defaults, preserve explicit nullable sort/filter fields,
+ * and return one serializable request value including `filter_op`.
+ */
+export const createNodeDataRequest = (
+  request: Pick<NodeDataRequest, 'page' | 'page_size'> & Partial<NodeDataRequest>,
+): NodeDataRequest => ({
+  page: request.page,
+  page_size: request.page_size,
+  sort_by: request.sort_by ?? null,
+  descending: request.descending ?? false,
+  filter_column: request.filter_column ?? null,
+  filter_value: request.filter_value ?? null,
+  filter_op: request.filter_op ?? 'contains',
+});
+
 /**
  * TanStack Query key factory.
  *
@@ -18,7 +44,7 @@ export const queryKeys = {
   /** Nodes list for a workspace; invalidated after graph-changing workspace mutations. */
   workspaceNodes: (workspaceId: string) => ['workspaces', workspaceId, 'nodes'] as const,
 
-  /** Paginated node data. Includes page, size, sort, and filter for distinct cache entries. */
+  /** Paginated node data keyed by the exact generated request query. */
   /**
    * Returns the node-data prefix for broad invalidation, or appends
    * page/sort/filter values for a concrete table request.
@@ -26,24 +52,10 @@ export const queryKeys = {
   nodeData: (
     workspaceId: string,
     nodeId: string,
-    page?: number,
-    pageSize?: number,
-    sortBy?: string | null,
-    descending?: boolean,
-    filterColumn?: string | null,
-    filterValue?: string | null,
+    request?: NodeDataRequest,
   ) => {
     const base = ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const;
-    if (page === undefined || pageSize === undefined) return base;
-    return [
-      ...base,
-      page,
-      pageSize,
-      sortBy ?? null,
-      descending ?? false,
-      filterColumn ?? null,
-      filterValue ?? null,
-    ] as const;
+    return request ? ([...base, request] as const) : base;
   },
 
   /** Annotation class-description rows for one selected class table node. */

@@ -61,7 +61,7 @@ describe('useTokenFrequencyTaskFlow', () => {
         },
         lock: { getAuthHeaders: () => ({ Authorization: 'Bearer test' }) },
         navigation: {
-          selectNodes: vi.fn(),
+          replaceSelectedNodes: vi.fn(),
           setPendingConcordance: vi.fn(),
           setCurrentView: vi.fn(),
           applyStopSetFromText: vi.fn(),
@@ -89,7 +89,7 @@ describe('useTokenFrequencyTaskFlow', () => {
 
   // Two-node comparison fixture shared by the token-click handoff tests below.
   interface TwoNodeNavigation {
-    selectNodes: (nodeIds: string[]) => void;
+    replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
     setPendingConcordance: (payload: PendingConcordance) => void;
     setCurrentView: (view: ViewType) => void;
   }
@@ -138,17 +138,23 @@ describe('useTokenFrequencyTaskFlow', () => {
     );
 
   it('scopes the concordance handoff to the clicked node when a source id is given', () => {
-    const selectNodes = vi.fn<(nodeIds: string[]) => void>();
+    const replaceSelectedNodes = vi.fn<
+      (nodeIds: string[], activeNodeId?: string | null) => void
+    >();
     const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
     const setCurrentView = vi.fn<(view: ViewType) => void>();
 
-    const { result } = renderTwoNodeFlow({ selectNodes, setPendingConcordance, setCurrentView });
+    const { result } = renderTwoNodeFlow({
+      replaceSelectedNodes,
+      setPendingConcordance,
+      setCurrentView,
+    });
 
     act(() => {
       result.current.handleTokenClick('hello', 'node-2');
     });
 
-    expect(selectNodes).toHaveBeenCalledWith(['node-2']);
+    expect(replaceSelectedNodes).toHaveBeenCalledWith(['node-2'], 'node-2');
     expect(setPendingConcordance).toHaveBeenCalledWith(
       expect.objectContaining({
         searchWord: 'hello',
@@ -161,17 +167,23 @@ describe('useTokenFrequencyTaskFlow', () => {
   });
 
   it('keeps both compared nodes when no source id is given', () => {
-    const selectNodes = vi.fn<(nodeIds: string[]) => void>();
+    const replaceSelectedNodes = vi.fn<
+      (nodeIds: string[], activeNodeId?: string | null) => void
+    >();
     const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
     const setCurrentView = vi.fn<(view: ViewType) => void>();
 
-    const { result } = renderTwoNodeFlow({ selectNodes, setPendingConcordance, setCurrentView });
+    const { result } = renderTwoNodeFlow({
+      replaceSelectedNodes,
+      setPendingConcordance,
+      setCurrentView,
+    });
 
     act(() => {
       result.current.handleTokenClick('hello');
     });
 
-    expect(selectNodes).toHaveBeenCalledWith(['node-1', 'node-2']);
+    expect(replaceSelectedNodes).toHaveBeenCalledWith(['node-1', 'node-2'], 'node-2');
     expect(setPendingConcordance).toHaveBeenCalledWith(
       expect.objectContaining({
         searchWord: 'hello',

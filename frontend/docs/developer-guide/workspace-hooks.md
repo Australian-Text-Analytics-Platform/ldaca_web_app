@@ -6,9 +6,10 @@ Workspace state is exposed through four slice contexts, all provided by
 ## Provider Slices
 
 - `useWorkspaceData()` exposes workspace lists, current workspace metadata,
-  graph data, selected node data, and query-derived data.
-- `useWorkspaceSelection()` exposes selected node id(s), pagination, sorting,
-  and filter state.
+  graph data, and query-derived node identities.
+- `useWorkspaceSelection()` exposes the active node, selected nodes, and their
+  canonical ordered ids. Selection actions are exposed through
+  `useWorkspaceActions()`.
 - `useWorkspaceStatus()` exposes loading and error state.
 - `useWorkspaceActions()` exposes workspace and node mutations.
 
@@ -19,10 +20,10 @@ slice they need.
 
 `useWorkspaceInternal()` composes three lower-level hooks:
 
-- `useWorkspaceCore()` reads auth headers, selected workspace/node ids,
-  pagination state, and UI operation tracking.
+- `useWorkspaceCore()` reads auth headers, selected workspace/node ids, and UI
+  operation tracking.
 - `useWorkspaceQueries()` owns TanStack Query calls for workspace list, current
-  workspace, graph, and selected node data.
+  workspace, and graph data. Selected node-page data belongs to Data View.
 - `useWorkspaceNodeMutations()` is the action facade. It composes focused
   mutation groups while preserving one `useWorkspaceActions()` surface for
   consumers:
@@ -48,8 +49,10 @@ node-colour mutation.
 
 ## Query Keys And Invalidations
 
-Selected node data is keyed by workspace id, node id, page, page size, sorting,
-and filters. Mutations invalidate the narrowest practical set of queries:
+Selected node data is keyed by workspace id, node id, and one complete
+generated request-query object containing page, page size, sorting, filter
+column/value, and filter operator. Data View sends that same object to the SDK.
+Mutations invalidate the narrowest practical set of queries:
 graph, node data, workspace summaries, and node-info metadata.
 
 `queryKeys.workspaceGraph()` is the lightweight topology/display query. Full
@@ -71,13 +74,19 @@ display state, undo/redo flags, selection/active visual state, fresh-node
 highlighting, and React Flow state updates. It does not own schema, column,
 shape, or tokenizer metadata; those live behind the node-info query.
 
-The graph hook uses signatures and `requestAnimationFrame` to avoid rewriting
-React Flow state on every render.
+The graph hook derives serializable node/edge presentation signatures from the
+fields it renders, including node colour and edge label. React Flow-owned drag
+position and selection stay on their dedicated reconciliation path. Node-data
+commands read volatile workspace/view context when invoked, and session-only
+fresh-node baselines are keyed by workspace so overlapping node ids cannot
+share acknowledgement state.
 
 ## Table Hooks
 
 `data-view/hooks/useWorkspaceDataTable.ts` maps node data to TanStack Table
-state. Sorting and filters feed back into the selected node data query key.
+state. It owns per-workspace/node pagination, sorting, and filter requests plus
+the selected node-data query; table request state is not exposed by the
+workspace selection context.
 Column cast, rename, delete, refresh, and query-plan actions all route through
 workspace actions.
 

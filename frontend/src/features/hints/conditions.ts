@@ -20,7 +20,7 @@ export function useHintConditions(): {
   context: HintResolverContext;
 } {
   const { currentWorkspaceId, workspaceGraph } = useWorkspaceData();
-  const { selectedNodeId } = useWorkspaceSelection();
+  const { activeNodeId } = useWorkspaceSelection();
   const { currentView, lastUploadedFilePath, hasAnyModalOpen } = useUIStore(
     useShallow((s) => ({
       currentView: s.currentView,
@@ -65,8 +65,8 @@ export function useHintConditions(): {
   // Suppress all hints while a modal/dialog is open to avoid stacking UI.
   const enabled = !hasAnyModalOpen;
   const isFilterView = currentView === 'filter';
-  const filterNoNodeSelected = isFilterView && workspaceHasNodes && !selectedNodeId;
-  const filterAwaitingColumnSelection = isFilterView && !!selectedNodeId;
+  const filterNoNodeSelected = isFilterView && workspaceHasNodes && !activeNodeId;
+  const filterAwaitingColumnSelection = isFilterView && !!activeNodeId;
 
   return {
     conditions: {

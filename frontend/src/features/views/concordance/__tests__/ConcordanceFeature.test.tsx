@@ -213,7 +213,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
     materializeConcordance: vi.fn(),
-    selectNodes: vi.fn(),
+    replaceSelectedNodes: vi.fn(),
   }),
 }));
 

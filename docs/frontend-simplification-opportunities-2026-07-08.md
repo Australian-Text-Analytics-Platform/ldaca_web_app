@@ -65,34 +65,6 @@ settled before deletion.
 
 ### Correctness-sensitive ownership seams
 
-#### C1. Separate ordered selection membership from the active node
-
-- **Evidence / strength — Strong:** [selectionStore.ts](../frontend/src/stores/selectionStore.ts#L12-L103) treats `selectedNodeIds` as both an ordered tab strip and selection membership, [useWorkspaceDataTable.ts](../frontend/src/features/workspace/data-view/hooks/useWorkspaceDataTable.ts#L99-L205) adds local order/reconciliation, and [useWorkspaceGraphMutations.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceGraphMutations.ts#L112-L132) clears everything when the active node is deleted while a non-active deleted ID can remain stale.
-- **Recommended direction:** define semantic `activate`, `reorder`, `remove`, `replace`, `toggle`, and `clear` actions, with an independent active ID. These action names and shapes are recommendations only.
-- **Deletion test:** the table hook no longer mirrors tab order or repairs membership, and deletion call sites no longer choose between ad hoc single-ID removal and global clear.
-- **Validation:** delete active and non-active tabs, reorder then delete, multi-select from graph/list, switch views, and verify active fallback plus ordered membership independently.
-
-#### C2. Make node-table query identity equal the request identity
-
-- **Evidence / strength — Strong:** [queryKeys.ts](../frontend/src/lib/queryKeys.ts#L26-L45) omits `filter_op`, while [useWorkspaceQueries.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceQueries.ts#L110-L145) sends it; pagination/filter state also lives in the selection slice and [useWorkspaceDataTable.ts](../frontend/src/features/workspace/data-view/hooks/useWorkspaceDataTable.ts#L267-L279) applies a quotation-oriented fallback.
-- **Recommended direction:** build one canonical request-parameter object and use it for both the query key and generated request. Move table pagination/filter ownership out of selection state and remove the quotation fallback coupling.
-- **Deletion test:** there is one parameter projection, changing only `filter_op` changes the key, and selection state contains no table-query fields.
-- **Validation:** switch operators with identical text, paginate/sort/filter multiple nodes, return via history, and confirm cache entries never cross request shapes.
-
-#### C3. Define one serializable React Flow presentation projection
-
-- **Evidence / strength — Strong:** [useWorkspaceGraph.ts](../frontend/src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts#L203-L315) renders node colour and edge labels but omits visible colour/label fields from `nodeSignatureFor`; callbacks read `currentView` live yet still close over workspace ID, and empty-selection reconciliation is duplicated later in the hook.
-- **Recommended direction:** derive nodes and edges from one canonical serializable presentation projection; read volatile command context live while preserving identity-sensitive React Flow reconciliation.
-- **Deletion test:** the signature cannot drift from rendered visible fields, command callbacks do not retain volatile workspace/view values, and the duplicate empty-selection effect disappears.
-- **Validation:** change colour and edge label without topology changes, switch view/workspace before invoking graph controls, clear selection, and exercise drag/selection identity behavior.
-
-#### C4. Scope fresh-node observation to a workspace
-
-- **Evidence / strength — Strong:** [freshNodesStore.ts](../frontend/src/stores/freshNodesStore.ts#L4-L101) keeps global seen/baseline sets; [useWorkspaceGraph.ts](../frontend/src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts#L139-L181) observes IDs without workspace identity; `forgetNodeIds` has no production caller.
-- **Recommended direction:** key freshness/baseline state by workspace or reset it explicitly at the workspace boundary, and remove the unowned forget action if the scoped design does not need it.
-- **Deletion test:** identical node IDs in different workspaces cannot share seen state and the zero-caller action is gone.
-- **Validation:** alternate between two workspaces with overlapping IDs, receive a new node while inactive, delete/recreate IDs, and reload the session.
-
 #### C5. Identify analysis status by workspace, tab, and task
 
 - **Evidence / strength — Strong:** [useAnalysisTaskStatus.ts](../frontend/src/features/views/common/useAnalysisTaskStatus.ts#L60-L74) selects by task type, while [useAnalysisTaskFlow.ts](../frontend/src/features/views/common/tasks/useAnalysisTaskFlow.ts#L25-L76) separately knows workspace and banner task context.
@@ -667,6 +639,34 @@ unreachable callers. Product/external-contract caveats remain where noted.
     - Done 2026-07-09. The backend no longer exposes the broad
       `DELETE /api/workspaces/{workspace_id}/token-frequencies` endpoint, and
       regenerated frontend API files no longer export `clearTokenFrequencies`.
+
+32. Separate ordered selection membership from the active node (C1)
+    - Done 2026-07-10. `selectionStore` now owns independent `activeNodeId` and
+      ordered `selectedNodeIds` through semantic activate, reorder, remove,
+      replace, toggle, and clear actions. Data View no longer mirrors or repairs
+      tab order, and successful node deletion always removes the deleted id so
+      active and non-active deletion share one tested fallback path.
+
+33. Make node-table query identity equal the request identity (C2)
+    - Done 2026-07-10. Data View now owns per-workspace/node table request state
+      and its selected-node query. One complete generated query object,
+      including `filter_op`, drives both `queryKeys.nodeData` and the SDK call;
+      workspace selection contexts and Quotation no longer carry/fall back to
+      Data View pagination, sorting, or filtering.
+
+34. Define one serializable React Flow presentation projection (C3)
+    - Done 2026-07-10. React Flow reconciliation now serializes every rendered
+      backend node and edge field, including node colour and edge label/style,
+      while leaving drag position and selection on their identity-sensitive
+      paths. Cached node commands read current action/workspace/view context at
+      invocation time, and the duplicate empty-selection effect is gone.
+
+35. Scope fresh-node observation to a workspace (C4)
+    - Done 2026-07-10. Freshness baselines are keyed by workspace, overlapping
+      node ids remain independent, removed ids are pruned automatically so
+      recreation is fresh, and the zero-caller `forgetNodeIds` action was
+      deleted. Focused regressions plus lint, 167 files / 782 tests, build,
+      Knip, and `git diff --check` passed.
 
 ## Endpoint And Source-Of-Truth Notes
 

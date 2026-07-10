@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { getNodeDataByWorkspaceId } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
-import { queryKeys } from '@/lib/queryKeys';
+import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import { collectDocumentColumnText } from '../components/tokenizerModelSelectorUtils';
 
 const LANGUAGE_SAMPLE_PAGE_SIZE = 100;
+const LANGUAGE_SAMPLE_REQUEST = createNodeDataRequest({
+  page: 1,
+  page_size: LANGUAGE_SAMPLE_PAGE_SIZE,
+});
 
 export interface UseDetectedColumnLanguageArgs {
   workspaceId: string | null;
@@ -43,7 +47,7 @@ export function useDetectedColumnLanguage({
     queryKey:
       workspaceId && nodeId
         ? [
-            ...queryKeys.nodeData(workspaceId, nodeId, 1, LANGUAGE_SAMPLE_PAGE_SIZE),
+            ...queryKeys.nodeData(workspaceId, nodeId, LANGUAGE_SAMPLE_REQUEST),
             'language-sample',
             column,
           ]
@@ -55,7 +59,7 @@ export function useDetectedColumnLanguage({
       const { data } = await getNodeDataByWorkspaceId({
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- queryFn only runs when canFetchSample guarantees workspaceId/nodeId are set
         path: { workspace_id: workspaceId!, node_id: nodeId! },
-        query: { page: 1, page_size: LANGUAGE_SAMPLE_PAGE_SIZE },
+        query: LANGUAGE_SAMPLE_REQUEST,
         headers: getAuthHeaders(),
         throwOnError: true,
       });

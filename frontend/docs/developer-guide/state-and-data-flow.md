@@ -43,7 +43,10 @@ overrides for generated-client tests instead of mocking generated modules.
 
 `providers/QueryProvider.tsx` creates a singleton `QueryClient`. Server state
 belongs in TanStack Query: workspace lists, lightweight graph data, full
-node-info metadata, node pages, file trees, and analysis result fetches.
+node-info metadata, node pages, file trees, and analysis result fetches. Data
+View builds one complete generated node-data query object (including
+`filter_op`) and uses that exact value for both the query key and SDK request,
+so cache identity cannot diverge from request identity.
 
 Mutation hooks invalidate the relevant query keys after backend changes. Avoid
 duplicating server state into Zustand unless it is needed for UI interaction.
@@ -55,7 +58,10 @@ The main stores are:
 - `authStore`: auth bootstrap, token storage, login/logout, and auth headers.
 - `uiStore`: active view, visible views, layout splits, modal state, hints, and
   operation loading flags.
-- `selectionStore`: current workspace id and selected node ids.
+- `selectionStore`: current workspace id, ordered selected-node membership,
+  and an independent active node id. Semantic activate/reorder/remove/replace/
+  toggle/clear actions own fallback behavior so graph, sidebar, and Data View
+  do not repair selection independently.
 - `analysisStore`: task list, terminal-state helpers, pending handoffs, and
   materialization events.
 - `preferencesStore`: user preferences persisted locally and synced to backend.
@@ -64,7 +70,9 @@ The main stores are:
 - `recentSelectionsStore`: recently-used node groups for analysis input presets.
 
 Stores are used for cross-feature UI state, not as a replacement for query
-cache.
+cache. Data View pagination, sorting, and filtering are local table-request
+state rather than selection state; Quotation owns its separate task-result
+pagination and does not fall back to Data View controls.
 
 ## URL View State
 

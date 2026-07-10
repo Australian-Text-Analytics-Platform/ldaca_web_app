@@ -89,7 +89,7 @@ function ConcordanceFeature({
     detachConcordance,
     detachConcordanceDispersion,
     materializeConcordance,
-    selectNodes,
+    replaceSelectedNodes,
     setNodeColor: persistNodeColor,
   } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
@@ -599,7 +599,7 @@ function ConcordanceFeature({
     setNodeColumnSelections: (sels) => {
       applyInputsFromSelections(sels);
     },
-    selectNodes,
+    replaceSelectedNodes,
   });
 
   // No auto-column recompute: a node's default column is chosen at add-time by

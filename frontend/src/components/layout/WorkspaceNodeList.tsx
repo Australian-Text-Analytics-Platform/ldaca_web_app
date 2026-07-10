@@ -7,7 +7,10 @@ import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { SidebarWorkspaceNode } from './sidebar/types';
 
+const EMPTY_FRESH_IDS = new Set<string>();
+
 interface WorkspaceNodeListProps {
+  workspaceId: string | null;
   nodes: SidebarWorkspaceNode[];
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
@@ -102,6 +105,7 @@ const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
  * then render toggleable node rows.
  */
 function WorkspaceNodeList({
+  workspaceId,
   nodes,
   selectedNodeIds,
   onToggleNodeSelection,
@@ -110,7 +114,11 @@ function WorkspaceNodeList({
 }: WorkspaceNodeListProps) {
   const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
 
-  const freshIds = useFreshNodesStore((state) => state.freshIds);
+  const freshIds = useFreshNodesStore(
+    (state) =>
+      (workspaceId ? state.freshnessByWorkspace.get(workspaceId)?.freshIds : undefined) ??
+      EMPTY_FRESH_IDS,
+  );
   const markInteracted = useFreshNodesStore(
     (state) =>
       // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
@@ -119,7 +127,7 @@ function WorkspaceNodeList({
 
   /** Called by: WorkspaceNodeList row click and keyboard activation handlers. */
   const handleToggle = (nodeId: string) => {
-    markInteracted([nodeId]);
+    if (workspaceId) markInteracted(workspaceId, [nodeId]);
     onToggleNodeSelection(nodeId);
   };
 

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { SortingState, ColumnFiltersState } from '@tanstack/react-table';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
-import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { getNodeQueryPlan } from '@/api';
+import { getNodeDataByWorkspaceId, getNodeQueryPlan, type NodeDataResponse } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { createNodeDataRequest, queryKeys, type NodeDataRequest } from '@/lib/queryKeys';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import type { FilterOperator } from '../types';
 import { getNodeDocumentColumn } from '../utils/documentColumn';
@@ -54,6 +55,24 @@ export interface WorkspaceDataTableViewModel {
   };
 }
 
+const DEFAULT_NODE_TABLE_REQUEST = createNodeDataRequest({ page: 1, page_size: 20 });
+
+const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
+  data: [],
+  pagination: {
+    page: 0,
+    page_size: 20,
+    total_rows: 0,
+    total_pages: 0,
+    has_next: false,
+    has_prev: false,
+  },
+  columns: [],
+  dtypes: {},
+  sorting: { sort_by: null, descending: false },
+  filtering: { column: null, value: null, op: 'contains' },
+});
+
 /**
  * Creates one tab descriptor for the multi-selected-node tab strip.
  * Used by: local callers in workspace/useWorkspaceDataTable module because selected nodes need normalized tab labels before rendering.
@@ -95,21 +114,15 @@ const resolveNodeDisplayLabel = (
 /**
  * Composes workspace data, selection, actions, and table callbacks into the
  * view model consumed by `WorkspaceDataTableFeature`.
- * Used by: useWorkspaceData hook, WorkspaceDataTableFeature component, WorkspaceTable component (rg call sites/imports) because the feature shell needs a single view-model hook.
- * Flow: read workspace slices, preserve tab order across multi-selection changes, build header/node actions/tabs, then adapt pagination, sorting, filters, and mutations into table props.
+ * Used by: `WorkspaceDataTableFeature`, which needs one view model for the
+ * header, canonical selection tabs, selected-node query, and `WorkspaceTable`.
+ * Flow: read canonical selection membership, own per-workspace/node table
+ * requests and their query, then adapt tabs, request controls, and mutations
+ * into table props.
  */
 export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
-  const { currentWorkspaceId, nodeData } = useWorkspaceData();
-  const {
-    selectedNode,
-    selectedNodes,
-    selectedNodeIds,
-    handlePageChange,
-    handlePageSizeChange,
-    handleSortingChange,
-    handleFilterChange,
-    getPaginationForNode,
-  } = useWorkspaceSelection();
+  const { currentWorkspaceId } = useWorkspaceData();
+  const { activeNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
   const { getAuthHeaders } = useAuth();
   const {
     castColumn,
@@ -120,17 +133,14 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     renameNode,
     undoNode,
     redoNode,
-    selectNodes,
-    toggleNodeSelection,
+    activateNode,
+    reorderSelectedNodes,
+    removeNode,
   } = useWorkspaceActions();
-  const { isLoading } = useWorkspaceStatus();
 
-  const normalizedSelectedNodeIds = selectedNodeIds;
   const multiSelectedNodes = selectedNodes.filter(Boolean);
-  const shouldShowTabs = multiSelectedNodes.length > 1;
-  const activeNodeId = selectedNode?.id ?? multiSelectedNodes[0]?.id ?? null;
+  const shouldShowTabs = selectedNodeIds.length > 1;
 
-  const [tabOrder, setTabOrder] = useState<string[]>(() => [...normalizedSelectedNodeIds]);
   const nodeById = (() => {
     const map = new Map<string, (typeof multiSelectedNodes)[number]>();
     multiSelectedNodes.forEach((node) => {
@@ -141,70 +151,92 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     return map;
   })();
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Syncing tab order with selected node IDs; updater avoids unnecessary re-renders */
-  useEffect(() => {
-    setTabOrder((current) => {
-      const filtered = current.filter((id) => normalizedSelectedNodeIds.includes(id));
-      const additions = normalizedSelectedNodeIds.filter((id) => !filtered.includes(id));
-      if (
-        filtered.length === current.length &&
-        additions.length === 0 &&
-        current.length === normalizedSelectedNodeIds.length
-      ) {
-        return current;
-      }
-      return [...filtered, ...additions];
-    });
-  }, [normalizedSelectedNodeIds]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const displayTabIds = shouldShowTabs ? tabOrder.filter((id) => nodeById.has(id)) : [];
+  const displayTabIds = shouldShowTabs ? selectedNodeIds : [];
 
   const activeTabIndex = displayTabIds.findIndex((id) => id === activeNodeId);
   const tabPosition = activeTabIndex >= 0 ? activeTabIndex + 1 : displayTabIds.length > 0 ? 1 : 0;
 
   /**
    * Promotes a selected node tab to the active node.
-   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   * Called by: `WorkspaceSelectionTabs` when a user activates a tab.
+   * Why: tab activation changes the active pointer without changing membership
+   * or order.
    */
   const handleTabChange = (nodeId: string) => {
-    if (!nodeId || nodeId === activeNodeId || !normalizedSelectedNodeIds.includes(nodeId)) {
+    if (!nodeId || nodeId === activeNodeId || !selectedNodeIds.includes(nodeId)) {
       return;
     }
-    const reordered = [...normalizedSelectedNodeIds.filter((id) => id !== nodeId), nodeId];
-    selectNodes(reordered);
+    activateNode(nodeId);
   };
 
   /**
    * Removes a node from the multi-selection tab strip.
-   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   * Called by: `WorkspaceSelectionTabs` close controls.
+   * Why: the selection store owns active fallback when either an active or
+   * non-active tab closes.
    */
   const handleTabClose = (nodeId: string) => {
     if (!nodeId) {
       return;
     }
-    setTabOrder((current) => current.filter((id) => id !== nodeId));
-    toggleNodeSelection(nodeId);
+    removeNode(nodeId);
   };
 
   /**
    * Persists a drag-and-drop reordering of the selection tab strip.
    * Called by: WorkspaceSelectionTabs via the shared ChromeTabs ``onReorder``.
-   * Why: the tab strip order is local presentation state, so a reorder only
-   * needs to update ``tabOrder`` (selection membership is unchanged).
+   * Why: ordered membership belongs to the selection store, so every graph,
+   * list, and table consumer sees the same order and active fallback.
    */
   const handleTabReorder = (orderedNodeIds: string[]) => {
-    setTabOrder((current) => {
-      const known = orderedNodeIds.filter((id) => current.includes(id));
-      const missing = current.filter((id) => !known.includes(id));
-      const next = [...known, ...missing];
-      const unchanged =
-        next.length === current.length && next.every((id, index) => id === current[index]);
-      return unchanged ? current : next;
+    reorderSelectedNodes(orderedNodeIds);
+  };
+
+  const tableStateKey = currentWorkspaceId && activeNodeId ? `${currentWorkspaceId}\0${activeNodeId}` : '';
+  const [requestByNode, setRequestByNode] = useState<Record<string, NodeDataRequest>>({});
+  const nodeTableRequest = tableStateKey
+    ? (requestByNode[tableStateKey] ?? DEFAULT_NODE_TABLE_REQUEST)
+    : DEFAULT_NODE_TABLE_REQUEST;
+
+  /**
+   * Updates the active table request without coupling it to selection state.
+   * Called by: TanStack Table pagination, sorting, and filter adapters below.
+   * Flow: start from the current complete request, apply one transition, and
+   * retain each workspace/node's request while Data View remains mounted.
+   */
+  const updateNodeTableRequest = (updater: (request: NodeDataRequest) => NodeDataRequest) => {
+    if (!tableStateKey) return;
+    setRequestByNode((current) => {
+      const existing = current[tableStateKey] ?? DEFAULT_NODE_TABLE_REQUEST;
+      const next = updater(existing);
+      return next === existing ? current : { ...current, [tableStateKey]: next };
     });
   };
+
+  const nodeDataQuery = useQuery({
+    queryKey: queryKeys.nodeData(currentWorkspaceId ?? '', activeNodeId ?? '', nodeTableRequest),
+    enabled: Boolean(currentWorkspaceId && activeNodeId),
+    /**
+     * Fetches the active node page for `WorkspaceTable`.
+     * Called by: TanStack Query when the complete request value changes.
+     * Why: the exact object in the cache key is also sent to the generated SDK,
+     * preventing cache reuse across operator-only or default-shape changes.
+     */
+    queryFn: async () => {
+      if (!currentWorkspaceId || !activeNodeId) {
+        throw new Error('Missing workspace or node ID');
+      }
+      const { data } = await getNodeDataByWorkspaceId({
+        headers: getAuthHeaders(),
+        path: { workspace_id: currentWorkspaceId, node_id: activeNodeId },
+        query: nodeTableRequest,
+        throwOnError: true,
+      });
+      return data;
+    },
+    staleTime: 30 * 1000,
+  });
+  const nodeData = nodeDataQuery.data ?? EMPTY_NODE_DATA;
 
   const selectedNodeCapabilities = selectedNode as {
     id?: string;
@@ -217,7 +249,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const header: WorkspaceDataTableHeaderInfo = {
     nodeLabel: resolveNodeDisplayLabel(selectedNode) ?? 'Unknown node',
     tabPosition,
-    totalTabs: multiSelectedNodes.length,
+    totalTabs: selectedNodeIds.length,
     isEmptyTable: Array.isArray(nodeData.data) && nodeData.data.length === 0,
   };
 
@@ -249,68 +281,60 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       buildTabDescriptor(id, resolveNodeDisplayLabel(nodeById.get(id)) ?? id, id === activeNodeId),
     ),
     tabPosition,
-    totalTabs: multiSelectedNodes.length,
+    totalTabs: selectedNodeIds.length,
     onTabChange: handleTabChange,
     onTabClose: handleTabClose,
     onTabReorder: handleTabReorder,
   };
 
-  // ── Derive TanStack-compatible sorting / filtering state from per-node pagination ──
-  const paginationState = (() => {
-    if (!selectedNode?.id) return undefined;
-    return getPaginationForNode(selectedNode.id);
-  })();
-
-  const sorting: SortingState = paginationState?.sortBy
-    ? [{ id: paginationState.sortBy, desc: paginationState.descending ?? false }]
+  const sorting: SortingState = nodeTableRequest.sort_by
+    ? [{ id: nodeTableRequest.sort_by, desc: nodeTableRequest.descending }]
     : [];
 
   const columnFilters: ColumnFiltersState =
-    paginationState?.filterColumn && paginationState.filterValue
+    nodeTableRequest.filter_column && nodeTableRequest.filter_value
       ? [
           {
-            id: paginationState.filterColumn,
+            id: nodeTableRequest.filter_column,
             value: {
-              value: paginationState.filterValue,
-              op: (paginationState.filterOp ?? 'contains') as FilterOperator,
+              value: nodeTableRequest.filter_value,
+              op: nodeTableRequest.filter_op as FilterOperator,
             },
           },
         ]
       : [];
 
   /**
-   * Adapts TanStack sorting state into workspace pagination state.
-   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   * Adapts TanStack sorting into the active node's complete request.
+   * Called by: `WorkspaceTable` through its controlled sorting callback.
    */
   const onSortingChange = (next: SortingState) => {
-    if (next.length === 0) {
-      handleSortingChange(undefined, undefined);
-    } else {
-      // next is non-empty here, so next[0] is guaranteed present.
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      handleSortingChange(next[0]!.id, next[0]!.desc);
-    }
+    const sort = next[0];
+    updateNodeTableRequest((request) => ({
+      ...request,
+      page: 1,
+      sort_by: sort?.id ?? null,
+      descending: sort?.desc ?? false,
+    }));
   };
 
   /**
-   * Adapts TanStack column-filter state into workspace pagination state.
-   * Called by: useWorkspaceDataTable internal event, effect, or helper flow.
-   * Why: because the table view model needs small helpers to translate workspace data and UI events into server-backed table state.
+   * Adapts TanStack column filters into the active node's complete request.
+   * Called by: `WorkspaceTable` through its controlled filter callback.
    */
   const onColumnFiltersChange = (next: ColumnFiltersState) => {
-    if (next.length === 0) {
-      handleFilterChange(undefined, undefined, undefined);
-    } else {
-      // next is non-empty here, so next[0] is guaranteed present.
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const filter = next[0]!;
-      const parts = filter.value as { value: string; op: string };
-      handleFilterChange(filter.id, parts.value, parts.op);
-    }
+    const filter = next[0];
+    const parts = filter?.value as { value: string; op: string } | undefined;
+    updateNodeTableRequest((request) => ({
+      ...request,
+      page: 1,
+      filter_column: filter?.id ?? null,
+      filter_value: parts?.value ?? null,
+      filter_op: parts?.op ?? 'contains',
+    }));
   };
 
-  // Mutation callbacks are stable per-selectedNodeId so the WorkspaceTable
+  // Mutation callbacks are stable per active node id so the WorkspaceTable
   // effect that depends on `onRefreshSchema` only fires when the selection
   // actually changes, not on every parent render.
   const selectedNodeIdForCallbacks = selectedNode?.id;
@@ -351,7 +375,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const table: WorkspaceTableProps = {
     data: nodeData.data,
     columns: nodeData.columns,
-    loading: isLoading.nodeData,
+    loading: nodeDataQuery.isLoading,
     workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,
     documentColumn: getNodeDocumentColumn(selectedNode),
@@ -365,8 +389,12 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onSortingChange,
     columnFilters,
     onColumnFiltersChange,
-    onPageChange: handlePageChange,
-    onPageSizeChange: handlePageSizeChange,
+    onPageChange: (page) => {
+      updateNodeTableRequest((request) => ({ ...request, page }));
+    },
+    onPageSizeChange: (pageSize) => {
+      updateNodeTableRequest((request) => ({ ...request, page: 1, page_size: pageSize }));
+    },
   };
 
   return {
@@ -376,7 +404,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     tabs,
     table,
     loading: {
-      nodeData: isLoading.nodeData,
+      nodeData: nodeDataQuery.isLoading,
     },
   };
 };

@@ -3,7 +3,6 @@ import type { QuotationAnalysisResponse, AnalysisTabInput, QuotationEngineConfig
 
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
@@ -89,8 +88,6 @@ function QuotationFeature({
   tabInputSets,
   onTabInputSetChange,
 }: QuotationFeatureProps) {
-  const { handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } =
-    useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
@@ -391,8 +388,6 @@ function QuotationFeature({
       setNodeMaterializing,
       setMaterializeTaskIds,
       showErrorDialog,
-      baseHandlePageChange,
-      baseHandlePageSizeChange,
       updateResultState,
       applyContextLengthPreferenceFromResult,
       setLocalTaskId,

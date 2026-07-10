@@ -56,8 +56,6 @@ interface QuotationActions {
   setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
   setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
   showErrorDialog: (message: string) => void;
-  baseHandlePageChange: (page: number) => void;
-  baseHandlePageSizeChange: (pageSize: number) => void;
   updateResultState: (nodeId: string, column: string, result: QuotationAnalysisResponse) => void;
   applyContextLengthPreferenceFromResult: (payload: QuotationAnalysisResponse) => void;
   setLocalTaskId: (id: string | null) => void;
@@ -111,8 +109,6 @@ export function useQuotationTaskFlow({
     setNodeMaterializing,
     setMaterializeTaskIds,
     showErrorDialog,
-    baseHandlePageChange,
-    baseHandlePageSizeChange,
     updateResultState,
     applyContextLengthPreferenceFromResult,
     setLocalTaskId,
@@ -307,23 +303,15 @@ export function useQuotationTaskFlow({
     }
   };
 
-  // Handles page changes by updating stored locked results when possible, otherwise local state.
+  // Handles page changes by updating the stored task result.
   /**
    * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks.
    */
   const handlePageChange = async (newPage: number) => {
     const targetNode = displayedNodes[0];
     const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
-    if (!nodeId) {
-      baseHandlePageChange(newPage);
-      return;
-    }
-    if (!hasLoaded) {
-      baseHandlePageChange(newPage);
-      return;
-    }
-    const updated = await updateStoredQuotationResult({ page: newPage });
-    if (!updated) baseHandlePageChange(newPage);
+    if (!nodeId || !hasLoaded) return;
+    await updateStoredQuotationResult({ page: newPage });
   };
 
   // Handles page-size changes while preserving the stored task as the source of truth in locked mode.
@@ -333,19 +321,11 @@ export function useQuotationTaskFlow({
   const handlePageSizeChange = async (pageSize: number) => {
     const targetNode = displayedNodes[0];
     const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
-    if (!nodeId) {
-      baseHandlePageSizeChange(pageSize);
-      return;
-    }
-    if (!hasLoaded) {
-      baseHandlePageSizeChange(pageSize);
-      return;
-    }
-    const updated = await updateStoredQuotationResult({
+    if (!nodeId || !hasLoaded) return;
+    await updateStoredQuotationResult({
       page: 1,
       page_size: pageSize,
     });
-    if (!updated) baseHandlePageSizeChange(pageSize);
   };
 
   // Applies sortable-column requests either through a fresh search or stored result update.

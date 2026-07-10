@@ -46,7 +46,7 @@ interface LockActions {
 }
 
 interface NavigationActions {
-  selectNodes: (nodeIds: string[]) => void;
+  replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
   setPendingConcordance: (payload: PendingConcordance) => void;
   setCurrentView: (view: ViewType) => void;
   applyStopSetFromText: (text: string) => void;
@@ -89,7 +89,12 @@ export const useTokenFrequencyTaskFlow = ({
     onTaskIdAssigned,
   },
   lock: { getAuthHeaders },
-  navigation: { selectNodes, setPendingConcordance, setCurrentView, applyStopSetFromText },
+  navigation: {
+    replaceSelectedNodes,
+    setPendingConcordance,
+    setCurrentView,
+    applyStopSetFromText,
+  },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
   // concordance tab for every token click. Sharing the workspace-tabs query
@@ -261,7 +266,7 @@ export const useTokenFrequencyTaskFlow = ({
 
       if (uniqueNodeIds.length > 0) {
         try {
-          selectNodes(uniqueNodeIds);
+          replaceSelectedNodes(uniqueNodeIds, uniqueNodeIds.at(-1));
         } catch (error) {
           console.warn('Failed to sync workspace selection for concordance handoff:', error);
         }
@@ -300,7 +305,7 @@ export const useTokenFrequencyTaskFlow = ({
       panelNodeIds,
       lockedNodeNameMap,
       nodeIdToName,
-      selectNodes,
+      replaceSelectedNodes,
       setPendingConcordance,
       createConcordanceTab,
       setCurrentView,
