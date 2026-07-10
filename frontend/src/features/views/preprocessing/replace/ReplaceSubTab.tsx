@@ -17,7 +17,6 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
-import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
 type ReplaceSubTabComponentProps = ReplaceSubTabProps & {
@@ -224,7 +223,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
         readyMessage={preview.readyMessage}
         page={preview.page}
         pageSize={preview.pageSize}
-        documentColumn={getNodeDocumentColumn(effectiveNodes[0])}
+        documentColumn={effectiveNodes[0]?.document ?? undefined}
         onPageSizeChange={preview.setPageSize}
         onPageChange={preview.onPageChange}
       />

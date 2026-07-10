@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { AnalysisTabInput } from '@/api';
+import type { AnalysisTabInput, WorkspaceNodeInfo } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import {
-  type NodeLike,
-  useNodeColumnInfos,
-} from '@/features/workspace/common/hooks/useNodeColumnInfos';
+  projectWorkspaceNodeMetadata,
+  type WorkspaceNodeMetadata,
+} from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
-import type { NodeInfo } from '@/lib/nodeInfo';
 import { useUIStore } from '@/stores';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
@@ -17,8 +17,6 @@ import {
   getTabInputSet,
   type AnalysisTabInputSets,
 } from '../tabs/tabStateOps';
-import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
-import { getNodeDisplayName, getNodeIdentifier } from '../nodeSelectionTypes';
 import type { NodeAddRejection, NodeInputConstraints } from './nodeInputsCore';
 import { type UseNodeInputsResult, useNodeInputs } from './useNodeInputs';
 
@@ -53,11 +51,11 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
   /** Recently-used node groups, resolved against live nodes, for "Add preset". */
   recentPresets: ResolvedPreset[];
   /** Node-info responses for the currently selected input nodes. */
-  nodeInfoCache: Record<string, NodeInfo>;
+  nodeInfoCache: Record<string, WorkspaceNodeInfo>;
   /** Returns cached typed columns for a selected input node, with snapshot fallback. */
-  getColumnInfos: (node: NodeLike | null | undefined) => ColumnInfo[];
+  getColumnInfos: (node: WorkspaceNodeMetadata | null | undefined) => ColumnInfo[];
   /** Returns cached node-info metadata for a selected input node when loaded. */
-  getNodeInfo: (node: NodeLike | null | undefined) => NodeInfo | undefined;
+  getNodeInfo: (node: WorkspaceNodeMetadata | null | undefined) => WorkspaceNodeInfo | undefined;
 }
 
 /**
@@ -91,7 +89,6 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   const { selectedNodeIds } = useWorkspaceSelection();
   const currentView = useUIStore((state) => state.currentView);
 
-  const allNodes = useMemo(() => nodes as WorkspaceNodeLike[], [nodes]);
   const value = useMemo(
     () => getTabInputSet({ input_sets: tabInputSets }, selectorId),
     [selectorId, tabInputSets],
@@ -134,15 +131,20 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
 
   // Typed columns for the already-selected nodes; getColumnInfos falls back to
   // the node snapshot for any node not in this query set (e.g. add candidates).
-  const selectedNodeObjs = useMemo(() => {
+  const selectedGraphNodes = useMemo(() => {
     const ids = new Set(effectiveValue.map((i) => i.node_id));
-    return allNodes.filter((node) => ids.has(getNodeIdentifier(node)));
-  }, [allNodes, effectiveValue]);
+    return nodes.filter((node) => ids.has(node.id));
+  }, [nodes, effectiveValue]);
 
   const { getColumnInfos, getNodeInfo, nodeInfoCache } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
-    nodes: selectedNodeObjs,
+    nodes: selectedGraphNodes,
   });
+
+  const allNodes = useMemo(
+    () => nodes.map((node) => projectWorkspaceNodeMetadata(node, nodeInfoCache[node.id])),
+    [nodeInfoCache, nodes],
+  );
 
   const result = useNodeInputs({
     value: effectiveValue,
@@ -205,8 +207,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   const nodeNameById = useMemo(() => {
     const map = new Map<string, string>();
     allNodes.forEach((node) => {
-      const id = getNodeIdentifier(node);
-      map.set(id, getNodeDisplayName(node, id));
+      map.set(node.id, node.name);
     });
     return map;
   }, [allNodes]);

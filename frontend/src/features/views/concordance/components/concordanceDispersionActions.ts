@@ -1,6 +1,3 @@
-export const CONCORDANCE_DISPERSION_READ_ONLY_REASON =
-  'This action is unavailable while results are read-only.';
-
 interface VisibleMatchedTextsInput {
   colourMatches: boolean;
   allMatchedTexts: string[];
@@ -8,7 +5,6 @@ interface VisibleMatchedTextsInput {
 }
 
 interface DispersionDetachActionInput extends VisibleMatchedTextsInput {
-  readOnly: boolean;
   isBusy: boolean;
   hasSearchWord: boolean;
   hasDetachTarget: boolean;
@@ -48,10 +44,9 @@ export function getVisibleMatchedTexts({
  * Used by: ConcordanceDispersionNodeBlock's combined and per-node branches.
  * Flow: derive visible legend terms, block selected-bin detaches until bins are
  * materialized for whole-corpus scope, block all-hidden legends, then apply the
- * shared busy/read-only/search/target gates.
+ * shared busy/search/target gates.
  */
 export function buildDispersionDetachActionState({
-  readOnly,
   isBusy,
   hasSearchWord,
   hasDetachTarget,
@@ -72,17 +67,14 @@ export function buildDispersionDetachActionState({
   const scopeMismatch = hasSelection && !hasMaterializedBins;
   const allLegendHidden =
     visibleMatchedTexts !== null && allMatchedTexts.length > 0 && visibleMatchedTexts.length === 0;
-  const disabled =
-    readOnly || isBusy || !hasSearchWord || !hasDetachTarget || scopeMismatch || allLegendHidden;
-  const title = readOnly
-    ? CONCORDANCE_DISPERSION_READ_ONLY_REASON
-    : scopeMismatch
-      ? materializeSelectionHint
-      : allLegendHidden
-        ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
-        : hasSelection
-          ? selectedBinsHint
-          : allHitsHint;
+  const disabled = isBusy || !hasSearchWord || !hasDetachTarget || scopeMismatch || allLegendHidden;
+  const title = scopeMismatch
+    ? materializeSelectionHint
+    : allLegendHidden
+      ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
+      : hasSelection
+        ? selectedBinsHint
+        : allHitsHint;
 
   return {
     disabled,

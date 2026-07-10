@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
 import { OperationPopover } from './components/OperationPopover';
 import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
@@ -51,7 +50,7 @@ const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string 
 function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
   const { isLoading } = props;
   const { renderNodeInputsPanel } = props;
-  const { nodeSelection, expression, basicBuilder, preview, apply, dropZoneRef } =
+  const { activeNode, expression, basicBuilder, preview, apply, dropZoneRef } =
     useAggregateSubTab(props);
 
   return (
@@ -220,7 +219,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                               ) : (
                                 <OperationPopover
                                   workspaceId={props.currentWorkspaceId}
-                                  nodeId={nodeSelection.effectiveNodes[0]?.id ?? ''}
+                                  nodeId={activeNode?.id ?? ''}
                                   column={token.column}
                                   onSelect={(op) => {
                                     basicBuilder.addOperation(token.id, op);
@@ -324,7 +323,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
               autoCapitalize="none"
               autoComplete="off"
               placeholder="new_column"
-              disabled={!nodeSelection.effectiveNodes.length || isLoading.operations}
+              disabled={!activeNode || isLoading.operations}
               className="min-w-0 flex-1"
             />
           </div>
@@ -369,7 +368,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
         readyMessage={preview.readyMessage}
         page={preview.page}
         pageSize={preview.pageSize}
-        documentColumn={getNodeDocumentColumn(nodeSelection.effectiveNodes[0])}
+        documentColumn={activeNode?.document ?? undefined}
         onPageSizeChange={preview.setPageSize}
         onPageChange={preview.onPageChange}
       />

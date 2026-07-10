@@ -1,10 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  getMyCurrentWorkspace,
-  getWorkspaceGraphById,
-  listWorkspaces,
-} from '@/api';
+import { getMyCurrentWorkspace, getWorkspaceGraphById, listWorkspaces } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type { WorkspaceGraphNode as GraphNode } from '@/api';
 
@@ -102,17 +98,10 @@ export const useWorkspaceQueries = ({
       nodes: graphQuery.isLoading,
       graph: graphQuery.isLoading,
     }),
-    [
-      workspacesQuery.isLoading,
-      currentWorkspaceQuery.isLoading,
-      graphQuery.isLoading,
-    ],
+    [workspacesQuery.isLoading, currentWorkspaceQuery.isLoading, graphQuery.isLoading],
   );
 
   return {
-    workspacesQuery,
-    currentWorkspaceQuery,
-    graphQuery,
     workspaces,
     currentWorkspace,
     workspaceGraph,

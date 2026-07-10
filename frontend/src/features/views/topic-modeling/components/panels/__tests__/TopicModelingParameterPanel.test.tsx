@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TopicModelingParameterPanel } from '../TopicModelingParameterPanel';
-import { sanitizeMinTopicSizeInput } from '../minTopicSize';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 vi.mock('../../../../../../components/help/InfoIcon', () => ({
   // Used by: InfoIcon mock module factory so tests focus on parameter behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
@@ -45,31 +45,50 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
   ),
 }));
 
-const nodeInputsFixture = (selectedNodes: { id: string; name?: string }[] = []) => ({
-  inputs: selectedNodes.map((node) => ({ node_id: node.id, column: 'text' })),
-  resolvedNodes: selectedNodes.map((node) => ({
-    id: node.id,
-    name: node.name ?? node.id,
-    node,
-    column: 'text',
-    columnOptions: [{ name: 'text', dataType: 'string' }],
-  })),
-  selectedNodes,
-  nodeColumnSelections: selectedNodes.map((node) => ({ nodeId: node.id, column: 'text' })),
-  availableNodes: [],
-  canAddMore: true,
-  addNodes: vi.fn(() => []),
-  getAddRejection: vi.fn(() => null),
-  removeNode: vi.fn(),
-  clear: vi.fn(),
-  setColumn: vi.fn(),
-  graphSelectedIds: [],
-  workspaceId: 'workspace-1',
-  recentPresets: [],
-  nodeInfoCache: {},
-  getColumnInfos: vi.fn(() => []),
-  getNodeInfo: vi.fn(() => undefined),
+const workspaceNodeFixture = (
+  overrides: Pick<WorkspaceNodeMetadata, 'id' | 'name'>,
+): WorkspaceNodeMetadata => ({
+  color: null,
+  document: null,
+  columns: ['text'],
+  schema: { text: 'String' },
+  shape: undefined,
+  tokenizerModels: {},
+  canUndo: false,
+  canRedo: false,
+  ...overrides,
 });
+
+const nodeInputsFixture = (
+  selectedNodeSeeds: Pick<WorkspaceNodeMetadata, 'id' | 'name'>[] = [],
+) => {
+  const selectedNodes = selectedNodeSeeds.map(workspaceNodeFixture);
+  return {
+    inputs: selectedNodes.map((node) => ({ node_id: node.id, column: 'text' })),
+    resolvedNodes: selectedNodes.map((node) => ({
+      id: node.id,
+      name: node.name,
+      node,
+      column: 'text',
+      columnOptions: [{ name: 'text', dataType: 'string' }],
+    })),
+    selectedNodes,
+    nodeColumnSelections: selectedNodes.map((node) => ({ nodeId: node.id, column: 'text' })),
+    availableNodes: [],
+    canAddMore: true,
+    addNodes: vi.fn(() => []),
+    getAddRejection: vi.fn(() => null),
+    removeNode: vi.fn(),
+    clear: vi.fn(),
+    setColumn: vi.fn(),
+    graphSelectedIds: [],
+    workspaceId: 'workspace-1',
+    recentPresets: [],
+    nodeInfoCache: {},
+    getColumnInfos: vi.fn(() => []),
+    getNodeInfo: vi.fn(() => undefined),
+  };
+};
 
 vi.mock('../../../../common/components/AnalysisCardLayout', () => ({
   // Used by: AnalysisCardLayout mock module factory to preserve children under test because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
@@ -129,10 +148,23 @@ describe('TopicModelingParameterPanel', () => {
     expect(input.value).toBe('30');
   });
 
-  it('sanitizes min topic size values on commit', () => {
-    expect(sanitizeMinTopicSizeInput('')).toBe(2);
-    expect(sanitizeMinTopicSizeInput('1')).toBe(2);
-    expect(sanitizeMinTopicSizeInput('15')).toBe(15);
+  it('commits a bounded integer minimum topic size from the rendered control', () => {
+    const onTopicSizeValueChange = vi.fn();
+    render(
+      <TopicModelingParameterPanel
+        {...baseProps}
+        onTopicSizeValueChange={onTopicSizeValueChange}
+      />,
+    );
+
+    const input = screen.getByLabelText<HTMLInputElement>('Minimum topic size');
+    fireEvent.change(input, { target: { value: '1' } });
+    fireEvent.blur(input);
+    expect(onTopicSizeValueChange).toHaveBeenLastCalledWith(2);
+
+    fireEvent.change(input, { target: { value: '14.6' } });
+    fireEvent.blur(input);
+    expect(onTopicSizeValueChange).toHaveBeenLastCalledWith(15);
   });
 
   it('renders percentage sampling inside the selected node card', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { analysisTaskDispersionBins } from '@/api';
 import type { ConcordanceAnalysisResponse, ConcordanceDispersionBinRow } from '@/api';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { VIZ_PALETTE } from '../../common';
 import {
   buildConcordanceNodeColorMap,
@@ -19,7 +19,7 @@ interface Params {
   workspaceId: string | null;
   results: ConcordanceAnalysisResponse | null;
   concordanceTaskId: string;
-  panelSelectedNodes: WorkspaceNodeLike[];
+  panelSelectedNodes: WorkspaceNodeMetadata[];
   showDispersion: boolean;
   proportionalDispersionBars: boolean;
   colourMatches: boolean;

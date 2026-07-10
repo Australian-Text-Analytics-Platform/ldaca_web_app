@@ -12,11 +12,6 @@ vi.mock('../results/TopicModelingBubbleChartSection', () => ({
   ),
 }));
 
-vi.mock('../results/TopicModelingDetachDialog', () => ({
-  // Used by: TopicModelingDetachDialog mock module factory to remove detach chrome because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-  TopicModelingDetachDialog: () => null,
-}));
-
 vi.mock('../../../common/components/AnalysisCardLayout', () => ({
   // Used by: AnalysisCardLayout mock module factory to preserve children under test because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   AnalysisCardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -31,7 +26,8 @@ const baseProps = {
   topicWaitingBanner: null,
   runningTask: null,
   result: {
-    state: 'successful',
+    state: 'successful' as const,
+    message: 'Topics ready',
     data: {
       topics: [
         {
@@ -101,5 +97,26 @@ describe('TopicModelingResultsPanel', () => {
     // topic-count modes; only the native min-cluster-size control remains.
     expect(screen.queryByRole('slider')).not.toBeInTheDocument();
     expect(screen.getByText('Topics (1)')).toBeInTheDocument();
+  });
+
+  it('owns the topic detach dialog copy directly', () => {
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          detachDialogOpen
+          detachNodeOptions={[
+            {
+              node_id: 'node-1',
+              node_name: 'Corpus A',
+              available_columns: ['TOPIC_topic', 'document'],
+            },
+          ]}
+          selectedDetachColumns={{ 'node-1': ['TOPIC_topic'] }}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Detach Topic Results' })).toBeInTheDocument();
   });
 });

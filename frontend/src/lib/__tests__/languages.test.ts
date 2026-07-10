@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  normaliseIso6391LanguageCode,
-  orderedTokenizerModelsForLanguage,
-  partitionTokenizerModelsForLanguage,
-} from '../languages';
+import { normaliseIso6391LanguageCode, partitionTokenizerModelsForLanguage } from '../languages';
 
 const TOKENIZER_MODELS = [
   { model: 'native:plain_words_en', label: 'Plain words (English)', languages: ['en'] },
@@ -23,21 +19,6 @@ describe('tokenizer model inventory', () => {
     expect(normaliseIso6391LanguageCode('pt_BR')).toBe('pt');
     expect(normaliseIso6391LanguageCode('multi')).toBeNull();
     expect(normaliseIso6391LanguageCode('')).toBeNull();
-  });
-
-  it('orders predefined tokenizer models with language-compatible models first', () => {
-    expect(
-      orderedTokenizerModelsForLanguage(TOKENIZER_MODELS, 'ja').map((option) => option.model),
-    ).toEqual([
-      'lindera:ja-ipadic',
-      'lindera:ja-ipadic-neologd',
-      'lindera:ja-unidic',
-      'native:plain_words_en',
-      'huggingface:bert-base-uncased',
-      'lindera:cc-cedict',
-      'lindera:jieba',
-      'lindera:ko-dic',
-    ]);
   });
 
   it('partitions recommended models separately so the dropdown can outline them', () => {

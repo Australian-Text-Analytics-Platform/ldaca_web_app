@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { NodeSchemaResponse } from '@/features/workspace/data-view/types';
+import type { WorkspaceNodeInfo } from '@/api';
 
 const toastMock = vi.hoisted(() => ({
   error: vi.fn(),
@@ -13,12 +13,11 @@ vi.mock('sonner', () => ({
 
 import { useColumnMutations } from '../useColumnMutations';
 
-const schemaWithTypes = (columnTypes: Record<string, string>): NodeSchemaResponse => ({
-  node_id: 'node-1',
-  schema: {},
+const schemaWithTypes = (columnTypes: Record<string, string>): WorkspaceNodeInfo => ({
+  id: 'node-1',
+  name: 'Node 1',
+  schema: columnTypes,
   columns: Object.keys(columnTypes),
-  column_types: columnTypes,
-  is_text_data: false,
 });
 
 describe('useColumnMutations', () => {

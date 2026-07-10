@@ -36,7 +36,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
-import type { SidebarWorkspaceNode } from '@/components/layout/sidebar/types';
+import type { WorkspaceGraphNode } from '@/api';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
@@ -127,17 +127,16 @@ function Sidebar() {
   // eslint-disable-next-line @typescript-eslint/unbound-method -- zustand action is bound to the store and does not rely on `this`
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
 
-  const rawNodes = workspaceGraph?.nodes;
-  const nodes = Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
+  const nodes = workspaceGraph?.nodes ?? [];
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds.length;
   const pinnedIdSet = new Set(pinnedNodeIds);
 
-  const getToolbarNode = (node: SidebarWorkspaceNode) => ({
+  const getToolbarNode = (node: WorkspaceGraphNode) => ({
     id: node.id,
-    name: node.name ?? node.label ?? node.id,
-    canUndo: node.can_undo,
-    canRedo: node.can_redo,
+    name: node.name,
+    canUndo: node.can_undo ?? undefined,
+    canRedo: node.can_redo ?? undefined,
   });
 
   /**
@@ -391,14 +390,14 @@ function Sidebar() {
                             nodes={nodes}
                             selectedNodeIds={selectedNodeIds}
                             onToggleNodeSelection={toggleNode}
-                            renderPinnedRowAction={(node: SidebarWorkspaceNode) => (
+                            renderPinnedRowAction={(node: WorkspaceGraphNode) => (
                               <NodePinButton
                                 node={getToolbarNode(node)}
                                 isPinned={pinnedIdSet.has(node.id)}
                                 onTogglePin={togglePinnedNode}
                               />
                             )}
-                            renderRowActions={(node: SidebarWorkspaceNode) => (
+                            renderRowActions={(node: WorkspaceGraphNode) => (
                               <NodeActionsToolbar
                                 node={getToolbarNode(node)}
                                 isPinned={pinnedIdSet.has(node.id)}

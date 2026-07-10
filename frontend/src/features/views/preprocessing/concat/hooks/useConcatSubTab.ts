@@ -1,9 +1,7 @@
 import { useState } from 'react';
 
-import type {
-  NodeColumnSelection,
-  WorkspaceNodeLike,
-} from '@/features/views/common/nodeSelectionTypes';
+import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
@@ -14,11 +12,6 @@ import type {
   PreviewRow,
 } from '../../types';
 import { MAX_CONCAT_NODES } from '../../types';
-import {
-  buildWorkspaceNodeMap,
-  deriveNodeLabel,
-  getNodeKey,
-} from '../../utils/nodeMetadata';
 import { dedupeNodeIds } from '@/features/workspace/common/utils/selectionUtils';
 
 const DEFAULT_CONCAT_PALETTE = [
@@ -35,8 +28,8 @@ const DEFAULT_CONCAT_PALETTE = [
 export interface ConcatSubTabProps {
   selectedNodeIds: string[];
   currentWorkspaceId: string | null;
-  workspaceNodes: WorkspaceNodeLike[];
-  getColumnInfos: (node: WorkspaceNodeLike) => ColumnInfo[];
+  workspaceNodes: WorkspaceNodeMetadata[];
+  getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[];
   concatNodes: (nodeIds: string[], newNodeName?: string, deduplicate?: boolean) => Promise<unknown>;
   concatPreview: (
     request: ConcatPreviewRequestPayload & {
@@ -56,7 +49,7 @@ export interface ConcatSubTabProps {
 }
 
 interface ConcatSelectionPanelConfig {
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceNodeMetadata[];
   nodeColumnSelections: NodeColumnSelection[];
   nodeColors: Record<string, string>;
   defaultPalette: string[];
@@ -124,12 +117,12 @@ const noop = () => undefined;
  * return the metadata needed by preview/apply paths.
  */
 const buildConcatNodeSummaries = (
-  nodes: WorkspaceNodeLike[],
-  getColumnInfos: (node: WorkspaceNodeLike) => ColumnInfo[],
+  nodes: WorkspaceNodeMetadata[],
+  getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[],
 ): ConcatNodeSummary[] => {
   return nodes.map((node) => {
-    const nodeId = getNodeKey(node);
-    const displayName = deriveNodeLabel(node) || nodeId;
+    const nodeId = node.id;
+    const displayName = node.name;
 
     const columnInfos = getColumnInfos(node);
     const columns = columnInfos.map((column) => column.name);
@@ -275,14 +268,14 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   const [deduplicate, setDeduplicate] = useState(true);
   const [isConcatenating, setIsConcatenating] = useState(false);
 
-  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
+  const workspaceNodeMap = new Map(workspaceNodes.map((node) => [node.id, node]));
 
   const concatNodeIds = dedupeNodeIds(selectedNodeIds);
 
-  const concatSelectedNodes: WorkspaceNodeLike[] = (() => {
+  const concatSelectedNodes: WorkspaceNodeMetadata[] = (() => {
     return concatNodeIds
       .map((nodeId) => workspaceNodeMap.get(nodeId))
-      .filter((node): node is WorkspaceNodeLike => Boolean(node));
+      .filter((node): node is WorkspaceNodeMetadata => Boolean(node));
   })();
 
   const concatNodeSummaries = buildConcatNodeSummaries(concatSelectedNodes, getColumnInfos);

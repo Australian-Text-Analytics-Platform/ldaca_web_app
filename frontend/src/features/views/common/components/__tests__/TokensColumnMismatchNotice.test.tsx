@@ -4,13 +4,21 @@ import { describe, expect, it } from 'vitest';
 import { TokensColumnMismatchNotice } from '../TokensColumnMismatchNotice';
 
 describe('TokensColumnMismatchNotice', () => {
-  it('reads persisted tokenizer model source columns from node.tokenizer_models', () => {
+  it('reads projected tokenizer model source columns from node metadata', () => {
     render(
       <TokensColumnMismatchNotice
         nodes={[
           {
             id: 'node-1',
-            tokenizer_models: { text: 'lindera:jieba' },
+            name: 'Corpus',
+            color: null,
+            document: null,
+            columns: ['text'],
+            schema: { text: 'String' },
+            shape: undefined,
+            tokenizerModels: { text: 'lindera:jieba' },
+            canUndo: false,
+            canRedo: false,
           },
         ]}
         selections={[{ nodeId: 'node-1', column: 'notes' }]}
@@ -27,7 +35,15 @@ describe('TokensColumnMismatchNotice', () => {
         nodes={[
           {
             id: 'node-1',
-            tokenizer_models: { text: 'lindera:jieba' },
+            name: 'Corpus',
+            color: null,
+            document: null,
+            columns: ['text'],
+            schema: { text: 'String' },
+            shape: undefined,
+            tokenizerModels: { text: 'lindera:jieba' },
+            canUndo: false,
+            canRedo: false,
           },
         ]}
         selections={[{ nodeId: 'node-1', column: 'text' }]}

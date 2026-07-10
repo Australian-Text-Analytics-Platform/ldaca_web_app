@@ -45,5 +45,5 @@ export const useZoom = ({ keyboardShortcuts = false, initial = 1 }: UseZoomOptio
     };
   }, [keyboardShortcuts]);
 
-  return { zoom, zoomIn, zoomOut, zoomReset, clamp };
+  return { zoom, zoomIn, zoomOut, zoomReset };
 };

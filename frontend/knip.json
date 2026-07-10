@@ -7,11 +7,9 @@
         "src/**/*.{ts,tsx}"
     ],
     "ignore": [
-        "src/api/generated/**",
-        "src/components/ui/**"
+        "src/api/generated/**"
     ],
     "ignoreDependencies": [
-        "postcss",
         "tw-animate-css",
         "tailwindcss",
         "@tailwindcss/typography"

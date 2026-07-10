@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { useNodeColorControls } from '../useNodeColorControls';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 describe('useNodeColorControls', () => {
   it('derives colours from persisted node metadata and posts defaults for missing colours', async () => {
@@ -10,8 +11,8 @@ describe('useNodeColorControls', () => {
       useNodeColorControls({
         nodeIds: ['node-1', 'node-2'],
         nodes: [
-          { id: 'node-1', name: 'Saved', color: '#111111' },
-          { id: 'node-2', name: 'Missing' },
+          projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Saved', color: '#111111' }),
+          projectWorkspaceNodeMetadata({ id: 'node-2', name: 'Missing' }),
         ],
         persistNodeColor,
       }),
@@ -35,7 +36,7 @@ describe('useNodeColorControls', () => {
     const { result } = renderHook(() =>
       useNodeColorControls({
         nodeIds: ['node-1'],
-        nodes: [{ id: 'node-1', name: 'Corpus' }],
+        nodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
         persistNodeColor,
       }),
     );

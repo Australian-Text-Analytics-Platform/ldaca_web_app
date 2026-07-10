@@ -1,11 +1,6 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-
-interface NodeWithTokenizerModels {
-  id: string;
-  tokenizer_models?: unknown;
-  [key: string]: unknown;
-}
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 interface Selection {
   nodeId: string;
@@ -13,14 +8,13 @@ interface Selection {
 }
 
 export interface TokensColumnMismatchNoticeProps {
-  nodes: readonly NodeWithTokenizerModels[];
+  nodes: readonly WorkspaceNodeMetadata[];
   selections: readonly Selection[];
   className?: string;
 }
 
 /** Called by: TokensColumnMismatchNotice when matching selections to live workspace nodes because selected analysis inputs store the same node id. */
-const nodeMatchesId = (node: NodeWithTokenizerModels, id: string) =>
-  node.id === id;
+const nodeMatchesId = (node: WorkspaceNodeMetadata, id: string) => node.id === id;
 
 /** Called by: TokensColumnMismatchNotice to describe saved tokenizer-model columns. */
 const collectTokenizerModelSources = (tokenizerModels: unknown): string[] => {
@@ -49,7 +43,7 @@ export function TokensColumnMismatchNotice({
     if (!first?.column || !first.nodeId) return null;
     const node = nodes.find((n) => nodeMatchesId(n, first.nodeId));
     if (!node) return null;
-    const tokenizerModelSources = collectTokenizerModelSources(node.tokenizer_models);
+    const tokenizerModelSources = collectTokenizerModelSources(node.tokenizerModels);
     if (tokenizerModelSources.length === 0) return null;
     if (tokenizerModelSources.includes(first.column)) return null;
     return { selectedColumn: first.column, tokenizerModelSources };

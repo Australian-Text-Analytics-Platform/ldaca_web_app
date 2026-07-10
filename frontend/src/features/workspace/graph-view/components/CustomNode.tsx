@@ -18,13 +18,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { type WorkspaceNode } from '@/features/workspace/data-view/types';
+import type { WorkspaceGraphNodeCard } from '../graphNodeModel';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
-import {
-  CUSTOM_NODE_TOOLBAR_BUTTON_CLASS,
-  CustomNodeActionMenu,
-} from './CustomNodeActionMenu';
+import { CUSTOM_NODE_TOOLBAR_BUTTON_CLASS, CustomNodeActionMenu } from './CustomNodeActionMenu';
 import { CustomNodeRenameForm } from './CustomNodeRenameForm';
 import {
   releaseToolbarOwner,
@@ -33,20 +30,19 @@ import {
 } from './customNodeToolbarOwner';
 
 interface CustomNodeData extends Record<string, unknown> {
-  node: WorkspaceNode;
-  isMultiSelected?: boolean;
+  node: WorkspaceGraphNodeCard;
   /** True for nodes that appeared mid-session (detach / join / stack /
    * clone outputs etc.) and haven't been interacted with yet. Triggers
    * the red "new" dot in the graph + sidebar. Cleared by ``markInteracted``
    * in useFreshNodesStore on first click / selection. */
-  isFresh?: boolean;
+  isFresh: boolean;
   onDelete: (nodeId: string) => void;
-  onRename?: (nodeId: string, newName: string) => void;
-  onCopy?: (nodeId: string) => void;
-  onUndo?: (nodeId: string) => void;
-  onRedo?: (nodeId: string) => void;
+  onRename: (nodeId: string, newName: string) => void;
+  onCopy: (nodeId: string) => void;
+  onUndo: (nodeId: string) => void;
+  onRedo: (nodeId: string) => void;
   /** Requests that this node is added to the active view's node inputs. */
-  onAddToSelection?: (nodeId: string) => void;
+  onAddToSelection: (nodeId: string) => void;
 }
 
 const COMPACT_NODE_ZOOM_THRESHOLD = 0.6;
@@ -153,16 +149,7 @@ function customNodeUiReducer(
  * Flow: React Flow passes node data, zoom and selection choose compact or full rendering, and actions invoke workspace mutations.
  */
 function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
-  const {
-    node,
-    isFresh = false,
-    onDelete,
-    onRename,
-    onCopy,
-    onUndo,
-    onRedo,
-    onAddToSelection,
-  } = data;
+  const { node, isFresh, onDelete, onRename, onCopy, onUndo, onRedo, onAddToSelection } = data;
   // Visual state is selection (React Flow ``selected``) plus an optional
   // per-node accent: a valid ``node.color`` paints a coloured left spine on the
   // card (see ``accentBorderStyle``) without tinting the header/body, so the
@@ -191,7 +178,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   // hover toolbar hides immediately.
   const activeToolbarId = useCustomNodeToolbarOwner();
 
-  const nodeName = node.name || 'Loading...';
+  const nodeName = node.name;
   const nodeShape = node.shape;
 
   // Optional per-node accent. A valid ``#rrggbb`` ``Node.color`` is drawn as a
@@ -266,7 +253,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleRenameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    dispatchUi({ type: 'start-rename', name: node.name || '' });
+    dispatchUi({ type: 'start-rename', name: node.name });
     setTimeout(() => {
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
@@ -279,7 +266,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleRenameSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onRename && node.id && newName.trim()) {
+    if (newName.trim()) {
       onRename(node.id, newName.trim());
     }
     dispatchUi({ type: 'cancel-rename' });
@@ -307,9 +294,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleCopyNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (onCopy && node.id) {
-      onCopy(node.id);
-    }
+    onCopy(node.id);
   };
 
   /**
@@ -318,7 +303,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleUndoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (onUndo && node.id && node.can_undo) {
+    if (node.canUndo) {
       onUndo(node.id);
     }
   };
@@ -329,7 +314,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const handleRedoNode = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (onRedo && node.id && node.can_redo) {
+    if (node.canRedo) {
       onRedo(node.id);
     }
   };
@@ -389,7 +374,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node.id) onAddToSelection?.(node.id);
+    onAddToSelection(node.id);
   };
 
   /**
@@ -420,8 +405,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         showMenu={showMenu}
         menuOpensUp={menuOpensUp}
         menuOpensRight={menuOpensRight}
-        canUndo={node.can_undo}
-        canRedo={node.can_redo}
+        canUndo={node.canUndo}
+        canRedo={node.canRedo}
         onMenuChange={(willOpen, placement) => {
           dispatchUi({
             type: 'set-menu',

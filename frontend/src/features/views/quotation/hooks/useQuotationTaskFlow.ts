@@ -8,8 +8,9 @@ import type {
   QuotationMaterializeRequest,
   AnalysisTaskActionResponse,
 } from '@/api';
-import { getNodeIdentifier, extractAndSetTaskId } from '../../common';
-import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
+import { extractAndSetTaskId } from '../../common';
+import type { NodeColumnSelection, NodePaginationState } from '../../common';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -42,7 +43,7 @@ function getErrorMessage(error: unknown): string {
 interface QuotationState {
   currentWorkspaceId: string | null;
   hasLoaded: boolean;
-  displayedNodes: WorkspaceNodeLike[];
+  displayedNodes: Pick<WorkspaceNodeMetadata, 'id' | 'name'>[];
   activeSelections: NodeColumnSelection[];
   nodeState: Record<string, NodePaginationState>;
   originalColumnsByNode: Record<string, string[]>;
@@ -131,11 +132,9 @@ export function useQuotationTaskFlow({
    * Called by: useQuotationTaskFlow as a local helper in this analysis workflow.
    */
   const resolveNodeLabel = (nodeId: string): string => {
-    const match = displayedNodes.find((node) => getNodeIdentifier(node) === nodeId);
-    // node label fields may be '' and must fall through to the next identifier source
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    const rawLabel = match?.name || match?.label || match?.id || nodeId;
-    return rawLabel;
+    const match = displayedNodes.find((node) => node.id === nodeId);
+    if (!match) return nodeId;
+    return match.name.length > 0 ? match.name : match.id;
   };
 
   // Locates the locked node and column that should receive stored-result updates.
@@ -148,7 +147,7 @@ export function useQuotationTaskFlow({
   } | null => {
     const sourceNode = displayedNodes[0];
     if (!sourceNode) return null;
-    const nodeId = getNodeIdentifier(sourceNode);
+    const nodeId = sourceNode.id;
     const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
     const column = selection?.column;
     if (!column) return null;
@@ -287,7 +286,7 @@ export function useQuotationTaskFlow({
    */
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
+    const nodeId = targetNode?.id ?? '';
     if (!nodeId) return;
 
     setIsLoadingQuotations(true);
@@ -306,7 +305,7 @@ export function useQuotationTaskFlow({
    */
   const handlePageChange = async (newPage: number) => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
+    const nodeId = targetNode?.id ?? '';
     if (!nodeId || !hasLoaded) return;
     await updateStoredQuotationResult({ page: newPage });
   };
@@ -317,7 +316,7 @@ export function useQuotationTaskFlow({
    */
   const handlePageSizeChange = async (pageSize: number) => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
+    const nodeId = targetNode?.id ?? '';
     if (!nodeId || !hasLoaded) return;
     await updateStoredQuotationResult({
       page: 1,

@@ -7,7 +7,7 @@ import {
   resolveTokenFrequencyNodeContext,
   type TokenFrequencyAnalysisParams,
 } from '@/features/views/token-frequency/tokenFrequencyHelpers';
-import { type WorkspaceNodeLike } from '../../common';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
@@ -17,7 +17,7 @@ import type { ViewType } from '@/features/views/viewIds';
 interface AnalysisState {
   currentWorkspaceId: string | null;
   panelNodeIds: string[];
-  panelSelectedNodes: WorkspaceNodeLike[];
+  panelSelectedNodes: Pick<WorkspaceNodeMetadata, 'id' | 'name'>[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   tokenizerModelsByNode: Record<string, string>;
   stopWords: string;
@@ -83,12 +83,7 @@ export const useTokenFrequencyTaskFlow = ({
     lastFetchedRef,
     onTaskIdAssigned,
   },
-  navigation: {
-    replaceSelectedNodes,
-    setPendingConcordance,
-    setCurrentView,
-    applyStopSetFromText,
-  },
+  navigation: { replaceSelectedNodes, setPendingConcordance, setCurrentView, applyStopSetFromText },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
   // concordance tab for every token click. Sharing the workspace-tabs query

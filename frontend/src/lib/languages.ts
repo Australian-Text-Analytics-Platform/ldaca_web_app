@@ -32,13 +32,3 @@ export function partitionTokenizerModelsForLanguage(
   const other = models.filter((option) => !option.languages.includes(normalised));
   return { recommended, other };
 }
-
-/** Returns tokenizer models in the order selectors expect: recommended first, then the rest. */
-/** Used by: src/lib/__tests__/languages.test.ts. */
-export function orderedTokenizerModelsForLanguage(
-  models: readonly LanguageModelOption[],
-  code: string | null | undefined,
-): readonly LanguageModelOption[] {
-  const { recommended, other } = partitionTokenizerModelsForLanguage(models, code);
-  return [...recommended, ...other];
-}

@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from 'react';
-import { clampDisplayTokenLimit } from './utils';
 import { isNetworkError } from '@/lib/apiError';
 
 /**
@@ -37,7 +36,7 @@ const toHydrationState = ({
   ...state
 }: HydrationInternalState): HydrationState => state;
 
-export interface UseAnalysisHydrationConfig<TRequest, TResult, TPreferences> {
+interface UseAnalysisHydrationConfig<TRequest, TResult> {
   workspaceId?: string | null;
   resolveTaskId?: () => MaybePromise<string | null>;
   onTaskIdResolved?: (taskId: string | null) => void;
@@ -45,46 +44,22 @@ export interface UseAnalysisHydrationConfig<TRequest, TResult, TPreferences> {
   fetchResult?: (taskId?: string | null) => MaybePromise<Nullable<TResult>>;
   applyRequest?: (request: Nullable<TRequest>) => MaybePromise<void>;
   applyResult?: (result: Nullable<TResult>) => MaybePromise<void>;
-  persistPreferences?: (partial: TPreferences) => MaybePromise<void>;
   onHydrationError?: (error: unknown) => void;
 }
 
-export interface UseAnalysisHydrationReturn<TPreferences> {
+interface UseAnalysisHydrationReturn {
   hydrateFromServer: () => Promise<void>;
   hydrationState: HydrationState;
-  persistPreferences: (partial: TPreferences) => Promise<void>;
 }
 
 /**
- * Normalizes preference values before persisting them.
- * Flow: copy the partial preference payload, clamp token limits, then return
- * the normalized object.
- */
-const normalizePreferencePayload = <TPreferences extends Record<string, unknown>>(
-  partial: TPreferences,
-): TPreferences => {
-  const normalized: Record<string, unknown> = { ...partial };
-
-  if (typeof normalized.token_limit === 'number') {
-    normalized.token_limit = clampDisplayTokenLimit(normalized.token_limit).limit;
-  }
-
-  return normalized as TPreferences;
-};
-
-/**
- * Restores an explicit task's request/result pair for an analysis tab and offers
- * a safe preference persistence wrapper for panels that hydrate from the server.
+ * Restores an explicit task's request/result pair for an analysis tab.
  * Used by: useAnalysisFeature and analysis hydration tests because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
-export function useAnalysisHydration<
-  TRequest = unknown,
-  TResult = unknown,
-  TPreferences extends Record<string, unknown> = Record<string, unknown>,
->(
-  config: UseAnalysisHydrationConfig<TRequest, TResult, TPreferences>,
-): UseAnalysisHydrationReturn<TPreferences> {
+export function useAnalysisHydration<TRequest = unknown, TResult = unknown>(
+  config: UseAnalysisHydrationConfig<TRequest, TResult>,
+): UseAnalysisHydrationReturn {
   const {
     workspaceId,
     resolveTaskId,
@@ -93,7 +68,6 @@ export function useAnalysisHydration<
     fetchResult,
     applyRequest,
     applyResult,
-    persistPreferences,
     onHydrationError,
   } = config;
 
@@ -197,15 +171,8 @@ export function useAnalysisHydration<
     onHydrationError,
   ]);
 
-  const persistPreferencesSafe = async (partial: TPreferences) => {
-    if (!persistPreferences || !workspaceId) return;
-    const normalized = normalizePreferencePayload(partial);
-    await persistPreferences(normalized);
-  };
-
   return {
     hydrateFromServer,
     hydrationState,
-    persistPreferences: persistPreferencesSafe,
   };
 }

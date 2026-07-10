@@ -1,7 +1,7 @@
 import { useState, type SetStateAction } from 'react';
 
 import { analysisTaskDetachOptions } from '@/api';
-import type { DetachDialogNodeOption } from '../../common/components/DetachColumnsDialog';
+import type { DetachNodeOption } from '@/api';
 import type { NodeColumnSelection } from '../../common';
 import { useDetachColumnsState } from '../../common/hooks/useDetachColumnsState';
 
@@ -27,7 +27,7 @@ interface UseQuotationDetachDialogArgs {
  * detach columns because quotation output columns are generated automatically
  * while source columns remain opt-in.
  */
-function emptySelectionForOptions(options: DetachDialogNodeOption[]): Record<string, string[]> {
+function emptySelectionForOptions(options: DetachNodeOption[]): Record<string, string[]> {
   const initial: Record<string, string[]> = {};
   options.forEach((node) => {
     initial[node.node_id] = [];
@@ -55,7 +55,7 @@ export function useQuotationDetachDialog({
 }: UseQuotationDetachDialogArgs) {
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
-  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
+  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachNodeOption[]>([]);
   const {
     selectedDetachColumns,
     setSelectedDetachColumns,
@@ -106,8 +106,8 @@ export function useQuotationDetachDialog({
 
   /** Confirms detach with selected source columns and the node's cached path. */
   /**
-   * Called by: QuotationDetachDialog because the shared confirm button should
-   * turn dialog selections into one quotation workspace-detach request.
+   * Called by: QuotationFeature's shared DetachColumnsDialog because its
+   * confirm button turns selections into one quotation workspace-detach request.
    */
   const handleDetachConfirm = async () => {
     if (!pendingDetachNodeId) return;

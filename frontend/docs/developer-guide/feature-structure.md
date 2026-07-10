@@ -107,13 +107,22 @@ Shared code used by multiple views lives in `views/common/`:
   keeps DOM-free geometry helpers, while `chromeTabsInteractionState.ts` owns
   the coupled drag-preview and inline-rename reducer state.
 - `common/nodeInputs/` — add-node-as-needed input resolution, validation, and
-  persistence helpers used by analysis tabs and preprocessing subtabs.
+  persistence helpers used by analysis tabs and preprocessing subtabs. These
+  inputs consume the canonical projected workspace-node metadata contract;
+  feature-local node aliases and metadata resolver ladders are not supported.
 - `common/utils/` — shared utilities (`datetimeFormatInfer`).
 - `common/` root — shared helpers (`analysisTaskUtils`, `generatedColumns`,
   `runOrUpdate`, `palette`, etc.).
 
 New views should start their shared code in `views/common/` before introducing
 view-local task, visualization-colour, or result hydration logic.
+
+Feature owners render `DetachColumnsDialog` directly with their own title,
+description, options, and submit handler. Quotation, Concordance (table and
+dispersion), and Topic Modeling do not add pass-through dialog wrappers.
+Topic Modeling uses generated topic/result types and keeps handwritten types
+only for transformed chart state. Concordance has no read-only mode; its
+controls and result actions expose only supported interactive behavior.
 
 ### Data Loader
 
@@ -229,6 +238,9 @@ translation, and extract connector handling cannot drift.
   persisting selections through `useWorkspaceTabs`.
 - `common/utils/` holds workspace-wide utilities (`selectionUtils`).
 - `graph-view/` maps backend graph data into React Flow nodes and edges.
+- `graph-view/graphNodeModel.ts` is the required card projection consumed by
+  `CustomNode`; sidebar rows consume generated `WorkspaceGraphNode` objects
+  directly and require their selection/action renderers.
 - `data-view/` renders the selected node's paginated table and column actions.
 - `data-view/hooks/` holds workspace data-table hooks (`useColumnMutations`, `useWorkspaceDataTable`). The shared server-pagination hook (`useServerTable`) and footer (`ServerPaginationFooter`) live in `features/views/common/`.
 - `data-view/utils/` holds column-type utilities (`columnTypes`) and

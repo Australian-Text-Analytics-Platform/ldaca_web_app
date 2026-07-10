@@ -14,7 +14,7 @@ import { TokensColumnMismatchNotice } from '@/features/views/common/components/T
 import type { NodeColumnSelection } from '../../common';
 import type { RerunActionState } from '@/features/views/common/rerunActionState';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 export interface ConcordanceParameterPanelProps {
   // Selection (add-node-as-needed)
@@ -90,7 +90,7 @@ export function ConcordanceParameterPanel({
   renderTokenizerModelSelector,
 }: ConcordanceParameterPanelProps) {
   const effectiveNodeColumnSelections: NodeColumnSelection[] = nodeInputs.nodeColumnSelections;
-  const panelSelectedNodes: WorkspaceNodeLike[] = nodeInputs.selectedNodes;
+  const panelSelectedNodes: WorkspaceNodeMetadata[] = nodeInputs.selectedNodes;
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
     if (actionState.runDisabledReason) return actionState.runDisabledReason;
@@ -99,13 +99,6 @@ export function ConcordanceParameterPanel({
       return 'Select a column for each data block';
     return undefined;
   })();
-  // Add-node-as-needed model has no read-only panel; these keep the existing
-  // DisabledReasonTooltip wiring intact without ever disabling the controls.
-  const readOnly = false;
-  const readOnlyReason: string | undefined = undefined;
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string or false reason must collapse to undefined (no tooltip)
-  const readOnlyOrReason = (reason?: string | false) => reason || undefined;
-
   return (
     <Card>
       <AnalysisFeatureHeader
@@ -153,59 +146,50 @@ export function ConcordanceParameterPanel({
                   label="Concordance search term"
                 />
               </div>
-              <DisabledReasonTooltip reason={readOnlyReason} className="w-full">
-                <input
-                  type="text"
-                  value={searchWord}
-                  onChange={(e) => {
-                    setSearchWord(e.target.value);
-                  }}
-                  disabled={readOnly}
-                  placeholder={
-                    searchMode === 'tokens'
-                      ? 'One or more tokens, separated by space, comma, or |'
-                      : 'Enter word or phrase to search for'
-                  }
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </DisabledReasonTooltip>
+              <input
+                type="text"
+                value={searchWord}
+                onChange={(e) => {
+                  setSearchWord(e.target.value);
+                }}
+                placeholder={
+                  searchMode === 'tokens'
+                    ? 'One or more tokens, separated by space, comma, or |'
+                    : 'Enter word or phrase to search for'
+                }
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+              />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-foreground">
                   Left context (tokens)
                 </label>
-                <DisabledReasonTooltip reason={readOnlyReason} className="w-full">
-                  <input
-                    type="number"
-                    value={numLeftTokens}
-                    onChange={(e) => {
-                      setNumLeftTokens(parseInt(e.target.value) || 0);
-                    }}
-                    disabled={readOnly}
-                    min="0"
-                    max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </DisabledReasonTooltip>
+                <input
+                  type="number"
+                  value={numLeftTokens}
+                  onChange={(e) => {
+                    setNumLeftTokens(parseInt(e.target.value) || 0);
+                  }}
+                  min="0"
+                  max="50"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                />
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-foreground">
                   Right context (tokens)
                 </label>
-                <DisabledReasonTooltip reason={readOnlyReason} className="w-full">
-                  <input
-                    type="number"
-                    value={numRightTokens}
-                    onChange={(e) => {
-                      setNumRightTokens(parseInt(e.target.value) || 0);
-                    }}
-                    disabled={readOnly}
-                    min="0"
-                    max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </DisabledReasonTooltip>
+                <input
+                  type="number"
+                  value={numRightTokens}
+                  onChange={(e) => {
+                    setNumRightTokens(parseInt(e.target.value) || 0);
+                  }}
+                  min="0"
+                  max="50"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                />
               </div>
             </div>
           </div>
@@ -225,23 +209,17 @@ export function ConcordanceParameterPanel({
                 }}
               >
                 <TabsList className="h-8">
-                  <DisabledReasonTooltip reason={readOnlyReason}>
-                    <TabsTrigger value="regex" disabled={readOnly} className="text-xs">
-                      Text
-                    </TabsTrigger>
-                  </DisabledReasonTooltip>
+                  <TabsTrigger value="regex" className="text-xs">
+                    Text
+                  </TabsTrigger>
                   <DisabledReasonTooltip
-                    reason={readOnlyOrReason(
+                    reason={
                       tokensModeAvailable
                         ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                        : 'Tokens mode needs a tokenizer model for each selected column.',
-                    )}
+                        : 'Tokens mode needs a tokenizer model for each selected column.'
+                    }
                   >
-                    <TabsTrigger
-                      value="tokens"
-                      disabled={!tokensModeAvailable || readOnly}
-                      className="text-xs"
-                    >
+                    <TabsTrigger value="tokens" disabled={!tokensModeAvailable} className="text-xs">
                       Tokens
                     </TabsTrigger>
                   </DisabledReasonTooltip>
@@ -256,126 +234,115 @@ export function ConcordanceParameterPanel({
             {searchMode === 'regex' && (
               <>
                 <div className="flex items-center gap-2">
-                  <DisabledReasonTooltip reason={readOnlyReason}>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={wholeWord}
-                        onChange={(e) => {
-                          setWholeWord(e.target.checked);
-                        }}
-                        disabled={regex || readOnly}
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm text-foreground">Whole word</span>
-                    </label>
-                  </DisabledReasonTooltip>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={wholeWord}
+                      onChange={(e) => {
+                        setWholeWord(e.target.checked);
+                      }}
+                      disabled={regex}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm text-foreground">Whole word</span>
+                  </label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <DisabledReasonTooltip reason={readOnlyReason}>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={regex}
-                        disabled={readOnly}
-                        onChange={(e) => {
-                          const nextRegex = e.target.checked;
-                          setRegex(nextRegex);
-                          if (nextRegex) {
-                            setWholeWord(false);
-                          }
-                        }}
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm text-foreground">Use regular expression</span>
-                    </label>
-                  </DisabledReasonTooltip>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={regex}
+                      onChange={(e) => {
+                        const nextRegex = e.target.checked;
+                        setRegex(nextRegex);
+                        if (nextRegex) {
+                          setWholeWord(false);
+                        }
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm text-foreground">Use regular expression</span>
+                  </label>
                   <HelpIcon
                     targetKey="analysis.concordance.regex-toggle"
                     label="Regex mode toggle"
                   />
                 </div>
-                <DisabledReasonTooltip reason={readOnlyReason}>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={caseSensitive}
-                      onChange={(e) => {
-                        setCaseSensitive(e.target.checked);
-                      }}
-                      disabled={readOnly}
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm text-foreground">Case sensitive</span>
-                  </label>
-                </DisabledReasonTooltip>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={caseSensitive}
+                    onChange={(e) => {
+                      setCaseSensitive(e.target.checked);
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm text-foreground">Case sensitive</span>
+                </label>
               </>
             )}
           </div>
         </div>
       </CardContent>
       <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
-        {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- readOnly is an intentional always-false placeholder kept for future read-only wiring */}
-        {!readOnly && (
-          <>
-            <DisabledReasonTooltip reason={runDisabledReason}>
-              <Button
-                onClick={() => {
-                  void handleRunOrUpdate();
-                }}
-                disabled={
-                  actionState.runDisabled ||
-                  !searchWord.trim() ||
-                  effectiveNodeColumnSelections.some((sel) => !sel.column)
-                }
-                className="w-full md:w-auto"
-              >
-                {isSearching ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    {actionState.runLabel}
-                  </>
-                )}
-              </Button>
-            </DisabledReasonTooltip>
-
-            {handleStopTask && isSearching ? (
-              <Button
-                onClick={() => {
-                  void handleStopTask();
-                }}
-                variant="outline"
-                disabled={isStopping}
-              >
-                {isStopping ? (
+        <>
+          <DisabledReasonTooltip reason={runDisabledReason}>
+            <Button
+              onClick={() => {
+                void handleRunOrUpdate();
+              }}
+              disabled={
+                actionState.runDisabled ||
+                !searchWord.trim() ||
+                effectiveNodeColumnSelections.some((sel) => !sel.column)
+              }
+              className="w-full md:w-auto"
+            >
+              {isSearching ? (
+                <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Square className="mr-2 h-4 w-4" />
-                )}
-                Stop
-              </Button>
-            ) : null}
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  {actionState.runLabel}
+                </>
+              )}
+            </Button>
+          </DisabledReasonTooltip>
 
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => {
-                  void handleClearResults();
-                }}
-                variant="destructive"
-                disabled={actionState.clearDisabled}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Clear Results
-              </Button>
-              <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
-            </div>
-          </>
-        )}
+          {handleStopTask && isSearching ? (
+            <Button
+              onClick={() => {
+                void handleStopTask();
+              }}
+              variant="outline"
+              disabled={isStopping}
+            >
+              {isStopping ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Square className="mr-2 h-4 w-4" />
+              )}
+              Stop
+            </Button>
+          ) : null}
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                void handleClearResults();
+              }}
+              variant="destructive"
+              disabled={actionState.clearDisabled}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Results
+            </Button>
+            <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
+          </div>
+        </>
       </CardFooter>
     </Card>
   );

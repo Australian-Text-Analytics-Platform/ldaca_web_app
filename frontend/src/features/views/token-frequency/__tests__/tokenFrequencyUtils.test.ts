@@ -91,16 +91,25 @@ describe('tokenFrequencyUtils', () => {
     });
   });
 
-  it('buildNodeIdDisplayNameMap falls back from empty names to labels and ids', () => {
+  it('buildNodeIdDisplayNameMap falls back from empty names to ids', () => {
     expect(
       buildNodeIdDisplayNameMap([
-        { id: 'node-a', name: 'Alpha', label: 'Ignored' },
-        { id: 'node-b', name: '', label: 'Beta' },
-        { id: 'node-c', name: '', label: '' },
+        {
+          id: 'node-a',
+          name: 'Alpha',
+        },
+        {
+          id: 'node-b',
+          name: '',
+        },
+        {
+          id: 'node-c',
+          name: '',
+        },
       ]),
     ).toEqual({
       'node-a': 'Alpha',
-      'node-b': 'Beta',
+      'node-b': 'node-b',
       'node-c': 'node-c',
     });
   });

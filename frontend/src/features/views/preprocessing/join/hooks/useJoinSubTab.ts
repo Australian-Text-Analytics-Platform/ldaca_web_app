@@ -1,10 +1,8 @@
 import { useState, type ReactNode } from 'react';
 
 import { joinNodesPreview } from '@/api';
-import type {
-  NodeColumnSelection,
-  WorkspaceNodeLike,
-} from '@/features/views/common/nodeSelectionTypes';
+import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type {
@@ -14,11 +12,6 @@ import type {
   PreviewRow,
 } from '../../types';
 import { JOIN_TYPE_OPTIONS } from '../../types';
-import {
-  buildWorkspaceNodeMap,
-  deriveNodeLabel,
-  getNodeKey,
-} from '../../utils/nodeMetadata';
 import { dedupeNodeIds } from '@/features/workspace/common/utils/selectionUtils';
 import { MAX_JOIN_NODES } from '../../types';
 
@@ -28,8 +21,8 @@ export interface JoinSubTabProps {
   selectedNodeIds: string[];
   selectedNodeColumns: Record<string, string>;
   currentWorkspaceId: string | null;
-  workspaceNodes: WorkspaceNodeLike[];
-  getColumnInfos: (node: WorkspaceNodeLike) => ColumnInfo[];
+  workspaceNodes: WorkspaceNodeMetadata[];
+  getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[];
   joinNodes: (
     leftNodeId: string,
     rightNodeId: string,
@@ -45,17 +38,17 @@ export interface JoinSubTabProps {
 }
 
 interface JoinSelectionPanelConfig {
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceNodeMetadata[];
   nodeColumnSelections: NodeColumnSelection[];
   nodeColors: Record<string, string>;
   defaultPalette: string[];
   maxCompare: number;
   disabled: boolean;
   statusMessage: string | null;
-  columnLabelFn: (node: WorkspaceNodeLike, index: number) => ReactNode;
+  columnLabelFn: (node: WorkspaceNodeMetadata, index: number) => ReactNode;
   onColumnChange: (nodeId: string, column: string) => void;
   onColorChange: (nodeId: string, color: string) => void;
-  getNodeColumns: (node: WorkspaceNodeLike) => string[];
+  getNodeColumns: (node: WorkspaceNodeMetadata) => string[];
 }
 
 interface JoinPreviewConfig {
@@ -166,7 +159,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const [joinNewNodeName, setJoinNewNodeName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
-  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
+  const workspaceNodeMap = new Map(workspaceNodes.map((node) => [node.id, node]));
 
   const joinNodeIds = dedupeNodeIds(selectedNodeIds);
   const joinLeftNodeId = joinNodeIds[0] ?? '';
@@ -175,7 +168,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const joinSelectedNodes = (() => {
     return joinNodeIds
       .map((nodeId) => workspaceNodeMap.get(nodeId))
-      .filter((node): node is WorkspaceNodeLike => Boolean(node));
+      .filter((node): node is WorkspaceNodeMetadata => Boolean(node));
   })();
 
   /**
@@ -191,8 +184,8 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
    * Labels the left and right column selectors in the shared node panel.
    * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
-  const columnLabelFn = (node: WorkspaceNodeLike) => {
-    const nodeId = getNodeKey(node);
+  const columnLabelFn = (node: WorkspaceNodeMetadata) => {
+    const nodeId = node.id;
     if (nodeId === joinLeftNodeId) return 'Left column:';
     if (nodeId === joinRightNodeId) return 'Right column:';
     return 'Join column:';
@@ -268,9 +261,9 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       const leftNode = workspaceNodeMap.get(joinLeftNodeId);
       const rightNode = workspaceNodeMap.get(joinRightNodeId);
       if (needsColumns) {
-        return `Ready to join ${deriveNodeLabel(leftNode)} and ${deriveNodeLabel(rightNode)} on ${joinLeftColumn} = ${joinRightColumn}.`;
+        return `Ready to join ${leftNode?.name ?? ''} and ${rightNode?.name ?? ''} on ${joinLeftColumn} = ${joinRightColumn}.`;
       }
-      return `Ready to run a ${joinType} join between ${deriveNodeLabel(leftNode)} and ${deriveNodeLabel(rightNode)}.`;
+      return `Ready to run a ${joinType} join between ${leftNode?.name ?? ''} and ${rightNode?.name ?? ''}.`;
     }
     return joinConfigIssues || 'Configure the join to preview results.';
   })();
@@ -281,8 +274,8 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     if (!joinLeftNodeId || !joinRightNodeId || joinLeftNodeId === joinRightNodeId) return '';
     const leftNode = workspaceNodeMap.get(joinLeftNodeId);
     const rightNode = workspaceNodeMap.get(joinRightNodeId);
-    const leftName = deriveNodeLabel(leftNode);
-    const rightName = deriveNodeLabel(rightNode);
+    const leftName = leftNode?.name ?? '';
+    const rightName = rightNode?.name ?? '';
     if (!leftName || !rightName) return '';
     return `${leftName}_${joinType}_join_${rightName}`.replace(/\s+/g, '_');
   })();
@@ -446,9 +439,8 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     // Lets the preprocessing input panel render column options from the hook's normalized
     // workspace-node map instead of reading raw node metadata itself.
     // Called by: useJoinSubTab object consumers because consumers need this callback at the object boundary instead of recreating it inline.
-    getNodeColumns: (node: WorkspaceNodeLike) => {
-      const key = getNodeKey(node);
-      return key ? getNodeColumnsForJoin(key) : [];
+    getNodeColumns: (node: WorkspaceNodeMetadata) => {
+      return getNodeColumnsForJoin(node.id);
     },
   };
 

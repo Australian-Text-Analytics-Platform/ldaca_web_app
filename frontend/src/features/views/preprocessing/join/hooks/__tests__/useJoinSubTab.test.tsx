@@ -14,6 +14,7 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
 }));
 
 import { useJoinSubTab } from '../useJoinSubTab';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 const pagination = {
   has_next: false,
@@ -46,8 +47,14 @@ describe('useJoinSubTab preview adapter', () => {
       });
 
     const workspaceNodes = [
-      { id: 'left', name: 'Left', columns: ['id'], schema: { id: 'String' } },
-      { id: 'right', name: 'Right', columns: ['id'], schema: { id: 'String' } },
+      projectWorkspaceNodeMetadata(
+        { id: 'left', name: 'Left' },
+        { id: 'left', name: 'Left', columns: ['id'], schema: { id: 'String' } },
+      ),
+      projectWorkspaceNodeMetadata(
+        { id: 'right', name: 'Right' },
+        { id: 'right', name: 'Right', columns: ['id'], schema: { id: 'String' } },
+      ),
     ];
     const { rerender } = renderHook(
       ({ workspaceId }) =>

@@ -205,7 +205,7 @@ describe('materialized concordance key helpers', () => {
 describe('concordance source display helpers', () => {
   const sourceNodes = [
     { id: 'node-1', name: 'Left Corpus' },
-    { id: 'node-2', label: 'Right Label', data: { name: 'Nested Corpus' } },
+    { id: 'node-2', name: 'Right Corpus' },
   ];
 
   it('normalizes backend label-to-node maps and drops invalid entries', () => {
@@ -222,11 +222,11 @@ describe('concordance source display helpers', () => {
     expect(normalizeConcordanceLabelToNodeMap(null)).toBeNull();
   });
 
-  it('builds node and source colour maps across id, label, and nested metadata aliases', () => {
+  it('builds node and source colour maps from canonical ids and names', () => {
     const nodeColors = buildConcordanceNodeColorMap(
       [
         { id: 'node-1', name: 'Left Corpus' },
-        { id: 'node-2', label: 'Right Label', data: { name: 'Nested Corpus' } },
+        { id: 'node-2', name: 'Right Corpus' },
       ],
       ['red', 'blue'],
     );
@@ -239,7 +239,7 @@ describe('concordance source display helpers', () => {
       buildConcordanceSourceColorMap(
         [
           { id: 'node-1', name: 'Left Corpus' },
-          { id: 'node-2', label: 'Right Label', data: { name: 'Nested Corpus' } },
+          { id: 'node-2', name: 'Right Corpus' },
         ],
         nodeColors,
         ['red', 'blue'],
@@ -248,18 +248,15 @@ describe('concordance source display helpers', () => {
       'node-1': 'red',
       'left corpus': 'red',
       'node-2': 'blue',
-      'right label': 'blue',
-      'nested corpus': 'blue',
+      'right corpus': 'blue',
     });
   });
 
   it('applies node colour overrides by selected node id', () => {
     expect(
-      buildConcordanceNodeColorMap(
-        [{ id: 'node-1', name: 'Left Corpus' }],
-        ['red'],
-        { 'node-1': '#123456' },
-      ),
+      buildConcordanceNodeColorMap([{ id: 'node-1', name: 'Left Corpus' }], ['red'], {
+        'node-1': '#123456',
+      }),
     ).toEqual({
       'node-1': '#123456',
     });
@@ -267,8 +264,7 @@ describe('concordance source display helpers', () => {
 
   it('finds the selected source node represented by a rendered source label', () => {
     expect(findConcordanceSourceNode(sourceNodes, 'left corpus')?.id).toBe('node-1');
-    expect(findConcordanceSourceNode(sourceNodes, 'Nested Corpus')?.id).toBe('node-2');
-    expect(findConcordanceSourceNode(sourceNodes, 'right label')?.id).toBe('node-2');
+    expect(findConcordanceSourceNode(sourceNodes, 'right corpus')?.id).toBe('node-2');
     expect(findConcordanceSourceNode(sourceNodes, 'missing')).toBeUndefined();
   });
 

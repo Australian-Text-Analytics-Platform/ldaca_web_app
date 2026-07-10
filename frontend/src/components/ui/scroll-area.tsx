@@ -41,7 +41,7 @@ function ScrollArea({ className, children, scrollbars = 'vertical', ...props }: 
 
 /**
  * Scrollbar renderer used by `ScrollArea` for vertical and horizontal rails.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ * Why: `ScrollArea` needs one internal owner for orientation-specific Radix rails and thumbs.
  * Flow: compose orientation-specific rail classes, render the Radix ScrollAreaScrollbar, then nest the styled thumb primitive.
  */
 function ScrollBar({
@@ -71,4 +71,4 @@ function ScrollBar({
   );
 }
 
-export { ScrollArea, ScrollBar };
+export { ScrollArea };

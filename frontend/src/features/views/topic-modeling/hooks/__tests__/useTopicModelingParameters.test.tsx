@@ -1,26 +1,38 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import type { WorkspaceNodeInfo } from '@/api';
 
-import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
-import type { NodeInfo } from '@/lib/nodeInfo';
+import {
+  projectWorkspaceNodeMetadata,
+  type WorkspaceNodeMetadata,
+} from '@/features/workspace/common/workspaceNodeMetadata';
 import {
   DEFAULT_TOPIC_SIZE_VALUE,
   useTopicModelingParameters,
 } from '../useTopicModelingParameters';
 
-const nodes = (...counts: number[]): WorkspaceNodeLike[] =>
-  counts.map((_count, index) => ({
-    id: `node-${String(index + 1)}`,
-    name: `Node ${String(index + 1)}`,
-  }));
+const nodes = (...counts: number[]): WorkspaceNodeMetadata[] =>
+  counts.map((_count, index) =>
+    projectWorkspaceNodeMetadata({
+      id: `node-${String(index + 1)}`,
+      name: `Node ${String(index + 1)}`,
+    }),
+  );
 
 const nodeIds = (...counts: number[]) => counts.map((_, index) => `node-${String(index + 1)}`);
 
-const nodeInfoCache = (...counts: number[]): Record<string, NodeInfo> =>
+const nodeInfoCache = (...counts: number[]): Record<string, WorkspaceNodeInfo> =>
   Object.fromEntries(
     counts.map((count, index) => {
       const id = `node-${String(index + 1)}`;
-      return [id, { id, name: `Node ${String(index + 1)}`, shape: [count, 3] as NodeInfo['shape'] }];
+      return [
+        id,
+        {
+          id,
+          name: `Node ${String(index + 1)}`,
+          shape: [count, 3] as WorkspaceNodeInfo['shape'],
+        },
+      ];
     }),
   );
 
@@ -121,19 +133,18 @@ describe('useTopicModelingParameters', () => {
         panelSelectedNodes,
         panelNodeIdsKey,
       }: {
-        panelSelectedNodes: WorkspaceNodeLike[];
+        panelSelectedNodes: WorkspaceNodeMetadata[];
         panelNodeIdsKey: string;
       }) =>
         useTopicModelingParameters({
           panelSelectedNodes,
           panelNodeIds: panelNodeIdsKey ? panelNodeIdsKey.split('|') : [],
           panelNodeIdsKey,
-          nodeInfoCache:
-            panelNodeIdsKey === 'node-1' ? nodeInfoCache(10000) : {},
+          nodeInfoCache: panelNodeIdsKey === 'node-1' ? nodeInfoCache(10000) : {},
         }),
       {
         initialProps: {
-          panelSelectedNodes: [] as WorkspaceNodeLike[],
+          panelSelectedNodes: [] as WorkspaceNodeMetadata[],
           panelNodeIdsKey: '',
         },
       },

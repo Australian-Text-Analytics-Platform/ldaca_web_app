@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useConcatSubTab } from '../useConcatSubTab';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 const pagination = {
   has_next: false,
@@ -31,8 +32,14 @@ describe('useConcatSubTab preview adapter', () => {
       .mockImplementationOnce(() => firstResponse)
       .mockResolvedValueOnce({ data: [{ id: 2 }], columns: ['id'], pagination });
     const workspaceNodes = [
-      { id: 'node-1', name: 'One', columns: ['id'], schema: { id: 'String' } },
-      { id: 'node-2', name: 'Two', columns: ['id'], schema: { id: 'String' } },
+      projectWorkspaceNodeMetadata(
+        { id: 'node-1', name: 'One' },
+        { id: 'node-1', name: 'One', columns: ['id'], schema: { id: 'String' } },
+      ),
+      projectWorkspaceNodeMetadata(
+        { id: 'node-2', name: 'Two' },
+        { id: 'node-2', name: 'Two', columns: ['id'], schema: { id: 'String' } },
+      ),
     ];
 
     const { rerender } = renderHook(

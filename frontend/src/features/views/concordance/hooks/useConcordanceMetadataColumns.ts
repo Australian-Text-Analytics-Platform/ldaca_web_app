@@ -3,7 +3,7 @@ import type {
   ConcordanceNodeResult as ConcordanceResultEntry,
 } from '@/api';
 import type { NodeColumnSelection } from '../../common';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceViewModels';
 
 interface Section {
@@ -18,12 +18,12 @@ export interface ConcordanceMetadataColumnSet {
   metadataDisabledReason: string | undefined;
 }
 
-type GetColumnInfo = (node: WorkspaceNodeLike) => { name?: string }[];
+type GetColumnInfo = (node: WorkspaceNodeMetadata) => { name?: string }[];
 type ResolveNodeIdForKey = (nodeKey: string) => string | null;
 
 interface Params {
   results: ConcordanceAnalysisResponse | null;
-  panelSelectedNodes: WorkspaceNodeLike[];
+  panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   getColumnInfos: GetColumnInfo;
   viewMode: 'separated' | 'combined';
@@ -63,7 +63,6 @@ export function useConcordanceMetadataColumns({
     panelSelectedNodes.forEach((node) => {
       const rawId = node.id;
       const rawName = node.name;
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string name/id should fall back to the next identifier
       const nodeKey = rawName || rawId;
       const sel = effectiveNodeColumnSelections.find((s) => s.nodeId === rawId);
       const textColumn = sel?.column;

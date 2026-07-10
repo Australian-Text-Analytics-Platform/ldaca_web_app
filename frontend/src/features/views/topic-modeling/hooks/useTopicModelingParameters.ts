@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef } from 'react';
-import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
-import type { NodeInfo } from '@/lib/nodeInfo';
+import type { WorkspaceNodeInfo } from '@/api';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import {
   DEFAULT_TOPIC_SIZE_VALUE,
   createTopicModelingParameterState,
@@ -22,10 +22,10 @@ export {
 export type { CorpusSample };
 
 interface UseTopicModelingParametersArgs {
-  panelSelectedNodes: WorkspaceNodeLike[];
+  panelSelectedNodes: WorkspaceNodeMetadata[];
   panelNodeIds: string[];
   panelNodeIdsKey: string;
-  nodeInfoCache: Record<string, NodeInfo>;
+  nodeInfoCache: Record<string, WorkspaceNodeInfo>;
 }
 
 export interface UseTopicModelingParametersResult {
@@ -51,7 +51,7 @@ export interface UseTopicModelingParametersResult {
   resetAfterClear: () => void;
 }
 
-const nodeDocumentCount = (nodeInfo: NodeInfo | undefined): number => {
+const nodeDocumentCount = (nodeInfo: WorkspaceNodeInfo | undefined): number => {
   const firstShapeValue = nodeInfo?.shape?.[0];
   return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
     ? firstShapeValue

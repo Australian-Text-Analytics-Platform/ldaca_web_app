@@ -11,12 +11,6 @@ const DropdownMenu = DropdownMenuPrimitive.Root;
 /** Dropdown trigger primitive for menu buttons and icon affordances. */
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
-/** Dropdown grouping primitive used when menu items need semantic sections. */
-const DropdownMenuGroup = DropdownMenuPrimitive.Group;
-
-/** Dropdown portal primitive used to render menu content above app layout layers. */
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
-
 /** Dropdown sub-menu primitive used by nested menu compositions. */
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 
@@ -175,14 +169,6 @@ const DropdownMenuSeparator = React.forwardRef<
 ));
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
-/** Used by: dropdown menu items that display trailing keyboard shortcut hints. */
-const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return (
-    <span className={cn('ml-auto text-xs tracking-widest opacity-60', className)} {...props} />
-  );
-};
-DropdownMenuShortcut.displayName = 'DropdownMenuShortcut';
-
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -192,9 +178,6 @@ export {
   DropdownMenuRadioItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuGroup,
-  DropdownMenuPortal,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,

@@ -15,12 +15,11 @@ describe('column type normalization', () => {
 });
 
 describe('mapColumnsToInfo', () => {
-  it('uses schema and dtype evidence when available', () => {
+  it('uses the generated schema map and preserves column order', () => {
     expect(
       mapColumnsToInfo({
         columns: ['title', 'count'],
-        schema: { title: 'Utf8' },
-        dtypes: { count: 'Int64' },
+        schema: { title: 'Utf8', count: 'Int64' },
       }),
     ).toEqual([
       { name: 'title', dataType: 'string' },

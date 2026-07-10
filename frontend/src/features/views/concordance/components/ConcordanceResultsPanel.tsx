@@ -3,9 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
-import type { ConcordanceAnalysisResponse } from '@/api';
+import type { ConcordanceAnalysisResponse, WorkspaceGraphNode } from '@/api';
 import type { NodeColumnSelection } from '../../common';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
 import {
   CONCORDANCE_COMBINED_NODE_KEY,
@@ -77,8 +77,8 @@ export interface ConcordanceResultsPanelProps {
 
   // Search + selection (for per-block dispatch)
   searchWord: string;
-  selectedNodes: WorkspaceNodeLike[];
-  panelSelectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceGraphNode[];
+  panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   labelToNodeId: Record<string, string> | null;
   sourceColorMap: Record<string, string>;
@@ -126,8 +126,6 @@ export interface ConcordanceResultsPanelProps {
       matchCaseInsensitive?: boolean;
     },
   ) => Promise<void> | void;
-  /** Read-only flag that disables mutation surfaces while preserving pagination, sorting, chart interaction, and exports. */
-  readOnly?: boolean;
 }
 
 /**
@@ -195,7 +193,6 @@ export function ConcordanceResultsPanel({
   handleMaterialize,
   openDetachDialog,
   onDispersionDetach,
-  readOnly = false,
 }: ConcordanceResultsPanelProps) {
   const showDispersion = concordanceView === 'dispersion';
 
@@ -351,16 +348,18 @@ export function ConcordanceResultsPanel({
                 .map(([nodeName, nodeData]) => {
                   const keyedOrder = Object.keys(results.data);
                   const approxIndex = keyedOrder.indexOf(nodeName);
-                  let node = panelSelectedNodes.find((n: WorkspaceNodeLike) => {
-                    const d = n.data;
-                    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node id
-                    return (d?.name || n.id) === nodeName;
-                  });
-                  node ??= panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === nodeName);
-                  node ??= panelSelectedNodes.find((n: WorkspaceNodeLike) => n.name === nodeName);
+                  let node = panelSelectedNodes.find(
+                    (candidate: WorkspaceNodeMetadata) => candidate.name === nodeName,
+                  );
+                  node ??= panelSelectedNodes.find((n: WorkspaceNodeMetadata) => n.id === nodeName);
+                  node ??= panelSelectedNodes.find(
+                    (n: WorkspaceNodeMetadata) => n.name === nodeName,
+                  );
                   const mappedNodeId = labelToNodeId?.[nodeName];
                   if (!node && mappedNodeId) {
-                    node = panelSelectedNodes.find((n: WorkspaceNodeLike) => n.id === mappedNodeId);
+                    node = panelSelectedNodes.find(
+                      (n: WorkspaceNodeMetadata) => n.id === mappedNodeId,
+                    );
                   }
                   node ??= panelSelectedNodes[approxIndex];
 
@@ -417,7 +416,6 @@ export function ConcordanceResultsPanel({
                     handleMaterialize,
                     setCombinedPage,
                     openDetachDialog,
-                    readOnly,
                   };
                   return concordanceView === 'dispersion' ? (
                     <ConcordanceDispersionNodeBlock

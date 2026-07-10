@@ -37,7 +37,7 @@ const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
 /**
  * Hook used by sidebar subcomponents to access provider state and toggles.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
+ * Why: `Sidebar`, `SidebarTrigger`, and `SidebarMenuButton` share one private context contract.
  */
 function useSidebar() {
   const context = React.useContext(SidebarContext);
@@ -440,6 +440,4 @@ export {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-  // eslint-disable-next-line react-refresh/only-export-components -- Hook must be co-exported with provider component
-  useSidebar,
 };

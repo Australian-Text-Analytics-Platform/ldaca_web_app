@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { WorkspaceNodeLike } from '../../nodeSelectionTypes';
+import {
+  projectWorkspaceNodeMetadata,
+  type WorkspaceNodeMetadata,
+} from '@/features/workspace/common/workspaceNodeMetadata';
 import {
   type NodeInput,
   buildNodeMap,
@@ -9,25 +12,28 @@ import {
   validateAdd,
 } from '../nodeInputsCore';
 
-const stringNode = (id: string, columns: string[], extra?: Partial<WorkspaceNodeLike>) =>
-  ({
-    id,
-    name: id,
-    columns,
-    schema: Object.fromEntries(columns.map((column) => [column, 'String'])),
-    ...extra,
-  }) as WorkspaceNodeLike;
+const stringNode = (
+  id: string,
+  columns: string[],
+  extra?: Partial<WorkspaceNodeMetadata>,
+): WorkspaceNodeMetadata => ({
+  ...projectWorkspaceNodeMetadata(
+    { id, name: id },
+    {
+      id,
+      name: id,
+      columns,
+      schema: Object.fromEntries(columns.map((column) => [column, 'String'])),
+    },
+  ),
+  ...extra,
+});
 
-const nodes: WorkspaceNodeLike[] = [
+const nodes: WorkspaceNodeMetadata[] = [
   stringNode('n1', ['text', 'id']),
-  stringNode('n2', ['body'], { data: { document: 'body' } }),
+  stringNode('n2', ['body'], { document: 'body' }),
   // numeric-only node: schema marks the column as integer
-  {
-    id: 'n3',
-    name: 'n3',
-    columns: ['count'],
-    schema: [{ name: 'count', type: 'Int64' }],
-  },
+  stringNode('n3', ['count'], { schema: { count: 'Int64' } }),
 ];
 
 const map = buildNodeMap(nodes);
@@ -69,7 +75,6 @@ describe('validateAdd', () => {
   it('allows a valid string node', () => {
     expect(validateAdd('n1', [], map, { allowedDataTypes: ['string'] })).toBeNull();
   });
-
 });
 
 describe('defaultColumnForNode', () => {

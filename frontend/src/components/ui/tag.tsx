@@ -4,7 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
-/** Tag tone/size variants used for semantic chips in analysis and workspace screens. */
+/** Used by `Tag` to map its tone and size props to semantic-chip styles. */
 const tagVariants = cva(
   'inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-60',
   {
@@ -30,7 +30,7 @@ const tagVariants = cva(
   },
 );
 
-export type TagProps = React.ComponentProps<'span'> &
+type TagProps = React.ComponentProps<'span'> &
   VariantProps<typeof tagVariants> & {
     asChild?: boolean;
   };
@@ -44,5 +44,4 @@ const Tag = React.forwardRef<React.ComponentRef<'span'>, TagProps>(
 );
 Tag.displayName = 'Tag';
 
-// eslint-disable-next-line react-refresh/only-export-components -- Shadcn UI pattern: CVA variants must be co-exported for consumer styling
-export { Tag, tagVariants };
+export { Tag };

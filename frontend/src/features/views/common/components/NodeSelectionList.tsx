@@ -2,18 +2,17 @@ import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
-import { getNodeDisplayName, getNodeIdentifier } from '../nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 export interface NodeSelectionRenderArgs {
-  node: WorkspaceNodeLike;
+  node: WorkspaceNodeMetadata;
   nodeId: string;
   index: number;
   color: string;
 }
 
 export interface NodeSelectionListProps {
-  nodes?: WorkspaceNodeLike[];
+  nodes?: WorkspaceNodeMetadata[];
   nodeIds?: string[];
   palette: string[];
   nodeColors?: Record<string, string>;
@@ -23,7 +22,7 @@ export interface NodeSelectionListProps {
   renderNodeMeta?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderNodeBody?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderExtraNodeContent?: (args: NodeSelectionRenderArgs) => React.ReactNode;
-  getNodeTitle?: (node: WorkspaceNodeLike, nodeId: string, index: number) => string;
+  getNodeTitle?: (node: WorkspaceNodeMetadata, nodeId: string, index: number) => string;
   emptyState?: React.ReactNode;
   className?: string;
   cardClassName?: string;
@@ -48,15 +47,12 @@ export function NodeSelectionList({
   renderNodeMeta,
   renderNodeBody,
   renderExtraNodeContent,
-  getNodeTitle = getNodeDisplayName,
+  getNodeTitle = (node) => node.name,
   emptyState,
   className,
   cardClassName,
 }: NodeSelectionListProps) {
-  const derivedNodeIds =
-    nodeIds?.length === nodes.length
-      ? nodeIds
-      : nodes.map((node) => getNodeIdentifier(node));
+  const derivedNodeIds = nodeIds?.length === nodes.length ? nodeIds : nodes.map((node) => node.id);
 
   // Auto-scroll to the right end when the selection changes so the
   // most recently selected data blocks are always visible.

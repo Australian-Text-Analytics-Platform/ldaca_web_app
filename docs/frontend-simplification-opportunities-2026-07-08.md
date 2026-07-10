@@ -88,62 +88,6 @@ settled before deletion.
 
 ### Deletion and simplification
 
-#### D11. Consolidate canonical workspace-node and document/schema metadata
-
-- **Evidence / strength — Strong:** workspace helpers still include legacy node types, re-export ladders, duplicated document/schema utilities, and test-only builders after generated `WorkspaceNodeInfo` became canonical; examples include [selectionUtils.ts](../frontend/src/features/workspace/common/utils/selectionUtils.ts), [nodeMetadata.ts](../frontend/src/features/views/preprocessing/utils/nodeMetadata.ts), and [schemaMutations.ts](../frontend/src/features/workspace/data-view/services/schemaMutations.ts).
-- **Recommended direction:** project generated node metadata once at the handwritten boundary and keep only feature-specific derived helpers.
-- **Deletion test:** legacy aliases, duplicate document/schema resolvers, and builders with no behavioral test purpose disappear.
-- **Validation:** graph/list/table identities, document-column selection, schema mutation, preprocessing inputs, and persisted analysis inputs.
-
-#### D12. Replace topic-modeling type mirrors with generated types
-
-- **Evidence / strength — Strong:** [topicModelingAdapters.ts](../frontend/src/features/views/topic-modeling/topicModelingAdapters.ts) and feature hooks mirror generated request/result shapes, increasing adapter surface without a distinct domain invariant.
-- **Recommended direction:** use generated types at the transport boundary and retain only genuinely transformed chart/view models.
-- **Deletion test:** a field addition no longer requires matching handwritten transport interfaces and pass-through adapters.
-- **Validation:** run/hydrate/clear, legacy persisted-result rejection, chart shaping, detach, and generated-client regeneration.
-
-#### D13. Remove sidebar compatibility props and graph-node fallback shapes
-
-- **Evidence / strength — Strong:** sidebar components still accept compatibility props with no live variation, and graph consumers retain fallback shapes after the canonical `id` migration; [Sidebar.tsx](../frontend/src/components/layout/Sidebar.tsx) and [useWorkspaceGraph.ts](../frontend/src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts) are the central seams.
-- **Recommended direction:** make the live shape required and delete fallback-only branches rather than carrying another adapter.
-- **Deletion test:** removing the compatibility props/fallback objects changes no production call site and leaves one node identity shape.
-- **Validation:** desktop/mobile sidebar, graph selection/actions, fresh highlights, node rename/settings, and persisted workspaces.
-
-#### D14. Remove the Knip UI blind spot and prune hidden exports
-
-- **Evidence / strength — Strong:** [knip.json](../frontend/knip.json#L9-L15) ignores all `src/components/ui/**`, masking unused modifiers/exports even after the first sidebar primitive cleanup.
-- **Recommended direction:** remove or narrow the exclusion and export only primitives/modifiers used by handwritten production code or deliberate test seams.
-- **Deletion test:** configured Knip passes without a blanket UI ignore and no barrel keeps unused UI exports alive.
-- **Validation:** Knip, lint, tests, build, and visual smoke of every changed shared primitive.
-
-#### D15. Replace four shallow detach-dialog wrappers with the shared dialog
-
-- **Evidence / strength — Strong:** [QuotationDetachDialog.tsx](../frontend/src/features/views/quotation/components/QuotationDetachDialog.tsx), [TopicModelingDetachDialog.tsx](../frontend/src/features/views/topic-modeling/components/results/TopicModelingDetachDialog.tsx), [ConcordanceDetachDialog.tsx](../frontend/src/features/views/concordance/components/ConcordanceDetachDialog.tsx), and [ConcordanceDispersionDetachDialog.tsx](../frontend/src/features/views/concordance/components/ConcordanceDispersionDetachDialog.tsx) mostly forward props to the same shared dialog.
-- **Recommended direction:** have feature owners call the shared dialog with feature-specific labels/options; retain a wrapper only where it owns real transformation.
-- **Deletion test:** four files disappear or shrink to actual domain logic, with no new generic abstraction.
-- **Validation:** open/close, default options, submit payloads, pending/errors, table and dispersion variants, and keyboard focus.
-
-#### D16. Delete impossible Concordance read-only branches
-
-- **Evidence / strength — Strong:** [ConcordanceFeature.tsx](../frontend/src/features/views/concordance/ConcordanceFeature.tsx) hardcodes false/undefined values into read-only branches threaded through [ConcordanceResultsPanel.tsx](../frontend/src/features/views/concordance/components/ConcordanceResultsPanel.tsx).
-- **Recommended direction:** remove the unsupported mode and its props unless a product requirement first supplies a real caller.
-- **Deletion test:** false/undefined prop plumbing and unreachable render branches vanish.
-- **Validation:** combined and dispersion results, row detail, materialization, detach, source navigation, and empty/error states.
-
-#### D17. Remove verified zero-caller helpers, not deliberate test seams
-
-- **Evidence / strength — Strong:** confirmed candidates include [minTopicSize.ts](../frontend/src/features/views/topic-modeling/components/panels/minTopicSize.ts), recent-selection clear in [recentSelectionsStore.ts](../frontend/src/stores/recentSelectionsStore.ts), the unused return from [useZoom.ts](../frontend/src/hooks/useZoom.ts), tokenizer-order helpers, tutorial status fields, and compact/schema props.
-- **Recommended direction:** delete each implementation with its now-orphaned test/export; keep seams whose tests protect a supported contract even if production has no direct caller.
-- **Deletion test:** `rg`, dependency/export scans, and Knip show zero callers before deletion, and no replacement compatibility layer is added.
-- **Validation:** focused owner tests plus configured Knip, lint, full frontend tests, and build in the implementation change.
-
-#### D18. Sweep narrow internal return fields, actions, and exports
-
-- **Evidence / strength — Strong:** hooks still expose raw query objects, dead task-flow outputs/actions, unused schema aliases/base-hook exports, and hydration/request helpers not consumed by production. Representative owners include [useWorkspaceQueries.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceQueries.ts), [useAnalysisTaskFlow.ts](../frontend/src/features/views/common/tasks/useAnalysisTaskFlow.ts), and [useAnalysisHydration.ts](../frontend/src/features/views/common/useAnalysisHydration.ts).
-- **Recommended direction:** return only the stable behavior each caller uses; remove one item at a time with call-site proof.
-- **Deletion test:** each removed field/export has zero consumers and deleting it shortens both owner and adapter code.
-- **Validation:** affected focused tests, typecheck/build, Knip without broad ignores, and persisted hydration scenarios.
-
 #### D19. Break the route import cycle without removing URL behavior
 
 - **Evidence / strength — Strong:** the cycle is [router.tsx](../frontend/src/router.tsx) → [App.tsx](../frontend/src/App.tsx) → [WorkspaceShell.tsx](../frontend/src/components/layout/WorkspaceShell.tsx) → [ViewRouteSync.tsx](../frontend/src/components/layout/ViewRouteSync.tsx) → `router.tsx`.
@@ -260,13 +204,6 @@ settled before deletion.
 - **Deletion test:** application tests survive generated file reshaping when the handwritten API contract is unchanged.
 - **Validation:** regenerate the client, run the 14 migrated tests and full suite, and verify request bodies/auth/error paths through MSW where appropriate.
 
-#### B6. Make Knip authoritative and decide `postcss` ownership
-
-- **Evidence / strength — Strong:** [knip.json](../frontend/knip.json#L9-L20) ignores UI sources and direct `postcss`, while [package.json](../frontend/package.json#L113-L135) also has Tailwind's PostCSS integration. Removing the direct dependency still requires confirming the clean-install toolchain contract.
-- **Recommended direction:** remove the UI exclusion, prune exports, and confirm whether tooling resolves `postcss` transitively before deleting the direct dependency.
-- **Deletion test:** configured Knip passes without blanket ignores; `postcss` is either proven direct and documented or absent.
-- **Validation:** Knip, CSS build, Tailwind processing, clean lockfile install, lint, tests, and production build.
-
 #### B7. Provide one executable frontend verification contract
 
 - **Evidence / strength — Strong:** [package.json](../frontend/package.json#L88-L105) exposes separate checks while guides and CI compose overlapping subsets, making the required local/CI contract easy to drift.
@@ -323,12 +260,6 @@ unreachable callers. Product/external-contract caveats remain where noted.
 
 | Candidate | Evidence / deletion guard |
 | --- | --- |
-| Topic minimum-size helper | Remove [minTopicSize.ts](../frontend/src/features/views/topic-modeling/components/panels/minTopicSize.ts) after its zero-import check. |
-| Recent-selection clear | Remove the unused clear action from [recentSelectionsStore.ts](../frontend/src/stores/recentSelectionsStore.ts). |
-| `useZoom` clamp return | Remove the unused return surface from [useZoom.ts](../frontend/src/hooks/useZoom.ts), retaining live zoom behavior. |
-| Tokenizer-order/test helpers | Delete only helpers with zero production and meaningful test consumers; do not erase deliberate contract seams. |
-| Hidden UI modifiers/exports | Remove after Knip runs without the blanket UI ignore. |
-| Narrow hook/API outputs | Delete zero-caller raw query fields, task outputs, schema aliases, hydration/request helpers, and exports one owner at a time. |
 | Retired Tauri/workflow surfaces | Remove HTTP plugin, direct serde, global/window-webview permissions, `__BACKEND_PORT__`, and `build-notes`; keep live opener/dialog/filesystem. |
 | Private npm publication | Remove CLI, `bin`/`files`/prepublish configuration, `.npmignore`, and publishing docs while preserving workspace name/version. |
 
@@ -681,6 +612,72 @@ unreachable callers. Product/external-contract caveats remain where noted.
       dismissal persistence, route/modal conditions, target changes, and
       single observer/listener ownership. The full 190-file / 832-test suite,
       lint, Knip, production build, docs drift, and `git diff --check` passed.
+
+52. Consolidate canonical workspace-node and schema metadata (D11)
+    - Done 2026-07-10. `workspaceNodeMetadata.ts` now projects generated graph
+      and node-info responses once into a required feature-facing contract.
+      Legacy `WorkspaceNodeLike`, id/name aliases, document/schema resolvers,
+      preprocessing metadata builders, and the handwritten schema response
+      mirror are gone. Schema refresh returns generated `WorkspaceNodeInfo`
+      directly, and Concordance source helpers accept canonical `id`/`name`
+      identities plus the explicit backend `label_to_node_map` only.
+
+53. Replace Topic Modeling transport mirrors with generated types (D12)
+    - Done 2026-07-10. Topic result panels, bubble-chart hooks, zoom/brush
+      controls, and adapters now consume generated topic/result contracts or
+      narrow `Pick` projections. Handwritten types remain only where the chart
+      owns a transformed domain model.
+
+54. Require the live sidebar and graph node shapes (D13)
+    - Done 2026-07-10. Sidebar lists consume generated graph nodes with required
+      selection and action renderers. React Flow projects one explicit card
+      model with required callbacks and freshness, while duplicate selection,
+      schema, preview, table, and legacy node fallback fields were removed.
+
+55. Remove the Knip UI blind spot and hidden exports (D14)
+    - Done 2026-07-10. The blanket `components/ui/**` exclusion is gone.
+      Twenty-one unused UI exports and four unused exported types were removed;
+      twelve zero-caller primitives were deleted and nine live helpers became
+      private. Configured Knip now scans the shared UI directory normally.
+
+56. Render the shared detach dialog from feature owners (D15)
+    - Done 2026-07-10. Quotation, Topic Modeling, and both Concordance detach
+      variants now render `DetachColumnsDialog` directly with feature-owned
+      copy and handlers. Four pass-through wrappers and their wrapper-only
+      tests were deleted while hook/payload coverage remains at the owners.
+
+57. Delete impossible Concordance read-only branches (D16)
+    - Done 2026-07-10. The hardcoded false prop chain, unreachable control
+      branches, disabled-reason constants, pagination gates, and action-state
+      branches are gone from parameter, table, dispersion, and result owners.
+      Concordance exposes only the supported interactive mode.
+
+58. Remove verified zero-caller helpers (D17)
+    - Done 2026-07-10. The topic minimum-size helper, recent-selection clear,
+      unused zoom return, test-only tokenizer ordering helper, raw workspace
+      query returns, dead task-flow outputs/actions, and obsolete schema-hook
+      returns were deleted with their orphaned exports/tests. Deliberate
+      behavioral test seams remain.
+
+59. Narrow internal hook and schema surfaces (D18)
+    - Done 2026-07-10. Analysis task/hydration hooks now return only consumed
+      lifecycle behavior; the unused preference-persistence hydration branch,
+      raw task/query fields, test-only schema snapshot builders, batch node-info
+      helper, and public argument types with no external consumer were removed.
+      Automatic terminal refresh and workspace-scoped hydration have direct
+      regression coverage.
+
+60. Make Knip authoritative and resolve PostCSS ownership (B6)
+    - Done 2026-07-10. Knip scans shared UI code without broad ignores, and the
+      unused direct `postcss` dependency/importer entry was removed. A frozen
+      install confirms PostCSS remains transitively owned by Vite and Tailwind;
+      the shared lockfile package records remain because those live dependencies
+      still consume them.
+
+    - Implementation validation: 189 test files / 811 tests, lint, configured
+      Knip, production build, docs drift (70 literals), frozen install, and
+      `git diff --check` passed. The separately tracked format baseline still
+      reports the same 49 files.
 
 ## Endpoint And Source-Of-Truth Notes
 

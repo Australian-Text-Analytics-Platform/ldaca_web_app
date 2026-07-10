@@ -1,17 +1,13 @@
 import { useReducer, useState } from 'react';
 
-import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
-import type {
-  PolarsExpressionRequest,
-  PolarsExpressionApplyResponse,
-} from '@/api';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import type { PolarsExpressionRequest, PolarsExpressionApplyResponse } from '@/api';
 import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
 } from '../../hooks/useNodePreviewWithRawFallback';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
-import { deriveNodeLabel, getNodeKey } from '../../utils/nodeMetadata';
 import {
   buildPolarsExpressionRequest,
   createPolarsExpressionDraftState,
@@ -29,7 +25,7 @@ export {
 
 export interface PolarsExpressionSubTabProps {
   currentWorkspaceId: string | null;
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceNodeMetadata[];
   isLoading: { operations: boolean };
   onAlert: (message: string) => void;
   polarsExpressionPreview: OperationPreviewFetcher<PolarsExpressionRequest>;
@@ -61,7 +57,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   } = props;
 
   const effectiveNode = takeMostRecent(selectedNodes, 1)[0] ?? null;
-  const nodeId = effectiveNode ? getNodeKey(effectiveNode) || null : null;
+  const nodeId = effectiveNode?.id ?? null;
 
   const [draftState, dispatchDraft] = useReducer(
     polarsExpressionDraftReducer,
@@ -70,17 +66,11 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   );
   const [newNodeName, setNewNodeName] = useState('');
   const [isApplying, setIsApplying] = useState(false);
-  const {
-    activeContext,
-    filterCode,
-    withColumns,
-    selectExpressions,
-    sortItems,
-    groupByState,
-  } = draftState;
+  const { activeContext, filterCode, withColumns, selectExpressions, sortItems, groupByState } =
+    draftState;
 
   const newNodeNamePlaceholder = buildExpressionAutoNodeName({
-    baseName: deriveNodeLabel(effectiveNode),
+    baseName: effectiveNode?.name ?? '',
     context: activeContext,
   });
 

@@ -9,9 +9,6 @@ import { buttonVariants } from '@/components/ui/button';
 /** Radix alert dialog root used for confirmation/destructive decision flows. */
 const AlertDialog = AlertDialogPrimitive.Root;
 
-/** Alert dialog trigger primitive for callers that let Radix manage opening. */
-const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
-
 /** Portal primitive used by alert dialog content to escape normal layout flow. */
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
@@ -115,9 +112,6 @@ AlertDialogCancel.displayName = AlertDialogPrimitive.Cancel.displayName;
 
 export {
   AlertDialog,
-  AlertDialogPortal,
-  AlertDialogOverlay,
-  AlertDialogTrigger,
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogFooter,

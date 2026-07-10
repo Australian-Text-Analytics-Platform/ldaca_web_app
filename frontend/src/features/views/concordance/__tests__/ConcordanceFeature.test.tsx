@@ -267,12 +267,6 @@ vi.mock('@/hooks/analysisTaskUtils', () => ({
     taskId && state ? `${taskId}:${state}` : null,
 }));
 
-vi.mock('../components/ConcordanceDetachDialog', () => ({
-  /** Removes the detach dialog from tests that focus on run/update behavior. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-  ConcordanceDetachDialog: () => null,
-}));
-
 vi.mock('../generatedColumns', () => ({
   CONCORDANCE_COLUMN_KEYS: {
     matchedText: 'CONC_MATCHED_TEXT',
@@ -306,7 +300,6 @@ vi.mock('../../common', async () => {
   const ReactModule = await import('react');
   return {
     /** Mirrors the shared node-id helper with a deterministic fallback for fixtures. */
-    getNodeIdentifier: (node: { id?: string }, index: number) => node.id ?? `node-${String(index)}`,
     /** Supplies the last-run request used only for Run/Re-run button diffing. */
     useLastRunRequest: () => ({
       serverRequest: {
@@ -333,7 +326,6 @@ vi.mock('../../common', async () => {
       setIsRunning: vi.fn(),
       taskStatus: { tasks: [] },
       banner: null,
-      hasActiveTask: false,
       hydrationState: mockHydrationState,
       clearResults: clearResultsMock,
     }),

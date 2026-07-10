@@ -22,29 +22,3 @@ export interface SidebarTaskRecord {
   progress?: number;
   progress_message?: string;
 }
-
-type SidebarNodeShape = [number | null, number | null];
-
-export interface SidebarWorkspaceNode {
-  id: string;
-  name?: string;
-  label?: string;
-  type?: string;
-  operation?: string;
-  /** Persisted per-node display colour (``#rrggbb``) forwarded straight from the
-   * backend ``WorkspaceNodeInfo.color``. Rendered as a left accent on Data Blocks
-   * list rows by WorkspaceNodeList; undefined/null when the node has no colour. */
-  color?: string | null;
-  /** Backend undo/redo availability, present on workspace-graph nodes. Used by
-   * the right-panel list-view row toolbar to enable/disable undo/redo. */
-  can_undo?: boolean;
-  can_redo?: boolean;
-  data?: {
-    nodeName?: string;
-    label?: string;
-    nodeType?: string;
-    dataType?: string;
-    shape?: SidebarNodeShape;
-    [key: string]: unknown;
-  };
-}

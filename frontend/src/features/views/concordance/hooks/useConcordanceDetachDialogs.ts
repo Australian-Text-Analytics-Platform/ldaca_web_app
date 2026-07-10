@@ -2,7 +2,7 @@ import { useReducer, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 
 import { analysisTaskDetachOptions } from '@/api';
-import type { DetachDialogNodeOption } from '../../common/components/DetachColumnsDialog';
+import type { DetachNodeOption } from '@/api';
 import { useDetachColumnsState } from '../../common/hooks/useDetachColumnsState';
 import {
   CONCORDANCE_COLUMN_KEYS,
@@ -68,7 +68,7 @@ const loadDetachNodeOptions = async (
   workspaceId: string,
   taskId: string,
   nodes: ConcordanceDetachTarget[],
-): Promise<DetachDialogNodeOption[]> => {
+): Promise<DetachNodeOption[]> => {
   const responses = await Promise.all(
     nodes.map((node) =>
       analysisTaskDetachOptions({
@@ -85,9 +85,7 @@ const loadDetachNodeOptions = async (
 /**
  * Called by: useConcordanceDetachDialogs after loading per-hit options because the feature wants concordance output columns selected automatically while source metadata remains opt-in.
  */
-const selectDefaultConcordanceColumns = (
-  options: DetachDialogNodeOption[],
-): Record<string, string[]> => {
+const selectDefaultConcordanceColumns = (options: DetachNodeOption[]): Record<string, string[]> => {
   const initial: Record<string, string[]> = {};
   options.forEach((node) => {
     initial[node.node_id] = node.available_columns.filter((column) =>
@@ -101,7 +99,7 @@ const selectDefaultConcordanceColumns = (
 /**
  * Called by: useConcordanceDetachDialogs after loading dispersion options because the aggregated worker always emits its generated columns and only source columns should be user-selectable.
  */
-const toDispersionDetachOptions = (options: DetachDialogNodeOption[]): DetachDialogNodeOption[] => {
+const toDispersionDetachOptions = (options: DetachNodeOption[]): DetachNodeOption[] => {
   const dispersionHiddenColumns = new Set<string>([CONCORDANCE_COLUMN_KEYS.extraction]);
   return options.map((node) => {
     const disabled = new Set(node.disabled_columns ?? []);
@@ -119,7 +117,7 @@ const toDispersionDetachOptions = (options: DetachDialogNodeOption[]): DetachDia
 /**
  * Called by: useConcordanceDetachDialogs when opening the dispersion dialog because dispersion columns start as explicit opt-ins rather than generated defaults.
  */
-const emptySelectionForOptions = (options: DetachDialogNodeOption[]): Record<string, string[]> => {
+const emptySelectionForOptions = (options: DetachNodeOption[]): Record<string, string[]> => {
   const initial: Record<string, string[]> = {};
   options.forEach((node) => {
     initial[node.node_id] = [];
@@ -153,10 +151,7 @@ export function useConcordanceDetachDialogs({
     undefined,
     createConcordanceDetachDialogState,
   );
-  const {
-    perHit: perHitDialog,
-    dispersion: dispersionDialog,
-  } = dialogState;
+  const { perHit: perHitDialog, dispersion: dispersionDialog } = dialogState;
 
   const {
     selectedDetachColumns,
@@ -210,7 +205,7 @@ export function useConcordanceDetachDialogs({
 
   /** Confirms per-hit detach using selected columns and materialized paths. */
   /**
-   * Called by: ConcordanceDetachDialog through shared dialog props because the confirm button must dispatch one workspace detach request per pending source node.
+   * Called by: ConcordanceFeature's table-results DetachColumnsDialog because the confirm button must dispatch one workspace detach request per pending source node.
    */
   const handleDetachConfirm = async () => {
     for (const node of perHitDialog.pendingNodes) {
@@ -250,11 +245,7 @@ export function useConcordanceDetachDialogs({
       if (!workspaceId) throw new Error('No workspace selected');
       const taskId = await resolveTaskId();
       if (!taskId) throw new Error('No concordance task to detach');
-      const loadedOptions = await loadDetachNodeOptions(
-        workspaceId,
-        taskId,
-        nodes,
-      );
+      const loadedOptions = await loadDetachNodeOptions(workspaceId, taskId, nodes);
       const dispersionOptions = toDispersionDetachOptions(loadedOptions);
       setSelectedDispersionColumns(emptySelectionForOptions(dispersionOptions));
       dispatchDialog({ type: 'dispersionOpened', options: dispersionOptions });
@@ -269,7 +260,7 @@ export function useConcordanceDetachDialogs({
 
   /** Confirms aggregated dispersion detach with the cached bin and legend filters. */
   /**
-   * Called by: ConcordanceDispersionDetachDialog through shared dialog props because the confirm button must dispatch one aggregated detach request per pending source node.
+   * Called by: ConcordanceFeature's dispersion DetachColumnsDialog because the confirm button must dispatch one aggregated detach request per pending source node.
    * Flow: restore the selected-bin Set expected by the task-flow handler, pass selected columns and filters for each node, then reset dialog state.
    */
   const handleDispersionDetachConfirm = async () => {

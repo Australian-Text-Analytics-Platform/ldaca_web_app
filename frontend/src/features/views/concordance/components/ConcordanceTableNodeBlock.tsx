@@ -1,16 +1,14 @@
 import { Button } from '@/components/ui/button';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
+import type { ConcordanceNodeResult as ConcordanceResultEntry, WorkspaceGraphNode } from '@/api';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import { getNodeIdentifier } from '../../common';
 import type { NodeColumnSelection } from '../../common';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { SortableHeader } from './SortableHeader';
 import {
@@ -25,8 +23,6 @@ import {
   type ConcordanceGroupedRow,
   type ConcordanceRow,
 } from './concordanceTableModel';
-
-const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
 
 export interface ConcordanceTableNodeBlockProps {
   nodeKey: string;
@@ -46,8 +42,8 @@ export interface ConcordanceTableNodeBlockProps {
   selectedMetadataColumns: string[];
 
   // Workspace selection
-  selectedNodes: WorkspaceNodeLike[];
-  panelSelectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceGraphNode[];
+  panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   labelToNodeId: Record<string, string> | null;
 
@@ -83,8 +79,6 @@ export interface ConcordanceTableNodeBlockProps {
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
   openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
-  /** Read-only flag that disables Process All and Add to Workspace buttons while pagination, sort, and row details remain active. */
-  readOnly?: boolean;
 }
 
 /**
@@ -135,7 +129,6 @@ function CombinedConcordanceTable({
   handleMaterialize,
   setCombinedPage,
   openDetachDialog,
-  readOnly = false,
 }: ConcordanceTableNodeBlockProps) {
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
     nodeData,
@@ -152,7 +145,7 @@ function CombinedConcordanceTable({
     // Called by: useServerTable option object because consumers need this callback at the object boundary instead of recreating it inline.
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
-        if (!readOnly) onPageSizeChange(next.pageSize);
+        onPageSizeChange(next.pageSize);
         return;
       }
       const newPage = next.pageIndex + 1;
@@ -205,7 +198,7 @@ function CombinedConcordanceTable({
         pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={combinedLoading}
-        showPageSize={!readOnly}
+        showPageSize
       />
     </>
   );
@@ -216,79 +209,62 @@ function CombinedConcordanceTable({
         <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
         <div className="ml-auto flex items-center space-x-2">
           <span className="text-xs text-gray-500">Rows colored by source data block</span>
-          <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                for (const nid of combinedNodeIds) {
-                  if (materializedPaths[nid]) continue;
+          <Button
+            onClick={() => {
+              if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+              for (const nid of combinedNodeIds) {
+                if (materializedPaths[nid]) continue;
+                const col =
+                  effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
+                if (!col) continue;
+                void handleMaterialize(nid, col);
+              }
+            }}
+            disabled={
+              isAnyCombinedMaterializing ||
+              allCombinedMaterialized ||
+              !searchWord.trim() ||
+              combinedNodeIds.length === 0
+            }
+            size="sm"
+            variant="outline"
+            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+            title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
+          >
+            {isAnyCombinedMaterializing ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                Processing...
+              </>
+            ) : allCombinedMaterialized ? (
+              <>Processed</>
+            ) : (
+              <>Process Both</>
+            )}
+          </Button>
+          <Button
+            onClick={() => {
+              if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+              const nodes = combinedNodeIds
+                .map((nid) => {
                   const col =
                     effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
-                  if (!col) continue;
-                  void handleMaterialize(nid, col);
-                }
-              }}
-              disabled={
-                readOnly ||
-                isAnyCombinedMaterializing ||
-                allCombinedMaterialized ||
-                !searchWord.trim() ||
-                combinedNodeIds.length === 0
-              }
-              size="sm"
-              variant="outline"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title={
-                readOnly
-                  ? undefined
-                  : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
-              }
-            >
-              {isAnyCombinedMaterializing ? (
-                <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  Processing...
-                </>
-              ) : allCombinedMaterialized ? (
-                <>Processed</>
-              ) : (
-                <>Process Both</>
-              )}
-            </Button>
-          </DisabledReasonTooltip>
-          <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                const nodes = combinedNodeIds
-                  .map((nid) => {
-                    const col =
-                      effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
-                    const sourceNode = panelSelectedNodes.find(
-                      (node) => getNodeIdentifier(node) === nid,
-                    );
-                    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
-                    const sourceLabel = sourceNode?.name || sourceNode?.id || nid;
-                    return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                  })
-                  .filter((n) => n.column);
-                openDetachDialog(nodes);
-              }}
-              disabled={
-                readOnly || combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0
-              }
-              size="sm"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title={
-                readOnly
-                  ? undefined
-                  : 'Create new data blocks with concordance results for both sources joined to their original tables'
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Both to Workspace
-            </Button>
-          </DisabledReasonTooltip>
+                  const sourceNode = panelSelectedNodes.find((node) => node.id === nid);
+                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
+                  const sourceLabel = sourceNode?.name || sourceNode?.id || nid;
+                  return { nodeId: nid, column: col, nodeLabel: sourceLabel };
+                })
+                .filter((n) => n.column);
+              openDetachDialog(nodes);
+            }}
+            disabled={combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
+            size="sm"
+            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+            title="Create new data blocks with concordance results for both sources joined to their original tables"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Both to Workspace
+          </Button>
         </div>
       </div>
       <AnalysisTableFrame maxHeightClass="max-h-100" belowTable={combinedBelowTable}>
@@ -359,7 +335,6 @@ function PerNodeConcordanceTable({
   handleRowClick,
   handleMaterialize,
   openDetachDialog,
-  readOnly = false,
 }: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const effectiveNodeId = actualNodeId || requestNodeId;
@@ -387,7 +362,7 @@ function PerNodeConcordanceTable({
     // Called by: useServerTable option object because consumers need this callback at the object boundary instead of recreating it inline.
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
-        if (!readOnly) onPageSizeChange(next.pageSize);
+        onPageSizeChange(next.pageSize);
         return;
       }
       const newPage = next.pageIndex + 1;
@@ -449,94 +424,78 @@ function PerNodeConcordanceTable({
         pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
-        showPageSize={!readOnly}
+        showPageSize
       >
-        <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
-          <Button
-            onClick={() => {
-              if (!searchWord.trim()) return;
-              for (const nid of processTargetIds) {
-                if (materializedPaths[nid]) continue;
-                const col = isMultiBlock
-                  ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
-                  : column;
-                if (!col) continue;
-                void handleMaterialize(nid, col);
-              }
-            }}
-            disabled={
-              readOnly ||
-              nodeIsLoading ||
-              isAnyProcessTargetMaterializing ||
-              allProcessTargetsMaterialized ||
-              !searchWord.trim() ||
-              !canDetach ||
-              processTargetIds.length === 0
+        <Button
+          onClick={() => {
+            if (!searchWord.trim()) return;
+            for (const nid of processTargetIds) {
+              if (materializedPaths[nid]) continue;
+              const col = isMultiBlock
+                ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
+                : column;
+              if (!col) continue;
+              void handleMaterialize(nid, col);
             }
-            size="sm"
-            variant="outline"
-            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title={
-              readOnly
-                ? undefined
-                : isMultiBlock
-                  ? 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
-                  : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
+          }}
+          disabled={
+            nodeIsLoading ||
+            isAnyProcessTargetMaterializing ||
+            allProcessTargetsMaterialized ||
+            !searchWord.trim() ||
+            !canDetach ||
+            processTargetIds.length === 0
+          }
+          size="sm"
+          variant="outline"
+          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+          title={
+            isMultiBlock
+              ? 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
+              : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
+          }
+        >
+          {isAnyProcessTargetMaterializing ? (
+            <>
+              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+              Processing...
+            </>
+          ) : allProcessTargetsMaterialized ? (
+            <>Processed</>
+          ) : isMultiBlock ? (
+            <>Process Both Blocks</>
+          ) : (
+            <>Process All</>
+          )}
+        </Button>
+        <Button
+          onClick={() => {
+            if (detachNodeId) {
+              const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
+              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
+              const detachLabel = detachNode?.name || nodeKey;
+              openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
             }
-          >
-            {isAnyProcessTargetMaterializing ? (
-              <>
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                Processing...
-              </>
-            ) : allProcessTargetsMaterialized ? (
-              <>Processed</>
-            ) : isMultiBlock ? (
-              <>Process Both Blocks</>
-            ) : (
-              <>Process All</>
-            )}
-          </Button>
-        </DisabledReasonTooltip>
-        <DisabledReasonTooltip reason={readOnly ? READ_ONLY_DISABLED_REASON : undefined}>
-          <Button
-            onClick={() => {
-              if (detachNodeId) {
-                const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
-                const detachLabel = detachNode?.name || nodeKey;
-                openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
-              }
-            }}
-            disabled={
-              readOnly ||
-              nodeIsLoading ||
-              isDetaching ||
-              !searchWord.trim() ||
-              !canDetach ||
-              !detachNodeId
-            }
-            size="sm"
-            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title={
-              readOnly
-                ? undefined
-                : 'Create a new data block with concordance results joined to the original table'
-            }
-          >
-            {isDetaching ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding to Workspace...
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                Add to Workspace
-              </>
-            )}
-          </Button>
-        </DisabledReasonTooltip>
+          }}
+          disabled={
+            nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId
+          }
+          size="sm"
+          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+          title="Create a new data block with concordance results joined to the original table"
+        >
+          {isDetaching ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Adding to Workspace...
+            </>
+          ) : (
+            <>
+              <Plus className="mr-2 h-4 w-4" />
+              Add to Workspace
+            </>
+          )}
+        </Button>
       </ServerPaginationFooter>
     </>
   );

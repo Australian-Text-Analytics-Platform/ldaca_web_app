@@ -13,12 +13,9 @@ import {
 import { insertItemAt, moveItemTo, removeItemAt } from './tokenIndexMath';
 import { useAggregateBuilderDragHandlers } from './useAggregateBuilderDrag';
 
-import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import {
-  type PolarsExpressionRequest,
-  type PolarsExpressionApplyResponse,
-} from '@/api';
+import { type PolarsExpressionRequest, type PolarsExpressionApplyResponse } from '@/api';
 import {
   mapColumnsToInfo,
   type ColumnInfo,
@@ -27,15 +24,11 @@ import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
 } from '../../hooks/useNodePreviewWithRawFallback';
-import {
-  buildSingleNodeSelectionPanelModel,
-  getNodeKey,
-} from '../../utils/nodeMetadata';
 import type { PreviewPagination, PreviewRow } from '../../types';
 
 export interface AggregateSubTabProps {
   currentWorkspaceId: string | null;
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceNodeMetadata[];
   isLoading: {
     operations: boolean;
   };
@@ -46,14 +39,6 @@ export interface AggregateSubTabProps {
     request: PolarsExpressionRequest,
   ) => Promise<PolarsExpressionApplyResponse>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
-}
-
-interface NodeSelectionConfig {
-  effectiveNodes: WorkspaceNodeLike[];
-  nodeColumnSelections: { nodeId: string; column: string }[];
-  nodeColors: Record<string, string>;
-  defaultPalette: string[];
-  originalCount: number;
 }
 
 interface ExpressionConfig {
@@ -127,8 +112,8 @@ interface ApplyConfig {
 
 export interface UseAggregateSubTabResult {
   activeNodeId: string | null;
+  activeNode: WorkspaceNodeMetadata | null;
   hasSelection: boolean;
-  nodeSelection: NodeSelectionConfig;
   expression: ExpressionConfig;
   basicBuilder: BasicBuilderConfig;
   preview: PreviewConfig;
@@ -172,10 +157,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const effectiveNodes = takeMostRecent(selectedNodes, 1);
   const activeNode = effectiveNodes[0] ?? null;
 
-  const limitedNodeId = (() => {
-    if (!activeNode) return null;
-    return getNodeKey(activeNode) || null;
-  })();
+  const limitedNodeId = activeNode?.id ?? null;
 
   const [expression, setExpression] = useState('');
   const [columnName, setColumnName] = useState('new_column');
@@ -199,12 +181,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const latestExpressionRef = useRef('');
   const latestColumnNameRef = useRef('new_column');
 
-  const selectionPanelModel = buildSingleNodeSelectionPanelModel({
-    nodeId: limitedNodeId,
-    selectedNode: activeNode,
-  });
-  const effectiveSelectedNodes = selectionPanelModel.selectedNodes;
-
   const activeNodeId = limitedNodeId;
 
   const hasSelection = Boolean(activeNodeId);
@@ -212,9 +188,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const basicDisabled = !hasSelection || isLoading.operations;
 
   const availableColumns: ColumnInfo[] = (() => {
-    if (!effectiveSelectedNodes.length) return [];
-    const [node] = effectiveSelectedNodes;
-    return mapColumnsToInfo(node).filter(
+    if (!activeNode) return [];
+    return mapColumnsToInfo(activeNode).filter(
       (info) => typeof info.name === 'string' && info.name.length > 0,
     );
   })();
@@ -588,14 +563,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   return {
     activeNodeId,
+    activeNode,
     hasSelection,
-    nodeSelection: {
-      effectiveNodes: effectiveSelectedNodes,
-      nodeColumnSelections: selectionPanelModel.nodeColumnSelections,
-      nodeColors: selectionPanelModel.nodeColors,
-      defaultPalette: selectionPanelModel.defaultPalette,
-      originalCount: selectedNodes.length,
-    },
     expression: {
       expression,
       columnName,

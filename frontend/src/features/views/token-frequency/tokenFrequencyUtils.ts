@@ -1,6 +1,6 @@
 import type { TokenFrequencyResponse } from '@/api';
-import { getNodeIdentifier, isNonEmptyString } from '../common';
-import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
+import { isNonEmptyString } from '../common';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 export interface NodeNameEntry {
   id: string;
@@ -62,10 +62,12 @@ export const buildSelectionNameKey = (
  * Flow: cap the panel selection to two nodes and keep each generated
  * workspace-node `id`.
  */
-export const derivePanelNodeIds = (panelSelectedNodes: WorkspaceNodeLike[]): string[] =>
+export const derivePanelNodeIds = (
+  panelSelectedNodes: Pick<WorkspaceNodeMetadata, 'id'>[],
+): string[] =>
   panelSelectedNodes
     .slice(0, 2)
-    .map((node) => getNodeIdentifier(node))
+    .map((node) => node.id)
     .filter((id): id is string => Boolean(id));
 
 /** Derives the study-corpus id and backend comparison order for token-frequency runs. */
@@ -93,18 +95,17 @@ export const deriveStudyNodeOrder = (
 
 /** Builds the node-id display-name map used by token-click handoffs and result fallbacks. */
 /**
- * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because handoffs to concordance and result labels need the same name/label/id fallback order.
- * Flow: scan selected nodes, keep entries with stable ids, and choose name, label, then id as the display value.
+ * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because handoffs to concordance and result labels need the same canonical name/id fallback order.
+ * Flow: scan selected nodes, keep entries with stable ids, and choose the projected name, then id as the display value.
  */
 export const buildNodeIdDisplayNameMap = (
-  panelSelectedNodes: WorkspaceNodeLike[],
+  panelSelectedNodes: Pick<WorkspaceNodeMetadata, 'id' | 'name'>[],
 ): Record<string, string> => {
   const map: Record<string, string> = {};
   panelSelectedNodes.forEach((node) => {
     const nodeId = typeof node.id === 'string' ? node.id : '';
     if (!nodeId) return;
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty name/label should fall back to the next display source, not render blank
-    map[nodeId] = node.name || node.label || nodeId;
+    map[nodeId] = node.name.length > 0 ? node.name : nodeId;
   });
   return map;
 };

@@ -1,4 +1,5 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import type { DetachNodeOption } from '@/api';
 import { Loader2, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -15,26 +16,13 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 
-export interface DetachDialogNodeOption {
-  node_id: string;
-  node_name: string;
-  available_columns: string[];
-  disabled_columns?: string[];
-  /** Columns to tick by default when the dialog opens. When absent the caller
-   * falls back to its per-tool default (e.g. select-all). */
-  default_selected_columns?: string[] | null;
-  /** Column the analysis ran on. Bolded in the column list so it
-   * stands out from sibling metadata columns. */
-  text_column?: string | null;
-}
-
 interface DetachColumnsDialogProps {
   open: boolean;
   onOpenChange: Dispatch<SetStateAction<boolean>>;
   isDetaching: boolean;
   title: string;
   description: string;
-  detachNodeOptions: DetachDialogNodeOption[];
+  detachNodeOptions: DetachNodeOption[];
   selectedDetachColumns: Record<string, string[]>;
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
   selectAllDetachColumns: () => void;

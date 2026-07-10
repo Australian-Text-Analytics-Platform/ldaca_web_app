@@ -55,7 +55,7 @@ const PolarsExpressionFallback = () => (
  * expression editor only when users open that subtab.
  */
 function DataPreprocessingFeature() {
-  const { currentWorkspaceId, nodes: workspaceNodes } = useWorkspaceData();
+  const { currentWorkspaceId } = useWorkspaceData();
   const {
     filterNode,
     filterPreview,
@@ -82,11 +82,7 @@ function DataPreprocessingFeature() {
   );
   const setPersistedInputs = usePreprocessingInputsStore((state) => state.setInputs);
   const maxInputNodes =
-    activeSubtab === 'join'
-      ? MAX_JOIN_NODES
-      : activeSubtab === 'concat'
-        ? MAX_CONCAT_NODES
-        : 1;
+    activeSubtab === 'join' ? MAX_JOIN_NODES : activeSubtab === 'concat' ? MAX_CONCAT_NODES : 1;
   const nodeInputs = useTabNodeInputs({
     tabInputSets: { [DEFAULT_TAB_INPUT_SET_ID]: persistedInputs },
     onTabInputSetChange: (_selectorId, inputs) => {
@@ -99,6 +95,7 @@ function DataPreprocessingFeature() {
     },
   });
   const selectedNodes = nodeInputs.selectedNodes;
+  const workspaceNodes = [...selectedNodes, ...nodeInputs.availableNodes];
   const selectedNode = selectedNodes[0] ?? null;
   const selectedNodeIds = nodeInputs.resolvedNodes.map((node) => node.id);
   const selectedNodeId = selectedNodeIds[0] ?? null;
@@ -215,7 +212,6 @@ function DataPreprocessingFeature() {
             renderNodeInputsPanel={renderNodeInputsPanel}
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
-            selectedNodes={selectedNodes}
             columnOptions={selectedNodeColumnOptions}
             currentWorkspaceId={currentWorkspaceId}
             filterNode={filterNode}
@@ -231,7 +227,6 @@ function DataPreprocessingFeature() {
             currentWorkspaceId={currentWorkspaceId}
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
-            selectedNodes={selectedNodes}
             sliceNode={sliceNode}
             slicePreview={slicePreview}
             isLoading={isLoading}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { TopicModelingTopic } from '@/api';
 import JSZip from 'jszip';
 import { Download, Scan } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,23 +14,13 @@ import {
 } from '@/lib/chartExport';
 import { saveBlob } from '@/lib/download';
 
-interface TopicLike {
-  id: number;
-  label: string;
-  representative_words?: string[];
-  size?: number[];
-  total_size?: number | null;
-  x?: number;
-  y?: number;
-}
-
 interface Props {
-  topics: TopicLike[];
+  topics: TopicModelingTopic[];
   chartRef: React.RefObject<HTMLDivElement | null>;
   handleResetZoom: () => void;
   isAtGlobalZoom: boolean;
   bubbleElements: React.ReactNode;
-  tooltip: { topic: TopicLike | null; x: number; y: number };
+  tooltip: { topic: TopicModelingTopic | null; x: number; y: number };
   renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -56,7 +47,7 @@ const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
 
 // Used by: topic-modeling chart downloads because optional CSV bundles must mirror selected-topic ordering and visible corpus columns. Flow: sort selected topics first, build topic/corpus headers, escape cells, then join rows as CSV.
 const buildTopicsCSV = (
-  topics: TopicLike[],
+  topics: TopicModelingTopic[],
   selectedTopicIds: Set<number>,
   nodeNames: string[],
 ): string => {
@@ -83,11 +74,11 @@ const buildTopicsCSV = (
     ];
     // Per-node document counts
     for (let i = 0; i < nodeNames.length; i++) {
-      cols.push(escapeCsv(String(t.size?.[i] ?? 0)));
+      cols.push(escapeCsv(String(t.size[i] ?? 0)));
     }
     // Total only when there are multiple corpora (otherwise it equals the single count)
     if (hasMultiCorpora) {
-      cols.push(escapeCsv(String(t.total_size ?? 0)));
+      cols.push(escapeCsv(String(t.total_size)));
     }
     return cols.join(',');
   });

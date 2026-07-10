@@ -1,4 +1,4 @@
-import type { NodeInfo } from '@/lib/nodeInfo';
+import type { WorkspaceNodeInfo } from '@/api';
 
 export interface TokenizerModelColumnSelection {
   nodeId: string;
@@ -13,7 +13,7 @@ export interface TokenizerModelColumnSelection {
  */
 export const deriveTokenizerModelsByNode = (
   selections: TokenizerModelColumnSelection[],
-  nodeInfoCache: Record<string, NodeInfo>,
+  nodeInfoCache: Record<string, WorkspaceNodeInfo>,
   liveTokenizerModelsByNode: Record<string, string>,
 ): Record<string, string> => {
   const fromNodes: Record<string, string> = {};

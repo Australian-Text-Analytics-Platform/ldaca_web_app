@@ -7,7 +7,6 @@ import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import {
-  getNodeIdentifier,
   useLastRunRequest,
   useAnalysisFeature,
   useNodeColorControls,
@@ -75,7 +74,7 @@ function TopicModelingFeature({
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const panelNodeIds = panelSelectedNodes
     .slice(0, 2)
-    .map((node) => getNodeIdentifier(node))
+    .map((node) => node.id)
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
   const { serverRequest } = useLastRunRequest({
@@ -176,11 +175,7 @@ function TopicModelingFeature({
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskRequest(
-        ANALYSIS_TAB_GROUPS.topicModeling,
-        currentWorkspaceId,
-        taskId,
-      );
+      return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.topicModeling, currentWorkspaceId, taskId);
     },
     // Applies freshly fetched task results and surfaces failed/successful status messages.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
@@ -549,7 +544,7 @@ function TopicModelingFeature({
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
           activeDomain={activeDomain}
-          nodeNames={panelSelectedNodes.map((n) => n.name ?? n.id)}
+          nodeNames={panelSelectedNodes.map((n) => n.name)}
           randomSeed={randomSeed}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}

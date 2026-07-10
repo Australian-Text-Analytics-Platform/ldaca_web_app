@@ -13,10 +13,11 @@ import type {
 } from './types';
 
 /**
- * Adapts global task-store status into the banner, active-task flag, and terminal
- * refresh callback contract used by every analysis tab.
+ * Adapts global task-store status into the banner and terminal refresh contract
+ * used by every analysis tab.
  * Used by: useAnalysisFeature to bridge global task status into feature UI state.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ * Flow: scope task status to the owning workspace/tab, derive the fallback
+ * banner, refresh one matching terminal task, and expose only status and banner.
  */
 export const useAnalysisTaskFlow = (
   options: UseAnalysisTaskFlowOptions,
@@ -87,26 +88,6 @@ export const useAnalysisTaskFlow = (
     return null;
   })();
 
-  /**
-   * Exposes an imperative refresh path for callers that need to reapply results
-   * outside the automatic terminal-task effect.
-   * Called by: consumers of useAnalysisTaskFlow through the refreshNow return value.
-   */
-  const refreshNow = async (reason: AnalysisTaskFlowRefreshContext['reason'] = 'terminal') => {
-    if (!workspaceId || !refreshResultsRef.current) {
-      return;
-    }
-
-    const context: AnalysisTaskFlowRefreshContext = {
-      reason,
-      task: status.terminalTask ?? null,
-      taskId: status.terminalTask?.task_id ?? null,
-      taskState: status.terminalTask?.state ?? null,
-    };
-
-    await refreshResultsRef.current(context);
-  };
-
   useEffect(() => {
     if (!workspaceId || !refreshResultsRef.current) {
       return;
@@ -148,22 +129,8 @@ export const useAnalysisTaskFlow = (
     void refreshResultsRef.current(context);
   }, [workspaceId, status.terminalTask, isTabActive, taskType]);
 
-  /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- boolean OR chain: hasActiveTask is truthy if any source is truthy */
-  const hasActiveTask = Boolean(
-    effectiveActiveTaskId ||
-      status.runningTask?.task_id ||
-      status.queuedTask?.task_id ||
-      status.terminalTask?.task_id ||
-      status.tasks.length > 0,
-  );
-  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
-
   return {
     status,
     banner,
-    waitingBanner: banner,
-    activeTaskId: effectiveActiveTaskId,
-    hasActiveTask,
-    refreshNow,
   };
 };

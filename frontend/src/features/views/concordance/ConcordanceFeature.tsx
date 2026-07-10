@@ -43,9 +43,8 @@ import { useConcordanceResultControls } from './hooks/useConcordanceResultContro
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
+import { DetachColumnsDialog } from '../common/components/DetachColumnsDialog';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
-import { ConcordanceDetachDialog } from './components/ConcordanceDetachDialog';
-import { ConcordanceDispersionDetachDialog } from './components/ConcordanceDispersionDetachDialog';
 import {
   usePersistNodeDocumentColumn,
   usePersistNodeTokenizationPreference,
@@ -347,20 +346,13 @@ function ConcordanceFeature({
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskResult<ConcordanceAnalysisResponse>(
-        currentWorkspaceId,
-        taskId,
-      );
+      return getAnalysisTaskResult<ConcordanceAnalysisResponse>(currentWorkspaceId, taskId);
     },
     /** Fetches the saved request so hydration can restore parameters and materialized state. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskRequest(
-        ANALYSIS_TAB_GROUPS.concordance,
-        currentWorkspaceId,
-        taskId,
-      );
+      return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.concordance, currentWorkspaceId, taskId);
     },
     /** Copies freshly fetched task results into the feature's safe-result state. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
@@ -790,7 +782,6 @@ function ConcordanceFeature({
             void openDetachDialog(nodes);
           }}
           onDispersionDetach={openDispersionDetachDialog}
-          readOnly={false}
         />
       )}
 
@@ -821,10 +812,18 @@ function ConcordanceFeature({
       )}
 
       {/* Dispersion (per-document aggregated) detach column dialog */}
-      <ConcordanceDispersionDetachDialog {...dispersionDetachDialog} />
+      <DetachColumnsDialog
+        {...dispersionDetachDialog}
+        title="Add aggregated concordance to workspace"
+        description="The detached data block always includes the per-document extract, matched-text list, and L1/R1 contexts as list columns. Optionally include the document column and any source metadata columns. The document column is selected by default — uncheck to omit it."
+      />
 
       {/* Detach column selection dialog */}
-      <ConcordanceDetachDialog {...detachDialog} />
+      <DetachColumnsDialog
+        {...detachDialog}
+        title="Detach Concordance Results"
+        description="Select optional source columns to include alongside the concordance results. Required output columns stay checked automatically."
+      />
     </div>
   );
 }

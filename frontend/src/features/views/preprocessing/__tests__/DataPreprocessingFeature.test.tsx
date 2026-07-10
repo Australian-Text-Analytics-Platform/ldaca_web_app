@@ -156,6 +156,7 @@ vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
       { name: 'Count', dataType: 'integer' },
     ],
     columnInfoCache: {},
+    nodeInfoCache: { 'node-1': mockSelectedNode },
     isLoading: false,
   }),
   useNodeColumnInfos: () => ({
@@ -164,6 +165,7 @@ vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
       { name: 'Count', dataType: 'integer' },
     ],
     columnInfoCache: {},
+    nodeInfoCache: { 'node-1': mockSelectedNode },
     isLoading: false,
   }),
 }));
@@ -260,10 +262,10 @@ describe('DataPreprocessingFeature replace tab', () => {
         pageSize: 10,
         signal: expect.any(AbortSignal),
         payload: {
-        source_column: 'Body',
-        pattern: regexPattern,
-        replacement: '#',
-        output_column_name: 'Body',
+          source_column: 'Body',
+          pattern: regexPattern,
+          replacement: '#',
+          output_column_name: 'Body',
         },
       });
     });

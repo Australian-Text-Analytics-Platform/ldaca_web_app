@@ -1,18 +1,11 @@
 import { useState } from 'react';
 import type { SliceRequest as SliceRequestPayload } from '@/api';
-import type {
-  NodeColumnSelection,
-  WorkspaceNodeLike,
-} from '@/features/views/common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
 } from '../../hooks/useNodePreviewWithRawFallback';
-import {
-  buildSingleNodeSelectionPanelModel,
-  deriveNodeLabel,
-} from '../../utils/nodeMetadata';
 import { buildSlicePayload, deriveSliceFormModel, type SamplingMode } from './sliceFormModel';
 
 interface SliceOperationResult {
@@ -29,8 +22,7 @@ interface SliceOperationResult {
 export interface SliceSubTabProps {
   currentWorkspaceId: string | null;
   selectedNodeId: string | null;
-  selectedNode: WorkspaceNodeLike | null;
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNode: WorkspaceNodeMetadata | null;
   sliceNode: (nodeId: string, request: SliceRequestPayload) => Promise<SliceOperationResult>;
   slicePreview: OperationPreviewFetcher<SliceRequestPayload>;
   isLoading: {
@@ -57,17 +49,6 @@ interface ScopedInlineError {
 interface ScopedSliceHistory {
   signature: string;
   result: SliceHistory;
-}
-
-interface SliceSelectionPanelConfig {
-  selectedNodes: WorkspaceNodeLike[];
-  nodeColumnSelections: NodeColumnSelection[];
-  nodeColors: Record<string, string>;
-  defaultPalette: string[];
-  disabled: boolean;
-  originalCount: number;
-  onColumnChange: () => void;
-  onColorChange: () => void;
 }
 
 interface SliceFormControllers {
@@ -116,7 +97,6 @@ interface SlicePreviewConfig {
 }
 
 export interface UseSliceSubTabResult {
-  selectionPanel: SliceSelectionPanelConfig;
   form: SliceFormControllers;
   summaries: {
     range: string;
@@ -156,7 +136,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     currentWorkspaceId,
     selectedNodeId,
     selectedNode,
-    selectedNodes,
     sliceNode,
     slicePreview,
     isLoading,
@@ -248,7 +227,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const selectedNodeLabel = (() => {
     if (!selectedNodeId) return '';
-    return deriveNodeLabel(activeNode) || selectedNodeId;
+    return activeNode?.name ?? selectedNodeId;
   })();
 
   const nodeRowCount: number | null = (() => {
@@ -257,11 +236,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     const rows = shape[0];
     return typeof rows === 'number' && Number.isFinite(rows) && rows >= 0 ? Math.round(rows) : null;
   })();
-
-  const selectionPanelModel = buildSingleNodeSelectionPanelModel({
-    nodeId: selectedNodeId,
-    selectedNode: activeNode,
-  });
 
   const sliceModel = deriveSliceFormModel({
     selectedNodeId,
@@ -481,24 +455,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   };
 
   return {
-    selectionPanel: {
-      selectedNodes: selectionPanelModel.selectedNodes,
-      nodeColumnSelections: selectionPanelModel.nodeColumnSelections,
-      nodeColors: selectionPanelModel.nodeColors,
-      defaultPalette: selectionPanelModel.defaultPalette,
-      disabled: selectionPanelModel.disabled,
-      originalCount: selectedNodes.length,
-      /**
-       * Satisfies the shared panel API; slice mode never edits source columns.
-       * Consumed by: useSliceSubTab return object for feature components because consumers need this returned value or action without owning the hook internals.
-       */
-      onColumnChange: () => undefined,
-      /**
-       * Satisfies the shared panel API; slice mode uses a fixed single-node color.
-       * Consumed by: useSliceSubTab return object for feature components because consumers need this returned value or action without owning the hook internals.
-       */
-      onColorChange: () => undefined,
-    },
     form: {
       mode,
       setMode,

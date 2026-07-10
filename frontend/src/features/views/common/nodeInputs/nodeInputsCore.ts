@@ -18,12 +18,7 @@ import {
   filterColumnsByType,
   mapColumnsToInfo,
 } from '@/features/workspace/data-view/utils/columnTypes';
-import { extractDocumentColumn } from '@/lib/documentColumn';
-import {
-  type WorkspaceNodeLike,
-  getNodeDisplayName,
-  getNodeIdentifier,
-} from '../nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 /** One node selected as input for a view. Mirrors backend ``AnalysisTabInput``. */
 export interface NodeInput {
@@ -54,7 +49,7 @@ export interface NodeInputConstraints {
 export interface ResolvedNodeInput {
   id: string;
   name: string;
-  node: WorkspaceNodeLike;
+  node: WorkspaceNodeMetadata;
   column: string;
   columnOptions: ColumnInfo[];
 }
@@ -66,7 +61,7 @@ export interface NodeAddRejection {
 }
 
 /** Optional typed-column getter (from ``useNodeColumnInfos``); falls back to node snapshot. */
-export type ColumnInfoGetter = (node: WorkspaceNodeLike) => ColumnInfo[] | undefined;
+export type ColumnInfoGetter = (node: WorkspaceNodeMetadata) => ColumnInfo[] | undefined;
 
 /**
  * Converts feature-local node/column selections into the persisted tab input shape.
@@ -85,10 +80,12 @@ export function nodeInputsFromSelections(selections: NodeSelectionInput[]): Node
  * Called by: resolveNodeInputs and useNodeInputs add/validate paths because
  * every resolve/validate step needs O(1) access to the live node by id.
  */
-export function buildNodeMap(allNodes: WorkspaceNodeLike[]): Map<string, WorkspaceNodeLike> {
-  const map = new Map<string, WorkspaceNodeLike>();
+export function buildNodeMap(
+  allNodes: WorkspaceNodeMetadata[],
+): Map<string, WorkspaceNodeMetadata> {
+  const map = new Map<string, WorkspaceNodeMetadata>();
   allNodes.forEach((node) => {
-    map.set(getNodeIdentifier(node), node);
+    map.set(node.id, node);
   });
   return map;
 }
@@ -103,7 +100,7 @@ export function buildNodeMap(allNodes: WorkspaceNodeLike[]): Map<string, Workspa
  * filtered set means the column picker should render empty).
  */
 function allowedColumnsForNode(
-  node: WorkspaceNodeLike,
+  node: WorkspaceNodeMetadata,
   constraints: NodeInputConstraints,
   getColumnInfos?: ColumnInfoGetter,
 ): ColumnInfo[] {
@@ -121,12 +118,12 @@ function allowedColumnsForNode(
  * first allowed column unless the view is document-only (then leave empty).
  */
 export function defaultColumnForNode(
-  node: WorkspaceNodeLike,
+  node: WorkspaceNodeMetadata,
   constraints: NodeInputConstraints,
   getColumnInfos?: ColumnInfoGetter,
 ): string {
   const allowed = allowedColumnsForNode(node, constraints, getColumnInfos).map((c) => c.name);
-  const documentColumn = extractDocumentColumn(node);
+  const documentColumn = node.document ?? '';
   if (documentColumn && allowed.includes(documentColumn)) return documentColumn;
   if (!constraints.docTypeOnly && allowed.length) return allowed[0] ?? '';
   return '';
@@ -143,7 +140,7 @@ export function defaultColumnForNode(
 export function validateAdd(
   nodeId: string,
   current: NodeInput[],
-  nodeMap: Map<string, WorkspaceNodeLike>,
+  nodeMap: Map<string, WorkspaceNodeMetadata>,
   constraints: NodeInputConstraints,
 ): string | null {
   const node = nodeMap.get(nodeId);
@@ -171,7 +168,7 @@ export function validateAdd(
  */
 export function resolveNodeInputs(
   inputs: NodeInput[],
-  nodeMap: Map<string, WorkspaceNodeLike>,
+  nodeMap: Map<string, WorkspaceNodeMetadata>,
   constraints: NodeInputConstraints,
   getColumnInfos?: ColumnInfoGetter,
 ): ResolvedNodeInput[] {
@@ -188,7 +185,7 @@ export function resolveNodeInputs(
         : defaultColumnForNode(node, constraints, getColumnInfos);
     resolved.push({
       id: input.node_id,
-      name: getNodeDisplayName(node, input.node_id),
+      name: node.name,
       node,
       column,
       columnOptions,

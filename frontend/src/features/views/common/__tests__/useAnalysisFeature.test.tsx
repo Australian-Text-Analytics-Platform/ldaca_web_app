@@ -3,14 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAnalysisFeature } from '../hooks/useAnalysisFeature';
 
-const { cancelTaskMock, clearAnalysisMock, hydrateFromServerMock, taskFlowOptionsMock } = vi.hoisted(
-  () => ({
-  cancelTaskMock: vi.fn(),
-  clearAnalysisMock: vi.fn(),
-  hydrateFromServerMock: vi.fn(() => Promise.resolve()),
+const { cancelTaskMock, clearAnalysisMock, hydrateFromServerMock, taskFlowOptionsMock } =
+  vi.hoisted(() => ({
+    cancelTaskMock: vi.fn(),
+    clearAnalysisMock: vi.fn(),
+    hydrateFromServerMock: vi.fn(() => Promise.resolve()),
     taskFlowOptionsMock: vi.fn(),
-  }),
-);
+  }));
 
 vi.mock('@tanstack/react-query', () => ({
   /** Called by: useAnalysisFeature under test when it requests a query client because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
@@ -51,7 +50,6 @@ vi.mock('../tasks/useAnalysisTaskFlow', () => ({
         bannerMessage: null,
       },
       banner: null,
-      hasActiveTask: false,
     };
   },
 }));
@@ -118,32 +116,6 @@ describe('useAnalysisFeature', () => {
     });
   });
 
-  it('ignores terminal refreshes for another task when a tab has no task id', async () => {
-    const fetchResult = vi.fn(() => Promise.resolve({ state: 'successful' }));
-    const onResultFetched = vi.fn();
-
-    const { result } = renderHook(() =>
-      useAnalysisFeature({
-        analysisType: 'token_frequencies',
-        taskType: 'token_frequencies',
-        workspaceId: 'workspace-1',
-        isTabActive: true,
-        hydrationTaskId: null,
-        resultRef: { current: null },
-        fetchResult,
-        onResultFetched,
-        onCleared: vi.fn(),
-      }),
-    );
-
-    await act(async () => {
-      await result.current.fetchAndApplyResult('task-from-first-tab', 'successful');
-    });
-
-    expect(fetchResult).not.toHaveBeenCalled();
-    expect(onResultFetched).not.toHaveBeenCalled();
-  });
-
   it('passes explicit empty and hydrated tab-owned task ids to task status', () => {
     const baseConfig = {
       analysisType: 'token_frequencies' as const,
@@ -172,12 +144,12 @@ describe('useAnalysisFeature', () => {
     );
   });
 
-  it('fetches terminal refreshes for the task owned by the active tab', async () => {
+  it('fetches a terminal refresh delivered for the task owned by the active tab', async () => {
     const terminalResult = { state: 'successful', metadata: { task_id: 'owned-task' } };
     const fetchResult = vi.fn(() => Promise.resolve(terminalResult));
     const onResultFetched = vi.fn();
 
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useAnalysisFeature({
         analysisType: 'token_frequencies',
         taskType: 'token_frequencies',
@@ -191,8 +163,22 @@ describe('useAnalysisFeature', () => {
       }),
     );
 
+    const taskFlowOptions = taskFlowOptionsMock.mock.lastCall?.[0] as {
+      refreshResults?: (context: {
+        reason: 'terminal';
+        task: null;
+        taskId: string;
+        taskState: 'successful';
+      }) => Promise<void>;
+    };
+
     await act(async () => {
-      await result.current.fetchAndApplyResult('owned-task', 'successful');
+      await taskFlowOptions.refreshResults?.({
+        reason: 'terminal',
+        task: null,
+        taskId: 'owned-task',
+        taskState: 'successful',
+      });
     });
 
     expect(fetchResult).toHaveBeenCalledWith('owned-task');

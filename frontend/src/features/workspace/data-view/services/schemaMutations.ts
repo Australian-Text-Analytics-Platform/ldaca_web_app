@@ -1,8 +1,4 @@
-import { type NodeSchemaResponse } from '@/features/workspace/data-view/types';
-
-// Canonical implementation lives in `@/utils/columnTypes`. Re-exported
-// here so workspace/data-view call sites can keep their existing import.
-export { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
+import type { WorkspaceNodeInfo } from '@/api';
 
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },
@@ -21,21 +17,9 @@ export const DATA_TYPES = [
  * Why: because column mutation UI needs backend schema types normalized before rendering cast options and labels.
  */
 export const extractColumnTypes = (
-  schema: NodeSchemaResponse | null | undefined,
+  nodeInfo: WorkspaceNodeInfo | null | undefined,
 ): Record<string, string> => {
-  if (!schema) {
-    return {};
-  }
-
-  if (Object.keys(schema.column_types).length > 0) {
-    return schema.column_types;
-  }
-
-  if (typeof schema.schema === 'object') {
-    return schema.schema;
-  }
-
-  return {};
+  return nodeInfo?.schema ?? {};
 };
 
 /**

@@ -11,8 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
-import { getNodeDocumentColumn } from '@/features/workspace/data-view/utils/documentColumn';
-import { deriveNodeLabel } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
@@ -26,7 +24,7 @@ type SliceSubTabComponentProps = SliceSubTabProps & {
  * Rendered by: DataPreprocessingFeature module, PreviewTable component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
  */
 export function SliceSubTab(props: SliceSubTabComponentProps) {
-  const selectedNodeLabel = deriveNodeLabel(props.selectedNode) || (props.selectedNodeId ?? '');
+  const selectedNodeLabel = props.selectedNode?.name ?? props.selectedNodeId ?? '';
   const selectedNodeKey = `${props.selectedNodeId ?? ''}:${selectedNodeLabel}`;
 
   return <SliceSubTabContent key={selectedNodeKey} {...props} />;
@@ -273,7 +271,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
         readyMessage={preview.readyMessage}
         page={preview.page}
         pageSize={preview.pageSize}
-        documentColumn={getNodeDocumentColumn(props.selectedNode)}
+        documentColumn={props.selectedNode?.document ?? undefined}
         onPageSizeChange={preview.onPageSizeChange}
         onPageChange={preview.onPageChange}
       />

@@ -1,4 +1,4 @@
-import type { DetachDialogNodeOption } from '../../common/components/DetachColumnsDialog';
+import type { DetachNodeOption } from '@/api';
 
 export interface ConcordanceDetachTarget {
   nodeId: string;
@@ -9,13 +9,13 @@ export interface ConcordanceDetachTarget {
 interface PerHitDetachDialogState {
   open: boolean;
   pendingNodes: ConcordanceDetachTarget[];
-  options: DetachDialogNodeOption[];
+  options: DetachNodeOption[];
 }
 
 interface DispersionDetachDialogState {
   open: boolean;
   pendingNodes: ConcordanceDetachTarget[];
-  options: DetachDialogNodeOption[];
+  options: DetachNodeOption[];
   selectedBins: number[] | null;
   binCount: number;
   matchedTexts: string[] | null;
@@ -29,7 +29,7 @@ export interface ConcordanceDetachDialogState {
 
 export type ConcordanceDetachDialogAction =
   | { type: 'perHitRequested'; nodes: ConcordanceDetachTarget[] }
-  | { type: 'perHitOpened'; options: DetachDialogNodeOption[] }
+  | { type: 'perHitOpened'; options: DetachNodeOption[] }
   | { type: 'perHitReset' }
   | {
       type: 'dispersionRequested';
@@ -39,7 +39,7 @@ export type ConcordanceDetachDialogAction =
       matchedTexts: string[] | null;
       caseInsensitive: boolean;
     }
-  | { type: 'dispersionOpened'; options: DetachDialogNodeOption[] }
+  | { type: 'dispersionOpened'; options: DetachNodeOption[] }
   | { type: 'dispersionReset' };
 
 const emptyPerHitState: PerHitDetachDialogState = {

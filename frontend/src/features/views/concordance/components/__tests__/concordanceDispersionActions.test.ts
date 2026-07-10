@@ -19,7 +19,6 @@ describe('concordance dispersion actions', () => {
 
   it('blocks selected-bin detach until materialized bins are available', () => {
     const state = buildDispersionDetachActionState({
-      readOnly: false,
       isBusy: false,
       hasSearchWord: true,
       hasDetachTarget: true,
@@ -41,7 +40,6 @@ describe('concordance dispersion actions', () => {
 
   it('blocks detach when every legend term is hidden', () => {
     const state = buildDispersionDetachActionState({
-      readOnly: false,
       isBusy: false,
       hasSearchWord: true,
       hasDetachTarget: true,
@@ -64,7 +62,6 @@ describe('concordance dispersion actions', () => {
 
   it('allows all-hit detach when required inputs are present and no legend block applies', () => {
     const state = buildDispersionDetachActionState({
-      readOnly: false,
       isBusy: false,
       hasSearchWord: true,
       hasDetachTarget: true,

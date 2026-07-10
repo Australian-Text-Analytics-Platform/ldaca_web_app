@@ -1,13 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { describeColumn } from '@/api';
 import { Checkbox } from '@/components/ui/checkbox';
-import type {
-  NodeColumnSelection,
-  WorkspaceNodeLike,
-} from '@/features/views/common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { normalizeTypeName, getOperatorsForType } from '../../utils/typeUtils';
 import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
-import { buildSingleNodeSelectionPanelModel } from '../../utils/nodeMetadata';
 import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
@@ -29,8 +25,7 @@ import type {
 
 export interface FilterSubTabProps {
   selectedNodeId: string | null;
-  selectedNode: WorkspaceNodeLike | null;
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNode: WorkspaceNodeMetadata | null;
   columnOptions: ConditionColumnOption[];
   currentWorkspaceId: string | null;
   filterNode: (nodeId: string, request: FilterRequest) => Promise<void>;
@@ -39,16 +34,6 @@ export interface FilterSubTabProps {
     operations: boolean;
   };
   onAlert: (message: string) => void;
-}
-
-interface FilterSelectionPanelConfig {
-  selectedNodes: WorkspaceNodeLike[];
-  nodeColumnSelections: NodeColumnSelection[];
-  nodeColors: Record<string, string>;
-  defaultPalette: string[];
-  onColumnChange: () => void;
-  onColorChange: () => void;
-  disabled: boolean;
 }
 
 interface FilterConditionBuilderConfig {
@@ -84,7 +69,6 @@ interface FilterPreviewConfig {
 }
 
 export interface UseFilterSubTabSectionsResult {
-  selectionPanel: FilterSelectionPanelConfig;
   schemaState: {
     hasSelection: boolean;
     hasSchema: boolean;
@@ -103,7 +87,6 @@ export interface UseFilterSubTabSectionsResult {
   applyButtonDisabled: boolean;
   applyButtonDisabledReason: string | undefined;
   preview: FilterPreviewConfig;
-  selectedNodesOriginalCount: number;
 }
 
 /**
@@ -121,7 +104,6 @@ export const useFilterSubTabSections = (
   const {
     selectedNodeId,
     selectedNode,
-    selectedNodes,
     columnOptions,
     currentWorkspaceId,
     filterNode,
@@ -171,25 +153,10 @@ export const useFilterSubTabSections = (
   const hasSchema = availableColumns.length > 0;
   const isConfigDisabled = !hasSelection || !hasSchema;
 
-  const selectionPanelModel = buildSingleNodeSelectionPanelModel({
-    nodeId: selectedNodeId,
-    selectedNode,
-  });
   const newNodeName = newNodeNameState.nodeId === selectedNodeId ? newNodeNameState.value : '';
   const setNewNodeName = (value: string) => {
     setNewNodeNameState({ nodeId: selectedNodeId, value });
   };
-
-  /**
-   * Placeholder color handler because the filter panel uses one fixed color.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow.
-   */
-  const handleFilterColorChange = () => undefined;
-  /**
-   * Placeholder column handler because filter columns are edited in conditions.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow.
-   */
-  const handleFilterColumnChange = () => undefined;
 
   const autoNodeName = buildFilterAutoNodeName({
     // Empty node name should fall back to the id, so keep `||`.
@@ -557,15 +524,6 @@ export const useFilterSubTabSections = (
   })();
 
   return {
-    selectionPanel: {
-      selectedNodes: selectionPanelModel.selectedNodes,
-      nodeColumnSelections: selectionPanelModel.nodeColumnSelections,
-      nodeColors: selectionPanelModel.nodeColors,
-      defaultPalette: selectionPanelModel.defaultPalette,
-      onColumnChange: handleFilterColumnChange,
-      onColorChange: handleFilterColorChange,
-      disabled: selectionPanelModel.disabled,
-    },
     schemaState: {
       hasSelection,
       hasSchema,
@@ -608,6 +566,5 @@ export const useFilterSubTabSections = (
       onPageChange: setPreviewPage,
       onPageSizeChange: setPreviewPageSize,
     },
-    selectedNodesOriginalCount: selectedNodes.length,
   };
 };

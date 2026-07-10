@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useReducer } from 'react';
 import { toast } from 'sonner';
 
-import type { NodeSchemaResponse } from '@/features/workspace/data-view/types';
+import type { WorkspaceNodeInfo } from '@/api';
 
-import { extractColumnTypes, normalizeTypeName } from '../services/schemaMutations';
+import { extractColumnTypes } from '../services/schemaMutations';
+import { normalizeTypeName } from '../utils/columnTypes';
 import {
   columnMutationReducer,
   createColumnMutationState,
@@ -81,7 +82,7 @@ export const useColumnMutations = ({
 
   /** Applies a fetched schema to local header dtype state. */
   const applySchema = useCallback((schema: unknown) => {
-    const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
+    const mapping = extractColumnTypes(schema as WorkspaceNodeInfo | null);
     dispatch({ type: 'schemaApplied', columnTypes: mapping });
     return mapping;
   }, []);

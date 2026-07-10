@@ -1,9 +1,6 @@
 import { Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  computeMenuPlacement,
-  type NodeMenuPlacement,
-} from './customNodeMenuPlacement';
+import { computeMenuPlacement, type NodeMenuPlacement } from './customNodeMenuPlacement';
 
 export const CUSTOM_NODE_TOOLBAR_BUTTON_CLASS =
   'relative flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
@@ -13,8 +10,8 @@ interface CustomNodeActionMenuProps {
   showMenu: boolean;
   menuOpensUp: boolean;
   menuOpensRight: boolean;
-  canUndo?: boolean | null;
-  canRedo?: boolean | null;
+  canUndo: boolean;
+  canRedo: boolean;
   onMenuChange: (showMenu: boolean, placement: NodeMenuPlacement | null) => void;
   onRenameClick: (event: React.MouseEvent) => void;
   onCopyNode: (event: React.MouseEvent) => void;

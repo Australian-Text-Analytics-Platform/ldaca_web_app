@@ -1,9 +1,7 @@
 import { CancelledError, type QueryClient } from '@tanstack/react-query';
-import { type WorkspaceGraphResponse } from '@/api';
-import { type NodeSchemaResponse } from '@/features/workspace/data-view/types';
+import { type WorkspaceGraphResponse, type WorkspaceNodeInfo } from '@/api';
 import { fetchNodeInfo } from '@/lib/nodeInfo';
 import { queryKeys } from '@/lib/queryKeys';
-import { normalizeSchemaFromInfo } from './useSchemaManagement';
 
 interface RefreshWorkspaceNodeSchemaParams {
   queryClient: QueryClient;
@@ -23,7 +21,7 @@ export const refreshWorkspaceNodeSchema = async ({
   queryClient,
   workspaceId,
   nodeId,
-}: RefreshWorkspaceNodeSchemaParams): Promise<NodeSchemaResponse | null> => {
+}: RefreshWorkspaceNodeSchemaParams): Promise<WorkspaceNodeInfo | null> => {
   if (!workspaceId) return null;
   const graphData = queryClient.getQueryData<WorkspaceGraphResponse>(
     queryKeys.workspaceGraph(workspaceId),
@@ -38,14 +36,7 @@ export const refreshWorkspaceNodeSchema = async ({
       nodeId,
       force: true,
     });
-    const schema = normalizeSchemaFromInfo(info);
-    return {
-      node_id: nodeId,
-      schema,
-      columns: Object.keys(schema),
-      column_types: schema,
-      is_text_data: false,
-    };
+    return info;
   } catch (error) {
     // `force: true` removes the existing query first, which can cancel an
     // observer-driven request for the same key. That race means "no fresh

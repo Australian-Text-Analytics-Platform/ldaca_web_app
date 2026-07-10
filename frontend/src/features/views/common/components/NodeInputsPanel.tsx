@@ -8,8 +8,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
-import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
-import { getNodeDisplayName, getNodeIdentifier } from '../nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { NodeAddRejection, ResolvedNodeInput } from '../nodeInputs/nodeInputsCore';
 import type { ResolvedPreset } from '../nodeInputs/useTabNodeInputs';
 import { NodeColumnSelector } from './NodeColumnSelector';
@@ -29,7 +28,7 @@ export interface NodeInputsPanelProps {
   /** Resolved (live, stale-dropped) inputs from useNodeInputs. */
   resolvedNodes: ResolvedNodeInput[];
   /** Live workspace nodes not yet added — the Add dropdown's candidate list. */
-  availableNodes: WorkspaceNodeLike[];
+  availableNodes: WorkspaceNodeMetadata[];
   /** Node ids currently selected in the graph (source for "Add preset" → current selection). */
   graphSelectedIds?: string[];
   /** Recently-used node groups for the "Add preset" list. */
@@ -161,19 +160,12 @@ export function NodeInputsPanel({
   const filteredAvailableNodes = useMemo(() => {
     const q = blockSearch.trim().toLowerCase();
     if (!q) return availableNodes;
-    return availableNodes.filter((node) =>
-      getNodeDisplayName(node, getNodeIdentifier(node)).toLowerCase().includes(q),
-    );
+    return availableNodes.filter((node) => node.name.toLowerCase().includes(q));
   }, [availableNodes, blockSearch]);
 
   /** Resolves graph-selected addable ids to display names for the preset entry. */
   const graphSelectionLabels = useMemo(() => {
-    const byId = new Map(
-      availableNodes.map((node) => {
-        const id = getNodeIdentifier(node);
-        return [id, getNodeDisplayName(node, id)];
-      }),
-    );
+    const byId = new Map(availableNodes.map((node) => [node.id, node.name]));
     return addableGraphIds.map((id) => byId.get(id) ?? id);
   }, [availableNodes, addableGraphIds]);
 
@@ -206,7 +198,7 @@ export function NodeInputsPanel({
     const colorControl = onNodeColorChange ? (
       <NodeColorPicker
         key="color"
-        nodeName={getNodeDisplayName(args.node, nodeId)}
+        nodeName={args.node.name}
         color={args.color}
         presets={defaultPalette}
         disabled={disabled}
@@ -411,7 +403,7 @@ export function NodeInputsPanel({
                     </div>
                   ) : (
                     filteredAvailableNodes.map((node) => {
-                      const id = getNodeIdentifier(node);
+                      const id = node.id;
                       const reason = getAddRejection(id);
                       return (
                         <button
@@ -426,7 +418,7 @@ export function NodeInputsPanel({
                             setBlockSearch('');
                           }}
                         >
-                          <span className="truncate">{getNodeDisplayName(node, id)}</span>
+                          <span className="truncate">{node.name}</span>
                           {reason && (
                             <span className="text-[10px] text-muted-foreground">{reason}</span>
                           )}

@@ -18,20 +18,18 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 import { getWorkspaceNodesInfoById } from '@/api';
-import type { WorkspaceNodeInfo as NodeInfoResponse } from '@/api';
+import type { WorkspaceNodeInfo } from '@/api';
 import { queryKeys } from './queryKeys';
-
-export type NodeInfo = NodeInfoResponse;
 
 interface WorkspaceQueryArgs {
   workspaceId: string;
 }
 
-export type NodeInfoQueryArgs = WorkspaceQueryArgs & {
+type NodeInfoQueryArgs = WorkspaceQueryArgs & {
   nodeId: string;
 };
 
-export type NodeInfosQueryArgs = WorkspaceQueryArgs & {
+type NodeInfosQueryArgs = WorkspaceQueryArgs & {
   nodeIds: string[];
 };
 
@@ -44,7 +42,7 @@ const normalizeNodeIds = (nodeIds: string[]): string[] =>
  * Fetches node-info payloads through the collection endpoint.
  * Why: single-node and batch metadata reads share one API source of truth.
  */
-const requestNodeInfos = async (args: NodeInfosQueryArgs): Promise<NodeInfo[]> => {
+const requestNodeInfos = async (args: NodeInfosQueryArgs): Promise<WorkspaceNodeInfo[]> => {
   const nodeIds = normalizeNodeIds(args.nodeIds);
   if (nodeIds.length === 0) return [];
   const { data } = await getWorkspaceNodesInfoById({
@@ -66,7 +64,7 @@ export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
    * Fetches fresh node metadata for query consumers while resolving auth at execution time.
    * Why: importers need one shared normalization boundary to keep behavior consistent.
    */
-  queryFn: async (): Promise<NodeInfo> => {
+  queryFn: async (): Promise<WorkspaceNodeInfo> => {
     const nodeInfos = await requestNodeInfos({
       ...args,
       nodeIds: [args.nodeId],
@@ -92,23 +90,15 @@ export const nodeInfosQueryOptions = (args: NodeInfosQueryArgs) => {
      * Fetches fresh node metadata for a selected-node batch.
      * Why: selectors should not fan out one schema request per selected node.
      */
-    queryFn: async (): Promise<NodeInfo[]> => requestNodeInfos({ ...args, nodeIds }),
+    queryFn: async (): Promise<WorkspaceNodeInfo[]> => requestNodeInfos({ ...args, nodeIds }),
   };
 };
 
-export interface FetchNodeInfoArgs {
+interface FetchNodeInfoArgs {
   queryClient: QueryClient;
   workspaceId: string;
   nodeId: string;
   /** When true, drop any cached value first so the next read re-fetches. */
-  force?: boolean;
-}
-
-export interface FetchNodeInfosArgs {
-  queryClient: QueryClient;
-  workspaceId: string;
-  nodeIds: string[];
-  /** When true, drop cached values first so the next read re-fetches. */
   force?: boolean;
 }
 
@@ -125,40 +115,11 @@ export const fetchNodeInfo = async ({
   workspaceId,
   nodeId,
   force,
-}: FetchNodeInfoArgs): Promise<NodeInfo> => {
+}: FetchNodeInfoArgs): Promise<WorkspaceNodeInfo> => {
   if (force) {
     queryClient.removeQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeId) });
   }
   return queryClient.fetchQuery(nodeInfoQueryOptions({ workspaceId, nodeId }));
-};
-
-/**
- * Non-hook batch fetcher for workflows that need metadata snapshots for
- * several nodes. The batch query is cached as a unit, and each returned node
- * also refreshes its single-node cache entry.
- */
-/** Used by: analysis snapshot builders because multi-node tasks should fetch schema metadata in one request. */
-export const fetchNodeInfos = async ({
-  queryClient,
-  workspaceId,
-  nodeIds,
-  force,
-}: FetchNodeInfosArgs): Promise<NodeInfo[]> => {
-  const normalizedNodeIds = normalizeNodeIds(nodeIds);
-  if (normalizedNodeIds.length === 0) return [];
-  if (force) {
-    queryClient.removeQueries({ queryKey: queryKeys.nodeInfos(workspaceId, normalizedNodeIds) });
-    normalizedNodeIds.forEach((nodeId) => {
-      queryClient.removeQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeId) });
-    });
-  }
-  const nodeInfos = await queryClient.fetchQuery(
-    nodeInfosQueryOptions({ workspaceId, nodeIds: normalizedNodeIds }),
-  );
-  nodeInfos.forEach((nodeInfo) => {
-    queryClient.setQueryData<NodeInfo>(queryKeys.nodeInfo(workspaceId, nodeInfo.id), nodeInfo);
-  });
-  return nodeInfos;
 };
 
 /**
@@ -190,9 +151,7 @@ export const invalidateNodeInfoQuery = (
       }
       const singleNodeInfoKey = key[4] === 'info' && (!nodeId || key[3] === nodeId);
       const batchNodeInfoKey =
-        key[3] === 'info' &&
-        key[4] === 'batch' &&
-        (!nodeId || key.slice(5).includes(nodeId));
+        key[3] === 'info' && key[4] === 'batch' && (!nodeId || key.slice(5).includes(nodeId));
       return singleNodeInfoKey || batchNodeInfoKey;
     },
   });

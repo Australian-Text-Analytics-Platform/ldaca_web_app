@@ -1,13 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import type { DetachDialogNodeOption } from '../../components/DetachColumnsDialog';
+import type { DetachNodeOption } from '@/api';
 import { useDetachColumnsState } from '../useDetachColumnsState';
 
 /** Used by: useDetachColumnsState tests that need detach-node fixtures because the hook expects full node option records while each case varies only selected columns. Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload. */
-const buildNodeOptions = (
-  overrides: Partial<DetachDialogNodeOption>[] = [],
-): DetachDialogNodeOption[] =>
+const buildNodeOptions = (overrides: Partial<DetachNodeOption>[] = []): DetachNodeOption[] =>
   overrides.map((override, idx) => ({
     node_id: override.node_id ?? `node-${String(idx + 1)}`,
     node_name: override.node_name ?? `Node ${String(idx + 1)}`,

@@ -1,10 +1,5 @@
 import * as React from 'react';
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  MoreHorizontal,
-  MoreHorizontalIcon,
-} from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontal } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -256,21 +251,6 @@ function PaginationNext({ className, ...props }: React.ComponentProps<typeof Pag
   );
 }
 
-/** Used by: pagination footers when compact ranges hide intermediate pages. */
-function PaginationEllipsis({ className, ...props }: React.ComponentProps<'span'>) {
-  return (
-    <span
-      aria-hidden
-      data-slot="pagination-ellipsis"
-      className={cn('flex size-9 items-center justify-center', className)}
-      {...props}
-    >
-      <MoreHorizontalIcon className="size-4" />
-      <span className="sr-only">More pages</span>
-    </span>
-  );
-}
-
 export {
   Pagination,
   PaginationContent,
@@ -278,7 +258,6 @@ export {
   PaginationItem,
   PaginationPrevious,
   PaginationNext,
-  PaginationEllipsis,
   // buildPaginationRange and PaginationJump are exported inline above as
   // top-level `export const` so consumers can import them directly.
 };

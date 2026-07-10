@@ -43,19 +43,6 @@ const TableBody = React.forwardRef<
 ));
 TableBody.displayName = 'TableBody';
 
-/** Table footer section used where summaries or footer controls need table semantics. */
-const TableFooter = React.forwardRef<
-  HTMLTableSectionElement,
-  React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <tfoot
-    ref={ref}
-    className={cn('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', className)}
-    {...props}
-  />
-));
-TableFooter.displayName = 'TableFooter';
-
 /** Table row primitive with shared hover/selected styling for data grids. */
 const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
   ({ className, ...props }, ref) => (
@@ -103,13 +90,4 @@ const TableCell = React.forwardRef<
 ));
 TableCell.displayName = 'TableCell';
 
-/** Table caption primitive used when callers need accessible table context below data. */
-const TableCaption = React.forwardRef<
-  HTMLTableCaptionElement,
-  React.HTMLAttributes<HTMLTableCaptionElement>
->(({ className, ...props }, ref) => (
-  <caption ref={ref} className={cn('mt-4 text-sm text-muted-foreground', className)} {...props} />
-));
-TableCaption.displayName = 'TableCaption';
-
-export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };
+export { Table, TableHeader, TableBody, TableHead, TableRow, TableCell };

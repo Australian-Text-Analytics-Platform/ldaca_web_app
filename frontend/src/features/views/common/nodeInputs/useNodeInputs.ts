@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import type { NodeColumnSelection, WorkspaceNodeLike } from '../nodeSelectionTypes';
-import { getNodeIdentifier } from '../nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import type { NodeColumnSelection } from '../nodeSelectionTypes';
 import {
   type ColumnInfoGetter,
   type NodeAddRejection,
@@ -19,7 +19,7 @@ export interface UseNodeInputsConfig {
   /** Commit a new input list to the backing store. */
   onChange: (next: NodeInput[]) => void;
   /** Live workspace nodes — the source for resolution and the add picker. */
-  allNodes: WorkspaceNodeLike[];
+  allNodes: WorkspaceNodeMetadata[];
   /** Per-view constraints (allowed column types, max nodes, document-only). */
   constraints: NodeInputConstraints;
   /** Optional typed-column getter from ``useNodeColumnInfos`` for accurate dtypes. */
@@ -32,11 +32,11 @@ export interface UseNodeInputsResult {
   /** Inputs resolved against live nodes (stale dropped), with column options. */
   resolvedNodes: ResolvedNodeInput[];
   /** Convenience: just the resolved live nodes, in input order. */
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceNodeMetadata[];
   /** Convenience: {nodeId, column} pairs for request building / pickers. */
   nodeColumnSelections: NodeColumnSelection[];
   /** Live nodes not yet added (candidates for the Add control). */
-  availableNodes: WorkspaceNodeLike[];
+  availableNodes: WorkspaceNodeMetadata[];
   /** Whether another node may be added under the max-nodes constraint. */
   canAddMore: boolean;
   /** Append nodes by id; returns rejections for ids that failed validation. */
@@ -90,7 +90,7 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
   const selectedIds = useMemo(() => new Set(value.map((i) => i.node_id)), [value]);
 
   const availableNodes = useMemo(
-    () => allNodes.filter((node) => !selectedIds.has(getNodeIdentifier(node))),
+    () => allNodes.filter((node) => !selectedIds.has(node.id)),
     [allNodes, selectedIds],
   );
 

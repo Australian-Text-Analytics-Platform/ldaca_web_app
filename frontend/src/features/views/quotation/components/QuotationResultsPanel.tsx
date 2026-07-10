@@ -5,11 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Input } from '@/components/ui/input';
-import type {
-  NodeColumnSelection,
-  WorkspaceNodeLike,
-} from '@/features/views/common/nodeSelectionTypes';
-import { getNodeIdentifier } from '@/features/views/common';
+import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '@/features/views/common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '@/features/views/common/constants';
@@ -25,7 +22,7 @@ import { type QuotationHoverState } from './QuotationHighlightedCell';
 import { QuotationNodeBlock } from './QuotationNodeBlock';
 
 interface QuotationResultsPanelProps {
-  displayedNodes: WorkspaceNodeLike[];
+  displayedNodes: WorkspaceNodeMetadata[];
   activeSelections: NodeColumnSelection[];
   resultsByNode: Record<string, QuotationResultState>;
   selectedMetadataColumns: string[];
@@ -87,7 +84,7 @@ export function QuotationResultsPanel({
   onMaterialize,
   onOpenDetachDialog,
 }: QuotationResultsPanelProps) {
-  const metadataNodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0]) : '';
+  const metadataNodeId = displayedNodes[0]?.id ?? '';
   const quotationMetadataColumns = buildQuotationMetadataColumns(
     metadataNodeId ? resultsByNode[metadataNodeId] : null,
   );
@@ -165,7 +162,7 @@ export function QuotationResultsPanel({
       </CardHeader>
       <CardContent className="space-y-8">
         {displayedNodes.map((node) => {
-          const nodeId = getNodeIdentifier(node);
+          const nodeId = node.id;
           const selection = activeSelections.find((entry) => entry.nodeId === nodeId);
           const textCol = selection?.column ?? '';
 

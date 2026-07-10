@@ -172,7 +172,6 @@ describe('useWorkspaceNodeMutations', () => {
       rerender(args);
       expect(result.current.actions).toBe(firstActions);
     });
-
   });
 
   describe('createWorkspace', () => {
@@ -211,10 +210,7 @@ describe('useWorkspaceNodeMutations', () => {
       workspaceSdkMock.createWorkspace.mockRejectedValue(new Error('server down'));
 
       const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { endOperation }),
-          ),
+        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { endOperation })),
         { wrapper: wrapWithClient(queryClient) },
       );
 
@@ -331,12 +327,16 @@ describe('useWorkspaceNodeMutations', () => {
       expect(fetchNodeInfoMock).not.toHaveBeenCalled();
     });
 
-    it('fetches with force=true and normalises the response into NodeSchemaResponse', async () => {
+    it('fetches with force=true and returns the generated node-info contract', async () => {
       const queryClient = createTestClient();
       queryClient.setQueryData(['workspaces', 'ws-1', 'graph'], {
         nodes: [{ id: 'node-1' }],
       });
-      fetchNodeInfoMock.mockResolvedValue({ schema: { col_a: 'string', col_b: 'integer' } });
+      fetchNodeInfoMock.mockResolvedValue({
+        id: 'node-1',
+        name: 'Node 1',
+        schema: { col_a: 'string', col_b: 'integer' },
+      });
 
       const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
         wrapper: wrapWithClient(queryClient),
@@ -351,11 +351,9 @@ describe('useWorkspaceNodeMutations', () => {
         force: true,
       });
       expect(schema).toEqual({
-        node_id: 'node-1',
+        id: 'node-1',
+        name: 'Node 1',
         schema: { col_a: 'string', col_b: 'integer' },
-        columns: ['col_a', 'col_b'],
-        column_types: { col_a: 'string', col_b: 'integer' },
-        is_text_data: false,
       });
     });
   });
@@ -398,7 +396,9 @@ describe('useWorkspaceNodeMutations', () => {
       expect(
         predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'info', 'batch', 'node-1'] }),
       ).toBe(true);
-      expect(predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-2', 'info'] })).toBe(false);
+      expect(predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-2', 'info'] })).toBe(
+        false,
+      );
     });
   });
 

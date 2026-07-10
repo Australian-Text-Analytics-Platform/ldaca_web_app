@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
+import type { ConcordanceNodeResult as ConcordanceResultEntry, WorkspaceGraphNode } from '@/api';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
@@ -10,9 +10,8 @@ import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import { getNodeIdentifier } from '../../common';
 import type { NodeColumnSelection } from '../../common';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import {
   CONCORDANCE_COMBINED_NODE_KEY,
@@ -29,7 +28,6 @@ import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
 import { ConcordanceDispersionRowsTable } from './ConcordanceDispersionRowsTable';
 import { buildConcordanceDispersionTableModel } from './concordanceDispersionTableModel';
 import {
-  CONCORDANCE_DISPERSION_READ_ONLY_REASON,
   buildDispersionDetachActionState,
   toggleHiddenMatchedText,
 } from './concordanceDispersionActions';
@@ -64,8 +62,8 @@ export interface ConcordanceDispersionNodeBlockProps {
   resultsViewportWidth: number;
 
   // Workspace selection
-  selectedNodes: WorkspaceNodeLike[];
-  panelSelectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceGraphNode[];
+  panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   labelToNodeId: Record<string, string> | null;
 
@@ -133,8 +131,6 @@ export interface ConcordanceDispersionNodeBlockProps {
   ) => void;
   handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
-  /** Read-only flag that disables Process All / Process Both / Dispersion Detach buttons while leaving chart exploration controls active. */
-  readOnly?: boolean;
 }
 
 /**
@@ -188,7 +184,6 @@ export function ConcordanceDispersionNodeBlock({
   handleRowClick,
   handleMaterialize,
   setCombinedPage,
-  readOnly = false,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
   const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
@@ -220,7 +215,7 @@ export function ConcordanceDispersionNodeBlock({
     pageSize: globalPageSize,
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
-        if (!readOnly) onPageSizeChange(next.pageSize);
+        onPageSizeChange(next.pageSize);
         return;
       }
       const newPage = next.pageIndex + 1;
@@ -286,7 +281,7 @@ export function ConcordanceDispersionNodeBlock({
           pageSizeLabel="Documents per batch"
           pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
           loading={combinedLoading}
-          showPageSize={!readOnly}
+          showPageSize
         />
       </>
     );
@@ -297,48 +292,39 @@ export function ConcordanceDispersionNodeBlock({
           <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
           <div className="ml-auto flex items-center space-x-2">
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
-            <DisabledReasonTooltip
-              reason={readOnly ? CONCORDANCE_DISPERSION_READ_ONLY_REASON : undefined}
+            <Button
+              onClick={() => {
+                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
+                for (const nid of combinedNodeIds) {
+                  if (materializedPaths[nid]) continue;
+                  const col =
+                    effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
+                  if (!col) continue;
+                  void handleMaterialize(nid, col);
+                }
+              }}
+              disabled={
+                isAnyCombinedMaterializing ||
+                allCombinedMaterialized ||
+                !searchWord.trim() ||
+                combinedNodeIds.length === 0
+              }
+              size="sm"
+              variant="outline"
+              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+              title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
             >
-              <Button
-                onClick={() => {
-                  if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                  for (const nid of combinedNodeIds) {
-                    if (materializedPaths[nid]) continue;
-                    const col =
-                      effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
-                    if (!col) continue;
-                    void handleMaterialize(nid, col);
-                  }
-                }}
-                disabled={
-                  readOnly ||
-                  isAnyCombinedMaterializing ||
-                  allCombinedMaterialized ||
-                  !searchWord.trim() ||
-                  combinedNodeIds.length === 0
-                }
-                size="sm"
-                variant="outline"
-                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                title={
-                  readOnly
-                    ? undefined
-                    : 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
-                }
-              >
-                {isAnyCombinedMaterializing ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    Processing...
-                  </>
-                ) : allCombinedMaterialized ? (
-                  <>Processed</>
-                ) : (
-                  <>Process Both</>
-                )}
-              </Button>
-            </DisabledReasonTooltip>
+              {isAnyCombinedMaterializing ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  Processing...
+                </>
+              ) : allCombinedMaterialized ? (
+                <>Processed</>
+              ) : (
+                <>Process Both</>
+              )}
+            </Button>
             {(() => {
               const combinedSelection =
                 (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
@@ -349,7 +335,6 @@ export function ConcordanceDispersionNodeBlock({
               );
               const combinedHasSelection = combinedSelection.size > 0;
               const detachAction = buildDispersionDetachActionState({
-                readOnly,
                 isBusy: combinedLoading,
                 hasSearchWord: Boolean(searchWord.trim()),
                 hasDetachTarget: combinedNodeIds.length > 0,
@@ -377,9 +362,7 @@ export function ConcordanceDispersionNodeBlock({
                             (s) => s.nodeId === nid,
                           )?.column;
                           if (!col) return null;
-                          const sourceNode = panelSelectedNodes.find(
-                            (node) => getNodeIdentifier(node) === nid,
-                          );
+                          const sourceNode = panelSelectedNodes.find((node) => node.id === nid);
                           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
                           const label = sourceNode?.name || sourceNode?.id || nid;
                           return { nodeId: nid, column: col, nodeLabel: label };
@@ -584,64 +567,56 @@ export function ConcordanceDispersionNodeBlock({
         pageSizeLabel="Documents per batch"
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
-        showPageSize={!readOnly}
+        showPageSize
       >
-        <DisabledReasonTooltip
-          reason={readOnly ? CONCORDANCE_DISPERSION_READ_ONLY_REASON : undefined}
+        <Button
+          onClick={() => {
+            if (!searchWord.trim()) return;
+            for (const nid of processTargetIds) {
+              if (materializedPaths[nid]) continue;
+              const col = isMultiBlock
+                ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
+                : column;
+              if (!col) continue;
+              void handleMaterialize(nid, col);
+            }
+          }}
+          disabled={
+            nodeIsLoading ||
+            isAnyProcessTargetMaterializing ||
+            allProcessTargetsMaterialized ||
+            !searchWord.trim() ||
+            !canDetach ||
+            processTargetIds.length === 0
+          }
+          size="sm"
+          variant="outline"
+          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+          title={
+            isMultiBlock
+              ? 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
+              : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
+          }
         >
-          <Button
-            onClick={() => {
-              if (!searchWord.trim()) return;
-              for (const nid of processTargetIds) {
-                if (materializedPaths[nid]) continue;
-                const col = isMultiBlock
-                  ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
-                  : column;
-                if (!col) continue;
-                void handleMaterialize(nid, col);
-              }
-            }}
-            disabled={
-              readOnly ||
-              nodeIsLoading ||
-              isAnyProcessTargetMaterializing ||
-              allProcessTargetsMaterialized ||
-              !searchWord.trim() ||
-              !canDetach ||
-              processTargetIds.length === 0
-            }
-            size="sm"
-            variant="outline"
-            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title={
-              readOnly
-                ? undefined
-                : isMultiBlock
-                  ? 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
-                  : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
-            }
-          >
-            {isAnyProcessTargetMaterializing ? (
-              <>
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                Processing...
-              </>
-            ) : allProcessTargetsMaterialized ? (
-              <>Processed</>
-            ) : isMultiBlock ? (
-              <>Process Both Blocks</>
-            ) : (
-              <>Process All</>
-            )}
-          </Button>
-        </DisabledReasonTooltip>
+          {isAnyProcessTargetMaterializing ? (
+            <>
+              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+              Processing...
+            </>
+          ) : allProcessTargetsMaterialized ? (
+            <>Processed</>
+          ) : isMultiBlock ? (
+            <>Process Both Blocks</>
+          ) : (
+            <>Process All</>
+          )}
+        </Button>
         {(() => {
           const nodeSelection =
             (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ?? EMPTY_BIN_SELECTION;
           const nodeMaterialisedBins = getMaterializedBinsForKey(nodeKey);
           const nodeHasSelection = nodeSelection.size > 0;
           const detachAction = buildDispersionDetachActionState({
-            readOnly,
             isBusy: nodeIsLoading || isDetaching,
             hasSearchWord: Boolean(searchWord.trim()),
             hasDetachTarget: canDetach && Boolean(detachNodeId),
@@ -651,7 +626,8 @@ export function ConcordanceDispersionNodeBlock({
             allMatchedTexts,
             hiddenMatchedTexts,
             materializeSelectionHint: `Materialise the corpus first (${isMultiBlock ? 'Process Both Blocks' : 'Process All'}) to safely apply this bin selection across all documents.`,
-            selectedBinsHint: 'Add a per-document aggregation of the selected bin hits to the workspace',
+            selectedBinsHint:
+              'Add a per-document aggregation of the selected bin hits to the workspace',
             allHitsHint: 'Add a per-document aggregation of all hits to the workspace',
           });
           return (

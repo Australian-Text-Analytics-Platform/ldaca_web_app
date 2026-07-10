@@ -66,7 +66,6 @@ function recentSelectionsStore(overrides: Partial<RecentSelectionsStore> = {}) {
   const store: RecentSelectionsStore = {
     byWorkspace: {},
     record: vi.fn(),
-    clear: vi.fn(),
     ...overrides,
   };
   mocks.useRecentSelectionsStore.mockImplementation(
@@ -92,6 +91,7 @@ describe('useTabNodeInputs', () => {
     mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({
       getColumnInfos: () => [{ name: 'text', dataType: 'string' }],
+      nodeInfoCache: {},
     });
     mocks.useUIStore.mockImplementation((selector: (state: { currentView: string }) => unknown) =>
       selector({ currentView: 'annotation' }),
@@ -157,6 +157,7 @@ describe('useTabNodeInputs', () => {
     });
     mocks.useNodeColumnInfos.mockReturnValue({
       getColumnInfos: () => [],
+      nodeInfoCache: {},
     });
     nodeInputRequestsStore({
       requests: [{ id: 11, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
@@ -171,9 +172,7 @@ describe('useTabNodeInputs', () => {
       }),
     );
 
-    expect(onTabInputSetChange).toHaveBeenCalledWith('source', [
-      { node_id: 'node-a', column: '' },
-    ]);
+    expect(onTabInputSetChange).toHaveBeenCalledWith('source', [{ node_id: 'node-a', column: '' }]);
     expect(consume).toHaveBeenCalledWith(11);
   });
 
@@ -215,7 +214,9 @@ describe('useTabNodeInputs', () => {
     expect(consume).toHaveBeenCalledWith(12);
   });
 
-  it.each([2, 6])('consumes and rejects queued graph input when the %i-node cap is full', (maxNodes) => {
+  it.each([
+    2, 6,
+  ])('consumes and rejects queued graph input when the %i-node cap is full', (maxNodes) => {
     const nodes = Array.from({ length: maxNodes + 1 }, (_, index) => ({
       id: `node-${String(index + 1)}`,
       name: `Node ${String(index + 1)}`,
@@ -240,9 +241,7 @@ describe('useTabNodeInputs', () => {
     renderHook(() =>
       useTabNodeInputs({
         tabInputSets: {
-          source: nodes
-            .slice(0, maxNodes)
-            .map((node) => ({ node_id: node.id, column: 'text' })),
+          source: nodes.slice(0, maxNodes).map((node) => ({ node_id: node.id, column: 'text' })),
         },
         onTabInputSetChange,
         constraints: { allowedDataTypes: ['string'], maxNodes },
@@ -256,63 +255,62 @@ describe('useTabNodeInputs', () => {
     expect(consume).toHaveBeenCalledWith(maxNodes);
   });
 
-  it.each([2, 6])(
-    'normalizes cap %i once with stable identities and capped metadata under StrictMode',
-    (maxNodes) => {
-      const nodes = Array.from({ length: 12 }, (_, index) => ({
-        id: `node-${String(index + 1)}`,
-        name: `Node ${String(index + 1)}`,
-        columns: ['text'],
-        schema: { text: 'String' },
-      }));
-      const rawInputs = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
-      const tabInputSets = { source: rawInputs };
-      const constraints = { allowedDataTypes: ['string'], maxNodes };
-      const onTabInputSetChange = vi.fn();
-      mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
+  it.each([
+    2, 6,
+  ])('normalizes cap %i once with stable identities and capped metadata under StrictMode', (maxNodes) => {
+    const nodes = Array.from({ length: 12 }, (_, index) => ({
+      id: `node-${String(index + 1)}`,
+      name: `Node ${String(index + 1)}`,
+      columns: ['text'],
+      schema: { text: 'String' },
+    }));
+    const rawInputs = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
+    const tabInputSets = { source: rawInputs };
+    const constraints = { allowedDataTypes: ['string'], maxNodes };
+    const onTabInputSetChange = vi.fn();
+    mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
 
-      const { result, rerender } = renderHook(
-        () =>
-          useTabNodeInputs({
-            selectorId: 'source',
-            tabInputSets,
-            onTabInputSetChange,
-            constraints,
-            consumeNodeInputRequests: false,
-          }),
-        { wrapper: StrictMode },
-      );
+    const { result, rerender } = renderHook(
+      () =>
+        useTabNodeInputs({
+          selectorId: 'source',
+          tabInputSets,
+          onTabInputSetChange,
+          constraints,
+          consumeNodeInputRequests: false,
+        }),
+      { wrapper: StrictMode },
+    );
 
-      const expectedIds = nodes.slice(-maxNodes).map((node) => node.id);
-      const firstInputs = result.current.inputs;
-      const firstActions = {
-        addNodes: result.current.addNodes,
-        getAddRejection: result.current.getAddRejection,
-        removeNode: result.current.removeNode,
-        clear: result.current.clear,
-        setColumn: result.current.setColumn,
-      };
+    const expectedIds = nodes.slice(-maxNodes).map((node) => node.id);
+    const firstInputs = result.current.inputs;
+    const firstActions = {
+      addNodes: result.current.addNodes,
+      getAddRejection: result.current.getAddRejection,
+      removeNode: result.current.removeNode,
+      clear: result.current.clear,
+      setColumn: result.current.setColumn,
+    };
 
-      rerender();
+    rerender();
 
-      expect(result.current.inputs.map((input) => input.node_id)).toEqual(expectedIds);
-      expect(result.current.inputs).toBe(firstInputs);
-      expect(result.current.addNodes).toBe(firstActions.addNodes);
-      expect(result.current.getAddRejection).toBe(firstActions.getAddRejection);
-      expect(result.current.removeNode).toBe(firstActions.removeNode);
-      expect(result.current.clear).toBe(firstActions.clear);
-      expect(result.current.setColumn).toBe(firstActions.setColumn);
-      expect(mocks.useNodeColumnInfos).toHaveBeenCalled();
-      mocks.useNodeColumnInfos.mock.calls.forEach(([options]) => {
-        expect((options.nodes as { id: string }[]).map((node) => node.id)).toEqual(expectedIds);
-      });
-      expect(onTabInputSetChange).toHaveBeenCalledOnce();
-      expect(onTabInputSetChange.mock.calls[0]?.[0]).toBe('source');
-      expect(
-        onTabInputSetChange.mock.calls[0]?.[1].map((input: { node_id: string }) => input.node_id),
-      ).toEqual(expectedIds);
-    },
-  );
+    expect(result.current.inputs.map((input) => input.node_id)).toEqual(expectedIds);
+    expect(result.current.inputs).toBe(firstInputs);
+    expect(result.current.addNodes).toBe(firstActions.addNodes);
+    expect(result.current.getAddRejection).toBe(firstActions.getAddRejection);
+    expect(result.current.removeNode).toBe(firstActions.removeNode);
+    expect(result.current.clear).toBe(firstActions.clear);
+    expect(result.current.setColumn).toBe(firstActions.setColumn);
+    expect(mocks.useNodeColumnInfos).toHaveBeenCalled();
+    mocks.useNodeColumnInfos.mock.calls.forEach(([options]) => {
+      expect((options.nodes as { id: string }[]).map((node) => node.id)).toEqual(expectedIds);
+    });
+    expect(onTabInputSetChange).toHaveBeenCalledOnce();
+    expect(onTabInputSetChange.mock.calls[0]?.[0]).toBe('source');
+    expect(
+      onTabInputSetChange.mock.calls[0]?.[1].map((input: { node_id: string }) => input.node_id),
+    ).toEqual(expectedIds);
+  });
 
   it('does not repeat normalization when only the owner callback identity changes', () => {
     const nodes = Array.from({ length: 12 }, (_, index) => ({

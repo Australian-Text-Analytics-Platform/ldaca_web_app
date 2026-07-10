@@ -63,6 +63,17 @@ from `queryKeys.nodeInfo()` / `queryKeys.nodeInfos()` via
 `nodeInfoQueryOptions()`, or `nodeInfosQueryOptions()` instead of deriving
 metadata from graph nodes or table rows.
 
+`workspaceNodeMetadata.ts` is the single handwritten projection boundary for
+selectors that need both sources. It combines a generated `WorkspaceGraphNode`
+with an optional generated `WorkspaceNodeInfo` into required canonical fields
+(`id`, `name`, colour, document column, columns, schema, shape, tokenizer
+models, and undo/redo availability). Feature code must not accept legacy
+workspace-metadata identity/label aliases or rebuild document/schema fallbacks;
+persisted `AnalysisTabInput` selections still use their generated `node_id`
+transport field. Schema refresh
+returns the generated `WorkspaceNodeInfo` contract directly; column-header code
+reads its `schema` field instead of normalizing a second response shape.
+
 New mutations should follow the existing invalidation helpers instead of
 manually reloading the whole app state.
 
@@ -80,6 +91,11 @@ position and selection stay on their dedicated reconciliation path. Node-data
 commands read volatile workspace/view context when invoked, and session-only
 fresh-node baselines are keyed by workspace so overlapping node ids cannot
 share acknowledgement state.
+
+React Flow node `data` contains one explicit `WorkspaceGraphNodeCard`
+projection plus `isFresh` and the live callbacks required by `CustomNode`.
+Selection remains React Flow's `selected` field; do not add duplicate selection
+flags or restore schema/table fields to the graph-card model.
 
 ## Table Hooks
 

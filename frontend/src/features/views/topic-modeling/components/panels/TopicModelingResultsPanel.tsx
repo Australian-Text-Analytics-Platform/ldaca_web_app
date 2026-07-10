@@ -1,31 +1,13 @@
 import React from 'react';
+import type { DetachNodeOption, TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
-import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
+import { DetachColumnsDialog } from '@/features/views/common/components/DetachColumnsDialog';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
-
-interface TopicModelingTopic {
-  id: number;
-  label: string;
-  size: number[];
-  total_size: number;
-  x: number;
-  y: number;
-}
-type TopicModelingResult = {
-  state?: string | null;
-  data?: {
-    topics: TopicModelingTopic[];
-    corpus_sizes?: number[] | null;
-    meta?: Record<string, unknown> | null;
-  } | null;
-  metadata?: Record<string, unknown> | null;
-  message?: string | null;
-} | null;
 
 const READ_ONLY_DISABLED_REASON = 'This action is unavailable while results are read-only.';
 
@@ -42,7 +24,7 @@ interface Props {
     progress?: number;
     started_at?: string | null;
   } | null;
-  result: TopicModelingResult;
+  result: TopicModelingResponse | null;
   error?: string | null;
   topics: TopicModelingTopic[];
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -68,12 +50,7 @@ interface Props {
   randomSeed?: number;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  detachNodeOptions: {
-    node_id: string;
-    node_name: string;
-    available_columns: string[];
-    disabled_columns?: string[];
-  }[];
+  detachNodeOptions: DetachNodeOption[];
   selectedDetachColumns: Record<string, string[]>;
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
   selectAllDetachColumns: () => void;
@@ -162,7 +139,6 @@ export function TopicModelingResultsPanel({
 
         {isFailedState ? (
           <p className="text-sm text-muted-foreground">
-            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty failure message should fall back to the default text, not render blank */}
             {result.message || 'Topic modeling failed'}
           </p>
         ) : null}
@@ -232,10 +208,12 @@ export function TopicModelingResultsPanel({
         ) : null}
       </AnalysisCardLayout>
 
-      <TopicModelingDetachDialog
+      <DetachColumnsDialog
         open={detachDialogOpen}
         onOpenChange={setDetachDialogOpen}
         isDetaching={isDetaching}
+        title="Detach Topic Results"
+        description="Select the columns to include with the detached topic results. The topic columns are selected by default; untick any you don't need."
         detachNodeOptions={detachNodeOptions}
         selectedDetachColumns={selectedDetachColumns}
         toggleDetachColumn={toggleDetachColumn}

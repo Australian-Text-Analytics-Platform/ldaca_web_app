@@ -1,7 +1,4 @@
-export interface TopicModelingTopicPoint {
-  x: number;
-  y: number;
-}
+import type { TopicModelingTopic } from '@/api';
 
 export interface ZoomDomain {
   xMin: number;
@@ -61,7 +58,9 @@ export function getReadableTextColor(hexColor: string): string {
  * Used by: useTopicModelingZoomBrush.ts.
  * Flow: collect topic x/y coordinates, compute min/max bounds, widen flat axes with epsilon, then return the zoom domain.
  */
-export function computeZoomDomain(topics: TopicModelingTopicPoint[]): ZoomDomain | null {
+export function computeZoomDomain(
+  topics: Pick<TopicModelingTopic, 'x' | 'y'>[],
+): ZoomDomain | null {
   if (!topics.length) return null;
 
   const xs = topics.map((topic) => topic.x);

@@ -12,6 +12,10 @@ import type {
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import {
+  projectWorkspaceNodeMetadata,
+  type WorkspaceNodeMetadata,
+} from '@/features/workspace/common/workspaceNodeMetadata';
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const openRouterAiSettings = {
@@ -19,6 +23,13 @@ const openRouterAiSettings = {
   aiProvider: 'openrouter',
   aiProviderModels: JSON.stringify({ openrouter: 'gpt-4o' }),
 };
+
+const workspaceNode = (
+  overrides: Pick<WorkspaceNodeMetadata, 'id' | 'name'> & Partial<WorkspaceNodeMetadata>,
+): WorkspaceNodeMetadata => ({
+  ...projectWorkspaceNodeMetadata({ id: overrides.id, name: overrides.name }),
+  ...overrides,
+});
 
 const mocks = vi.hoisted(() => ({
   createAnnotationClassDescriptions: vi.fn(),
@@ -118,12 +129,12 @@ const sourceNodeInputs = (
     {
       id: 'source-node',
       name: 'Source',
-      node: {
+      node: workspaceNode({
         id: 'source-node',
         name: 'Source',
         columns: ['text', 'existing_annotation'],
         schema: { text: 'String', existing_annotation: 'String' },
-      },
+      }),
       column: 'text',
       columnOptions: [
         { name: 'text', dataType: 'string' },
@@ -132,11 +143,11 @@ const sourceNodeInputs = (
     },
   ],
   selectedNodes: [
-    {
+    workspaceNode({
       id: 'source-node',
       name: 'Source',
       columns: ['text', 'existing_annotation'],
-    },
+    }),
   ],
   nodeColumnSelections: [{ nodeId: 'source-node', column: 'text' }],
   availableNodes: [],
@@ -163,12 +174,12 @@ const classNodeInputs = (
     {
       id: 'classes-node',
       name: 'Annotation Classes',
-      node: {
+      node: workspaceNode({
         id: 'classes-node',
         name: 'Annotation Classes',
         columns: ['class', 'description'],
         schema: { class: 'String', description: 'String' },
-      },
+      }),
       column: 'class',
       columnOptions: [
         { name: 'class', dataType: 'string' },
@@ -177,11 +188,11 @@ const classNodeInputs = (
     },
   ],
   selectedNodes: [
-    {
+    workspaceNode({
       id: 'classes-node',
       name: 'Annotation Classes',
       columns: ['class', 'description'],
-    },
+    }),
   ],
   nodeColumnSelections: [{ nodeId: 'classes-node', column: 'class' }],
   availableNodes: [],
@@ -210,12 +221,12 @@ const exampleNodeInputs = (
     {
       id: 'example-node',
       name: 'Example',
-      node: {
+      node: workspaceNode({
         id: 'example-node',
         name: 'Example',
         columns: ['text', 'existing_annotation'],
         schema: { text: 'String', existing_annotation: 'String' },
-      },
+      }),
       column: 'text',
       columnOptions: [
         { name: 'text', dataType: 'string' },
@@ -224,11 +235,11 @@ const exampleNodeInputs = (
     },
   ],
   selectedNodes: [
-    {
+    workspaceNode({
       id: 'example-node',
       name: 'Example',
       columns: ['text', 'existing_annotation'],
-    },
+    }),
   ],
   nodeColumnSelections: [{ nodeId: 'example-node', column: 'text' }],
   availableNodes: [],
@@ -484,12 +495,12 @@ describe('AnnotationFeature', () => {
               {
                 id: 'source-node',
                 name: 'Source',
-                node: {
+                node: workspaceNode({
                   id: 'source-node',
                   name: 'Source',
                   columns: ['text', 'annotation'],
                   schema: { text: 'String', annotation: 'String' },
-                },
+                }),
                 column: 'text',
                 columnOptions: [
                   { name: 'text', dataType: 'string' },

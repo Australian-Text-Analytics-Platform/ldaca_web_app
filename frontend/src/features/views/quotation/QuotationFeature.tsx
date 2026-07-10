@@ -16,7 +16,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  getNodeIdentifier,
   getServerEngineConfig,
   useLastRunRequest,
   useAnalysisFeature,
@@ -33,10 +32,10 @@ import { useQuotationContextPreference } from './hooks/useQuotationContextPrefer
 import { useQuotationDetachDialog } from './hooks/useQuotationDetachDialog';
 import { useQuotationEngineSettings } from './hooks/useQuotationEngineSettings';
 import { useQuotationMaterializeLifecycle } from './hooks/useQuotationMaterializeLifecycle';
+import { DetachColumnsDialog } from '../common/components/DetachColumnsDialog';
 import { useQuotationResultControls } from './hooks/useQuotationResultControls';
 import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
 import { normalizeRemoteUrl } from './quotationRemoteUrl';
-import { QuotationDetachDialog } from './components/QuotationDetachDialog';
 import { QuotationEngineSettingsFields } from './components/QuotationEngineSettingsFields';
 import { type QuotationHoverState } from './components/QuotationHighlightedCell';
 import { QuotationResultsPanel } from './components/QuotationResultsPanel';
@@ -220,11 +219,7 @@ function QuotationFeature({
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskRequest(
-        ANALYSIS_TAB_GROUPS.quotation,
-        currentWorkspaceId,
-        taskId,
-      );
+      return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.quotation, currentWorkspaceId, taskId);
     },
     // Applies freshly fetched results to the active node table after lifecycle polling finishes.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
@@ -233,7 +228,7 @@ function QuotationFeature({
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!result) return;
       const targetNode = displayedNodes[0];
-      const nodeId = targetNode ? getNodeIdentifier(targetNode) : '';
+      const nodeId = targetNode?.id ?? '';
       const selection = activeSelections.find((s) => s.nodeId === nodeId);
       const column = selection?.column ?? '';
       applyContextLengthPreferenceFromResult(result);
@@ -289,7 +284,7 @@ function QuotationFeature({
   const hasIncompleteSelections =
     !displayedNodes.length ||
     displayedNodes.some((node) => {
-      const nodeId = getNodeIdentifier(node);
+      const nodeId = node.id;
       const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
       return !selection?.column;
     });
@@ -603,10 +598,12 @@ function QuotationFeature({
         </AlertDialogContent>
       </AlertDialog>
 
-      <QuotationDetachDialog
+      <DetachColumnsDialog
         open={detachDialog.open}
         onOpenChange={detachDialog.onOpenChange}
         isDetaching={detachDialog.isDetaching}
+        title="Detach Quotation Results"
+        description="Select optional source columns to include alongside the quotation results. Required output columns stay checked automatically."
         detachNodeOptions={detachDialog.detachNodeOptions}
         selectedDetachColumns={detachDialog.selectedDetachColumns}
         toggleDetachColumn={detachDialog.toggleDetachColumn}

@@ -48,8 +48,4 @@ export interface UseAnalysisTaskFlowOptions {
 export interface UseAnalysisTaskFlowResult {
   status: AnalysisTaskStatus;
   banner: AnalysisTaskBannerState | null;
-  waitingBanner: AnalysisTaskBannerState | null;
-  activeTaskId: string | null;
-  hasActiveTask: boolean;
-  refreshNow: (reason?: AnalysisTaskFlowRefreshContext['reason']) => Promise<void> | void;
 }

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { NodeInputsPanel } from '../NodeInputsPanel';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
@@ -27,7 +28,10 @@ const resolvedNodes = [
   {
     id: 'node-1',
     name: 'Corpus A',
-    node: { id: 'node-1', name: 'Corpus A', shape: [100, 2] },
+    node: projectWorkspaceNodeMetadata(
+      { id: 'node-1', name: 'Corpus A' },
+      { id: 'node-1', name: 'Corpus A', shape: [100, 2] },
+    ),
     column: 'body',
     columnOptions: [{ name: 'body', dataType: 'string' }],
   },

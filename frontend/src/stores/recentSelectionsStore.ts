@@ -22,8 +22,6 @@ interface RecentSelectionsState {
 interface RecentSelectionsActions {
   /** Record a node-id group as the most-recent preset for a workspace. */
   record: (workspaceId: string | null | undefined, ids: string[]) => void;
-  /** Clear all recorded presets for a workspace. */
-  clear: (workspaceId: string | null | undefined) => void;
 }
 
 export type RecentSelectionsStore = RecentSelectionsState & RecentSelectionsActions;
@@ -49,13 +47,6 @@ export const useRecentSelectionsStore = create<RecentSelectionsStore>()(
             const deduped = existing.filter((group) => groupKey(group) !== key);
             deduped.unshift([...ids]);
             state.byWorkspace[workspaceId] = deduped.slice(0, MAX_RECENT);
-          }),
-
-        /** Backs a future "clear presets" affordance. */
-        clear: (workspaceId) =>
-          set((state) => {
-            if (!workspaceId) return;
-            state.byWorkspace[workspaceId] = [];
           }),
       })),
       {

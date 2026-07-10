@@ -11,7 +11,7 @@ import {
 import { queryKeys } from '@/lib/queryKeys';
 import { useDetachColumnsState } from '@/features/views/common/hooks/useDetachColumnsState';
 import { runAnalysisTaskEnvelope } from '@/features/views/common/tasks/runAnalysisTaskEnvelope';
-import type { DetachDialogNodeOption } from '@/features/views/common/components/DetachColumnsDialog';
+import type { DetachNodeOption } from '@/api';
 import { buildSamplingAutoNodeName } from '@/features/views/common/samplingAutoNodeName';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
@@ -120,7 +120,7 @@ export function useTopicModelingTaskFlow({
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
-  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachDialogNodeOption[]>([]);
+  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachNodeOption[]>([]);
   const {
     selectedDetachColumns,
     setSelectedDetachColumns,

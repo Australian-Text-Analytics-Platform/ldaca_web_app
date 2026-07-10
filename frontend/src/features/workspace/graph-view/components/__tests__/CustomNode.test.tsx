@@ -50,6 +50,35 @@ const getLatestNodeSettingsButton = () => {
   return buttons[buttons.length - 1] as HTMLButtonElement;
 };
 
+/** Builds the required React Flow node-card contract for focused interaction tests. */
+const nodeData = (
+  node: Partial<{
+    id: string;
+    name: string;
+    color: string | null;
+    shape: [number | null, number | null];
+    canUndo: boolean;
+    canRedo: boolean;
+  }> = {},
+) => ({
+  node: {
+    id: 'node-1',
+    name: 'Corpus',
+    color: null,
+    shape: [10, 3] as [number | null, number | null],
+    canUndo: false,
+    canRedo: false,
+    ...node,
+  },
+  isFresh: false,
+  onDelete: vi.fn(),
+  onRename: vi.fn(),
+  onCopy: vi.fn(),
+  onUndo: vi.fn(),
+  onRedo: vi.fn(),
+  onAddToSelection: vi.fn(),
+});
+
 describe('CustomNode', () => {
   it('removes the save action from the node menu', async () => {
     mockZoom = 1;
@@ -57,23 +86,11 @@ describe('CustomNode', () => {
     const props = {
       id: 'node-1',
       type: 'custom',
-      data: {
-        node: {
-          id: 'node-1',
-          name: 'sample_data/ADO/qldelection2020_candidate_tweets',
-          shape: [480, 8],
-          columns: [],
-          preview: [],
-          is_text_data: false,
-          can_undo: true,
-          can_redo: false,
-        },
-        onDelete: vi.fn(),
-        onRename: vi.fn(),
-        onCopy: vi.fn(),
-        onUndo: vi.fn(),
-        onRedo: vi.fn(),
-      },
+      data: nodeData({
+        name: 'sample_data/ADO/qldelection2020_candidate_tweets',
+        shape: [480, 8],
+        canUndo: true,
+      }),
       selected: true,
       dragging: false,
       zIndex: 0,
@@ -102,18 +119,7 @@ describe('CustomNode', () => {
     const props = {
       id: 'node-1',
       type: 'custom',
-      data: {
-        node: {
-          id: 'node-1',
-          name: 'Corpus',
-          color: '#2563eb',
-          shape: [10, 3],
-          columns: [],
-          preview: [],
-          is_text_data: false,
-        },
-        onDelete: vi.fn(),
-      },
+      data: nodeData({ color: '#2563eb' }),
       selected: false,
       dragging: false,
       zIndex: 0,
@@ -138,18 +144,10 @@ describe('CustomNode', () => {
     const props = {
       id: 'node-1',
       type: 'custom',
-      data: {
-        node: {
-          id: 'node-1',
-          name: 'sample_data/ADO/qldelection2020_samidata_tweets',
-          shape: [2380, 15],
-          columns: [],
-          preview: [],
-          is_text_data: false,
-        },
-        onDelete: vi.fn(),
-        onRename: vi.fn(),
-      },
+      data: nodeData({
+        name: 'sample_data/ADO/qldelection2020_samidata_tweets',
+        shape: [2380, 15],
+      }),
       selected: true,
       dragging: false,
       zIndex: 0,
@@ -188,21 +186,14 @@ describe('CustomNode', () => {
         id="node-zoomed-out"
         type="custom"
         data={{
-          node: {
+          ...nodeData({
             id: 'node-zoomed-out',
             name: 'sample_data/ADO/qldelection2020_candidate_tweets',
             shape: [480, 8],
-            columns: [],
-            preview: [],
-            is_text_data: false,
-            can_undo: true,
-            can_redo: false,
-          },
+            canUndo: true,
+          }),
           onDelete,
           onRename,
-          onCopy: vi.fn(),
-          onUndo: vi.fn(),
-          onRedo: vi.fn(),
         }}
         selected={true}
         dragging={false}
@@ -236,21 +227,11 @@ describe('CustomNode', () => {
     const props = {
       id: 'node-hide',
       type: 'custom',
-      data: {
-        node: {
-          id: 'node-hide',
-          name: 'sample_data/ADO/qldelection2020_candidate_tweets',
-          shape: [480, 8],
-          columns: [],
-          preview: [],
-          is_text_data: false,
-        },
-        onDelete: vi.fn(),
-        onRename: vi.fn(),
-        onCopy: vi.fn(),
-        onUndo: vi.fn(),
-        onRedo: vi.fn(),
-      },
+      data: nodeData({
+        id: 'node-hide',
+        name: 'sample_data/ADO/qldelection2020_candidate_tweets',
+        shape: [480, 8],
+      }),
       selected: false,
       dragging: false,
       zIndex: 0,
@@ -284,18 +265,7 @@ describe('CustomNode', () => {
       <CustomNode
         id="node-fresh"
         type="custom"
-        data={{
-          node: {
-            id: 'node-fresh',
-            name: 'Fresh corpus',
-            shape: [10, 3],
-            columns: [],
-            preview: [],
-            is_text_data: false,
-          },
-          isFresh: true,
-          onDelete: vi.fn(),
-        }}
+        data={{ ...nodeData({ id: 'node-fresh', name: 'Fresh corpus' }), isFresh: true }}
         selected={false}
         dragging={false}
         zIndex={0}

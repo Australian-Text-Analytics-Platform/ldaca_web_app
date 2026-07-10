@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { TopicModelingTopic } from '@/api';
 import { computeZoomDomain, type ZoomDomain } from '../topicModelingAdapters';
 
 interface BrushRect {
@@ -8,10 +9,7 @@ interface BrushRect {
   currentY: number;
 }
 
-interface TopicPoint {
-  x: number;
-  y: number;
-}
+type TopicPoint = Pick<TopicModelingTopic, 'x' | 'y'>;
 
 interface ZoomState<TTopic extends TopicPoint> {
   topics: TTopic[];

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { getNodeIdentifier, type WorkspaceNodeLike } from '../nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { VIZ_PALETTE, vizColorMapForNodes } from '../vizPalette';
 
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 interface NodeColorControlsParams {
   nodeIds: readonly string[];
-  nodes: readonly WorkspaceNodeLike[];
+  nodes: readonly WorkspaceNodeMetadata[];
   persistNodeColor?: (nodeId: string, color: string) => Promise<unknown> | undefined;
 }
 
@@ -43,7 +43,7 @@ export function useNodeColorControls({
   const [optimisticNodeColors, setOptimisticNodeColors] = useState<Record<string, string>>({});
 
   const defaultNodeColors = vizColorMapForNodes(nodeIds);
-  const nodeById = new Map(nodes.map((node) => [getNodeIdentifier(node), node] as const));
+  const nodeById = new Map(nodes.map((node) => [node.id, node] as const));
   const nodeColors = { ...defaultNodeColors };
   nodeIds.forEach((nodeId) => {
     const persisted = normalizeHexColor(nodeById.get(nodeId)?.color);

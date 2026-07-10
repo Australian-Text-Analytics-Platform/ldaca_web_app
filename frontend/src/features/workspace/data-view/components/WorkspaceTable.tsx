@@ -31,7 +31,8 @@ import { ServerPaginationFooter } from '@/features/views/common/components/Serve
 import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
 import { TopicDistributionBar } from './TopicDistributionBar';
 import type { DataRow, FilterOperator, PaginationInfo } from '../types';
-import { DATA_TYPES, getTypeDisplayName, normalizeTypeName } from '../services/schemaMutations';
+import { DATA_TYPES, getTypeDisplayName } from '../services/schemaMutations';
+import { normalizeTypeName } from '../utils/columnTypes';
 import { useColumnMutations } from '../hooks/useColumnMutations';
 
 // --- Constants ---

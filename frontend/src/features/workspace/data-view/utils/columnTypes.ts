@@ -78,99 +78,32 @@ export const normalizeTypeName = (type?: string | null): string => {
   return 'unknown';
 };
 
-/** Reads the dtype field from whichever schema-entry shape a backend route returned. */
-/** Called by: normalizeTypeName and mapColumnsToInfo in this utility module. */
-const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
-  if (!entry) return undefined;
-  if (typeof entry === 'string') return entry;
-  if (typeof entry === 'object') {
-    const e = entry as Record<string, unknown>;
-    return (e.js_type as string) || (e.type as string) || (e.dtype as string);
-  }
-  return undefined;
-};
-
 /**
- * Extract an ordered `ColumnInfo[]` from a workspace-node-ish object,
- * merging whichever metadata shape the backend returned:
- * - `schema`: array of `{name, js_type|type|dtype}` OR object keyed by column.
- * - `dtypes`: object keyed by column.
- * - `columns`: plain string[] (types are `unknown` without schema/dtype evidence).
- *
- * If multiple sources disagree we keep the earliest concrete answer because
- * the generic `columns` list is the weakest evidence.
+ * Extracts ordered column metadata from the generated workspace node contract
+ * (or its handwritten `WorkspaceNodeMetadata` projection). `schema` is the
+ * only dtype source; `columns` supplies stable order and unknown fallbacks.
  */
 /**
  * Used by: useNodeColumnInfos, aggregate/replace preprocessing hooks, and
  * add-node input resolution because they need one backend-schema normalization
  * boundary before filtering or rendering column choices.
- * Flow: gather schema/dtypes/column names, register columns in stable order,
- * promote unknown entries only when later dtype evidence exists, then return the
- * normalized list.
+ * Flow: read the canonical schema and explicit column order, append schema-only
+ * names, then normalize each generated dtype for the handwritten controls.
  */
-export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
+export const mapColumnsToInfo = (
+  node: { columns?: string[]; schema?: Record<string, string> } | null | undefined,
+): ColumnInfo[] => {
   if (!node) return [];
-
-  const n = node as Record<string, unknown>;
-
-  const columnOrder: string[] = [];
-  const typeMap = new Map<string, string>();
-
-  /** Merges column order and dtype evidence while preserving the first reliable column position. */
-  /**
-   * Called by: normalizeTypeName and mapColumnsToInfo in this utility module.
-   * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
-   */
-  const register = (name: unknown, rawType?: unknown) => {
-    if (typeof name !== 'string' || !name) return;
-    const normalizedType =
-      rawType == null
-        ? (typeMap.get(name) ?? 'unknown')
-        : normalizeTypeName(
-            typeof rawType === 'string'
-              ? rawType
-              : // eslint-disable-next-line @typescript-eslint/no-base-to-string -- rawType is a backend dtype value; default coercion is intended
-                String(rawType),
-          );
-
-    if (!typeMap.has(name)) {
-      columnOrder.push(name);
-      typeMap.set(name, normalizedType);
-      return;
-    }
-
-    const existingType = typeMap.get(name) ?? 'unknown';
-    if (existingType === 'unknown' && normalizedType !== 'unknown') {
-      typeMap.set(name, normalizedType);
-    }
-  };
-
-  const schema = (n.data as Record<string, unknown> | undefined)?.schema ?? n.schema;
-  if (Array.isArray(schema)) {
-    schema.forEach((entry: Record<string, unknown>) => {
-      register(entry.name, entry.js_type ?? entry.type ?? entry.dtype);
-    });
-  } else if (schema && typeof schema === 'object') {
-    Object.entries(schema as Record<string, unknown>).forEach(([name, entry]) => {
-      register(name, extractTypeFromSchemaEntry(entry));
-    });
-  }
-
-  const dtypes = (n.data as Record<string, unknown> | undefined)?.dtypes ?? n.dtypes;
-  if (dtypes && typeof dtypes === 'object') {
-    Object.entries(dtypes).forEach(([name, dtype]) => {
-      register(name, dtype);
-    });
-  }
-
-  const columns = (n.data as Record<string, unknown> | undefined)?.columns ?? n.columns;
-  if (Array.isArray(columns)) {
-    columns.forEach((name: unknown) => {
-      register(name);
-    });
-  }
-
-  return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) ?? 'unknown' }));
+  const schema = node.schema ?? {};
+  const columns = node.columns ?? [];
+  const orderedNames = [
+    ...columns,
+    ...Object.keys(schema).filter((name) => !columns.includes(name)),
+  ];
+  return orderedNames.map((name) => ({
+    name,
+    dataType: normalizeTypeName(schema[name]),
+  }));
 };
 
 /**

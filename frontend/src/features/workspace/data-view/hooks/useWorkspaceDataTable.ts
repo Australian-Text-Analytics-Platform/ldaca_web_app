@@ -8,7 +8,6 @@ import { getNodeDataByWorkspaceId, getNodeQueryPlan, type NodeDataResponse } fro
 import { createNodeDataRequest, queryKeys, type NodeDataRequest } from '@/lib/queryKeys';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import type { FilterOperator } from '../types';
-import { getNodeDocumentColumn } from '../utils/documentColumn';
 
 export interface WorkspaceDataTableHeaderInfo {
   nodeLabel: string;
@@ -190,7 +189,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     reorderSelectedNodes(orderedNodeIds);
   };
 
-  const tableStateKey = currentWorkspaceId && activeNodeId ? `${currentWorkspaceId}\0${activeNodeId}` : '';
+  const tableStateKey =
+    currentWorkspaceId && activeNodeId ? `${currentWorkspaceId}\0${activeNodeId}` : '';
   const [requestByNode, setRequestByNode] = useState<Record<string, NodeDataRequest>>({});
   const nodeTableRequest = tableStateKey
     ? (requestByNode[tableStateKey] ?? DEFAULT_NODE_TABLE_REQUEST)
@@ -374,7 +374,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     loading: nodeDataQuery.isLoading,
     workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,
-    documentColumn: getNodeDocumentColumn(selectedNode),
+    documentColumn: selectedNode?.document ?? undefined,
     onCast: selectedNodeIdForCallbacks ? handleCast : undefined,
     onRenameColumn: selectedNodeIdForCallbacks ? handleRenameColumn : undefined,
     onDeleteColumn: selectedNodeIdForCallbacks ? handleDeleteColumn : undefined,

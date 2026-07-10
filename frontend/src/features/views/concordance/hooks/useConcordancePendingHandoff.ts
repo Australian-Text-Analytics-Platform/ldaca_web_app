@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import type { WorkspaceGraphNode } from '@/api';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { HydrationState } from '../../common/useAnalysisHydration';
 import type { NodeColumnSelection } from '../../common';
-import type { WorkspaceNodeLike } from '../../common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 interface Params {
   pendingConcordance: PendingConcordance | null;
   clearPendingConcordance: () => void;
   hydrationState: HydrationState;
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceGraphNode[];
   setSearchWord: Dispatch<SetStateAction<string>>;
   setNodeColumnSelections: (
     selections: NodeColumnSelection[],

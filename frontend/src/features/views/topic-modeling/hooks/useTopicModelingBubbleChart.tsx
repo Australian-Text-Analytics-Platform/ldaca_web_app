@@ -1,15 +1,7 @@
 import React from 'react';
+import type { TopicModelingTopic } from '@/api';
 import { getReadableTextColor, interpolateColor, type ZoomDomain } from '../topicModelingAdapters';
 import { matchChecklistOption } from '@/features/views/common/checklistSearch';
-
-interface TopicModelingTopic {
-  id: number;
-  label: string;
-  size: number[];
-  total_size: number;
-  x: number;
-  y: number;
-}
 
 interface BrushRect {
   startX: number;

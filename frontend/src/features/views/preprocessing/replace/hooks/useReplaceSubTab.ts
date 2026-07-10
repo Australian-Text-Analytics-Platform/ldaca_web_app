@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { WorkspaceNodeLike } from '@/features/views/common/nodeSelectionTypes';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { type ReplaceApplyResponse, type ReplaceRequest } from '@/api';
 import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
@@ -8,7 +8,6 @@ import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
 } from '../../hooks/useNodePreviewWithRawFallback';
-import { getNodeKey } from '../../utils/nodeMetadata';
 import {
   buildReplaceRequest,
   resolveReplaceOutputColumnName,
@@ -19,7 +18,7 @@ import {
 export interface ReplaceSubTabProps {
   currentWorkspaceId: string | null;
   selectedColumn?: string;
-  selectedNodes: WorkspaceNodeLike[];
+  selectedNodes: WorkspaceNodeMetadata[];
   isLoading: {
     operations: boolean;
   };
@@ -51,7 +50,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const effectiveNodes = takeMostRecent(selectedNodes, 1);
 
   const activeNode = effectiveNodes[0] ?? null;
-  const activeNodeId = activeNode ? getNodeKey(activeNode) : null;
+  const activeNodeId = activeNode?.id ?? null;
   const stringColumns = activeNode
     ? mapColumnsToInfo(activeNode)
         .filter((column) => column.dataType === 'string')

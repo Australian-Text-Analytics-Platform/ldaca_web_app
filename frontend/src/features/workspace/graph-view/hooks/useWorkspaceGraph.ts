@@ -22,6 +22,7 @@ import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useSelectionStore } from '@/stores/selectionStore';
 import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
+import { projectWorkspaceGraphNodeCard, type WorkspaceGraphNodeCard } from '../graphNodeModel';
 
 const EDGE_STROKE = '#0f172a';
 const EMPTY_FRESH_IDS = new Set<string>();
@@ -62,22 +63,8 @@ export interface WorkspaceGraphViewModel {
 }
 
 interface ProjectedNodeData {
-  node?: {
-    id?: string;
-    name?: string;
-    color?: string | null;
-    shape?: unknown;
-    columns?: unknown;
-    preview?: unknown;
-    is_text_data?: boolean;
-    data_type?: string;
-    can_undo?: boolean;
-    can_redo?: boolean;
-    document?: string | null;
-    document_column?: string | null;
-    column_schema?: unknown;
-  };
-  isFresh?: boolean;
+  node: WorkspaceGraphNodeCard;
+  isFresh: boolean;
 }
 
 /**
@@ -89,29 +76,15 @@ interface ProjectedNodeData {
  * React Flow owns position and the dedicated selection effect owns selection.
  */
 const nodePresentationFor = (node: Node) => {
-  const data = node.data as ProjectedNodeData;
+  const data = node.data as unknown as ProjectedNodeData;
   return {
     id: node.id,
     type: node.type,
     hidden: node.hidden,
     selectable: node.selectable,
     connectable: node.connectable,
-    node: {
-      id: data.node?.id ?? null,
-      name: data.node?.name ?? null,
-      color: data.node?.color ?? null,
-      shape: data.node?.shape ?? null,
-      columns: data.node?.columns ?? null,
-      preview: data.node?.preview ?? null,
-      is_text_data: data.node?.is_text_data ?? false,
-      data_type: data.node?.data_type ?? null,
-      can_undo: data.node?.can_undo ?? false,
-      can_redo: data.node?.can_redo ?? false,
-      document: data.node?.document ?? null,
-      document_column: data.node?.document_column ?? null,
-      column_schema: data.node?.column_schema ?? null,
-    },
-    isFresh: data.isFresh ?? false,
+    node: data.node,
+    isFresh: data.isFresh,
   };
 };
 
@@ -164,15 +137,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
-  const {
-    deleteNode,
-    copyNode,
-    renameNode,
-    undoNode,
-    redoNode,
-    toggleNode,
-    clearSelection,
-  } = useWorkspaceActions();
+  const { deleteNode, copyNode, renameNode, undoNode, redoNode, toggleNode, clearSelection } =
+    useWorkspaceActions();
 
   // React Flow owns node-data identity between hook renders, so command
   // adapters stay stable while reading the latest provider actions from this
@@ -184,59 +150,44 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   }, [copyNode, deleteNode, redoNode, renameNode, undoNode]);
 
   /** Deletes a graph node through workspace actions. */
-  const handleDelete = useCallback(
-    (nodeId: string) => {
-      if (!nodeId) {
-        return;
-      }
-      void graphCommandsRef.current.deleteNode(nodeId);
-    },
-    [],
-  );
+  const handleDelete = useCallback((nodeId: string) => {
+    if (!nodeId) {
+      return;
+    }
+    void graphCommandsRef.current.deleteNode(nodeId);
+  }, []);
 
   /** Renames a graph node through workspace actions. */
-  const handleRename = useCallback(
-    (nodeId: string, newName: string) => {
-      if (!nodeId || !newName.trim()) {
-        return;
-      }
-      void graphCommandsRef.current.renameNode(nodeId, newName.trim());
-    },
-    [],
-  );
+  const handleRename = useCallback((nodeId: string, newName: string) => {
+    if (!nodeId || !newName.trim()) {
+      return;
+    }
+    void graphCommandsRef.current.renameNode(nodeId, newName.trim());
+  }, []);
 
   /** Clones a graph node through workspace actions. */
-  const handleCopy = useCallback(
-    (nodeId: string) => {
-      if (!nodeId) {
-        return;
-      }
-      void graphCommandsRef.current.copyNode(nodeId);
-    },
-    [],
-  );
+  const handleCopy = useCallback((nodeId: string) => {
+    if (!nodeId) {
+      return;
+    }
+    void graphCommandsRef.current.copyNode(nodeId);
+  }, []);
 
   /** Applies an undo operation to a graph node. */
-  const handleUndo = useCallback(
-    (nodeId: string) => {
-      if (!nodeId) {
-        return;
-      }
-      void graphCommandsRef.current.undoNode(nodeId);
-    },
-    [],
-  );
+  const handleUndo = useCallback((nodeId: string) => {
+    if (!nodeId) {
+      return;
+    }
+    void graphCommandsRef.current.undoNode(nodeId);
+  }, []);
 
   /** Applies a redo operation to a graph node. */
-  const handleRedo = useCallback(
-    (nodeId: string) => {
-      if (!nodeId) {
-        return;
-      }
-      void graphCommandsRef.current.redoNode(nodeId);
-    },
-    [],
-  );
+  const handleRedo = useCallback((nodeId: string) => {
+    if (!nodeId) {
+      return;
+    }
+    void graphCommandsRef.current.redoNode(nodeId);
+  }, []);
 
   // "Fresh" = nodes that appeared mid-session (detach / join / stack /
   // clone / etc. outputs) and haven't been interacted with yet. The
@@ -307,9 +258,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     );
 
     return workspaceGraph.nodes.map((node: GraphNode, index: number) => {
-      const documentColumn =
-        typeof node.document === 'string' && node.document.trim().length > 0 ? node.document : null;
-
       const position = positions.get(node.id) ?? { x: index * 320, y: 50 };
 
       return {
@@ -317,24 +265,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         type: 'customNode',
         position,
         data: {
-          node: {
-            id: node.id,
-            name: node.name || `Node ${String(index + 1)}`,
-            // Carry the persisted colour through so CustomNode can paint the
-            // left accent; backend omits it (null) for uncoloured nodes.
-            color: node.color ?? null,
-            shape: [null, null],
-            columns: [],
-            preview: [],
-            is_text_data: Boolean(documentColumn),
-            data_type: 'LazyFrame',
-            can_undo: Boolean(node.can_undo),
-            can_redo: Boolean(node.can_redo),
-            document: documentColumn,
-            document_column: documentColumn,
-            column_schema: {},
-          },
-          isMultiSelected: selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
+          node: projectWorkspaceGraphNodeCard(node),
           isFresh: freshIds.has(node.id),
           onDelete: handleDelete,
           onRename: handleRename,
@@ -446,10 +377,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       existing.map((node: Node) => ({
         ...node,
         selected: selectedNodeIds.includes(node.id),
-        data: {
-          ...node.data,
-          isMultiSelected: selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id),
-        },
       })),
     );
   }, [selectedNodeIds, setNodes]);

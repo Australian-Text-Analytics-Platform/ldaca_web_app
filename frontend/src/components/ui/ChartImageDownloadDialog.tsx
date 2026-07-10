@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { CHART_IMAGE_FORMATS, type ChartImageFormat } from '@/lib/chartExport';
 
-export interface ChartDownloadExtraOption {
+interface ChartDownloadExtraOption {
   id: string;
   label: string;
   defaultChecked?: boolean;

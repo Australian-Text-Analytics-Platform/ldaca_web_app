@@ -20,6 +20,7 @@ vi.mock('../../hooks/usePreprocessingPreview', () => ({
 
 import { useConcatSubTab } from '../../concat/hooks/useConcatSubTab';
 import { useJoinSubTab } from '../../join/hooks/useJoinSubTab';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 const previewState = {
   data: [],
@@ -47,8 +48,14 @@ describe('direct preprocessing preview adapters', () => {
       data: { data: [], columns: [], pagination: null },
     });
     const workspaceNodes = [
-      { id: 'left', name: 'Left', columns: ['id'], schema: { id: 'String' } },
-      { id: 'right', name: 'Right', columns: ['id'], schema: { id: 'String' } },
+      projectWorkspaceNodeMetadata(
+        { id: 'left', name: 'Left' },
+        { id: 'left', name: 'Left', columns: ['id'], schema: { id: 'String' } },
+      ),
+      projectWorkspaceNodeMetadata(
+        { id: 'right', name: 'Right' },
+        { id: 'right', name: 'Right', columns: ['id'], schema: { id: 'String' } },
+      ),
     ];
 
     renderHook(() =>
@@ -98,12 +105,16 @@ describe('direct preprocessing preview adapters', () => {
   });
 
   it('maps the Stack request workspace and exact signal to its workspace action', async () => {
-    const concatPreview = vi
-      .fn()
-      .mockResolvedValue({ data: [], columns: [], pagination: null });
+    const concatPreview = vi.fn().mockResolvedValue({ data: [], columns: [], pagination: null });
     const workspaceNodes = [
-      { id: 'node-1', name: 'One', columns: ['id'], schema: { id: 'String' } },
-      { id: 'node-2', name: 'Two', columns: ['id'], schema: { id: 'String' } },
+      projectWorkspaceNodeMetadata(
+        { id: 'node-1', name: 'One' },
+        { id: 'node-1', name: 'One', columns: ['id'], schema: { id: 'String' } },
+      ),
+      projectWorkspaceNodeMetadata(
+        { id: 'node-2', name: 'Two' },
+        { id: 'node-2', name: 'Two', columns: ['id'], schema: { id: 'String' } },
+      ),
     ];
 
     renderHook(() =>

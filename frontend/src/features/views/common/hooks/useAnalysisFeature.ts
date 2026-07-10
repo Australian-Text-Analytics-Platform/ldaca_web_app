@@ -41,7 +41,7 @@ export interface ClearAnalysisUiOptions {
 // Config
 // ---------------------------------------------------------------------------
 
-export interface UseAnalysisFeatureConfig<TResult = unknown> {
+interface UseAnalysisFeatureConfig<TResult = unknown> {
   analysisType: LastRunAnalysisType;
   taskType: CanonicalAnalysisTaskType | (string & {});
   workspaceId: string | null;
@@ -93,8 +93,7 @@ export interface UseAnalysisFeatureConfig<TResult = unknown> {
 // Return
 // ---------------------------------------------------------------------------
 
-export interface UseAnalysisFeatureReturn {
-  localTaskId: string | null;
+interface UseAnalysisFeatureReturn {
   setLocalTaskId: React.Dispatch<React.SetStateAction<string | null>>;
   resolveTaskId: () => Promise<string | null>;
 
@@ -105,15 +104,8 @@ export interface UseAnalysisFeatureReturn {
 
   taskStatus: AnalysisTaskStatus;
   banner: AnalysisTaskBannerState | null;
-  hasActiveTask: boolean;
-
-  fetchAndApplyResult: (
-    taskId: string | null,
-    expectedState: 'successful' | 'failed',
-  ) => Promise<void>;
   lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
 
-  hydrateFromServer: () => Promise<void>;
   hydrationState: HydrationState;
 
   stopTask: () => Promise<void>;
@@ -359,11 +351,7 @@ export function useAnalysisFeature<TResult = unknown>(
     : undefined;
 
   // ---- Task flow ----
-  const {
-    status: taskStatus,
-    banner,
-    hasActiveTask,
-  } = useAnalysisTaskFlow({
+  const { status: taskStatus, banner } = useAnalysisTaskFlow({
     taskType: config.taskType,
     isTabActive: config.isTabActive,
     workspaceId: config.workspaceId,
@@ -536,7 +524,6 @@ export function useAnalysisFeature<TResult = unknown>(
   };
 
   return {
-    localTaskId,
     setLocalTaskId,
     resolveTaskId,
     isRunning,
@@ -545,10 +532,7 @@ export function useAnalysisFeature<TResult = unknown>(
     runningRef,
     taskStatus,
     banner,
-    hasActiveTask,
-    fetchAndApplyResult,
     lastFetchedRef,
-    hydrateFromServer,
     hydrationState,
     stopTask,
     clearResults,

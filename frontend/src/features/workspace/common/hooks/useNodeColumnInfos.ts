@@ -3,28 +3,22 @@ import {
   type ColumnInfo,
   mapColumnsToInfo,
 } from '@/features/workspace/data-view/utils/columnTypes';
-import { type NodeInfo, nodeInfosQueryOptions } from '@/lib/nodeInfo';
-
-export type NodeLike = Record<string, unknown> & {
-  id: string;
-};
-
-/** Resolves the backend node id from a live workspace node. */
-/** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-const resolveNodeId = (node: NodeLike | null | undefined): string | null => node?.id ?? null;
+import type { WorkspaceGraphNode, WorkspaceNodeInfo } from '@/api';
+import type { WorkspaceNodeMetadata } from '../workspaceNodeMetadata';
+import { nodeInfosQueryOptions } from '@/lib/nodeInfo';
 
 export interface UseNodeColumnInfosResult {
   columnInfoCache: Record<string, ColumnInfo[]>;
   /** Full node-info responses keyed by node id for metadata beyond columns. */
-  nodeInfoCache: Record<string, NodeInfo>;
+  nodeInfoCache: Record<string, WorkspaceNodeInfo>;
   /**
    * Returns cached column infos for the provided node. Falls back to any dtype
    * evidence already present on the node snapshot; graph-only nodes usually
    * have no column metadata until node-info has hydrated.
    */
-  getColumnInfos: (node: NodeLike | null | undefined) => ColumnInfo[];
+  getColumnInfos: (node: WorkspaceNodeMetadata | null | undefined) => ColumnInfo[];
   /** Returns the cached node-info response for consumers that need shape or tokenizer metadata. */
-  getNodeInfo: (node: NodeLike | null | undefined) => NodeInfo | undefined;
+  getNodeInfo: (node: WorkspaceNodeMetadata | null | undefined) => WorkspaceNodeInfo | undefined;
   /** True while one or more schemas are being fetched. */
   isLoading: boolean;
 }
@@ -40,13 +34,11 @@ export interface UseNodeColumnInfosResult {
  */
 export const useNodeColumnInfos = (params: {
   workspaceId?: string | null;
-  nodes: NodeLike[];
+  nodes: WorkspaceGraphNode[];
   enabled?: boolean;
 }): UseNodeColumnInfosResult => {
   const { workspaceId, nodes, enabled = true } = params;
-  const nodeIds = nodes
-    .map((node) => resolveNodeId(node))
-    .filter((id): id is string => !!id);
+  const nodeIds = nodes.map((node) => node.id);
 
   const queryEnabled = enabled && Boolean(workspaceId) && nodeIds.length > 0;
   const nodeInfosQuery = useQuery({
@@ -55,7 +47,7 @@ export const useNodeColumnInfos = (params: {
     staleTime: 60_000,
   });
 
-  const nodeInfoCache: Record<string, NodeInfo> = {};
+  const nodeInfoCache: Record<string, WorkspaceNodeInfo> = {};
   for (const nodeInfo of nodeInfosQuery.data ?? []) {
     nodeInfoCache[nodeInfo.id] = nodeInfo;
   }
@@ -70,10 +62,9 @@ export const useNodeColumnInfos = (params: {
 
   /** Returns typed cached columns when available, otherwise derives from the node snapshot. */
   /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-  const getColumnInfos = (node: NodeLike | null | undefined): ColumnInfo[] => {
-    const nodeId = resolveNodeId(node);
-    if (!nodeId) return [];
-    const cached = columnInfoCache[nodeId];
+  const getColumnInfos = (node: WorkspaceNodeMetadata | null | undefined): ColumnInfo[] => {
+    if (!node) return [];
+    const cached = columnInfoCache[node.id];
     if (cached?.length) {
       return cached;
     }
@@ -82,10 +73,9 @@ export const useNodeColumnInfos = (params: {
 
   /** Returns cached node metadata for consumers that need full node-info fields. */
   /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-  const getNodeInfo = (node: NodeLike | null | undefined): NodeInfo | undefined => {
-    const nodeId = resolveNodeId(node);
-    return nodeId ? nodeInfoCache[nodeId] : undefined;
-  };
+  const getNodeInfo = (
+    node: WorkspaceNodeMetadata | null | undefined,
+  ): WorkspaceNodeInfo | undefined => (node ? nodeInfoCache[node.id] : undefined);
 
   const isLoading = nodeInfosQuery.isFetching;
 

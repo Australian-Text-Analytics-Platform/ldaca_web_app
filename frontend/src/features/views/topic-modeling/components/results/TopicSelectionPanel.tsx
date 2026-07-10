@@ -1,19 +1,11 @@
 import React from 'react';
+import type { TopicModelingTopic } from '@/api';
 import { Search, X } from 'lucide-react';
 import { matchChecklistOption } from '@/features/views/common/checklistSearch';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
-interface TopicLike {
-  id: number;
-  label: string;
-  size?: number[];
-  total_size?: number | null;
-  x?: number;
-  y?: number;
-}
-
 interface Props {
-  topics: TopicLike[];
+  topics: TopicModelingTopic[];
   selectedTopicIds: Set<number>;
   onToggleTopicSelection: (id: number) => void;
   onClearSelection: () => void;
@@ -27,8 +19,7 @@ interface Props {
 }
 
 /** Used by: TopicSelectionPanel filtering to check whether a topic is inside the current zoom domain. */
-function isTopicInDomain(topic: TopicLike, domain: ZoomDomain): boolean {
-  if (topic.x == null || topic.y == null) return true;
+function isTopicInDomain(topic: TopicModelingTopic, domain: ZoomDomain): boolean {
   return (
     topic.x >= domain.xMin &&
     topic.x <= domain.xMax &&
@@ -54,7 +45,7 @@ export function TopicSelectionPanel({
   hoveredTopicId,
   setHoveredTopicId,
 }: Props) {
-  const sortedTopics = topics.toSorted((a, b) => (b.total_size ?? 0) - (a.total_size ?? 0));
+  const sortedTopics = topics.toSorted((a, b) => b.total_size - a.total_size);
 
   const filteredTopics = sortedTopics.filter((topic) => {
     if (!isAtGlobalZoom && activeDomain && !isTopicInDomain(topic, activeDomain)) {

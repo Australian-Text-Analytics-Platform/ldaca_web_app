@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { DetachDialogNodeOption } from '../components/DetachColumnsDialog';
+import type { DetachNodeOption } from '@/api';
 
 export interface UseDetachColumnsStateResult {
   /** Per-node-id list of columns currently checked. */
@@ -27,7 +27,7 @@ export interface UseDetachColumnsStateResult {
  * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
  */
 export const useDetachColumnsState = (
-  detachNodeOptions: DetachDialogNodeOption[],
+  detachNodeOptions: DetachNodeOption[],
 ): UseDetachColumnsStateResult => {
   const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
 

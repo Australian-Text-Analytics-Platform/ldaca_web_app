@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisTaskDispersionBins } from '@/api';
 import type { ConcordanceAnalysisResponse } from '@/api';
 import { useConcordanceResultViewModel } from '../useConcordanceResultViewModel';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 vi.mock('@/api', () => ({
   analysisTaskDispersionBins: vi.fn(),
@@ -51,8 +52,8 @@ const defaultArgs = {
   results: makeResult(),
   concordanceTaskId: 'task-1',
   panelSelectedNodes: [
-    { id: 'node-1', name: 'Left Corpus' },
-    { id: 'node-2', name: 'Right Corpus' },
+    projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Left Corpus' }),
+    projectWorkspaceNodeMetadata({ id: 'node-2', name: 'Right Corpus' }),
   ],
   showDispersion: true,
   proportionalDispersionBars: false,

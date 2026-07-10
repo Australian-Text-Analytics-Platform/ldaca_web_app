@@ -11,16 +11,6 @@ function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
 
-/** Used by: controls that open slide-in sheet panels. */
-function SheetTrigger({ ...props }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
-}
-
-/** Used by: custom close controls inside slide-in sheet panels. */
-function SheetClose({ ...props }: React.ComponentProps<typeof SheetPrimitive.Close>) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
-}
-
 /** Used by: SheetContent to render panels outside the caller's layout. */
 function SheetPortal({ ...props }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
@@ -96,17 +86,6 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-/** Used by: sheet consumers that render footer actions. */
-function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="sheet-footer"
-      className={cn('mt-auto flex flex-col gap-2 p-4', className)}
-      {...props}
-    />
-  );
-}
-
 /**
  * Accessible sheet title primitive used by sheet content.
  * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
@@ -138,13 +117,4 @@ function SheetDescription({
   );
 }
 
-export {
-  Sheet,
-  SheetTrigger,
-  SheetClose,
-  SheetContent,
-  SheetHeader,
-  SheetFooter,
-  SheetTitle,
-  SheetDescription,
-};
+export { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription };

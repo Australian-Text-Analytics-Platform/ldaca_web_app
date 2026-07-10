@@ -9,19 +9,21 @@ import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 const nodes = [
   {
     id: 'node-1',
-    data: {
-      nodeName: 'Corpus',
-      shape: [12, 4] as [number, number],
-    },
+    name: 'Corpus',
   },
 ];
 
 /** Three-node fixture used to exercise client-side pin and selection grouping. */
 const orderedNodes = [
-  { id: 'node-1', data: { nodeName: 'Alpha' } },
-  { id: 'node-2', data: { nodeName: 'Beta' } },
-  { id: 'node-3', data: { nodeName: 'Gamma' } },
+  { id: 'node-1', name: 'Alpha' },
+  { id: 'node-2', name: 'Beta' },
+  { id: 'node-3', name: 'Gamma' },
 ];
+
+const defaultRowActions = {
+  renderPinnedRowAction: () => null,
+  renderRowActions: () => null,
+};
 
 const longNodeName = 'full_filtered_by_username_in_AnnastaciaMP_topic_topic_meanings';
 
@@ -42,6 +44,7 @@ describe('WorkspaceNodeList', () => {
 
     render(
       <WorkspaceNodeList
+        {...defaultRowActions}
         workspaceId="workspace-1"
         nodes={nodes}
         selectedNodeIds={[]}
@@ -67,7 +70,9 @@ describe('WorkspaceNodeList', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
-        nodes={[{ id: 'node-1', color: '#2563eb', data: { nodeName: 'Corpus' } }]}
+        nodes={[{ id: 'node-1', name: 'Corpus', color: '#2563eb' }]}
+        selectedNodeIds={[]}
+        {...defaultRowActions}
         onToggleNodeSelection={vi.fn()}
       />,
     );
@@ -83,7 +88,9 @@ describe('WorkspaceNodeList', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
-        nodes={[{ id: 'node-1', data: { nodeName: 'Corpus' } }]}
+        nodes={[{ id: 'node-1', name: 'Corpus' }]}
+        selectedNodeIds={[]}
+        {...defaultRowActions}
         onToggleNodeSelection={vi.fn()}
       />,
     );
@@ -96,6 +103,7 @@ describe('WorkspaceNodeList', () => {
     usePinnedNodesStore.getState().togglePinnedNode('node-3');
     render(
       <WorkspaceNodeList
+        {...defaultRowActions}
         workspaceId="workspace-1"
         nodes={orderedNodes}
         selectedNodeIds={['node-2', 'node-3']}
@@ -110,6 +118,7 @@ describe('WorkspaceNodeList', () => {
     const user = userEvent.setup();
     render(
       <WorkspaceNodeList
+        renderPinnedRowAction={() => null}
         workspaceId="workspace-1"
         nodes={orderedNodes}
         selectedNodeIds={[]}
@@ -122,7 +131,7 @@ describe('WorkspaceNodeList', () => {
             onClick={() => {
               usePinnedNodesStore.getState().togglePinnedNode(node.id);
             }}
-            aria-label={`${usePinnedNodesStore.getState().isPinned(node.id) ? 'Unpin' : 'Pin'} ${node.data?.nodeName ?? node.id}`}
+            aria-label={`${usePinnedNodesStore.getState().isPinned(node.id) ? 'Unpin' : 'Pin'} ${node.name}`}
           >
             Pin
           </button>
@@ -145,24 +154,16 @@ describe('WorkspaceNodeList', () => {
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
         renderPinnedRowAction={(node) => (
-          <button
-            type="button"
-            data-pin-action
-            aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}
-          >
+          <button type="button" data-pin-action aria-label={`Unpin ${node.name}`}>
             Pin
           </button>
         )}
         renderRowActions={(node) => (
           <>
-            <button
-              type="button"
-              data-pin-action
-              aria-label={`Unpin ${node.data?.nodeName ?? node.id}`}
-            >
+            <button type="button" data-pin-action aria-label={`Unpin ${node.name}`}>
               Pin
             </button>
-            <button type="button" aria-label={`More actions for ${node.data?.nodeName ?? node.id}`}>
+            <button type="button" aria-label={`More actions for ${node.name}`}>
               More
             </button>
           </>
@@ -183,12 +184,13 @@ describe('WorkspaceNodeList', () => {
   it('lets hover-revealed row actions receive pointer clicks', () => {
     render(
       <WorkspaceNodeList
+        renderPinnedRowAction={() => null}
         workspaceId="workspace-1"
         nodes={orderedNodes}
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
         renderRowActions={(node) => (
-          <button type="button" aria-label={`Add ${node.data?.nodeName ?? node.id}`}>
+          <button type="button" aria-label={`Add ${node.name}`}>
             Add
           </button>
         )}
@@ -206,7 +208,8 @@ describe('WorkspaceNodeList', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
-        nodes={[{ id: 'node-long', data: { nodeName: longNodeName } }]}
+        nodes={[{ id: 'node-long', name: longNodeName }]}
+        renderPinnedRowAction={() => null}
         selectedNodeIds={[]}
         onToggleNodeSelection={vi.fn()}
         renderRowActions={() => (

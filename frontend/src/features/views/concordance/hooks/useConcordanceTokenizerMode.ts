@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { NodeInfo } from '@/lib/nodeInfo';
+import type { WorkspaceNodeInfo } from '@/api';
 import {
   deriveTokenizerModelsByNode,
   type TokenizerModelColumnSelection,
@@ -9,7 +9,7 @@ type ConcordanceSearchMode = 'regex' | 'tokens';
 
 interface UseConcordanceTokenizerModeOptions {
   effectiveNodeColumnSelections: TokenizerModelColumnSelection[];
-  nodeInfoCache: Record<string, NodeInfo>;
+  nodeInfoCache: Record<string, WorkspaceNodeInfo>;
 }
 
 interface UseConcordanceTokenizerModeResult {
