@@ -89,12 +89,9 @@ export const useWorkspaceAnalysisMutations = ({
         throwOnError: true,
       }).then(({ data }) => ({ task_id: data.metadata?.task_id ?? undefined })),
     onMutate: operationLifecycle.onMutate('detachConcordanceDispersion'),
-    onSuccess: operationLifecycle.onSuccess(
-      'detachConcordanceDispersion',
-      (_data, variables) => {
-        invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
-      },
-    ),
+    onSuccess: operationLifecycle.onSuccess('detachConcordanceDispersion', (_data, variables) => {
+      invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
+    }),
     onError: operationLifecycle.onError('detachConcordanceDispersion'),
   });
 
@@ -180,10 +177,7 @@ export const useWorkspaceAnalysisMutations = ({
           taskId,
           request,
         }),
-      detachConcordanceDispersion: (
-        taskId: string,
-        request: ConcordanceDispersionDetachRequest,
-      ) =>
+      detachConcordanceDispersion: (taskId: string, request: ConcordanceDispersionDetachRequest) =>
         detachConcordanceDispersionMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
           taskId,

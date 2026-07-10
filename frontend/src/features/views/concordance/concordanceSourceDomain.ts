@@ -18,8 +18,7 @@ interface ConcordanceMaterializedLookupOptions {
 /** Cycles a palette with one explicit empty-palette policy at the caller. */
 const cyclePalette = (palette: readonly string[], index: number, emptyColor: string): string =>
   palette.reduce(
-    (selected, color, paletteIndex) =>
-      paletteIndex === index % palette.length ? color : selected,
+    (selected, color, paletteIndex) => (paletteIndex === index % palette.length ? color : selected),
     emptyColor,
   );
 

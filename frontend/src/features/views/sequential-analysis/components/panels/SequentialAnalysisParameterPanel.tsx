@@ -18,9 +18,7 @@ import type { SequentialAnalysisRequest } from '@/api';
 import { UniqueValueCount } from '../UniqueValueCount';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
-type SequentialCustomIntervalUnit = NonNullable<
-  SequentialAnalysisRequest['custom_interval_unit']
->;
+type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
 interface ColumnLike {
   name: string;

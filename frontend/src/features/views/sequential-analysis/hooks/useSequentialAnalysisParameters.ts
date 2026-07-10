@@ -420,11 +420,14 @@ export function useSequentialAnalysisParameters() {
    * Called by: SequentialAnalysisFeature hydration after it fetches the stored
    * request for a task id.
    */
-  const applyHydratedRequest = useCallback((request: Record<string, unknown>) => {
-    const hydrated = resolveHydratedSequentialParameters(request, state.frequency);
-    dispatch({ type: 'hydrate', state: hydrated.state });
-    return hydrated;
-  }, [state.frequency]);
+  const applyHydratedRequest = useCallback(
+    (request: Record<string, unknown>) => {
+      const hydrated = resolveHydratedSequentialParameters(request, state.frequency);
+      dispatch({ type: 'hydrate', state: hydrated.state });
+      return hydrated;
+    },
+    [state.frequency],
+  );
 
   /**
    * Resets only the fields the historical clear-results flow reset, preserving

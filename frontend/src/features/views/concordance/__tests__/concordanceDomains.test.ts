@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  buildDispersionRows,
-  getDispersionBarWidthPercent,
-} from '../concordanceDispersionDomain';
+import { buildDispersionRows, getDispersionBarWidthPercent } from '../concordanceDispersionDomain';
 import {
   buildConcordanceNodeColorMap,
   buildConcordanceSourceColorMap,

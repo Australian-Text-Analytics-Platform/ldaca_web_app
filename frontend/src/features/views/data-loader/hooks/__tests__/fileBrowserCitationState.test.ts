@@ -41,13 +41,14 @@ describe('fileBrowserCitationState', () => {
       loading: true,
     });
 
-    expect(fileBrowserCitationReducer(loading, { type: 'loaded', content: '# Citation' }))
-      .toMatchObject({
-        directory,
-        path: '/data/corpus/README.md',
-        content: '# Citation',
-        loading: false,
-      });
+    expect(
+      fileBrowserCitationReducer(loading, { type: 'loaded', content: '# Citation' }),
+    ).toMatchObject({
+      directory,
+      path: '/data/corpus/README.md',
+      content: '# Citation',
+      loading: false,
+    });
   });
 
   it('closes or fails without leaving stale loading state', () => {

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  columnMutationReducer,
-  createColumnMutationState,
-} from '../columnMutationState';
+import { columnMutationReducer, createColumnMutationState } from '../columnMutationState';
 
 describe('columnMutationReducer', () => {
   it('uses the selected delete column as the delete-dialog source of truth', () => {

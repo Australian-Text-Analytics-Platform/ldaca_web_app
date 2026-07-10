@@ -26,18 +26,15 @@ const context: PreviewRequestContext = {
 
 describe('preprocessingPreviewReducer', () => {
   it('keeps previous data visible while a new preview loads', () => {
-    const loadedState = preprocessingPreviewReducer(
-      createPreprocessingPreviewState(context),
-      {
-        type: 'success',
-        context,
-        response: {
-          data: [{ token: 'old' }],
-          columns: ['token'],
-          pagination: pagination(1),
-        },
+    const loadedState = preprocessingPreviewReducer(createPreprocessingPreviewState(context), {
+      type: 'success',
+      context,
+      response: {
+        data: [{ token: 'old' }],
+        columns: ['token'],
+        pagination: pagination(1),
       },
-    );
+    });
 
     const loadingState = preprocessingPreviewReducer(loadedState, { type: 'loading', context });
 
@@ -47,18 +44,15 @@ describe('preprocessingPreviewReducer', () => {
   });
 
   it('normalizes successful responses and adopts the backend page when it differs', () => {
-    const state = preprocessingPreviewReducer(
-      createPreprocessingPreviewState(context),
-      {
-        type: 'success',
-        context,
-        response: {
-          data: [{ token: 'next' }],
-          columns: ['token'],
-          pagination: pagination(2),
-        },
+    const state = preprocessingPreviewReducer(createPreprocessingPreviewState(context), {
+      type: 'success',
+      context,
+      response: {
+        data: [{ token: 'next' }],
+        columns: ['token'],
+        pagination: pagination(2),
       },
-    );
+    });
 
     expect(state.loading).toBe(false);
     expect(state.error).toBeNull();
@@ -68,18 +62,15 @@ describe('preprocessingPreviewReducer', () => {
   });
 
   it('clears rows and records the error when a preview fetch fails', () => {
-    const loadedState = preprocessingPreviewReducer(
-      createPreprocessingPreviewState(context),
-      {
-        type: 'success',
-        context,
-        response: {
-          data: [{ token: 'old' }],
-          columns: ['token'],
-          pagination: pagination(1),
-        },
+    const loadedState = preprocessingPreviewReducer(createPreprocessingPreviewState(context), {
+      type: 'success',
+      context,
+      response: {
+        data: [{ token: 'old' }],
+        columns: ['token'],
+        pagination: pagination(1),
       },
-    );
+    });
 
     const errorState = preprocessingPreviewReducer(loadedState, {
       type: 'error',
@@ -120,18 +111,15 @@ describe('preprocessingPreviewReducer', () => {
   });
 
   it('clears stale data when the preview becomes disabled', () => {
-    const loadedState = preprocessingPreviewReducer(
-      createPreprocessingPreviewState(context),
-      {
-        type: 'success',
-        context,
-        response: {
-          data: [{ token: 'old' }],
-          columns: ['token'],
-          pagination: pagination(1),
-        },
+    const loadedState = preprocessingPreviewReducer(createPreprocessingPreviewState(context), {
+      type: 'success',
+      context,
+      response: {
+        data: [{ token: 'old' }],
+        columns: ['token'],
+        pagination: pagination(1),
       },
-    );
+    });
 
     const disabledState = preprocessingPreviewReducer(loadedState, {
       type: 'disabled',

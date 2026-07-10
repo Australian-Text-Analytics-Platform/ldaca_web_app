@@ -27,14 +27,8 @@ type ConcatSubTabComponentProps = ConcatSubTabProps & {
  */
 export function ConcatSubTab(props: ConcatSubTabComponentProps) {
   const { renderNodeInputsPanel } = props;
-  const {
-    form,
-    statusMessage,
-    preview,
-    apply,
-    mismatches,
-    showActivityTag,
-  } = useConcatSubTab(props);
+  const { form, statusMessage, preview, apply, mismatches, showActivityTag } =
+    useConcatSubTab(props);
 
   return (
     <div className="space-y-4">

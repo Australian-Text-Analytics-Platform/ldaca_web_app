@@ -106,13 +106,6 @@ settled before deletion.
 
 ### Build, dependency, and maintenance improvements
 
-#### B9. Resolve the 49-file format-check baseline
-
-- **Evidence / strength — Strong:** `pnpm -C frontend format:check` currently reports 49 files while [package.json](../frontend/package.json#L96-L97) presents the command as a verification surface.
-- **Recommended direction:** align the existing files and enforce the check, or remove/rename a misleading command if formatting is intentionally non-gating; do this as a focused mechanical change.
-- **Deletion test:** the command either passes and is enforced or no longer claims to be a check.
-- **Validation:** zero-diff format check after the dedicated formatting change, lint, tests, build, and review that generated/vendor files remain excluded.
-
 #### B10. Consolidate the release-version registry
 
 - **Evidence / strength — Strong:** this is the maintenance counterpart of C10: [bump-version.mjs](../scripts/bump-version.mjs) and [check-versions.mjs](../scripts/check-versions.mjs) duplicate ownership and omit lock/tag assertions.
@@ -758,6 +751,13 @@ unreachable callers. Product/external-contract caveats remain where noted.
       lint command covers both configs as well as `src`, exposing and fixing
       unsafe package JSON parsing, unchecked month indexing, template coercion,
       and an unnecessary Babel assertion without adding rule suppressions.
+
+78. Resolve the format-check baseline (B9)
+    - Done 2026-07-11. Biome mechanically formatted the 44 files remaining in
+      the live baseline (the original audit recorded 49 before intervening
+      milestone rewrites). Generated, build, and vendor content remain outside
+      the configured `src/` surface. `format:check` now passes without mutation
+      and is the first gate in the shared frontend `check` contract.
 
 ## Endpoint And Source-Of-Truth Notes
 

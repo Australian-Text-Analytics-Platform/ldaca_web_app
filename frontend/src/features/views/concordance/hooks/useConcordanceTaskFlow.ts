@@ -112,12 +112,7 @@ export function useConcordanceTaskFlow({
     setMaterializeTaskIds,
     onTaskIdAssigned,
   },
-  lock: {
-    resolveTaskId,
-    detachConcordance,
-    detachConcordanceDispersion,
-    materializeConcordance,
-  },
+  lock: { resolveTaskId, detachConcordance, detachConcordanceDispersion, materializeConcordance },
 }: Params) {
   /** Builds stable derived node names for workspace outputs created by concordance actions. */
   /**

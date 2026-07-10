@@ -76,10 +76,7 @@ export function useSafeResult<T extends ResultLike | null>() {
    */
   const setResult: Dispatch<SetStateAction<T | null>> = (action) => {
     const previous = resultRef.current;
-    const next =
-      typeof action === 'function'
-        ? action(previous)
-        : action;
+    const next = typeof action === 'function' ? action(previous) : action;
     if (isStaleAnalysisResult(previous, next)) {
       return;
     }

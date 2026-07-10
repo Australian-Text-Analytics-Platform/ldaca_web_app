@@ -44,9 +44,7 @@ export async function clearAnalysis({
     }
 
     const settled = await Promise.allSettled(
-      allTaskIds.map((taskId) =>
-        clearTask({ path: { task_id: taskId }, throwOnError: true }),
-      ),
+      allTaskIds.map((taskId) => clearTask({ path: { task_id: taskId }, throwOnError: true })),
     );
 
     settled.forEach((result, index) => {

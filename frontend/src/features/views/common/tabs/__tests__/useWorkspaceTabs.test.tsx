@@ -71,10 +71,9 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
   });
 
   it('clears the backend task when a tab that owns a task id is closed', async () => {
-    const { result } = renderHook(
-      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE),
-      { wrapper: makeWrapper() },
-    );
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.tabs).toHaveLength(2);
@@ -91,10 +90,9 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
   });
 
   it('does not call clearTask when the closed tab owns no task id', async () => {
-    const { result } = renderHook(
-      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE),
-      { wrapper: makeWrapper() },
-    );
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.tabs).toHaveLength(2);
@@ -121,10 +119,9 @@ describe('useWorkspaceTabs setTabSetting', () => {
   });
 
   it('persists a free-form tab setting through to the PUT body', async () => {
-    const { result } = renderHook(
-      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE),
-      { wrapper: makeWrapper() },
-    );
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.tabs).toHaveLength(2);

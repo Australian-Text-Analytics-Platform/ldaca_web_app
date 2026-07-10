@@ -27,11 +27,7 @@ import { ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
@@ -68,9 +64,7 @@ export function AnnotationInferenceSettings({
 }: AnnotationInferenceSettingsProps) {
   return (
     <Collapsible defaultOpen={false} className="rounded-lg border bg-background/60">
-      <CollapsibleTrigger
-        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-hidden [&[data-state=open]>svg]:rotate-180"
-      >
+      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-hidden [&[data-state=open]>svg]:rotate-180">
         Model Configuration
         <ChevronDown className="size-3.5 transition-transform duration-200" aria-hidden="true" />
       </CollapsibleTrigger>

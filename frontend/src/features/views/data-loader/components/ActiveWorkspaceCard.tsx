@@ -45,11 +45,7 @@ interface CreateWorkspaceFormProps {
  * active controls own only their local draft inputs.
  */
 function getActiveWorkspaceDraftKey(workspace: WorkspaceListItem) {
-  return [
-    workspace.id,
-    workspace.name,
-    workspace.description ?? '',
-  ].join('\n');
+  return [workspace.id, workspace.name, workspace.description ?? ''].join('\n');
 }
 
 /**

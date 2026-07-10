@@ -26,10 +26,9 @@ describe('useFileBrowserActions cache policy', () => {
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
-    const { result } = renderHook(
-      () => useFileBrowserActions({ refreshFiles, notify }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useFileBrowserActions({ refreshFiles, notify }), {
+      wrapper,
+    });
 
     await act(async () => {
       await result.current.handleMoveFile('source.csv', 'target');

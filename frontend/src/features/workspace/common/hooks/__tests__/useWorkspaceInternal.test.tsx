@@ -309,7 +309,6 @@ describe('useWorkspaceInternal', () => {
       expect(result.current.isLoading.operations).toBe(false);
       expect(result.current.isLoading.workspaces).toBe(true);
     });
-
   });
 
   describe('passthrough fields', () => {

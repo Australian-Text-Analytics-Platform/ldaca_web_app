@@ -137,9 +137,7 @@ describe('useTokenFrequencyTaskFlow', () => {
     );
 
   it('scopes the concordance handoff to the clicked node when a source id is given', () => {
-    const replaceSelectedNodes = vi.fn<
-      (nodeIds: string[], activeNodeId?: string | null) => void
-    >();
+    const replaceSelectedNodes = vi.fn<(nodeIds: string[], activeNodeId?: string | null) => void>();
     const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
     const setCurrentView = vi.fn<(view: ViewType) => void>();
 
@@ -166,9 +164,7 @@ describe('useTokenFrequencyTaskFlow', () => {
   });
 
   it('keeps both compared nodes when no source id is given', () => {
-    const replaceSelectedNodes = vi.fn<
-      (nodeIds: string[], activeNodeId?: string | null) => void
-    >();
+    const replaceSelectedNodes = vi.fn<(nodeIds: string[], activeNodeId?: string | null) => void>();
     const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
     const setCurrentView = vi.fn<(view: ViewType) => void>();
 

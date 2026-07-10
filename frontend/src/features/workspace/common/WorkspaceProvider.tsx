@@ -31,13 +31,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       nodes: ws.nodes,
       workspaceGraph: ws.workspaceGraph,
     }),
-    [
-      ws.workspaces,
-      ws.currentWorkspace,
-      ws.currentWorkspaceId,
-      ws.nodes,
-      ws.workspaceGraph,
-    ],
+    [ws.workspaces, ws.currentWorkspace, ws.currentWorkspaceId, ws.nodes, ws.workspaceGraph],
   );
 
   const selectionValue = useMemo(
@@ -47,12 +41,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       activeNodeId: ws.activeNodeId,
       selectedNodeIds: ws.selectedNodeIds,
     }),
-    [
-      ws.selectedNode,
-      ws.selectedNodes,
-      ws.activeNodeId,
-      ws.selectedNodeIds,
-    ],
+    [ws.selectedNode, ws.selectedNodes, ws.activeNodeId, ws.selectedNodeIds],
   );
 
   const statusValue = useMemo(

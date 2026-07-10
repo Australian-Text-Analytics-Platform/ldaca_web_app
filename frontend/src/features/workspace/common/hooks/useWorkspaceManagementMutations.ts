@@ -90,24 +90,27 @@ export const useWorkspaceManagementMutations = ({
         return { previousId };
       },
     ),
-    onSuccess: operationLifecycle.onSuccess('setCurrentWorkspace', (_data, workspaceId, context) => {
-      const previousId = context.previousId ?? null;
-      const nextId = workspaceId ?? null;
-      setCurrentWorkspaceId(nextId);
-      clearSelection();
+    onSuccess: operationLifecycle.onSuccess(
+      'setCurrentWorkspace',
+      (_data, workspaceId, context) => {
+        const previousId = context.previousId ?? null;
+        const nextId = workspaceId ?? null;
+        setCurrentWorkspaceId(nextId);
+        clearSelection();
 
-      if (nextId) {
-        void queryClient.invalidateQueries({
-          predicate: ({ queryKey }) => isWorkspaceDetailQueryKey(queryKey, nextId),
-        });
-      } else if (previousId) {
-        queryClient.removeQueries({
-          predicate: ({ queryKey }) => isWorkspaceDetailQueryKey(queryKey, previousId),
-        });
-      }
+        if (nextId) {
+          void queryClient.invalidateQueries({
+            predicate: ({ queryKey }) => isWorkspaceDetailQueryKey(queryKey, nextId),
+          });
+        } else if (previousId) {
+          queryClient.removeQueries({
+            predicate: ({ queryKey }) => isWorkspaceDetailQueryKey(queryKey, previousId),
+          });
+        }
 
-      void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
-    }),
+        void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
+      },
+    ),
     onError: operationLifecycle.onError('setCurrentWorkspace'),
   });
 

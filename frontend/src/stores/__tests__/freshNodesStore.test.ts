@@ -16,34 +16,34 @@ describe('useFreshNodesStore', () => {
   it('subsequent observation marks new ids as fresh, leaves existing ones alone', () => {
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a', 'b']);
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a', 'b', 'c']);
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds,
-    ).toEqual(new Set(['c']));
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds).toEqual(
+      new Set(['c']),
+    );
   });
 
   it('multiple new arrivals in one observation all get marked fresh', () => {
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a']);
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a', 'b', 'c']);
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds,
-    ).toEqual(new Set(['b', 'c']));
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds).toEqual(
+      new Set(['b', 'c']),
+    );
   });
 
   it('observation is idempotent for already-seen ids', () => {
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a', 'b']);
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a', 'b']);
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds,
-    ).toEqual(new Set());
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds).toEqual(
+      new Set(),
+    );
   });
 
   it('markInteracted clears the given fresh ids', () => {
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a']);
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a', 'b', 'c']);
     useFreshNodesStore.getState().markInteracted('workspace-a', ['b']);
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds,
-    ).toEqual(new Set(['c']));
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds).toEqual(
+      new Set(['c']),
+    );
   });
 
   it('markInteracted is a no-op for ids not currently fresh', () => {
@@ -60,12 +60,12 @@ describe('useFreshNodesStore', () => {
     useFreshNodesStore.getState().observeNodeIds('workspace-b', ['shared']);
     useFreshNodesStore.getState().observeNodeIds('workspace-b', ['shared', 'workspace-b-new']);
 
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds,
-    ).toEqual(new Set(['workspace-a-new']));
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-b')?.freshIds,
-    ).toEqual(new Set(['workspace-b-new']));
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds).toEqual(
+      new Set(['workspace-a-new']),
+    );
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-b')?.freshIds).toEqual(
+      new Set(['workspace-b-new']),
+    );
   });
 
   it('treats a deleted then recreated id as a new arrival', () => {
@@ -73,16 +73,16 @@ describe('useFreshNodesStore', () => {
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a']);
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['a', 'b']);
 
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds,
-    ).toEqual(new Set(['b']));
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.freshIds).toEqual(
+      new Set(['b']),
+    );
   });
 
   it('skips falsy ids defensively', () => {
     useFreshNodesStore.getState().observeNodeIds('workspace-a', ['', 'a']);
-    expect(
-      useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.seenIds,
-    ).toEqual(new Set(['a']));
+    expect(useFreshNodesStore.getState().freshnessByWorkspace.get('workspace-a')?.seenIds).toEqual(
+      new Set(['a']),
+    );
   });
 
   it('reset clears every workspace baseline', () => {

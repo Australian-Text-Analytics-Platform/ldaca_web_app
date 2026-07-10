@@ -27,16 +27,14 @@ interface PreviewRequest<P> {
   payload: P | null;
 }
 
-export type OperationPreviewFetcher<P> = (
-  params: {
-    workspaceId: string;
-    nodeId: string;
-    payload: P;
-    page: number;
-    pageSize: number;
-    signal: AbortSignal;
-  },
-) => Promise<RawishResponse>;
+export type OperationPreviewFetcher<P> = (params: {
+  workspaceId: string;
+  nodeId: string;
+  payload: P;
+  page: number;
+  pageSize: number;
+  signal: AbortSignal;
+}) => Promise<RawishResponse>;
 
 export interface UseNodePreviewWithRawFallbackOptions<P> {
   /** Currently-active workspace id, or null if no workspace is selected. */

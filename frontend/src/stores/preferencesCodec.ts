@@ -1,8 +1,4 @@
-import type {
-  AnnotationAiCustomProvider,
-  UserPreferences,
-  UserPreferencesUpdate,
-} from '@/api';
+import type { AnnotationAiCustomProvider, UserPreferences, UserPreferencesUpdate } from '@/api';
 
 /** Durable preference shape shared by local persistence and backend transport. */
 export interface DurablePreferences {
@@ -16,9 +12,7 @@ export interface DurablePreferences {
 }
 
 /** Applies backend defaults at the single server-to-store boundary. */
-export const normalizeServerPreferences = (
-  data: Partial<UserPreferences>,
-): DurablePreferences => ({
+export const normalizeServerPreferences = (data: Partial<UserPreferences>): DurablePreferences => ({
   hiddenViews: data.hidden_views ?? [],
   favoriteWorkspaces: data.favorite_workspaces ?? [],
   defaultTokenizerModel: data.default_tokenizer_model ?? null,

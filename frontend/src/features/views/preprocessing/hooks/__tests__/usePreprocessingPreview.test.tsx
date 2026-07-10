@@ -162,11 +162,13 @@ describe('usePreprocessingPreview', () => {
 
   it('cancels an in-flight preview when workspace identity changes and ignores its stale completion', async () => {
     vi.useFakeTimers();
-    let resolveFirst: ((value: {
-      data: { workspace: string }[];
-      columns: string[];
-      pagination: PreviewPagination;
-    }) => void) | null = null;
+    let resolveFirst:
+      | ((value: {
+          data: { workspace: string }[];
+          columns: string[];
+          pagination: PreviewPagination;
+        }) => void)
+      | null = null;
     const firstResponse = new Promise<{
       data: { workspace: string }[];
       columns: string[];

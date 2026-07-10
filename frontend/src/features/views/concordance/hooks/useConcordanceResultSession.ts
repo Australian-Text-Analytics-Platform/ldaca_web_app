@@ -80,7 +80,7 @@ const INITIAL_STATE: ConcordanceResultSessionState = {
   globalPageSize: 20,
 };
 
-const resolveStateAction = <T,>(current: T, value: SetStateAction<T>): T =>
+const resolveStateAction = <T>(current: T, value: SetStateAction<T>): T =>
   typeof value === 'function' ? (value as (previous: T) => T)(current) : value;
 
 const applyPageSize = (
@@ -281,7 +281,8 @@ export function useConcordanceResultSession({
         | undefined) ??
       {};
     const firstNodePageSize = Object.values(results.data)[0]?.pagination.page_size;
-    const nextPageSize = preferenceSource.page_size ?? analysisParams.page_size ?? firstNodePageSize;
+    const nextPageSize =
+      preferenceSource.page_size ?? analysisParams.page_size ?? firstNodePageSize;
     if (
       typeof nextPageSize !== 'number' ||
       !Number.isFinite(nextPageSize) ||

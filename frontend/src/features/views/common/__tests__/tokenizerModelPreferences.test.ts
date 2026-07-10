@@ -14,11 +14,9 @@ describe('deriveTokenizerModelsByNode', () => {
       'node-c': { id: 'node-c', name: 'Node C', tokenizer_models: { text: 'ignored' } },
     };
 
-    expect(deriveTokenizerModelsByNode(selections, nodeInfoCache, { 'node-b': 'live-b' })).toEqual(
-      {
-        'node-a': 'stored-a',
-        'node-b': 'live-b',
-      },
-    );
+    expect(deriveTokenizerModelsByNode(selections, nodeInfoCache, { 'node-b': 'live-b' })).toEqual({
+      'node-a': 'stored-a',
+      'node-b': 'live-b',
+    });
   });
 });

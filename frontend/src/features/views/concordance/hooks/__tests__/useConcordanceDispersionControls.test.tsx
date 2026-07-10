@@ -71,8 +71,6 @@ describe('useConcordanceDispersionControls', () => {
       result.current.handleBinRangeSelect('node-a', 7, 8, true);
     });
 
-    expect(Array.from(result.current.selectedBinIndices['node-a'] ?? [])).toEqual([
-      2, 3, 4, 7, 8,
-    ]);
+    expect(Array.from(result.current.selectedBinIndices['node-a'] ?? [])).toEqual([2, 3, 4, 7, 8]);
   });
 });

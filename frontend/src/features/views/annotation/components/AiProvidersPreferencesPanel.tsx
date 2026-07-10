@@ -47,7 +47,13 @@ interface ProviderKeyFieldProps {
  * key changes (hydration, commit, or delete) while staying stable during typing.
  * Used by: the provider rows in AiProvidersPreferencesPanel.
  */
-function ProviderKeyField({ providerId, label, optional, apiKey, onCommit }: ProviderKeyFieldProps) {
+function ProviderKeyField({
+  providerId,
+  label,
+  optional,
+  apiKey,
+  onCommit,
+}: ProviderKeyFieldProps) {
   return (
     <Input
       key={`pref-ai-key-${providerId}-${apiKey}`}
@@ -105,8 +111,8 @@ export function AiProvidersPreferencesPanel() {
         <div>
           <h3 className="text-sm font-semibold">AI Providers</h3>
           <p className="text-sm text-muted-foreground">
-            API keys are saved to your preferences and used by the Annotation tab's AI mode.
-            Keys are stored in your local preferences file.
+            API keys are saved to your preferences and used by the Annotation tab's AI mode. Keys
+            are stored in your local preferences file.
           </p>
         </div>
         <div className="space-y-2">
@@ -232,9 +238,7 @@ export function AiProvidersPreferencesPanel() {
         }}
         title="Delete custom provider?"
         description={
-          pendingDelete
-            ? `${pendingDelete.name} and its saved API key will be removed.`
-            : ''
+          pendingDelete ? `${pendingDelete.name} and its saved API key will be removed.` : ''
         }
         confirmText="Delete"
         cancelText="Cancel"

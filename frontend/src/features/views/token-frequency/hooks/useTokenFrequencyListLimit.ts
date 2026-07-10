@@ -36,9 +36,7 @@ const MIN_TOKEN_LIMIT = 10;
  * Used by: useTokenFrequencyListLimit so the list-side display limit can
  * exceed the cloud cap while still staying inside the loaded result rows.
  */
-export const deriveTokenFrequencyMaxVocabulary = (
-  nodeDisplayResults: NodeResultView[],
-): number => {
+export const deriveTokenFrequencyMaxVocabulary = (nodeDisplayResults: NodeResultView[]): number => {
   let max = 0;
   for (const node of nodeDisplayResults) {
     const filtered = Array.isArray(node.filteredRows) ? node.filteredRows.length : 0;
@@ -65,7 +63,8 @@ const tokenFrequencyListLimitReducer = (
       }
       return {
         ...state,
-        listLimit: state.listLimit > CLOUD_TOKEN_LIMIT_CAP ? state.listLimit : action.effectiveTokenLimit,
+        listLimit:
+          state.listLimit > CLOUD_TOKEN_LIMIT_CAP ? state.listLimit : action.effectiveTokenLimit,
         listLimitInput:
           Number.isFinite(Number.parseInt(state.listLimitInput, 10)) &&
           Number.parseInt(state.listLimitInput, 10) > CLOUD_TOKEN_LIMIT_CAP
@@ -118,10 +117,7 @@ export function useTokenFrequencyListLimit({
     () => deriveTokenFrequencyMaxVocabulary(nodeDisplayResults),
     [nodeDisplayResults],
   );
-  const [state, dispatch] = useReducer(
-    tokenFrequencyListLimitReducer,
-    INITIAL_LIST_LIMIT_STATE,
-  );
+  const [state, dispatch] = useReducer(tokenFrequencyListLimitReducer, INITIAL_LIST_LIMIT_STATE);
 
   useEffect(() => {
     dispatch({ type: 'sync-cloud-limit', effectiveTokenLimit });

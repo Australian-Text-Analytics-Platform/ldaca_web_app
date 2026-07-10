@@ -22,10 +22,7 @@ interface UseFileBrowserActionsParams {
  * Flow: wrap file refresh/move/citation operations with loading state and notifications, then
  * expose handlers consumed by FileTree and DataLoaderFeature.
  */
-export function useFileBrowserActions({
-  refreshFiles,
-  notify,
-}: UseFileBrowserActionsParams) {
+export function useFileBrowserActions({ refreshFiles, notify }: UseFileBrowserActionsParams) {
   const queryClient = useQueryClient();
   const [citation, dispatchCitation] = useReducer(
     fileBrowserCitationReducer,

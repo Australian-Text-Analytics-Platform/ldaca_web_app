@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import {
-  durablePreferencesEqual,
-  projectDurablePreferences,
-} from '@/stores/preferencesCodec';
+import { durablePreferencesEqual, projectDurablePreferences } from '@/stores/preferencesCodec';
 
 /**
  * Coalesce rapid preference changes into a single backend write. Hand-tuned:

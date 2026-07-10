@@ -12,37 +12,36 @@ vi.mock('@/api', () => ({
 
 const mockedAnalysisTaskDispersionBins = vi.mocked(analysisTaskDispersionBins);
 
-const makeResult = (pageSize = 20): ConcordanceAnalysisResponse =>
-  ({
-    state: 'successful',
-    message: 'ok',
-    metadata: { task_id: 'task-1' },
-    preferences: { page_size: pageSize },
-    analysis_params: {
-      label_to_node_map: { 'Left result': 'node-1' },
-    },
-    data: {
-      'node-1': {
-        data: [[{ CONC_matched_text: 'Fallback' }]],
-        columns: ['CONC_matched_text'],
-        metadata: {
-          concordance_columns: ['CONC_matched_text'],
-          metadata_columns: [],
-          all_columns: ['CONC_matched_text'],
-        },
-        pagination: {
-          page: 1,
-          page_size: pageSize,
-          total_source_rows: 1,
-          total_source_pages: 1,
-          result_count: 1,
-          has_next: false,
-          has_prev: false,
-        },
-        sorting: { sort_by: null, descending: false },
+const makeResult = (pageSize = 20): ConcordanceAnalysisResponse => ({
+  state: 'successful',
+  message: 'ok',
+  metadata: { task_id: 'task-1' },
+  preferences: { page_size: pageSize },
+  analysis_params: {
+    label_to_node_map: { 'Left result': 'node-1' },
+  },
+  data: {
+    'node-1': {
+      data: [[{ CONC_matched_text: 'Fallback' }]],
+      columns: ['CONC_matched_text'],
+      metadata: {
+        concordance_columns: ['CONC_matched_text'],
+        metadata_columns: [],
+        all_columns: ['CONC_matched_text'],
       },
+      pagination: {
+        page: 1,
+        page_size: pageSize,
+        total_source_rows: 1,
+        total_source_pages: 1,
+        result_count: 1,
+        has_next: false,
+        has_prev: false,
+      },
+      sorting: { sort_by: null, descending: false },
     },
-  });
+  },
+});
 
 const defaultOptions = {
   workspaceId: 'workspace-1',

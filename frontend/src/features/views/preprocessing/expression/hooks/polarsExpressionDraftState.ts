@@ -163,14 +163,8 @@ export const polarsExpressionDraftReducer = (
 export const buildPolarsExpressionRequest = (
   drafts: PolarsExpressionDraftState,
 ): PolarsExpressionRequest => {
-  const {
-    activeContext,
-    filterCode,
-    withColumns,
-    selectExpressions,
-    sortItems,
-    groupByState,
-  } = drafts;
+  const { activeContext, filterCode, withColumns, selectExpressions, sortItems, groupByState } =
+    drafts;
 
   if (activeContext === 'group_by_agg') {
     return {

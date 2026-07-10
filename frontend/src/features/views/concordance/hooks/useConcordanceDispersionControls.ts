@@ -89,8 +89,7 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     endIndex: number,
     shiftHeld: boolean,
   ) => {
-    const [from, to] =
-      startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+    const [from, to] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
     setSelectedBinIndices((prev) => {
       const next = shiftHeld ? new Set(prev[blockKey] ?? []) : new Set<number>();
       for (let index = from; index <= to; index++) next.add(index);

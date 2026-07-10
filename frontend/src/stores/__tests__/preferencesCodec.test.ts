@@ -56,9 +56,7 @@ describe('preferencesCodec', () => {
       analysis_multi_tab_enabled: true,
       annotation_ai: {
         api_keys: { openai: 'key' },
-        custom_providers: [
-          { id: 'custom:1', name: 'Local', base_url: 'http://localhost:9000' },
-        ],
+        custom_providers: [{ id: 'custom:1', name: 'Local', base_url: 'http://localhost:9000' }],
       },
     });
   });

@@ -39,8 +39,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   const uploadMutation = useMutation({
     /** Uploads a browser File object through the generated SDK for file panel actions. */
     /** Called by: the upload mutation when `handleUploadFile` invokes `mutateAsync`. */
-    mutationFn: (file: File) =>
-      uploadFile({ body: { file }, throwOnError: true }),
+    mutationFn: (file: File) => uploadFile({ body: { file }, throwOnError: true }),
     onSuccess: () => invalidateFilesQuery(queryClient),
   });
 

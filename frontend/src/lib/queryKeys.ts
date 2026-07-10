@@ -49,11 +49,7 @@ export const queryKeys = {
    * Returns the node-data prefix for broad invalidation, or appends
    * page/sort/filter values for a concrete table request.
    */
-  nodeData: (
-    workspaceId: string,
-    nodeId: string,
-    request?: NodeDataRequest,
-  ) => {
+  nodeData: (workspaceId: string, nodeId: string, request?: NodeDataRequest) => {
     const base = ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const;
     return request ? ([...base, request] as const) : base;
   },

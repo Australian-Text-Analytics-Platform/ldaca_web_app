@@ -77,8 +77,7 @@ export const useAnalysisTaskStatus = ({
   taskIds,
 }: UseAnalysisTaskStatusOptions): AnalysisTaskStatus => {
   const tasks = useAnalysisStore((state) => state.tasks);
-  const taskTypeList: readonly string[] =
-    typeof taskTypes === 'string' ? [taskTypes] : taskTypes;
+  const taskTypeList: readonly string[] = typeof taskTypes === 'string' ? [taskTypes] : taskTypes;
   const candidateTypes = taskTypeList.flatMap((value) => getTaskTypeCandidates(value));
   const candidateSet = new Set(candidateTypes);
   const ownedTaskIds = taskIds === undefined ? null : new Set(taskIds);

@@ -114,10 +114,7 @@ describe('ConcordanceDispersionSummary', () => {
       'data-state',
       'closed',
     );
-    expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveAttribute(
-      'data-state',
-      'closed',
-    );
+    expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveAttribute('data-state', 'closed');
     expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveTextContent('Density');
     expect(screen.getByText('Density dispersion')).toBeInTheDocument();
     const scopeSelect = screen.getByRole('combobox', { name: 'Aggregation scope' });

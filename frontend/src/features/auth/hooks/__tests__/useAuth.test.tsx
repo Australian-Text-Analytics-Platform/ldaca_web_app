@@ -32,11 +32,10 @@ const buildAuthInfo = (overrides: Partial<AuthInfoResponse> = {}): AuthInfoRespo
 
 /** Builds config fixtures for auth-mode tests without repeating generated response fields. */
 /** Used by: tests in this file. */
-const buildConfig = (overrides: Partial<RuntimeConfigResponse> = {}): RuntimeConfigResponse =>
-  ({
-    multi_user_mode: true,
-    ...overrides,
-  });
+const buildConfig = (overrides: Partial<RuntimeConfigResponse> = {}): RuntimeConfigResponse => ({
+  multi_user_mode: true,
+  ...overrides,
+});
 
 // Each test wants a clean module instance: the Zustand auth store is created
 // at module load, plus a few imperative module-locals (`bootstrapAttempts`,

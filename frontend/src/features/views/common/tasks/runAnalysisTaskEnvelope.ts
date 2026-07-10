@@ -26,7 +26,10 @@ interface RunAnalysisTaskEnvelopeOptions<TResponse extends AnalysisRunResponse> 
   shouldReleaseRunning?: (response: TResponse) => boolean;
 }
 
-const releaseRunning = (runningRef: CurrentRef<boolean>, setIsRunning: (value: boolean) => void) => {
+const releaseRunning = (
+  runningRef: CurrentRef<boolean>,
+  setIsRunning: (value: boolean) => void,
+) => {
   setIsRunning(false);
   runningRef.current = false;
 };
