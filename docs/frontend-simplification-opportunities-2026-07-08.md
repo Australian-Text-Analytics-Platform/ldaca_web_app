@@ -1,18 +1,495 @@
 # Frontend Simplification Opportunities - 2026-07-08
 
+> Refreshed 2026-07-10. This keeps the original 2026-07-08 report date and the
+> completed-work history below while replacing the exhausted first-pass TODO
+> list with the broader follow-up audit.
+
 ## Scope
 
-This scan covered the handwritten frontend under `frontend/src`, with generated
-API files excluded except where they affect the handwritten API boundary. The
-goal is to remove unnecessary intermediate layers, reduce duplicated wiring,
-and improve modularity where a file currently owns too many responsibilities.
+The refresh covers handwritten React code, tests, documentation, configuration,
+scripts, release workflows, and the Tauri shell. Generated API files remain
+excluded except where handwritten code violates or duplicates their contracts.
+The goal is still deletion and simpler ownership, but the scan also records
+correctness-sensitive seams and deep modules that should be improved without
+flattening intentional architecture.
 
-Completed work is removed from the open TODO list and recorded in `Done`.
+This is a report-only backlog. Every proposed action or future interface below
+is a **recommendation**, not a public API or type change made by this refresh.
+Completed work remains in `Done` exactly as originally recorded.
+
+## Audit Method And Evidence Baseline
+
+The follow-up used complementary checks so that a single static-analysis result
+did not decide architecture by itself:
+
+- Read the root and frontend developer guides, then checked Git history around
+  the affected boundaries to distinguish current contracts from abandoned
+  experiments.
+- Traced the route import graph and other import cycles, plus dependency and
+  export usage from both package metadata and call sites.
+- Ran configured Knip and a second Knip pass without the blanket UI exclusion,
+  then classified hits as production dead code, test seams, generated ownership,
+  or product-contract questions.
+- Ran clone detection over handwritten sources and inspected the production
+  bundle and source maps for duplicated work and optional-code weight.
+- Followed state and query ownership end-to-end across stores, providers,
+  TanStack Query keys/fetchers, React Flow reconciliation, analysis task streams,
+  and Data Loader navigation.
+- Followed Tauri packaging from Python runtime preparation through staging,
+  resource configuration, Rust runtime discovery, process launch, and desktop
+  workflows. Rust source validation was not inferred from a build that stopped
+  before compiling the shell.
+
+### 2026-07-10 Evidence Snapshot
+
+| Check | Current baseline |
+| --- | --- |
+| Configured Knip | Passed. |
+| Frontend lint | Passed. |
+| Frontend tests | 163 test files and 772 tests passed. |
+| Production build | Passed; 4,826 modules transformed; main entry 520.13 kB raw / 160.66 kB gzip. |
+| Documentation drift | Passed for 70 literal targets. |
+| Version check | All five configured sources agreed on 0.6.0, but the check missed `Cargo.lock` and release-tag drift. |
+| `git diff --check` | Passed for the audited tree. |
+| Clone scan | 28 clones across 365 files, about 1.06% duplicated tokens / 0.84% duplicated lines. |
+| Format check | Currently reports 49 files. This is recorded debt, not a passing gate. |
+| Tauri test/clippy | Could not reach useful source validation: the ignored generated runtime resource and stale/coupled lock/resource contracts stop the build first. |
 
 ## Open TODOs
 
-No open TODOs remain from this scan. New findings from the follow-up endpoint
-rescan should be added here before implementation.
+Findings are ordered by risk and leverage within each group. `Strong` means the
+evidence already supports implementation planning; `Worth exploring` means the
+direction is promising but needs comparison or a bounded spike; `Worth
+confirming` means a product, release, or external-consumer contract must be
+settled before deletion.
+
+### Correctness-sensitive ownership seams
+
+#### C1. Separate ordered selection membership from the active node
+
+- **Evidence / strength — Strong:** [selectionStore.ts](../frontend/src/stores/selectionStore.ts#L12-L103) treats `selectedNodeIds` as both an ordered tab strip and selection membership, [useWorkspaceDataTable.ts](../frontend/src/features/workspace/data-view/hooks/useWorkspaceDataTable.ts#L99-L205) adds local order/reconciliation, and [useWorkspaceGraphMutations.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceGraphMutations.ts#L112-L132) clears everything when the active node is deleted while a non-active deleted ID can remain stale.
+- **Recommended direction:** define semantic `activate`, `reorder`, `remove`, `replace`, `toggle`, and `clear` actions, with an independent active ID. These action names and shapes are recommendations only.
+- **Deletion test:** the table hook no longer mirrors tab order or repairs membership, and deletion call sites no longer choose between ad hoc single-ID removal and global clear.
+- **Validation:** delete active and non-active tabs, reorder then delete, multi-select from graph/list, switch views, and verify active fallback plus ordered membership independently.
+
+#### C2. Make node-table query identity equal the request identity
+
+- **Evidence / strength — Strong:** [queryKeys.ts](../frontend/src/lib/queryKeys.ts#L26-L45) omits `filter_op`, while [useWorkspaceQueries.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceQueries.ts#L110-L145) sends it; pagination/filter state also lives in the selection slice and [useWorkspaceDataTable.ts](../frontend/src/features/workspace/data-view/hooks/useWorkspaceDataTable.ts#L267-L279) applies a quotation-oriented fallback.
+- **Recommended direction:** build one canonical request-parameter object and use it for both the query key and generated request. Move table pagination/filter ownership out of selection state and remove the quotation fallback coupling.
+- **Deletion test:** there is one parameter projection, changing only `filter_op` changes the key, and selection state contains no table-query fields.
+- **Validation:** switch operators with identical text, paginate/sort/filter multiple nodes, return via history, and confirm cache entries never cross request shapes.
+
+#### C3. Define one serializable React Flow presentation projection
+
+- **Evidence / strength — Strong:** [useWorkspaceGraph.ts](../frontend/src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts#L203-L315) renders node colour and edge labels but omits visible colour/label fields from `nodeSignatureFor`; callbacks read `currentView` live yet still close over workspace ID, and empty-selection reconciliation is duplicated later in the hook.
+- **Recommended direction:** derive nodes and edges from one canonical serializable presentation projection; read volatile command context live while preserving identity-sensitive React Flow reconciliation.
+- **Deletion test:** the signature cannot drift from rendered visible fields, command callbacks do not retain volatile workspace/view values, and the duplicate empty-selection effect disappears.
+- **Validation:** change colour and edge label without topology changes, switch view/workspace before invoking graph controls, clear selection, and exercise drag/selection identity behavior.
+
+#### C4. Scope fresh-node observation to a workspace
+
+- **Evidence / strength — Strong:** [freshNodesStore.ts](../frontend/src/stores/freshNodesStore.ts#L4-L101) keeps global seen/baseline sets; [useWorkspaceGraph.ts](../frontend/src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts#L139-L181) observes IDs without workspace identity; `forgetNodeIds` has no production caller.
+- **Recommended direction:** key freshness/baseline state by workspace or reset it explicitly at the workspace boundary, and remove the unowned forget action if the scoped design does not need it.
+- **Deletion test:** identical node IDs in different workspaces cannot share seen state and the zero-caller action is gone.
+- **Validation:** alternate between two workspaces with overlapping IDs, receive a new node while inactive, delete/recreate IDs, and reload the session.
+
+#### C5. Identify analysis status by workspace, tab, and task
+
+- **Evidence / strength — Strong:** [useAnalysisTaskStatus.ts](../frontend/src/features/views/common/useAnalysisTaskStatus.ts#L60-L74) selects by task type, while [useAnalysisTaskFlow.ts](../frontend/src/features/views/common/tasks/useAnalysisTaskFlow.ts#L25-L76) separately knows workspace and banner task context.
+- **Recommended direction:** resolve status with workspace ID, tab ID, and task ID when available; task type should classify work, not uniquely identify an instance.
+- **Deletion test:** no consumer treats a task type alone as sufficient identity and feature hooks stop re-filtering ambiguous status.
+- **Validation:** run the same analysis in two tabs/workspaces, overlap old and new tasks, detach/clear one task, and verify banners/results remain isolated.
+
+#### C6. Make `useSafeResult` expose only the safe setter
+
+- **Evidence / strength — Strong:** [useSafeResult.ts](../frontend/src/features/views/common/useSafeResult.ts#L68-L79) updates the state/ref pair through `setResultSafely` but also returns raw `setResult`, allowing callers to bypass the ref.
+- **Recommended direction:** expose one `Dispatch<SetStateAction<T | null>>`-compatible setter that computes the next value and updates state/ref atomically while enforcing stale-result rules.
+- **Deletion test:** the raw setter is not returned and no caller can update result state without synchronizing the ref.
+- **Validation:** direct values, functional updaters, rapid task replacement, clear-after-result, and stale completion ordering.
+
+#### C7. Bind preprocessing preview signatures and cancellation to the full request
+
+- **Evidence / strength — Strong:** [useJoinSubTab.ts](../frontend/src/features/views/preprocessing/join/hooks/useJoinSubTab.ts#L296-L377) builds a join signature without workspace identity; [usePreprocessingPreview.ts](../frontend/src/features/views/preprocessing/hooks/usePreprocessingPreview.ts#L16-L157) creates an abort signal, but feature fetchers close over current workspace and do not consistently propagate that signal to the generated request.
+- **Recommended direction:** include workspace in the canonical signature/request data, make fetchers consume only that data, and carry the abort signal through the SDK transport.
+- **Deletion test:** no preview fetcher closes over current workspace and every cancellable request consumes the hook signal.
+- **Validation:** change workspace during debounce/in-flight fetch, change only join inputs, paginate while a prior request is pending, and assert aborted responses cannot win.
+
+#### C8. Own workspace-download completion above Data Loader navigation
+
+- **Evidence / strength — Strong:** [usePendingWorkspaceDownloads.ts](../frontend/src/features/views/data-loader/hooks/usePendingWorkspaceDownloads.ts#L38-L156) stores task IDs in component-local state, and [DataLoaderFeature.tsx](../frontend/src/features/views/data-loader/DataLoaderFeature.tsx) unmounts that owner when the user navigates away.
+- **Recommended direction:** move pending artifact completion to an app/workspace task owner that survives feature unmount; keep the Data Loader row as a view of that state.
+- **Deletion test:** Data Loader no longer owns the completion watcher and no navigation path can orphan a started artifact.
+- **Validation:** start a download, navigate across views/workspaces, complete/fail/cancel it, return to Data Loader, and verify exactly one save/toast.
+
+#### C9. Use one Tauri development command and port contract
+
+- **Evidence / strength — Strong:** [tauri.conf.json](../frontend/src-tauri/tauri.conf.json#L6-L9) invokes npm and waits on port 3001, while [vite.config.ts](../frontend/vite.config.ts#L44-L51), [.env.example](../frontend/.env.example#L8-L12), and repository scripts use port 3000 and pnpm.
+- **Recommended direction:** make Tauri call the repository's pnpm-owned dev command and derive the dev URL from the same port contract.
+- **Deletion test:** the independent npm/3001 path disappears without adding another port adapter.
+- **Validation:** clean `pnpm desktop:dev` startup, default and custom ports, readiness waiting, and desktop-to-backend connectivity.
+
+#### C10. Make release version checks cover lock and tag identity
+
+- **Evidence / strength — Strong:** [bump-version.mjs](../scripts/bump-version.mjs#L28-L93) and [check-versions.mjs](../scripts/check-versions.mjs#L18-L46) duplicate target registries; the current five-source 0.6.0 check misses `Cargo.lock`, and [release.yml](../.github/workflows/release.yml#L32-L48) does not prove the tag matches the stamped version.
+- **Recommended direction:** share one version target registry and validate `Cargo.lock` plus expected release tag/version equality.
+- **Deletion test:** one duplicated target list is removed and a stale lock or mismatched tag fails before desktop jobs.
+- **Validation:** fixtures for source drift, lock drift, `vX.Y.Z` mismatch, manual dispatch, prerelease handling, and the normal bump path.
+
+#### C11. Validate packaged Python exactly as production resolves it
+
+- **Evidence / strength — Strong:** [package_backend_runtime.py](../scripts/package_backend_runtime.py#L236-L259), [stage-backend-runtime.mjs](../frontend/scripts/stage-backend-runtime.mjs#L67-L109), and [main.rs](../frontend/src-tauri/src/main.rs#L366-L637) disagree about the runtime path contract; staging describes a relative `pyvenv.cfg` home but writes an absolute staging path, while desktop workflows execute different interpreter paths.
+- **Recommended direction:** validate the same resolved interpreter, `PYTHONHOME`, `PYTHONPATH`, and environment that production launches, from a relocated bundle rather than the source staging tree.
+- **Deletion test:** CI-specific interpreter guesses and the absolute-path rewrite are replaced by one consumed runtime-layout contract.
+- **Validation:** relocate a staged bundle on macOS/Windows, launch health and representative imports, verify no checkout paths leak, and compare CI resolution to Rust launch resolution.
+
+### Deletion and simplification
+
+#### D1. Let the generated client and one app owner own auth
+
+- **Evidence / strength — Strong:** generated client configuration already injects auth, but handwritten generated-SDK calls still pass headers; [useAuth.ts](../frontend/src/features/auth/hooks/useAuth.ts#L20-L49) mounts lifecycle work for every caller, and Data Loader performs a second bootstrap.
+- **Recommended direction:** retain explicit auth only for raw `fetch`, `EventSource`, and native downloads; provide generated configuration through a dependency-light app owner to remove dynamic generated-config/auth-store cycles.
+- **Deletion test:** ordinary SDK calls pass no manual auth headers, lifecycle effects mount once, and Data Loader has no parallel bootstrap.
+- **Validation:** initial auth, refresh/logout, 401 recovery, Google/CILogon redirects, EventSource, browser downloads, and native downloads.
+
+#### D2. Derive view visibility instead of mirroring it into UI state
+
+- **Evidence / strength — Strong:** [preferencesStore.ts](../frontend/src/stores/preferencesStore.ts) owns view preferences while [uiStore.ts](../frontend/src/stores/uiStore.ts) mirrors visibility beside `currentView`; [viewRegistry.ts](../frontend/src/features/views/viewRegistry.ts) already centralizes view metadata.
+- **Recommended direction:** derive visible navigation in one navigation module from preferences and registry; keep only the active view in UI state.
+- **Deletion test:** no action synchronizes preference visibility into `uiStore` and consumers read one derived list.
+- **Validation:** hide/show the active view, restore preferences, direct-link to hidden/workspace-gated views, and traverse browser history.
+
+#### D3. Delete workspace error state with no reader
+
+- **Evidence / strength — Strong:** workspace lifecycle code writes an error and immediately removes it, while [useWorkspaceStatus.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceStatus.ts) exposes `WorkspaceStatus.errors` with no production reader.
+- **Recommended direction:** report operation failures at the owning mutation/toast boundary and remove the transient status map and plumbing.
+- **Deletion test:** the errors field, setters, and immediate cleanup all disappear with unchanged visible failure behavior.
+- **Validation:** load, save, delete, reorder, undo/redo, and network failures still produce the intended user feedback and loading cleanup.
+
+#### D4. Persist preferences through one codec/projection
+
+- **Evidence / strength — Strong:** [preferencesStore.ts](../frontend/src/stores/preferencesStore.ts), [usePreferences.ts](../frontend/src/hooks/usePreferences.ts), generated preference DTOs, local partialization, and hook snapshots repeat normalized/resolved shapes and equality decisions.
+- **Recommended direction:** define one canonical persistence projection/codec/equality boundary; UI-only resolved values remain outside the DTO.
+- **Deletion test:** schema lists and normalization/equality logic are not repeated across store, hook, and transport layers.
+- **Validation:** old local state, server merge, partial updates, multi-tab toggles, AI-provider maps, serialization round trips, and no-op updates.
+
+#### D5. Remove compact-panel state that cannot affect layout
+
+- **Evidence / strength — Strong:** [useResizableSplit.ts](../frontend/src/hooks/useResizableSplit.ts), [useRightPanelResize.ts](../frontend/src/hooks/useRightPanelResize.ts), and panel adapters retain collapsed/last-ratio state, unreachable collapsed branches, and an unused schema callback.
+- **Recommended direction:** keep only layout state that a live caller reads; collapse should be either a real supported mode or absent, not a residual schema.
+- **Deletion test:** collapsed ratio, last ratio, unreachable branches, and unused callback props are removed without replacement bookkeeping.
+- **Validation:** drag, reset, resize, remount, narrow viewport, and each compact/expanded panel consumer.
+
+#### D6. Mount global feedback, docs, and toaster hosts once
+
+- **Evidence / strength — Strong:** [App.tsx](../frontend/src/App.tsx#L15-L77) duplicates docs/toaster hosts across branches, while [WorkspaceShell.tsx](../frontend/src/components/layout/WorkspaceShell.tsx#L23-L120) mounts another feedback host.
+- **Recommended direction:** put each global host at the lowest common app boundary and pass only open/close intent from feature shells.
+- **Deletion test:** exactly one feedback panel, docs banner, and toaster host remain in the mounted app tree.
+- **Validation:** authenticated/unauthenticated branches, workspace load failure, feedback opening from sidebar, toast ordering, and docs end-of-life display.
+
+#### D7. Remove zero-caller `uiStore` state and actions
+
+- **Evidence / strength — Strong:** [uiStore.ts](../frontend/src/stores/uiStore.ts) retains sidebar-collapse methods, modal methods, and other state/actions with no production call sites after the current layout migrations.
+- **Recommended direction:** delete only verified zero-callers and keep active view plus live UI ownership.
+- **Deletion test:** every remaining field/action has a production consumer or a documented test seam.
+- **Validation:** sidebar mobile/desktop behavior, settings/feedback dialogs, view switching, hydration, and store tests.
+
+#### D8. Delete the orphan `DataFolderDialog` shell
+
+- **Evidence / strength — Strong:** [DataFolderDialog.tsx](../frontend/src/components/dialogs/DataFolderDialog.tsx) is effectively consumed only by [DataFolderDialog.test.tsx](../frontend/src/components/dialogs/__tests__/DataFolderDialog.test.tsx); Settings uses the shared panel directly.
+- **Recommended direction:** remove the shell and its shell-only test while keeping the live settings panel and data-root flow.
+- **Deletion test:** no test imports a component absent from production and the underlying panel has direct coverage.
+- **Validation:** open Settings, inspect/change data root in supported modes, save/cancel, and surface backend errors.
+
+#### D9. Collapse documentation registry shims and impossible status paths
+
+- **Evidence / strength — Strong:** [tutorialRegistry.ts](../frontend/src/tutorials/tutorialRegistry.ts), [infoRegistry.ts](../frontend/src/tutorials/infoRegistry.ts), and [referenceRegistry.ts](../frontend/src/tutorials/referenceRegistry.ts) are thin re-exports around duplicated target/type contracts; [registryStore.ts](../frontend/src/tutorials/registryStore.ts) retains dead status fields and an always-null/no-caller warning path.
+- **Recommended direction:** keep one registry contract, delete impossible warning/status state, and strengthen docs-drift checks beyond literal existence.
+- **Deletion test:** thin registry ladders, duplicate types, and unreachable warning UI are gone while every live target still resolves.
+- **Validation:** bundled/remote/offline docs, dynamic links, missing targets, registry refresh failure, and all documentation entry surfaces.
+
+#### D10. Unify hint state, policy, and measurement ownership
+
+- **Evidence / strength — Strong:** [hintsStore.ts](../frontend/src/stores/hintsStore.ts), [HintsController.tsx](../frontend/src/features/hints/HintsController.tsx), [conditions.ts](../frontend/src/features/hints/conditions.ts), and [hintRegistry.ts](../frontend/src/features/hints/hintRegistry.ts) split durable/transient state, duplicate observers/listeners/polling, and retain unused priority, `oneShot`, and action policy.
+- **Recommended direction:** use one policy evaluator and one measurement observer; make persistence explicit and remove unsupported policy fields.
+- **Deletion test:** each DOM event/observer is registered once and every retained policy field changes behavior.
+- **Validation:** route/workspace changes, target mount/unmount, resize/scroll, dismissal persistence, ordered hints, and accessibility focus.
+
+#### D11. Consolidate canonical workspace-node and document/schema metadata
+
+- **Evidence / strength — Strong:** workspace helpers still include legacy node types, re-export ladders, duplicated document/schema utilities, and test-only builders after generated `WorkspaceNodeInfo` became canonical; examples include [selectionUtils.ts](../frontend/src/features/workspace/common/utils/selectionUtils.ts), [nodeMetadata.ts](../frontend/src/features/views/preprocessing/utils/nodeMetadata.ts), and [schemaMutations.ts](../frontend/src/features/workspace/data-view/services/schemaMutations.ts).
+- **Recommended direction:** project generated node metadata once at the handwritten boundary and keep only feature-specific derived helpers.
+- **Deletion test:** legacy aliases, duplicate document/schema resolvers, and builders with no behavioral test purpose disappear.
+- **Validation:** graph/list/table identities, document-column selection, schema mutation, preprocessing inputs, and persisted analysis inputs.
+
+#### D12. Replace topic-modeling type mirrors with generated types
+
+- **Evidence / strength — Strong:** [topicModelingAdapters.ts](../frontend/src/features/views/topic-modeling/topicModelingAdapters.ts) and feature hooks mirror generated request/result shapes, increasing adapter surface without a distinct domain invariant.
+- **Recommended direction:** use generated types at the transport boundary and retain only genuinely transformed chart/view models.
+- **Deletion test:** a field addition no longer requires matching handwritten transport interfaces and pass-through adapters.
+- **Validation:** run/hydrate/clear, legacy persisted-result rejection, chart shaping, detach, and generated-client regeneration.
+
+#### D13. Remove sidebar compatibility props and graph-node fallback shapes
+
+- **Evidence / strength — Strong:** sidebar components still accept compatibility props with no live variation, and graph consumers retain fallback shapes after the canonical `id` migration; [Sidebar.tsx](../frontend/src/components/layout/Sidebar.tsx) and [useWorkspaceGraph.ts](../frontend/src/features/workspace/graph-view/hooks/useWorkspaceGraph.ts) are the central seams.
+- **Recommended direction:** make the live shape required and delete fallback-only branches rather than carrying another adapter.
+- **Deletion test:** removing the compatibility props/fallback objects changes no production call site and leaves one node identity shape.
+- **Validation:** desktop/mobile sidebar, graph selection/actions, fresh highlights, node rename/settings, and persisted workspaces.
+
+#### D14. Remove the Knip UI blind spot and prune hidden exports
+
+- **Evidence / strength — Strong:** [knip.json](../frontend/knip.json#L9-L15) ignores all `src/components/ui/**`, masking unused modifiers/exports even after the first sidebar primitive cleanup.
+- **Recommended direction:** remove or narrow the exclusion and export only primitives/modifiers used by handwritten production code or deliberate test seams.
+- **Deletion test:** configured Knip passes without a blanket UI ignore and no barrel keeps unused UI exports alive.
+- **Validation:** Knip, lint, tests, build, and visual smoke of every changed shared primitive.
+
+#### D15. Replace four shallow detach-dialog wrappers with the shared dialog
+
+- **Evidence / strength — Strong:** [QuotationDetachDialog.tsx](../frontend/src/features/views/quotation/components/QuotationDetachDialog.tsx), [TopicModelingDetachDialog.tsx](../frontend/src/features/views/topic-modeling/components/results/TopicModelingDetachDialog.tsx), [ConcordanceDetachDialog.tsx](../frontend/src/features/views/concordance/components/ConcordanceDetachDialog.tsx), and [ConcordanceDispersionDetachDialog.tsx](../frontend/src/features/views/concordance/components/ConcordanceDispersionDetachDialog.tsx) mostly forward props to the same shared dialog.
+- **Recommended direction:** have feature owners call the shared dialog with feature-specific labels/options; retain a wrapper only where it owns real transformation.
+- **Deletion test:** four files disappear or shrink to actual domain logic, with no new generic abstraction.
+- **Validation:** open/close, default options, submit payloads, pending/errors, table and dispersion variants, and keyboard focus.
+
+#### D16. Delete impossible Concordance read-only branches
+
+- **Evidence / strength — Strong:** [ConcordanceFeature.tsx](../frontend/src/features/views/concordance/ConcordanceFeature.tsx) hardcodes false/undefined values into read-only branches threaded through [ConcordanceResultsPanel.tsx](../frontend/src/features/views/concordance/components/ConcordanceResultsPanel.tsx).
+- **Recommended direction:** remove the unsupported mode and its props unless a product requirement first supplies a real caller.
+- **Deletion test:** false/undefined prop plumbing and unreachable render branches vanish.
+- **Validation:** combined and dispersion results, row detail, materialization, detach, source navigation, and empty/error states.
+
+#### D17. Remove verified zero-caller helpers, not deliberate test seams
+
+- **Evidence / strength — Strong:** confirmed candidates include [minTopicSize.ts](../frontend/src/features/views/topic-modeling/components/panels/minTopicSize.ts), recent-selection clear in [recentSelectionsStore.ts](../frontend/src/stores/recentSelectionsStore.ts), the unused return from [useZoom.ts](../frontend/src/hooks/useZoom.ts), tokenizer-order helpers, tutorial status fields, and compact/schema props.
+- **Recommended direction:** delete each implementation with its now-orphaned test/export; keep seams whose tests protect a supported contract even if production has no direct caller.
+- **Deletion test:** `rg`, dependency/export scans, and Knip show zero callers before deletion, and no replacement compatibility layer is added.
+- **Validation:** focused owner tests plus configured Knip, lint, full frontend tests, and build in the implementation change.
+
+#### D18. Sweep narrow internal return fields, actions, and exports
+
+- **Evidence / strength — Strong:** hooks still expose raw query objects, dead task-flow outputs/actions, unused schema aliases/base-hook exports, and hydration/request helpers not consumed by production. Representative owners include [useWorkspaceQueries.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceQueries.ts), [useAnalysisTaskFlow.ts](../frontend/src/features/views/common/tasks/useAnalysisTaskFlow.ts), and [useAnalysisHydration.ts](../frontend/src/features/views/common/useAnalysisHydration.ts).
+- **Recommended direction:** return only the stable behavior each caller uses; remove one item at a time with call-site proof.
+- **Deletion test:** each removed field/export has zero consumers and deleting it shortens both owner and adapter code.
+- **Validation:** affected focused tests, typecheck/build, Knip without broad ignores, and persisted hydration scenarios.
+
+#### D19. Break the route import cycle without removing URL behavior
+
+- **Evidence / strength — Strong:** the cycle is [router.tsx](../frontend/src/router.tsx) → [App.tsx](../frontend/src/App.tsx) → [WorkspaceShell.tsx](../frontend/src/components/layout/WorkspaceShell.tsx) → [ViewRouteSync.tsx](../frontend/src/components/layout/ViewRouteSync.tsx) → `router.tsx`.
+- **Recommended direction:** extract typed/pure search contracts or narrow router hooks; keep deep links, back/forward behavior, and pending-workspace synchronization intact.
+- **Deletion test:** cycle detection no longer reports the chain and no second navigation state machine is introduced.
+- **Validation:** cold deep links, invalid workspace/view, pending workspace load, replace vs push, back/forward, hidden views, and auth transitions.
+
+#### D20. Replace stale boilerplate comments with verified ownership notes
+
+- **Evidence / strength — Strong:** handwritten files still contain repeated placeholders such as `typed store boundary` in [selectionStore.ts](../frontend/src/stores/selectionStore.ts#L53-L99), `(rg call sites/imports)` in [HintsController.tsx](../frontend/src/features/hints/HintsController.tsx#L95), `internal event/effect/helper flow`, `parent component boundary`, and route boilerplate, alongside stale caller claims.
+- **Recommended direction:** treat this as targeted regression cleanup: update the nearest changed unit with verified caller/why/flow context and remove only placeholder narration.
+- **Deletion test:** placeholder patterns reach zero without reducing useful lifecycle, side-effect, or identity documentation.
+- **Validation:** structured comment audit plus targeted `rg`; spot-check named callers against imports/tests before claiming coverage.
+
+#### D21. Remove memo/callback residue only in local identity-insensitive code
+
+- **Evidence / strength — Worth exploring:** local helpers such as [ChromeTabs.tsx](../frontend/src/components/tabs/ChromeTabs.tsx), [useResizableSplit.ts](../frontend/src/hooks/useResizableSplit.ts), and [useStackedSplits.ts](../frontend/src/components/layout/sidebar/useStackedSplits.ts) contain candidates the React Compiler can own, but other memoization is identity-sensitive.
+- **Recommended direction:** make narrow removals after confirming no effect dependency, library contract, or expensive-model identity requirement; explicitly reject a blanket sweep.
+- **Deletion test:** removed wrappers reduce code without increasing effects, listener churn, or third-party reconciliation.
+- **Validation:** render-count/effect-focused tests where relevant, drag/reorder/resize smoke, full tests, and build.
+
+#### D22. Narrow over-broad internal barrels
+
+- **Evidence / strength — Strong:** [features/views/common/index.ts](../frontend/src/features/views/common/index.ts) exports unrelated feature helpers through one wide surface and can hide ownership/cycles.
+- **Recommended direction:** prefer direct imports for internal feature code while retaining the deliberate public API barrel and meaningful feature seams.
+- **Deletion test:** the common barrel exports only a coherent contract or is no longer used internally, with fewer cycle/unused-export edges.
+- **Validation:** import-cycle scan, Knip, typecheck/build, and no change to generated/API barrel ownership.
+
+#### D23. Give Data Loader mutations and dialogs one owner
+
+- **Evidence / strength — Strong:** [useFiles.ts](../frontend/src/features/views/data-loader/hooks/useFiles.ts#L41-L85) combines mutation invalidation with immediate refetches; refetch is threaded through callers, while Data Loader retains nested outer/inner dialogs, an unreachable no-workspace alert, and unused facade props.
+- **Recommended direction:** let TanStack mutation ownership choose invalidation or awaited refetch once, and collapse dialogs/facades to the component that owns their state.
+- **Deletion test:** duplicate network refresh, refetch prop threading, nested shells, and unreachable alert/facade props disappear.
+- **Validation:** upload/move/delete/create-folder/import, rapid consecutive mutations, stale list recovery, dialog focus/cancel, and missing-workspace routing.
+
+#### D24. Apply exact preprocessing input limits and move shared utilities
+
+- **Evidence / strength — Strong:** a generic UI cap of 12 conflicts with join's 2-input and concat's 6-input contracts; topic/sequential code imports generic helpers owned by preprocessing. [NodeInputsPanel.tsx](../frontend/src/features/views/common/components/NodeInputsPanel.tsx), [useJoinSubTab.ts](../frontend/src/features/views/preprocessing/join/hooks/useJoinSubTab.ts), and [useConcatSubTab.ts](../frontend/src/features/views/preprocessing/concat/hooks/useConcatSubTab.ts) show the split.
+- **Recommended direction:** make the active feature's exact constraint authoritative and move genuinely cross-feature concepts to a neutral shared module.
+- **Deletion test:** no generic cap can admit an invalid feature request and no non-preprocessing feature imports a preprocessing-owned generic helper.
+- **Validation:** add/remove/reorder at 0/1/2/6/12 boundaries, queued graph inputs, direct restoration, and backend validation parity.
+
+### Deep modularity opportunities
+
+#### M1. Extract an Annotation AI preview-session boundary
+
+- **Evidence / strength — Strong:** [AnnotationAiPreviewPanel.tsx](../frontend/src/features/views/annotation/components/AnnotationAiPreviewPanel.tsx) owns query/session hydration, signatures, overrides, annotation, detach/cache/dialog/table behavior, while repeated node-page and class-description queries span adjacent annotation owners.
+- **Recommended direction:** introduce a deep `useAnnotationAiPreviewSession`-style recommendation that owns the lifecycle and exposes domain commands/state; share repeated queries without changing signatures or refetch semantics.
+- **Deletion test:** the panel becomes rendering/composition, and moving the hook back would reintroduce substantial cohesive lifecycle logic rather than a cosmetic wrapper.
+- **Validation:** hydrate/new session, signature change, override, annotate-all, detach, cache refresh, pagination, cancellation, and stale task completion.
+
+#### M2. Move Sequential result shaping into the chart model
+
+- **Evidence / strength — Strong:** [useSequentialResultSummary.ts](../frontend/src/features/views/sequential-analysis/hooks/useSequentialResultSummary.ts), [useSequentialChartControls.ts](../frontend/src/features/views/sequential-analysis/hooks/useSequentialChartControls.ts), and [SequentialChart.tsx](../frontend/src/features/views/sequential-analysis/components/SequentialChart.tsx) split substantial pure result shaping across async hooks and rendering.
+- **Recommended direction:** extend the existing pure chart-model domain to accept result inputs and return render-ready series/labels/selection metadata; hooks retain async/task ownership.
+- **Deletion test:** hooks stop rebuilding chart-domain structures and the pure model can be tested without React.
+- **Validation:** empty/single/multi-series, selection, normalization, tooltip/legend, export, resize, and malformed/partial result handling.
+
+#### M3. Normalize quotation rows and highlights once
+
+- **Evidence / strength — Strong:** [quotationResultsModel.ts](../frontend/src/features/views/quotation/quotationResultsModel.ts), [quotationHighlight.ts](../frontend/src/features/views/quotation/quotationHighlight.ts), [quotationCellText.ts](../frontend/src/features/views/quotation/quotationCellText.ts), and renderer helpers repeat row/highlight/materialization parsing.
+- **Recommended direction:** define one typed row/span model with shared pure segmentation, palette, and materialization parsers; keep table/detail/render adapters distinct.
+- **Deletion test:** source payload interpretation occurs once and renderers no longer carry fallback parsing.
+- **Validation:** nested/overlapping spans, Unicode, empty text, palette stability, row detail, remote URLs, materialization, and export.
+
+#### M4. Create a Concordance results-session owner and split domains
+
+- **Evidence / strength — Strong:** [ConcordanceFeature.tsx](../frontend/src/features/views/concordance/ConcordanceFeature.tsx), [ConcordanceResultsPanel.tsx](../frontend/src/features/views/concordance/components/ConcordanceResultsPanel.tsx), and [useConcordanceResultViewModel.ts](../frontend/src/features/views/concordance/hooks/useConcordanceResultViewModel.ts) carry roughly 61-, 29-, and 47-prop handoffs around an 803-line view-model domain.
+- **Recommended direction:** own query/result/session commands at a deep context/hook boundary, then split pure combined/table, dispersion, and source/materialization domains; factor only genuinely shared node-shell/model/scroll behavior.
+- **Deletion test:** prop count falls because ownership moved, not because props were packed into an opaque bag, and each extracted module has cohesive tests.
+- **Validation:** combined/dispersion switch, tokenizer mode, paging, selection, scroll sync, row detail, materialization, detach, pending handoff, and stale results.
+
+#### M5. Let the analysis host own the canonical feature contract
+
+- **Evidence / strength — Strong:** six analysis feature components repeat near-identical prop interfaces and optional tab-ID callback guards around [AnalysisTabsHost.tsx](../frontend/src/features/views/common/tabs/AnalysisTabsHost.tsx).
+- **Recommended direction:** capture workspace/tab commands in the host closure and pass each feature a small canonical host contract plus its domain-specific inputs.
+- **Deletion test:** repeated feature interfaces and optional callback guards disappear without a new mega-prop object.
+- **Validation:** single/multi-tab modes, tab create/close/reorder, persisted IDs, feature switching, task banners, and disabled optional actions.
+
+#### M6. Split `main.rs` into deep internal modules
+
+- **Evidence / strength — Strong:** [main.rs](../frontend/src-tauri/src/main.rs#L126-L1156) combines runtime resolution, backend process/environment/port lifecycle, native download, platform behavior, and Tauri assembly; nested mutex/optional-child ownership obscures shutdown invariants.
+- **Recommended direction:** keep a thin assembly entrypoint and extract runtime, backend-process, platform, and download modules; simplify to one process owner and testable lifecycle transitions.
+- **Deletion test:** each module owns substantial cohesive behavior and `main.rs` becomes assembly rather than a collection of forwarding wrappers.
+- **Validation:** startup failure, port collision, double-close, graceful timeout, process-tree termination, app exit, macOS/Windows resolution, and large native download.
+
+#### M7. Resolve the Tauri runtime-layout contract once
+
+- **Evidence / strength — Strong:** [package_backend_runtime.py](../scripts/package_backend_runtime.py#L236-L259) writes `python_executable`, [stage-backend-runtime.mjs](../frontend/scripts/stage-backend-runtime.mjs#L67-L96) reparses/rewrites it, and [main.rs](../frontend/src-tauri/src/main.rs#L210-L519) ignores the value and rescans layout.
+- **Recommended direction:** either consume a relative manifest as the runtime contract or declare it diagnostic and delete path rewrites; resolve interpreter/home/site-packages once.
+- **Deletion test:** repeated scans and manifest-field rewrites are gone, with one authoritative layout result passed to launch/validation.
+- **Validation:** packaged and development layouts, relocated bundle, missing/corrupt manifest, free-threaded interpreter, site-packages imports, and both desktop platforms.
+
+### Build, dependency, and maintenance improvements
+
+#### B1. Load stopwords only after the user asks for them
+
+- **Evidence / strength — Strong:** the static stopword package contributes 65 modules and about 208k source characters to a roughly 224.76 kB chunk even though the feature is user-triggered; [loadMergedStopwords.ts](../frontend/src/lib/loadMergedStopwords.ts) is already the natural async boundary.
+- **Recommended direction:** complete that boundary with a dynamic import and keep compact language metadata separate if it is needed eagerly.
+- **Deletion test:** the stopword implementation leaves the initial graph and appears in a lazy chunk without duplicating language data.
+- **Validation:** first/subsequent loads, multiple languages, missing language, offline desktop, recommendation flows, build chunk inspection, and loading/error UX.
+
+#### B2. Choose an explicit distributable source-map policy
+
+- **Evidence / strength — Strong:** the production output contains 67 maps totaling about 15 MiB versus about 11.7 MiB non-map output (about 56.2% of the build), and [vite.config.ts](../frontend/vite.config.ts) emits maps that packaging copies into backend resources without an upload step.
+- **Recommended direction:** decide among disabled maps or hidden maps uploaded to the error service and excluded from packages; this is a release/security policy, not dead-code deletion.
+- **Deletion test:** distributable artifacts contain only policy-approved maps and no unused map-copy weight.
+- **Validation:** browser and Tauri stack traces, Sentry symbolication if chosen, backend package contents, desktop installers, and release size.
+
+#### B3. Localize optional Sentry, Google, and Settings ownership
+
+- **Evidence / strength — Worth exploring:** [sentry.ts](../frontend/src/lib/sentry.ts), [ErrorBoundary.tsx](../frontend/src/components/ErrorBoundary.tsx), and [index.tsx](../frontend/src/index.tsx#L6-L54) leave about 24 Sentry modules in the entry despite optional DSN and mount Google globally; [SettingsDialog.tsx](../frontend/src/components/dialogs/SettingsDialog.tsx) is another candidate lazy boundary.
+- **Recommended direction:** explore an optional Sentry boundary, localize Google provider to Google auth, and lazy-load Settings without making error capture or login timing fragile.
+- **Deletion test:** optional provider code leaves the main entry when disabled and no duplicate providers/configuration appear.
+- **Validation:** DSN on/off, pre-root and render errors, Google-only/CILogon-only/no-auth deployments, redirect callback, first Settings open, and chunk failure.
+
+#### B4. Remove private npm publication and CLI residue
+
+- **Evidence / strength — Strong:** [package.json](../frontend/package.json#L6-L31) still has `bin`, `files`, and `prepublishOnly`; [bin/cli.js](../frontend/bin/cli.js), [.npmignore](../frontend/.npmignore), and [publishing.md](../frontend/docs/reference/publishing.md) describe a package no workflow publishes.
+- **Recommended direction:** remove the private npm CLI/publication contract together while keeping workspace name/version fields used by builds/releases.
+- **Deletion test:** no packaging-only file/script/doc remains and normal workspace install/build/version commands still work.
+- **Validation:** clean pnpm install, root wrappers, frontend build, version bump/check, desktop packaging metadata, and release workflow.
+
+#### B5. Mock the handwritten API boundary, not generated internals
+
+- **Evidence / strength — Strong:** 14 tests import/mock generated SDK modules directly instead of the documented [api/index.ts](../frontend/src/api/index.ts) plus MSW transport boundary.
+- **Recommended direction:** move tests to `@/api` or request-level MSW based on what behavior they own; reserve generated mocks for generator-contract tests.
+- **Deletion test:** application tests survive generated file reshaping when the handwritten API contract is unchanged.
+- **Validation:** regenerate the client, run the 14 migrated tests and full suite, and verify request bodies/auth/error paths through MSW where appropriate.
+
+#### B6. Make Knip authoritative and decide `postcss` ownership
+
+- **Evidence / strength — Strong:** [knip.json](../frontend/knip.json#L9-L20) ignores UI sources and direct `postcss`, while [package.json](../frontend/package.json#L113-L135) also has Tailwind's PostCSS integration. Removing the direct dependency still requires confirming the clean-install toolchain contract.
+- **Recommended direction:** remove the UI exclusion, prune exports, and confirm whether tooling resolves `postcss` transitively before deleting the direct dependency.
+- **Deletion test:** configured Knip passes without blanket ignores; `postcss` is either proven direct and documented or absent.
+- **Validation:** Knip, CSS build, Tailwind processing, clean lockfile install, lint, tests, and production build.
+
+#### B7. Provide one executable frontend verification contract
+
+- **Evidence / strength — Strong:** [package.json](../frontend/package.json#L88-L105) exposes separate checks while guides and CI compose overlapping subsets, making the required local/CI contract easy to drift.
+- **Recommended direction:** add one non-mutating verification command that calls the agreed checks and make CI invoke the same contract, with desktop-only checks separate where resources are required.
+- **Deletion test:** duplicated check lists disappear from workflows/docs and one command documents the frontend acceptance gate.
+- **Validation:** clean pass, purposeful failures for lint/test/build/Knip/docs/version, CI exit propagation, and no format mutation.
+
+#### B8. Add lint/type coverage for tooling configuration
+
+- **Evidence / strength — Strong:** current lint targets only `src/**/*.{ts,tsx}`, excluding [vite.config.ts](../frontend/vite.config.ts) and [openapi.config.ts](../frontend/openapi.config.ts), even though these execute in build/generation paths.
+- **Recommended direction:** include tooling configs in an appropriate TypeScript/ESLint project or a small dedicated config check.
+- **Deletion test:** config-specific suppressions are minimal and syntax/type regressions fail before production build/client generation.
+- **Validation:** lint/typecheck both configs, Vite build, OpenAPI generation, Node runtime compatibility, and clean IDE resolution.
+
+#### B9. Resolve the 49-file format-check baseline
+
+- **Evidence / strength — Strong:** `pnpm -C frontend format:check` currently reports 49 files while [package.json](../frontend/package.json#L96-L97) presents the command as a verification surface.
+- **Recommended direction:** align the existing files and enforce the check, or remove/rename a misleading command if formatting is intentionally non-gating; do this as a focused mechanical change.
+- **Deletion test:** the command either passes and is enforced or no longer claims to be a check.
+- **Validation:** zero-diff format check after the dedicated formatting change, lint, tests, build, and review that generated/vendor files remain excluded.
+
+#### B10. Consolidate the release-version registry
+
+- **Evidence / strength — Strong:** this is the maintenance counterpart of C10: [bump-version.mjs](../scripts/bump-version.mjs) and [check-versions.mjs](../scripts/check-versions.mjs) duplicate ownership and omit lock/tag assertions.
+- **Recommended direction:** make one data registry drive bump and verification, with Cargo lock and tag checks at release time.
+- **Deletion test:** adding a versioned source requires one registry change and all release surfaces are covered automatically.
+- **Validation:** unit fixtures plus `pnpm bump-version` in a disposable tree, `pnpm check-versions`, lock regeneration, and tagged/manual workflows.
+
+#### B11. Consolidate Python runtime-preparation commands
+
+- **Evidence / strength — Strong:** Python 3.14t selection and packaging commands are duplicated across [package.json](../frontend/package.json#L100-L105), [desktop-macos.yml](../.github/workflows/desktop-macos.yml#L94-L142), and [desktop-windows.yml](../.github/workflows/desktop-windows.yml#L101-L157).
+- **Recommended direction:** let one repository script own runtime preparation/version; workflows retain platform setup and artifact verification only.
+- **Deletion test:** duplicated command strings/selectors disappear from workflows without hiding platform-specific signing/bundling.
+- **Validation:** local macOS preparation, Windows workflow shell behavior, cached/clean runs, free-threaded Python, staged manifest, and desktop builds.
+
+#### B12. Delete retired workflow and Tauri surfaces
+
+- **Evidence / strength — Strong:** zero-callers include `build-notes` in [desktop-macos.yml](../.github/workflows/desktop-macos.yml#L6-L22) / [desktop-windows.yml](../.github/workflows/desktop-windows.yml#L6-L32), Tauri HTTP plugin/direct serde dependencies in [Cargo.toml](../frontend/src-tauri/Cargo.toml), global/window-webview permissions in [default.json](../frontend/src-tauri/capabilities/default.json), and dead `__BACKEND_PORT__` injection in [main.rs](../frontend/src-tauri/src/main.rs#L1068-L1077). External runtime-environment compatibility remains a separate confirmation item below.
+- **Recommended direction:** remove those surfaces and stale config docs while preserving live opener, dialog, and filesystem capabilities; confirm external `.env` compatibility separately below.
+- **Deletion test:** manifests/workflows contain no permission/dependency/input/global with zero consumers, and live native commands retain least privilege.
+- **Validation:** workflow dispatch/release, capability-denial smoke, open/save dialogs, external links, filesystem access, native download, and runtime-config backend URL.
+
+#### B13. Treat Vite 8 residue as a measured cleanup
+
+- **Evidence / strength — Worth exploring:** [vite.config.ts](../frontend/vite.config.ts#L70-L76) explicitly selects esbuild CSS minification although Vite 8 defaults to Lightning CSS, and [package.json](../frontend/package.json#L125-L135) retains direct esbuild; the React Compiler bridge remains intentional.
+- **Recommended direction:** compare emitted CSS and representative visuals before removing the override/dependency; ignore low-value redundant defaults unless they obscure a real contract.
+- **Deletion test:** the override/direct dependency can disappear with equivalent supported CSS and no extra compatibility layer.
+- **Validation:** bundle diff, CSS size/order, Tailwind output, browser/Tauri visual smoke, animations/themes, and full production build.
+
+### Direct Deletion Wins
+
+These are compact implementation candidates with confirmed zero-callers or
+unreachable callers. Product/external-contract caveats remain where noted.
+
+| Candidate | Evidence / deletion guard |
+| --- | --- |
+| `DataFolderDialog` shell | Remove [DataFolderDialog.tsx](../frontend/src/components/dialogs/DataFolderDialog.tsx) and shell-only test; retain the live Settings panel. |
+| Topic minimum-size helper | Remove [minTopicSize.ts](../frontend/src/features/views/topic-modeling/components/panels/minTopicSize.ts) after its zero-import check. |
+| Dead UI-store methods/state | Delete verified sidebar/modal/other zero-callers from [uiStore.ts](../frontend/src/stores/uiStore.ts), not active-view state. |
+| Tutorial registry status/warning | Remove dead fields and the impossible warning path in [registryStore.ts](../frontend/src/tutorials/registryStore.ts). |
+| Recent-selection clear | Remove the unused clear action from [recentSelectionsStore.ts](../frontend/src/stores/recentSelectionsStore.ts). |
+| `useZoom` clamp return | Remove the unused return surface from [useZoom.ts](../frontend/src/hooks/useZoom.ts), retaining live zoom behavior. |
+| Tokenizer-order/test helpers | Delete only helpers with zero production and meaningful test consumers; do not erase deliberate contract seams. |
+| Schema/compact props | Remove unused schema callback, collapsed/last-ratio fields, and unreachable compact branches from their owners. |
+| Hidden UI modifiers/exports | Remove after Knip runs without the blanket UI ignore. |
+| Narrow hook/API outputs | Delete zero-caller raw query fields, task outputs, schema aliases, hydration/request helpers, and exports one owner at a time. |
+| Retired Tauri/workflow surfaces | Remove HTTP plugin, direct serde, global/window-webview permissions, `__BACKEND_PORT__`, and `build-notes`; keep live opener/dialog/filesystem. |
+| Private npm publication | Remove CLI, `bin`/`files`/prepublish configuration, `.npmignore`, and publishing docs while preserving workspace name/version. |
+| Data Loader facades | Remove nested dialog shell, unreachable no-workspace alert, refetch prop threading, and unused facade props after ownership is consolidated. |
+
+### Worth Confirming
+
+- **Bundled documentation pruning:** 25 of 43 registry entries have no literal
+  call site, but remote/offline registries and dynamic-link contracts may still
+  require them. Confirm the product contract before deleting content.
+- **External desktop runtime environment:** confirm whether external deployments
+  rely on `.env` / `.env.desktop` loading before removing it. The standard
+  packager does not establish that compatibility requirement.
+- **Vite 8 CSS minifier:** remove the explicit esbuild choice only after output
+  and visual comparison; keep the React Compiler Vite/Babel bridge.
+- **Release/source-map/signing policy:** source maps, tag rules, signing identity,
+  and bundle targets are policy decisions. Record the chosen policy rather than
+  calling these surfaces dead code.
 
 ## Done
 
@@ -193,62 +670,95 @@ rescan should be added here before implementation.
 
 ## Endpoint And Source-Of-Truth Notes
 
-The original production `page=1&page_size=1` preprocessing metadata misuse is
-gone. Remaining handwritten `getNodeData` calls are row-content flows:
-workspace table data, annotation preview/results rows, preprocessing raw-preview
-fallback, and language sampling for stop-word/tokenizer recommendations.
+The 2026-07-09 cleanup remains the starting contract for this refresh:
 
-Workspace data table columns now use `NodeDataResponse.columns`; row-shape
-column inference has been removed from typed workspace and preview table paths.
-
-Live workspace-node identity is now `WorkspaceNodeInfo.id`. Keep `node_id` only
-where the backend contract explicitly uses that field, such as path params,
-request bodies, `AnalysisTabInput`, and detach-option/result DTOs.
-React Flow `CustomNode` data also uses `id` directly; it no longer carries a
-frontend-only `node_id` alias.
-Data Loader workspace summaries also use generated `WorkspaceSummary` directly;
-legacy `unique_id`/`updated_at`/`dataframe_count` aliases were removed.
-Concordance selected-node helpers use generated `id` and backend
-`label_to_node_map`; selected-node `node_id` aliases were removed.
-
-Raw frontend URL construction is limited to boundaries that need URL strings or
-external resources: health checks, document/file rendering, remote tutorial
-registry reads, OpenRouter model discovery, export blob downloads, and native
-EventSource task streaming. Backend auth redirect, export, and task-stream URL
-builders are typed against generated endpoint contracts.
-
-Final rescan 2026-07-09: no handwritten production `page=1&page_size=1`
-metadata probes remain, `clearTokenFrequencies` is absent from the regenerated
-client, and the only handwritten `getNodeDataByWorkspaceId` calls are
-row-content flows already listed above.
+- The original production `page=1&page_size=1` preprocessing metadata misuse is
+  gone. Remaining handwritten `getNodeData` calls fetch row content for workspace
+  tables, annotation, preprocessing raw-preview fallback, or language sampling.
+- Workspace and preview table columns come from `NodeDataResponse.columns`, not
+  first-row inference.
+- Live workspace-node identity is `WorkspaceNodeInfo.id`; `node_id` remains only
+  where an explicit backend path/request/result DTO owns that spelling.
+- Data Loader consumes generated `WorkspaceSummary`, and Concordance resolves
+  selected nodes by generated `id` plus backend `label_to_node_map`.
+- `clearTokenFrequencies` remains absent from the generated client.
+- Raw URL/auth handling is justified only at boundaries that need a URL string
+  or cannot use the generated transport: health/external resources, browser or
+  native streaming downloads, auth redirects, and `EventSource`. Ordinary SDK
+  calls should follow generated configuration rather than duplicate headers.
 
 ## Layers Checked And Not Recommended For Flattening
 
-- `WorkspaceProvider` slice contexts: the data/selection/status/action split is
-  a real identity boundary for frequent consumers. Removing it would likely
-  increase rerenders and coupling.
-- `useWorkspaceTabs` and `tabStateOps`: this is real sidecar persistence and
-  optimistic read-modify-write logic. The legacy `inputs` mirror has been
-  removed from both frontend and backend contracts; named `input_sets` are now
-  the tab input source of truth.
-- `useAnalysisFeature`: this is shared task hydration, clear/stop handling,
-  tab-owned task id resolution, and task banner state. It is not an unnecessary
-  wrapper.
-- Task stream hooks: `useWorkspaceTaskStreamClient` owns SSE connection/retry,
-  while `useWorkspaceTaskInbox` owns event ordering, terminal-state regression
-  guards, store merging, and graph invalidation. This split is justified.
-- Manual `useMemo`, `useCallback`, and `React.memo`: do not remove these
-  broadly. The repo uses React Compiler, but several current memoization sites
-  are around context values, React Flow, TanStack Table, effects, and d3/cloud
-  rendering where identity can still matter.
+- **`WorkspaceProvider` slice contexts:** retain the data/selection/status/action
+  contexts. Call-site tracing shows many consumers need only one slice; a single
+  context would broaden update fan-out and erase a useful identity boundary.
+- **URL synchronization behavior:** retain deep links, back/forward handling,
+  pending-workspace resolution, and invalid-route repair in `ViewRouteSync`.
+  Break only the import cycle identified in D19; replacing it with local mirror
+  state would duplicate router truth.
+- **View ID / registry / component split:** retain light IDs for stores/routes,
+  metadata for navigation, and lazy component loading in a Fast Refresh-safe
+  module. The three layers have different import and runtime constraints; the
+  earlier one-wrapper-per-view layer is already gone.
+- **`QueryProvider`:** retain the app-level TanStack client/error-policy owner.
+  It establishes one cache lifetime and does not merely forward props.
+- **Analysis lifecycle and tab persistence:** retain `useAnalysisFeature`,
+  `useWorkspaceTabs`, and `tabStateOps`. They own hydration, clear/stop behavior,
+  task ID resolution, optimistic sidecar read-modify-write, and named
+  `input_sets`; removing them would redistribute stateful behavior across six
+  features.
+- **Task stream client/inbox split:** retain the SSE connection/retry client and
+  the independent inbox that orders events, rejects terminal-state regression,
+  merges stores, and invalidates the graph. Transport lifetime and event-domain
+  reduction are separate responsibilities.
+- **Direct node-input queue plus explicit consume opt-out:** retain the simple
+  request queue and `consumeNodeInputRequests: false` for multi-selector owners.
+  The prior registration layer was removed because it introduced hidden
+  coordination; do not restore it.
+- **`CustomNode` decomposition:** retain toolbar, menu placement/settings, and
+  inline rename components. Each owns interaction or geometry and has focused
+  tests; recombining them would rebuild a large branchy React Flow node.
+- **Nested error boundaries:** retain app/workspace/view boundaries because they
+  isolate failures at different recovery scopes. The duplicate global hosts in
+  D6 are separate from these recovery boundaries.
+- **Identity-sensitive memoization:** retain memoization around React Flow,
+  TanStack Table, Recharts/d3, context values, and effect/listener identities.
+  React Compiler does not remove third-party identity contracts; only the narrow
+  local candidates in D21 should be tested.
+- **API barrel and generated-code boundary:** retain `@/api` as the handwritten
+  application seam and generated code as generator-owned output. Direct internal
+  imports in tests are cleanup targets, but generated files should not be
+  manually simplified.
+- **React Compiler Vite/Babel bridge:** retain it. The compiler integration is a
+  build contract, not residue from manual memoization.
+- **Runtime-config classic-script ordering:** retain the classic bootstrap script
+  before the module entry so the API/backend base exists before module
+  evaluation in web and desktop packages.
+- **Tauri runtime staging concept:** retain a prepared Python resource, but make
+  its layout contract singular and testable. Also retain the native large-file
+  download path, PID reaping and runtime-search fallbacks until production-path
+  tests cover their startup/crash cases, `build.rs` because Tauri requires it,
+  and Vite's relative asset base for backend/desktop static loading.
+- **Live Tauri plugins:** retain opener, dialog, and filesystem plugins. Source
+  tracing found real consumers; only unused HTTP/global/window-webview surfaces
+  are deletion candidates.
+- **Existing deep/lazy boundaries:** retain CodeMirror, MediaPipe,
+  `DocumentView`/`WorkspaceView`, analysis feature chunks, and split-layout
+  primitives. Bundle/import tracing shows these defer meaningful work or own
+  reusable behavior rather than serving as cosmetic wrappers.
 
 ## Suggested Verification By Change Type
 
-- View registry/tab wrapper changes: `pnpm -C frontend test -- --run`,
-  `pnpm -C frontend lint`, `pnpm -C frontend build`, plus manual smoke of view
-  switching and multi-tab analysis.
-- Annotation extraction: focused annotation tests plus `pnpm -C frontend test
-  -- --run`, `pnpm -C frontend lint`, and `pnpm -C frontend build`.
-- Legacy adapter removal: frontend tests, backend tests for affected persisted
-  request/task readers, OpenAPI/client regeneration if route contracts change,
-  and `git diff --check`.
+- Run the focused validation scenarios written under each finding first, then
+  the repository's frontend lint, tests, build, and Knip gates. Do not use this
+  report refresh as evidence that a future implementation passed those gates.
+- Any backend/API contract change additionally needs backend type/tests and
+  OpenAPI/client regeneration; generated files remain generator-owned.
+- Tauri changes need clean-checkout Rust source checks that do not depend on a
+  generated runtime, plus staged/relocated bundle tests on macOS and Windows for
+  packaging behavior.
+- Release and source-map changes need artifact inspection and policy-specific
+  workflow checks, not only a successful frontend build.
+- Broad deletion/comment passes should repeat dependency/export/cycle checks and
+  targeted caller verification, preserving deliberate test seams and the
+  retained layers above.
