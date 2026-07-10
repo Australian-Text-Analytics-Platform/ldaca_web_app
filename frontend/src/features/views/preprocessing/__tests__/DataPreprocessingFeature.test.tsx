@@ -30,7 +30,7 @@ const mockSelectedNode = {
   shape: [2, 2] as [number, number],
 };
 
-vi.mock('@/api/generated/sdk.gen', async (importOriginal) => {
+vi.mock('@/api', async (importOriginal) => {
   const actual = await importOriginal<typeof SdkGen>();
   return {
     ...actual,

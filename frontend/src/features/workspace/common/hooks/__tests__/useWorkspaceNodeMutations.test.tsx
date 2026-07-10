@@ -42,7 +42,10 @@ const workspaceSdkMock = vi.hoisted(() => ({
 /** Hoisted node-info mock isolates schema refresh behavior from network I/O. */
 const fetchNodeInfoMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/api/generated/sdk.gen', () => workspaceSdkMock);
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  ...workspaceSdkMock,
+}));
 vi.mock('@/lib/nodeInfo', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {

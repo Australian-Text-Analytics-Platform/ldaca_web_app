@@ -44,10 +44,7 @@ because newly bumped sibling package versions may not be published yet.
 Run frontend commands through the root wrapper or with `pnpm -C frontend`:
 
 ```bash
-pnpm -C frontend build
-pnpm -C frontend test -- --run
-pnpm -C frontend lint
-pnpm -C frontend knip
+pnpm -C frontend check
 ```
 
 Frontend work is not complete until tests and lint have run after the edit.
@@ -123,3 +120,6 @@ base resolver reads the injected `window.__BACKEND_URL__` in desktop mode.
 `pnpm desktop:dev` uses the same packaged-runtime path as desktop builds. Build
 speedups should come from uv, Cargo, maturin, and sccache configuration rather
 than a separate dev-only runtime mode.
+This non-mutating command is the same frontend acceptance contract used by pull
+requests: formatting, source and tooling-config lint/type checks, tests, Knip,
+production build, and documentation drift.

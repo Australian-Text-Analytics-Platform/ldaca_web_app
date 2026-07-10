@@ -206,16 +206,19 @@ export function collectDocumentationProblems({
 /** Verifies that relevant docs changes actually trigger and execute the workflow. */
 export function collectWorkflowProblems(workflow) {
   const problems = [];
-  if (!workflow.includes('frontend/public/**')) {
+  const checksAllFrontend = workflow.includes('frontend/**');
+  if (!checksAllFrontend && !workflow.includes('frontend/public/**')) {
     problems.push('workflow does not trigger for frontend/public documentation');
   }
-  if (!workflow.includes('frontend/src/tutorials/bundledRegistry.ts')) {
+  if (!checksAllFrontend && !workflow.includes('frontend/src/tutorials/bundledRegistry.ts')) {
     problems.push('workflow does not trigger for the bundled registry');
   }
-  if (!workflow.includes('frontend/scripts/check-docs-drift.test.mjs')) {
+  if (!checksAllFrontend && !workflow.includes('frontend/scripts/check-docs-drift.test.mjs')) {
     problems.push('workflow does not trigger for the drift validator tests');
   }
-  if (!/run:\s*node\b[^\n]*scripts\/check-docs-drift\.mjs/.test(workflow)) {
+  const runsDriftDirectly = /run:\s*node\b[^\n]*scripts\/check-docs-drift\.mjs/.test(workflow);
+  const runsFrontendContract = /run:\s*pnpm\s+-C\s+frontend\s+check\b/.test(workflow);
+  if (!runsDriftDirectly && !runsFrontendContract) {
     problems.push('workflow does not execute scripts/check-docs-drift.mjs');
   }
   return problems;

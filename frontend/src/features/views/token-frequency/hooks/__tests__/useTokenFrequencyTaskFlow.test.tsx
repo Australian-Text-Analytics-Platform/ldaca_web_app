@@ -9,7 +9,8 @@ const { calculateTokenFrequenciesMock } = vi.hoisted(() => ({
   calculateTokenFrequenciesMock: vi.fn(),
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   calculateTokenFrequencies: calculateTokenFrequenciesMock,
 }));
 

@@ -6,7 +6,8 @@ import { useFileBrowserActions } from '../useFileBrowserActions';
 
 const mocks = vi.hoisted(() => ({ moveFile: vi.fn() }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   getRawFile: vi.fn(),
   moveFile: mocks.moveFile,
 }));

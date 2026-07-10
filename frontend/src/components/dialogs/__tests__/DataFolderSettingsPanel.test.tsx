@@ -17,7 +17,8 @@ vi.mock('sonner', () => ({
   }),
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   updateAdminConfig: (...args: unknown[]) => updateAdminConfig(...args),
 }));
 

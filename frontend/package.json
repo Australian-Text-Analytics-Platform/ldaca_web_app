@@ -20,16 +20,6 @@
   ],
   "author": "Australian Text Analytics Platform",
   "license": "MIT",
-  "bin": {
-    "ldaca_wordflow_frontend": "./bin/cli.js",
-    "ldaca_web_app_frontend": "./bin/cli.js",
-    "ldaca-frontend": "./bin/cli.js"
-  },
-  "files": [
-    "bin",
-    "build",
-    "README.md"
-  ],
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/view": "^6.43.1",
@@ -86,15 +76,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck:tooling && pnpm test && pnpm knip && pnpm build && pnpm docs:check",
     "preview": "vite preview",
-    "prepublishOnly": "pnpm build",
     "openapi:schema": "cd ../backend && uv run python scripts/export_openapi.py",
     "openapi:generate": "pnpm openapi:schema && openapi-ts -f openapi.config.ts",
     "test": "vitest run",
-    "lint": "eslint 'src/**/*.{ts,tsx}' --max-warnings=0",
+    "lint": "eslint 'src/**/*.{ts,tsx}' vite.config.ts openapi.config.ts --max-warnings=0",
+    "typecheck:tooling": "tsc -p tsconfig.tooling.json --noEmit",
     "knip": "knip",
     "format": "biome format --write src/",
     "format:check": "biome format src/",
+    "docs:check": "node --experimental-strip-types scripts/check-docs-drift.mjs",
     "tauri": "tauri",
     "clean": "cd src-tauri && cargo clean",
     "package:backend-runtime": "cd .. && uv run --no-project --python 3.14t python scripts/package_backend_runtime.py --clean --python-version 3.14t",

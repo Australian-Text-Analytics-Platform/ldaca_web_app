@@ -6,7 +6,10 @@ import { useFolderCreation } from '../useFolderCreation';
 
 const mocks = vi.hoisted(() => ({ createFolder: vi.fn() }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({ createFolder: mocks.createFolder }));
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  createFolder: mocks.createFolder,
+}));
 
 describe('useFolderCreation cache policy', () => {
   beforeEach(() => {

@@ -15,7 +15,10 @@ const generatedApiMock = vi.hoisted(() => ({
   logout: vi.fn<(...args: unknown[]) => Promise<{ data: unknown }>>(),
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => generatedApiMock);
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  ...generatedApiMock,
+}));
 
 /** Builds auth-info fixtures with backend defaults so each test overrides only its scenario. */
 /** Used by: tests in this file. */

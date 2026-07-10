@@ -13,7 +13,15 @@ const frontendRootDir = path.dirname(fileURLToPath(import.meta.url));
 
 const packageVersion = (() => {
   try {
-    return JSON.parse(readFileSync(path.join(frontendRootDir, 'package.json'), 'utf-8')).version ?? '';
+    const packageJson: unknown = JSON.parse(
+      readFileSync(path.join(frontendRootDir, 'package.json'), 'utf-8'),
+    ) as unknown;
+    return packageJson &&
+      typeof packageJson === 'object' &&
+      'version' in packageJson &&
+      typeof packageJson.version === 'string'
+      ? packageJson.version
+      : '';
   } catch {
     return '';
   }
@@ -38,7 +46,8 @@ process.env.VITE_APP_BUILD_DATE ??= (() => {
   const now = new Date();
   const day = String(now.getDate()).padStart(2, '0');
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${day}/${months[now.getMonth()]}/${now.getFullYear()}`;
+  const month = months[now.getMonth()] ?? 'Jan';
+  return `${day}/${month}/${String(now.getFullYear())}`;
 })();
 
 const serverConfig = {
@@ -57,7 +66,7 @@ export default defineConfig({
     babel({
       include: /\.[tj]sx?$/,
       presets: [reactCompilerPreset()],
-    } as Parameters<typeof babel>[0]),
+    }),
   ],
   resolve: {
     alias: {

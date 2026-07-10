@@ -21,7 +21,8 @@ vi.mock('../clearAnalysis', () => ({
   clearAnalysis: clearAnalysisMock,
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   cancelTask: cancelTaskMock,
 }));
 

@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
 }));
 
-vi.mock('@/api/generated/sdk.gen', async (importOriginal) => {
+vi.mock('@/api', async (importOriginal) => {
   const actual = await importOriginal<typeof GeneratedSdk>();
   return {
     ...actual,

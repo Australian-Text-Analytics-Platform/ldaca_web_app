@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   downloadWorkspaceArtifact: mocks.downloadWorkspaceArtifact,
   startWorkspaceDownload: mocks.startWorkspaceDownload,
 }));

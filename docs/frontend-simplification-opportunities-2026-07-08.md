@@ -106,34 +106,6 @@ settled before deletion.
 
 ### Build, dependency, and maintenance improvements
 
-#### B4. Remove private npm publication and CLI residue
-
-- **Evidence / strength — Strong:** [package.json](../frontend/package.json#L6-L31) still has `bin`, `files`, and `prepublishOnly`; [bin/cli.js](../frontend/bin/cli.js), [.npmignore](../frontend/.npmignore), and [publishing.md](../frontend/docs/reference/publishing.md) describe a package no workflow publishes.
-- **Recommended direction:** remove the private npm CLI/publication contract together while keeping workspace name/version fields used by builds/releases.
-- **Deletion test:** no packaging-only file/script/doc remains and normal workspace install/build/version commands still work.
-- **Validation:** clean pnpm install, root wrappers, frontend build, version bump/check, desktop packaging metadata, and release workflow.
-
-#### B5. Mock the handwritten API boundary, not generated internals
-
-- **Evidence / strength — Strong:** 14 tests import/mock generated SDK modules directly instead of the documented [api/index.ts](../frontend/src/api/index.ts) plus MSW transport boundary.
-- **Recommended direction:** move tests to `@/api` or request-level MSW based on what behavior they own; reserve generated mocks for generator-contract tests.
-- **Deletion test:** application tests survive generated file reshaping when the handwritten API contract is unchanged.
-- **Validation:** regenerate the client, run the 14 migrated tests and full suite, and verify request bodies/auth/error paths through MSW where appropriate.
-
-#### B7. Provide one executable frontend verification contract
-
-- **Evidence / strength — Strong:** [package.json](../frontend/package.json#L88-L105) exposes separate checks while guides and CI compose overlapping subsets, making the required local/CI contract easy to drift.
-- **Recommended direction:** add one non-mutating verification command that calls the agreed checks and make CI invoke the same contract, with desktop-only checks separate where resources are required.
-- **Deletion test:** duplicated check lists disappear from workflows/docs and one command documents the frontend acceptance gate.
-- **Validation:** clean pass, purposeful failures for lint/test/build/Knip/docs/version, CI exit propagation, and no format mutation.
-
-#### B8. Add lint/type coverage for tooling configuration
-
-- **Evidence / strength — Strong:** current lint targets only `src/**/*.{ts,tsx}`, excluding [vite.config.ts](../frontend/vite.config.ts) and [openapi.config.ts](../frontend/openapi.config.ts), even though these execute in build/generation paths.
-- **Recommended direction:** include tooling configs in an appropriate TypeScript/ESLint project or a small dedicated config check.
-- **Deletion test:** config-specific suppressions are minimal and syntax/type regressions fail before production build/client generation.
-- **Validation:** lint/typecheck both configs, Vite build, OpenAPI generation, Node runtime compatibility, and clean IDE resolution.
-
 #### B9. Resolve the 49-file format-check baseline
 
 - **Evidence / strength — Strong:** `pnpm -C frontend format:check` currently reports 49 files while [package.json](../frontend/package.json#L96-L97) presents the command as a verification surface.
@@ -170,7 +142,6 @@ unreachable callers. Product/external-contract caveats remain where noted.
 | Candidate | Evidence / deletion guard |
 | --- | --- |
 | Retired Tauri/workflow surfaces | Remove HTTP plugin, direct serde, global/window-webview permissions, `__BACKEND_PORT__`, and `build-notes`; keep live opener/dialog/filesystem. |
-| Private npm publication | Remove CLI, `bin`/`files`/prepublish configuration, `.npmignore`, and publishing docs while preserving workspace name/version. |
 
 ### Worth Confirming
 
@@ -758,6 +729,35 @@ unreachable callers. Product/external-contract caveats remain where noted.
       TypeScript and targeted lint, two production builds, zero emitted source
       maps, explicit lazy stopword/Google/Settings/Sentry chunks, CSS output
       comparison, and staged plus unstaged `git diff --check`.
+
+74. Remove private npm publication and CLI residue (B4)
+    - Done 2026-07-11. The private workspace package retains only the name and
+      version consumed by build/release tooling. Its unshipped `bin` aliases,
+      package `files`, `prepublishOnly`, CLI implementation, `.npmignore`, and
+      fictional npm publishing guide are deleted; no repository or workflow
+      consumer remained.
+
+75. Mock the handwritten API boundary instead of generated internals (B5)
+    - Done 2026-07-11. All 19 application tests that mocked
+      `generated/sdk.gen` now partially mock the stable `@/api` seam. The sample
+      catalogue/import test uses request-level MSW for the generated query
+      helper and mutation, proving payload transport rather than replacing a
+      generator-owned closure. No handwritten test imports or mocks a generated
+      path; the focused 19-file / 95-test migration suite passes.
+
+76. Provide one executable frontend verification contract (B7)
+    - Done 2026-07-11. `pnpm -C frontend check` is the non-mutating acceptance
+      contract for formatting, source/config lint and type checking, tests,
+      Knip, production build, and documentation drift. The pull-request
+      workflow installs the frozen pnpm workspace and invokes that same command;
+      the development guide no longer carries a second command list.
+
+77. Add lint and type coverage for tooling configuration (B8)
+    - Done 2026-07-11. `tsconfig.tooling.json` owns Vite/OpenAPI configuration
+      types and the ESLint Node override uses that explicit project. The normal
+      lint command covers both configs as well as `src`, exposing and fixing
+      unsafe package JSON parsing, unchecked month indexing, template coercion,
+      and an unnecessary Babel assertion without adding rule suppressions.
 
 ## Endpoint And Source-Of-Truth Notes
 

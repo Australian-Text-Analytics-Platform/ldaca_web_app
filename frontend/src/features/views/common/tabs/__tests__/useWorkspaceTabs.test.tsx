@@ -12,7 +12,8 @@ const { getWorkspaceTabsMock, putWorkspaceTabsMock, clearTaskMock } = vi.hoisted
   clearTaskMock: vi.fn(),
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   getWorkspaceTabs: getWorkspaceTabsMock,
   putWorkspaceTabs: putWorkspaceTabsMock,
   clearTask: clearTaskMock,

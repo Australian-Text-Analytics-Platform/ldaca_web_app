@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { server } from '@/test/msw/server';
 import { SampleDataPanel } from '../SampleDataPanel';
 
 const mocks = vi.hoisted(() => ({
-  getSampleDataCatalogue: vi.fn(),
-  importSampleData: vi.fn(),
+  importRequest: vi.fn(),
   toast: {
     dismiss: vi.fn(),
     error: vi.fn(),
@@ -16,45 +17,42 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
-  getSampleDataCatalogue: mocks.getSampleDataCatalogue,
-  getSampleDataReadme: vi.fn(),
-  importSampleData: mocks.importSampleData,
-}));
-
 vi.mock('sonner', () => ({ toast: mocks.toast }));
 
 describe('SampleDataPanel cache policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getSampleDataCatalogue.mockResolvedValue({
-      data: {
-        schema_version: 1,
-        collections: [
-          {
-            id: 'bundled-sample',
-            name: 'Bundled sample',
-            description: 'A bundled corpus',
-            language: 'en',
-            bundled: true,
-            files: [],
-            recommended_for: ['data-loader'],
-            status: 'bundled',
-            total_size_bytes: 100,
-          },
-        ],
-      },
-    });
-    mocks.importSampleData.mockResolvedValue({
-      data: {
-        bytes_copied: 100,
-        file_count: 1,
-        message: 'imported',
-        remote_download_started: false,
-        removed_existing: false,
-        status: 'successful',
-      },
-    });
+    server.use(
+      http.get('*/api/files/sample-data/catalogue', () =>
+        HttpResponse.json({
+          schema_version: 1,
+          collections: [
+            {
+              id: 'bundled-sample',
+              name: 'Bundled sample',
+              description: 'A bundled corpus',
+              language: 'en',
+              bundled: true,
+              files: [],
+              recommended_for: ['data-loader'],
+              status: 'bundled',
+              total_size_bytes: 100,
+            },
+          ],
+        }),
+      ),
+      http.post('*/api/files/import-sample-data', () => {
+        mocks.importRequest();
+        return HttpResponse.json({
+          bytes_copied: 100,
+          file_count: 1,
+          message: 'imported',
+          remote_download_started: false,
+          removed_existing: false,
+          status: 'successful',
+        });
+      }),
+    );
   });
 
   it('invalidates the file tree once after a sample import', async () => {
@@ -74,7 +72,7 @@ describe('SampleDataPanel cache policy', () => {
     await user.click(screen.getByRole('button', { name: 'Import selected' }));
 
     await waitFor(() => {
-      expect(mocks.importSampleData).toHaveBeenCalledTimes(1);
+      expect(mocks.importRequest).toHaveBeenCalledTimes(1);
     });
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
   });

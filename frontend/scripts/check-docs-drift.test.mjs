@@ -294,4 +294,19 @@ describe('documentation drift workflow validation', () => {
       'workflow does not execute scripts/check-docs-drift.mjs',
     ]);
   });
+
+  it('accepts the aggregate frontend trigger and verification contract', () => {
+    const workflow = [
+      'on:',
+      '  pull_request:',
+      '    paths:',
+      "      - 'frontend/**'",
+      'jobs:',
+      '  check:',
+      '    steps:',
+      '      - run: pnpm -C frontend check',
+    ].join('\n');
+
+    expect(collectWorkflowProblems(workflow)).toEqual([]);
+  });
 });

@@ -34,7 +34,8 @@ const useAuthMock = vi.hoisted(() =>
 vi.mock('@/features/auth/hooks/useAuth', () => ({ useAuth: useAuthMock }));
 
 const getNodeDataByWorkspaceIdMock = vi.hoisted(() => vi.fn());
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   getNodeDataByWorkspaceId: getNodeDataByWorkspaceIdMock,
 }));
 

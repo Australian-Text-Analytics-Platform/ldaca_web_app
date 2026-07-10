@@ -1,27 +1,23 @@
-name: Check docs drift
+name: Check frontend
 
 on:
   pull_request:
     paths:
-      - 'frontend/public/**'
-      - 'frontend/src/**/*.ts'
-      - 'frontend/src/**/*.tsx'
-      - 'frontend/src/tutorials/bundledRegistry.ts'
-      - 'frontend/scripts/check-docs-drift.mjs'
-      - 'frontend/scripts/check-docs-drift.test.mjs'
+      - 'frontend/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/check-docs-drift.yml'
   workflow_dispatch:
 
 jobs:
-  drift:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Check documentation contracts and links
-        working-directory: frontend
-        # `--experimental-strip-types` lets us import bundledRegistry.ts
-        # directly without a build step. Native on Node 22+.
-        run: node --experimental-strip-types scripts/check-docs-drift.mjs
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C frontend check

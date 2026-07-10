@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => ({
   uploadFile: vi.fn(),
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   deleteFile: mocks.deleteFile,
   downloadFile: mocks.downloadFile,
   getUserFiles: mocks.getUserFiles,

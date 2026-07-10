@@ -141,7 +141,8 @@ const mockFileTree = [
   },
 ];
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   getRawFile: mockRawFile,
   createFolder: mockCreateFolder,
   moveFile: mockMoveFile,

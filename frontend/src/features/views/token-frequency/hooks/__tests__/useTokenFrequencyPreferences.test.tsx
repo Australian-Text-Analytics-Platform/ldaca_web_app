@@ -6,7 +6,8 @@ const { analysisTaskPreferencesMock } = vi.hoisted(() => ({
   analysisTaskPreferencesMock: vi.fn(),
 }));
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   analysisTaskPreferences: analysisTaskPreferencesMock,
 }));
 

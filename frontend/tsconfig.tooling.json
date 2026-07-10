@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": ["node", "vite/client", "vitest/config"]
+  },
+  "include": ["vite.config.ts", "openapi.config.ts"],
+  "exclude": ["dist", "build", "node_modules"]
+}

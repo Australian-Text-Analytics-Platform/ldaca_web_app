@@ -6,7 +6,8 @@ import { getNodeDataByWorkspaceId, getTokenizerModels } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import TokenizerModelSelector from '../TokenizerModelSelector';
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   getNodeDataByWorkspaceId: vi.fn(),
   getTokenizerModels: vi.fn(),
 }));

@@ -85,6 +85,20 @@ export default tseslint.config([
     },
   },
 
+  // Node-executed TypeScript configuration has its own project and globals.
+  // The normal source project deliberately remains browser-only.
+  {
+    files: ['vite.config.ts', 'openapi.config.ts'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        projectService: false,
+        project: ['./tsconfig.tooling.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
   // ── Test files ──────────────────────────────────────────────────
   {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],

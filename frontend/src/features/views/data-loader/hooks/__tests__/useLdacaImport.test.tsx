@@ -4,7 +4,8 @@ import { importLdacaDataset, listLdacaFeaturedCollections, searchLdacaCollection
 import type { OniSearchResult as LdacaSearchResult } from '@/api';
 import { useLdacaImport } from '../useLdacaImport';
 
-vi.mock('@/api/generated/sdk.gen', () => ({
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
   listLdacaFeaturedCollections: vi.fn(),
   searchLdacaCollections: vi.fn(),
   importLdacaDataset: vi.fn(),
