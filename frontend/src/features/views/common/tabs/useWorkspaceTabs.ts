@@ -7,7 +7,8 @@
  *
  * Scoped to one ``analysisType`` (the tab-group namespace) so a feature only
  * sees and mutates its own tabs. The pure reducers in ``tabStateOps`` do the
- * actual state math; this hook owns caching, auth headers, and persistence.
+ * actual state math; this hook owns caching and sidecar persistence while the
+ * generated client supplies request authentication.
  *
  * Used by: AnalysisTabsHost to list/create/close/rename/activate tabs and to
  * wire a tab to its task id after a run or clear. Each analysis feature passes

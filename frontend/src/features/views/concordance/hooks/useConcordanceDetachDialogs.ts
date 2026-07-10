@@ -135,7 +135,7 @@ const resolveBooleanAction = (value: SetStateAction<boolean>, current: boolean):
  * parallel pending-node/option/column-selection state machines inline.
  * Used by: ConcordanceFeature because the results panel needs simple open
  * callbacks and dialog props while the detach workflow still needs access to
- * task handlers, auth headers, materialized paths, and node detaching state.
+ * task handlers, materialized paths, and node detaching state.
  * Flow: open a dialog by fetching options and seeding selections, confirm by
  * dispatching the matching task-flow handler for every pending node, then reset
  * that dialog's transient state.

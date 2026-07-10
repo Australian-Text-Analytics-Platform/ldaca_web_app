@@ -118,7 +118,7 @@ export interface FetchNodeInfosArgs {
  * value when present and fresh; otherwise runs the collection node-info
  * request once and caches the result for future hook subscriptions.
  * Why: importers need one shared normalization boundary to keep behavior consistent.
- * Flow: optionally remove the cached node entry, build headers or auth-provider query args, then fetch through TanStack Query.
+ * Flow: optionally remove the cached node entry, build the canonical query options, then fetch through TanStack Query; generated-client configuration owns request auth.
  */
 export const fetchNodeInfo = async ({
   queryClient,

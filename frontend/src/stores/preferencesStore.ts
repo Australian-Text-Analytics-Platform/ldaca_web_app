@@ -1,19 +1,20 @@
 /**
  * User preferences store. State is persisted to `localStorage` via the
  * `persist` middleware and to the backend via a debounced subscriber set
- * up in `usePreferencesInit` (`hooks/usePreferences.ts`):
+ * up in `usePreferencesInit` (`hooks/usePreferences.ts`). The shared
+ * preferences codec owns server normalization, the durable local projection,
+ * backend update encoding, and equality for that subscriber:
  *
  *   - Setters update local state only. They do *not* call
  *     `syncToBackend` directly.
  *   - The init hook subscribes to changes after `hydrated` flips true,
- *     coalesces bursts via a 800 ms debounce, and pushes the latest
- *     persisted preference subset using auth headers from the React-side `useAuth`.
+ *     coalesces bursts via an 800 ms debounce, and pushes the latest durable
+ *     projection through the generated client.
  *
- * Doing the sync at the hook level means the call always has fresh auth
- * headers; doing it via subscribe (instead of inline in each setter)
- * coalesces rapid edits (e.g. dragging the favourites list) into a
- * single request and never fires before the initial server load
- * completes.
+ * Generated-client configuration supplies request authentication. Keeping
+ * sync in the subscriber (instead of inline in each setter) coalesces rapid
+ * edits (e.g. dragging the favourites list) into one request and never fires
+ * before the initial server load completes.
  */
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';

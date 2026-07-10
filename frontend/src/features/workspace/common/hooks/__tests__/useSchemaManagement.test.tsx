@@ -211,8 +211,6 @@ describe('useSchemaManagement', () => {
           nodeId: 'node-1',
           isLocked: false,
           workspaceId: 'ws-1',
-          /** Supplies query auth headers so schema fetching can run in the hook test. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
 
@@ -230,8 +228,6 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
-          /** Keeps the hook signature complete while bypassing remote schema queries. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
 
@@ -248,8 +244,6 @@ describe('useSchemaManagement', () => {
           nodeId: 'node-1',
           isLocked: false,
           workspaceId: 'ws-1',
-          /** Provides headers for the unlocked schema fetch before lock capture. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
 
@@ -269,8 +263,6 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
-          /** Keeps auth plumbing present while testing explicit lock overrides. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
 
@@ -286,8 +278,6 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: undefined,
-          /** Keeps auth plumbing present while testing lock clearing. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
 
@@ -314,8 +304,6 @@ describe('useSchemaManagement', () => {
           nodeId: 'node-1',
           isLocked: false,
           workspaceId: 'ws-1',
-          /** Keeps auth plumbing present while testing type filtering over node-info data. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
 
@@ -337,8 +325,6 @@ describe('useSchemaManagement', () => {
           nodeId: null,
           isLocked: false,
           workspaceId: 'ws-1',
-          /** Provides headers even though null node IDs should keep the query disabled. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
       expect(fetchNodeInfoMock).not.toHaveBeenCalled();
@@ -350,8 +336,6 @@ describe('useSchemaManagement', () => {
           nodeId: 'node-1',
           isLocked: true,
           workspaceId: 'ws-1',
-          /** Provides headers that should not be consumed while schema fetching is locked. */
-          /** Called by: the hook under test through the mocked auth store. */
         }),
       );
       // give react-query a tick — even so, enabled=false should keep it idle

@@ -8,9 +8,10 @@
  *     never need to drive renders).
  *
  * Actions encapsulate every side effect (config fetch, info fetch, refresh
- * scheduling, login/logout, URL-token capture). The thin `useAuth` hook
- * subscribes to a flat slice of state and adds React-side concerns
- * (autoStart bootstrap effect + once-per-app URL-token capture).
+ * scheduling, login/logout, URL-token capture). `AuthBootstrap` is the sole
+ * React lifecycle owner: it processes a redirect token, starts the coalesced
+ * bootstrap fetch, and installs the refresh interval after backend readiness.
+ * The thin `useAuth` hook only subscribes to a flat slice of store state.
  */
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -59,7 +60,7 @@ interface AuthActions {
   loginWithGoogle: (idToken: string) => Promise<void>;
   /** Multi-user only — clear the bearer token and re-bootstrap as anonymous. */
   logout: () => Promise<void>;
-  /** Synchronous header read used by API callers and react-query keys. */
+  /** Synchronous header read used by raw fetch, native-download, and event-stream boundaries. */
   getAuthHeaders: () => Record<string, string>;
   /**
    * Pull a Google-redirect `auth_token` off the URL into localStorage and
@@ -266,7 +267,7 @@ export const useAuthStore = create<AuthStore>()(
       }
     },
 
-    /** Returns headers for API callers while suppressing bearer tokens in single-user mode. */
+    /** Returns headers for raw/native boundaries while suppressing tokens in single-user mode. */
     /** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     getAuthHeaders: (): Record<string, string> => {
       return getAuthHeaders();

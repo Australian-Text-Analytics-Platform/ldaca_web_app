@@ -95,14 +95,10 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
-  // Provides deterministic auth/data-folder context for generated API calls.
+  // Provides deterministic data-folder context for file-browser controls.
   // Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
   useAuth: () => ({
     dataFolder: '/tmp/user_data',
-    /**
-     * Returns empty headers so SDK calls avoid depending on auth setup.
-     * Used by: test mock object in data-loader/DataLoaderFeature because the test needs a stable fixture or assertion helper for this scenario.
-     */
     getAuthHeaders: () => ({}),
   }),
 }));

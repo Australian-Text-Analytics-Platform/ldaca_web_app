@@ -33,9 +33,9 @@ function workspaceArtifactFilename(artifactName: string, workspaceId: string): s
  * lifetime. `WorkspaceShell` mounts this provider above `ViewRouter`, while
  * Data Loader's workspace manager consumes the exposed command/view handle.
  *
- * Flow: start artifact generation with live auth headers, retain the returned
- * task/workspace identity across view navigation, claim a terminal task once
- * before any async download/save work, then report the single terminal result.
+ * Flow: start artifact generation through the generated client, retain the
+ * returned task/workspace identity across view navigation, claim a terminal
+ * task once before async download/save work, then report one terminal result.
  */
 export function WorkspaceDownloadsProvider({ children }: { children: ReactNode }) {
   const tasks = useAnalysisStore((state) => state.tasks);

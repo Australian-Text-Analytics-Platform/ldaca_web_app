@@ -55,7 +55,7 @@ import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
 /** Orchestrates the full concordance analysis UI, task lifecycle, and detach flows. */
 /**
  * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props (optional): when rendered inside an analysis tab by the
  * viewComponents loader, ``tabId`` identifies the active tab, ``tabTaskId``

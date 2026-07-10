@@ -23,7 +23,7 @@ interface WorkspaceNodeMutationsParams {
  * features.
  * Used by: `useWorkspaceInternal`, which composes generated-API mutations with
  * semantic selection actions for the provider action slice.
- * Flow: provider injects auth and selection state, actions call generated SDK mutations, then lifecycle handlers update operation state, selection, and caches.
+ * Flow: the provider supplies workspace, selection, cache, and operation-lifecycle inputs; generated SDK mutations run, then lifecycle handlers update operation state, selection, and caches.
  */
 export const useWorkspaceNodeMutations = ({
   currentWorkspaceId,

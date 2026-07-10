@@ -128,7 +128,7 @@ export interface UseAnalysisFeatureReturn {
  * Owns the common task lifecycle for analysis tabs: task id discovery, status
  * banners, hydration, stopping, result refresh, and clear/reset coordination.
  * Used by: task-backed analysis feature screens because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: resolve task identity and cached request state, then coordinate hydration, terminal refresh, cancellation, and clear callbacks.
  */
 export function useAnalysisFeature<TResult = unknown>(
   config: UseAnalysisFeatureConfig<TResult>,
@@ -417,7 +417,7 @@ export function useAnalysisFeature<TResult = unknown>(
      * Shares result fetching with terminal refreshes so hydration does not repeat
      * a result already applied for the same successful or failed task.
      * Called by: useAnalysisHydration when loading persisted task results because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-     * Flow: skip blank, duplicate, or already terminal task ids, call the feature result fetcher with auth headers, then release the in-flight guard.
+     * Flow: skip blank, duplicate, or already terminal task ids, call the feature result fetcher, then release the in-flight guard.
      */
     fetchResult: async (taskId) => {
       if (!taskId) return null;
@@ -505,7 +505,7 @@ export function useAnalysisFeature<TResult = unknown>(
    * Cancels the best-known running task id for features whose long-running
    * backend jobs can be stopped from the shared analysis banner.
    * Called by: analysis running banners through the hook return value because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: choose the running/active/local/result task id, send cancelTask with auth headers, then update stopping and running flags around failures.
+   * Flow: choose the running/active/local/result task id, send the generated cancel request, then update stopping and running flags around failures.
    */
   const stopTask = async (): Promise<void> => {
     const cfg = configRef.current;

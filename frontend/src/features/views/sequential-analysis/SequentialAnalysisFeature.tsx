@@ -51,7 +51,7 @@ const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
 /** Renders the sequential-analysis workflow for live trends and result exploration. */
 /**
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
- * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
  * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
@@ -518,7 +518,7 @@ const SequentialAnalysisFeature = ({
   // Exports the rendered chart SVG with contextual title and legend metadata.
   /**
    * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: validate the rendered chart, derive export metadata, then save the requested image format.
    */
   const handleDownloadChart = async (format: ChartImageFormat) => {
     if (!chartContainerRef.current) {

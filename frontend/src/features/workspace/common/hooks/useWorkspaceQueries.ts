@@ -21,9 +21,9 @@ interface WorkspaceQueriesParams {
  * projections together. Data View owns the selected node-page query.
  * Used by: `useWorkspaceInternal`, which needs one query bundle for provider
  * data/status slices and active-node projection.
- * Flow: auth headers and the current workspace id feed TanStack queries for
- * workspace bootstrap and graph data, then active/selected nodes are projected
- * from that graph response.
+ * Flow: authenticated readiness gates workspace bootstrap reads, the current
+ * workspace id selects the graph query, and active/selected nodes are projected
+ * from that graph response. Generated-client configuration owns request auth.
  */
 export const useWorkspaceQueries = ({
   isAuthenticated,
@@ -36,7 +36,7 @@ export const useWorkspaceQueries = ({
     /**
      * Loads workspace summaries for selectors and launch screens.
      * Called by: useQuery option object inside useWorkspaceQueries.
-     * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+     * Why: the list must wait for authenticated readiness and share one canonical cache key.
      */
     queryFn: async () => {
       const { data } = await listWorkspaces({ throwOnError: true });
@@ -51,7 +51,7 @@ export const useWorkspaceQueries = ({
     /**
      * Restores the backend-selected workspace during authenticated startup.
      * Called by: useQuery option object inside useWorkspaceQueries.
-     * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+     * Why: startup needs one authenticated, cached source for the backend-selected workspace id.
      */
     queryFn: async () => {
       const { data } = await getMyCurrentWorkspace({ throwOnError: true });
@@ -68,7 +68,7 @@ export const useWorkspaceQueries = ({
     /**
      * Fetches graph topology for the active workspace view.
      * Called by: useQuery option object inside useWorkspaceQueries.
-     * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
+     * Why: graph consumers need one cache entry gated by authenticated workspace identity.
      */
     queryFn: async () => {
       if (!currentWorkspaceId) throw new Error('Missing workspace ID');

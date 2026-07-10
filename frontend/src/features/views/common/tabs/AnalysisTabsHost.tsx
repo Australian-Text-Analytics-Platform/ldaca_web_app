@@ -12,7 +12,7 @@
  *
  * Rendered by: the lazy tabbed feature loaders in `viewComponents.tsx`, which
  * ViewRouter resolves from the active view id.
- * Flow: resolve workspace + auth, load this workspace's tab group, auto-create
+ * Flow: resolve workspace and preference state, load this workspace's tab group, auto-create
  * one empty tab only when entering an empty group, render the shared tab bar
  * only when the user preference enables it, then mount ``Feature`` keyed by the
  * active tab id so switching tabs gives each tab a fresh, independently-hydrated

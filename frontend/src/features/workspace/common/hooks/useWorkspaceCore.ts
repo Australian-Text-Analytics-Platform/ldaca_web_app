@@ -7,7 +7,7 @@ import { useUIStore } from '@/stores/uiStore';
 /**
  * Reads the selection store fields the workspace feature owns.
  * Used by: workspace/useWorkspaceCore components or tests that consume this hook.
- * Why: because the internal workspace hook needs auth, query client, and UI-store inputs gathered before query and mutation hooks run.
+ * Why: the internal workspace hook needs one selection snapshot before query and mutation hooks are composed.
  */
 const useSelectionSlice = () =>
   useSelectionStore(
@@ -28,7 +28,7 @@ const useSelectionSlice = () =>
 /**
  * Reads operation loading helpers from the UI store.
  * Used by: workspace/useWorkspaceCore components or tests that consume this hook.
- * Why: because the internal workspace hook needs auth, query client, and UI-store inputs gathered before query and mutation hooks run.
+ * Why: the internal workspace hook needs operation lifecycle state without subscribing to unrelated UI fields.
  */
 const useUISlice = () =>
   useUIStore(
@@ -46,9 +46,9 @@ const useUISlice = () =>
  * lifecycle and server query.
  * Used by: `useWorkspaceInternal`, which supplies these client-state inputs to
  * query and mutation hooks before building provider slices.
- * Flow: read the auth and selection stores, clear selection at workspace
- * boundaries, and expose stable auth/operation inputs to workspace queries and
- * mutations.
+ * Flow: read authenticated readiness plus selection and operation state, clear
+ * selection at workspace boundaries, and expose the query gate, semantic
+ * selection actions, and operation helpers to the workspace orchestrator.
  */
 export const useWorkspaceCore = () => {
   const { isAuthenticated } = useAuth();

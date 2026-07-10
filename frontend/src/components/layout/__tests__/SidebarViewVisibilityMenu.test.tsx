@@ -21,10 +21,6 @@ vi.mock('sonner', () => ({
  * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
  */
 const authState = {
-  /**
-   * Supplies empty request headers for sidebar consumers that ask auth before data calls.
-   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
-   */
   getAuthHeaders: () => ({}),
   user: { name: 'Test User' },
   logout: vi.fn(),

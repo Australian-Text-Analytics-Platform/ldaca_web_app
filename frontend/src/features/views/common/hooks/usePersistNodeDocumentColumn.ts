@@ -64,7 +64,7 @@ function updateWorkspaceNodeInfoCache(
  * Returns the mutation used by node/column selectors to persist a preferred
  * document column and keep cached workspace metadata in sync.
  * Used by: analysis selectors that let users choose a document column per node because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: capture QueryClient and auth context, return a document-column mutation that trims empty values, writes the backend preference, updates caches, and shows a toast on failure.
+ * Flow: capture QueryClient and workspace identity, return a document-column mutation that trims empty values, writes the backend preference, updates caches, and shows a toast on failure.
  */
 export function usePersistNodeDocumentColumn({
   workspaceId,

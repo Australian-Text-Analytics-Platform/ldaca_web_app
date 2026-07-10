@@ -48,7 +48,7 @@ import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabState
 /** Renders the quotation extraction workflow, including live runs and result materialisation. */
 /**
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
- * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
  * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
@@ -166,7 +166,7 @@ function QuotationFeature({
   // Opens the shared error dialog with a fallback message for unexpected quotation failures.
   /**
    * Called by: QuotationFeature during this analysis workflow.
-   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Flow: normalize an empty failure message, store it, and open the shared error dialog.
    */
   const showErrorDialog = (message: string) => {
     setErrorDialogMessage(message || 'An unexpected error occurred.');
