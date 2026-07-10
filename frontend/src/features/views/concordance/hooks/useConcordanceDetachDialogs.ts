@@ -17,8 +17,6 @@ import {
 
 export type { ConcordanceDetachTarget } from './concordanceDetachDialogState';
 
-type AuthHeadersGetter = () => Record<string, string>;
-
 type PerHitDetachHandler = (
   nodeId: string,
   column: string,
@@ -49,7 +47,6 @@ interface OpenDispersionOptions {
 interface UseConcordanceDetachDialogsArgs {
   workspaceId: string | null;
   resolveTaskId: () => Promise<string | null>;
-  getAuthHeaders: AuthHeadersGetter;
   handleDetach: PerHitDetachHandler;
   handleDispersionDetach: DispersionDetachHandler;
   materializedPaths: Record<string, string>;
@@ -71,12 +68,10 @@ const loadDetachNodeOptions = async (
   workspaceId: string,
   taskId: string,
   nodes: ConcordanceDetachTarget[],
-  getAuthHeaders: AuthHeadersGetter,
 ): Promise<DetachDialogNodeOption[]> => {
   const responses = await Promise.all(
     nodes.map((node) =>
       analysisTaskDetachOptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, task_id: taskId },
         query: { node_id: node.nodeId, column: node.column },
         throwOnError: true,
@@ -148,7 +143,6 @@ const resolveBooleanAction = (value: SetStateAction<boolean>, current: boolean):
 export function useConcordanceDetachDialogs({
   workspaceId,
   resolveTaskId,
-  getAuthHeaders,
   handleDetach,
   handleDispersionDetach,
   materializedPaths,
@@ -202,7 +196,7 @@ export function useConcordanceDetachDialogs({
       if (!workspaceId) throw new Error('No workspace selected');
       const taskId = await resolveTaskId();
       if (!taskId) throw new Error('No concordance task to detach');
-      const options = await loadDetachNodeOptions(workspaceId, taskId, nodes, getAuthHeaders);
+      const options = await loadDetachNodeOptions(workspaceId, taskId, nodes);
       setSelectedDetachColumns(selectDefaultConcordanceColumns(options));
       dispatchDialog({ type: 'perHitOpened', options });
     } catch (error) {
@@ -260,7 +254,6 @@ export function useConcordanceDetachDialogs({
         workspaceId,
         taskId,
         nodes,
-        getAuthHeaders,
       );
       const dispersionOptions = toDispersionDetachOptions(loadedOptions);
       setSelectedDispersionColumns(emptySelectionForOptions(dispersionOptions));

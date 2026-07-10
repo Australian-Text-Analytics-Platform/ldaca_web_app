@@ -11,7 +11,6 @@ import { invalidateFilesQuery } from './fileCache';
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
 interface UseFileBrowserActionsParams {
-  authHeaders: Record<string, string>;
   refreshFiles: () => Promise<unknown>;
   notify: Notify;
 }
@@ -24,7 +23,6 @@ interface UseFileBrowserActionsParams {
  * expose handlers consumed by FileTree and DataLoaderFeature.
  */
 export function useFileBrowserActions({
-  authHeaders,
   refreshFiles,
   notify,
 }: UseFileBrowserActionsParams) {
@@ -62,7 +60,6 @@ export function useFileBrowserActions({
     try {
       await moveFile({
         body: { source_path: sourcePath, target_directory_path: targetDirectoryPath },
-        headers: authHeaders,
         throwOnError: true,
       });
       await invalidateFilesQuery(queryClient);
@@ -88,7 +85,6 @@ export function useFileBrowserActions({
     dispatchCitation({ type: 'startLoading', directory, path: readmePath });
     try {
       const { data } = await getRawFile({
-        headers: authHeaders,
         parseAs: 'text',
         query: { path: readmePath },
         throwOnError: true,

@@ -17,10 +17,8 @@ export async function getAnalysisTaskRequest(
   _analysisType: LastRunAnalysisType,
   workspaceId: string,
   taskId: string,
-  headers: Record<string, string>,
 ): Promise<unknown> {
   const { data } = await analysisTaskRequest({
-    headers,
     path: { workspace_id: workspaceId, task_id: taskId },
     throwOnError: true,
   });
@@ -36,11 +34,9 @@ export async function getAnalysisTaskRequest(
 export async function getAnalysisTaskResult<TResult>(
   workspaceId: string,
   taskId: string,
-  headers: Record<string, string>,
   query?: AnalysisTaskResultData['query'],
 ): Promise<TResult | null> {
   const { data } = await analysisTaskResult({
-    headers,
     path: { workspace_id: workspaceId, task_id: taskId },
     query,
     throwOnError: true,

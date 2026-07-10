@@ -9,7 +9,6 @@ import { queryKeys } from '@/lib/queryKeys';
 import type { WorkspaceGraphNode as GraphNode } from '@/api';
 
 interface WorkspaceQueriesParams {
-  authHeaders: Record<string, string>;
   isAuthenticated: boolean;
   currentWorkspaceId: string | null;
   activeNodeId: string | null;
@@ -27,7 +26,6 @@ interface WorkspaceQueriesParams {
  * from that graph response.
  */
 export const useWorkspaceQueries = ({
-  authHeaders,
   isAuthenticated,
   currentWorkspaceId,
   activeNodeId,
@@ -41,7 +39,7 @@ export const useWorkspaceQueries = ({
      * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
      */
     queryFn: async () => {
-      const { data } = await listWorkspaces({ headers: authHeaders, throwOnError: true });
+      const { data } = await listWorkspaces({ throwOnError: true });
       return data;
     },
     enabled: isAuthenticated,
@@ -56,7 +54,7 @@ export const useWorkspaceQueries = ({
      * Why: because each query option needs the shared auth, cache key, and enablement rules for the active workspace.
      */
     queryFn: async () => {
-      const { data } = await getMyCurrentWorkspace({ headers: authHeaders, throwOnError: true });
+      const { data } = await getMyCurrentWorkspace({ throwOnError: true });
       return data.id ?? null;
     },
     enabled: isAuthenticated,
@@ -75,7 +73,6 @@ export const useWorkspaceQueries = ({
     queryFn: async () => {
       if (!currentWorkspaceId) throw new Error('Missing workspace ID');
       const { data } = await getWorkspaceGraphById({
-        headers: authHeaders,
         path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
@@ -112,20 +109,6 @@ export const useWorkspaceQueries = ({
     ],
   );
 
-  const queryErrorState = useMemo(
-    () => ({
-      workspaces: workspacesQuery.error?.message ?? null,
-      currentWorkspace: currentWorkspaceQuery.error?.message ?? null,
-      nodes: graphQuery.error?.message ?? null,
-      graph: graphQuery.error?.message ?? null,
-    }),
-    [
-      workspacesQuery.error?.message,
-      currentWorkspaceQuery.error?.message,
-      graphQuery.error?.message,
-    ],
-  );
-
   return {
     workspacesQuery,
     currentWorkspaceQuery,
@@ -137,7 +120,6 @@ export const useWorkspaceQueries = ({
     selectedNode,
     selectedNodes,
     queryLoadingState,
-    queryErrorState,
     currentWorkspaceIdFromQuery: currentWorkspaceQuery.data,
     currentWorkspaceQueryError: currentWorkspaceQuery.isError,
   } as const;

@@ -85,7 +85,6 @@ interface UseResizableSplitOptions {
 export interface ResizableSplitHandle {
   containerRef: React.RefObject<HTMLDivElement | null>;
   value: number;
-  setValue: React.Dispatch<React.SetStateAction<number>>;
   isDragging: boolean;
   splitterProps: {
     role: 'separator';
@@ -359,5 +358,5 @@ export function useResizableSplit({
     onDoubleClick,
   };
 
-  return { containerRef, value, setValue, isDragging, splitterProps };
+  return { containerRef, value, isDragging, splitterProps };
 }

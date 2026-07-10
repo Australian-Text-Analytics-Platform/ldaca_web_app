@@ -46,7 +46,10 @@ subdirectories.
 
 - hydrates the documentation registry,
 - waits for backend health,
-- delegates auth gating to `features/auth/`,
+- mounts the single auth lifecycle owner after backend health and delegates
+  state-driven auth gating to `features/auth/`,
+- mounts one global feedback panel, documentation end-of-life banner, and
+  toaster outside startup/auth branches,
 - renders the sidebar, active feature route, and right-side workspace panel.
 
 `ViewRouter.tsx` maps the current view id from `uiStore` to a lazy feature

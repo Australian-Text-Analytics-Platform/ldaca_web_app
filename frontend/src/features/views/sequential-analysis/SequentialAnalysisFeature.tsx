@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import { useSchemaManagement } from '@/features/workspace/common/hooks/useSchemaManagement';
 
@@ -80,7 +79,6 @@ const SequentialAnalysisFeature = ({
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'analysis';
 
-  const { getAuthHeaders } = useAuth();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -108,7 +106,6 @@ const SequentialAnalysisFeature = ({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.sequential,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     taskId: tabTaskId ?? null,
   });
 
@@ -149,7 +146,6 @@ const SequentialAnalysisFeature = ({
     nodeId: activeNodeId,
     isLocked: false,
     workspaceId: currentWorkspaceId ?? undefined,
-    getAuthHeaders,
   });
 
   const [liveResults, resultRef, setResults] = useSafeResult<Record<string, unknown>>();
@@ -169,7 +165,6 @@ const SequentialAnalysisFeature = ({
     analysisType: ANALYSIS_TAB_GROUPS.sequential,
     taskType: ANALYSIS_TASK_TYPES.sequential,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
@@ -177,19 +172,18 @@ const SequentialAnalysisFeature = ({
     resultRef,
     // Loads the latest sequential-analysis result for polling and task resumption.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchResult: async (taskId, headers) => {
+    fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskResult<Record<string, unknown>>(currentWorkspaceId, taskId, headers);
+      return getAnalysisTaskResult<Record<string, unknown>>(currentWorkspaceId, taskId);
     },
     // Retrieves the submitted request so hydration can restore parameters and locks.
     // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchRequest: async (taskId, headers) => {
+    fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
         ANALYSIS_TAB_GROUPS.sequential,
         currentWorkspaceId,
         taskId,
-        headers,
       );
     },
     // Applies freshly fetched task results to chart state after lifecycle polling completes.
@@ -258,7 +252,6 @@ const SequentialAnalysisFeature = ({
             queryClient,
             workspaceId: currentWorkspaceId,
             nodeId: nodeIdStr,
-            getAuthHeaders,
           });
           setLockedSchema(normalizeSchemaFromInfo(info));
         }
@@ -438,7 +431,6 @@ const SequentialAnalysisFeature = ({
         if (tabId) onTabTaskChange?.(taskId);
       },
     },
-    lock: { getAuthHeaders },
   });
 
   const chartData = liveChartData;
@@ -491,7 +483,6 @@ const SequentialAnalysisFeature = ({
   const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
     currentWorkspaceId,
     resolveTaskId,
-    getAuthHeaders,
     panelSelectedNodes,
     chartData,
     results,

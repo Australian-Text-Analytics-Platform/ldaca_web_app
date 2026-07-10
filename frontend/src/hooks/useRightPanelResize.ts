@@ -5,27 +5,23 @@ import {
   ASIDE_PANEL_MIN_RATIO,
   ASIDE_PANEL_MAX_RATIO,
   ASIDE_PANEL_MAX_PIXELS,
-  ASIDE_PANEL_COLLAPSED_RATIO,
 } from '@/config/layout';
 
 /**
  * Percent-based right panel resize + collapse toggle.
  *
- * "Collapse" no longer hides the panel — it switches the panel content to the
- * compact list + schema view (handled by the consumer) and snaps the panel to a
- * narrower default ratio. The panel stays resizable in both states; expanding
- * restores the ratio the user had before collapsing.
+ * Collapse is a real visibility mode owned by the shell; it does not rewrite
+ * the persisted split ratio, so expanding restores the exact live layout
+ * without a second ratio state.
  */
 export const useRightPanelResize = () => {
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
-  const [lastAsidePanelRatio, setLastAsidePanelRatio] = useState<number>(ASIDE_PANEL_DEFAULT_RATIO);
   const mainRef = useRef<HTMLDivElement>(null);
   const asideRef = useRef<HTMLElement>(null);
 
   const {
     containerRef: layoutRef,
     value: asidePanelRatio,
-    setValue: setAsidePanelRatio,
     isDragging: isResizing,
     splitterProps: rightPanelSplitterProps,
   } = useResizableSplit({
@@ -43,19 +39,9 @@ export const useRightPanelResize = () => {
     },
   });
 
-  /** Toggles between the full graph/table view and the compact list/schema view.
-   * On collapse, remembers the current ratio and snaps to the narrower collapsed
-   * ratio; on expand, restores the remembered ratio. */
+  /** Toggles the shell's zero-width aside without mutating its split ratio. */
   const toggleRightPanel = () => {
-    setIsRightCollapsed((prev) => {
-      if (prev) {
-        setAsidePanelRatio(lastAsidePanelRatio);
-        return false;
-      }
-      setLastAsidePanelRatio(asidePanelRatio);
-      setAsidePanelRatio(ASIDE_PANEL_COLLAPSED_RATIO);
-      return true;
-    });
+    setIsRightCollapsed((previous) => !previous);
   };
 
   return {

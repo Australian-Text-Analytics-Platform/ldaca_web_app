@@ -8,7 +8,6 @@ interface UseQuotationMaterializeLifecycleParams {
   materializeTaskIds: Record<string, string>;
   setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
   setMaterializeTaskIds: Dispatch<SetStateAction<Record<string, string>>>;
-  getAuthHeaders: () => Record<string, string>;
   resolveTaskId: () => Promise<string | null>;
   handlePageSizeChange: (pageSize: number) => Promise<void>;
   applyMaterializedRequest: (
@@ -33,7 +32,6 @@ export function useQuotationMaterializeLifecycle({
   materializeTaskIds,
   setNodeMaterializing,
   setMaterializeTaskIds,
-  getAuthHeaders,
   resolveTaskId,
   handlePageSizeChange,
   applyMaterializedRequest,
@@ -41,14 +39,12 @@ export function useQuotationMaterializeLifecycle({
   const handleMaterializeSuccess = async (nodeId: string, _taskId: string) => {
     void _taskId;
     try {
-      const headers = getAuthHeaders();
       const parentTaskId = await resolveTaskId();
       if (workspaceId && parentTaskId) {
         const requestPayload = await getAnalysisTaskRequest(
           ANALYSIS_TAB_GROUPS.quotation,
           workspaceId,
           parentTaskId,
-          headers,
         );
         const requestObject = (requestPayload as Record<string, unknown> | null) ?? {};
         applyMaterializedRequest(

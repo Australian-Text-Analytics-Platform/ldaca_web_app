@@ -6,7 +6,6 @@ import { invalidateFilesQuery } from './fileCache';
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
 interface UseFolderCreationParams {
-  authHeaders: Record<string, string>;
   notify: Notify;
 }
 
@@ -97,7 +96,7 @@ function folderCreationReducer(
  * Flow: tracks the selected parent, resets stale draft/error state when opened,
  * then submits the trimmed folder name and invalidates the browser on success.
  */
-export function useFolderCreation({ authHeaders, notify }: UseFolderCreationParams) {
+export function useFolderCreation({ notify }: UseFolderCreationParams) {
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(folderCreationReducer, initialFolderCreationState);
 
@@ -129,7 +128,6 @@ export function useFolderCreation({ authHeaders, notify }: UseFolderCreationPara
     try {
       await createFolder({
         body: { parent_path: state.createFolderParentPath, name: trimmedName },
-        headers: authHeaders,
         throwOnError: true,
       });
       await invalidateFilesQuery(queryClient);

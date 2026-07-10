@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useSelectionStore } from '@/stores/selectionStore';
@@ -26,7 +26,7 @@ const useSelectionSlice = () =>
   );
 
 /**
- * Reads operation loading/error helpers from the UI store.
+ * Reads operation loading helpers from the UI store.
  * Used by: workspace/useWorkspaceCore components or tests that consume this hook.
  * Why: because the internal workspace hook needs auth, query client, and UI-store inputs gathered before query and mutation hooks run.
  */
@@ -34,10 +34,8 @@ const useUISlice = () =>
   useUIStore(
     useShallow((state) => ({
       loadingOperations: state.loadingOperations,
-      operationErrors: state.operationErrors,
       startOperation: state.startOperation,
       endOperation: state.endOperation,
-      setOperationError: state.setOperationError,
     })),
   );
 
@@ -53,7 +51,7 @@ const useUISlice = () =>
  * mutations.
  */
 export const useWorkspaceCore = () => {
-  const { getAuthHeaders, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const {
     currentWorkspaceId,
     setCurrentWorkspaceId,
@@ -79,23 +77,7 @@ export const useWorkspaceCore = () => {
     previousWorkspaceIdRef.current = currentWorkspaceId;
   }, [clearSelection, currentWorkspaceId]);
 
-  // Memoize authHeaders so the (~25) downstream mutation closures and
-  // the four-slice WorkspaceProvider context don't see a new object
-  // identity on every render. `getAuthHeaders` is itself useCallback'd
-  // in useAuth.ts:271 so this dep is stable across the auth lifetime.
-  const authHeaders = useMemo(() => {
-    if (!isAuthenticated) return {};
-    const headers = getAuthHeaders();
-    return headers.Authorization ? headers : {};
-  }, [isAuthenticated, getAuthHeaders]);
-
-  const operationErrorsRecord: Record<string, string> = {};
-  ui.operationErrors.forEach((value, key) => {
-    operationErrorsRecord[key] = value;
-  });
-
   return {
-    authHeaders,
     isAuthenticated,
 
     currentWorkspaceId,
@@ -111,9 +93,7 @@ export const useWorkspaceCore = () => {
     clearSelection,
 
     loadingOperationCount: ui.loadingOperations.size,
-    operationErrorsRecord,
     startOperation: ui.startOperation,
     endOperation: ui.endOperation,
-    setOperationError: ui.setOperationError,
   } as const;
 };

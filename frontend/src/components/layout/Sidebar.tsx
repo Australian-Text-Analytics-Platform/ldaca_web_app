@@ -43,6 +43,8 @@ import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
 import { BookOpen, Circle, Cog, MessageSquare, ChevronDown, Pencil } from 'lucide-react';
 import { VIEW_DEFINITIONS, isWorkspaceRequired } from '@/features/views/viewRegistry';
+import { useVisibleViews } from '@/features/views/useVisibleViews';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import logo from '@/logo.png';
 
 type SectionKey = 'views' | 'nodes' | 'tasks';
@@ -86,15 +88,15 @@ const SECTION_MIN_HEIGHTS: Partial<Record<SectionKey, number>> = {
  * Flow: select global/workspace/task state, wire logout/settings/dialog handlers, compute split sections and visible nav items, then render sidebar chrome.
  */
 function Sidebar() {
-  const { currentView, visibleViews, setCurrentView, setViewVisibility, openModal } = useUIStore(
-    useShallow(({ currentView, visibleViews, setCurrentView, setViewVisibility, openModal }) => ({
+  const { currentView, setCurrentView, openModal } = useUIStore(
+    useShallow(({ currentView, setCurrentView, openModal }) => ({
       currentView,
-      visibleViews,
       setCurrentView,
-      setViewVisibility,
       openModal,
     })),
   );
+  const visibleViews = useVisibleViews();
+  const setViewHidden = usePreferencesStore((state) => state.setViewHidden);
   const { currentWorkspaceId } = useWorkspaceData();
   const { user, logout, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
@@ -348,15 +350,13 @@ function Sidebar() {
                               ({ requiresWorkspace }) => requiresWorkspace,
                             ).map(({ id, label }) => {
                               const checked = visibleViews.includes(id);
-                              const isLastVisibleItem = checked && visibleViews.length === 1;
                               return (
                                 <DropdownMenuCheckboxItem
                                   key={id}
                                   checked={checked}
-                                  disabled={isLastVisibleItem}
                                   onSelect={(event) => {
                                     event.preventDefault();
-                                    setViewVisibility(id, !checked);
+                                    setViewHidden(id, checked);
                                   }}
                                 >
                                   {label}

@@ -9,7 +9,6 @@ interface RefreshWorkspaceNodeSchemaParams {
   queryClient: QueryClient;
   workspaceId: string | null;
   nodeId: string;
-  authHeaders: Record<string, string>;
 }
 
 /**
@@ -24,7 +23,6 @@ export const refreshWorkspaceNodeSchema = async ({
   queryClient,
   workspaceId,
   nodeId,
-  authHeaders,
 }: RefreshWorkspaceNodeSchemaParams): Promise<NodeSchemaResponse | null> => {
   if (!workspaceId) return null;
   const graphData = queryClient.getQueryData<WorkspaceGraphResponse>(
@@ -38,7 +36,6 @@ export const refreshWorkspaceNodeSchema = async ({
       queryClient,
       workspaceId,
       nodeId,
-      headers: authHeaders,
       force: true,
     });
     const schema = normalizeSchemaFromInfo(info);

@@ -15,7 +15,6 @@ interface UseAnnotationClassDescriptionsArgs {
   nodeId: string | null;
   classColumn: string | null;
   descriptionColumn: string | null;
-  getAuthHeaders: () => Record<string, string>;
 }
 
 export const normalizeClassDescriptionRows = (
@@ -40,7 +39,6 @@ export function useAnnotationClassDescriptions({
   nodeId,
   classColumn,
   descriptionColumn,
-  getAuthHeaders,
 }: UseAnnotationClassDescriptionsArgs) {
   const canLoad = Boolean(workspaceId && nodeId && classColumn && descriptionColumn);
   const queryKey =
@@ -56,7 +54,6 @@ export function useAnnotationClassDescriptions({
         throw new Error('Missing class-description selection');
       }
       const { data } = await getAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         query: { class_column: classColumn, description_column: descriptionColumn },
         throwOnError: true,

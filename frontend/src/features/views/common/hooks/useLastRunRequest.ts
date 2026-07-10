@@ -17,7 +17,6 @@ export const lastRunRequestQueryKey = (
 interface Args {
   analysisType: LastRunAnalysisType;
   workspaceId: string | null;
-  getAuthHeaders: () => Record<string, string>;
   /** Active analysis tab's task id; null means the tab has not run yet. */
   taskId?: string | null;
 }
@@ -30,7 +29,7 @@ interface Args {
  * keyed by the tab's task id so sibling tabs can compare against independent
  * last-run requests.
  */
-export function useLastRunRequest({ analysisType, workspaceId, getAuthHeaders, taskId }: Args) {
+export function useLastRunRequest({ analysisType, workspaceId, taskId }: Args) {
   const queryKey = lastRunRequestQueryKey(analysisType, workspaceId, taskId ?? null);
 
   const query = useQuery({
@@ -50,7 +49,6 @@ export function useLastRunRequest({ analysisType, workspaceId, getAuthHeaders, t
           analysisType,
           workspaceId,
           taskId,
-          getAuthHeaders(),
         );
         const serverRequest =
           request && typeof request === 'object' ? (request as Record<string, unknown>) : null;

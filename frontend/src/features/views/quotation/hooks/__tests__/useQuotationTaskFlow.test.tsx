@@ -61,7 +61,6 @@ describe('useQuotationTaskFlow', () => {
         lock: {
           // Supplies empty auth headers because these tests assert request payload shaping only.
           // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-          getAuthHeaders: () => ({}),
           resolveTaskId: vi.fn(() => Promise.resolve(null)),
           quotationSearch,
           detachQuotation: vi.fn(() =>
@@ -132,7 +131,6 @@ describe('useQuotationTaskFlow', () => {
         lock: {
           // Supplies empty auth headers because these tests assert pagination payload shaping only.
           // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-          getAuthHeaders: () => ({}),
           resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
           quotationSearch,
           detachQuotation: vi.fn(() =>

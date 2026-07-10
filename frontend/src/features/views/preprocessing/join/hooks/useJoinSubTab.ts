@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
 import { joinNodesPreview } from '@/api';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import type {
   NodeColumnSelection,
   WorkspaceNodeLike,
@@ -160,7 +159,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     isLoading,
     onAlert,
   } = props;
-  const { getAuthHeaders } = useAuth();
 
   const [joinLeftColumnDraft, setJoinLeftColumnDraft] = useState<JoinColumnDraft | null>(null);
   const [joinRightColumnDraft, setJoinRightColumnDraft] = useState<JoinColumnDraft | null>(null);
@@ -325,7 +323,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     signal: AbortSignal;
   }) => {
     const { data: response } = await joinNodesPreview({
-      headers: getAuthHeaders(),
       path: { workspace_id: request.workspaceId },
       query: {
         left_node_id: request.leftNodeId,

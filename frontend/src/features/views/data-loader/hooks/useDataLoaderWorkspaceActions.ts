@@ -17,7 +17,6 @@ interface DeleteWorkspaceTarget {
 interface UseDataLoaderWorkspaceActionsParams {
   workspaces: WorkspaceSummary[];
   hasWorkspaceSelected: boolean;
-  authHeaders: Record<string, string>;
   notify: Notify;
 }
 
@@ -32,7 +31,6 @@ interface UseDataLoaderWorkspaceActionsParams {
 export function useDataLoaderWorkspaceActions({
   workspaces,
   hasWorkspaceSelected,
-  authHeaders,
   notify,
 }: UseDataLoaderWorkspaceActionsParams) {
   const queryClient = useQueryClient();
@@ -184,7 +182,7 @@ export function useDataLoaderWorkspaceActions({
   const handleUploadWorkspaceZip = async (file: File) => {
     setUploadingWorkspaceZip(true);
     try {
-      await uploadWorkspaceZip({ body: { file }, headers: authHeaders, throwOnError: true });
+      await uploadWorkspaceZip({ body: { file }, throwOnError: true });
       await queryClient.refetchQueries({ queryKey: queryKeys.workspaces, exact: true });
       notify('success', `Workspace ZIP "${file.name}" uploaded.`);
     } catch (error) {

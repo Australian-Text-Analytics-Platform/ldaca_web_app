@@ -19,12 +19,10 @@ import { invalidateWorkspaceGraphQuery } from './workspaceMutationCache';
 import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceAnalysisMutationsParams {
-  authHeaders: Record<string, string>;
   currentWorkspaceId: string | null;
   queryClient: QueryClient;
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
-  setOperationError: (operationId: string, error: string) => void;
 }
 
 /**
@@ -37,12 +35,10 @@ interface WorkspaceAnalysisMutationsParams {
  * action functions for WorkspaceProvider consumers.
  */
 export const useWorkspaceAnalysisMutations = ({
-  authHeaders,
   currentWorkspaceId,
   queryClient,
   startOperation,
   endOperation,
-  setOperationError,
 }: WorkspaceAnalysisMutationsParams) => {
   const ensureWorkspaceSelected = () => {
     if (!currentWorkspaceId) {
@@ -53,7 +49,6 @@ export const useWorkspaceAnalysisMutations = ({
   const operationLifecycle = createWorkspaceOperationLifecycle({
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   const detachConcordanceMutation = useMutation({
@@ -68,7 +63,6 @@ export const useWorkspaceAnalysisMutations = ({
     }) =>
       createAnalysisTaskDetachment({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data as AnalysisTaskActionResponse),
@@ -91,7 +85,6 @@ export const useWorkspaceAnalysisMutations = ({
     }) =>
       createAnalysisTaskDispersionDetachment({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => ({ task_id: data.metadata?.task_id ?? undefined })),
@@ -117,7 +110,6 @@ export const useWorkspaceAnalysisMutations = ({
     }) =>
       createAnalysisTaskMaterialization({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data),
@@ -130,7 +122,6 @@ export const useWorkspaceAnalysisMutations = ({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: QuotationRequest }) =>
       getQuotation({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
@@ -151,7 +142,6 @@ export const useWorkspaceAnalysisMutations = ({
     }) =>
       createAnalysisTaskDetachment({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data as AnalysisTaskActionResponse),
@@ -174,7 +164,6 @@ export const useWorkspaceAnalysisMutations = ({
     }) =>
       createAnalysisTaskMaterialization({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: workspaceId, task_id: taskId },
         throwOnError: true,
       }).then(({ data }) => data),

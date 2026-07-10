@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   type ColumnInfo,
   mapColumnsToInfo,
@@ -45,15 +44,13 @@ export const useNodeColumnInfos = (params: {
   enabled?: boolean;
 }): UseNodeColumnInfosResult => {
   const { workspaceId, nodes, enabled = true } = params;
-  const { getAuthHeaders } = useAuth();
-
   const nodeIds = nodes
     .map((node) => resolveNodeId(node))
     .filter((id): id is string => !!id);
 
   const queryEnabled = enabled && Boolean(workspaceId) && nodeIds.length > 0;
   const nodeInfosQuery = useQuery({
-    ...nodeInfosQueryOptions({ workspaceId: workspaceId ?? '', nodeIds, getAuthHeaders }),
+    ...nodeInfosQueryOptions({ workspaceId: workspaceId ?? '', nodeIds }),
     enabled: queryEnabled,
     staleTime: 60_000,
   });

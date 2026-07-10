@@ -59,7 +59,6 @@ describe('useTokenFrequencyTaskFlow', () => {
           lastFetchedRef: { current: { taskId: null, state: null } },
           onTaskIdAssigned,
         },
-        lock: { getAuthHeaders: () => ({ Authorization: 'Bearer test' }) },
         navigation: {
           replaceSelectedNodes: vi.fn(),
           setPendingConcordance: vi.fn(),
@@ -129,7 +128,6 @@ describe('useTokenFrequencyTaskFlow', () => {
           lastFetchedRef: { current: { taskId: null, state: null } },
           onTaskIdAssigned: vi.fn(),
         },
-        lock: { getAuthHeaders: () => ({ Authorization: 'Bearer test' }) },
         navigation: {
           ...navigation,
           applyStopSetFromText: vi.fn(),

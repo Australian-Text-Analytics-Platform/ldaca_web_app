@@ -5,8 +5,6 @@ import type { DetachDialogNodeOption } from '../../common/components/DetachColum
 import type { NodeColumnSelection } from '../../common';
 import { useDetachColumnsState } from '../../common/hooks/useDetachColumnsState';
 
-type AuthHeadersGetter = () => Record<string, string>;
-
 type QuotationDetachHandler = (
   nodeId: string,
   selectedColumns: string[],
@@ -17,7 +15,6 @@ interface UseQuotationDetachDialogArgs {
   workspaceId: string | null;
   activeSelections: NodeColumnSelection[];
   resolveTaskId: () => Promise<string | null>;
-  getAuthHeaders: AuthHeadersGetter;
   handleDetach: QuotationDetachHandler;
   materializedPaths: Record<string, string>;
   nodeDetaching: Record<string, boolean>;
@@ -51,7 +48,6 @@ export function useQuotationDetachDialog({
   workspaceId,
   activeSelections,
   resolveTaskId,
-  getAuthHeaders,
   handleDetach,
   materializedPaths,
   nodeDetaching,
@@ -91,7 +87,6 @@ export function useQuotationDetachDialog({
       const taskId = await resolveTaskId();
       if (!taskId) throw new Error('No quotation task to detach');
       const { data: response } = await analysisTaskDetachOptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, task_id: taskId },
         query: { node_id: nodeId, column: selection.column },
         throwOnError: true,

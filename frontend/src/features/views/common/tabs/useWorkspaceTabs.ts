@@ -75,7 +75,6 @@ export interface UseWorkspaceTabsResult {
 export function useWorkspaceTabs(
   workspaceId: string | null | undefined,
   analysisType: string,
-  getAuthHeaders: () => Record<string, string>,
 ): UseWorkspaceTabsResult {
   const queryClient = useQueryClient();
 
@@ -98,7 +97,6 @@ export function useWorkspaceTabs(
     staleTime: 30_000,
     queryFn: async () => {
       const { data: payload } = await getWorkspaceTabs({
-        headers: getAuthHeaders(),
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- query is enabled only when workspaceId is set
         path: { workspace_id: workspaceId! },
         throwOnError: true,
@@ -117,7 +115,6 @@ export function useWorkspaceTabs(
       if (!workspaceId) return next;
       const { data: saved } = await putWorkspaceTabs({
         body: next,
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId },
         throwOnError: true,
       });
@@ -186,7 +183,6 @@ export function useWorkspaceTabs(
         // failed cleanup must not block the UI. A miss just leaves a harmless
         // orphan task for later garbage collection; log it for diagnosis.
         void clearTask({
-          headers: getAuthHeaders(),
           path: { task_id: taskId },
           throwOnError: true,
         }).catch((error: unknown) => {
@@ -194,7 +190,7 @@ export function useWorkspaceTabs(
         });
       }
     },
-    [analysisType, readState, commit, getAuthHeaders],
+    [analysisType, readState, commit],
   );
 
   const renameTab = useCallback(

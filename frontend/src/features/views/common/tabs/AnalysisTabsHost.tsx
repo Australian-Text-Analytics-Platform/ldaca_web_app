@@ -22,7 +22,6 @@
 import { useEffect, useRef, type ComponentType } from 'react';
 import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
 import type { AnalysisTabInputSets } from './tabStateOps';
@@ -63,7 +62,6 @@ export interface AnalysisTabsHostProps {
  */
 export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
   const { currentWorkspaceId } = useWorkspaceData();
-  const { getAuthHeaders } = useAuth();
   const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
   const autoCreateKeyRef = useRef<string | null>(null);
 
@@ -79,7 +77,7 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     setTabTask,
     setTabInputSet,
     setTabSetting,
-  } = useWorkspaceTabs(currentWorkspaceId, tabGroup, getAuthHeaders);
+  } = useWorkspaceTabs(currentWorkspaceId, tabGroup);
 
   // Requirement: entering an empty analysis view presents one ready tab, but
   // closing the final tab while already there must leave the group empty until

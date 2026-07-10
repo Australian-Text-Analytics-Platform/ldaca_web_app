@@ -139,10 +139,6 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-interface Props {
-  authHeaders: Record<string, string>;
-}
-
 /**
  * Opens the sample-content import workflow from Data Loader. It manages local
  * dataset selection and owns the file-query invalidation after import.
@@ -150,7 +146,7 @@ interface Props {
  * Flow: request available sample categories, render the dataset dialog, then
  * import selected collections and invalidate the shared file query once.
  */
-export function SampleDataPanel({ authHeaders }: Props) {
+export function SampleDataPanel() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -200,7 +196,6 @@ export function SampleDataPanel({ authHeaders }: Props) {
     try {
       const { data: result } = await importSampleData({
         body: { collection_ids: selectedIds },
-        headers: authHeaders,
         throwOnError: true,
       });
       toast.dismiss(loadingToastId);

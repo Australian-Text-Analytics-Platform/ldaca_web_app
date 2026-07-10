@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 
@@ -45,7 +44,7 @@ const UNIFIED_WORDCLOUD_HEIGHT = 340;
 /** Coordinates token-frequency selection, execution, and export wiring for the analysis tab. */
 /**
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
- * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+ * Flow: read workspace state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
  * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
@@ -73,7 +72,6 @@ const TokenFrequencyFeature = ({
   // Controls the "Add Default" stop-words dialog where the user confirms which
   // language's defaults to append (guessed on the fly, not stored per column).
   const [fillDialogOpen, setFillDialogOpen] = useState(false);
-  const { getAuthHeaders } = useAuth();
   const { currentWorkspace } = useWorkspaceData();
   const currentWorkspaceId = currentWorkspace?.id ?? null;
   const nodeInputs = useTabNodeInputs({
@@ -121,7 +119,6 @@ const TokenFrequencyFeature = ({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     taskId: tabTaskId ?? null,
   });
 
@@ -140,7 +137,6 @@ const TokenFrequencyFeature = ({
     analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
     taskType: ANALYSIS_TASK_TYPES.tokenFrequencies,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
@@ -148,19 +144,18 @@ const TokenFrequencyFeature = ({
     resultRef,
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchResult: async (taskId, headers) => {
+    fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskResult<TokenFrequencyResponse>(currentWorkspaceId, taskId, headers);
+      return getAnalysisTaskResult<TokenFrequencyResponse>(currentWorkspaceId, taskId);
     },
     /** Fetches the saved task request so a reopened task can restore panel state. */
     // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchRequest: async (taskId, headers) => {
+    fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
         ANALYSIS_TAB_GROUPS.tokenFrequencies,
         currentWorkspaceId,
         taskId,
-        headers,
       );
     },
     /** Pushes fetched task results into guarded component state. */
@@ -294,7 +289,6 @@ const TokenFrequencyFeature = ({
     currentWorkspaceId,
     results,
     setResults: setResultSafely,
-    getAuthHeaders,
     resolveTokenFrequencyTaskId: resolveTaskId,
     backendTokenLimit,
     backendStopWordsKey,
@@ -342,9 +336,6 @@ const TokenFrequencyFeature = ({
       onTaskIdAssigned: (taskId) => {
         if (tabId) onTabTaskChange?.(taskId);
       },
-    },
-    lock: {
-      getAuthHeaders,
     },
     navigation: {
       replaceSelectedNodes,
@@ -433,11 +424,9 @@ const TokenFrequencyFeature = ({
 
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
   });
   const persistTokenizerPreference = usePersistNodeTokenizationPreference({
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
   });
 
   /** Persists a selected document column for a node when live analysis is editable. */
@@ -506,7 +495,6 @@ const TokenFrequencyFeature = ({
             onChange={(model, detectedLanguage) => {
               handleTokenizerModelChange(nodeId, column, model, detectedLanguage);
             }}
-            getAuthHeaders={getAuthHeaders}
             disabled={false}
             disabledReason={undefined}
           />
@@ -566,7 +554,6 @@ const TokenFrequencyFeature = ({
         workspaceId={currentWorkspaceId}
         nodeId={fillDefaultTarget.nodeId}
         column={fillDefaultTarget.column}
-        getAuthHeaders={getAuthHeaders}
         isLoading={isLoadingStopWords}
         onFill={(language) => {
           void handleAddDefaultStopWords(language);

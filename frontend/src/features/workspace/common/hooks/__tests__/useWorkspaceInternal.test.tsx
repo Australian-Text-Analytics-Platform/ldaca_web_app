@@ -27,14 +27,12 @@ vi.mock('../useWorkspaceNodeMutations', () => ({
 import { useWorkspaceInternal } from '../useWorkspaceInternal';
 
 interface CoreOverrides {
-  authHeaders?: Record<string, string>;
   isAuthenticated?: boolean;
   currentWorkspaceId?: string | null;
   setCurrentWorkspaceId?: ReturnType<typeof vi.fn>;
   activeNodeId?: string | null;
   selectedNodeIds?: string[];
   loadingOperationCount?: number;
-  operationErrorsRecord?: Record<string, string>;
 }
 
 interface QueriesOverrides {
@@ -45,7 +43,6 @@ interface QueriesOverrides {
   selectedNode?: unknown;
   selectedNodes?: unknown[];
   queryLoadingState?: Record<string, boolean>;
-  queryErrorState?: Record<string, string | null>;
   currentWorkspaceIdFromQuery?: string | null | undefined;
   currentWorkspaceQueryError?: Error | null;
 }
@@ -57,7 +54,6 @@ interface QueriesOverrides {
  * Flow: start from production-shaped defaults, then override only the fields a test scenario needs.
  */
 const buildCoreReturn = (overrides: CoreOverrides = {}) => ({
-  authHeaders: overrides.authHeaders ?? { Authorization: 'Bearer x' },
   isAuthenticated: overrides.isAuthenticated ?? true,
   currentWorkspaceId: overrides.currentWorkspaceId ?? null,
   setCurrentWorkspaceId: overrides.setCurrentWorkspaceId ?? vi.fn(),
@@ -70,10 +66,8 @@ const buildCoreReturn = (overrides: CoreOverrides = {}) => ({
   toggleNode: vi.fn(),
   clearSelection: vi.fn(),
   loadingOperationCount: overrides.loadingOperationCount ?? 0,
-  operationErrorsRecord: overrides.operationErrorsRecord ?? {},
   startOperation: vi.fn(),
   endOperation: vi.fn(),
-  setOperationError: vi.fn(),
 });
 
 /**
@@ -90,7 +84,6 @@ const buildQueriesReturn = (overrides: QueriesOverrides = {}) => ({
   selectedNode: overrides.selectedNode ?? null,
   selectedNodes: overrides.selectedNodes ?? [],
   queryLoadingState: overrides.queryLoadingState ?? {},
-  queryErrorState: overrides.queryErrorState ?? {},
   currentWorkspaceIdFromQuery: overrides.currentWorkspaceIdFromQuery,
   currentWorkspaceQueryError: overrides.currentWorkspaceQueryError ?? null,
 });
@@ -327,18 +320,6 @@ describe('useWorkspaceInternal', () => {
       expect(result.current.isLoading.workspaces).toBe(true);
     });
 
-    it('reflects the first operationErrors entry in errors.operations', () => {
-      useWorkspaceCoreMock.mockReturnValue(
-        buildCoreReturn({ operationErrorsRecord: { castNode: 'failed' } }),
-      );
-      useWorkspaceQueriesMock.mockReturnValue(
-        buildQueriesReturn({ queryErrorState: { workspaces: null } }),
-      );
-      useWorkspaceNodeMutationsMock.mockReturnValue(buildMutationsReturn());
-
-      const { result } = renderInternal();
-      expect(result.current.errors.operations).toBe('failed');
-    });
   });
 
   describe('passthrough fields', () => {

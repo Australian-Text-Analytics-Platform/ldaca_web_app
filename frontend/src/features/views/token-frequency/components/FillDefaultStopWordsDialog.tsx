@@ -25,7 +25,6 @@ interface FillDefaultStopWordsDialogProps {
   workspaceId: string | null;
   nodeId: string | null;
   column: string | null;
-  getAuthHeaders: () => Record<string, string>;
   /** True while the chosen stoplist is being loaded into the editor. */
   isLoading: boolean;
   /** Loads default stop words for the picked ISO 639-1 language. */
@@ -48,7 +47,6 @@ function FillDefaultStopWordsDialog({
   workspaceId,
   nodeId,
   column,
-  getAuthHeaders,
   isLoading,
   onFill,
 }: FillDefaultStopWordsDialogProps) {
@@ -57,7 +55,6 @@ function FillDefaultStopWordsDialog({
     workspaceId,
     nodeId,
     column,
-    getAuthHeaders,
     enabled: open,
   });
 

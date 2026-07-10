@@ -41,10 +41,6 @@ interface AnalysisActions {
   onTaskIdAssigned?: (taskId: string | null) => void;
 }
 
-interface LockActions {
-  getAuthHeaders: () => Record<string, string>;
-}
-
 interface NavigationActions {
   replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
   setPendingConcordance: (payload: PendingConcordance) => void;
@@ -55,7 +51,6 @@ interface NavigationActions {
 interface UseTokenFrequencyTaskFlowParams {
   state: AnalysisState;
   actions: AnalysisActions;
-  lock: LockActions;
   navigation: NavigationActions;
 }
 
@@ -88,7 +83,6 @@ export const useTokenFrequencyTaskFlow = ({
     lastFetchedRef,
     onTaskIdAssigned,
   },
-  lock: { getAuthHeaders },
   navigation: {
     replaceSelectedNodes,
     setPendingConcordance,
@@ -104,7 +98,6 @@ export const useTokenFrequencyTaskFlow = ({
   const { createTab: createConcordanceTab } = useWorkspaceTabs(
     currentWorkspaceId,
     ANALYSIS_TAB_GROUPS.concordance,
-    getAuthHeaders,
   );
 
   /** Builds and submits a token-frequency request from the current selection state. */
@@ -164,7 +157,6 @@ export const useTokenFrequencyTaskFlow = ({
       submit: async () => {
         const { data: response } = await calculateTokenFrequencies({
           body: request,
-          headers: getAuthHeaders(),
           path: { workspace_id: currentWorkspaceId },
           throwOnError: true,
         });

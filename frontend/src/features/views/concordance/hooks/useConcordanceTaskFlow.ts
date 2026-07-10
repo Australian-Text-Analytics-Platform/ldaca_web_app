@@ -54,7 +54,6 @@ interface ConcordanceActions {
 }
 
 interface ConcordanceLock {
-  getAuthHeaders: () => Record<string, string>;
   resolveTaskId: () => Promise<string | null>;
   detachConcordance: (
     taskId: string,
@@ -112,7 +111,6 @@ export function useConcordanceTaskFlow({
     onTaskIdAssigned,
   },
   lock: {
-    getAuthHeaders,
     resolveTaskId,
     detachConcordance,
     detachConcordanceDispersion,
@@ -146,12 +144,10 @@ export function useConcordanceTaskFlow({
   ): Promise<ConcordanceAnalysisResponse | null> => {
     if (!currentWorkspaceId) return null;
 
-    const headers = getAuthHeaders();
     const taskId = await resolveTaskId();
     if (!taskId) return null;
     const { data } = await analysisTaskResultQuery({
       body,
-      headers,
       path: { workspace_id: currentWorkspaceId, task_id: taskId },
       throwOnError: true,
     });
@@ -248,7 +244,6 @@ export function useConcordanceTaskFlow({
 
     setIsSearching(true);
     try {
-      const authHeaders = getAuthHeaders();
       const request: ConcordanceAnalysisRequest = {
         node_ids: requestNodeIds,
         node_columns: nodeColumns,
@@ -267,7 +262,6 @@ export function useConcordanceTaskFlow({
 
       const { data: response } = await runConcordance({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });

@@ -195,7 +195,6 @@ describe('useNodePreviewWithRawFallback', () => {
 
       expect(operationFetch).not.toHaveBeenCalled();
       expect(getNodeDataByWorkspaceIdMock).toHaveBeenCalledWith({
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'workspace-1', node_id: 'node-1' },
         query: { page: 1, page_size: 10 },
         signal,

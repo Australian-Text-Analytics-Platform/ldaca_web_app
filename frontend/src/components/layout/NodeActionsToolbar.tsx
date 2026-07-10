@@ -31,7 +31,6 @@ interface NodeActionsToolbarNode {
 export interface NodeActionsToolbarProps {
   node: NodeActionsToolbarNode;
   isPinned: boolean;
-  onShowSchema?: (nodeId: string) => void;
   onTogglePin: (nodeId: string) => void;
   onAddToSelection: (nodeId: string) => void;
   onRename: (nodeId: string, newName: string) => void;
@@ -101,7 +100,6 @@ export function NodePinButton({ node, isPinned, onTogglePin }: NodePinButtonProp
 export function NodeActionsToolbar({
   node,
   isPinned,
-  onShowSchema: _onShowSchema,
   onTogglePin,
   onAddToSelection,
   onRename,

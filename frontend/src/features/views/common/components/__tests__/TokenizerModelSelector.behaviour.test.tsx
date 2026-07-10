@@ -41,7 +41,6 @@ const renderSelector = ({
           column="text"
           value={value}
           onChange={onChange}
-          getAuthHeaders={() => ({ authorization: 'Bearer test' })}
         />
       </QueryClientProvider>,
     ),

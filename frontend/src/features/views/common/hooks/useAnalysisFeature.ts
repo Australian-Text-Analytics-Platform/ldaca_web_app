@@ -45,16 +45,15 @@ export interface UseAnalysisFeatureConfig<TResult = unknown> {
   analysisType: LastRunAnalysisType;
   taskType: CanonicalAnalysisTaskType | (string & {});
   workspaceId: string | null;
-  getAuthHeaders: () => Record<string, string>;
   isTabActive: boolean;
 
   /** Ref to feature-managed result state — hook reads for banner / clear logic */
   resultRef: { current: TResult | null };
 
   /** Fetch a task's result from the backend */
-  fetchResult: (taskId: string, headers: Record<string, string>) => Promise<TResult | null>;
+  fetchResult: (taskId: string) => Promise<TResult | null>;
   /** Optionally fetch a task's request payload (used during hydration) */
-  fetchRequest?: (taskId: string, headers: Record<string, string>) => Promise<unknown>;
+  fetchRequest?: (taskId: string) => Promise<unknown>;
 
   /** Called when a terminal task result is fetched */
   onResultFetched: (result: TResult, taskId: string) => void;
@@ -301,8 +300,7 @@ export function useAnalysisFeature<TResult = unknown>(
 
     try {
       fetchingTaskIdRef.current = resolvedTaskId;
-      const headers = cfg.getAuthHeaders();
-      const result = await cfg.fetchResult(resolvedTaskId, headers);
+      const result = await cfg.fetchResult(resolvedTaskId);
       if (!result) {
         return;
       }
@@ -412,9 +410,7 @@ export function useAnalysisFeature<TResult = unknown>(
           if (cached?.taskId === taskId && cached.serverRequest) {
             return cached.serverRequest;
           }
-          return (
-            configRef.current.fetchRequest?.(taskId, configRef.current.getAuthHeaders()) ?? null
-          );
+          return configRef.current.fetchRequest?.(taskId) ?? null;
         }
       : undefined,
     /**
@@ -432,7 +428,7 @@ export function useAnalysisFeature<TResult = unknown>(
       }
       fetchingTaskIdRef.current = taskId;
       try {
-        return await configRef.current.fetchResult(taskId, configRef.current.getAuthHeaders());
+        return await configRef.current.fetchResult(taskId);
       } finally {
         fetchingTaskIdRef.current = null;
       }
@@ -494,7 +490,6 @@ export function useAnalysisFeature<TResult = unknown>(
         ...extraSources,
       ],
       resolveTaskId,
-      getAuthHeaders: cfg.getAuthHeaders,
       /** Called by: clearAnalysis after backend task-cache cleanup completes because callers need shared hook state and handlers without duplicating analysis lifecycle wiring. */
       onCleanup: (taskIds) => {
         setLocalTaskId(null);
@@ -529,7 +524,6 @@ export function useAnalysisFeature<TResult = unknown>(
     setIsStopping(true);
     try {
       await cancelTask({
-        headers: cfg.getAuthHeaders(),
         path: { task_id: taskId },
         throwOnError: true,
       });

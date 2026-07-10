@@ -97,9 +97,7 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
 
     renderHook(
       () => {
-        useSingleTabModeWorkspaceCleanup('workspace-1', false, () => ({
-          Authorization: 'Bearer t',
-        }));
+        useSingleTabModeWorkspaceCleanup('workspace-1', false);
       },
       { wrapper: makeWrapper(queryClient) },
     );
@@ -136,7 +134,6 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
     await waitFor(() => {
       expect(putWorkspaceTabsMock).toHaveBeenCalledWith({
         body: expectedState,
-        headers: { Authorization: 'Bearer t' },
         path: { workspace_id: 'workspace-1' },
         throwOnError: true,
       });
@@ -145,12 +142,10 @@ describe('useSingleTabModeWorkspaceCleanup', () => {
       expect(queryClient.getQueryData(workspaceTabsQueryKey('workspace-1'))).toEqual(expectedState);
     });
     expect(clearTaskMock).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer t' },
       path: { task_id: 'task-remove-a' },
       throwOnError: true,
     });
     expect(clearTaskMock).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer t' },
       path: { task_id: 'task-remove-b' },
       throwOnError: true,
     });

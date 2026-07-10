@@ -4,9 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
-import { DEFAULT_VISIBLE_VIEWS } from '@/features/views/viewIds';
 import { useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 
 /** Toast spy used to verify sidebar menu actions surface user feedback. */
 const toastMock = vi.fn();
@@ -118,9 +118,7 @@ describe('Sidebar view visibility menu', () => {
     useUIStore.setState((state) => ({
       ...state,
       currentView: 'data-loader',
-      sidebarCollapsed: false,
       loadingOperations: new Set(),
-      operationErrors: new Map(),
       modals: {
         feedback: false,
         tutorial: false,
@@ -135,9 +133,9 @@ describe('Sidebar view visibility menu', () => {
         info: null,
         reference: null,
       },
-      visibleViews: [...DEFAULT_VISIBLE_VIEWS],
       sessionDismissedHints: new Set(),
     }));
+    usePreferencesStore.setState({ hiddenViews: [] });
     useHintsStore.setState({ dismissedHints: [], hintsEnabled: true });
     toastMock.mockReset();
   });

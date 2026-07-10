@@ -74,7 +74,6 @@ describe('WorkspaceDownloadsProvider', () => {
       expect(mocks.startWorkspaceDownload).toHaveBeenCalledTimes(1);
     });
     expect(mocks.startWorkspaceDownload).toHaveBeenCalledWith({
-      headers: expect.any(Object),
       path: { workspace_id: 'workspace-1' },
       throwOnError: true,
     });
@@ -109,7 +108,6 @@ describe('WorkspaceDownloadsProvider', () => {
       expect(mocks.downloadWorkspaceArtifact).toHaveBeenCalledTimes(1);
     });
     expect(mocks.downloadWorkspaceArtifact).toHaveBeenCalledWith({
-      headers: expect.any(Object),
       parseAs: 'blob',
       path: { workspace_id: 'workspace-1', task_id: 'task-1' },
       throwOnError: true,

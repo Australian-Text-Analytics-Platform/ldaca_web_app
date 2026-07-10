@@ -719,7 +719,6 @@ describe('AnnotationFeature', () => {
     await user.click(screen.getByRole('button', { name: 'Add new' }));
 
     expect(mocks.createAnnotationClassDescriptions).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer test' },
       path: { workspace_id: 'workspace-1' },
       throwOnError: true,
     });
@@ -754,7 +753,6 @@ describe('AnnotationFeature', () => {
     await user.tab();
 
     expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer test' },
       path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       body: {
         class_column: 'class',
@@ -818,7 +816,6 @@ describe('AnnotationFeature', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Delete class 1' }));
 
     expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer test' },
       path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       body: {
         class_column: 'class',
@@ -841,7 +838,6 @@ describe('AnnotationFeature', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Add class' }));
 
     expect(mocks.updateAnnotationClassDescriptions).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer test' },
       path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       body: {
         class_column: 'class',

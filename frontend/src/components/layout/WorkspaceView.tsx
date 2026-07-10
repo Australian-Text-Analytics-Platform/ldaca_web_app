@@ -68,7 +68,7 @@ function WorkspaceView({
         style={{ height: `calc(${String(ratio * 100)}% - 0.25rem)` }}
       >
         <div className="p-2 bg-muted border-b border-border shrink-0">
-          <WorkspaceControls collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
+          <WorkspaceControls onToggleCollapse={onToggleCollapse} />
         </div>
         <div className="flex-1 min-h-0">
           <WorkspaceGraphFeature />

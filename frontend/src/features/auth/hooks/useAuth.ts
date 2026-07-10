@@ -1,27 +1,18 @@
-import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useAuthStore, type AuthPhase } from '@/stores/authStore';
 
 export { REFRESH_FAILURE_THRESHOLD } from '@/stores/authStore';
+export { AuthBootstrap } from '../AuthBootstrap';
 export type { AuthPhase };
 
-export interface UseAuthOptions {
-  /**
-   * When false, the hook will wait for an explicit `refreshAuth` call
-   * before making the initial /api/auth/ request.
-   */
-  autoStart?: boolean;
-}
-
-/** Exposes auth store state/actions as a hook and performs first-mount auth bootstrap work. */
 /**
- * Used by: App, DataFolderSettingsPanel, Sidebar, and other authenticated feature consumers that need one normalized auth/session boundary.
- * Flow: subscribe to the auth-store slice, run redirect-token/bootstrap/refresh setup on mount, then derive UI-friendly auth flags and actions.
+ * Exposes auth state/actions without owning lifecycle effects.
+ *
+ * Used by: App gating, account UI, raw download/EventSource boundaries, and
+ * authenticated feature controls. `AuthBootstrap` is the only lifecycle owner.
  */
-export const useAuth = (options: UseAuthOptions = {}) => {
-  const autoStart = options.autoStart ?? false;
-
+export const useAuth = () => {
   const { phase, authInfo, config, refreshAuth, loginWithGoogle, logout, getAuthHeaders } =
     useAuthStore(
       useShallow((state) => ({
@@ -34,20 +25,6 @@ export const useAuth = (options: UseAuthOptions = {}) => {
         getAuthHeaders: state.getAuthHeaders,
       })),
     );
-
-  useEffect(() => {
-    const store = useAuthStore.getState();
-    // B6: URL-token capture used to run at module-import time. Run it here on
-    // first mount instead so test environments and SSR don't side-effect on
-    // import. The store action is idempotent (the token is removed from the
-    // URL after the first pass), so the only-once-per-app guarantee comes for
-    // free.
-    store.processGoogleRedirectToken();
-    if (autoStart && !store.authInfo) {
-      void store.runAuthFetch('bootstrap');
-    }
-    store.ensureRefreshInterval();
-  }, [autoStart]);
 
   const isAuthenticated = authInfo?.authenticated ?? false;
   const user = authInfo?.user ?? null;

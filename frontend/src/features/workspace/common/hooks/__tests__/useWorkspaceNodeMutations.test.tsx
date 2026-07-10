@@ -91,7 +91,6 @@ type ReplaceSelectedNodesSpy = ReturnType<typeof vi.fn> &
 type RemoveNodeSpy = ReturnType<typeof vi.fn> & ((nodeId: string) => void);
 type ClearSelectionSpy = ReturnType<typeof vi.fn> & (() => void);
 type OperationFnSpy = ReturnType<typeof vi.fn> & ((operationId: string) => void);
-type OperationErrorSpy = ReturnType<typeof vi.fn> & ((operationId: string, error: string) => void);
 
 /**
  * Creates a typed current-workspace setter spy for hook args.
@@ -118,15 +117,7 @@ const mkClearSelection = () => vi.fn() as unknown as ClearSelectionSpy;
  * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const mkOperationFn = () => vi.fn() as unknown as OperationFnSpy;
-/**
- * Creates a typed operation-error spy for hook args.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
- */
-const mkOperationError = () => vi.fn() as unknown as OperationErrorSpy;
-
 interface BuildArgs {
-  authHeaders?: Record<string, string>;
   currentWorkspaceId?: string | null;
   setCurrentWorkspaceId?: SetWorkspaceIdSpy;
   removeNode?: RemoveNodeSpy;
@@ -134,7 +125,6 @@ interface BuildArgs {
   clearSelection?: ClearSelectionSpy;
   startOperation?: OperationFnSpy;
   endOperation?: OperationFnSpy;
-  setOperationError?: OperationErrorSpy;
 }
 
 /**
@@ -144,7 +134,6 @@ interface BuildArgs {
  * Flow: merge default spies and ids with overrides, preserving explicit nulls for no-workspace branches.
  */
 const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => ({
-  authHeaders: overrides.authHeaders ?? { Authorization: 'Bearer test' },
   // `'currentWorkspaceId' in overrides` so callers can pass `null` to test
   // the no-workspace-selected branches; `?? 'ws-1'` would silently coerce
   // nullish overrides back to 'ws-1'. The cast preserves the
@@ -159,7 +148,6 @@ const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => (
   queryClient,
   startOperation: overrides.startOperation ?? mkOperationFn(),
   endOperation: overrides.endOperation ?? mkOperationFn(),
-  setOperationError: overrides.setOperationError ?? mkOperationError(),
 });
 
 describe('useWorkspaceNodeMutations', () => {
@@ -171,7 +159,7 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('actions shape and stability', () => {
-    it('memoizes actions across re-renders when authHeaders + currentWorkspaceId stay stable', () => {
+    it('memoizes actions across re-renders when currentWorkspaceId stays stable', () => {
       const queryClient = createTestClient();
       const args = buildHookArgs(queryClient);
 
@@ -185,23 +173,10 @@ describe('useWorkspaceNodeMutations', () => {
       expect(result.current.actions).toBe(firstActions);
     });
 
-    it('rebuilds actions when authHeaders identity changes', () => {
-      const queryClient = createTestClient();
-      const args = buildHookArgs(queryClient, { authHeaders: { Authorization: 'Bearer A' } });
-
-      const { result, rerender } = renderHook(
-        (props: ReturnType<typeof buildHookArgs>) => useWorkspaceNodeMutations(props),
-        { wrapper: wrapWithClient(queryClient), initialProps: args },
-      );
-
-      const firstActions = result.current.actions;
-      rerender({ ...args, authHeaders: { Authorization: 'Bearer B' } });
-      expect(result.current.actions).not.toBe(firstActions);
-    });
   });
 
   describe('createWorkspace', () => {
-    it('calls generated createWorkspace with the auth headers and invalidates the workspaces list', async () => {
+    it('calls generated createWorkspace and invalidates the workspaces list', async () => {
       const queryClient = createTestClient();
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
       const startOperation = mkOperationFn();
@@ -223,7 +198,6 @@ describe('useWorkspaceNodeMutations', () => {
 
       expect(workspaceSdkMock.createWorkspace).toHaveBeenCalledWith({
         body: { name: 'My ws', description: 'desc' },
-        headers: { Authorization: 'Bearer test' },
         throwOnError: true,
       });
       expect(startOperation).toHaveBeenCalledWith('createWorkspace');
@@ -231,16 +205,15 @@ describe('useWorkspaceNodeMutations', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['workspaces'] });
     });
 
-    it('routes API errors through setOperationError + endOperation', async () => {
+    it('ends operation loading when an API mutation rejects', async () => {
       const queryClient = createTestClient();
-      const setOperationError = mkOperationError();
       const endOperation = mkOperationFn();
       workspaceSdkMock.createWorkspace.mockRejectedValue(new Error('server down'));
 
       const { result } = renderHook(
         () =>
           useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { setOperationError, endOperation }),
+            buildHookArgs(queryClient, { endOperation }),
           ),
         { wrapper: wrapWithClient(queryClient) },
       );
@@ -249,7 +222,6 @@ describe('useWorkspaceNodeMutations', () => {
         await result.current.actions.createWorkspace('ws', 'd').catch(() => undefined);
       });
 
-      expect(setOperationError).toHaveBeenCalledWith('createWorkspace', 'server down');
       expect(endOperation).toHaveBeenCalledWith('createWorkspace');
     });
   });
@@ -278,7 +250,6 @@ describe('useWorkspaceNodeMutations', () => {
 
       expect(workspaceSdkMock.setMyCurrentWorkspace).toHaveBeenCalledWith({
         body: { workspace_id: 'ws-2' },
-        headers: { Authorization: 'Bearer test' },
         throwOnError: true,
       });
       expect(setCurrentWorkspaceId).toHaveBeenCalledWith('ws-2');
@@ -313,7 +284,6 @@ describe('useWorkspaceNodeMutations', () => {
       });
 
       expect(workspaceSdkMock.deleteWorkspaceById).toHaveBeenCalledWith({
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'ws-1' },
         throwOnError: true,
       });
@@ -378,7 +348,6 @@ describe('useWorkspaceNodeMutations', () => {
         queryClient,
         workspaceId: 'ws-1',
         nodeId: 'node-1',
-        headers: { Authorization: 'Bearer test' },
         force: true,
       });
       expect(schema).toEqual({
@@ -407,7 +376,6 @@ describe('useWorkspaceNodeMutations', () => {
 
       expect(workspaceSdkMock.castNode).toHaveBeenCalledWith({
         body: { column: 'col_a', target_type: 'integer', format: undefined },
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'ws-1', node_id: 'node-1' },
         throwOnError: true,
       });
@@ -487,7 +455,6 @@ describe('useWorkspaceNodeMutations', () => {
 
       expect(workspaceSdkMock.concatNodesPreview).toHaveBeenCalledWith({
         body: { node_ids: ['node-a', 'node-b'], deduplicate: true },
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'request-workspace' },
         query: { page: 2, page_size: 25 },
         signal,
@@ -524,7 +491,6 @@ describe('useWorkspaceNodeMutations', () => {
       });
 
       expect(workspaceSdkMock.joinNodes).toHaveBeenCalledWith({
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'ws-1' },
         query: {
           left_node_id: 'left-node',
@@ -567,7 +533,6 @@ describe('useWorkspaceNodeMutations', () => {
           new_node_name: 'Combined',
           deduplicate: true,
         },
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'ws-1' },
         throwOnError: true,
       });
@@ -621,7 +586,6 @@ describe('useWorkspaceNodeMutations', () => {
 
       expect(workspaceSdkMock.createAnalysisTaskDetachment).toHaveBeenCalledWith({
         body: { node_id: 'node-1', column: 'c', search_word: 'w', selected_columns: ['c'] },
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'ws-1', task_id: 'task-1' },
         throwOnError: true,
       });
@@ -646,7 +610,6 @@ describe('useWorkspaceNodeMutations', () => {
 
       expect(workspaceSdkMock.getQuotation).toHaveBeenCalledWith({
         body: { column: 'c' },
-        headers: { Authorization: 'Bearer test' },
         path: { workspace_id: 'ws-1', node_id: 'node-1' },
         throwOnError: true,
       });

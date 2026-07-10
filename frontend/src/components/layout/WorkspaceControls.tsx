@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PanelRightClose, PanelRightOpen, Pencil } from 'lucide-react';
+import { PanelRightClose, Pencil } from 'lucide-react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
@@ -27,19 +27,11 @@ const MIN_BATCH_DELETE_COUNT = 1;
  * Rendered by: WorkspaceView above the graph canvas.
  * Flow: read workspace and selection state, prepare selected-delete metadata, manage rename/delete dialogs, then render toolbar controls.
  *
- * ``onToggleCollapse`` (optional): renders the collapse/expand button in the
- * header. ``collapsed`` switches the panel between the full "Workspace Graph
- * View" header (rename/help/delete) and a minimal "Workspace List View" header
- * (just the toggle + title) used when the right panel is collapsed to the
- * compact list + schema view. Supplied by WorkspaceView from WorkspaceShell.
+ * ``onToggleCollapse`` renders the collapse button. The collapsed shell
+ * returns before mounting this toolbar, so controls only model the live graph
+ * view and carry no unreachable compact-mode branch.
  */
-export function WorkspaceControls({
-  collapsed = false,
-  onToggleCollapse,
-}: {
-  collapsed?: boolean;
-  onToggleCollapse?: () => void;
-} = {}) {
+export function WorkspaceControls({ onToggleCollapse }: { onToggleCollapse?: () => void } = {}) {
   const { currentWorkspace, workspaceGraph } = useWorkspaceData();
   const { renameWorkspace, deleteNode, clearSelection } = useWorkspaceActions();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -122,92 +114,79 @@ export function WorkspaceControls({
           type="button"
           onClick={onToggleCollapse}
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white/80 text-gray-700 shadow-sm hover:bg-gray-50"
-          aria-label={collapsed ? 'Expand to graph view' : 'Collapse to list view'}
-          title={collapsed ? 'Expand' : 'Collapse'}
+          aria-label="Collapse workspace panel"
+          title="Collapse"
         >
-          {collapsed ? (
-            <PanelRightOpen className="h-4 w-4" />
-          ) : (
-            <PanelRightClose className="h-4 w-4" />
-          )}
+          <PanelRightClose className="h-4 w-4" />
         </button>
       )}
-      {collapsed ? (
-        // Collapsed/list view: keep the header minimal — just the toggle and
-        // the title. Rename/help/delete are dropped to fit the narrow panel.
-        <h3 className="text-sm font-medium text-gray-700">Workspace List View</h3>
+      <h3 className="text-sm font-medium text-gray-700">Workspace Graph View</h3>
+      <HelpIcon
+        targetKey="ui.workspace-graph-view"
+        label="Workspace Graph View"
+        className="h-5 w-5 text-muted-foreground"
+      />
+      <span className="text-gray-300">|</span>
+
+      {isEditing ? (
+        <input
+          className="px-2 py-1 border rounded text-sm"
+          value={renameDraft.value}
+          onChange={(e) => {
+            setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value });
+          }}
+          onBlur={() => {
+            void handleRenameCommit();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleRenameCommit();
+            if (e.key === 'Escape') setRenameDraft(undefined);
+          }}
+          autoFocus
+          aria-label="Workspace name"
+        />
       ) : (
+        <span className="text-sm font-semibold text-gray-800">
+          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- show placeholder for an empty name, not only null/undefined */}
+          {currentWorkspace?.name || 'No Workspace'}
+        </span>
+      )}
+
+      {currentWorkspace && (
         <>
-          <h3 className="text-sm font-medium text-gray-700">Workspace Graph View</h3>
-          <HelpIcon
-            targetKey="ui.workspace-graph-view"
-            label="Workspace Graph View"
-            className="h-5 w-5 text-muted-foreground"
-          />
-          <span className="text-gray-300">|</span>
+          <button
+            className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
+            onClick={startRename}
+            title="Rename"
+            aria-label="Rename workspace"
+          >
+            <Pencil className="h-3 w-3" />
+            Rename
+          </button>
 
-          {isEditing ? (
-            <input
-              className="px-2 py-1 border rounded text-sm"
-              value={renameDraft.value}
-              onChange={(e) => {
-                setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value });
-              }}
-              onBlur={() => {
-                void handleRenameCommit();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleRenameCommit();
-                if (e.key === 'Escape') setRenameDraft(undefined);
-              }}
-              autoFocus
-              aria-label="Workspace name"
-            />
-          ) : (
-            <span className="text-sm font-semibold text-gray-800">
-              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- show placeholder for an empty name, not only null/undefined */}
-              {currentWorkspace?.name || 'No Workspace'}
-            </span>
-          )}
-
-          {currentWorkspace && (
-            <>
-              <button
-                className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
-                onClick={startRename}
-                title="Rename"
-                aria-label="Rename workspace"
-              >
-                <Pencil className="h-3 w-3" />
-                Rename
-              </button>
-
-              {/* Delete — always enabled so there are no surprises about why
+          {/* Delete — always enabled so there are no surprises about why
               it's greyed out. The confirmation dialog gates the actual
               removal, and the disabled state only kicks in mid-delete.
               Per-node delete is still available from each node's context
               menu in the graph. Same size + shape in both states so the
               layout stays stable; only colours swap — destructive (red)
               when actionable, the existing muted/bordered look when not. */}
-              <button
-                className={`text-xs px-2 py-1 border rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  canBatchDelete && !isDeleting
-                    ? 'bg-destructive text-destructive-foreground border-destructive shadow-sm hover:bg-destructive/90 hover:border-destructive/90'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
-                onClick={() => {
-                  setDeleteConfirmOpen(true);
-                }}
-                disabled={isDeleting}
-                title="Delete the selected data blocks"
-              >
-                Delete ({selectedCount})
-              </button>
-            </>
-          )}
+          <button
+            className={`text-xs px-2 py-1 border rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              canBatchDelete && !isDeleting
+                ? 'bg-destructive text-destructive-foreground border-destructive shadow-sm hover:bg-destructive/90 hover:border-destructive/90'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+            onClick={() => {
+              setDeleteConfirmOpen(true);
+            }}
+            disabled={isDeleting}
+            title="Delete the selected data blocks"
+          >
+            Delete ({selectedCount})
+          </button>
         </>
       )}
-
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

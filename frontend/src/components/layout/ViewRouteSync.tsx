@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { DEFAULT_VIEW } from '@/features/views/viewIds';
 import { isWorkspaceRequired } from '@/features/views/viewRegistry';
+import { useVisibleViews } from '@/features/views/useVisibleViews';
 import { appRoute, viewSearchFor } from '@/router';
 import { useUIStore, type ViewType } from '@/stores';
 
@@ -33,13 +34,13 @@ export const ViewRouteSync = () => {
   const { view: routeView } = appRoute.useSearch();
   const navigate = appRoute.useNavigate();
   const { currentWorkspaceId } = useWorkspaceData();
-  const { currentView, setCurrentView, visibleViews } = useUIStore(
+  const { currentView, setCurrentView } = useUIStore(
     useShallow((state) => ({
       currentView: state.currentView,
       setCurrentView: state.setCurrentView,
-      visibleViews: state.visibleViews,
     })),
   );
+  const visibleViews = useVisibleViews();
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
   const routeViewAllowed = Boolean(

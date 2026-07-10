@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import type { ApiError } from '@/lib/apiError';
 import { createClientConfig, getGeneratedApiBase } from '@/lib/backend/generatedClientConfig';
+import { setRequiresAuthentication } from '@/lib/backend/authToken';
 
 const originalFetch = global.fetch;
 
@@ -15,6 +16,7 @@ const requireFetch = (fetchImpl: typeof fetch | undefined): typeof fetch => {
 describe('generatedClientConfig', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    setRequiresAuthentication(null);
   });
 
   afterEach(() => {
@@ -35,6 +37,20 @@ describe('generatedClientConfig', () => {
     const [request] = fetchMock.mock.calls[0] as [Request];
     expect(request.credentials).toBe('include');
     expect(request.headers.get('Authorization')).toBe('Bearer test-token');
+  });
+
+  it('suppresses a stale stored token after single-user auth mode resolves', async () => {
+    window.localStorage.setItem('auth_token', 'stale-token');
+    setRequiresAuthentication(false);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const config = createClientConfig({ baseUrl: 'http://api.test/api', fetch: fetchMock });
+
+    await requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/runtime-config`));
+
+    const [request] = fetchMock.mock.calls[0] as [Request];
+    expect(request.headers.has('Authorization')).toBe(false);
   });
 
   it('uses a base URL compatible with generated paths that already include /api', () => {

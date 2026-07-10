@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { getColumnUniqueValues } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -14,14 +13,11 @@ interface UniqueValueCountProps {
  * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
  */
 export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValueCountProps) {
-  const { getAuthHeaders } = useAuth();
-
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.columnUniqueValues(workspaceId, nodeId, columnName),
     // Used by: UniqueValueCount query to fetch metadata that informs group-by decisions.
     queryFn: async () => {
       const { data: response } = await getColumnUniqueValues({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, column_name: columnName, node_id: nodeId },
         throwOnError: true,
       });

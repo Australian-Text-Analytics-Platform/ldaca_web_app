@@ -51,7 +51,6 @@ interface AnnotationResultsPanelProps {
   classNodeId: string | null;
   classColumn: string | null;
   descriptionColumn: string | null;
-  getAuthHeaders: () => Record<string, string>;
 }
 
 /**
@@ -81,7 +80,6 @@ export function AnnotationResultsPanel({
   classNodeId,
   classColumn,
   descriptionColumn,
-  getAuthHeaders,
 }: AnnotationResultsPanelProps) {
   // Per-row class overrides keyed by source row position; falls back to the source value.
   const [selections, setSelections] = useState<Record<number, string>>({});
@@ -103,7 +101,6 @@ export function AnnotationResultsPanel({
     mutationFn: async (vars: { rowPosition: number; value: string; previous: string }) => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await setAnnotationCell({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         body: {
           column_name: annotationColumn,
@@ -133,7 +130,6 @@ export function AnnotationResultsPanel({
     queryFn: async () => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await getNodeDataByWorkspaceId({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         query: nodeDataRequest,
         throwOnError: true,
@@ -157,7 +153,6 @@ export function AnnotationResultsPanel({
     queryFn: async () => {
       if (!workspaceId || !classNodeId) throw new Error('Missing class node');
       const { data } = await getAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: classNodeId },
         query: { class_column: classColumn ?? '', description_column: descriptionColumn ?? '' },
         throwOnError: true,

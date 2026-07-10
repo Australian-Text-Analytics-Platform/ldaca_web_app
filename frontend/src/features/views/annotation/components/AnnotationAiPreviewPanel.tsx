@@ -88,7 +88,6 @@ interface AnnotationAiPreviewPanelProps {
   temperature?: number;
   reasoningEnabled?: boolean;
   reasoningEffort?: string;
-  getAuthHeaders: () => Record<string, string>;
 }
 
 /**
@@ -147,7 +146,6 @@ export function AnnotationAiPreviewPanel({
   temperature = 0,
   reasoningEnabled = false,
   reasoningEffort = 'medium',
-  getAuthHeaders,
 }: AnnotationAiPreviewPanelProps) {
   const queryClient = useQueryClient();
   // Per-row prediction overrides keyed by absolute row position; falls back to
@@ -175,7 +173,6 @@ export function AnnotationAiPreviewPanel({
     queryFn: async () => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await getNodeDataByWorkspaceId({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         query: nodeDataRequest,
         throwOnError: true,
@@ -199,7 +196,6 @@ export function AnnotationAiPreviewPanel({
     queryFn: async () => {
       if (!workspaceId || !classNodeId) throw new Error('Missing class node');
       const { data } = await getAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: classNodeId },
         query: { class_column: classColumn ?? '', description_column: descriptionColumn ?? '' },
         throwOnError: true,
@@ -252,7 +248,6 @@ export function AnnotationAiPreviewPanel({
     queryFn: async () => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await annotateAiPreviewState({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         query: {
           text_column: textColumn,
@@ -337,7 +332,7 @@ export function AnnotationAiPreviewPanel({
       const { data } = await annotateAiPreview({
         // AI batches can outlast the client's default 30s cap; give a page a
         // generous window (the backend bounds each provider request itself).
-        headers: { ...getAuthHeaders(), 'x-client-timeout-ms': '120000' },
+        headers: { 'x-client-timeout-ms': '120000' },
         path: { workspace_id: workspaceId },
         body: {
           node_id: nodeId,
@@ -395,7 +390,6 @@ export function AnnotationAiPreviewPanel({
     queryFn: async () => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await detachAiPreviewedRows({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         body: { annotation_column: annotationColumn, dry_run: true },
         throwOnError: true,
@@ -413,7 +407,6 @@ export function AnnotationAiPreviewPanel({
     mutationFn: async (variables: { rowIndex: number; label: string }) => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       await annotateAiPreviewOverride({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId, row_index: variables.rowIndex },
         body: {
           // '' is the "None" pick — send null so the server records an explicit
@@ -439,7 +432,7 @@ export function AnnotationAiPreviewPanel({
         // A whole-table run fans many batches out on the backend and can take
         // minutes; extend the client timeout well past the 30s default (still
         // finite so a truly hung request eventually surfaces an error).
-        headers: { ...getAuthHeaders(), 'x-client-timeout-ms': '600000' },
+        headers: { 'x-client-timeout-ms': '600000' },
         path: { workspace_id: workspaceId, node_id: nodeId },
         body: {
           text_column: textColumn,
@@ -493,7 +486,6 @@ export function AnnotationAiPreviewPanel({
     mutationFn: async () => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const { data } = await detachAiPreviewedRows({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         body: {
           annotation_column: annotationColumn,

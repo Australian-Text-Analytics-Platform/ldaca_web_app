@@ -17,6 +17,11 @@ import { immer } from 'zustand/middleware/immer';
 
 import { getAuthInfo, getRuntimeConfig, googleAuth, logout as logoutSession } from '@/api';
 import type { AuthInfoResponse, RuntimeConfigResponse } from '@/api';
+import {
+  getAuthHeaders,
+  persistAuthToken,
+  setRequiresAuthentication,
+} from '@/lib/backend/authToken';
 
 const AUTH_INFO_TIMEOUT_MS = 7000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -74,39 +79,6 @@ let refreshFailures = 0;
 let inFlight: Promise<void> | null = null;
 let refreshIntervalId: number | null = null;
 
-/** Reads the bearer token captured from login flows without making React subscribe to storage. */
-/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-const readStoredToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem('auth_token');
-  } catch {
-    return null;
-  }
-};
-
-/** Writes or clears the bearer token for generated SDK auth header resolution. */
-/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-const persistToken = (token: string | null): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    if (token) {
-      window.localStorage.setItem('auth_token', token);
-    } else {
-      window.localStorage.removeItem('auth_token');
-    }
-  } catch {
-    // Ignore storage errors (Safari private mode, etc.)
-  }
-};
-
-/** Builds raw Authorization headers for bootstrap/logout calls that bypass the store action. */
-/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-const buildAuthHeaders = (): Record<string, string> => {
-  const token = readStoredToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 /** Creates a bounded signal for auth probes so startup does not hang indefinitely. */
 /** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
 const timeoutSignal = (timeoutMs: number): AbortSignal => AbortSignal.timeout(timeoutMs);
@@ -150,10 +122,10 @@ export const useAuthStore = create<AuthStore>()(
           }
 
           const { data: info } = await getAuthInfo({
-            headers: buildAuthHeaders(),
             signal: timeoutSignal(AUTH_INFO_TIMEOUT_MS),
             throwOnError: true,
           });
+          setRequiresAuthentication(info.requires_authentication);
           bootstrapAttempts = 0;
           refreshFailures = 0;
           set((state) => {
@@ -182,7 +154,7 @@ export const useAuthStore = create<AuthStore>()(
           }
 
           if (unauthorized) {
-            persistToken(null);
+            persistAuthToken(null);
             refreshFailures = REFRESH_FAILURE_THRESHOLD;
             set((state) => {
               state.authInfo = null;
@@ -261,7 +233,7 @@ export const useAuthStore = create<AuthStore>()(
           body: { id_token: idToken },
           throwOnError: true,
         });
-        persistToken(response.access_token);
+        persistAuthToken(response.access_token);
         await get().runAuthFetch('bootstrap');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Google login failed';
@@ -278,11 +250,12 @@ export const useAuthStore = create<AuthStore>()(
       if (!get().config?.multi_user_mode) return;
 
       try {
-        await logoutSession({ headers: buildAuthHeaders(), throwOnError: true });
+        await logoutSession({ throwOnError: true });
       } catch (err) {
         console.error('Logout error:', err);
       } finally {
-        persistToken(null);
+        persistAuthToken(null);
+        setRequiresAuthentication(null);
         bootstrapAttempts = 0;
         refreshFailures = 0;
         set((state) => {
@@ -296,11 +269,7 @@ export const useAuthStore = create<AuthStore>()(
     /** Returns headers for API callers while suppressing bearer tokens in single-user mode. */
     /** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
     getAuthHeaders: (): Record<string, string> => {
-      const token = readStoredToken();
-      if (!token) return {};
-      const { authInfo } = get();
-      if (authInfo && !authInfo.requires_authentication) return {};
-      return { Authorization: `Bearer ${token}` };
+      return getAuthHeaders();
     },
 
     /** Captures redirect-token login results and scrubs secrets from the visible URL. */
@@ -313,7 +282,7 @@ export const useAuthStore = create<AuthStore>()(
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get('auth_token');
       if (!urlToken) return;
-      persistToken(urlToken);
+      persistAuthToken(urlToken);
       params.delete('auth_token');
       const clean = params.toString();
       const newUrl = `${window.location.pathname}${clean ? `?${clean}` : ''}${window.location.hash}`;

@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react';
 import { describeColumn } from '@/api';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Checkbox } from '@/components/ui/checkbox';
 import type {
   NodeColumnSelection,
@@ -130,7 +129,6 @@ export const useFilterSubTabSections = (
     isLoading,
     onAlert,
   } = props;
-  const { getAuthHeaders } = useAuth();
   const [conditions, setConditions] = useState<FilterConditionWithId[]>([
     {
       id: '1',
@@ -160,7 +158,6 @@ export const useFilterSubTabSections = (
     currentWorkspaceId,
     selectedNodeId,
     conditions,
-    getAuthHeaders,
   });
 
   const availableColumns = columnOptions
@@ -395,7 +392,6 @@ export const useFilterSubTabSections = (
 
     try {
       const { data: describeData } = await describeColumn({
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
         throwOnError: true,
       });
@@ -453,7 +449,6 @@ export const useFilterSubTabSections = (
 
     try {
       const { data: describeData } = await describeColumn({
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
         throwOnError: true,
       });

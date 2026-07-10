@@ -2,20 +2,13 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
-import { usePreferencesStore } from './preferencesStore';
-import {
-  ALL_VIEWS,
-  DEFAULT_VIEW,
-  DEFAULT_VISIBLE_VIEWS,
-  type ViewType,
-} from '@/features/views/viewIds';
+import { DEFAULT_VIEW, type ViewType } from '@/features/views/viewIds';
 
 enableMapSet();
 
 /**
- * Global UI state: active view, sidebar layout, per-operation loading/error
- * tracking, and the small set of modals that live outside their feature
- * components.
+ * Global UI state: active view, operation loading, global modal intent, and
+ * contextual-hint state that lives outside individual feature components.
  *
  * Business state (workspaces, nodes, selections, analysis tasks) belongs in
  * the server cache or dedicated stores — this store is purely presentation.
@@ -31,13 +24,9 @@ interface ModalTarget {
 
 interface UIState {
   currentView: ViewType;
-  visibleViews: ViewType[];
-  sidebarCollapsed: boolean;
 
   /** Set of in-flight operation ids. Read via `.size` / `.has` elsewhere. */
   loadingOperations: Set<string>;
-  /** Map of operation id → last error message. */
-  operationErrors: Map<string, string>;
 
   /** Which global modals are open, keyed by kind. */
   modals: Record<ModalKind, boolean>;
@@ -57,21 +46,14 @@ interface UIState {
 interface UIActions {
   // Views / layout
   setCurrentView: (view: ViewType) => void;
-  setViewVisibility: (view: ViewType, visible: boolean) => void;
-  syncVisibleViewsFromPreferences: () => void;
-  toggleSidebar: () => void;
-  setSidebarCollapsed: (collapsed: boolean) => void;
 
   // Operation tracking
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
-  setOperationError: (operationId: string, error: string) => void;
 
   // Modals
   openModal: (kind: ModalKind, target?: ModalTarget) => void;
   closeModal: (kind: ModalKind) => void;
-  closeAllModals: () => void;
-  setModalOpen: (kind: ModalKind, open: boolean) => void;
 
   // Hints
   setLastUploadedFilePath: (path: string | null) => void;
@@ -86,10 +68,7 @@ export const useUIStore = create<UIStore>()(
     persist(
       immer((set) => ({
         currentView: DEFAULT_VIEW,
-        visibleViews: [...DEFAULT_VISIBLE_VIEWS],
-        sidebarCollapsed: false,
         loadingOperations: new Set(),
-        operationErrors: new Map(),
         modals: {
           feedback: false,
           tutorial: false,
@@ -112,45 +91,6 @@ export const useUIStore = create<UIStore>()(
             if (state.currentView !== view) state.currentView = view;
           }),
 
-        setViewVisibility: (view, visible) =>
-          set((state) => {
-            const currentlyVisible = state.visibleViews.includes(view);
-            if (currentlyVisible === visible) return;
-
-            if (visible) {
-              state.visibleViews = ALL_VIEWS.filter(
-                (candidate) => candidate === view || state.visibleViews.includes(candidate),
-              );
-            } else {
-              if (state.visibleViews.length <= 1) return;
-              state.visibleViews = state.visibleViews.filter((c) => c !== view);
-              if (state.currentView === view) {
-                state.currentView = state.visibleViews[0] ?? DEFAULT_VIEW;
-              }
-            }
-
-            usePreferencesStore.getState().setViewHidden(view, !visible);
-          }),
-
-        syncVisibleViewsFromPreferences: () =>
-          set((state) => {
-            const hiddenViews = usePreferencesStore.getState().hiddenViews;
-            state.visibleViews = ALL_VIEWS.filter((v) => !hiddenViews.includes(v));
-            if (!state.visibleViews.includes(state.currentView)) {
-              state.currentView = state.visibleViews[0] ?? DEFAULT_VIEW;
-            }
-          }),
-
-        toggleSidebar: () =>
-          set((state) => {
-            state.sidebarCollapsed = !state.sidebarCollapsed;
-          }),
-
-        setSidebarCollapsed: (collapsed) =>
-          set((state) => {
-            state.sidebarCollapsed = collapsed;
-          }),
-
         startOperation: (operationId) =>
           set((state) => {
             state.loadingOperations.add(operationId);
@@ -158,13 +98,6 @@ export const useUIStore = create<UIStore>()(
 
         endOperation: (operationId) =>
           set((state) => {
-            state.loadingOperations.delete(operationId);
-            state.operationErrors.delete(operationId);
-          }),
-
-        setOperationError: (operationId, error) =>
-          set((state) => {
-            state.operationErrors.set(operationId, error);
             state.loadingOperations.delete(operationId);
           }),
 
@@ -180,23 +113,6 @@ export const useUIStore = create<UIStore>()(
           set((state) => {
             state.modals[kind] = false;
             state.modalTargets[kind] = null;
-          }),
-
-        closeAllModals: () =>
-          set((state) => {
-            for (const kind of Object.keys(state.modals) as ModalKind[]) {
-              state.modals[kind] = false;
-            }
-          }),
-
-        setModalOpen: (kind, open) =>
-          set((state) => {
-            if (open) {
-              state.modals[kind] = true;
-            } else {
-              state.modals[kind] = false;
-              state.modalTargets[kind] = null;
-            }
           }),
 
         setLastUploadedFilePath: (path) =>

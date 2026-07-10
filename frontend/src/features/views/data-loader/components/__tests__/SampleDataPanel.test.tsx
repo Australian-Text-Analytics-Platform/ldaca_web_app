@@ -65,7 +65,7 @@ describe('SampleDataPanel cache policy', () => {
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
     render(
       <QueryClientProvider client={queryClient}>
-        <SampleDataPanel authHeaders={{}} />
+        <SampleDataPanel />
       </QueryClientProvider>,
     );
 

@@ -7,7 +7,6 @@ import { useWorkspaceManagementMutations } from './useWorkspaceManagementMutatio
 import { useWorkspaceTransformMutations } from './useWorkspaceTransformMutations';
 
 interface WorkspaceNodeMutationsParams {
-  authHeaders: Record<string, string>;
   currentWorkspaceId: string | null;
   setCurrentWorkspaceId: (workspaceId: string | null) => void;
   removeNode: (nodeId: string) => void;
@@ -16,7 +15,6 @@ interface WorkspaceNodeMutationsParams {
   queryClient: QueryClient;
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
-  setOperationError: (operationId: string, error: string) => void;
 }
 
 /**
@@ -28,7 +26,6 @@ interface WorkspaceNodeMutationsParams {
  * Flow: provider injects auth and selection state, actions call generated SDK mutations, then lifecycle handlers update operation state, selection, and caches.
  */
 export const useWorkspaceNodeMutations = ({
-  authHeaders,
   currentWorkspaceId,
   setCurrentWorkspaceId,
   removeNode,
@@ -37,21 +34,17 @@ export const useWorkspaceNodeMutations = ({
   queryClient,
   startOperation,
   endOperation,
-  setOperationError,
 }: WorkspaceNodeMutationsParams) => {
   const { actions: managementActions } = useWorkspaceManagementMutations({
-    authHeaders,
     currentWorkspaceId,
     setCurrentWorkspaceId,
     clearSelection,
     queryClient,
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   const { actions: graphActions } = useWorkspaceGraphMutations({
-    authHeaders,
     currentWorkspaceId,
     removeNode,
     replaceSelectedNodes,
@@ -59,25 +52,20 @@ export const useWorkspaceNodeMutations = ({
     queryClient,
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   const { actions: transformActions } = useWorkspaceTransformMutations({
-    authHeaders,
     currentWorkspaceId,
     queryClient,
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   const { actions: analysisActions } = useWorkspaceAnalysisMutations({
-    authHeaders,
     currentWorkspaceId,
     queryClient,
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   // Memoize the action surface so consumers (the WorkspaceProvider context
@@ -89,8 +77,8 @@ export const useWorkspaceNodeMutations = ({
   // Deps explanation: TanStack's `*.mutateAsync` is referentially stable
   // across the parent's lifetime, so capturing each mutation by closure is
   // safe even though the mutation object itself is recreated. The values
-  // that DO change between renders are `authHeaders`, `currentWorkspaceId`,
-  // `queryClient`, and composed sub-action objects; those are listed below.
+  // that DO change between renders are `currentWorkspaceId`, `queryClient`,
+  // and composed sub-action objects; those are listed below.
   // Listing every mutation ref would needlessly invalidate the memo each
   // render without a behaviour difference.
   const actions = useMemo(
@@ -110,12 +98,10 @@ export const useWorkspaceNodeMutations = ({
           queryClient,
           workspaceId: currentWorkspaceId,
           nodeId,
-          authHeaders,
         }),
     }),
     [
       analysisActions,
-      authHeaders,
       currentWorkspaceId,
       graphActions,
       managementActions,

@@ -4,7 +4,6 @@ import type { QuotationAnalysisResponse, AnalysisTabInput, QuotationEngineConfig
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import {
@@ -90,7 +89,6 @@ function QuotationFeature({
 }: QuotationFeatureProps) {
   const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
-  const { getAuthHeaders } = useAuth();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'quotation';
   const nodeInputs = useTabNodeInputs({
@@ -109,12 +107,10 @@ function QuotationFeature({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.quotation,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     taskId: tabTaskId ?? null,
   });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
   });
 
   const {
@@ -205,7 +201,6 @@ function QuotationFeature({
     analysisType: ANALYSIS_TAB_GROUPS.quotation,
     taskType: ANALYSIS_TASK_TYPES.quotation,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
@@ -213,24 +208,22 @@ function QuotationFeature({
     resultRef: quotationResultRef,
     // Loads the latest quotation result for polling and task resumption.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchResult: async (taskId, headers) => {
+    fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       const data = await getAnalysisTaskResult<QuotationAnalysisResponse>(
         currentWorkspaceId,
         taskId,
-        headers,
       );
       return isQuotationAnalysisResponse(data) ? data : null;
     },
     // Retrieves the submitted quotation request so hydration can restore engine and selection state.
     // Called by: QuotationFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchRequest: async (taskId, headers) => {
+    fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
         ANALYSIS_TAB_GROUPS.quotation,
         currentWorkspaceId,
         taskId,
-        headers,
       );
     },
     // Applies freshly fetched results to the active node table after lifecycle polling finishes.
@@ -398,7 +391,6 @@ function QuotationFeature({
       },
     },
     lock: {
-      getAuthHeaders,
       resolveTaskId,
       quotationSearch: async (nodeId, request) => {
         const response = await quotationSearch(nodeId, request);
@@ -418,7 +410,6 @@ function QuotationFeature({
     materializeTaskIds,
     setNodeMaterializing,
     setMaterializeTaskIds,
-    getAuthHeaders,
     resolveTaskId,
     handlePageSizeChange,
     applyMaterializedRequest,
@@ -428,7 +419,6 @@ function QuotationFeature({
     workspaceId: currentWorkspaceId,
     activeSelections,
     resolveTaskId,
-    getAuthHeaders,
     handleDetach,
     materializedPaths,
     nodeDetaching,

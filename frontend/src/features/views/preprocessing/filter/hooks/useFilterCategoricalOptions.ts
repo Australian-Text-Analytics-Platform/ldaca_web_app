@@ -10,7 +10,6 @@ interface UseFilterCategoricalOptionsParams {
   currentWorkspaceId: string | null;
   selectedNodeId: string | null;
   conditions: FilterConditionWithId[];
-  getAuthHeaders: () => Record<string, string>;
 }
 
 interface UseFilterCategoricalOptionsResult {
@@ -41,7 +40,6 @@ export function useFilterCategoricalOptions({
   currentWorkspaceId,
   selectedNodeId,
   conditions,
-  getAuthHeaders,
 }: UseFilterCategoricalOptionsParams): UseFilterCategoricalOptionsResult {
   const [categoricalOptions, setCategoricalOptions] = useState<CategoricalOptionsByKey>({});
   const [optionSearchQueries, setOptionSearchQueries] = useState<Record<string, string>>({});
@@ -83,7 +81,6 @@ export function useFilterCategoricalOptions({
 
       try {
         const { data: response } = await getColumnUniqueValues({
-          headers: getAuthHeaders(),
           path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
           throwOnError: true,
         });
@@ -118,7 +115,7 @@ export function useFilterCategoricalOptions({
         }));
       }
     },
-    [getCategoricalKey, currentWorkspaceId, selectedNodeId, getAuthHeaders],
+    [getCategoricalKey, currentWorkspaceId, selectedNodeId],
   );
 
   useEffect(() => {

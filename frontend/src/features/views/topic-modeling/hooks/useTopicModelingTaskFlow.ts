@@ -55,7 +55,6 @@ interface TopicModelingActions {
 }
 
 interface TopicModelingLock {
-  getAuthHeaders: () => Record<string, string>;
   queryClient: QueryClient;
 }
 
@@ -116,7 +115,7 @@ export function useTopicModelingTaskFlow({
     setLocalTaskId,
     onTaskIdAssigned,
   },
-  lock: { getAuthHeaders, queryClient },
+  lock: { queryClient },
 }: Params) {
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
@@ -173,7 +172,6 @@ export function useTopicModelingTaskFlow({
       submit: async () => {
         const { data: res } = await runTopicModeling({
           body: req,
-          headers: getAuthHeaders(),
           path: { workspace_id: currentWorkspaceId },
           throwOnError: true,
         });
@@ -208,7 +206,6 @@ export function useTopicModelingTaskFlow({
     try {
       setIsDetachLoading(true);
       const { data: resp } = await analysisTaskDetachOptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
@@ -285,7 +282,6 @@ export function useTopicModelingTaskFlow({
       };
       const { data: resp } = await createAnalysisTaskDetachment({
         body: payload,
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });

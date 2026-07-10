@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
@@ -208,7 +207,6 @@ function AnnotationFeature({
   const [exampleAnnotationColumns, setExampleAnnotationColumns] = useState<Record<string, string>>(
     {},
   );
-  const { getAuthHeaders } = useAuth();
   const { currentWorkspaceId } = useWorkspaceData();
   const queryClient = useQueryClient();
 
@@ -366,7 +364,6 @@ function AnnotationFeature({
     setIsCreatingClassNode(true);
     try {
       const { data } = await createAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
@@ -405,7 +402,6 @@ function AnnotationFeature({
     nodeId: classDescriptionNode?.id ?? null,
     classColumn: classDescriptionClassColumn,
     descriptionColumn: classDescriptionDescriptionColumn,
-    getAuthHeaders,
   });
   // Count only non-empty class names: an empty class node (or one whose rows are all
   // blank) offers nothing to classify into, so Preview must stay disabled until at
@@ -464,14 +460,12 @@ function AnnotationFeature({
     setIsStarting(true);
     try {
       await createAnnotationColumn({
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, node_id: sourceNode.id },
         body: { column_name: columnName },
         throwOnError: true,
       });
       if (classDescriptionNode) {
         await setAnnotationClassParent({
-          headers: getAuthHeaders(),
           path: { workspace_id: currentWorkspaceId, node_id: classDescriptionNode.id },
           body: { parent_node_id: sourceNode.id },
           throwOnError: true,
@@ -518,7 +512,6 @@ function AnnotationFeature({
       handleReset();
       if (currentWorkspaceId && sourceNode) {
         void annotateAiPreviewClear({
-          headers: getAuthHeaders(),
           path: { workspace_id: currentWorkspaceId, node_id: sourceNode.id },
           throwOnError: true,
         }).catch((error: unknown) => {
@@ -641,7 +634,6 @@ function AnnotationFeature({
                 nodeId={classDescriptionNode?.id ?? null}
                 classColumn={classDescriptionClassColumn}
                 descriptionColumn={classDescriptionDescriptionColumn}
-                getAuthHeaders={getAuthHeaders}
               />
             </section>
 
@@ -757,7 +749,6 @@ function AnnotationFeature({
           classNodeId={classDescriptionNode?.id ?? null}
           classColumn={classDescriptionClassColumn}
           descriptionColumn={classDescriptionDescriptionColumn}
-          getAuthHeaders={getAuthHeaders}
         />
       ) : null}
       {annotationMode === 'ai' && isPreviewing && sourceNode && resolvedAiProvider ? (
@@ -778,7 +769,6 @@ function AnnotationFeature({
           temperature={aiTemperature}
           reasoningEnabled={aiReasoningEnabled}
           reasoningEffort={aiReasoningEffort}
-          getAuthHeaders={getAuthHeaders}
         />
       ) : null}
     </section>

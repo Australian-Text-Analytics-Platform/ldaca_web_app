@@ -25,7 +25,6 @@ interface Params {
   colourMatches: boolean;
   lowercaseMatches: boolean;
   nodeColorOverrides?: Record<string, string>;
-  getAuthHeaders: () => Record<string, string>;
 }
 
 interface Result {
@@ -69,7 +68,6 @@ export function useConcordanceResultViewModel({
   colourMatches,
   lowercaseMatches,
   nodeColorOverrides = {},
-  getAuthHeaders,
 }: Params): Result {
   const [materializedBins, setMaterializedBins] = useState<
     Record<string, ConcordanceDispersionBinRow[]>
@@ -130,13 +128,10 @@ export function useConcordanceResultViewModel({
     if (!workspaceId) return;
 
     let cancelled = false;
-    const authHeaders = getAuthHeaders();
-
     void Promise.all(
       missing.map(async (nodeId) => {
         try {
           const { data: resp } = await analysisTaskDispersionBins({
-            headers: authHeaders,
             path: { workspace_id: workspaceId, task_id: effectiveTaskId },
             query: { node_id: nodeId },
             throwOnError: true,
@@ -177,7 +172,6 @@ export function useConcordanceResultViewModel({
     materializedPaths,
     materializedBins,
     panelSelectedNodes,
-    getAuthHeaders,
     workspaceId,
   ]);
 

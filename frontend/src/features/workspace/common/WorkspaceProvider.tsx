@@ -58,9 +58,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const statusValue = useMemo(
     () => ({
       isLoading: ws.isLoading,
-      errors: ws.errors,
     }),
-    [ws.isLoading, ws.errors],
+    [ws.isLoading],
   );
 
   return (

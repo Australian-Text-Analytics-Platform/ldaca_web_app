@@ -96,7 +96,7 @@ const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
   event.key === 'Enter' || event.key === ' ';
 
 /**
- * Selectable node list shown in the collapsed right panel's list view. It
+ * Selectable node list shown in the sidebar's Data Blocks section. It
  * presents nodes in their original workspace order and bridges row clicks back
  * to workspace selection and fresh-node acknowledgement stores.
  * Rendered by: the sidebar Data Blocks section because graph selection and

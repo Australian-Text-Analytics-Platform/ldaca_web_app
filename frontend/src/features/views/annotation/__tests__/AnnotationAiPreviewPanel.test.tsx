@@ -52,7 +52,6 @@ const renderPanel = (props?: { annotationColumn?: string }) => {
         apiKey="sk-test"
         model="gpt-4o"
         systemPrompt="Classify."
-        getAuthHeaders={() => ({})}
       />
     </QueryClientProvider>,
   );

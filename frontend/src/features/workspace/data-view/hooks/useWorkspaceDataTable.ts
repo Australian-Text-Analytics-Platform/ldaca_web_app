@@ -5,7 +5,6 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { getNodeDataByWorkspaceId, getNodeQueryPlan, type NodeDataResponse } from '@/api';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { createNodeDataRequest, queryKeys, type NodeDataRequest } from '@/lib/queryKeys';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import type { FilterOperator } from '../types';
@@ -123,7 +122,6 @@ const resolveNodeDisplayLabel = (
 export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { activeNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
-  const { getAuthHeaders } = useAuth();
   const {
     castColumn,
     renameColumn,
@@ -227,7 +225,6 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
         throw new Error('Missing workspace or node ID');
       }
       const { data } = await getNodeDataByWorkspaceId({
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, node_id: activeNodeId },
         query: nodeTableRequest,
         throwOnError: true,
@@ -264,7 +261,6 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       ? async () => {
           if (!currentWorkspaceId) return null;
           const { data: resp } = await getNodeQueryPlan({
-            headers: getAuthHeaders(),
             path: { workspace_id: currentWorkspaceId, node_id: selectedNode.id },
             throwOnError: true,
           });

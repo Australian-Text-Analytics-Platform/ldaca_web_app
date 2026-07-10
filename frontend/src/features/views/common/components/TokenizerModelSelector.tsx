@@ -26,7 +26,6 @@ interface TokenizerModelSelectorProps {
   column: string;
   value?: string;
   onChange: (value: string, detectedLanguage: string | null) => void;
-  getAuthHeaders: () => Record<string, string>;
   disabled?: boolean;
   disabledReason?: string;
   className?: string;
@@ -44,7 +43,6 @@ function TokenizerModelSelector({
   column,
   value,
   onChange,
-  getAuthHeaders,
   disabled = false,
   disabledReason,
   className,
@@ -54,7 +52,6 @@ function TokenizerModelSelector({
     workspaceId,
     nodeId,
     column,
-    getAuthHeaders,
     enabled: canFetchSample,
   });
 
@@ -65,7 +62,6 @@ function TokenizerModelSelector({
     /** Called by: TanStack Query when the selector opens and requests model inventory. */
     queryFn: async () => {
       const { data } = await getTokenizerModels({
-        headers: getAuthHeaders(),
         throwOnError: true,
       });
       return data.models;

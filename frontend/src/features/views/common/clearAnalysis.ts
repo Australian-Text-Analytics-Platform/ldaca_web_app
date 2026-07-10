@@ -16,7 +16,6 @@ export interface ClearAnalysisOptions {
   queryClient: QueryClientLike;
   taskIdSources: (string | null | undefined)[];
   resolveTaskId?: () => Promise<string | null>;
-  getAuthHeaders: () => Record<string, string>;
   onCleanup: (clearedTaskIds: string[]) => void;
 }
 
@@ -32,15 +31,12 @@ export async function clearAnalysis({
   queryClient,
   taskIdSources,
   resolveTaskId,
-  getAuthHeaders,
   onCleanup,
 }: ClearAnalysisOptions): Promise<void> {
   const initialIds = collectTaskIds(taskIdSources);
   let allTaskIds = initialIds;
 
   try {
-    const headers = getAuthHeaders();
-
     if (resolveTaskId) {
       const resolvedId = await resolveTaskId();
       allTaskIds = collectTaskIds([...initialIds, resolvedId]);
@@ -48,7 +44,7 @@ export async function clearAnalysis({
 
     const settled = await Promise.allSettled(
       allTaskIds.map((taskId) =>
-        clearTask({ headers, path: { task_id: taskId }, throwOnError: true }),
+        clearTask({ path: { task_id: taskId }, throwOnError: true }),
       ),
     );
 

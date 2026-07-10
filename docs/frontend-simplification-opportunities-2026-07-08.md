@@ -88,55 +88,6 @@ settled before deletion.
 
 ### Deletion and simplification
 
-#### D1. Let the generated client and one app owner own auth
-
-- **Evidence / strength — Strong:** generated client configuration already injects auth, but handwritten generated-SDK calls still pass headers; [useAuth.ts](../frontend/src/features/auth/hooks/useAuth.ts#L20-L49) mounts lifecycle work for every caller, and Data Loader performs a second bootstrap.
-- **Recommended direction:** retain explicit auth only for raw `fetch`, `EventSource`, and native downloads; provide generated configuration through a dependency-light app owner to remove dynamic generated-config/auth-store cycles.
-- **Deletion test:** ordinary SDK calls pass no manual auth headers, lifecycle effects mount once, and Data Loader has no parallel bootstrap.
-- **Validation:** initial auth, refresh/logout, 401 recovery, Google/CILogon redirects, EventSource, browser downloads, and native downloads.
-
-#### D2. Derive view visibility instead of mirroring it into UI state
-
-- **Evidence / strength — Strong:** [preferencesStore.ts](../frontend/src/stores/preferencesStore.ts) owns view preferences while [uiStore.ts](../frontend/src/stores/uiStore.ts) mirrors visibility beside `currentView`; [viewRegistry.ts](../frontend/src/features/views/viewRegistry.ts) already centralizes view metadata.
-- **Recommended direction:** derive visible navigation in one navigation module from preferences and registry; keep only the active view in UI state.
-- **Deletion test:** no action synchronizes preference visibility into `uiStore` and consumers read one derived list.
-- **Validation:** hide/show the active view, restore preferences, direct-link to hidden/workspace-gated views, and traverse browser history.
-
-#### D3. Delete workspace error state with no reader
-
-- **Evidence / strength — Strong:** workspace lifecycle code writes an error and immediately removes it, while [useWorkspaceStatus.ts](../frontend/src/features/workspace/common/hooks/useWorkspaceStatus.ts) exposes `WorkspaceStatus.errors` with no production reader.
-- **Recommended direction:** report operation failures at the owning mutation/toast boundary and remove the transient status map and plumbing.
-- **Deletion test:** the errors field, setters, and immediate cleanup all disappear with unchanged visible failure behavior.
-- **Validation:** load, save, delete, reorder, undo/redo, and network failures still produce the intended user feedback and loading cleanup.
-
-#### D4. Persist preferences through one codec/projection
-
-- **Evidence / strength — Strong:** [preferencesStore.ts](../frontend/src/stores/preferencesStore.ts), [usePreferences.ts](../frontend/src/hooks/usePreferences.ts), generated preference DTOs, local partialization, and hook snapshots repeat normalized/resolved shapes and equality decisions.
-- **Recommended direction:** define one canonical persistence projection/codec/equality boundary; UI-only resolved values remain outside the DTO.
-- **Deletion test:** schema lists and normalization/equality logic are not repeated across store, hook, and transport layers.
-- **Validation:** old local state, server merge, partial updates, multi-tab toggles, AI-provider maps, serialization round trips, and no-op updates.
-
-#### D5. Remove compact-panel state that cannot affect layout
-
-- **Evidence / strength — Strong:** [useResizableSplit.ts](../frontend/src/hooks/useResizableSplit.ts), [useRightPanelResize.ts](../frontend/src/hooks/useRightPanelResize.ts), and panel adapters retain collapsed/last-ratio state, unreachable collapsed branches, and an unused schema callback.
-- **Recommended direction:** keep only layout state that a live caller reads; collapse should be either a real supported mode or absent, not a residual schema.
-- **Deletion test:** collapsed ratio, last ratio, unreachable branches, and unused callback props are removed without replacement bookkeeping.
-- **Validation:** drag, reset, resize, remount, narrow viewport, and each compact/expanded panel consumer.
-
-#### D6. Mount global feedback, docs, and toaster hosts once
-
-- **Evidence / strength — Strong:** [App.tsx](../frontend/src/App.tsx#L15-L77) duplicates docs/toaster hosts across branches, while [WorkspaceShell.tsx](../frontend/src/components/layout/WorkspaceShell.tsx#L23-L120) mounts another feedback host.
-- **Recommended direction:** put each global host at the lowest common app boundary and pass only open/close intent from feature shells.
-- **Deletion test:** exactly one feedback panel, docs banner, and toaster host remain in the mounted app tree.
-- **Validation:** authenticated/unauthenticated branches, workspace load failure, feedback opening from sidebar, toast ordering, and docs end-of-life display.
-
-#### D7. Remove zero-caller `uiStore` state and actions
-
-- **Evidence / strength — Strong:** [uiStore.ts](../frontend/src/stores/uiStore.ts) retains sidebar-collapse methods, modal methods, and other state/actions with no production call sites after the current layout migrations.
-- **Recommended direction:** delete only verified zero-callers and keep active view plus live UI ownership.
-- **Deletion test:** every remaining field/action has a production consumer or a documented test seam.
-- **Validation:** sidebar mobile/desktop behavior, settings/feedback dialogs, view switching, hydration, and store tests.
-
 #### D9. Collapse documentation registry shims and impossible status paths
 
 - **Evidence / strength — Strong:** [tutorialRegistry.ts](../frontend/src/tutorials/tutorialRegistry.ts), [infoRegistry.ts](../frontend/src/tutorials/infoRegistry.ts), and [referenceRegistry.ts](../frontend/src/tutorials/referenceRegistry.ts) are thin re-exports around duplicated target/type contracts; [registryStore.ts](../frontend/src/tutorials/registryStore.ts) retains dead status fields and an always-null/no-caller warning path.
@@ -387,12 +338,10 @@ unreachable callers. Product/external-contract caveats remain where noted.
 | Candidate | Evidence / deletion guard |
 | --- | --- |
 | Topic minimum-size helper | Remove [minTopicSize.ts](../frontend/src/features/views/topic-modeling/components/panels/minTopicSize.ts) after its zero-import check. |
-| Dead UI-store methods/state | Delete verified sidebar/modal/other zero-callers from [uiStore.ts](../frontend/src/stores/uiStore.ts), not active-view state. |
 | Tutorial registry status/warning | Remove dead fields and the impossible warning path in [registryStore.ts](../frontend/src/tutorials/registryStore.ts). |
 | Recent-selection clear | Remove the unused clear action from [recentSelectionsStore.ts](../frontend/src/stores/recentSelectionsStore.ts). |
 | `useZoom` clamp return | Remove the unused return surface from [useZoom.ts](../frontend/src/hooks/useZoom.ts), retaining live zoom behavior. |
 | Tokenizer-order/test helpers | Delete only helpers with zero production and meaningful test consumers; do not erase deliberate contract seams. |
-| Schema/compact props | Remove unused schema callback, collapsed/last-ratio fields, and unreachable compact branches from their owners. |
 | Hidden UI modifiers/exports | Remove after Knip runs without the blanket UI ignore. |
 | Narrow hook/API outputs | Delete zero-caller raw query fields, task outputs, schema aliases, hydration/request helpers, and exports one owner at a time. |
 | Retired Tauri/workflow surfaces | Remove HTTP plugin, direct serde, global/window-webview permissions, `__BACKEND_PORT__`, and `build-notes`; keep live opener/dialog/filesystem. |
@@ -462,8 +411,10 @@ unreachable callers. Product/external-contract caveats remain where noted.
      construction and result shaping stay feature-specific.
 
 9. Add a small operation-lifecycle helper for workspace mutations
-   - Done 2026-07-09. `workspaceMutationLifecycle.ts` centralizes operation
-     start, success cleanup, and error reporting for workspace mutation hooks.
+   - Done 2026-07-09 and narrowed 2026-07-10.
+     `workspaceMutationLifecycle.ts` centralizes operation start and terminal
+     loading cleanup; rejected promises remain with owning feature feedback
+     rather than being copied into an unread global error map.
 
 10. Modularize `CustomNode` without changing its interaction model
     - Done 2026-07-09. `CustomNode.tsx` now delegates toolbar ownership, menu
@@ -676,6 +627,54 @@ unreachable callers. Product/external-contract caveats remain where noted.
       no-workspace Add action no longer carries an unreachable alert/state
       facade.
 
+43. Let the generated client and one app owner own auth (D1)
+    - Done 2026-07-10. `AuthBootstrap` now mounts once after backend health,
+      while `useAuth` is subscription-only. A dependency-light token module is
+      shared by `authStore` and generated fetch configuration, preserving stale
+      token suppression in single-user mode without the dynamic store import.
+      Ordinary generated SDK calls and their auth-only parameter ladders no
+      longer pass headers; explicit auth remains only for raw file/export,
+      native download, and `EventSource` boundaries, while custom Oni and
+      timeout headers remain call-site owned.
+
+44. Derive view visibility instead of mirroring it into UI state (D2)
+    - Done 2026-07-10. `useVisibleViews` derives registry order directly from
+      `preferencesStore.hiddenViews`, defensively retaining Data Loader even
+      for stale persisted input. Sidebar and Settings write the preference
+      directly, `uiStore` retains only `currentView`, and `ViewRouteSync`
+      remains the sole hidden/workspace-gated active-view repair owner.
+
+45. Delete workspace error state with no reader (D3)
+    - Done 2026-07-10. Removed the UI-store operation error map, setter,
+      workspace status `errors` field, query-error projection, and mutation
+      plumbing. Mutation promises still reject to their owning feature/toast
+      boundary, while the shared lifecycle always clears operation loading on
+      success and failure.
+
+46. Persist preferences through one codec/projection (D4)
+    - Done 2026-07-10. `preferencesCodec.ts` now owns server normalization,
+      the durable local projection, generated update encoding, and equality.
+      Store hydration/sync, Zustand `partialize`, and the debounced subscriber
+      all consume that one field contract.
+
+47. Remove compact-panel state that cannot affect layout (D5)
+    - Done 2026-07-10. The right-panel collapse remains a real zero-width shell
+      mode but no longer mutates or remembers a second split ratio. Removed the
+      collapsed-ratio constant, last-ratio state, unreachable compact toolbar
+      rendering, unused node-schema callback, and unused public split setter.
+
+48. Mount global feedback, docs, and toaster hosts once (D6)
+    - Done 2026-07-10. `GlobalHosts` is mounted once outside backend/auth
+      branches and owns the single lazy feedback panel, docs end-of-life
+      banner, and toast queue. Startup feedback and workspace/sidebar feedback
+      now share the same modal intent and host.
+
+49. Remove zero-caller `uiStore` state and actions (D7)
+    - Done 2026-07-10. Removed the independent sidebar-collapse state/actions,
+      mirror visibility actions, operation errors, `closeAllModals`, and
+      `setModalOpen`. Every remaining UI-store field/action has a production
+      consumer, with shadcn sidebar state kept in its live local provider.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The 2026-07-09 cleanup remains the starting contract for this refresh:
@@ -727,8 +726,8 @@ The 2026-07-09 cleanup remains the starting contract for this refresh:
   inline rename components. Each owns interaction or geometry and has focused
   tests; recombining them would rebuild a large branchy React Flow node.
 - **Nested error boundaries:** retain app/workspace/view boundaries because they
-  isolate failures at different recovery scopes. The duplicate global hosts in
-  D6 are separate from these recovery boundaries.
+  isolate failures at different recovery scopes. Global feedback/docs/toast
+  hosts are now consolidated separately at the app boundary.
 - **Identity-sensitive memoization:** retain memoization around React Flow,
   TanStack Table, Recharts/d3, context values, and effect/listener identities.
   React Compiler does not remove third-party identity contracts; only the narrow

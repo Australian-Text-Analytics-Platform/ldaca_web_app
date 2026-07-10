@@ -7,6 +7,12 @@ generated TanStack Query helpers. Raw `fetch` is reserved for browser/Tauri
 streaming cases such as file downloads, and those paths should still share
 generated endpoint types where practical.
 
+The generated fetch configuration injects the current bearer token from the
+dependency-light `authToken` module. Handwritten generated-SDK calls do not
+pass Authorization headers; explicit auth remains only at raw fetch,
+`EventSource`, and native download boundaries. Custom request headers such as
+the LDaCA Oni token and client-only timeout sentinel remain call-site owned.
+
 `src/lib/backend/env.ts` resolves the `/api` base URL in this order: explicit
 override, Tauri-injected `window.__BACKEND_URL__`, Vite environment,
 backend-injected base path, local dev backend port, then same-origin.
@@ -56,7 +62,7 @@ duplicating server state into Zustand unless it is needed for UI interaction.
 The main stores are:
 
 - `authStore`: auth bootstrap, token storage, login/logout, and auth headers.
-- `uiStore`: active view, visible views, layout splits, modal state, hints, and
+- `uiStore`: active view, global modal intent, contextual hint state, and
   operation loading flags.
 - `selectionStore`: current workspace id, ordered selected-node membership,
   and an independent active node id. Semantic activate/reorder/remove/replace/
@@ -79,9 +85,11 @@ pagination and does not fall back to Data View controls.
 `uiStore.currentView` still drives feature rendering. `ViewRouteSync` mirrors
 that view into TanStack Router search state as `?view=...` and applies validated
 incoming view search params when the target view is visible and, for workspace
-views, a workspace is loaded. The default `data-loader` view is omitted from the
-URL. Keep this as search state rather than path routes so static backend and
-Tauri builds continue to reload correctly.
+views, a workspace is loaded. Visible views are derived directly from the view
+registry minus `preferencesStore.hiddenViews`; Data Loader is always retained,
+even if stale persisted data says otherwise. The default `data-loader` view is
+omitted from the URL. Keep this as search state rather than path routes so
+static backend and Tauri builds continue to reload correctly.
 
 `ViewRouteSync` is also the single owner of invalid-view fallback. If a shared
 URL names a workspace view before the workspace id is available, the sync layer
@@ -92,10 +100,12 @@ out of sync.
 
 ## Auth Bootstrap
 
-`hooks/useAuth.ts` is the React-facing auth hook. It delegates to `authStore`,
-processes redirect tokens, ensures refresh timers, and exposes headers for API
-calls. `authStore` coalesces concurrent bootstrap requests to avoid duplicate
-auth probes during startup. It reads public auth-mode metadata through generated
+`hooks/useAuth.ts` is a subscription-only React-facing auth hook.
+`AuthBootstrap` is mounted once by `App` after backend health succeeds; it
+processes redirect tokens, starts the coalesced bootstrap request, and ensures
+the refresh timer. `authStore` coalesces concurrent requests and shares token
+persistence/header construction with generated client configuration through
+`lib/backend/authToken.ts`. It reads public auth-mode metadata through generated
 `getRuntimeConfig` (`GET /api/runtime-config`) before fetching `/api/auth/`.
 Working-directory changes use generated `updateAdminConfig`
 (`PATCH /api/admin/config`) from the settings dialog path because mutating the
@@ -108,13 +118,16 @@ favorites, LDaCA token, default tokenizer model, whether analysis views show the
 multi-tab controls, and the Annotation AI settings (per-provider API keys keyed
 by provider id, and user-defined custom providers).
 `usePreferences` initializes the store from `/api/preferences` and debounces
-backend sync. `SettingsDialog` is the unified preference surface: it edits
+backend sync. `preferencesCodec.ts` is the single boundary for server
+normalization, durable local projection, backend update encoding, and equality,
+and is shared by Zustand persistence, backend load/sync, and the debounce
+subscriber. `SettingsDialog` is the unified preference surface: it edits
 backend preferences, working-directory config, and browser-local settings such
 as hint enablement/dismissals. Its **AI** tab renders
 `AiProvidersPreferencesPanel`, which manages the built-in providers' API keys
 (save-on-blur) and lets users add, edit (name + base URL), and delete custom
 OpenAI-compatible providers — deleting one also drops its stored key. View
-visibility is mirrored into `uiStore`.
+visibility is read directly from preferences and the view registry.
 When the multi-tab preference is off, a workspace-level cleanup collapses every
 persisted analysis tab group in the current workspace to the first tab and
 clears tasks owned by removed tabs. `SettingsDialog` checks the current

@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { usePreferencesInit } from '@/hooks/usePreferences';
 import { useSidebarResize } from '@/hooks/useSidebarResize';
 import { useRightPanelResize } from '@/hooks/useRightPanelResize';
@@ -11,8 +11,6 @@ import { InsetCard } from '@/components/layout/InsetCard';
 import { RefreshStatusBanner } from '@/features/auth/components/RefreshStatusBanner';
 import { useUIStore } from '@/stores';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { useShallow } from 'zustand/react/shallow';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useSingleTabModeWorkspaceCleanup } from '@/features/views/common/tabs/useSingleTabModeWorkspaceCleanup';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -21,11 +19,6 @@ import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
 import { isTabbedMainView } from '@/features/views/viewRegistry';
 
-const FeedbackPanel = lazy(() =>
-  import('@/features/feedback/components/FeedbackPanel').then((m) => ({
-    default: m.FeedbackPanel,
-  })),
-);
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 const HintsController = lazy(() =>
   import('@/features/hints/HintsController').then((m) => ({ default: m.HintsController })),
@@ -40,27 +33,14 @@ const HintsController = lazy(() =>
 function SingleTabModeWorkspaceCleanup() {
   const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
   const { currentWorkspaceId } = useWorkspaceData();
-  const { getAuthHeaders } = useAuth();
-  useSingleTabModeWorkspaceCleanup(currentWorkspaceId, analysisMultiTabEnabled, getAuthHeaders);
+  useSingleTabModeWorkspaceCleanup(currentWorkspaceId, analysisMultiTabEnabled);
   return null;
 }
 
 export function WorkspaceShell() {
-  const { feedbackOpen, closeModal } = useUIStore(
-    useShallow((state) => ({
-      feedbackOpen: state.modals.feedback,
-      closeModal: state.closeModal,
-    })),
-  );
-
   usePreferencesInit();
-  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
-  const syncVisibleViews = useUIStore((s) => s.syncVisibleViewsFromPreferences);
   const currentView = useUIStore((s) => s.currentView);
   const isTabbedMain = isTabbedMainView(currentView);
-  useEffect(() => {
-    if (prefsHydrated) syncVisibleViews();
-  }, [prefsHydrated, syncVisibleViews]);
 
   const {
     containerRef: sidebarHostRef,
@@ -113,15 +93,6 @@ export function WorkspaceShell() {
               </div>
 
               <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
-                <Suspense fallback={null}>
-                  <FeedbackPanel
-                    open={feedbackOpen}
-                    onClose={() => {
-                      closeModal('feedback');
-                    }}
-                  />
-                </Suspense>
-
                 <header className="border-border/40 border-b bg-white px-4 py-3 md:hidden">
                   <div className="flex items-center justify-between">
                     <SidebarTrigger />

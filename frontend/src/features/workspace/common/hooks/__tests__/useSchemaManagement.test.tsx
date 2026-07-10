@@ -13,7 +13,6 @@ vi.mock('@/lib/nodeInfo', async (importOriginal) => {
     fetchNodeInfos: (args: {
       workspaceId: string;
       nodeIds: string[];
-      getAuthHeaders?: () => Record<string, string>;
     }) =>
       Promise.all(
         args.nodeIds.map(async (nodeId) => ({
@@ -21,21 +20,18 @@ vi.mock('@/lib/nodeInfo', async (importOriginal) => {
           ...((await fetchNodeInfoMock({
             workspaceId: args.workspaceId,
             nodeId,
-            getAuthHeaders: args.getAuthHeaders,
           })) as Record<string, unknown>),
         })),
       ),
     nodeInfoQueryOptions: (args: {
       workspaceId: string;
       nodeId: string;
-      getAuthHeaders?: () => Record<string, string>;
     }) => ({
       queryKey: ['workspaces', args.workspaceId, 'nodes', args.nodeId, 'info'] as const,
       queryFn: () =>
         fetchNodeInfoMock({
           workspaceId: args.workspaceId,
           nodeId: args.nodeId,
-          getAuthHeaders: args.getAuthHeaders,
         }),
     }),
   };
@@ -150,7 +146,6 @@ describe('createNodeSnapshot', () => {
     const snapshot = await createNodeSnapshot(
       'ws-1',
       'node-1',
-      () => ({ Authorization: 'Bearer x' }),
       queryClient,
     );
 
@@ -158,7 +153,6 @@ describe('createNodeSnapshot', () => {
       queryClient,
       workspaceId: 'ws-1',
       nodeId: 'node-1',
-      getAuthHeaders: expect.any(Function),
     });
     expect(snapshot).toEqual({
       id: 'node-1',
@@ -175,7 +169,7 @@ describe('createNodeSnapshot', () => {
     });
 
     const queryClient = new QueryClient();
-    const snapshot = await createNodeSnapshot('ws-1', 'node-fallback', () => ({}), queryClient);
+    const snapshot = await createNodeSnapshot('ws-1', 'node-fallback', queryClient);
 
     expect(snapshot.name).toBe('node-fallback');
     expect(snapshot.columns).toEqual([]);
@@ -196,7 +190,7 @@ describe('createNodeSnapshots', () => {
 
     const queryClient = new QueryClient();
     await expect(
-      createNodeSnapshots('ws-1', ['n1', 'n2', 'n3'], () => ({}), queryClient),
+      createNodeSnapshots('ws-1', ['n1', 'n2', 'n3'], queryClient),
     ).rejects.toThrow('boom');
   });
 });
@@ -219,7 +213,6 @@ describe('useSchemaManagement', () => {
           workspaceId: 'ws-1',
           /** Supplies query auth headers so schema fetching can run in the hook test. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
 
@@ -239,7 +232,6 @@ describe('useSchemaManagement', () => {
           workspaceId: undefined,
           /** Keeps the hook signature complete while bypassing remote schema queries. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
 
@@ -258,7 +250,6 @@ describe('useSchemaManagement', () => {
           workspaceId: 'ws-1',
           /** Provides headers for the unlocked schema fetch before lock capture. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
 
@@ -280,7 +271,6 @@ describe('useSchemaManagement', () => {
           workspaceId: undefined,
           /** Keeps auth plumbing present while testing explicit lock overrides. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
 
@@ -298,7 +288,6 @@ describe('useSchemaManagement', () => {
           workspaceId: undefined,
           /** Keeps auth plumbing present while testing lock clearing. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
 
@@ -327,7 +316,6 @@ describe('useSchemaManagement', () => {
           workspaceId: 'ws-1',
           /** Keeps auth plumbing present while testing type filtering over node-info data. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
 
@@ -351,7 +339,6 @@ describe('useSchemaManagement', () => {
           workspaceId: 'ws-1',
           /** Provides headers even though null node IDs should keep the query disabled. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
       expect(fetchNodeInfoMock).not.toHaveBeenCalled();
@@ -365,7 +352,6 @@ describe('useSchemaManagement', () => {
           workspaceId: 'ws-1',
           /** Provides headers that should not be consumed while schema fetching is locked. */
           /** Called by: the hook under test through the mocked auth store. */
-          getAuthHeaders: () => ({}),
         }),
       );
       // give react-query a tick — even so, enabled=false should keep it idle

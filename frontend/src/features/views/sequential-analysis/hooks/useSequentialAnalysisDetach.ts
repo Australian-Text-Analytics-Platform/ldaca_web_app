@@ -12,7 +12,6 @@ interface SequentialAnalysisDetachNode {
 interface SequentialAnalysisDetachParams {
   currentWorkspaceId: string | null;
   resolveTaskId: () => Promise<string | null>;
-  getAuthHeaders: () => Record<string, string>;
   panelSelectedNodes: SequentialAnalysisDetachNode[];
   chartData: SequentialAnalysisDatum[];
   results: Record<string, unknown> | null;
@@ -32,7 +31,6 @@ interface SequentialAnalysisDetachParams {
 export function useSequentialAnalysisDetach({
   currentWorkspaceId,
   resolveTaskId,
-  getAuthHeaders,
   panelSelectedNodes,
   chartData,
   results,
@@ -120,7 +118,6 @@ export function useSequentialAnalysisDetach({
           ...(visibleGroups ? { visible_groups: visibleGroups } : {}),
           new_node_name: newNodeName,
         },
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });

@@ -34,7 +34,6 @@ interface AnnotationClassDescriptionsEditorProps {
   nodeId: string | null;
   classColumn: string | null;
   descriptionColumn: string | null;
-  getAuthHeaders: () => Record<string, string>;
 }
 
 /**
@@ -56,7 +55,6 @@ export function AnnotationClassDescriptionsEditor({
   nodeId,
   classColumn,
   descriptionColumn,
-  getAuthHeaders,
 }: AnnotationClassDescriptionsEditorProps) {
   const queryClient = useQueryClient();
   const [draftRows, setDraftRows] = useState<AnnotationClassDescriptionRow[] | null>(null);
@@ -66,7 +64,6 @@ export function AnnotationClassDescriptionsEditor({
     nodeId,
     classColumn,
     descriptionColumn,
-    getAuthHeaders,
   });
 
   const savedRows = classDescriptions.rows;
@@ -94,7 +91,6 @@ export function AnnotationClassDescriptionsEditor({
         rows,
       };
       const { data } = await updateAnnotationClassDescriptions({
-        headers: getAuthHeaders(),
         path: { workspace_id: workspaceId, node_id: nodeId },
         body,
         throwOnError: true,

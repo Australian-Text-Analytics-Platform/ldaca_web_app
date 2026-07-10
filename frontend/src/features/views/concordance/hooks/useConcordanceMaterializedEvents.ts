@@ -25,7 +25,6 @@ interface Params {
   concordanceTaskId: string;
   materializeTaskIds: Record<string, string>;
   materializedEvents: AnalysisMaterializedEvent[];
-  getAuthHeaders: () => Record<string, string>;
   resolveTaskId: () => Promise<string | null>;
   persistResultPreferences: (partial: { pageSize?: number }) => Promise<unknown>;
   setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -78,7 +77,6 @@ export function useConcordanceMaterializedEvents({
   concordanceTaskId,
   materializeTaskIds,
   materializedEvents,
-  getAuthHeaders,
   resolveTaskId,
   persistResultPreferences,
   setNodeMaterializing,
@@ -104,14 +102,12 @@ export function useConcordanceMaterializedEvents({
       // authoritative path arrives via the `analysis_materialized` SSE event
       // (handled separately) — this fetch is best-effort additional coverage.
       try {
-        const headers = getAuthHeaders();
         const parentTaskId = await resolveTaskId();
         if (workspaceId && parentTaskId) {
           const req = await getAnalysisTaskRequest(
             ANALYSIS_TAB_GROUPS.concordance,
             workspaceId,
             parentTaskId,
-            headers,
           );
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- req is API-sourced; keep defensive default when the response body is null
           const reqObj = (req as Record<string, unknown>) ?? {};
@@ -155,7 +151,6 @@ export function useConcordanceMaterializedEvents({
       }
     },
     [
-      getAuthHeaders,
       resolveTaskId,
       persistResultPreferences,
       workspaceId,

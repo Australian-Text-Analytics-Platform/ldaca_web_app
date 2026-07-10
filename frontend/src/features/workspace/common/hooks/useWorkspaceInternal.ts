@@ -16,7 +16,6 @@ export const useWorkspaceInternal = () => {
   const queryClient = useQueryClient();
 
   const {
-    authHeaders,
     isAuthenticated,
     currentWorkspaceId,
     setCurrentWorkspaceId,
@@ -29,10 +28,8 @@ export const useWorkspaceInternal = () => {
     toggleNode,
     clearSelection,
     loadingOperationCount,
-    operationErrorsRecord,
     startOperation,
     endOperation,
-    setOperationError,
   } = core;
 
   const {
@@ -43,11 +40,9 @@ export const useWorkspaceInternal = () => {
     selectedNode,
     selectedNodes,
     queryLoadingState,
-    queryErrorState,
     currentWorkspaceIdFromQuery,
     currentWorkspaceQueryError,
   } = useWorkspaceQueries({
-    authHeaders,
     isAuthenticated,
     currentWorkspaceId,
     activeNodeId,
@@ -88,7 +83,6 @@ export const useWorkspaceInternal = () => {
   ]);
 
   const { actions: nodeActions } = useWorkspaceNodeMutations({
-    authHeaders,
     currentWorkspaceId,
     setCurrentWorkspaceId,
     removeNode,
@@ -97,7 +91,6 @@ export const useWorkspaceInternal = () => {
     queryClient,
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   const selectionActions = useMemo(
@@ -136,15 +129,6 @@ export const useWorkspaceInternal = () => {
     [queryLoadingState, operationsLoading],
   );
 
-  const operationsError = Object.values(operationErrorsRecord)[0] ?? null;
-  const errors = useMemo(
-    () => ({
-      ...queryErrorState,
-      operations: operationsError,
-    }),
-    [queryErrorState, operationsError],
-  );
-
   return {
     workspaces,
     currentWorkspace,
@@ -156,7 +140,6 @@ export const useWorkspaceInternal = () => {
     selectedNodeIds,
     workspaceGraph,
     isLoading,
-    errors,
     actions,
   };
 };

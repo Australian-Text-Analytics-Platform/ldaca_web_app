@@ -41,7 +41,6 @@ describe('useAnnotationClassDescriptions', () => {
           nodeId: 'classes-node',
           classColumn: 'class',
           descriptionColumn: 'description',
-          getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
         }),
       { wrapper },
     );
@@ -51,7 +50,6 @@ describe('useAnnotationClassDescriptions', () => {
     });
 
     expect(mocks.getAnnotationClassDescriptions).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer test' },
       path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
       query: { class_column: 'class', description_column: 'description' },
       throwOnError: true,
@@ -70,7 +68,6 @@ describe('useAnnotationClassDescriptions', () => {
           nodeId: null,
           classColumn: 'class',
           descriptionColumn: 'description',
-          getAuthHeaders: () => ({}),
         }),
       { wrapper },
     );

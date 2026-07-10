@@ -19,7 +19,6 @@ export const ALL_VIEWS = [
 export type ViewType = (typeof ALL_VIEWS)[number];
 
 export const DEFAULT_VIEW: ViewType = 'data-loader';
-export const DEFAULT_VISIBLE_VIEWS: ViewType[] = [...ALL_VIEWS];
 
 export const isViewType = (value: unknown): value is ViewType =>
   typeof value === 'string' && ALL_VIEWS.includes(value as ViewType);

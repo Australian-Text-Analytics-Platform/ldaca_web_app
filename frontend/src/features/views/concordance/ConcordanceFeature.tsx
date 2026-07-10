@@ -4,7 +4,6 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
@@ -94,14 +93,11 @@ function ConcordanceFeature({
   } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
-  const { getAuthHeaders } = useAuth();
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
   });
   const persistTokenizerPreference = usePersistNodeTokenizationPreference({
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
   });
   const {
     nodeColumnSelections,
@@ -151,7 +147,6 @@ function ConcordanceFeature({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.concordance,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     taskId: tabTaskId ?? null,
   });
   /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
@@ -239,7 +234,6 @@ function ConcordanceFeature({
     colourMatches,
     lowercaseMatches,
     nodeColorOverrides,
-    getAuthHeaders,
   });
 
   const [viewMode, setViewMode] = useState<'separated' | 'combined'>('separated');
@@ -343,7 +337,6 @@ function ConcordanceFeature({
     analysisType: ANALYSIS_TAB_GROUPS.concordance,
     taskType: ANALYSIS_TASK_TYPES.concordance,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: when mounted inside an analysis tab,
     // the tab's persisted task id must win task resolution over transient local
@@ -352,23 +345,21 @@ function ConcordanceFeature({
     resultRef: concordanceResultsRef,
     /** Fetches a completed concordance task result for polling and hydration. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchResult: async (taskId, headers) => {
+    fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<ConcordanceAnalysisResponse>(
         currentWorkspaceId,
         taskId,
-        headers,
       );
     },
     /** Fetches the saved request so hydration can restore parameters and materialized state. */
     // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchRequest: async (taskId, headers) => {
+    fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
         ANALYSIS_TAB_GROUPS.concordance,
         currentWorkspaceId,
         taskId,
-        headers,
       );
     },
     /** Copies freshly fetched task results into the feature's safe-result state. */
@@ -499,7 +490,6 @@ function ConcordanceFeature({
       },
     },
     lock: {
-      getAuthHeaders,
       resolveTaskId,
       detachConcordance,
       detachConcordanceDispersion,
@@ -511,7 +501,6 @@ function ConcordanceFeature({
     useConcordanceDetachDialogs({
       workspaceId: currentWorkspaceId,
       resolveTaskId,
-      getAuthHeaders,
       handleDetach,
       handleDispersionDetach,
       materializedPaths,
@@ -561,7 +550,6 @@ function ConcordanceFeature({
     concordanceTaskId,
     materializeTaskIds,
     materializedEvents,
-    getAuthHeaders,
     resolveTaskId,
     persistResultPreferences,
     setNodeMaterializing,
@@ -715,7 +703,6 @@ function ConcordanceFeature({
             onChange={(model, detectedLanguage) => {
               handleTokenizerModelChange(nodeId, column, model, detectedLanguage);
             }}
-            getAuthHeaders={getAuthHeaders}
             disabled={false}
             disabledReason="Clear results first to change tokenizer models"
           />

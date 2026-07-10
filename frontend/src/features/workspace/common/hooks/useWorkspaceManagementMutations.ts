@@ -14,14 +14,12 @@ import { invalidateWorkspaceSummaries, isWorkspaceDetailQueryKey } from './works
 import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceManagementMutationsParams {
-  authHeaders: Record<string, string>;
   currentWorkspaceId: string | null;
   setCurrentWorkspaceId: (workspaceId: string | null) => void;
   clearSelection: () => void;
   queryClient: QueryClient;
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
-  setOperationError: (operationId: string, error: string) => void;
 }
 
 /**
@@ -34,14 +32,12 @@ interface WorkspaceManagementMutationsParams {
  * functions for launch/header/settings consumers.
  */
 export const useWorkspaceManagementMutations = ({
-  authHeaders,
   currentWorkspaceId,
   setCurrentWorkspaceId,
   clearSelection,
   queryClient,
   startOperation,
   endOperation,
-  setOperationError,
 }: WorkspaceManagementMutationsParams) => {
   const ensureWorkspaceSelected = () => {
     if (!currentWorkspaceId) {
@@ -52,14 +48,12 @@ export const useWorkspaceManagementMutations = ({
   const operationLifecycle = createWorkspaceOperationLifecycle({
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   const setCurrentWorkspaceOnServer = async (workspaceId: string | null) => {
     const setCurrent = () =>
       setMyCurrentWorkspace({
         body: { workspace_id: workspaceId },
-        headers: authHeaders,
         throwOnError: true,
       });
 
@@ -71,7 +65,7 @@ export const useWorkspaceManagementMutations = ({
         throw error;
       }
 
-      await listWorkspaces({ headers: authHeaders, throwOnError: true });
+      await listWorkspaces({ throwOnError: true });
       const { data } = await setCurrent();
       return data;
     }
@@ -121,7 +115,6 @@ export const useWorkspaceManagementMutations = ({
     mutationFn: ({ name, description }: { name: string; description?: string }) =>
       createWorkspace({
         body: { name, description: description ?? '' },
-        headers: authHeaders,
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: operationLifecycle.onMutate('createWorkspace'),
@@ -143,7 +136,6 @@ export const useWorkspaceManagementMutations = ({
         throw new Error('workspaceId is required');
       }
       return deleteWorkspaceById({
-        headers: authHeaders,
         path: { workspace_id: workspaceId },
         throwOnError: true,
       }).then(({ data }) => data);
@@ -167,7 +159,6 @@ export const useWorkspaceManagementMutations = ({
     mutationFn: () => {
       const workspaceId = ensureWorkspaceSelected();
       return saveWorkspaceById({
-        headers: authHeaders,
         path: { workspace_id: workspaceId },
         throwOnError: true,
       }).then(({ data }) => data);
@@ -182,7 +173,6 @@ export const useWorkspaceManagementMutations = ({
       const workspaceId = ensureWorkspaceSelected();
       return updateWorkspaceById({
         body: { name: newName },
-        headers: authHeaders,
         path: { workspace_id: workspaceId },
         throwOnError: true,
       }).then(({ data }) => data);
@@ -199,7 +189,6 @@ export const useWorkspaceManagementMutations = ({
       const workspaceId = ensureWorkspaceSelected();
       return updateWorkspaceById({
         body: { description },
-        headers: authHeaders,
         path: { workspace_id: workspaceId },
         throwOnError: true,
       }).then(({ data }) => data);
@@ -224,7 +213,7 @@ export const useWorkspaceManagementMutations = ({
         updateWorkspaceDescriptionMutation.mutateAsync(description),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutation refs intentionally omitted; mutateAsync identities are stable
-    [authHeaders, currentWorkspaceId, queryClient],
+    [currentWorkspaceId, queryClient],
   );
 
   return { actions } as const;

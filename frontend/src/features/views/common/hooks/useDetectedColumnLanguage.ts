@@ -14,7 +14,6 @@ export interface UseDetectedColumnLanguageArgs {
   workspaceId: string | null;
   nodeId: string | null;
   column: string | null;
-  getAuthHeaders: () => Record<string, string>;
   /** When false the sample fetch and detection are skipped (e.g. dialog closed). */
   enabled?: boolean;
 }
@@ -39,7 +38,6 @@ export function useDetectedColumnLanguage({
   workspaceId,
   nodeId,
   column,
-  getAuthHeaders,
   enabled = true,
 }: UseDetectedColumnLanguageArgs): DetectedColumnLanguage {
   const canFetchSample = Boolean(enabled && workspaceId && nodeId && column);
@@ -60,7 +58,6 @@ export function useDetectedColumnLanguage({
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- queryFn only runs when canFetchSample guarantees workspaceId/nodeId are set
         path: { workspace_id: workspaceId!, node_id: nodeId! },
         query: LANGUAGE_SAMPLE_REQUEST,
-        headers: getAuthHeaders(),
         throwOnError: true,
       });
       return data;

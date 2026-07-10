@@ -26,6 +26,7 @@ import {
 } from '@/features/views/common/tabs/tabStateOps';
 import { workspaceTabsQueryKey } from '@/features/views/common/tabs/useWorkspaceTabs';
 import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
+import { useVisibleViews } from '@/features/views/useVisibleViews';
 import { useUIStore } from '@/stores/uiStore';
 import { useHintsStore } from '@/stores/hintsStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -55,11 +56,10 @@ const SETTINGS_TABS = [
  * Flow: hydrate draft inputs from stores when opened, route tab controls to the existing preference/UI/hints stores, and reuse the working-directory backend config panel in single-user mode.
  */
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const { dataFolder, getAuthHeaders, isMultiUserMode } = useAuth();
+  const { dataFolder, isMultiUserMode } = useAuth();
   const { currentWorkspaceId, workspaces } = useWorkspaceData();
   const queryClient = useQueryClient();
-  const visibleViews = useUIStore((state) => state.visibleViews);
-  const setViewVisibility = useUIStore((state) => state.setViewVisibility);
+  const visibleViews = useVisibleViews();
   const resetSessionDismissedHints = useUIStore((state) => state.resetSessionDismissedHints);
   const sessionDismissedHints = useUIStore((state) => state.sessionDismissedHints);
   const hintsEnabled = useHintsStore((state) => state.hintsEnabled);
@@ -67,6 +67,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const resetHints = useHintsStore((state) => state.resetHints);
   const setHintsEnabled = useHintsStore((state) => state.setHintsEnabled);
   const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
+  const setViewHidden = usePreferencesStore((state) => state.setViewHidden);
   const toggleFavorite = usePreferencesStore((state) => state.toggleFavorite);
   const defaultTokenizerModel = usePreferencesStore((state) => state.defaultTokenizerModel);
   const setDefaultTokenizerModel = usePreferencesStore((state) => state.setDefaultTokenizerModel);
@@ -89,7 +90,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     if (!currentWorkspaceId) return EMPTY_TABS_STATE;
     const queryKey = workspaceTabsQueryKey(currentWorkspaceId);
     const { data: payload } = await getWorkspaceTabs({
-      headers: getAuthHeaders(),
       path: { workspace_id: currentWorkspaceId },
       throwOnError: true,
     });
@@ -359,7 +359,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <div className="grid gap-2 sm:grid-cols-2">
                   {VIEW_DEFINITIONS.map(({ id: view, label, requiresWorkspace }) => {
                     const checked = visibleViews.includes(view);
-                    const disabled = !requiresWorkspace || (checked && visibleViews.length === 1);
+                    const disabled = !requiresWorkspace;
                     return (
                       <Label
                         key={view}
@@ -371,7 +371,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           checked={checked}
                           disabled={disabled}
                           onCheckedChange={(nextChecked) => {
-                            setViewVisibility(view, nextChecked === true);
+                            setViewHidden(view, nextChecked !== true);
                           }}
                         />
                         <span>{label}</span>

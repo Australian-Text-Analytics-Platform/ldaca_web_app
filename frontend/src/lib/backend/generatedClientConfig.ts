@@ -1,5 +1,6 @@
 import { getApiBase } from '@/lib/backend/env';
 import { ApiError, formatErrorDetail } from '@/lib/apiError';
+import { getAuthHeaders } from '@/lib/backend/authToken';
 
 import type { CreateClientConfig } from '@/api';
 
@@ -33,13 +34,6 @@ const getRequestSignal = (
 /** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts. */
 export const getGeneratedApiBase = (apiBase = getApiBase()): string =>
   apiBase.replace(/\/api\/?$/, '');
-
-/** Lazy-loads auth headers to avoid an import cycle between generated SDK config and the auth store. */
-/** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  const { useAuthStore } = await import('@/stores/authStore');
-  return useAuthStore.getState().getAuthHeaders();
-};
 
 /** Creates the per-request timeout and propagates upstream caller aborts into one signal. */
 /**
@@ -108,13 +102,13 @@ const resolveTimeoutOverride = (
  * Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
  * Flow: start from caller or Request headers, fill missing auth headers lazily, then create a Request with the chained timeout signal.
  */
-const createRequest = async (
+const createRequest = (
   input: RequestInfo | URL,
   init: RequestInit | undefined,
   signal: AbortSignal,
-): Promise<Request> => {
+): Request => {
   const headers = new Headers(init?.headers ?? (isRequest(input) ? input.headers : undefined));
-  for (const [name, value] of Object.entries(await getAuthHeaders())) {
+  for (const [name, value] of Object.entries(getAuthHeaders())) {
     if (!headers.has(name)) {
       headers.set(name, value);
     }
@@ -162,7 +156,7 @@ const createGeneratedApiFetch = (fetchImpl?: typeof fetch): typeof fetch => {
     const { timeoutMs, init: cleanedInit } = resolveTimeoutOverride(input, init);
     const timeout = createTimeout(getRequestSignal(input, cleanedInit), timeoutMs);
     try {
-      const request = await createRequest(input, cleanedInit, timeout.signal);
+      const request = createRequest(input, cleanedInit, timeout.signal);
       const response = await (fetchImpl ?? globalThis.fetch)(request);
       if (!response.ok) {
         throw await parseErrorResponse(response);

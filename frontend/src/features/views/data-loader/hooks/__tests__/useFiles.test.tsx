@@ -38,7 +38,7 @@ describe('useFiles cache policy', () => {
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useFiles({ authHeaders: {} }), {
+    const { result } = renderHook(() => useFiles(), {
       wrapper: makeWrapper(queryClient),
     });
     await waitFor(() => {

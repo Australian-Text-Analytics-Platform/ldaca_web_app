@@ -21,7 +21,7 @@ describe('useFolderCreation cache policy', () => {
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
-    const { result } = renderHook(() => useFolderCreation({ authHeaders: {}, notify }), {
+    const { result } = renderHook(() => useFolderCreation({ notify }), {
       wrapper,
     });
 

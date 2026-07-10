@@ -24,7 +24,6 @@ const cooeeRecord: LdacaSearchResult = {
 };
 
 describe('useLdacaImport', () => {
-  const authHeaders = { Authorization: 'Bearer token' };
   const ldacaApiToken = 'ldaca-secret-token';
   const notify = vi.fn();
 
@@ -57,7 +56,7 @@ describe('useLdacaImport', () => {
   });
 
   it('loads staff picks when the dialog opens', async () => {
-    const { result } = renderHook(() => useLdacaImport({ authHeaders, ldacaApiToken, notify }));
+    const { result } = renderHook(() => useLdacaImport({ ldacaApiToken, notify }));
 
     act(() => {
       result.current.setLdacaImportOpen(true);
@@ -67,13 +66,13 @@ describe('useLdacaImport', () => {
       expect(result.current.featuredRecords).toEqual([cooeeRecord]);
     });
     expect(listLdacaFeaturedCollections).toHaveBeenCalledWith({
-      headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
+      headers: { 'X-LDACA-API-Token': ldacaApiToken },
       throwOnError: true,
     });
   });
 
   it('searches with the selected method and query', async () => {
-    const { result } = renderHook(() => useLdacaImport({ authHeaders, ldacaApiToken, notify }));
+    const { result } = renderHook(() => useLdacaImport({ ldacaApiToken, notify }));
 
     act(() => {
       result.current.setSearchMethod('identifier');
@@ -92,7 +91,7 @@ describe('useLdacaImport', () => {
         limit: 25,
         offset: 0,
       },
-      headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
+      headers: { 'X-LDACA-API-Token': ldacaApiToken },
       throwOnError: true,
     });
     expect(result.current.searchResults).toEqual([cooeeRecord]);
@@ -100,7 +99,7 @@ describe('useLdacaImport', () => {
   });
 
   it('imports the chosen record id and closes the dialog', async () => {
-    const { result } = renderHook(() => useLdacaImport({ authHeaders, ldacaApiToken, notify }));
+    const { result } = renderHook(() => useLdacaImport({ ldacaApiToken, notify }));
 
     act(() => {
       result.current.setLdacaImportOpen(true);
@@ -111,7 +110,7 @@ describe('useLdacaImport', () => {
 
     expect(importLdacaDataset).toHaveBeenCalledWith({
       body: { url: cooeeRecord.id },
-      headers: { ...authHeaders, 'X-LDACA-API-Token': ldacaApiToken },
+      headers: { 'X-LDACA-API-Token': ldacaApiToken },
       throwOnError: true,
     });
     expect(notify).toHaveBeenCalledWith('success', 'LDaCA import started');

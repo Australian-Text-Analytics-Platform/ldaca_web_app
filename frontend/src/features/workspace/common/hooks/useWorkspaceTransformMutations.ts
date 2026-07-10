@@ -26,12 +26,10 @@ import {
 import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceTransformMutationsParams {
-  authHeaders: Record<string, string>;
   currentWorkspaceId: string | null;
   queryClient: QueryClient;
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
-  setOperationError: (operationId: string, error: string) => void;
 }
 
 /** Complete identity and transport context for one cancellable preprocessing preview. */
@@ -54,12 +52,10 @@ interface WorkspaceOperationPreviewRequest<RequestPayload> {
  * action object for preprocessing and table consumers.
  */
 export const useWorkspaceTransformMutations = ({
-  authHeaders,
   currentWorkspaceId,
   queryClient,
   startOperation,
   endOperation,
-  setOperationError,
 }: WorkspaceTransformMutationsParams) => {
   const ensureWorkspaceSelected = () => {
     if (!currentWorkspaceId) {
@@ -70,14 +66,12 @@ export const useWorkspaceTransformMutations = ({
   const operationLifecycle = createWorkspaceOperationLifecycle({
     startOperation,
     endOperation,
-    setOperationError,
   });
 
   const filterNodeMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: FilterRequestPayload }) =>
       applyFilterNode({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(() => undefined),
@@ -92,7 +86,6 @@ export const useWorkspaceTransformMutations = ({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: ReplaceRequest }) =>
       replaceApply({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
@@ -110,7 +103,6 @@ export const useWorkspaceTransformMutations = ({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: SliceRequest }) =>
       applySliceNode({
         body: request,
-        headers: authHeaders,
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
@@ -135,7 +127,6 @@ export const useWorkspaceTransformMutations = ({
     }) =>
       castNode({
         body: { column, target_type: targetType, format },
-        headers: authHeaders,
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
@@ -162,7 +153,6 @@ export const useWorkspaceTransformMutations = ({
     }) =>
       renameNodeColumn({
         body: { new_name: newName },
-        headers: authHeaders,
         path: { workspace_id: ensureWorkspaceSelected(), column_name: column, node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
@@ -179,7 +169,6 @@ export const useWorkspaceTransformMutations = ({
   const deleteColumnMutation = useMutation({
     mutationFn: ({ nodeId, column }: { nodeId: string; column: string }) =>
       deleteNodeColumn({
-        headers: authHeaders,
         path: { workspace_id: ensureWorkspaceSelected(), column_name: column, node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => data),
@@ -207,7 +196,6 @@ export const useWorkspaceTransformMutations = ({
       }: WorkspaceOperationPreviewRequest<FilterRequestPayload>) =>
         filterPreview({
           body: payload,
-          headers: authHeaders,
           path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
           signal,
@@ -225,7 +213,6 @@ export const useWorkspaceTransformMutations = ({
       }: WorkspaceOperationPreviewRequest<SliceRequest>) =>
         slicePreview({
           body: payload,
-          headers: authHeaders,
           path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
           signal,
@@ -243,7 +230,6 @@ export const useWorkspaceTransformMutations = ({
       }: WorkspaceOperationPreviewRequest<ReplaceRequest>) =>
         replacePreview({
           body: payload,
-          headers: authHeaders,
           path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
           signal,
@@ -259,7 +245,6 @@ export const useWorkspaceTransformMutations = ({
       }: WorkspaceOperationPreviewRequest<PolarsExpressionRequest>) =>
         polarsExpressionPreview({
           body: payload,
-          headers: authHeaders,
           path: { workspace_id: workspaceId, node_id: nodeId },
           query: { page, page_size: pageSize },
           signal,
@@ -268,7 +253,6 @@ export const useWorkspaceTransformMutations = ({
       polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) =>
         applyPolarsExpression({
           body: request,
-          headers: authHeaders,
           path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
           throwOnError: true,
         }).then(({ data }) => data),
@@ -280,7 +264,7 @@ export const useWorkspaceTransformMutations = ({
         deleteColumnMutation.mutateAsync({ nodeId, column }),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutation refs intentionally omitted; mutateAsync identities are stable
-    [authHeaders, currentWorkspaceId, queryClient],
+    [currentWorkspaceId, queryClient],
   );
 
   return { actions } as const;

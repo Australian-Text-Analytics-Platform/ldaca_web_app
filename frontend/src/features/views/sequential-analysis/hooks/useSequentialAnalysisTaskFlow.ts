@@ -78,14 +78,9 @@ interface SequentialAnalysisActions {
   onTaskIdAssigned?: (taskId: string | null) => void;
 }
 
-interface SequentialAnalysisLock {
-  getAuthHeaders: () => Record<string, string>;
-}
-
 interface Params {
   state: SequentialAnalysisState;
   actions: SequentialAnalysisActions;
-  lock: SequentialAnalysisLock;
 }
 
 /** Builds the submit, clear, chart-type, and chart-shaping logic for sequential analysis. */
@@ -123,7 +118,6 @@ export function useSequentialAnalysisTaskFlow({
     clearResults,
     onTaskIdAssigned,
   },
-  lock: { getAuthHeaders },
 }: Params) {
   // Validates current parameters, submits the analysis request, and locks the selected node.
   /**
@@ -198,11 +192,8 @@ export function useSequentialAnalysisTaskFlow({
 
     try {
       setIsAnalyzing(true);
-      const authHeaders = getAuthHeaders();
-      const headers = Object.keys(authHeaders).length > 0 ? authHeaders : {};
       const { data: result } = await runSequentialAnalysis({
         body: request,
-        headers,
         path: { workspace_id: currentWorkspaceId, node_id: nodeIdForAnalysis },
         throwOnError: true,
       });
@@ -263,14 +254,11 @@ export function useSequentialAnalysisTaskFlow({
     );
 
     if (!currentWorkspaceId) return;
-    const authHeaders = getAuthHeaders();
-    const headers = Object.keys(authHeaders).length > 0 ? authHeaders : {};
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return;
       await analysisTaskPreferences({
         body: { chart_type: value },
-        headers,
         path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });

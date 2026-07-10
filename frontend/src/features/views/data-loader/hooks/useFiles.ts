@@ -7,7 +7,6 @@ import { queryKeys } from '@/lib/queryKeys';
 import { invalidateFilesQuery } from './fileCache';
 
 interface UseFilesProps {
-  authHeaders?: Record<string, string>;
   /** Defer the initial fetch until auth has been resolved. */
   enabled?: boolean;
 }
@@ -17,7 +16,7 @@ interface UseFilesProps {
  * Used by: src/features/views/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
  * Flow: fetch the file tree, wire upload/delete mutations to cache invalidation, then expose selection and file actions for data-loader panels.
  */
-export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {
+export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   const queryClient = useQueryClient();
 
   const filesQuery = useQuery<FileTreeNode[]>({
@@ -27,7 +26,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
      * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
      */
     queryFn: async () => {
-      const { data } = await getUserFiles({ headers: authHeaders, throwOnError: true });
+      const { data } = await getUserFiles({ throwOnError: true });
       return data as FileTreeNode[];
     },
     enabled,
@@ -41,7 +40,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     /** Uploads a browser File object through the generated SDK for file panel actions. */
     /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
     mutationFn: (file: File) =>
-      uploadFile({ body: { file }, headers: authHeaders, throwOnError: true }),
+      uploadFile({ body: { file }, throwOnError: true }),
     onSuccess: () => invalidateFilesQuery(queryClient),
   });
 
@@ -50,7 +49,6 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
     mutationFn: (filename: string) =>
       deleteFile({
-        headers: authHeaders,
         query: { path: filename },
         throwOnError: true,
       }),
@@ -94,7 +92,6 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const handleDownloadFile = async (filename: string) => {
     try {
       const { data } = await downloadFile({
-        headers: authHeaders,
         parseAs: 'blob',
         query: { path: filename },
         throwOnError: true,

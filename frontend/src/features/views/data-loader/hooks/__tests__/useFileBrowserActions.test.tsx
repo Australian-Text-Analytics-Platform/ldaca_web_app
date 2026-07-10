@@ -26,7 +26,7 @@ describe('useFileBrowserActions cache policy', () => {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(
-      () => useFileBrowserActions({ authHeaders: {}, refreshFiles, notify }),
+      () => useFileBrowserActions({ refreshFiles, notify }),
       { wrapper },
     );
 

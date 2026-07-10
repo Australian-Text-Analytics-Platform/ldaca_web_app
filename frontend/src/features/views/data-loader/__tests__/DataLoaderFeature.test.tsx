@@ -283,7 +283,6 @@ describe('DataLoaderFeature citation UI', () => {
 
     await waitFor(() => {
       expect(mockRawFile).toHaveBeenCalledWith({
-        headers: {},
         parseAs: 'text',
         query: { path: 'sample_data/ADO/README.md' },
         throwOnError: true,
@@ -305,7 +304,6 @@ describe('DataLoaderFeature citation UI', () => {
     await waitFor(() => {
       expect(mockCreateFolder).toHaveBeenCalledWith({
         body: { name: 'Research Notes', parent_path: '' },
-        headers: {},
         throwOnError: true,
       });
     });
@@ -336,7 +334,6 @@ describe('DataLoaderFeature citation UI', () => {
     await waitFor(() => {
       expect(mockCreateFolder).toHaveBeenCalledWith({
         body: { name: 'Transcripts', parent_path: 'sample_data/ADO' },
-        headers: {},
         throwOnError: true,
       });
     });
@@ -407,7 +404,6 @@ describe('DataLoaderFeature citation UI', () => {
           source_path: 'sample_data/ADO/docs.csv',
           target_directory_path: 'sample_data/Other',
         },
-        headers: {},
         throwOnError: true,
       });
     });
@@ -446,7 +442,6 @@ describe('DataLoaderFeature citation UI', () => {
           source_path: 'sample_data/ADO/docs.csv',
           target_directory_path: 'sample_data/Other',
         },
-        headers: {},
         throwOnError: true,
       });
     });

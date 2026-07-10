@@ -1,4 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import type { AuthInfoResponse, RuntimeConfigResponse } from '@/api';
@@ -46,6 +47,14 @@ const importUseAuth = async () => {
   return mod;
 };
 
+/** Mounts the one lifecycle owner beside a pure auth subscription. */
+const renderBootstrappedAuth = async () => {
+  const { AuthBootstrap, useAuth } = await importUseAuth();
+  const { result } = renderHook(() => useAuth());
+  render(<AuthBootstrap />);
+  return { result };
+};
+
 describe('useAuth', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -61,15 +70,35 @@ describe('useAuth', () => {
     vi.clearAllTimers();
   });
 
-  it('bootstraps to "ready" with user info when autoStart is true and the API resolves', async () => {
+  it('keeps subscriptions pure and bootstraps once from the app lifecycle owner', async () => {
+    generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo() });
+    generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
+
+    const { AuthBootstrap, useAuth } = await importUseAuth();
+    renderHook(() => useAuth());
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(generatedApiMock.getAuthInfo).not.toHaveBeenCalled();
+
+    render(
+      <StrictMode>
+        <AuthBootstrap />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(generatedApiMock.getAuthInfo).toHaveBeenCalledTimes(1);
+    });
+    expect(generatedApiMock.getRuntimeConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('bootstraps to "ready" with user info when the lifecycle owner mounts', async () => {
     const info = buildAuthInfo();
     const config = buildConfig();
     generatedApiMock.getAuthInfo.mockResolvedValue({ data: info });
     generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: config });
 
-    const { useAuth } = await importUseAuth();
-
-    const { result } = renderHook(() => useAuth({ autoStart: true }));
+    const { result } = await renderBootstrappedAuth();
 
     await waitFor(() => {
       expect(result.current.phase.status).toBe('ready');
@@ -88,8 +117,7 @@ describe('useAuth', () => {
     generatedApiMock.getAuthInfo.mockRejectedValue(new Error('boom'));
     generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
-    const { useAuth } = await importUseAuth();
-    const { result } = renderHook(() => useAuth({ autoStart: true }));
+    const { result } = await renderBootstrappedAuth();
 
     await waitFor(() => {
       expect(result.current.phase.status).toBe('bootstrapping');
@@ -101,12 +129,12 @@ describe('useAuth', () => {
     expect(result.current.error).toBe('boom');
   });
 
-  it('does not bootstrap when autoStart=false; refreshAuth triggers it on demand', async () => {
+  it('does not bootstrap from a subscription; refreshAuth triggers it on demand', async () => {
     generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo() });
     generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
     const { useAuth } = await importUseAuth();
-    const { result } = renderHook(() => useAuth({ autoStart: false }));
+    const { result } = renderHook(() => useAuth());
 
     // Brief tick to let any "should not run" effects settle.
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -129,8 +157,7 @@ describe('useAuth', () => {
       });
       generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
-      const { useAuth } = await importUseAuth();
-      const { result } = renderHook(() => useAuth({ autoStart: true }));
+      const { result } = await renderBootstrappedAuth();
 
       await waitFor(() => {
         expect(result.current.phase.status).toBe('ready');
@@ -145,8 +172,7 @@ describe('useAuth', () => {
       });
       generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
-      const { useAuth } = await importUseAuth();
-      const { result } = renderHook(() => useAuth({ autoStart: true }));
+      const { result } = await renderBootstrappedAuth();
 
       await waitFor(() => {
         expect(result.current.phase.status).toBe('ready');
@@ -161,8 +187,7 @@ describe('useAuth', () => {
       });
       generatedApiMock.getRuntimeConfig.mockResolvedValue({ data: buildConfig() });
 
-      const { useAuth } = await importUseAuth();
-      const { result } = renderHook(() => useAuth({ autoStart: true }));
+      const { result } = await renderBootstrappedAuth();
 
       await waitFor(() => {
         expect(result.current.phase.status).toBe('ready');
@@ -172,7 +197,7 @@ describe('useAuth', () => {
   });
 
   describe('logout', () => {
-    it('calls generated logout with the current bearer headers, clears the token, and refetches', async () => {
+    it('calls generated logout through client auth, clears the token, and refetches', async () => {
       window.localStorage.setItem('auth_token', 'tok-9');
       generatedApiMock.getAuthInfo.mockResolvedValue({ data: buildAuthInfo() });
       generatedApiMock.getRuntimeConfig.mockResolvedValue({
@@ -180,8 +205,7 @@ describe('useAuth', () => {
       });
       (generatedApiMock.logout as Mock).mockResolvedValue({ data: undefined });
 
-      const { useAuth } = await importUseAuth();
-      const { result } = renderHook(() => useAuth({ autoStart: true }));
+      const { result } = await renderBootstrappedAuth();
       await waitFor(() => {
         expect(result.current.phase.status).toBe('ready');
       });
@@ -196,7 +220,6 @@ describe('useAuth', () => {
       });
 
       expect(generatedApiMock.logout).toHaveBeenCalledWith({
-        headers: { Authorization: 'Bearer tok-9' },
         throwOnError: true,
       });
       expect(window.localStorage.getItem('auth_token')).toBeNull();
@@ -211,8 +234,7 @@ describe('useAuth', () => {
         data: buildConfig({ multi_user_mode: false }),
       });
 
-      const { useAuth } = await importUseAuth();
-      const { result } = renderHook(() => useAuth({ autoStart: true }));
+      const { result } = await renderBootstrappedAuth();
       await waitFor(() => {
         expect(result.current.phase.status).toBe('ready');
       });
@@ -234,8 +256,7 @@ describe('useAuth', () => {
         data: buildConfig({ multi_user_mode: false }),
       });
 
-      const { useAuth } = await importUseAuth();
-      const { result } = renderHook(() => useAuth({ autoStart: true }));
+      const { result } = await renderBootstrappedAuth();
       await waitFor(() => {
         expect(result.current.phase.status).toBe('ready');
       });
@@ -257,8 +278,7 @@ describe('useAuth', () => {
         data: { access_token: 'gtok-abc' },
       });
 
-      const { useAuth } = await importUseAuth();
-      const { result } = renderHook(() => useAuth({ autoStart: true }));
+      const { result } = await renderBootstrappedAuth();
       await waitFor(() => {
         expect(generatedApiMock.getAuthInfo).toHaveBeenCalledTimes(1);
       });

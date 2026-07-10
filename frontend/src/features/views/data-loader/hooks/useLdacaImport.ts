@@ -19,18 +19,14 @@ type LdacaSearchRequest = Omit<OniSearchRequest, 'method' | 'query'> & {
  * featured records, and import calls all share this adapter.
  * Used by: local callers in data-loader/useLdacaImport module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
  */
-function withLdacaApiToken(
-  headers: Record<string, string> = {},
-  token?: string | null,
-): Record<string, string> {
+function withLdacaApiToken(token?: string | null): Record<string, string> {
   const trimmed = token?.trim();
-  return trimmed ? { ...headers, [LDACA_API_TOKEN_HEADER]: trimmed } : headers;
+  return trimmed ? { [LDACA_API_TOKEN_HEADER]: trimmed } : {};
 }
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
 interface UseLdacaImportParams {
-  authHeaders: Record<string, string>;
   ldacaApiToken?: string | null;
   notify: Notify;
 }
@@ -43,7 +39,7 @@ interface UseLdacaImportParams {
  * Flow: load featured records, run ONI search from dialog filters, import selected records
  * through backend APIs, and keep loading/error state isolated for DataLoaderDialogs.
  */
-export function useLdacaImport({ authHeaders, ldacaApiToken, notify }: UseLdacaImportParams) {
+export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) {
   const [state, dispatch] = useReducer(ldacaImportReducer, initialLdacaImportState);
 
   /**
@@ -59,7 +55,7 @@ export function useLdacaImport({ authHeaders, ldacaApiToken, notify }: UseLdacaI
     dispatch({ type: 'featuredStarted' });
     try {
       const { data: response } = await listLdacaFeaturedCollections({
-        headers: withLdacaApiToken(authHeaders, tokenOverride),
+        headers: withLdacaApiToken(tokenOverride),
         throwOnError: true,
       });
       dispatch({ type: 'featuredSucceeded', records: response.data });
@@ -129,7 +125,7 @@ export function useLdacaImport({ authHeaders, ldacaApiToken, notify }: UseLdacaI
       };
       const { data: response } = await searchLdacaCollections({
         body: request,
-        headers: withLdacaApiToken(authHeaders, ldacaApiToken),
+        headers: withLdacaApiToken(ldacaApiToken),
         throwOnError: true,
       });
       dispatch({ type: 'searchSucceeded', records: response.data });
@@ -157,7 +153,7 @@ export function useLdacaImport({ authHeaders, ldacaApiToken, notify }: UseLdacaI
     try {
       const { data: response } = await importLdacaDataset({
         body: { url: target },
-        headers: withLdacaApiToken(authHeaders, ldacaApiToken),
+        headers: withLdacaApiToken(ldacaApiToken),
         throwOnError: true,
       });
 

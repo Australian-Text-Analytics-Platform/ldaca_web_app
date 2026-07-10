@@ -8,10 +8,6 @@ export const ASIDE_PANEL_DEFAULT_RATIO = 0.3;
 export const ASIDE_PANEL_MIN_RATIO = 0.15;
 export const ASIDE_PANEL_MAX_RATIO = 0.8;
 export const ASIDE_PANEL_MAX_PIXELS = 800;
-/** Narrower default ratio applied when the right panel collapses to the
- * compact list + schema view. The panel stays resizable; this is just the
- * width it snaps to on collapse (the previous ratio is restored on expand). */
-export const ASIDE_PANEL_COLLAPSED_RATIO = 0.18;
 
 /** Document viewer zoom bounds. */
 export const DOC_ZOOM_MIN = 0.5;

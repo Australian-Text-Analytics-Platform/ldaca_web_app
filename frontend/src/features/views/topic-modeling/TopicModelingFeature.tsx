@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { AnalysisTabInput, TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
@@ -61,7 +60,6 @@ function TopicModelingFeature({
 }: TopicModelingFeatureProps) {
   const { currentWorkspaceId } = useWorkspaceData();
   const { setNodeColor: persistNodeColor } = useWorkspaceActions();
-  const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
@@ -83,12 +81,10 @@ function TopicModelingFeature({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     taskId: tabTaskId ?? null,
   });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
   });
 
   const typedServerRequest = serverRequest as {
@@ -165,7 +161,6 @@ function TopicModelingFeature({
     analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
     taskType: ANALYSIS_TASK_TYPES.topicModeling,
     workspaceId: currentWorkspaceId,
-    getAuthHeaders,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
@@ -173,19 +168,18 @@ function TopicModelingFeature({
     resultRef,
     // Loads the latest topic-modeling result for polling and task resumption.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchResult: async (taskId, headers) => {
+    fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskResult<TopicModelingResponse>(currentWorkspaceId, taskId, headers);
+      return getAnalysisTaskResult<TopicModelingResponse>(currentWorkspaceId, taskId);
     },
     // Retrieves the submitted request so hydration can restore parameter and lock state.
     // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
-    fetchRequest: async (taskId, headers) => {
+    fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
         ANALYSIS_TAB_GROUPS.topicModeling,
         currentWorkspaceId,
         taskId,
-        headers,
       );
     },
     // Applies freshly fetched task results and surfaces failed/successful status messages.
@@ -419,7 +413,6 @@ function TopicModelingFeature({
       },
     },
     lock: {
-      getAuthHeaders,
       queryClient,
     },
   });

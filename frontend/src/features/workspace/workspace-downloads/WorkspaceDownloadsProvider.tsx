@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { downloadWorkspaceArtifact, startWorkspaceDownload } from '@/api';
 import { saveBlob } from '@/lib/download';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
-import { useAuthStore } from '@/stores/authStore';
 import {
   WorkspaceDownloadsContext,
   type PendingWorkspaceDownload,
@@ -56,7 +55,6 @@ export function WorkspaceDownloadsProvider({ children }: { children: ReactNode }
     setStartingWorkspaceIds((current) => new Set(current).add(workspaceId));
     try {
       const { data: response } = await startWorkspaceDownload({
-        headers: useAuthStore.getState().getAuthHeaders(),
         path: { workspace_id: workspaceId },
         throwOnError: true,
       });
@@ -117,7 +115,6 @@ export function WorkspaceDownloadsProvider({ children }: { children: ReactNode }
       void (async () => {
         try {
           const { data } = await downloadWorkspaceArtifact({
-            headers: useAuthStore.getState().getAuthHeaders(),
             parseAs: 'blob',
             path: { workspace_id: pending.workspaceId, task_id: pending.taskId },
             throwOnError: true,

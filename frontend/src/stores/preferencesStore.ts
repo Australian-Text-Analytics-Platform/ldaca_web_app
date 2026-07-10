@@ -19,21 +19,18 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { getPreferences, updatePreferences } from '@/api';
-import type { AnnotationAiCustomProvider, UserPreferences, UserPreferencesUpdate } from '@/api';
+import type { AnnotationAiCustomProvider } from '@/api';
 import type { ViewType } from '@/features/views/viewIds';
+import {
+  encodePreferencesUpdate,
+  normalizeServerPreferences,
+  projectDurablePreferences,
+  type DurablePreferences,
+} from './preferencesCodec';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = [];
 
-interface PreferencesState {
-  hiddenViews: string[];
-  favoriteWorkspaces: string[];
-  defaultTokenizerModel: string | null;
-  ldacaOniApiToken: string | null;
-  analysisMultiTabEnabled: boolean;
-  /** Per-provider AI API keys for the Annotation tab, keyed by provider id. */
-  annotationAiApiKeys: Record<string, string>;
-  /** User-defined custom AI providers (OpenAI-compatible) for the Annotation tab. */
-  annotationAiCustomProviders: AnnotationAiCustomProvider[];
+interface PreferencesState extends DurablePreferences {
   /** True once the first backend fetch completes */
   hydrated: boolean;
   /** True while a backend sync is in-flight */
@@ -56,69 +53,26 @@ interface PreferencesActions {
   /** Remove a custom AI provider (and its stored API key) by id. */
   removeAnnotationAiCustomProvider: (providerId: string) => void;
   /** Fetch preferences from backend and hydrate the store */
-  loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
+  loadFromBackend: () => Promise<void>;
   /** Push current state to backend */
-  syncToBackend: (headers?: Record<string, string>) => Promise<void>;
+  syncToBackend: () => Promise<void>;
 }
 
 type PreferencesStore = PreferencesState & PreferencesActions;
-
-type ResolvedUserPreferences = Omit<
-  UserPreferences,
-  | 'default_tokenizer_model'
-  | 'favorite_workspaces'
-  | 'hidden_views'
-  | 'ldaca_oni_api_token'
-  | 'analysis_multi_tab_enabled'
-  | 'annotation_ai'
-> & {
-  hidden_views: string[];
-  favorite_workspaces: string[];
-  default_tokenizer_model: string | null;
-  ldaca_oni_api_token: string | null;
-  analysis_multi_tab_enabled: boolean;
-  annotation_ai_api_keys: Record<string, string>;
-  annotation_ai_custom_providers: AnnotationAiCustomProvider[];
-};
-
-/** Converts frontend auth header casing to the generated preferences client contract. */
-/** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-const getAuthorizationHeaders = (
-  headers?: Record<string, string>,
-): { authorization?: string } | undefined => {
-  const authorization = headers?.Authorization ?? headers?.authorization;
-  return authorization ? { authorization } : undefined;
-};
-
-/** Applies backend defaults so the store always works with concrete preference fields. */
-/**
- * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
- * Flow: fill missing backend arrays, tokenizer/token choices, and analysis UI
- * flags with concrete frontend defaults.
- */
-const normalizePreferences = (data: UserPreferences): ResolvedUserPreferences => ({
-  hidden_views: data.hidden_views ?? [],
-  favorite_workspaces: data.favorite_workspaces ?? [],
-  default_tokenizer_model: data.default_tokenizer_model ?? null,
-  ldaca_oni_api_token: data.ldaca_oni_api_token ?? null,
-  analysis_multi_tab_enabled: data.analysis_multi_tab_enabled ?? false,
-  annotation_ai_api_keys: data.annotation_ai?.api_keys ?? {},
-  annotation_ai_custom_providers: data.annotation_ai?.custom_providers ?? [],
-});
 
 /** Hydrates persisted preference fields into the immer draft after a successful backend load. */
 /**
  * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
  * Flow: copy resolved backend preference fields into the draft store state, then mark hydration complete for subscribers.
  */
-function applyServerState(state: PreferencesState, data: ResolvedUserPreferences) {
-  state.hiddenViews = data.hidden_views;
-  state.favoriteWorkspaces = data.favorite_workspaces;
-  state.defaultTokenizerModel = data.default_tokenizer_model;
-  state.ldacaOniApiToken = data.ldaca_oni_api_token;
-  state.analysisMultiTabEnabled = data.analysis_multi_tab_enabled;
-  state.annotationAiApiKeys = data.annotation_ai_api_keys;
-  state.annotationAiCustomProviders = data.annotation_ai_custom_providers;
+function applyServerState(state: PreferencesState, data: DurablePreferences) {
+  state.hiddenViews = data.hiddenViews;
+  state.favoriteWorkspaces = data.favoriteWorkspaces;
+  state.defaultTokenizerModel = data.defaultTokenizerModel;
+  state.ldacaOniApiToken = data.ldacaOniApiToken;
+  state.analysisMultiTabEnabled = data.analysisMultiTabEnabled;
+  state.annotationAiApiKeys = data.annotationAiApiKeys;
+  state.annotationAiCustomProviders = data.annotationAiCustomProviders;
   state.hydrated = true;
 }
 
@@ -265,13 +219,12 @@ export const usePreferencesStore = create<PreferencesStore>()(
 
         /** Loads preferences from the backend once auth is available, falling back to local state. */
         /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
-        loadFromBackend: async (headers) => {
+        loadFromBackend: async () => {
           try {
             const { data: preferences } = await getPreferences({
-              headers: getAuthorizationHeaders(headers),
               throwOnError: true,
             });
-            const data = normalizePreferences(preferences);
+            const data = normalizeServerPreferences(preferences);
             set((state) => {
               applyServerState(state, data);
               state.lastSyncError = null;
@@ -289,29 +242,16 @@ export const usePreferencesStore = create<PreferencesStore>()(
          * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
          * Flow: guard concurrent syncs, build the partial preferences payload, call the backend update, then clear syncing even if the request fails.
          */
-        syncToBackend: async (headers) => {
+        syncToBackend: async () => {
           const state = get();
           if (state.syncing) return;
           set((s) => {
             s.syncing = true;
           });
-          const body: UserPreferencesUpdate = {
-            hidden_views: state.hiddenViews,
-            favorite_workspaces: state.favoriteWorkspaces,
-            ...(state.defaultTokenizerModel !== null
-              ? { default_tokenizer_model: state.defaultTokenizerModel }
-              : {}),
-            ldaca_oni_api_token: state.ldacaOniApiToken,
-            analysis_multi_tab_enabled: state.analysisMultiTabEnabled,
-            annotation_ai: {
-              api_keys: state.annotationAiApiKeys,
-              custom_providers: state.annotationAiCustomProviders,
-            },
-          };
+          const body = encodePreferencesUpdate(projectDurablePreferences(state));
           try {
             await updatePreferences({
               body,
-              headers: getAuthorizationHeaders(headers),
               throwOnError: true,
             });
           } catch (e) {
@@ -329,15 +269,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
         name: 'ldaca-preferences',
         /** Persists only durable user choices; transient hydration/sync flags stay in memory. */
         /** Consumed by: Zustand persist for usePreferencesStore because persisted hydration needs a stable storage contract before store state is restored. */
-        partialize: (state) => ({
-          hiddenViews: state.hiddenViews,
-          favoriteWorkspaces: state.favoriteWorkspaces,
-          defaultTokenizerModel: state.defaultTokenizerModel,
-          ldacaOniApiToken: state.ldacaOniApiToken,
-          analysisMultiTabEnabled: state.analysisMultiTabEnabled,
-          annotationAiApiKeys: state.annotationAiApiKeys,
-          annotationAiCustomProviders: state.annotationAiCustomProviders,
-        }),
+        partialize: projectDurablePreferences,
       },
     ),
     { name: 'preferences-store' },

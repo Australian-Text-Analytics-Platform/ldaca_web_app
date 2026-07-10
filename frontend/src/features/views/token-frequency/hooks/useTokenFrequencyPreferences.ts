@@ -17,7 +17,6 @@ interface UseTokenFrequencyPreferencesParams {
   currentWorkspaceId: string | null;
   results: TokenFrequencyResponse | null;
   setResults: React.Dispatch<React.SetStateAction<TokenFrequencyResponse | null>>;
-  getAuthHeaders: () => Record<string, string>;
   resolveTokenFrequencyTaskId: () => Promise<string | null>;
   backendTokenLimit: number | null;
   backendStopWordsKey: string;
@@ -35,7 +34,6 @@ export const useTokenFrequencyPreferences = ({
   currentWorkspaceId,
   results,
   setResults,
-  getAuthHeaders,
   resolveTokenFrequencyTaskId,
   backendTokenLimit,
   backendStopWordsKey,
@@ -146,7 +144,6 @@ export const useTokenFrequencyPreferences = ({
 
       await analysisTaskPreferences({
         body: payload,
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });
@@ -156,7 +153,6 @@ export const useTokenFrequencyPreferences = ({
       currentWorkspaceId,
       resolveTokenFrequencyTaskId,
       maxTokenLimitInput,
-      getAuthHeaders,
     ],
   );
 

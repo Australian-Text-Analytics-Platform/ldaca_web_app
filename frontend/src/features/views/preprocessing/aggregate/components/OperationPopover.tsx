@@ -3,7 +3,6 @@ import { ChevronDown } from 'lucide-react';
 
 import { columnOperations } from '@/api';
 import type { ColumnOperationsResponse } from '@/api';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,7 +33,6 @@ export function OperationPopover({
   disabled,
   children,
 }: OperationPopoverProps) {
-  const { getAuthHeaders } = useAuth();
   const [open, setOpen] = useState(false);
   const [operations, setOperations] = useState<ColumnOperationsResponse['operations'] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +43,6 @@ export function OperationPopover({
     if (!workspaceId || !nodeId || !column) return;
     let cancelled = false;
     columnOperations({
-      headers: getAuthHeaders(),
       path: { workspace_id: workspaceId, column_name: column, node_id: nodeId },
       throwOnError: true,
     })
@@ -58,7 +55,7 @@ export function OperationPopover({
     return () => {
       cancelled = true;
     };
-  }, [open, workspaceId, nodeId, column, getAuthHeaders]);
+  }, [open, workspaceId, nodeId, column]);
 
   /**
    * Applies the chosen operation to the parent token and closes the popover.

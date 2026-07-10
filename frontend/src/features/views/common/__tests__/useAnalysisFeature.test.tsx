@@ -76,8 +76,6 @@ describe('useAnalysisFeature', () => {
         analysisType: 'sequential_analysis',
         taskType: 'sequential_analysis',
         workspaceId: 'workspace-1',
-        /** Called by: useAnalysisFeature clear plumbing if auth headers are needed because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
-        getAuthHeaders: () => ({}),
         isTabActive: true,
         resultRef: { current: null },
         fetchResult: vi.fn(() => Promise.resolve(null)),
@@ -97,15 +95,11 @@ describe('useAnalysisFeature', () => {
   });
 
   it('cancels the resolved analysis task from the owning analysis tab', async () => {
-    const headers = { Authorization: 'Bearer token' };
-
     const { result } = renderHook(() =>
       useAnalysisFeature({
         analysisType: 'sequential_analysis',
         taskType: 'sequential_analysis',
         workspaceId: 'workspace-1',
-        /** Called by: stopTask before forwarding headers to cancelTask because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
-        getAuthHeaders: () => headers,
         isTabActive: true,
         resultRef: { current: { metadata: { task_id: 'task-1' } } },
         fetchResult: vi.fn(() => Promise.resolve(null)),
@@ -119,7 +113,6 @@ describe('useAnalysisFeature', () => {
     });
 
     expect(cancelTaskMock).toHaveBeenCalledWith({
-      headers,
       path: { task_id: 'task-1' },
       throwOnError: true,
     });
@@ -134,7 +127,6 @@ describe('useAnalysisFeature', () => {
         analysisType: 'token_frequencies',
         taskType: 'token_frequencies',
         workspaceId: 'workspace-1',
-        getAuthHeaders: () => ({}),
         isTabActive: true,
         hydrationTaskId: null,
         resultRef: { current: null },
@@ -157,7 +149,6 @@ describe('useAnalysisFeature', () => {
       analysisType: 'token_frequencies' as const,
       taskType: 'token_frequencies',
       workspaceId: 'workspace-1',
-      getAuthHeaders: () => ({}),
       isTabActive: true,
       resultRef: { current: null },
       fetchResult: vi.fn(() => Promise.resolve(null)),
@@ -191,7 +182,6 @@ describe('useAnalysisFeature', () => {
         analysisType: 'token_frequencies',
         taskType: 'token_frequencies',
         workspaceId: 'workspace-1',
-        getAuthHeaders: () => ({}),
         isTabActive: true,
         hydrationTaskId: 'owned-task',
         resultRef: { current: null },
@@ -205,7 +195,7 @@ describe('useAnalysisFeature', () => {
       await result.current.fetchAndApplyResult('owned-task', 'successful');
     });
 
-    expect(fetchResult).toHaveBeenCalledWith('owned-task', {});
+    expect(fetchResult).toHaveBeenCalledWith('owned-task');
     expect(onResultFetched).toHaveBeenCalledWith(terminalResult, 'owned-task');
   });
 
@@ -214,7 +204,6 @@ describe('useAnalysisFeature', () => {
       analysisType: 'token_frequencies' as const,
       taskType: 'token_frequencies',
       workspaceId: 'workspace-1',
-      getAuthHeaders: () => ({}),
       isTabActive: true,
       resultRef: { current: null },
       fetchResult: vi.fn(() => Promise.resolve(null)),

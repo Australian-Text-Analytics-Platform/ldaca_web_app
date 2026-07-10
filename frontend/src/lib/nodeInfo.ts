@@ -27,34 +27,13 @@ interface WorkspaceQueryArgs {
   workspaceId: string;
 }
 
-type HeadersArgs = WorkspaceQueryArgs & {
-  headers: Record<string, string>;
-  getAuthHeaders?: never;
-};
-
-type AuthProviderArgs = WorkspaceQueryArgs & {
-  headers?: never;
-  getAuthHeaders: () => Record<string, string>;
-};
-
-/**
- * Either an explicit headers snapshot or an auth provider — never both.
- * Mirrors the original `nodeInfoCache` discriminated union.
- */
-type HeaderProviderArgs = HeadersArgs | AuthProviderArgs;
-
-export type NodeInfoQueryArgs = HeaderProviderArgs & {
+export type NodeInfoQueryArgs = WorkspaceQueryArgs & {
   nodeId: string;
 };
 
-export type NodeInfosQueryArgs = HeaderProviderArgs & {
+export type NodeInfosQueryArgs = WorkspaceQueryArgs & {
   nodeIds: string[];
 };
-
-/** Resolves auth once a query actually executes so refetches see current credentials. */
-/** Called by: nodeInfoQueryOptions and fetchNodeInfo in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
-const resolveHeaders = (args: HeaderProviderArgs): Record<string, string> =>
-  'headers' in args && args.headers ? args.headers : args.getAuthHeaders();
 
 /** Removes duplicate/empty ids before constructing request bodies and cache keys. */
 /** Called by: nodeInfo query helpers because callers may derive ids from repeated tab inputs or selections. */
@@ -69,7 +48,6 @@ const requestNodeInfos = async (args: NodeInfosQueryArgs): Promise<NodeInfo[]> =
   const nodeIds = normalizeNodeIds(args.nodeIds);
   if (nodeIds.length === 0) return [];
   const { data } = await getWorkspaceNodesInfoById({
-    headers: resolveHeaders(args),
     path: { workspace_id: args.workspaceId },
     body: { nodes: nodeIds },
     throwOnError: true,
@@ -79,8 +57,7 @@ const requestNodeInfos = async (args: NodeInfosQueryArgs): Promise<NodeInfo[]> =
 
 /**
  * Build the `useQuery` options for a (workspace, node) pair.
- * Headers are resolved lazily inside `queryFn` so the latest auth is
- * picked up on each refetch.
+ * Generated client configuration resolves auth for each request.
  */
 /** Used by: schema and hydration hooks because they need one shared node-info query shape. */
 export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
@@ -104,8 +81,7 @@ export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
 
 /**
  * Build the `useQuery` options for a batch of workspace nodes.
- * Headers are resolved lazily inside `queryFn` so the latest auth is
- * picked up on each refetch.
+ * Generated client configuration resolves auth for each request.
  */
 /** Used by: useNodeColumnInfos because batched selectors need one request for all selected nodes. */
 export const nodeInfosQueryOptions = (args: NodeInfosQueryArgs) => {
@@ -126,8 +102,6 @@ export interface FetchNodeInfoArgs {
   nodeId: string;
   /** When true, drop any cached value first so the next read re-fetches. */
   force?: boolean;
-  headers?: Record<string, string>;
-  getAuthHeaders?: () => Record<string, string>;
 }
 
 export interface FetchNodeInfosArgs {
@@ -136,8 +110,6 @@ export interface FetchNodeInfosArgs {
   nodeIds: string[];
   /** When true, drop cached values first so the next read re-fetches. */
   force?: boolean;
-  headers?: Record<string, string>;
-  getAuthHeaders?: () => Record<string, string>;
 }
 
 /**
@@ -153,16 +125,11 @@ export const fetchNodeInfo = async ({
   workspaceId,
   nodeId,
   force,
-  headers,
-  getAuthHeaders,
 }: FetchNodeInfoArgs): Promise<NodeInfo> => {
   if (force) {
     queryClient.removeQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeId) });
   }
-  const queryArgs: NodeInfoQueryArgs = headers
-    ? { workspaceId, nodeId, headers }
-    : { workspaceId, nodeId, getAuthHeaders: getAuthHeaders ?? (() => ({})) };
-  return queryClient.fetchQuery(nodeInfoQueryOptions(queryArgs));
+  return queryClient.fetchQuery(nodeInfoQueryOptions({ workspaceId, nodeId }));
 };
 
 /**
@@ -176,8 +143,6 @@ export const fetchNodeInfos = async ({
   workspaceId,
   nodeIds,
   force,
-  headers,
-  getAuthHeaders,
 }: FetchNodeInfosArgs): Promise<NodeInfo[]> => {
   const normalizedNodeIds = normalizeNodeIds(nodeIds);
   if (normalizedNodeIds.length === 0) return [];
@@ -187,14 +152,9 @@ export const fetchNodeInfos = async ({
       queryClient.removeQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeId) });
     });
   }
-  const queryArgs: NodeInfosQueryArgs = headers
-    ? { workspaceId, nodeIds: normalizedNodeIds, headers }
-    : {
-        workspaceId,
-        nodeIds: normalizedNodeIds,
-        getAuthHeaders: getAuthHeaders ?? (() => ({})),
-      };
-  const nodeInfos = await queryClient.fetchQuery(nodeInfosQueryOptions(queryArgs));
+  const nodeInfos = await queryClient.fetchQuery(
+    nodeInfosQueryOptions({ workspaceId, nodeIds: normalizedNodeIds }),
+  );
   nodeInfos.forEach((nodeInfo) => {
     queryClient.setQueryData<NodeInfo>(queryKeys.nodeInfo(workspaceId, nodeInfo.id), nodeInfo);
   });

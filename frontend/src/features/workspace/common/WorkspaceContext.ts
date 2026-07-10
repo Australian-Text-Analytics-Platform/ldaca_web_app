@@ -20,7 +20,6 @@ export interface WorkspaceSelectionSlice {
 
 export interface WorkspaceStatusSlice {
   isLoading: WorkspaceInternal['isLoading'];
-  errors: WorkspaceInternal['errors'];
 }
 
 export type WorkspaceActionsSlice = WorkspaceInternal['actions'];

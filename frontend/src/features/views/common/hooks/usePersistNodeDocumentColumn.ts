@@ -68,10 +68,8 @@ function updateWorkspaceNodeInfoCache(
  */
 export function usePersistNodeDocumentColumn({
   workspaceId,
-  getAuthHeaders,
 }: {
   workspaceId: string | null | undefined;
-  getAuthHeaders: () => Record<string, string>;
 }) {
   const queryClient = useQueryClient();
 
@@ -82,7 +80,6 @@ export function usePersistNodeDocumentColumn({
         const { data } = await setNodeDocumentColumn({
           path: { workspace_id: workspaceId, node_id: nodeId },
           body: { document_column: column.trim() || null },
-          headers: getAuthHeaders(),
           throwOnError: true,
         });
         updateWorkspaceNodeInfoCache(queryClient, workspaceId, data);
@@ -92,7 +89,7 @@ export function usePersistNodeDocumentColumn({
         return null;
       }
     },
-    [getAuthHeaders, queryClient, workspaceId],
+    [queryClient, workspaceId],
   );
 }
 
@@ -104,10 +101,8 @@ export function usePersistNodeDocumentColumn({
  */
 export function usePersistNodeTokenizationPreference({
   workspaceId,
-  getAuthHeaders,
 }: {
   workspaceId: string | null | undefined;
-  getAuthHeaders: () => Record<string, string>;
 }) {
   const queryClient = useQueryClient();
 
@@ -123,7 +118,6 @@ export function usePersistNodeTokenizationPreference({
             model: trimmedModel || null,
             language: trimmedModel ? language : null,
           },
-          headers: getAuthHeaders(),
           throwOnError: true,
         });
         updateWorkspaceNodeInfoCache(queryClient, workspaceId, data);
@@ -133,6 +127,6 @@ export function usePersistNodeTokenizationPreference({
         return null;
       }
     },
-    [getAuthHeaders, queryClient, workspaceId],
+    [queryClient, workspaceId],
   );
 }

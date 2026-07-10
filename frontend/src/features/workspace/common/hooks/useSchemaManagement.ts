@@ -73,10 +73,9 @@ function nodeSnapshotFromInfo(nodeId: string, info: NodeInfo): NodeSnapshot {
 export async function createNodeSnapshot(
   workspaceId: string,
   nodeId: string,
-  getAuthHeaders: () => Record<string, string>,
   queryClient: QueryClient,
 ): Promise<NodeSnapshot> {
-  const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId, getAuthHeaders });
+  const info = await fetchNodeInfo({ queryClient, workspaceId, nodeId });
   return nodeSnapshotFromInfo(nodeId, info);
 }
 
@@ -87,10 +86,9 @@ export async function createNodeSnapshot(
 export async function createNodeSnapshots(
   workspaceId: string,
   nodeIds: string[],
-  getAuthHeaders: () => Record<string, string>,
   queryClient: QueryClient,
 ): Promise<NodeSnapshot[]> {
-  const infos = await fetchNodeInfos({ queryClient, workspaceId, nodeIds, getAuthHeaders });
+  const infos = await fetchNodeInfos({ queryClient, workspaceId, nodeIds });
   const infoById = new Map(infos.map((info) => [info.id, info]));
   return nodeIds.map((nodeId) => {
     const info = infoById.get(nodeId);
@@ -146,10 +144,6 @@ interface SchemaManagementConfig {
    */
   workspaceId: string | undefined;
 
-  /**
-   * Function to get auth headers
-   */
-  getAuthHeaders: () => Record<string, string>;
 }
 
 /**
@@ -169,7 +163,7 @@ interface SchemaManagementConfig {
  * Flow: subscribe to the canonical node-info query while unlocked, preserve locked schema during runs, then expose effective schema and column options.
  */
 export function useSchemaManagement(config: SchemaManagementConfig) {
-  const { nodeId, isLocked, workspaceId, getAuthHeaders } = config;
+  const { nodeId, isLocked, workspaceId } = config;
 
   const [currentSchema, setCurrentSchema] = useState<Record<string, string>>({});
   const [lockedSchema, setLockedSchema] = useState<Record<string, string> | null>(null);
@@ -179,7 +173,6 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     ...nodeInfoQueryOptions({
       workspaceId: workspaceId ?? '',
       nodeId: nodeId ?? '',
-      getAuthHeaders,
     }),
     select: normalizeSchemaFromInfo,
     /** Fetches schema through node info so cast/preprocessing invalidations refresh column types. */

@@ -97,8 +97,7 @@ function FileListShell({
 function DataLoaderFeature() {
   const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
-  const { dataFolder, getAuthHeaders } = useAuth({ autoStart: true });
-  const authHeaders = getAuthHeaders();
+  const { dataFolder } = useAuth();
   const ldacaOniApiToken = usePreferencesStore((state) => state.ldacaOniApiToken);
   const setLdacaOniApiToken = usePreferencesStore((state) => state.setLdacaOniApiToken);
 
@@ -112,7 +111,7 @@ function DataLoaderFeature() {
     handleDeleteFile,
     handleDownloadFile,
     refreshFiles,
-  } = useFiles({ authHeaders });
+  } = useFiles();
 
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
@@ -167,7 +166,6 @@ function DataLoaderFeature() {
   } = useDataLoaderWorkspaceActions({
     workspaces,
     hasWorkspaceSelected,
-    authHeaders,
     notify,
   });
   const {
@@ -180,7 +178,7 @@ function DataLoaderFeature() {
     handleMoveFile,
     openCitation,
     closeCitation,
-  } = useFileBrowserActions({ authHeaders, refreshFiles, notify });
+  } = useFileBrowserActions({ refreshFiles, notify });
   const {
     ldacaImportOpen,
     setLdacaImportOpen,
@@ -203,7 +201,7 @@ function DataLoaderFeature() {
     reloadFeaturedRecords,
     handleLdacaSearch,
     handleLdacaImport,
-  } = useLdacaImport({ authHeaders, ldacaApiToken: ldacaOniApiToken, notify });
+  } = useLdacaImport({ ldacaApiToken: ldacaOniApiToken, notify });
   const {
     fileInputRef,
     uploadingFiles,
@@ -226,7 +224,7 @@ function DataLoaderFeature() {
     closeFolderNameAlert,
     openCreateFolderDialog,
     handleCreateFolder,
-  } = useFolderCreation({ authHeaders, notify });
+  } = useFolderCreation({ notify });
 
   const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
 
@@ -389,7 +387,7 @@ function DataLoaderFeature() {
                   <HelpIcon targetKey="data-loader.upload.button" label="About upload files" />
                 </div>
                 <div className="flex items-center gap-1">
-                  <SampleDataPanel authHeaders={authHeaders} />
+                  <SampleDataPanel />
                   <HelpIcon
                     targetKey="data-loader.import-sample.button"
                     label="About import sample data"

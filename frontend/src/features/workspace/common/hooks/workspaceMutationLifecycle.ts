@@ -1,20 +1,9 @@
 interface WorkspaceOperationLifecycleConfig {
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
-  setOperationError: (operationId: string, error: string) => void;
 }
 
 type MaybePromise<T> = T | Promise<T>;
-
-const operationErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  return 'Unknown operation error';
-};
 
 /**
  * Builds TanStack mutation lifecycle callbacks for workspace operations.
@@ -27,12 +16,12 @@ const operationErrorMessage = (error: unknown): string => {
  * Flow: `onMutate` starts the named operation before any caller-specific
  * optimistic work, `onSuccess` runs caller cache/selection work and always ends
  * the operation, and `onError` runs caller rollback work before storing the
- * operation error and ending the operation.
+ * operation and ending loading bookkeeping. Errors remain on the rejected
+ * mutation promise for the owning feature boundary to report.
  */
 export const createWorkspaceOperationLifecycle = ({
   startOperation,
   endOperation,
-  setOperationError,
 }: WorkspaceOperationLifecycleConfig) => {
   function onMutate(operationId: string): () => void;
   function onMutate<TVariables, TContext>(
@@ -100,7 +89,6 @@ export const createWorkspaceOperationLifecycle = ({
       try {
         await handler?.(error, variables, onMutateResult);
       } finally {
-        setOperationError(operationId, operationErrorMessage(error));
         endOperation(operationId);
       }
     };

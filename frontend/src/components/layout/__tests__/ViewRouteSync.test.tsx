@@ -1,8 +1,8 @@
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_VISIBLE_VIEWS } from '@/features/views/viewIds';
 import { useUIStore } from '@/stores/uiStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { ViewRouteSync } from '../ViewRouteSync';
 
 const routeFixture = vi.hoisted(() => ({
@@ -44,8 +44,8 @@ const resetFixtures = () => {
   useUIStore.setState((state) => ({
     ...state,
     currentView: 'data-loader',
-    visibleViews: [...DEFAULT_VISIBLE_VIEWS],
   }));
+  usePreferencesStore.setState({ hiddenViews: [] });
 };
 
 describe('ViewRouteSync', () => {
@@ -80,5 +80,16 @@ describe('ViewRouteSync', () => {
       expect(useUIStore.getState().currentView).toBe('filter');
     });
     expect(routeFixture.navigate).not.toHaveBeenCalled();
+  });
+
+  it('repairs an active view hidden by restored preferences', async () => {
+    useUIStore.setState({ currentView: 'quotation' });
+    usePreferencesStore.setState({ hiddenViews: ['quotation'] });
+
+    render(<ViewRouteSync />);
+
+    await waitFor(() => {
+      expect(useUIStore.getState().currentView).toBe('data-loader');
+    });
   });
 });

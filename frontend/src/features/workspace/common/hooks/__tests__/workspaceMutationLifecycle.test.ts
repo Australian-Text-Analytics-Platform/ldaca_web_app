@@ -13,9 +13,6 @@ const createLifecycle = () => {
       endOperation: (operationId) => {
         calls.push(`end:${operationId}`);
       },
-      setOperationError: (operationId, error) => {
-        calls.push(`error:${operationId}:${error}`);
-      },
     }),
   };
 };
@@ -42,13 +39,13 @@ describe('createWorkspaceOperationLifecycle', () => {
     expect(calls).toEqual(['invalidate', 'end:copyNode']);
   });
 
-  it('runs error rollback before recording the operation error', async () => {
+  it('runs error rollback before ending the operation', async () => {
     const { calls, lifecycle } = createLifecycle();
 
     await lifecycle.onError('reorderNodes', () => {
       calls.push('rollback');
     })(new Error('failed'), {}, undefined, {});
 
-    expect(calls).toEqual(['rollback', 'error:reorderNodes:failed', 'end:reorderNodes']);
+    expect(calls).toEqual(['rollback', 'end:reorderNodes']);
   });
 });

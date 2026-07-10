@@ -1,5 +1,4 @@
 import { getNodeDataByWorkspaceId } from '@/api';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {
   usePreprocessingPreview,
@@ -87,7 +86,6 @@ export const useNodePreviewWithRawFallback = <P>(
     enabled = true,
     debounceMs,
   } = opts;
-  const { getAuthHeaders } = useAuth();
 
   const request: PreviewRequest<P> | null =
     enabled && workspaceId && nodeId ? { workspaceId, nodeId, payload: operationPayload } : null;
@@ -124,7 +122,6 @@ export const useNodePreviewWithRawFallback = <P>(
         );
       }
       const { data } = await getNodeDataByWorkspaceId({
-        headers: getAuthHeaders(),
         path: { workspace_id: req.workspaceId, node_id: req.nodeId },
         query: { page, page_size: pageSize },
         signal,

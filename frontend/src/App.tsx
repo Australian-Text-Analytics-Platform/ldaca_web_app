@@ -1,22 +1,14 @@
-import { useState, useEffect, Suspense, lazy } from 'react';
-import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useState, useEffect } from 'react';
+import { AuthBootstrap, useAuth } from '@/features/auth/hooks/useAuth';
 import { useBackendHealth } from '@/hooks/useBackendHealth';
 import { useUIStore } from '@/stores';
-import { useShallow } from 'zustand/react/shallow';
 import { getBlockingCopy } from '@/features/auth/authPhaseCopy';
 import BlockingScreen from '@/features/auth/components/BlockingScreen';
 import { LoginScreen } from '@/features/auth/components/LoginScreen';
 import { LAG_HINT_DELAY_MS } from '@/config/timings';
 import { loadRemoteRegistry } from '@/tutorials/remoteRegistry';
-import { DocsEolBanner } from '@/tutorials/DocsEolBanner';
-import { Toaster } from '@/components/ui/sonner';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
-
-const FeedbackPanel = lazy(() =>
-  import('@/features/feedback/components/FeedbackPanel').then((m) => ({
-    default: m.FeedbackPanel,
-  })),
-);
+import { GlobalHosts } from '@/components/layout/GlobalHosts';
 
 function App() {
   useEffect(() => {
@@ -24,17 +16,11 @@ function App() {
   }, []);
 
   const { ready: backendReady, error: backendError } = useBackendHealth();
-  const { feedbackOpen, openModal, closeModal } = useUIStore(
-    useShallow((state) => ({
-      feedbackOpen: state.modals.feedback,
-      openModal: state.openModal,
-      closeModal: state.closeModal,
-    })),
-  );
+  const openModal = useUIStore((state) => state.openModal);
 
-  if (!backendReady) {
-    return (
-      <>
+  return (
+    <>
+      {!backendReady ? (
         <BlockingScreen
           title="Starting backend services"
           description="Hang tight while we verify the backend is up and happy."
@@ -56,25 +42,13 @@ function App() {
             </button>
           }
         />
-        <Suspense fallback={null}>
-          <FeedbackPanel
-            open={feedbackOpen}
-            onClose={() => {
-              closeModal('feedback');
-            }}
-          />
-        </Suspense>
-        <DocsEolBanner />
-        <Toaster />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <AuthGate />
-      <DocsEolBanner />
-      <Toaster />
+      ) : (
+        <>
+          <AuthBootstrap />
+          <AuthGate />
+        </>
+      )}
+      <GlobalHosts />
     </>
   );
 }
@@ -89,7 +63,7 @@ function AuthGate() {
     error: authError,
     refreshAuth,
     availableAuthMethods,
-  } = useAuth({ autoStart: true });
+  } = useAuth();
 
   const [laggingHintReady, setLaggingHintReady] = useState(false);
   const showLaggingHint = laggingHintReady && phase.status === 'bootstrapping';

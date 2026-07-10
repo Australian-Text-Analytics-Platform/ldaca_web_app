@@ -88,7 +88,6 @@ describe('useConcordanceResultViewModel', () => {
 
     await waitFor(() => {
       expect(mockedAnalysisTaskDispersionBins).toHaveBeenCalledWith({
-        headers: { Authorization: 'Bearer test-token' },
         path: { workspace_id: 'workspace-1', task_id: 'task-1' },
         query: { node_id: 'node-1' },
         throwOnError: true,

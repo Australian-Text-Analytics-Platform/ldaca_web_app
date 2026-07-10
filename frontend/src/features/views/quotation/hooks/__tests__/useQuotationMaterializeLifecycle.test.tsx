@@ -95,7 +95,6 @@ describe('useQuotationMaterializeLifecycle', () => {
       'quotation_analysis',
       'workspace-1',
       'parent-task-1',
-      { Authorization: 'Bearer token' },
     );
     expect(applyMaterializedRequest).toHaveBeenCalledWith('node-1', '/tmp/quotations.parquet', {
       recordCount: 3,

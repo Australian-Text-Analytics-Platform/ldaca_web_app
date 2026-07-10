@@ -39,7 +39,6 @@ describe('useFilterCategoricalOptions', () => {
         currentWorkspaceId: 'workspace-1',
         selectedNodeId: 'node-1',
         conditions: [],
-        getAuthHeaders: () => ({ Authorization: 'Bearer token' }),
       }),
     );
 
@@ -49,7 +48,6 @@ describe('useFilterCategoricalOptions', () => {
 
     const key = result.current.getCategoricalKey('speaker');
     expect(getColumnUniqueValuesMock).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer token' },
       path: { workspace_id: 'workspace-1', column_name: 'speaker', node_id: 'node-1' },
       throwOnError: true,
     });
@@ -71,7 +69,6 @@ describe('useFilterCategoricalOptions', () => {
         currentWorkspaceId: null,
         selectedNodeId: null,
         conditions: [],
-        getAuthHeaders: () => ({}),
       }),
     );
 
@@ -97,7 +94,6 @@ describe('useFilterCategoricalOptions', () => {
           currentWorkspaceId: 'workspace-1',
           selectedNodeId,
           conditions,
-          getAuthHeaders: () => ({}),
         }),
       {
         initialProps: {

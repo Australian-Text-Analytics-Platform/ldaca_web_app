@@ -71,7 +71,7 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
 
   it('clears the backend task when a tab that owns a task id is closed', async () => {
     const { result } = renderHook(
-      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE, () => ({ Authorization: 'Bearer t' })),
+      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE),
       { wrapper: makeWrapper() },
     );
 
@@ -84,7 +84,6 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
     });
 
     expect(clearTaskMock).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer t' },
       path: { task_id: 'task-1' },
       throwOnError: true,
     });
@@ -92,7 +91,7 @@ describe('useWorkspaceTabs closeTab cleanup', () => {
 
   it('does not call clearTask when the closed tab owns no task id', async () => {
     const { result } = renderHook(
-      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE, () => ({})),
+      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE),
       { wrapper: makeWrapper() },
     );
 
@@ -122,7 +121,7 @@ describe('useWorkspaceTabs setTabSetting', () => {
 
   it('persists a free-form tab setting through to the PUT body', async () => {
     const { result } = renderHook(
-      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE, () => ({ Authorization: 'Bearer t' })),
+      () => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE),
       { wrapper: makeWrapper() },
     );
 

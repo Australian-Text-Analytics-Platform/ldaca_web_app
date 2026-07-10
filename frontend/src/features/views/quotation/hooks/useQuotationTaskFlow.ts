@@ -65,7 +65,6 @@ interface QuotationActions {
 }
 
 interface QuotationLock {
-  getAuthHeaders: () => Record<string, string>;
   resolveTaskId: () => Promise<string | null>;
   quotationSearch: (
     nodeId: string,
@@ -114,7 +113,7 @@ export function useQuotationTaskFlow({
     setLocalTaskId,
     onTaskIdAssigned,
   },
-  lock: { getAuthHeaders, resolveTaskId, quotationSearch, detachQuotation, materializeQuotation },
+  lock: { resolveTaskId, quotationSearch, detachQuotation, materializeQuotation },
 }: Params) {
   // Builds deterministic output names for detach operations from display labels.
   /**
@@ -166,7 +165,6 @@ export function useQuotationTaskFlow({
     if (!taskId) return;
     await analysisTaskPreferences({
       body: { context_length: value },
-      headers: getAuthHeaders(),
       path: { workspace_id: currentWorkspaceId, task_id: taskId },
       throwOnError: true,
     });
@@ -266,7 +264,6 @@ export function useQuotationTaskFlow({
       if (!taskId) return null;
       const { data } = await analysisTaskResultQuery({
         body: payload,
-        headers: getAuthHeaders(),
         path: { workspace_id: currentWorkspaceId, task_id: taskId },
         throwOnError: true,
       });

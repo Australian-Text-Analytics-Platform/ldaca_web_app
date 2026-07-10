@@ -25,10 +25,8 @@ import { workspaceTabsQueryKey } from './useWorkspaceTabs';
  */
 async function collapseWorkspaceTabsToFirst(
   workspaceId: string,
-  headers: Record<string, string>,
 ): Promise<WorkspaceTabsState | null> {
   const { data: payload } = await getWorkspaceTabs({
-    headers,
     path: { workspace_id: workspaceId },
     throwOnError: true,
   });
@@ -52,7 +50,6 @@ async function collapseWorkspaceTabsToFirst(
 
   const { data: saved } = await putWorkspaceTabs({
     body: next,
-    headers,
     path: { workspace_id: workspaceId },
     throwOnError: true,
   });
@@ -61,7 +58,6 @@ async function collapseWorkspaceTabsToFirst(
 
   for (const taskId of removedTaskIds) {
     void clearTask({
-      headers,
       path: { task_id: taskId },
       throwOnError: true,
     }).catch((error: unknown) => {
@@ -79,7 +75,6 @@ async function collapseWorkspaceTabsToFirst(
 export function useSingleTabModeWorkspaceCleanup(
   workspaceId: string | null | undefined,
   analysisMultiTabEnabled: boolean,
-  getAuthHeaders: () => Record<string, string>,
 ) {
   const queryClient = useQueryClient();
   const cleanedWorkspaceRef = useRef<string | null>(null);
@@ -92,7 +87,7 @@ export function useSingleTabModeWorkspaceCleanup(
     if (cleanedWorkspaceRef.current === workspaceId) return;
     cleanedWorkspaceRef.current = workspaceId;
 
-    void collapseWorkspaceTabsToFirst(workspaceId, getAuthHeaders())
+    void collapseWorkspaceTabsToFirst(workspaceId)
       .then((savedState) => {
         if (savedState) {
           queryClient.setQueryData(workspaceTabsQueryKey(workspaceId), savedState);
@@ -105,5 +100,5 @@ export function useSingleTabModeWorkspaceCleanup(
           error,
         );
       });
-  }, [analysisMultiTabEnabled, getAuthHeaders, queryClient, workspaceId]);
+  }, [analysisMultiTabEnabled, queryClient, workspaceId]);
 }
