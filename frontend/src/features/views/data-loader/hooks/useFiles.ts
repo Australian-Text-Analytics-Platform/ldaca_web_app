@@ -4,6 +4,7 @@ import { deleteFile, downloadFile, getUserFiles, uploadFile } from '@/api';
 import { saveBlob } from '@/lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateFilesQuery } from './fileCache';
 
 interface UseFilesProps {
   authHeaders?: Record<string, string>;
@@ -36,16 +37,12 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
-  /** Invalidates the shared file-tree cache after file mutations. */
-  /** Called by: useFiles in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-  const invalidateFiles = () => queryClient.invalidateQueries({ queryKey: queryKeys.files });
-
   const uploadMutation = useMutation({
     /** Uploads a browser File object through the generated SDK for file panel actions. */
     /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
     mutationFn: (file: File) =>
       uploadFile({ body: { file }, headers: authHeaders, throwOnError: true }),
-    onSuccess: invalidateFiles,
+    onSuccess: () => invalidateFilesQuery(queryClient),
   });
 
   const deleteMutation = useMutation({
@@ -57,19 +54,21 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
         query: { path: filename },
         throwOnError: true,
       }),
-    onSuccess: invalidateFiles,
+    onSuccess: () => invalidateFilesQuery(queryClient),
   });
 
-  /** Gives panels an imperative refresh entry point after external file operations. */
-  /** Called by: useFiles in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
-  const refetchFiles = async () => (await filesQuery.refetch()).data ?? null;
+  /**
+   * Runs only the explicit user-requested file-list refresh command. Used by:
+   * Data Loader's Refresh button; mutation owners invalidate through
+   * `invalidateFilesQuery` instead of calling this command.
+   */
+  const refreshFiles = async () => (await filesQuery.refetch()).data ?? null;
 
   /** Uploads a selected file and returns a boolean so panels can update inline status. */
   /** Used by: useFiles callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const handleUploadFile = async (file: File) => {
     try {
       await uploadMutation.mutateAsync(file);
-      await refetchFiles();
       return true;
     } catch (error) {
       console.error('Failed to upload file:', error);
@@ -82,7 +81,6 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const handleDeleteFile = async (filename: string) => {
     try {
       await deleteMutation.mutateAsync(filename);
-      await refetchFiles();
       if (selectedFile === filename) setSelectedFile(null);
       return true;
     } catch (error) {
@@ -119,6 +117,6 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     handleUploadFile,
     handleDeleteFile,
     handleDownloadFile,
-    refetchFiles,
+    refreshFiles,
   };
 };

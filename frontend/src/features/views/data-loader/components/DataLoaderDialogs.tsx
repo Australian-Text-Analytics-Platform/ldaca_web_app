@@ -26,10 +26,6 @@ import type { FileTreeDirectory } from '@/features/views/data-loader/types';
 import { LdacaImportDialog, type LdacaImportDialogProps } from './LdacaImportDialog';
 
 export interface DataLoaderDialogsProps {
-  noWorkspaceAlert: {
-    open: boolean;
-    onClose: () => void;
-  };
   workspaceNameAlert: {
     message: string | null;
     onClose: () => void;
@@ -73,7 +69,6 @@ export interface DataLoaderDialogsProps {
  * delegate confirmations/import/search actions back to DataLoaderFeature hooks.
  */
 export function DataLoaderDialogs({
-  noWorkspaceAlert,
   workspaceNameAlert,
   folderNameAlert,
   deleteWorkspace,
@@ -83,26 +78,6 @@ export function DataLoaderDialogs({
 }: DataLoaderDialogsProps) {
   return (
     <>
-      <AlertDialog
-        open={noWorkspaceAlert.open}
-        onOpenChange={(open) => {
-          if (!open) noWorkspaceAlert.onClose();
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>No workspace selected</AlertDialogTitle>
-            <AlertDialogDescription>
-              Choose or create a workspace in the Active workspace panel before adding files. The
-              Add action will be available once a workspace is active.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={noWorkspaceAlert.onClose}>Got it</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog
         open={Boolean(workspaceNameAlert.message)}
         onOpenChange={(open) => {

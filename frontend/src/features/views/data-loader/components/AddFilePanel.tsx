@@ -4,7 +4,6 @@ import { useFilePreview } from '../hooks/useFilePreview';
 import { FilePreviewContent } from './FilePreviewContent';
 import { CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
 
 interface AddFilePanelProps {
   filename: string | null;
@@ -14,28 +13,16 @@ interface AddFilePanelProps {
 }
 
 /**
- * Confirmation dialog opened by the data loader before a selected file becomes
- * a workspace block. It gates rendering on a filename so preview hooks only run
- * for an actual file chosen by the uploader.
+ * Confirmation panel opened by the data loader before a selected file becomes
+ * a workspace block. `FilePreviewContent` is the sole Dialog owner; this
+ * component only gates its body so preview hooks run for a concrete open file.
  * Rendered by: DataLoaderFeature when a pending upload needs confirmation.
- * Flow: combine open state with filename presence, mirror close events to the
- * caller, then mount the dialog content only for a concrete file.
+ * Flow: combine open state with filename presence, then mount the preview
+ * content that owns the single focus, escape, and close lifecycle.
  */
 export function AddFilePanel({ filename, open, onClose, onConfirm }: AddFilePanelProps) {
-  const isOpen = open && Boolean(filename);
-
-  return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-    >
-      {isOpen && filename && (
-        <AddFilePanelBody filename={filename} onClose={onClose} onConfirm={onConfirm} />
-      )}
-    </Dialog>
-  );
+  if (!open || !filename) return null;
+  return <AddFilePanelBody filename={filename} onClose={onClose} onConfirm={onConfirm} />;
 }
 
 /**

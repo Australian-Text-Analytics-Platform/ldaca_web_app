@@ -4,6 +4,7 @@ import { useSidebarResize } from '@/hooks/useSidebarResize';
 import { useRightPanelResize } from '@/hooks/useRightPanelResize';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { WorkspaceProvider } from '@/features/workspace/common/WorkspaceProvider';
+import { WorkspaceDownloadsProvider } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import Sidebar from '@/components/layout/Sidebar';
 import { InsetCard } from '@/components/layout/InsetCard';
@@ -154,7 +155,9 @@ export function WorkspaceShell() {
                       }
                     >
                       <div className="mx-0 flex min-h-0 w-full max-w-none flex-1">
-                        <ViewRouter />
+                        <WorkspaceDownloadsProvider>
+                          <ViewRouter />
+                        </WorkspaceDownloadsProvider>
                       </div>
                     </InsetCard>
 

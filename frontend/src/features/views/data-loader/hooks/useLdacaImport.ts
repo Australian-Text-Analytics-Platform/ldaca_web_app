@@ -32,7 +32,6 @@ type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 interface UseLdacaImportParams {
   authHeaders: Record<string, string>;
   ldacaApiToken?: string | null;
-  refetchFiles: () => Promise<unknown>;
   notify: Notify;
 }
 
@@ -44,12 +43,7 @@ interface UseLdacaImportParams {
  * Flow: load featured records, run ONI search from dialog filters, import selected records
  * through backend APIs, and keep loading/error state isolated for DataLoaderDialogs.
  */
-export function useLdacaImport({
-  authHeaders,
-  ldacaApiToken,
-  refetchFiles,
-  notify,
-}: UseLdacaImportParams) {
+export function useLdacaImport({ authHeaders, ldacaApiToken, notify }: UseLdacaImportParams) {
   const [state, dispatch] = useReducer(ldacaImportReducer, initialLdacaImportState);
 
   /**
@@ -147,11 +141,11 @@ export function useLdacaImport({
   };
 
   /**
-   * Starts a backend import for a selected Oni record or typed identifier, then
-   * refreshes the file browser so new downloads can appear.
+   * Starts a backend import for a selected Oni record or typed identifier.
    * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    * Steps: resolve the selected record, call the import endpoint, close/reset dialog state,
-   * refresh files, and clear the row-level importing flag.
+   * and clear the row-level importing flag. The workspace task inbox owns the
+   * single file-query invalidation when the background import reaches success.
    */
   const handleLdacaImport = async (recordId?: string) => {
     // an empty recordId should fall through to the typed search query
@@ -169,7 +163,6 @@ export function useLdacaImport({
 
       notify('success', response.message || 'LDaCA import started in background.');
       dispatch({ type: 'importSucceeded' });
-      await refetchFiles();
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to start LDaCA import.');
     } finally {

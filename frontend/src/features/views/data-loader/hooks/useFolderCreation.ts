@@ -1,11 +1,12 @@
 import { useReducer } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { createFolder } from '@/api';
+import { invalidateFilesQuery } from './fileCache';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
 interface UseFolderCreationParams {
   authHeaders: Record<string, string>;
-  refetchFiles: () => Promise<unknown>;
   notify: Notify;
 }
 
@@ -91,12 +92,13 @@ function folderCreationReducer(
  * Manages the create-folder dialog state and backend mutation for the Data
  * Loader file browser.
  * Used by: DataLoaderFeature module and DataLoaderDialogs component because
- * they need shared dialog state, validation feedback, and refresh side effects
+ * they need shared dialog state, validation feedback, and cache side effects
  * without duplicating folder-creation mutation logic.
  * Flow: tracks the selected parent, resets stale draft/error state when opened,
- * then submits the trimmed folder name and refreshes the browser on success.
+ * then submits the trimmed folder name and invalidates the browser on success.
  */
-export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFolderCreationParams) {
+export function useFolderCreation({ authHeaders, notify }: UseFolderCreationParams) {
+  const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(folderCreationReducer, initialFolderCreationState);
 
   /**
@@ -110,12 +112,12 @@ export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFold
   };
 
   /**
-   * Creates the folder, refreshes the file browser, and routes invalid-name
+   * Creates the folder, invalidates the file browser, and routes invalid-name
    * errors to the alert dialog shown by `DataLoaderDialogs`.
    * Called by: DataLoaderDialogs submit handling because the UI needs one
-   * guarded path for validation, backend mutation, refresh, toast, and cleanup.
+   * guarded path for validation, backend mutation, invalidation, toast, and cleanup.
    * Steps: ignore blank names, mark the request busy, call the generated API,
-   * refetch files, then split invalid-name errors into dialog alerts.
+   * invalidate files, then split invalid-name errors into dialog alerts.
    */
   const handleCreateFolder = async () => {
     const trimmedName = state.newFolderName.trim();
@@ -130,7 +132,7 @@ export function useFolderCreation({ authHeaders, refetchFiles, notify }: UseFold
         headers: authHeaders,
         throwOnError: true,
       });
-      await refetchFiles();
+      await invalidateFilesQuery(queryClient);
       notify('success', `Folder "${trimmedName}" created.`);
       dispatch({ type: 'create-succeeded' });
     } catch (error) {

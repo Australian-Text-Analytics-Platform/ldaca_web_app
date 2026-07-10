@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { invalidateFilesQuery } from '../hooks/fileCache';
 
 const TOOL_LABELS: Record<string, string> = {
   concordance: 'Concordance',
@@ -140,17 +141,17 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
 
 interface Props {
   authHeaders: Record<string, string>;
-  onImportComplete: () => void;
 }
 
 /**
  * Opens the sample-content import workflow from Data Loader. It manages local
- * dataset selection and delegates successful imports back to the parent file
- * browser refresh callback.
+ * dataset selection and owns the file-query invalidation after import.
  * Rendered by: DataLoaderFeature module because the parent needs this component boundary to keep feature controls and state presentation isolated.
- * Flow: request available sample categories, render the dataset dialog, then delegate imports so the Data Loader can refresh files afterward.
+ * Flow: request available sample categories, render the dataset dialog, then
+ * import selected collections and invalidate the shared file query once.
  */
-export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
+export function SampleDataPanel({ authHeaders }: Props) {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [importing, setImporting] = useState(false);
@@ -183,11 +184,11 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
   };
 
   /**
-   * Imports selected sample datasets and refreshes the parent file browser once
-   * the backend reports the import has started or completed.
+   * Imports selected sample datasets and invalidates the shared file browser
+   * once the backend reports the import has started or completed.
    * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    * Steps: collect selected IDs, show import progress, call the backend, report remote-download
-   * state, refresh files, then reset dialog state.
+   * state, invalidate files, then reset dialog state.
    */
   const handleImport = async () => {
     const selectedIds = catalogue
@@ -212,7 +213,7 @@ export function SampleDataPanel({ authHeaders, onImportComplete }: Props) {
       } else {
         toast.success('Sample data imported.');
       }
-      onImportComplete();
+      await invalidateFilesQuery(queryClient);
       setOpen(false);
     } catch (err) {
       toast.dismiss(loadingToastId);

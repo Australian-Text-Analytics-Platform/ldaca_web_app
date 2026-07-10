@@ -22,7 +22,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import type { WorkspaceSummary } from '@/api';
 import { formatBytes, formatTimestamp } from '../utils/format';
-import type { PendingWorkspaceDownloadsHandle } from '../hooks/usePendingWorkspaceDownloads';
+import type { WorkspaceDownloadsHandle } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
 
 export type WorkspaceListItem = WorkspaceSummary;
 
@@ -33,7 +33,7 @@ export interface WorkspaceManagerCardProps {
   hasActiveTask?: boolean;
   uploadingZip: boolean;
   refreshing: boolean;
-  downloads: PendingWorkspaceDownloadsHandle;
+  downloads: WorkspaceDownloadsHandle;
   onUploadZip: (file: File) => Promise<void> | void;
   onRefresh: () => void;
   onLoadWorkspace: (workspaceId: string | null) => void;

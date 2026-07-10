@@ -1,16 +1,18 @@
 import { useReducer, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getRawFile, moveFile } from '@/api';
 import type { FileTreeDirectory } from '@/features/views/data-loader/types';
 import {
   createFileBrowserCitationState,
   fileBrowserCitationReducer,
 } from './fileBrowserCitationState';
+import { invalidateFilesQuery } from './fileCache';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
 interface UseFileBrowserActionsParams {
   authHeaders: Record<string, string>;
-  refetchFiles: () => Promise<unknown>;
+  refreshFiles: () => Promise<unknown>;
   notify: Notify;
 }
 
@@ -23,9 +25,10 @@ interface UseFileBrowserActionsParams {
  */
 export function useFileBrowserActions({
   authHeaders,
-  refetchFiles,
+  refreshFiles,
   notify,
 }: UseFileBrowserActionsParams) {
+  const queryClient = useQueryClient();
   const [citation, dispatchCitation] = useReducer(
     fileBrowserCitationReducer,
     undefined,
@@ -41,7 +44,7 @@ export function useFileBrowserActions({
   const handleRefreshFiles = async () => {
     setRefreshingFiles(true);
     try {
-      await refetchFiles();
+      await refreshFiles();
       notify('success', 'File list refreshed.');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to refresh file list.');
@@ -52,7 +55,7 @@ export function useFileBrowserActions({
 
   /**
    * Moves a file into a target directory for `FileTree` drop events, then
-   * refreshes the browser so the row appears in its new location.
+   * invalidates the browser query so the row appears in its new location.
    * Called by: useFileBrowserActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const handleMoveFile = async (sourcePath: string, targetDirectoryPath: string) => {
@@ -62,7 +65,7 @@ export function useFileBrowserActions({
         headers: authHeaders,
         throwOnError: true,
       });
-      await refetchFiles();
+      await invalidateFilesQuery(queryClient);
       notify('success', `Moved ${String(sourcePath.split('/').at(-1))}.`);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to move file.');

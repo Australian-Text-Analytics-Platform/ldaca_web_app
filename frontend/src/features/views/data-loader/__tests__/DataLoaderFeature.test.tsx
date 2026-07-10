@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
 import { listLdacaFeaturedCollections } from '@/api';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { WorkspaceDownloadsProvider } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsProvider';
 
 const {
   mockSetCurrentWorkspace,
@@ -175,7 +176,7 @@ vi.mock('@/features/views/data-loader/hooks/useFiles', () => ({
     handleUploadFile: mockHandleUploadFile,
     handleDeleteFile: mockHandleDeleteFile,
     handleDownloadFile: vi.fn(),
-    refetchFiles: vi.fn(),
+    refreshFiles: vi.fn(),
   }),
 }));
 
@@ -230,7 +231,11 @@ describe('DataLoaderFeature citation UI', () => {
         },
       },
     });
-    return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <WorkspaceDownloadsProvider>{ui}</WorkspaceDownloadsProvider>
+      </QueryClientProvider>,
+    );
   };
 
   beforeEach(() => {

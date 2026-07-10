@@ -65,13 +65,6 @@ settled before deletion.
 
 ### Correctness-sensitive ownership seams
 
-#### C8. Own workspace-download completion above Data Loader navigation
-
-- **Evidence / strength — Strong:** [usePendingWorkspaceDownloads.ts](../frontend/src/features/views/data-loader/hooks/usePendingWorkspaceDownloads.ts#L38-L156) stores task IDs in component-local state, and [DataLoaderFeature.tsx](../frontend/src/features/views/data-loader/DataLoaderFeature.tsx) unmounts that owner when the user navigates away.
-- **Recommended direction:** move pending artifact completion to an app/workspace task owner that survives feature unmount; keep the Data Loader row as a view of that state.
-- **Deletion test:** Data Loader no longer owns the completion watcher and no navigation path can orphan a started artifact.
-- **Validation:** start a download, navigate across views/workspaces, complete/fail/cancel it, return to Data Loader, and verify exactly one save/toast.
-
 #### C9. Use one Tauri development command and port contract
 
 - **Evidence / strength — Strong:** [tauri.conf.json](../frontend/src-tauri/tauri.conf.json#L6-L9) invokes npm and waits on port 3001, while [vite.config.ts](../frontend/vite.config.ts#L44-L51), [.env.example](../frontend/.env.example#L8-L12), and repository scripts use port 3000 and pnpm.
@@ -143,13 +136,6 @@ settled before deletion.
 - **Recommended direction:** delete only verified zero-callers and keep active view plus live UI ownership.
 - **Deletion test:** every remaining field/action has a production consumer or a documented test seam.
 - **Validation:** sidebar mobile/desktop behavior, settings/feedback dialogs, view switching, hydration, and store tests.
-
-#### D8. Delete the orphan `DataFolderDialog` shell
-
-- **Evidence / strength — Strong:** [DataFolderDialog.tsx](../frontend/src/components/dialogs/DataFolderDialog.tsx) is effectively consumed only by [DataFolderDialog.test.tsx](../frontend/src/components/dialogs/__tests__/DataFolderDialog.test.tsx); Settings uses the shared panel directly.
-- **Recommended direction:** remove the shell and its shell-only test while keeping the live settings panel and data-root flow.
-- **Deletion test:** no test imports a component absent from production and the underlying panel has direct coverage.
-- **Validation:** open Settings, inspect/change data root in supported modes, save/cancel, and surface backend errors.
 
 #### D9. Collapse documentation registry shims and impossible status paths
 
@@ -248,13 +234,6 @@ settled before deletion.
 - **Recommended direction:** prefer direct imports for internal feature code while retaining the deliberate public API barrel and meaningful feature seams.
 - **Deletion test:** the common barrel exports only a coherent contract or is no longer used internally, with fewer cycle/unused-export edges.
 - **Validation:** import-cycle scan, Knip, typecheck/build, and no change to generated/API barrel ownership.
-
-#### D23. Give Data Loader mutations and dialogs one owner
-
-- **Evidence / strength — Strong:** [useFiles.ts](../frontend/src/features/views/data-loader/hooks/useFiles.ts#L41-L85) combines mutation invalidation with immediate refetches; refetch is threaded through callers, while Data Loader retains nested outer/inner dialogs, an unreachable no-workspace alert, and unused facade props.
-- **Recommended direction:** let TanStack mutation ownership choose invalidation or awaited refetch once, and collapse dialogs/facades to the component that owns their state.
-- **Deletion test:** duplicate network refresh, refetch prop threading, nested shells, and unreachable alert/facade props disappear.
-- **Validation:** upload/move/delete/create-folder/import, rapid consecutive mutations, stale list recovery, dialog focus/cancel, and missing-workspace routing.
 
 ### Deep modularity opportunities
 
@@ -407,7 +386,6 @@ unreachable callers. Product/external-contract caveats remain where noted.
 
 | Candidate | Evidence / deletion guard |
 | --- | --- |
-| `DataFolderDialog` shell | Remove [DataFolderDialog.tsx](../frontend/src/components/dialogs/DataFolderDialog.tsx) and shell-only test; retain the live Settings panel. |
 | Topic minimum-size helper | Remove [minTopicSize.ts](../frontend/src/features/views/topic-modeling/components/panels/minTopicSize.ts) after its zero-import check. |
 | Dead UI-store methods/state | Delete verified sidebar/modal/other zero-callers from [uiStore.ts](../frontend/src/stores/uiStore.ts), not active-view state. |
 | Tutorial registry status/warning | Remove dead fields and the impossible warning path in [registryStore.ts](../frontend/src/tutorials/registryStore.ts). |
@@ -419,7 +397,6 @@ unreachable callers. Product/external-contract caveats remain where noted.
 | Narrow hook/API outputs | Delete zero-caller raw query fields, task outputs, schema aliases, hydration/request helpers, and exports one owner at a time. |
 | Retired Tauri/workflow surfaces | Remove HTTP plugin, direct serde, global/window-webview permissions, `__BACKEND_PORT__`, and `build-notes`; keep live opener/dialog/filesystem. |
 | Private npm publication | Remove CLI, `bin`/`files`/prepublish configuration, `.npmignore`, and publishing docs while preserving workspace name/version. |
-| Data Loader facades | Remove nested dialog shell, unreachable no-workspace alert, refetch prop threading, and unused facade props after ownership is consolidated. |
 
 ### Worth Confirming
 
@@ -672,6 +649,31 @@ unreachable callers. Product/external-contract caveats remain where noted.
       placeholder-on-Tab moved wholesale to `views/common`, while only
       sampling-name construction moved out of the preprocessing-specific
       expression/filter naming module; no compatibility re-exports remain.
+
+40. Own workspace-download completion above Data Loader navigation (C8)
+    - Done 2026-07-10. `WorkspaceDownloadsProvider` now owns pending artifact
+      tasks inside the persistent workspace shell, reads auth headers live, and
+      matches terminal work by workspace plus returned task id. It claims each
+      terminal outcome before asynchronous artifact download/save, so navigation
+      and repeated success/failure/cancel emissions cannot orphan or duplicate a
+      save/toast; Data Loader only consumes the provider handle.
+
+41. Delete the orphan data-folder dialog shell (D8)
+    - Done 2026-07-10. Settings now imports the live
+      `DataFolderSettingsPanel` from its correctly named module, while the
+      zero-production-caller `DataFolderDialog` shell and shell-only test are
+      gone. Direct panel coverage preserves workspace unload, admin data-root
+      update, auth refresh, and workspace/file query refresh behavior.
+
+42. Give Data Loader mutations and dialogs one owner (D23)
+    - Done 2026-07-10. Upload, delete, move, folder creation, and sample import
+      each invalidate the file query once through their mutation owner; LDaCA
+      keeps terminal task-owned invalidation and claims successful task ids so
+      replayed events cannot refresh twice. The explicit Refresh button remains
+      a separate refetch command. `refetchFiles` prop threading and duplicate
+      immediate refetches are gone. File preview has one Dialog owner, and the
+      disabled no-workspace Add action no longer carries an unreachable
+      alert/state facade.
 
 ## Endpoint And Source-Of-Truth Notes
 

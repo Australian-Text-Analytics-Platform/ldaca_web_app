@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
-import { usePendingWorkspaceDownloads } from './hooks/usePendingWorkspaceDownloads';
+import { useWorkspaceDownloads } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
 import { useDataLoaderWorkspaceActions } from './hooks/useDataLoaderWorkspaceActions';
 import { useFileBrowserActions } from './hooks/useFileBrowserActions';
 import { useFolderCreation } from './hooks/useFolderCreation';
@@ -111,12 +111,11 @@ function DataLoaderFeature() {
     handleUploadFile,
     handleDeleteFile,
     handleDownloadFile,
-    refetchFiles,
+    refreshFiles,
   } = useFiles({ authHeaders });
 
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
-  const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
   const {
     containerRef: splitContainerRef,
     value: topRatio,
@@ -135,7 +134,7 @@ function DataLoaderFeature() {
    * Flow: choose an error-specific or normal duration, map the semantic status
    * to the matching Sonner API, and fall back to the neutral toast for info.
    */
-  const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+  const notify = (type: 'success' | 'error' | 'info', message: string) => {
     const duration = type === 'error' ? 6000 : 3500;
     if (type === 'success') {
       toast.success(message, { duration });
@@ -144,9 +143,9 @@ function DataLoaderFeature() {
     } else {
       toast(message, { duration });
     }
-  }, []);
+  };
 
-  const workspaceDownloads = usePendingWorkspaceDownloads({ authHeaders, notify });
+  const workspaceDownloads = useWorkspaceDownloads();
   const {
     workspaceToDelete,
     deletingWorkspace,
@@ -181,7 +180,7 @@ function DataLoaderFeature() {
     handleMoveFile,
     openCitation,
     closeCitation,
-  } = useFileBrowserActions({ authHeaders, refetchFiles, notify });
+  } = useFileBrowserActions({ authHeaders, refreshFiles, notify });
   const {
     ldacaImportOpen,
     setLdacaImportOpen,
@@ -204,7 +203,7 @@ function DataLoaderFeature() {
     reloadFeaturedRecords,
     handleLdacaSearch,
     handleLdacaImport,
-  } = useLdacaImport({ authHeaders, ldacaApiToken: ldacaOniApiToken, refetchFiles, notify });
+  } = useLdacaImport({ authHeaders, ldacaApiToken: ldacaOniApiToken, notify });
   const {
     fileInputRef,
     uploadingFiles,
@@ -227,7 +226,7 @@ function DataLoaderFeature() {
     closeFolderNameAlert,
     openCreateFolderDialog,
     handleCreateFolder,
-  } = useFolderCreation({ authHeaders, refetchFiles, notify });
+  } = useFolderCreation({ authHeaders, notify });
 
   const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
 
@@ -390,12 +389,7 @@ function DataLoaderFeature() {
                   <HelpIcon targetKey="data-loader.upload.button" label="About upload files" />
                 </div>
                 <div className="flex items-center gap-1">
-                  <SampleDataPanel
-                    authHeaders={authHeaders}
-                    onImportComplete={() => {
-                      void refetchFiles();
-                    }}
-                  />
+                  <SampleDataPanel authHeaders={authHeaders} />
                   <HelpIcon
                     targetKey="data-loader.import-sample.button"
                     label="About import sample data"
@@ -490,9 +484,6 @@ function DataLoaderFeature() {
                           onDeleteFile={(file) => {
                             void handleDeleteFile(file);
                           }}
-                          onWarnNoWorkspace={() => {
-                            setWorkspaceAlertOpen(true);
-                          }}
                           onCreateFolderInside={openCreateFolderDialog}
                           onOpenCitation={(directory, readmePath) => {
                             void openCitation(directory, readmePath);
@@ -530,16 +521,6 @@ function DataLoaderFeature() {
         onConfirm={handleAddToWorkspace}
       />
       <DataLoaderDialogs
-        noWorkspaceAlert={{
-          open: workspaceAlertOpen,
-          /**
-           * Dismisses the no-workspace alert owned by DataLoaderDialogs.
-           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
-           */
-          onClose: () => {
-            setWorkspaceAlertOpen(false);
-          },
-        }}
         workspaceNameAlert={{
           message: workspaceNameAlert,
           onClose: closeWorkspaceNameAlert,

@@ -42,7 +42,6 @@ export interface FileTreeProps {
   onSelectFile: (path: string) => void;
   onDownloadFile: (path: string) => void;
   onDeleteFile: (path: string) => void;
-  onWarnNoWorkspace: () => void;
   onCreateFolderInside: (parentPath: string, parentLabel: string) => void;
   onOpenCitation: (directory: FileTreeDirectory, readmePath: string | null) => void;
   onMoveFile: (sourcePath: string, targetDirectoryPath: string) => Promise<void> | void;
@@ -65,7 +64,6 @@ export function FileTree({
   onSelectFile,
   onDownloadFile,
   onDeleteFile,
-  onWarnNoWorkspace,
   onCreateFolderInside,
   onOpenCitation,
   onMoveFile,
@@ -270,10 +268,6 @@ export function FileTree({
             disabled={!hasWorkspaceSelected}
             data-hint-id="data-loader.file-row.add"
             onClick={() => {
-              if (!hasWorkspaceSelected) {
-                onWarnNoWorkspace();
-                return;
-              }
               onAddFile(file.path);
               onSelectFile(file.path);
             }}

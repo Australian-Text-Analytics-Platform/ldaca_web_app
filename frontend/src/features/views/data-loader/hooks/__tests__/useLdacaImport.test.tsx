@@ -26,7 +26,6 @@ const cooeeRecord: LdacaSearchResult = {
 describe('useLdacaImport', () => {
   const authHeaders = { Authorization: 'Bearer token' };
   const ldacaApiToken = 'ldaca-secret-token';
-  const refetchFiles = vi.fn(() => Promise.resolve());
   const notify = vi.fn();
 
   beforeEach(() => {
@@ -58,9 +57,7 @@ describe('useLdacaImport', () => {
   });
 
   it('loads staff picks when the dialog opens', async () => {
-    const { result } = renderHook(() =>
-      useLdacaImport({ authHeaders, ldacaApiToken, refetchFiles, notify }),
-    );
+    const { result } = renderHook(() => useLdacaImport({ authHeaders, ldacaApiToken, notify }));
 
     act(() => {
       result.current.setLdacaImportOpen(true);
@@ -76,9 +73,7 @@ describe('useLdacaImport', () => {
   });
 
   it('searches with the selected method and query', async () => {
-    const { result } = renderHook(() =>
-      useLdacaImport({ authHeaders, ldacaApiToken, refetchFiles, notify }),
-    );
+    const { result } = renderHook(() => useLdacaImport({ authHeaders, ldacaApiToken, notify }));
 
     act(() => {
       result.current.setSearchMethod('identifier');
@@ -105,9 +100,7 @@ describe('useLdacaImport', () => {
   });
 
   it('imports the chosen record id and closes the dialog', async () => {
-    const { result } = renderHook(() =>
-      useLdacaImport({ authHeaders, ldacaApiToken, refetchFiles, notify }),
-    );
+    const { result } = renderHook(() => useLdacaImport({ authHeaders, ldacaApiToken, notify }));
 
     act(() => {
       result.current.setLdacaImportOpen(true);
@@ -122,7 +115,7 @@ describe('useLdacaImport', () => {
       throwOnError: true,
     });
     expect(notify).toHaveBeenCalledWith('success', 'LDaCA import started');
-    expect(refetchFiles).toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
     expect(result.current.ldacaImportOpen).toBe(false);
     expect(result.current.hasSearched).toBe(false);
   });

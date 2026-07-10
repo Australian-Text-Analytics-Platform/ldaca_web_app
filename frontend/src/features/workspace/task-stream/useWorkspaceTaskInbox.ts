@@ -216,7 +216,7 @@ const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
  * Connects task-stream events to the analysis store and workspace query cache.
  * Analysis panels consume its client state for connection status.
  * Used by: Sidebar component, SidebarViewVisibilityMenu tests (rg call sites/imports) because the sidebar owns the global task inbox indicator.
- * Flow: subscribe to the authenticated SSE client, route payloads into task/cache/materialization handlers, and expose transient stream errors as inbox status.
+ * Flow: subscribe to the authenticated SSE client, route payloads into task/cache/materialization handlers, claim LDaCA terminal file refreshes by task id, and expose transient stream errors as inbox status.
  */
 export const useWorkspaceTaskInbox = (
   workspaceId: string | null,
@@ -227,6 +227,10 @@ export const useWorkspaceTaskInbox = (
   const pushMaterializedEvent = useAnalysisStore((state) => state.pushMaterializedEvent);
   const [transientError, setTransientError] = useState<string | null>(null);
   const eventSequenceRef = useRef(0);
+  // Successful task_changed events may be replayed by the stream. This set is
+  // imperative claim state: the task store remains the render source of truth,
+  // while each LDaCA task may invalidate the files query only once.
+  const refreshedLdacaImportTaskIdsRef = useRef(new Set<string>());
 
   /**
    * Assigns a local sequence to incoming SSE events for deterministic merges.
@@ -297,7 +301,12 @@ export const useWorkspaceTaskInbox = (
             ]),
           );
 
-          if (changedTask.task_type === 'ldaca_import' && changedTask.state === 'successful') {
+          if (
+            changedTask.task_type === 'ldaca_import' &&
+            changedTask.state === 'successful' &&
+            !refreshedLdacaImportTaskIdsRef.current.has(changedTask.task_id)
+          ) {
+            refreshedLdacaImportTaskIdsRef.current.add(changedTask.task_id);
             void queryClient.invalidateQueries({ queryKey: queryKeys.files });
           }
 

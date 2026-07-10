@@ -2,14 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DataFolderDialog } from '../DataFolderDialog';
+import { DataFolderSettingsPanel } from '../DataFolderSettingsPanel';
 import { queryKeys } from '@/lib/queryKeys';
 
-/** Auth refresh mock used to verify directory changes reload session-derived config. */
 const refreshAuth = vi.fn();
-/** Workspace reset mock used to verify changing data roots unloads the active workspace first. */
 const setCurrentWorkspace = vi.fn();
-/** Used by: the generated SDK module factory to inspect admin config update payloads. */
 const updateAdminConfig = vi.fn();
 
 vi.mock('sonner', () => ({
@@ -21,12 +18,10 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/api/generated/sdk.gen', () => ({
-  /** Used by: the generated SDK module mock to assert DataFolderDialog updateAdminConfig calls. */
   updateAdminConfig: (...args: unknown[]) => updateAdminConfig(...args),
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
-  /** Used by: DataFolderDialog tests to supply auth state and refresh behavior. */
   useAuth: () => ({
     dataFolder: '/tmp/original',
     refreshAuth,
@@ -34,23 +29,18 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  /** Used by: DataFolderDialog tests to supply the active-workspace fixture. */
   useWorkspaceData: () => ({
     currentWorkspaceId: 'ws-1',
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
-  /**
-   * Exposes the workspace reset spy consumed by the dialog submit path.
-   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
-   */
   useWorkspaceActions: () => ({
     setCurrentWorkspace,
   }),
 }));
 
-describe('DataFolderDialog', () => {
+describe('DataFolderSettingsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     refreshAuth.mockResolvedValue(undefined);
@@ -73,7 +63,7 @@ describe('DataFolderDialog', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <DataFolderDialog open onOpenChange={vi.fn()} />
+        <DataFolderSettingsPanel />
       </QueryClientProvider>,
     );
 

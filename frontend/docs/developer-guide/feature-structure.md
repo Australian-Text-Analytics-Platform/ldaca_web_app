@@ -60,6 +60,18 @@ split, but stacks the main feature pane above the workspace pane below the `md`
 breakpoint. Keep resize-only inline widths behind responsive overrides so mobile
 screens do not inherit the desktop split and create horizontal overflow.
 
+Inside the existing `QueryProvider`/`WorkspaceProvider` lifetime,
+`WorkspaceDownloadsProvider` owns workspace ZIP generation through terminal
+task completion. Data Loader consumes its command/status view, but navigating
+away cannot unmount pending work. Terminal completion is matched by workspace
+and returned task id, then claimed before download/save so repeated task-stream
+emissions produce one artifact and one terminal toast.
+
+`SettingsDialog` renders `DataFolderSettingsPanel` directly for the live
+single-user data-root workflow. Do not add a second standalone dialog shell;
+the panel already owns workspace unload, backend config update, auth refresh,
+and workspace/file query refresh behavior.
+
 ## Views — Sidebar-Tab Features
 
 `src/features/views/` holds every tab rendered in the left sidebar. Each
@@ -116,6 +128,18 @@ invalid-name alert, while `DataLoaderDialogs` only renders that state.
 File-browser citation preview state follows the same pattern:
 `hooks/fileBrowserCitationState.ts` owns open/loading/content/close transitions,
 and `useFileBrowserActions` only performs the README fetch side effect.
+
+File-list server state stays in TanStack Query. Upload, delete, move, folder
+creation, and sample import owners call the shared file-query invalidation once
+after successful mutation; the task inbox claims each successful LDaCA task id
+before invalidating files, so replayed terminal events do not refresh twice.
+The toolbar Refresh button is the only explicit file-query refetch command, and
+must not be threaded back into mutation workflows.
+
+`FilePreviewContent` owns the shared preview Dialog for both inspect and
+add-to-workspace flows. `AddFilePanel` contributes confirmation state/content
+without wrapping another Dialog. FileTree disables Add when no workspace is
+selected, so Data Loader does not maintain an unreachable no-workspace alert.
 
 ### Preprocessing Tab
 
