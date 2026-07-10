@@ -666,10 +666,12 @@ unreachable callers. Product/external-contract caveats remain where noted.
 39. Apply exact preprocessing limits and neutral helper ownership (D24)
     - Done 2026-07-10. The active preprocessing subtab now supplies Join's
       two-node cap, Stack's six-node cap, or the one-node default to the shared
-      selector. Checklist search and placeholder-on-Tab moved wholesale to
-      `views/common`, while only sampling-name construction moved out of the
-      preprocessing-specific expression/filter naming module; no compatibility
-      re-exports remain.
+      selector. Restored over-limit state is immediately capped to the most
+      recent allowed inputs and persisted by that shared boundary, so Join and
+      Stack no longer truncate or warn independently. Checklist search and
+      placeholder-on-Tab moved wholesale to `views/common`, while only
+      sampling-name construction moved out of the preprocessing-specific
+      expression/filter naming module; no compatibility re-exports remain.
 
 ## Endpoint And Source-Of-Truth Notes
 

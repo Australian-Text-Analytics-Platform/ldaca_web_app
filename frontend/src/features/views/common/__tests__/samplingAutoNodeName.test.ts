@@ -16,4 +16,14 @@ describe('buildSamplingAutoNodeName', () => {
       }),
     ).toBe('Corpus_sampled_fr_0_4_rs_7');
   });
+
+  it('preserves sanitized naming for positive exponential sample sizes', () => {
+    expect(
+      buildSamplingAutoNodeName({
+        baseName: 'Corpus',
+        mode: 'random_sample',
+        sampleSize: 1e21,
+      }),
+    ).toBe('Corpus_sampled_n_1e_21');
+  });
 });

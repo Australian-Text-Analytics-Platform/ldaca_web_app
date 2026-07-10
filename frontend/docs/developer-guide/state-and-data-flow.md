@@ -157,7 +157,10 @@ including workspace, nodes, operation payload, and paging inputs. Switching any
 of those values aborts the previous generated-SDK request, and late responses
 cannot overwrite the new preview. The active preprocessing subtab supplies its
 exact input cap to the shared selector: Join accepts two nodes, Stack accepts
-six, and single-node tools accept one. Cross-feature checklist search,
+six, and single-node tools accept one. If persisted input state exceeds the
+active cap, the shared selector immediately uses the most recent allowed inputs
+and writes that normalized set back through the owning store. Join and Stack do
+not apply a second downstream truncation. Cross-feature checklist search,
 placeholder-on-Tab, and sampling-name helpers live under `views/common/` rather
 than under preprocessing.
 

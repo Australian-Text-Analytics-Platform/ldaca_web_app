@@ -19,7 +19,7 @@ import {
   deriveNodeLabel,
   getNodeKey,
 } from '../../utils/nodeMetadata';
-import { dedupeNodeIds, takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
+import { dedupeNodeIds } from '@/features/workspace/common/utils/selectionUtils';
 
 const DEFAULT_CONCAT_PALETTE = [
   '#2563eb',
@@ -61,7 +61,6 @@ interface ConcatSelectionPanelConfig {
   nodeColors: Record<string, string>;
   defaultPalette: string[];
   disabled: boolean;
-  originalCount: number;
   statusMessage: string | null;
   statusVariant: 'warning' | 'error' | null;
   maxCompare: number;
@@ -103,7 +102,6 @@ export interface UseConcatSubTabResult {
   form: ConcatFormControllers;
   statusMessage: string;
   statusVariant: 'warning' | 'error' | null;
-  extraSelectionMessage: string | null;
   analysis: ConcatSchemaAnalysis;
   preview: ConcatPreviewConfig;
   apply: ConcatApplyState;
@@ -279,9 +277,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
 
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
-  const uniqueNodeIds = dedupeNodeIds(selectedNodeIds);
-  const concatNodeIds = takeMostRecent(uniqueNodeIds, MAX_CONCAT_NODES);
-  const concatOriginalCount = uniqueNodeIds.length;
+  const concatNodeIds = dedupeNodeIds(selectedNodeIds);
 
   const concatSelectedNodes: WorkspaceNodeLike[] = (() => {
     return concatNodeIds
@@ -440,18 +436,12 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     }, {}),
     defaultPalette: DEFAULT_CONCAT_PALETTE,
     disabled: concatSelectedNodes.length < 2,
-    originalCount: concatOriginalCount,
     statusMessage: concatAnalysis.ready ? null : concatAnalysis.issues,
     statusVariant,
     maxCompare: MAX_CONCAT_NODES,
     onColumnChange: noop,
     onColorChange: noop,
   };
-
-  const extraSelectionMessage =
-    concatOriginalCount > MAX_CONCAT_NODES
-      ? `Using the most recent ${String(MAX_CONCAT_NODES)} of ${String(concatOriginalCount)} selected data blocks. Deselect extras to choose which ones to include.`
-      : null;
 
   return {
     selectionPanel,
@@ -464,7 +454,6 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     },
     statusMessage: concatAnalysis.issues,
     statusVariant,
-    extraSelectionMessage,
     analysis: concatAnalysis,
     preview: {
       columns: concatPreviewColumns,

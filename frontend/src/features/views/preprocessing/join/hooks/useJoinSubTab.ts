@@ -20,7 +20,7 @@ import {
   deriveNodeLabel,
   getNodeKey,
 } from '../../utils/nodeMetadata';
-import { dedupeNodeIds, takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
+import { dedupeNodeIds } from '@/features/workspace/common/utils/selectionUtils';
 import { MAX_JOIN_NODES } from '../../types';
 
 const DEFAULT_JOIN_PALETTE = ['#2563eb', '#dc2626'];
@@ -52,7 +52,6 @@ interface JoinSelectionPanelConfig {
   defaultPalette: string[];
   maxCompare: number;
   disabled: boolean;
-  originalCount: number;
   statusMessage: string | null;
   columnLabelFn: (node: WorkspaceNodeLike, index: number) => ReactNode;
   onColumnChange: (nodeId: string, column: string) => void;
@@ -171,9 +170,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
-  const uniqueSelectedNodeIds = dedupeNodeIds(selectedNodeIds);
-  const joinNodeIds = takeMostRecent(uniqueSelectedNodeIds, MAX_JOIN_NODES);
-  const joinOriginalCount = uniqueSelectedNodeIds.length;
+  const joinNodeIds = dedupeNodeIds(selectedNodeIds);
   const joinLeftNodeId = joinNodeIds[0] ?? '';
   const joinRightNodeId = joinNodeIds[1] ?? '';
 
@@ -445,7 +442,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     defaultPalette: DEFAULT_JOIN_PALETTE,
     maxCompare: MAX_JOIN_NODES,
     disabled: joinSelectedNodes.length < 2,
-    originalCount: joinOriginalCount,
     statusMessage: !joinConfigReady && joinConfigIssues ? joinConfigIssues : null,
     columnLabelFn,
     onColumnChange: handleJoinColumnChange,

@@ -30,7 +30,6 @@ export function ConcatSubTab(props: ConcatSubTabComponentProps) {
   const {
     form,
     statusMessage,
-    extraSelectionMessage,
     preview,
     apply,
     mismatches,
@@ -58,12 +57,6 @@ export function ConcatSubTab(props: ConcatSubTabComponentProps) {
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           {renderNodeInputsPanel?.()}
-
-          {extraSelectionMessage && (
-            <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-sm text-amber-900">
-              {extraSelectionMessage}
-            </div>
-          )}
 
           {mismatches.length > 0 && (
             <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">

@@ -134,18 +134,19 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   const consumeInputRequest = useNodeInputRequestsStore((s) => s.consume);
 
   const baseAddNodes = result.addNodes;
+  const effectiveInputs = result.inputs;
   const addNodes = useCallback(
     (ids: string[]): NodeAddRejection[] => {
       const rejections = baseAddNodes(ids);
       const rejected = new Set(rejections.map((r) => r.nodeId));
       const accepted = ids.filter((id) => !rejected.has(id));
       if (accepted.length > 0) {
-        const resulting = [...value.map((i) => i.node_id), ...accepted];
+        const resulting = [...effectiveInputs.map((i) => i.node_id), ...accepted];
         recordRecent(currentWorkspaceId, resulting);
       }
       return rejections;
     },
-    [baseAddNodes, value, recordRecent, currentWorkspaceId],
+    [baseAddNodes, effectiveInputs, recordRecent, currentWorkspaceId],
   );
 
   useEffect(() => {
@@ -183,7 +184,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   }, [allNodes]);
 
   const recentPresets = useMemo<ResolvedPreset[]>(() => {
-    const currentIds = new Set(value.map((i) => i.node_id));
+    const currentIds = new Set(effectiveInputs.map((i) => i.node_id));
     return (
       (recentGroups ?? [])
         .map((ids) => {
@@ -200,7 +201,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
         // Hide groups whose nodes have all vanished or are all already added.
         .filter((preset) => preset.labels.length > 0)
     );
-  }, [recentGroups, nodeNameById, value, result]);
+  }, [recentGroups, nodeNameById, effectiveInputs, result]);
 
   return {
     ...result,

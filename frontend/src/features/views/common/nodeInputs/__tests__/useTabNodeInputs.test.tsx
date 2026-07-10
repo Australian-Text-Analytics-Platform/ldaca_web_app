@@ -214,6 +214,78 @@ describe('useTabNodeInputs', () => {
     expect(consume).toHaveBeenCalledWith(12);
   });
 
+  it.each([2, 6])('consumes and rejects queued graph input when the %i-node cap is full', (maxNodes) => {
+    const nodes = Array.from({ length: maxNodes + 1 }, (_, index) => ({
+      id: `node-${String(index + 1)}`,
+      name: `Node ${String(index + 1)}`,
+      columns: ['text'],
+      schema: { text: 'String' },
+    }));
+    const consume = vi.fn();
+    const onTabInputSetChange = vi.fn();
+    mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
+    nodeInputRequestsStore({
+      requests: [
+        {
+          id: maxNodes,
+          workspaceId: 'workspace-1',
+          view: 'annotation',
+          nodeIds: [`node-${String(maxNodes + 1)}`],
+        },
+      ],
+      consume,
+    });
+
+    renderHook(() =>
+      useTabNodeInputs({
+        tabInputSets: {
+          source: nodes
+            .slice(0, maxNodes)
+            .map((node) => ({ node_id: node.id, column: 'text' })),
+        },
+        onTabInputSetChange,
+        constraints: { allowedDataTypes: ['string'], maxNodes },
+      }),
+    );
+
+    expect(onTabInputSetChange).not.toHaveBeenCalled();
+    expect(mocks.toastWarning).toHaveBeenCalledWith(
+      `Couldn't add node: This view accepts at most ${String(maxNodes)} nodes`,
+    );
+    expect(consume).toHaveBeenCalledWith(maxNodes);
+  });
+
+  it.each([2, 6])('persists restored over-limit inputs through the named tab owner at cap %i', (maxNodes) => {
+    const nodes = Array.from({ length: 12 }, (_, index) => ({
+      id: `node-${String(index + 1)}`,
+      name: `Node ${String(index + 1)}`,
+      columns: ['text'],
+      schema: { text: 'String' },
+    }));
+    const onTabInputSetChange = vi.fn();
+    mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
+
+    const { result } = renderHook(() =>
+      useTabNodeInputs({
+        selectorId: 'source',
+        tabInputSets: {
+          source: nodes.map((node) => ({ node_id: node.id, column: 'text' })),
+        },
+        onTabInputSetChange,
+        constraints: { allowedDataTypes: ['string'], maxNodes },
+        consumeNodeInputRequests: false,
+      }),
+    );
+
+    const expectedIds = nodes.slice(-maxNodes).map((node) => node.id);
+    expect(result.current.inputs.map((input) => input.node_id)).toEqual(expectedIds);
+    expect(onTabInputSetChange).toHaveBeenCalledOnce();
+    expect(onTabInputSetChange.mock.calls[0]?.[0]).toBe('source');
+    expect(
+      onTabInputSetChange.mock.calls[0]?.[1].map((input: { node_id: string }) => input.node_id),
+    ).toEqual(expectedIds);
+  });
+
   it('leaves current-view add requests pending when direct consumption is disabled', () => {
     const consume = vi.fn();
     const onTabInputSetChange = vi.fn();

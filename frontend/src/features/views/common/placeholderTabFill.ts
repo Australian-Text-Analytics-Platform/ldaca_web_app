@@ -6,7 +6,12 @@ interface PlaceholderTabFillArgs {
   setValue: (value: string) => void;
 }
 
-/** Restores the caret after a placeholder is accepted without moving focus. */
+/**
+ * Restores the caret after a placeholder is accepted without moving focus.
+ * Called by: acceptPlaceholderOnTab after it copies a generated placeholder.
+ * Flow: schedule after React commits the value, prefer animation-frame timing,
+ * fall back to a timer, and move the caret only while the input retains focus.
+ */
 const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
   const restore = () => {
     if (document.activeElement !== input) {

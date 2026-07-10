@@ -458,6 +458,43 @@ describe('useWorkspaceNodeMutations', () => {
   });
 
   describe('combined-node mutations', () => {
+    it('maps the request workspace and exact signal to concatNodesPreview', async () => {
+      const queryClient = createTestClient();
+      const signal = new AbortController().signal;
+      workspaceSdkMock.concatNodesPreview.mockResolvedValue({
+        data: { data: [], columns: [], pagination: null },
+        error: undefined,
+      });
+
+      const { result } = renderHook(
+        () =>
+          useWorkspaceNodeMutations(
+            buildHookArgs(queryClient, { currentWorkspaceId: 'closure-workspace' }),
+          ),
+        { wrapper: wrapWithClient(queryClient) },
+      );
+
+      await act(async () => {
+        await result.current.actions.concatPreview({
+          workspaceId: 'request-workspace',
+          nodeIds: ['node-a', 'node-b'],
+          page: 2,
+          pageSize: 25,
+          deduplicate: true,
+          signal,
+        });
+      });
+
+      expect(workspaceSdkMock.concatNodesPreview).toHaveBeenCalledWith({
+        body: { node_ids: ['node-a', 'node-b'], deduplicate: true },
+        headers: { Authorization: 'Bearer test' },
+        path: { workspace_id: 'request-workspace' },
+        query: { page: 2, page_size: 25 },
+        signal,
+        throwOnError: true,
+      });
+    });
+
     it('selects the id returned by joinNodes', async () => {
       const queryClient = createTestClient();
       const replaceSelectedNodes = mkReplaceSelectedNodes();

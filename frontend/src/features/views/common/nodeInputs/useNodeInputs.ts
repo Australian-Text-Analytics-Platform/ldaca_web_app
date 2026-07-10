@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../nodeSelectionTypes';
 import { getNodeIdentifier } from '../nodeSelectionTypes';
 import {
@@ -64,19 +64,28 @@ export interface UseNodeInputsResult {
  * because they need a uniform add/remove/clear/column surface plus a resolved
  * display model for the add-node-as-needed selection flow.
  *
- * Flow: resolve owned inputs against live nodes each render (dropping stale
- * ids), then expose mutators that validate only structural add-time rules
- * (existence, duplicates, max nodes) and commit via ``onChange``. Column type
- * constraints only filter picker options/defaults; they do not block adding.
+ * Flow: cap restored inputs to the most recent entries and persist that
+ * normalization through the existing owner, resolve the effective inputs
+ * against live nodes (dropping stale ids), then expose mutators that validate
+ * structural add-time rules and commit via ``onChange``. Column type constraints
+ * only filter picker options/defaults; they do not block adding.
  */
 export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult {
   const { value, onChange, allNodes, constraints, getColumnInfos } = config;
+  const maxNodes = constraints.maxNodes;
+  const inputs = maxNodes != null && value.length > maxNodes ? value.slice(-maxNodes) : value;
+
+  useEffect(() => {
+    if (maxNodes != null && value.length > maxNodes) {
+      onChange(value.slice(-maxNodes));
+    }
+  }, [maxNodes, onChange, value]);
 
   const nodeMap = useMemo(() => buildNodeMap(allNodes), [allNodes]);
 
   const resolvedNodes = useMemo(
-    () => resolveNodeInputs(value, nodeMap, constraints, getColumnInfos),
-    [value, nodeMap, constraints, getColumnInfos],
+    () => resolveNodeInputs(inputs, nodeMap, constraints, getColumnInfos),
+    [inputs, nodeMap, constraints, getColumnInfos],
   );
 
   const selectedNodes = useMemo(() => resolvedNodes.map((r) => r.node), [resolvedNodes]);
@@ -86,19 +95,19 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
     [resolvedNodes],
   );
 
-  const selectedIds = useMemo(() => new Set(value.map((i) => i.node_id)), [value]);
+  const selectedIds = useMemo(() => new Set(inputs.map((i) => i.node_id)), [inputs]);
 
   const availableNodes = useMemo(
     () => allNodes.filter((node) => !selectedIds.has(getNodeIdentifier(node))),
     [allNodes, selectedIds],
   );
 
-  const canAddMore = constraints.maxNodes == null || value.length < constraints.maxNodes;
+  const canAddMore = maxNodes == null || inputs.length < maxNodes;
 
   const addNodes = useCallback(
     (ids: string[]): NodeAddRejection[] => {
       const rejections: NodeAddRejection[] = [];
-      const next = [...value];
+      const next = [...inputs];
       for (const id of ids) {
         const reason = validateAdd(id, next, nodeMap, constraints);
         if (reason) {
@@ -109,33 +118,33 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
         const node = nodeMap.get(id)!;
         next.push({ node_id: id, column: defaultColumnForNode(node, constraints, getColumnInfos) });
       }
-      if (next.length !== value.length) onChange(next);
+      if (next.length !== inputs.length) onChange(next);
       return rejections;
     },
-    [value, nodeMap, constraints, getColumnInfos, onChange],
+    [inputs, nodeMap, constraints, getColumnInfos, onChange],
   );
 
   const getAddRejection = useCallback(
-    (id: string): string | null => validateAdd(id, value, nodeMap, constraints),
-    [value, nodeMap, constraints],
+    (id: string): string | null => validateAdd(id, inputs, nodeMap, constraints),
+    [inputs, nodeMap, constraints],
   );
 
   const removeNode = useCallback(
     (id: string) => {
-      const next = value.filter((i) => i.node_id !== id);
-      if (next.length !== value.length) onChange(next);
+      const next = inputs.filter((i) => i.node_id !== id);
+      if (next.length !== inputs.length) onChange(next);
     },
-    [value, onChange],
+    [inputs, onChange],
   );
 
   const clear = useCallback(() => {
-    if (value.length) onChange([]);
-  }, [value, onChange]);
+    if (inputs.length) onChange([]);
+  }, [inputs, onChange]);
 
   const setColumn = useCallback(
     (nodeId: string, column: string) => {
       let changed = false;
-      const next = value.map((i) => {
+      const next = inputs.map((i) => {
         if (i.node_id === nodeId && i.column !== column) {
           changed = true;
           return { ...i, column };
@@ -145,11 +154,11 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `changed` is mutated inside the map callback; TS control-flow analysis does not track the closure mutation
       if (changed) onChange(next);
     },
-    [value, onChange],
+    [inputs, onChange],
   );
 
   return {
-    inputs: value,
+    inputs,
     resolvedNodes,
     selectedNodes,
     nodeColumnSelections,
