@@ -11,12 +11,9 @@ import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { SortableHeader } from './SortableHeader';
-import {
-  CONCORDANCE_COMBINED_NODE_KEY,
-  batchProcessedCount,
-  findConcordanceSourceNode,
-  getConcordanceSourceColor,
-} from '../concordanceViewModels';
+import { batchProcessedCount } from '../concordanceDispersionDomain';
+import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
+import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import { ConcordancePlainHeader, ConcordanceRowsTable } from './ConcordanceRowsTable';
 import {
   buildConcordanceTableModel,

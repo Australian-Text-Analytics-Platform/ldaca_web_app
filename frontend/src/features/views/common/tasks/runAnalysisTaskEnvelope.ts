@@ -18,7 +18,7 @@ interface RunAnalysisTaskEnvelopeOptions<TResponse extends AnalysisRunResponse> 
   runningRef: CurrentRef<boolean>;
   setIsRunning: (value: boolean) => void;
   setLocalTaskId: (taskId: string | null) => void;
-  onTaskIdAssigned?: (taskId: string | null) => void;
+  onTaskIdAssigned: (taskId: string | null) => void;
   resetBeforeRun: () => void;
   submit: () => Promise<TResponse>;
   onSuccess: (response: TResponse, taskId: string | null) => void;
@@ -65,7 +65,7 @@ export async function runAnalysisTaskEnvelope<TResponse extends AnalysisRunRespo
   try {
     const response = await submit();
     const taskId = extractAndSetTaskId(response, setLocalTaskId);
-    onTaskIdAssigned?.(taskId);
+    onTaskIdAssigned(taskId);
     onSuccess(response, taskId);
 
     if (shouldReleaseRunning(response)) {

@@ -11,18 +11,14 @@ import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskB
 import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
-import { useSafeResult } from '../common/useSafeResult';
 import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-import type { AnalysisTabInput } from '@/api';
-import {
-  DEFAULT_TAB_INPUT_SET_ID,
-  type AnalysisTabInputSets,
-} from '@/features/views/common/tabs/tabStateOps';
+import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { useConcordanceTaskFlow } from './hooks/useConcordanceTaskFlow';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
@@ -32,12 +28,11 @@ import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
 import { useConcordanceDetachDialogs } from './hooks/useConcordanceDetachDialogs';
 import { useConcordanceDispersionControls } from './hooks/useConcordanceDispersionControls';
 import { useConcordanceTokenizerMode } from './hooks/useConcordanceTokenizerMode';
-import { useConcordanceResultViewModel } from './hooks/useConcordanceResultViewModel';
+import { useConcordanceResultSession } from './hooks/useConcordanceResultSession';
 import {
   readConcordanceServerParams,
   useConcordanceParameters,
 } from './hooks/useConcordanceParameters';
-import { useConcordanceResultControls } from './hooks/useConcordanceResultControls';
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
@@ -54,28 +49,17 @@ import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
  * Rendered by: the analysis feature registry when this panel is selected.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
- * Tab props (optional): when rendered inside an analysis tab by the
- * viewComponents loader, ``tabId`` identifies the active tab, ``tabTaskId``
- * seeds deterministic hydration of that tab's task, and ``onTabTaskChange``
- * lets the feature report task id assignment/clear back to the tab record.
- * ``onTabInputSetChange`` is required because node-input edits must persist
- * through the tab's input-set owner.
+ * The required host supplies normalized task/input state and closure-bound
+ * persistence commands for the active tab; this feature has no standalone or
+ * optional-tab compatibility path.
  */
-interface ConcordanceFeatureProps {
-  tabId?: string;
-  tabTaskId?: string | null;
-  onTabTaskChange?: (taskId: string | null) => void;
-  tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
-}
-
-function ConcordanceFeature({
-  tabId,
-  tabTaskId,
-  onTabTaskChange,
-  tabInputSets,
-  onTabInputSetChange,
-}: ConcordanceFeatureProps) {
+function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
+  const {
+    taskId: tabTaskId,
+    setTaskId: onTabTaskChange,
+    inputSets: tabInputSets,
+    setInputSet: onTabInputSetChange,
+  } = host;
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const { selectedNodes } = useWorkspaceSelection();
@@ -144,7 +128,7 @@ function ConcordanceFeature({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.concordance,
     workspaceId: currentWorkspaceId,
-    taskId: tabTaskId ?? null,
+    taskId: tabTaskId,
   });
   /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
   const applyInputsFromSelections = (sels: { nodeId: string; column?: string | null }[]) => {
@@ -198,20 +182,32 @@ function ConcordanceFeature({
     handleClearBinSelection,
   } = useConcordanceDispersionControls();
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
-  const [liveResults, concordanceResultsRef, setResults] =
-    useSafeResult<ConcordanceAnalysisResponse>();
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
-
-  const results = liveResults;
-  const concordanceTaskId = (() => {
-    const md = liveResults?.metadata as Record<string, unknown> | undefined;
-    const value = md?.task_id ?? md?.taskId;
-    return typeof value === 'string' ? value : '';
-  })();
   const {
+    results,
+    resultRef: concordanceResultsRef,
+    setResults,
+    taskId: concordanceTaskId,
+    nodePagination,
+    setNodePagination,
+    nodeLoading,
+    setNodeLoading,
+    nodeDetaching,
+    setNodeDetaching,
+    nodeMaterializing,
+    setNodeMaterializing,
+    materializeTaskIds,
+    setMaterializeTaskIds,
+    materializeSummaries,
+    setMaterializeSummaries,
     materializedPaths,
     setMaterializedPaths,
     setMaterializedBins,
+    globalPageSize,
+    setGlobalPageSize,
+    applyGlobalPageSize,
+    hydrateMaterialization,
+    reset: resetResultSession,
     labelToNodeId,
     defaultPalette,
     nodeColors,
@@ -221,11 +217,9 @@ function ConcordanceFeature({
     resolveNodeIdForKey,
     isBlockMaterialised,
     getMaterializedBinsForKey,
-  } = useConcordanceResultViewModel({
+  } = useConcordanceResultSession({
     workspaceId: currentWorkspaceId,
-    results,
-    concordanceTaskId,
-    panelSelectedNodes,
+    selectedNodes: panelSelectedNodes,
     showDispersion,
     proportionalDispersionBars,
     colourMatches,
@@ -294,24 +288,6 @@ function ConcordanceFeature({
     });
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
-  const resultControls = useConcordanceResultControls({ results });
-  const {
-    nodePagination,
-    setNodePagination,
-    nodeLoading,
-    setNodeLoading,
-    nodeDetaching,
-    setNodeDetaching,
-    nodeMaterializing,
-    setNodeMaterializing,
-    materializeTaskIds,
-    setMaterializeTaskIds,
-    materializeSummaries,
-    setMaterializeSummaries,
-    globalPageSize,
-    setGlobalPageSize,
-  } = resultControls;
-
   const { detailPayload, detailOpen, setDetailOpen, concordanceCustomization, handleRowClick } =
     useConcordanceRowDetail({
       currentWorkspaceId,
@@ -335,10 +311,8 @@ function ConcordanceFeature({
     taskType: ANALYSIS_TASK_TYPES.concordance,
     workspaceId: currentWorkspaceId,
     isTabActive: isActiveTab,
-    // Tab-driven deterministic hydration: when mounted inside an analysis tab,
-    // the tab's persisted task id must win task resolution over transient local
-    // state. Undefined in non-tabbed use, which the resolver skips.
-    hydrationTaskId: tabTaskId ?? null,
+    // The host's persisted task id wins task resolution over transient local state.
+    hydrationTaskId: tabTaskId,
     resultRef: concordanceResultsRef,
     /** Fetches a completed concordance task result for polling and hydration. */
     fetchResult: async (taskId) => {
@@ -382,18 +356,15 @@ function ConcordanceFeature({
       // the hydrated task contains.
       const paths = reqObj.materialized_paths as Record<string, string> | undefined;
       const nextPaths = paths && typeof paths === 'object' ? { ...paths } : {};
-      setMaterializedPaths(nextPaths);
-      setMaterializedBins({});
-      resetProcessedEvents();
       const summaries = reqObj.materialize_summaries as
         | Record<string, Record<string, unknown>>
         | undefined;
-      resultControls.applyHydratedMaterializeSummaries(summaries);
+      hydrateMaterialization(nextPaths, summaries);
+      resetProcessedEvents();
     },
     /** Clears result-specific state while preserving local controls when requested by handoff flows. */
     onCleared: (_, options) => {
-      setResults(null);
-      resultControls.resetAfterClear();
+      resetResultSession();
       setCombinedPage(1);
       if (options?.preserveLocalState) {
         return;
@@ -402,7 +373,7 @@ function ConcordanceFeature({
       // a task the user explicitly cleared. Preserve-local-state clears (handoff
       // flows) intentionally keep the tab→task link. Inputs are intentionally
       // left intact so the user keeps their curated selection after clearing.
-      onTabTaskChange?.(null);
+      onTabTaskChange(null);
     },
     /** Keeps the global task list free of concordance task duplicates after lifecycle updates. */
     pruneGlobalTasks: (taskIds) => {
@@ -469,7 +440,7 @@ function ConcordanceFeature({
       // Persist the run's assigned task id onto the active tab so reload
       // rehydrates the same task. No-op when not tab-mounted.
       onTaskIdAssigned: (taskId) => {
-        if (tabId) onTabTaskChange?.(taskId);
+        onTabTaskChange(taskId);
       },
     },
     lock: {
@@ -496,7 +467,7 @@ function ConcordanceFeature({
   // Flow: update globalPageSize, mirror it onto every node's internal pagination
   // (resetting to page 1), then persist unless the panel is read-only.
   const handleGlobalPageSizeChange = (newSize: number) => {
-    resultControls.applyGlobalPageSize(newSize);
+    applyGlobalPageSize(newSize);
     void persistResultPreferences({ pageSize: newSize });
   };
 
@@ -710,68 +681,80 @@ function ConcordanceFeature({
       {/* Results */}
       {results?.state === 'successful' && (
         <ConcordanceResultsPanel
-          results={results}
-          resultsRef={resultsRef}
-          resultsViewportRef={resultsViewportRef}
-          resultsViewportWidth={resultsViewportWidth}
-          viewMode={viewMode}
-          handleViewModeChange={handleViewModeChange}
-          combinedLoading={combinedLoading}
-          concordanceView={concordanceView}
-          setConcordanceView={setConcordanceView}
-          showMetadata={showMetadata}
-          availableMetadataColumns={availableMetadataColumns}
-          metadataColumnSections={metadataColumnSections}
-          metadataDisabledReason={metadataDisabledReason}
-          selectedMetadataColumns={selectedMetadataColumns}
-          setSelectedMetadataColumns={setSelectedMetadataColumns}
-          proportionalDispersionBars={proportionalDispersionBars}
-          setProportionalDispersionBars={setProportionalDispersionBars}
-          combinedSourceMode={combinedSourceMode}
-          setCombinedSourceMode={setCombinedSourceMode}
-          dispersionChartMode={dispersionChartMode}
-          setDispersionChartMode={setDispersionChartMode}
-          selectedBinIndices={selectedBinIndices}
-          onBinSelect={handleBinSelect}
-          onBinRangeSelect={handleBinRangeSelect}
-          onClearBinSelection={handleClearBinSelection}
-          colourMatches={colourMatches}
-          setColourMatches={setColourMatches}
-          lowercaseMatches={lowercaseMatches}
-          setLowercaseMatches={setLowercaseMatches}
-          hiddenMatchedTexts={hiddenMatchedTexts}
-          setHiddenMatchedTexts={setHiddenMatchedTexts}
-          binCount={binCount}
-          setBinCount={setBinCount}
-          allMatchedTexts={allMatchedTexts}
-          matchedTextColorMap={matchedTextColorMap}
-          getMaterializedBinsForKey={getMaterializedBinsForKey}
-          isBlockMaterialised={isBlockMaterialised}
-          searchWord={searchWord}
-          selectedNodes={selectedNodes}
-          panelSelectedNodes={panelSelectedNodes}
-          effectiveNodeColumnSelections={nodeColumnSelections}
-          labelToNodeId={labelToNodeId}
-          sourceColorMap={sourceColorMap}
-          defaultPalette={defaultPalette}
-          nodePagination={nodePagination}
-          globalPageSize={globalPageSize}
-          onPageSizeChange={handleGlobalPageSizeChange}
-          combinedPage={combinedPage}
-          setCombinedPage={setCombinedPage}
-          nodeLoading={nodeLoading}
-          nodeDetaching={nodeDetaching}
-          nodeMaterializing={nodeMaterializing}
-          materializedPaths={materializedPaths}
-          materializeSummaries={materializeSummaries}
-          handleSort={handleSort}
-          handlePageChange={handlePageChange}
-          handleRowClick={handleRowClick}
-          handleMaterialize={handleMaterialize}
-          openDetachDialog={(nodes) => {
-            void openDetachDialog(nodes);
+          shell={{
+            resultsRef,
+            resultsViewportRef,
+            resultsViewportWidth,
+            viewMode,
+            handleViewModeChange,
+            combinedLoading,
           }}
-          onDispersionDetach={openDispersionDetachDialog}
+          display={{
+            concordanceView,
+            setConcordanceView,
+            proportionalDispersionBars,
+            setProportionalDispersionBars,
+            combinedSourceMode,
+            setCombinedSourceMode,
+            dispersionChartMode,
+            setDispersionChartMode,
+            selectedBinIndices,
+            onBinSelect: handleBinSelect,
+            onBinRangeSelect: handleBinRangeSelect,
+            onClearBinSelection: handleClearBinSelection,
+            colourMatches,
+            setColourMatches,
+            lowercaseMatches,
+            setLowercaseMatches,
+            hiddenMatchedTexts,
+            setHiddenMatchedTexts,
+            binCount,
+            setBinCount,
+            allMatchedTexts,
+            matchedTextColorMap,
+            getMaterializedBinsForKey,
+            isBlockMaterialised,
+          }}
+          metadata={{
+            showMetadata,
+            availableMetadataColumns,
+            sections: metadataColumnSections,
+            disabledReason: metadataDisabledReason,
+            selectedColumns: selectedMetadataColumns,
+            setSelectedColumns: setSelectedMetadataColumns,
+          }}
+          sources={{
+            searchWord,
+            selectedNodes,
+            panelSelectedNodes,
+            effectiveNodeColumnSelections: nodeColumnSelections,
+            labelToNodeId,
+            sourceColorMap,
+            defaultPalette,
+          }}
+          session={{
+            results,
+            nodePagination,
+            globalPageSize,
+            onPageSizeChange: handleGlobalPageSizeChange,
+            combinedPage,
+            setCombinedPage,
+            nodeLoading,
+            nodeDetaching,
+            nodeMaterializing,
+            materializedPaths,
+            materializeSummaries,
+          }}
+          commands={{
+            handleSort,
+            handlePageChange,
+            handleRowClick,
+            handleMaterialize,
+            openDetachDialog: (nodes) => {
+              void openDetachDialog(nodes);
+            },
+            onDispersionDetach: openDispersionDetachDialog,
+          }}
         />
       )}
 

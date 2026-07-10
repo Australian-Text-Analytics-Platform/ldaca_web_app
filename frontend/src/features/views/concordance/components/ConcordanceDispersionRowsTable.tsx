@@ -12,9 +12,9 @@ import {
   getDispersionBarWidthPercent,
   getDispersionHits,
   getDispersionTextLength,
-  toCellText,
   type ConcordanceDispersionRow,
-} from '../concordanceViewModels';
+} from '../concordanceDispersionDomain';
+import { toCellText } from '../concordanceTableDomain';
 import { ConcordanceDispersionCell } from './ConcordanceDispersionCell';
 
 interface Props {

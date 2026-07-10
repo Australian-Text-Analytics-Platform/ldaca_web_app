@@ -2,11 +2,17 @@ import { useCallback, useReducer, type Dispatch, type SetStateAction } from 'rea
 
 import type { QuotationAnalysisResponse, QuotationMetadata } from '@/api';
 import type { NodePaginationState } from '../../common/tasks/types';
-import { QUOTATION_COLUMN_KEYS } from '../../common/generatedColumns';
+import {
+  normalizeQuotationMaterialization,
+  normalizeQuotationRow,
+  type QuotationMaterialization,
+  type QuotationMaterializeSummary,
+  type QuotationResultRow,
+} from '../quotationResultsModel';
 
 export interface QuotationResultState {
   groupedRows: QuotationGroupedRow[];
-  rows: QuotationDisplayRow[];
+  rows: QuotationResultRow[];
   columns: string[];
   metadata: QuotationMetadata;
   pagination: {
@@ -28,15 +34,7 @@ export interface QuotationResultState {
 type QuotationHitRow = Record<string, unknown>;
 type QuotationGroupedRow = QuotationHitRow[];
 
-type QuotationDisplayRow = QuotationHitRow & {
-  __spans: { start: number; end: number; type: string }[];
-};
-
-export interface MaterializeSummary {
-  recordCount: number;
-  uniqueDocuments: number;
-  totalDocuments: number;
-}
+export type MaterializeSummary = QuotationMaterializeSummary;
 
 interface QuotationResultControlsState {
   nodeState: Record<string, NodePaginationState>;
@@ -60,8 +58,7 @@ type QuotationResultControlsAction =
   | {
       type: 'apply-materialized-request';
       nodeId: string;
-      path: unknown;
-      summary: Record<string, unknown> | undefined;
+      materialization: QuotationMaterialization;
     }
   | { type: 'reset-after-clear' }
   | { type: 'set-node-detaching'; updater: BooleanMapUpdater }
@@ -105,23 +102,6 @@ function withoutKey<T>(map: Record<string, T>, key: string): Record<string, T> {
 }
 
 /**
- * Parses backend materialization summary metadata into the display shape used
- * by the Quotation result controls.
- * Used by: useQuotationResultControls because saved requests and completed
- * materialize tasks both return snake_case summary fields from the backend.
- */
-function parseMaterializeSummary(
-  summary: Record<string, unknown> | undefined,
-): MaterializeSummary | null {
-  if (!summary) return null;
-  return {
-    recordCount: Number(summary.record_count) || 0,
-    uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
-    totalDocuments: Number(summary.total_source_documents) || 0,
-  };
-}
-
-/**
  * Normalizes a Quotation response into the result-state shape consumed by
  * QuotationNodeBlock.
  * Used by: useQuotationResultControls when live searches, stored-task updates,
@@ -137,33 +117,7 @@ function buildQuotationResultState(
   const groupedRows = result.data;
   const rows = groupedRows
     .flatMap((group) => group)
-    .map((row) => {
-      const spans: { start: number; end: number; type: string }[] = [];
-      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
-        if (!type) return;
-        const s = Number(start);
-        const e = Number(end);
-        if (Number.isFinite(s) && Number.isFinite(e) && s < e) {
-          spans.push({ start: s, end: e, type });
-        }
-      };
-      addSpan(
-        row[QUOTATION_COLUMN_KEYS.speakerStartIdx],
-        row[QUOTATION_COLUMN_KEYS.speakerEndIdx],
-        'speaker',
-      );
-      addSpan(
-        row[QUOTATION_COLUMN_KEYS.quoteStartIdx],
-        row[QUOTATION_COLUMN_KEYS.quoteEndIdx],
-        'quote',
-      );
-      addSpan(
-        row[QUOTATION_COLUMN_KEYS.verbStartIdx],
-        row[QUOTATION_COLUMN_KEYS.verbEndIdx],
-        'verb',
-      );
-      return { ...row, __spans: spans };
-    }) as QuotationDisplayRow[];
+    .map((row) => normalizeQuotationRow(row, column));
 
   return {
     groupedRows,
@@ -210,11 +164,10 @@ function quotationResultControlsReducer(
     case 'apply-materialized-request':
       return {
         ...state,
-        materializedPaths:
-          typeof action.path === 'string' && action.path
-            ? { ...state.materializedPaths, [action.nodeId]: action.path }
-            : withoutKey(state.materializedPaths, action.nodeId),
-        materializeSummary: parseMaterializeSummary(action.summary),
+        materializedPaths: action.materialization.path
+          ? { ...state.materializedPaths, [action.nodeId]: action.materialization.path }
+          : withoutKey(state.materializedPaths, action.nodeId),
+        materializeSummary: action.materialization.summary,
       };
     case 'reset-after-clear':
       return {
@@ -306,7 +259,11 @@ export function useQuotationResultControls() {
     path: unknown,
     summary: Record<string, unknown> | undefined,
   ) => {
-    dispatch({ type: 'apply-materialized-request', nodeId, path, summary });
+    dispatch({
+      type: 'apply-materialized-request',
+      nodeId,
+      materialization: normalizeQuotationMaterialization(path, summary),
+    });
   };
 
   /**

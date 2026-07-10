@@ -54,7 +54,7 @@ import {
   type ConcordanceDispersionRow,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
-} from '../concordanceViewModels';
+} from '../concordanceDispersionDomain';
 
 interface Props {
   rows: ConcordanceDispersionRow[];

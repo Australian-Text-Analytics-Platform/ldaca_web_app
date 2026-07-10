@@ -16,6 +16,7 @@ import {
   buildQuotationMetadataColumns,
   filterQuotationRowsWithQuotes,
   resolveQuotationMetadataColumns,
+  type QuotationResultRow,
 } from '../quotationResultsModel';
 import type { MaterializeSummary, QuotationResultState } from '../hooks/useQuotationResultControls';
 import { type QuotationHoverState } from './QuotationHighlightedCell';
@@ -43,7 +44,7 @@ interface QuotationResultsPanelProps {
   onSort: (nodeId: string, columnName: string) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onRowClick: (row: Record<string, unknown>, textColumn: string) => void;
+  onRowClick: (row: QuotationResultRow) => void;
   onMaterialize: (nodeId: string) => void;
   onOpenDetachDialog: (nodeId: string) => void;
 }
@@ -188,7 +189,7 @@ export function QuotationResultsPanel({
               onPageChange={onPageChange}
               onPageSizeChange={onPageSizeChange}
               onRowClick={(row) => {
-                onRowClick(row, textCol);
+                onRowClick(row);
               }}
               pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
               pageSizeSummary={

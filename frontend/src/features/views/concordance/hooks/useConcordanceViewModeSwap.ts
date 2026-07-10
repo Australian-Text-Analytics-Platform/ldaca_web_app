@@ -8,7 +8,7 @@ import {
   type SetStateAction,
 } from 'react';
 import type { ConcordanceAnalysisResponse, ConcordanceResultQuery } from '@/api';
-import { buildCombinedSlice, CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceViewModels';
+import { buildCombinedSlice, CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 
 interface Params {
   viewMode: 'separated' | 'combined';

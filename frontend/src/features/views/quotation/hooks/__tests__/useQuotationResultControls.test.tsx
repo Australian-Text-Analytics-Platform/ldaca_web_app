@@ -52,7 +52,7 @@ describe('useQuotationResultControls', () => {
     });
 
     expect(result.current.resultsByNode['node-1']?.rows).toHaveLength(1);
-    expect(result.current.resultsByNode['node-1']?.rows[0]?.__spans).toEqual([
+    expect(result.current.resultsByNode['node-1']?.rows[0]?.spans).toEqual([
       { start: 0, end: 5, type: 'speaker' },
       { start: 11, end: 16, type: 'quote' },
       { start: 6, end: 10, type: 'verb' },

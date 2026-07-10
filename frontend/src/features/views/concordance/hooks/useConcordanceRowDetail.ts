@@ -7,7 +7,7 @@ import {
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_FREQ_COLUMNS,
 } from '../../common/generatedColumns';
-import { toCellText } from '../concordanceViewModels';
+import { toCellText } from '../concordanceTableDomain';
 
 type ConcordanceGroupedRow = Record<string, unknown>[];
 

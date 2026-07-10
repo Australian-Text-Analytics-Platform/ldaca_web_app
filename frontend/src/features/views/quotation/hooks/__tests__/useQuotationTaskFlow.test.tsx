@@ -53,6 +53,7 @@ describe('useQuotationTaskFlow', () => {
           updateResultState: vi.fn(),
           applyContextLengthPreferenceFromResult: vi.fn(),
           setLocalTaskId: vi.fn(),
+          onTaskIdAssigned: vi.fn(),
         },
         lock: {
           // Keeps task resolution empty so this test isolates initial request shaping.
@@ -122,6 +123,7 @@ describe('useQuotationTaskFlow', () => {
           updateResultState: vi.fn(),
           applyContextLengthPreferenceFromResult: vi.fn(),
           setLocalTaskId: vi.fn(),
+          onTaskIdAssigned: vi.fn(),
         },
         lock: {
           // Keeps task resolution deterministic while this test isolates pagination shaping.

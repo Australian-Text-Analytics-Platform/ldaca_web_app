@@ -42,7 +42,7 @@ interface SequentialAnalysisActions {
   clearResults: () => Promise<void>;
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
-  onTaskIdAssigned?: (taskId: string | null) => void;
+  onTaskIdAssigned: (taskId: string | null) => void;
 }
 
 interface Params {
@@ -169,7 +169,7 @@ export function useSequentialAnalysisTaskFlow({
         throwOnError: true,
       });
       const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
-      onTaskIdAssigned?.(assignedTaskId);
+      onTaskIdAssigned(assignedTaskId);
       const enrichedResult = {
         ...result,
         analysis_params: {

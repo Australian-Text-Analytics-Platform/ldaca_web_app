@@ -14,15 +14,14 @@ import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import {
-  CONCORDANCE_COMBINED_NODE_KEY,
   batchProcessedCount,
-  findConcordanceSourceNode,
   getDispersionHits,
-  getConcordanceSourceColor,
   type ConcordanceDispersionChartMode,
   type DispersionDisplayBinCount,
   type TaggedBinRow,
-} from '../concordanceViewModels';
+} from '../concordanceDispersionDomain';
+import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
+import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
 import { ConcordanceDispersionRowsTable } from './ConcordanceDispersionRowsTable';

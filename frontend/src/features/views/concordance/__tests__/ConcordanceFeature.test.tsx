@@ -402,7 +402,18 @@ vi.mock('../../common/rerunAnalysis', () => ({
 import ConcordanceFeature from '../ConcordanceFeature';
 
 const renderConcordanceFeature = () =>
-  renderWithClient(<ConcordanceFeature onTabInputSetChange={vi.fn()} />);
+  renderWithClient(
+    <ConcordanceFeature
+      host={{
+        taskId: null,
+        inputSets: {},
+        settings: {},
+        setTaskId: vi.fn(),
+        setInputSet: vi.fn(),
+        setSetting: vi.fn(),
+      }}
+    />,
+  );
 
 describe('ConcordanceFeature', () => {
   beforeEach(() => {

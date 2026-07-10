@@ -4,8 +4,8 @@ import type { AnnotationAiProviderId } from '../aiProviders';
 export type AnnotationMode = 'manual' | 'ai';
 
 interface UseAnnotationTabSettingsArgs {
-  tabSettings?: Record<string, string>;
-  onTabSettingChange?: (key: string, value: string) => void;
+  tabSettings: Record<string, string>;
+  onTabSettingChange: (key: string, value: string) => void;
 }
 
 /**
@@ -47,85 +47,83 @@ const parseStringMapSetting = (
 export function useAnnotationTabSettings({
   tabSettings,
   onTabSettingChange,
-}: UseAnnotationTabSettingsArgs = {}) {
+}: UseAnnotationTabSettingsArgs) {
   const [annotationMode, setAnnotationModeState] = useState<AnnotationMode>(() =>
-    tabSettings?.annotationMode === 'ai' ? 'ai' : 'manual',
+    tabSettings.annotationMode === 'ai' ? 'ai' : 'manual',
   );
   const setAnnotationMode = (mode: AnnotationMode) => {
     setAnnotationModeState(mode);
-    onTabSettingChange?.('annotationMode', mode);
+    onTabSettingChange('annotationMode', mode);
   };
 
   const [aiProviderModels, setAiProviderModelsState] = useState<Record<string, string>>(() =>
     parseStringMapSetting(
-      tabSettings?.aiProviderModels,
+      tabSettings.aiProviderModels,
       '[annotation] Ignoring malformed AI provider model setting:',
     ),
   );
   const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(
-    () => tabSettings?.aiProvider ?? '',
+    () => tabSettings.aiProvider ?? '',
   );
   const [aiModel, setAiModel] = useState(() => {
     const providerModels = parseStringMapSetting(
-      tabSettings?.aiProviderModels,
+      tabSettings.aiProviderModels,
       '[annotation] Ignoring malformed AI provider model setting:',
     );
-    const providerId = tabSettings?.aiProvider ?? '';
+    const providerId = tabSettings.aiProvider ?? '';
     return providerModels[providerId] ?? '';
   });
 
   const persistAiProviderModels = (models: Record<string, string>) => {
     setAiProviderModelsState(models);
-    onTabSettingChange?.('aiProviderModels', JSON.stringify(models));
+    onTabSettingChange('aiProviderModels', JSON.stringify(models));
   };
 
   const selectAiProvider = (id: AnnotationAiProviderId, modelForProvider: string) => {
     setAiProviderState(id);
     setAiModel(modelForProvider);
-    onTabSettingChange?.('aiProvider', id);
+    onTabSettingChange('aiProvider', id);
   };
 
-  const [aiPrompt, setAiPrompt] = useState(() => tabSettings?.aiPrompt ?? '');
+  const [aiPrompt, setAiPrompt] = useState(() => tabSettings.aiPrompt ?? '');
   const commitAiPrompt = (prompt: string) => {
-    onTabSettingChange?.('aiPrompt', prompt);
+    onTabSettingChange('aiPrompt', prompt);
   };
 
   const [aiTemperature, setAiTemperatureState] = useState<number>(() => {
-    const parsed = Number(tabSettings?.aiTemperature);
+    const parsed = Number(tabSettings.aiTemperature);
     return Number.isFinite(parsed) ? parsed : 0;
   });
   const commitAiTemperature = (value: number) => {
     setAiTemperatureState(value);
-    onTabSettingChange?.('aiTemperature', String(value));
+    onTabSettingChange('aiTemperature', String(value));
   };
 
   const [aiReasoningEnabled, setAiReasoningEnabledState] = useState<boolean>(
-    () => tabSettings?.aiReasoningEnabled === 'true',
+    () => tabSettings.aiReasoningEnabled === 'true',
   );
   const setAiReasoningEnabled = (enabled: boolean) => {
     setAiReasoningEnabledState(enabled);
-    onTabSettingChange?.('aiReasoningEnabled', String(enabled));
+    onTabSettingChange('aiReasoningEnabled', String(enabled));
   };
 
   const [aiReasoningEffort, setAiReasoningEffortState] = useState<string>(
-    () => tabSettings?.aiReasoningEffort ?? 'medium',
+    () => tabSettings.aiReasoningEffort ?? 'medium',
   );
   const setAiReasoningEffort = (effort: string) => {
     setAiReasoningEffortState(effort);
-    onTabSettingChange?.('aiReasoningEffort', effort);
+    onTabSettingChange('aiReasoningEffort', effort);
   };
 
-  const [isPreviewing, setIsPreviewingState] = useState(
-    () => tabSettings?.aiPreviewOpen === 'true',
-  );
+  const [isPreviewing, setIsPreviewingState] = useState(() => tabSettings.aiPreviewOpen === 'true');
   const setIsPreviewing = (open: boolean) => {
     setIsPreviewingState(open);
-    onTabSettingChange?.('aiPreviewOpen', String(open));
+    onTabSettingChange('aiPreviewOpen', String(open));
   };
 
   const [annotationTargets, setAnnotationTargets] = useState<Record<string, string>>(() =>
     parseStringMapSetting(
-      tabSettings?.annotationTargets,
+      tabSettings.annotationTargets,
       '[annotation] Ignoring malformed annotation-target setting:',
     ),
   );
@@ -137,7 +135,7 @@ export function useAnnotationTabSettings({
     const next = { ...annotationTargetsRef.current, [nodeId]: column };
     annotationTargetsRef.current = next;
     setAnnotationTargets(next);
-    onTabSettingChange?.('annotationTargets', JSON.stringify(next));
+    onTabSettingChange('annotationTargets', JSON.stringify(next));
   };
 
   return {

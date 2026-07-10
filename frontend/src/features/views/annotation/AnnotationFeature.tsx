@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { AnalysisTabInput } from '@/api';
 import {
   createAnnotationClassDescriptions,
   createAnnotationColumn,
@@ -40,10 +39,8 @@ import {
 import { useAnnotationTabSettings } from './hooks/useAnnotationTabSettings';
 import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
 import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
-import {
-  DEFAULT_TAB_INPUT_SET_ID,
-  type AnalysisTabInputSets,
-} from '@/features/views/common/tabs/tabStateOps';
+import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -70,18 +67,6 @@ const EXAMPLE_NODE_CONSTRAINTS: NodeInputConstraints = {
   maxNodes: 1,
 };
 const START_NEW_ANNOTATION_VALUE = '__start_new_annotation__';
-interface AnnotationFeatureProps {
-  tabId?: string;
-  tabTaskId?: string | null;
-  onTabTaskChange?: (taskId: string | null) => void;
-  tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
-  /** This tab's persisted free-form settings (Manual/AI mode, provider, ...). */
-  tabSettings?: Record<string, string>;
-  /** Commit one persisted free-form setting for this tab (writes tabs.json). */
-  onTabSettingChange?: (key: string, value: string) => void;
-}
-
 interface ColumnPickerProps {
   label: string;
   value: string;
@@ -160,12 +145,13 @@ function AnnotationColumnPicker({
  * Annotation-specific companion column pickers, create/select a backend
  * class-description node when requested, and load/save editable class rows.
  */
-function AnnotationFeature({
-  tabInputSets,
-  onTabInputSetChange,
-  tabSettings,
-  onTabSettingChange,
-}: AnnotationFeatureProps) {
+function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
+  const {
+    inputSets: tabInputSets,
+    setInputSet: onTabInputSetChange,
+    settings: tabSettings,
+    setSetting: onTabSettingChange,
+  } = host;
   const [descriptionColumns, setDescriptionColumns] = useState<Record<string, string>>({});
   const [newColumnNames, setNewColumnNames] = useState<Record<string, string>>({});
   const [isCreatingClassNode, setIsCreatingClassNode] = useState(false);

@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { DISPERSION_DEFAULT_BIN_COUNT } from '../../concordanceViewModels';
+import { DISPERSION_DEFAULT_BIN_COUNT } from '../../concordanceDispersionDomain';
 import { useConcordanceDispersionControls } from '../useConcordanceDispersionControls';
 
 describe('useConcordanceDispersionControls', () => {

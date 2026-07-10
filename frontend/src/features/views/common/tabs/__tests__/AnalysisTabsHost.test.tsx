@@ -1,9 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AnalysisTab } from '@/api';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { AnalysisTabsHost } from '../AnalysisTabsHost';
+import { AnalysisTabsHost, type AnalysisTabFeatureProps } from '../AnalysisTabsHost';
 import type { UseWorkspaceTabsResult } from '../useWorkspaceTabs';
 
 const mocks = vi.hoisted(() => ({
@@ -61,8 +61,41 @@ function Feature() {
   return <div>Feature panel</div>;
 }
 
-function FeatureWithTabId({ tabId }: { tabId?: string }) {
-  return <div>Active tab {tabId}</div>;
+function FeatureWithTask({ host }: AnalysisTabFeatureProps) {
+  return <div>Active task {host.taskId ?? 'none'}</div>;
+}
+
+function FeatureCommands({ host }: AnalysisTabFeatureProps) {
+  return (
+    <div>
+      <span>Inputs {String(host.inputSets.source?.length ?? 0)}</span>
+      <span>Setting {host.settings.mode}</span>
+      <button
+        type="button"
+        onClick={() => {
+          host.setTaskId('task-next');
+        }}
+      >
+        Save task
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          host.setInputSet('source', [{ node_id: 'node-next', column: 'text' }]);
+        }}
+      >
+        Save input
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          host.setSetting('mode', 'ai');
+        }}
+      >
+        Save setting
+      </button>
+    </div>
+  );
 }
 
 type PreferenceTestState = Partial<ReturnType<typeof usePreferencesStore.getState>> & {
@@ -159,8 +192,37 @@ describe('AnalysisTabsHost', () => {
       }),
     );
 
-    render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={FeatureWithTabId} />);
+    render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={FeatureWithTask} />);
 
-    expect(screen.getByText('Active tab tab-1')).toBeInTheDocument();
+    expect(screen.getByText('Active task none')).toBeInTheDocument();
+  });
+
+  it('binds required feature commands to the active persisted tab', () => {
+    const setTabTask = vi.fn();
+    const setTabInputSet = vi.fn();
+    const setTabSetting = vi.fn();
+    mocks.useWorkspaceTabs.mockReturnValue(
+      makeTabsResult({
+        tabs: [{ ...tab, settings: { mode: 'manual' } }],
+        activeTabId: tab.tab_id,
+        setTabTask,
+        setTabInputSet,
+        setTabSetting,
+      }),
+    );
+
+    render(<AnalysisTabsHost tabGroup="annotation" Feature={FeatureCommands} />);
+
+    expect(screen.getByText('Inputs 0')).toBeInTheDocument();
+    expect(screen.getByText('Setting manual')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save task' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save input' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save setting' }));
+
+    expect(setTabTask).toHaveBeenCalledWith('tab-1', 'task-next');
+    expect(setTabInputSet).toHaveBeenCalledWith('tab-1', 'source', [
+      { node_id: 'node-next', column: 'text' },
+    ]);
+    expect(setTabSetting).toHaveBeenCalledWith('tab-1', 'mode', 'ai');
   });
 });

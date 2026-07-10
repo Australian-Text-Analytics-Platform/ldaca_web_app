@@ -1,8 +1,10 @@
+import { useState } from 'react';
+
 import type { RowDetailPanelProps } from '../../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../../common/components/useRowDetailDialog';
 import { QUOTATION_COLUMN_KEYS } from '../../common/generatedColumns';
 import { renderQuotationDetailText } from '../components/quotationDetailText';
-import { toCellText } from '../quotationCellText';
+import type { QuotationResultRow } from '../quotationResultsModel';
 
 const GENERATED_QUOTATION_DETAIL_COLUMNS = [...Object.values(QUOTATION_COLUMN_KEYS), '__spans'];
 
@@ -11,7 +13,7 @@ interface UseQuotationRowDetailResult {
   detailOpen: boolean;
   setDetailOpen: (open: boolean) => void;
   quotationCustomization: RowDetailPanelProps['customization'];
-  handleRowClick: (row: Record<string, unknown>, textColumn: string) => void;
+  handleRowClick: (row: QuotationResultRow) => void;
 }
 
 /**
@@ -23,30 +25,30 @@ interface UseQuotationRowDetailResult {
  * table.
  */
 const buildQuotationCustomization = (
-  record: Record<string, unknown>,
+  row: QuotationResultRow,
 ): RowDetailPanelProps['customization'] => ({
   label: 'Quotation',
   summaryFields: [
     {
       label: 'Quote Type',
-      value: toCellText(record[QUOTATION_COLUMN_KEYS.quoteType]),
+      value: row.cellText(QUOTATION_COLUMN_KEYS.quoteType),
     },
     {
       label: 'Speaker',
-      value: toCellText(record[QUOTATION_COLUMN_KEYS.speaker]),
+      value: row.cellText(QUOTATION_COLUMN_KEYS.speaker),
     },
     {
       label: 'Verb',
-      value: toCellText(record[QUOTATION_COLUMN_KEYS.verb]),
+      value: row.cellText(QUOTATION_COLUMN_KEYS.verb),
     },
     {
       label: 'Quote',
-      value: toCellText(record[QUOTATION_COLUMN_KEYS.quote]),
+      value: row.cellText(QUOTATION_COLUMN_KEYS.quote),
     },
   ],
   /** Highlights speaker, quote, and verb spans in the source document text. */
   // Called by: RowDetailPanel document rendering because Quotation row details need generated span offsets applied to the original document text.
-  renderDocumentText: (text, row) => renderQuotationDetailText(text, row),
+  renderDocumentText: () => renderQuotationDetailText(row),
 });
 
 /**
@@ -57,16 +59,14 @@ const buildQuotationCustomization = (
  */
 export function useQuotationRowDetail(): UseQuotationRowDetailResult {
   const { detailPayload, detailOpen, setDetailOpen, openDetail } = useRowDetailDialog();
+  const [selectedRow, setSelectedRow] = useState<QuotationResultRow | null>(null);
 
-  const handleRowClick = (row: Record<string, unknown>, textColumn: string) => {
-    const record = { ...row };
-    const rawFullText = record[textColumn];
-    const fullText = rawFullText == null ? undefined : toCellText(rawFullText);
-
+  const handleRowClick = (row: QuotationResultRow) => {
+    setSelectedRow(row);
     openDetail({
-      record,
-      textColumn,
-      fullText,
+      record: row.raw,
+      textColumn: row.textColumn,
+      fullText: row.text,
       excludeMetadataColumns: GENERATED_QUOTATION_DETAIL_COLUMNS,
     });
   };
@@ -75,9 +75,8 @@ export function useQuotationRowDetail(): UseQuotationRowDetailResult {
     detailPayload,
     detailOpen,
     setDetailOpen,
-    quotationCustomization: detailPayload
-      ? buildQuotationCustomization(detailPayload.record)
-      : undefined,
+    quotationCustomization:
+      detailPayload && selectedRow ? buildQuotationCustomization(selectedRow) : undefined,
     handleRowClick,
   };
 }

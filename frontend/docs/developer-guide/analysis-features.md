@@ -28,18 +28,21 @@ string literals.
   uses it to persist its AI parameter panel — `annotationMode` (`manual`/`ai`),
   `aiProvider`, the `aiProviderModels` map, `aiPrompt`, inference knobs,
   `aiPreviewOpen`, and per-source `annotationTargets`. The host passes the map
-  in as `tabSettings` and a `onTabSettingChange(key, value)` writer; discrete
+  in through `host.settings` and a required `host.setSetting(key, value)` writer; discrete
   controls (the Manual/AI switch, the provider dropdown) write through on change
   while free-text fields (model, prompt) commit on blur to avoid a full
   `tabs.json` PUT per keystroke.
 
-When a tab becomes active, the host passes `tabTaskId`, `tabInputs`, and the
-named `tabInputSets` map into the feature. The feature must pass `tabTaskId` to
+When a tab becomes active, the host passes one required `AnalysisFeatureHost`
+with normalized `taskId`, `inputSets`, and `settings`, plus closure-bound
+`setTaskId`, `setInputSet`, and `setSetting` commands. Features do not accept a
+standalone/optional-tab shape and never inspect the tab id. The feature passes
+`host.taskId` to
 `useAnalysisFeature` as `hydrationTaskId` and provide both
 `fetchRequest(taskId, headers)` and `fetchResult(taskId, headers)`. Hydration
 then resolves the tab-owned task id, fetches the saved request first, applies
 feature parameters from that request, and fetches the result for the same task
-id. New runs report their assigned task id through `onTabTaskChange`, which
+id. New runs report their assigned task id through `host.setTaskId`, which
 persists it back to `tabs.json`. The
 `hydrationTaskId` change itself is a hydration trigger: after a run assigns a
 new task id, the feature fetches both request and result for that id instead of
@@ -61,7 +64,7 @@ every persisted analysis group in the current workspace to its first tab,
 persists the updated sidecar, and clears backend tasks owned by the removed
 tabs. `SettingsDialog` checks the current workspace sidecar first and shows a
 destructive confirmation only when extra tabs would actually be removed. The
-host still loads or creates one tab, passes that `tab_id` to the feature, and
+host still loads or creates one tab, binds its id inside the host commands, and
 persists tab-owned task and input state when the controls are hidden.
 
 ## Shared Lifecycle
@@ -184,16 +187,14 @@ request hydration, and rerun-diff normalization on top of
 `concordanceParameterState.ts`, which keeps the regex/whole-word invariant in a
 pure reducer. `useConcordanceTokenizerMode` owns regex/token-mode selection,
 token-mode availability, and live tokenizer model overrides.
-`useConcordanceResultControls` owns per-node pagination, loading flags,
-materialize progress, page-size hydration, and materialize summary parsing
-through one reducer-backed state model that still exposes Dispatch-compatible
-setters to the task-flow and materialization-event hooks.
-`concordanceViewModels.ts` owns pure result shaping for combined slices,
-dispersion rows/bins, materialized block lookup, server-bin tagging, and
-matched-text/source colour models. `useConcordanceResultViewModel` owns
-client-side materialized path/bin cache state, fetches missing server bins for
-whole-corpus dispersion charts, and exposes the label, colour, and lookup maps
-used by metadata and result panels. `concordanceTableModel.ts` and
+`useConcordanceResultSession` is the single result owner: it stores guarded
+result identity, reads only canonical `metadata.task_id`, owns pagination and
+loading/materialization state, hydrates page size and materialization metadata,
+cancels whole-corpus bin fetches, and clears every result-scoped cache together.
+Pure shaping is split by domain: `concordanceTableDomain.ts` owns combined/KWIC
+row behavior, `concordanceDispersionDomain.ts` owns dispersion rows/bins and bin
+selection labels, and `concordanceSourceDomain.ts` owns source identity,
+materialized lookup, and source/match colours. `concordanceTableModel.ts` and
 `concordanceDispersionTableModel.ts` own the table row/column models so
 combined and per-node result blocks share KWIC alignment, metadata filtering,
 and dispersion metadata-boundary behavior. `concordanceDispersionActions.ts`
@@ -221,9 +222,13 @@ owns the result-row detail payload, generated-column exclusions, and
 Quotation-specific RowDetailPanel summary/highlight customization.
 `useQuotationMaterializeLifecycle` watches background materialize tasks, refreshes
 the parent task request for materialized path/summary metadata, and resets the
-result page size after processing. `quotationResultsModel.ts` owns result
-metadata availability, selected-column filtering, display-column ordering, and
-quote-row filtering. `components/QuotationResultsPanel.tsx` owns the rendered
+result page size after processing. `quotationResultsModel.ts` is the only raw
+row boundary: it converts backend Unicode code-point offsets to JavaScript
+indices, validates legacy/custom span payloads, segments overlaps in canonical
+palette order, stringifies cells, and parses materialization metadata. Table and
+detail renderers consume the same typed row/span model; the former
+`quotationCellText.ts` and `quotationHighlight.ts` layers are gone.
+`components/QuotationResultsPanel.tsx` owns the rendered
 results card, metadata selector, context-length control, and per-node result
 table wiring; keep task lifecycle and request hydration in `QuotationFeature`.
 The tab still owns metadata-column visibility state.
@@ -534,10 +539,9 @@ when a generated response would otherwise become `unknown`.
 
 The minimum task-backed contract is:
 
-- accept `tabId`, `tabTaskId`, `onTabTaskChange`, `tabInputs`, and
-  `onTabInputsChange` from `AnalysisTabFeatureProps`; accept `tabInputSets`
-  and `onTabInputSetChange` only when the view has multiple node selectors;
-- pass `tabTaskId ?? null` as `hydrationTaskId` to `useAnalysisFeature`;
+- accept the required `host: AnalysisFeatureHost` prop from
+  `AnalysisTabFeatureProps`; do not add standalone fallbacks or expose tab ids;
+- pass `host.taskId` as `hydrationTaskId` to `useAnalysisFeature`;
 - implement `fetchRequest` and `fetchResult` through the shared
   `/workspaces/{workspace_id}/analysis-tasks/{task_id}/request` and
   `/result` endpoints;
@@ -545,13 +549,13 @@ The minimum task-backed contract is:
   `detach-options`, `detachments`, `dispersion-bins`,
   `dispersion-detachments`, and `materializations` as applicable, with node ids
   in the query/body and the parent task id in the path;
-- call `onTabTaskChange(taskId)` when a run assigns a backend task id;
-- call `onTabTaskChange(null)` when Clear Results removes the tab's task;
-- use `tabInputs`/`input_sets.source` as the only source-selector state,
+- call `host.setTaskId(taskId)` when a run assigns a backend task id;
+- call `host.setTaskId(null)` when Clear Results removes the tab's task;
+- use `host.inputSets.source` as the only source-selector state,
   seeding it from hydrated task requests when opening an existing task id;
 - for small scalar controls that are not node selectors or the task id, accept
-  `tabSettings`/`onTabSettingChange` and keep them as local mirror state seeded
-  from `tabSettings` (write through on change for discrete inputs, commit on
+  `host.settings`/`host.setSetting` and keep them as local mirror state seeded
+  from `host.settings` (write through on change for discrete inputs, commit on
   blur for free-text), rather than transient `useState`.
 
 Keep task refresh event-driven, and expose detach or materialize flows only

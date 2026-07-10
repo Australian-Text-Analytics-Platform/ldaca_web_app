@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { QUOTATION_COLUMN_KEYS } from '../../../common/generatedColumns';
+import { normalizeQuotationRow } from '../../quotationResultsModel';
 import { useQuotationRowDetail } from '../useQuotationRowDetail';
 
 describe('useQuotationRowDetail', () => {
@@ -24,7 +25,7 @@ describe('useQuotationRowDetail', () => {
     const { result } = renderHook(() => useQuotationRowDetail());
 
     act(() => {
-      result.current.handleRowClick(row, 'text');
+      result.current.handleRowClick(normalizeQuotationRow(row, 'text'));
     });
 
     expect(result.current.detailOpen).toBe(true);
@@ -52,10 +53,10 @@ describe('useQuotationRowDetail', () => {
     const { result } = renderHook(() => useQuotationRowDetail());
 
     act(() => {
-      result.current.handleRowClick(row, 'missing_text');
+      result.current.handleRowClick(normalizeQuotationRow(row, 'missing_text'));
     });
 
-    expect(result.current.detailPayload?.fullText).toBeUndefined();
+    expect(result.current.detailPayload?.fullText).toBe('');
     expect(result.current.quotationCustomization?.label).toBe('Quotation');
   });
 });

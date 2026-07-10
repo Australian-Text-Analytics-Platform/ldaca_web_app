@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api';
+import type { TokenFrequencyResponse } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 
@@ -38,7 +38,7 @@ import {
   usePersistNodeDocumentColumn,
   usePersistNodeTokenizationPreference,
 } from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
-import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabStateOps';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
@@ -49,26 +49,17 @@ const UNIFIED_WORDCLOUD_HEIGHT = 340;
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
- * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
- * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
- * id assignment/clear back to the tab record, and ``onTabInputSetChange`` owns
- * node-input persistence for add/remove/column actions.
+ * The required host supplies normalized task/input state and closure-bound
+ * persistence commands for the active tab; this feature has no standalone or
+ * optional-tab compatibility path.
  */
-interface TokenFrequencyFeatureProps {
-  tabId?: string;
-  tabTaskId?: string | null;
-  onTabTaskChange?: (taskId: string | null) => void;
-  tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
-}
-
-const TokenFrequencyFeature = ({
-  tabId,
-  tabTaskId,
-  onTabTaskChange,
-  tabInputSets,
-  onTabInputSetChange,
-}: TokenFrequencyFeatureProps) => {
+const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
+  const {
+    taskId: tabTaskId,
+    setTaskId: onTabTaskChange,
+    inputSets: tabInputSets,
+    setInputSet: onTabInputSetChange,
+  } = host;
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
   >({});
@@ -122,7 +113,7 @@ const TokenFrequencyFeature = ({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
     workspaceId: currentWorkspaceId,
-    taskId: tabTaskId ?? null,
+    taskId: tabTaskId,
   });
 
   const {
@@ -143,7 +134,7 @@ const TokenFrequencyFeature = ({
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
-    hydrationTaskId: tabTaskId ?? null,
+    hydrationTaskId: tabTaskId,
     resultRef,
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
     fetchResult: async (taskId) => {
@@ -225,7 +216,7 @@ const TokenFrequencyFeature = ({
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
       // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange?.(null);
+      onTabTaskChange(null);
       setLastCompareNodeIds([]);
       setStudyNodeId(null);
       resetPreferenceUiState();
@@ -338,7 +329,7 @@ const TokenFrequencyFeature = ({
       // Persist the run's assigned task id onto the active tab so reload
       // rehydrates the same task.
       onTaskIdAssigned: (taskId) => {
-        if (tabId) onTabTaskChange?.(taskId);
+        onTabTaskChange(taskId);
       },
     },
     navigation: {

@@ -5,7 +5,7 @@ import {
   buildDispersionRows,
   getDispersionTextLength,
   type ConcordanceDispersionRow,
-} from '../concordanceViewModels';
+} from '../concordanceDispersionDomain';
 
 const DISPERSION_COLUMN_WIDTH_RATIO = 0.85;
 const METADATA_COLUMN_MIN_WIDTH_PX = 200;

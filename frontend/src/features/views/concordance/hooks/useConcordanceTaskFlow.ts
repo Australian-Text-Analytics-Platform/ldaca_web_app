@@ -10,7 +10,7 @@ import {
   type ConcordanceResultQuery,
   type AnalysisTaskActionResponse,
 } from '@/api';
-import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
+import { formatBinIndicesAsRangeLabel } from '../concordanceDispersionDomain';
 import { extractAndSetTaskId } from '../../common/extractTaskId';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { NodePaginationState } from '../../common/tasks/types';
@@ -44,14 +44,14 @@ interface ConcordanceActions {
   setLocalTaskId: (id: string | null) => void;
   setNodeLoading: Dispatch<SetStateAction<Record<string, boolean>>>;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
+  setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setMaterializeTaskIds: Dispatch<SetStateAction<Record<string, string>>>;
   /**
    * Notifies AnalysisTabsHost of the task id assigned by a run (or null when
    * none). The host persists it onto the tab record so the tab
    * rehydrates the same task after reload. Optional for non-tabbed callers.
    */
-  onTaskIdAssigned?: (taskId: string | null) => void;
+  onTaskIdAssigned: (taskId: string | null) => void;
 }
 
 interface ConcordanceLock {
@@ -64,7 +64,7 @@ interface ConcordanceLock {
     taskId: string,
     request: ConcordanceDispersionDetachRequest,
   ) => Promise<{ task_id?: string }>;
-  materializeConcordance?: (
+  materializeConcordance: (
     taskId: string,
     request: ConcordanceMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
@@ -270,7 +270,7 @@ export function useConcordanceTaskFlow({
       });
       setResults(response);
       const assignedTaskId = extractAndSetTaskId(response, setLocalTaskId);
-      onTaskIdAssigned?.(assignedTaskId);
+      onTaskIdAssigned(assignedTaskId);
 
       if (response.combinable === false && viewMode === 'combined') {
         setViewMode('separated');
@@ -560,15 +560,13 @@ export function useConcordanceTaskFlow({
       toast.error('Run a concordance search first.');
       return;
     }
-    if (!materializeConcordance) return;
-
     const parentTaskId = await resolveTaskId();
     if (!parentTaskId) {
       toast.error('No concordance task to materialize.');
       return;
     }
 
-    setNodeMaterializing?.((prev) => ({ ...prev, [nodeId]: true }));
+    setNodeMaterializing((prev) => ({ ...prev, [nodeId]: true }));
     try {
       const request: ConcordanceMaterializeRequest = {
         node_id: nodeId,
@@ -585,7 +583,7 @@ export function useConcordanceTaskFlow({
       };
       const resp = await materializeConcordance(parentTaskId, request);
       const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
-      if (taskId && setMaterializeTaskIds) {
+      if (taskId) {
         setMaterializeTaskIds((prev) => ({ ...prev, [nodeId]: taskId }));
       }
       toast.success('Materialize started.');
@@ -593,7 +591,7 @@ export function useConcordanceTaskFlow({
       console.error('Error materializing concordance:', error);
       const msg = error instanceof Error ? error.message : String(error);
       toast.error(`Error materializing concordance: ${msg}`);
-      setNodeMaterializing?.((prev) => ({ ...prev, [nodeId]: false }));
+      setNodeMaterializing((prev) => ({ ...prev, [nodeId]: false }));
     }
   };
 

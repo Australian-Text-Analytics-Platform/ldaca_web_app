@@ -4,6 +4,8 @@
  * of word-boundary maths in its module scope.
  */
 
+import type { QuotationSpan } from './quotationResultsModel';
+
 export const DEFAULT_CONTEXT_LENGTH = 5;
 export const MAX_CONTEXT_LENGTH = 2000;
 
@@ -16,15 +18,9 @@ export const clampContextLength = (value: number): number => {
   return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
 };
 
-export interface HighlightSpan {
-  start: number;
-  end: number;
-  types: string[];
-}
-
 export interface ContextClipResult {
   text: string;
-  spans: HighlightSpan[];
+  spans: QuotationSpan[];
   prefixEllipsis: boolean;
   suffixEllipsis: boolean;
   sliceStart: number;
@@ -43,7 +39,7 @@ export interface ContextClipResult {
  */
 export const clipTextAroundSpans = (
   text: string,
-  spans: HighlightSpan[],
+  spans: QuotationSpan[],
   surroundingWords: number,
 ): ContextClipResult => {
   const normalizedWords = Number.isFinite(surroundingWords)
@@ -95,7 +91,7 @@ export const clipTextAroundSpans = (
         if (end <= start) return null;
         return { ...span, start: start - sliceStart, end: end - sliceStart };
       })
-      .filter((span): span is HighlightSpan => Boolean(span));
+      .filter((span): span is QuotationSpan => Boolean(span));
 
   if (!words.length) {
     const sliceStart = earliestStart;

@@ -51,7 +51,7 @@ interface TopicModelingActions {
   setLocalTaskId: (id: string | null) => void;
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
-  onTaskIdAssigned?: (taskId: string | null) => void;
+  onTaskIdAssigned: (taskId: string | null) => void;
 }
 
 interface TopicModelingLock {

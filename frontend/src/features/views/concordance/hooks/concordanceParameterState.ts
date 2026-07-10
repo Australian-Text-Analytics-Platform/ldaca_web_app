@@ -1,4 +1,4 @@
-import { toCellText } from '../concordanceViewModels';
+import { toCellText } from '../concordanceTableDomain';
 
 type ConcordanceParameterUpdate<T> = T | ((previous: T) => T);
 

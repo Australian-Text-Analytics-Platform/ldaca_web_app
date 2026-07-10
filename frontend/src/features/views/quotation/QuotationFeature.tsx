@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { QuotationAnalysisResponse, AnalysisTabInput, QuotationEngineConfig } from '@/api';
+import type { QuotationAnalysisResponse, QuotationEngineConfig } from '@/api';
 
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -40,26 +40,17 @@ import { QuotationResultsPanel } from './components/QuotationResultsPanel';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
-import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabStateOps';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 
 /** Renders the quotation extraction workflow, including live runs and result materialisation. */
 /**
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
- * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
- * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
- * id assignment/clear back to the tab record, and ``onTabInputSetChange`` owns
- * node-input persistence for add/remove/column actions.
+ * The required host supplies normalized task/input state and closure-bound
+ * persistence commands for the active tab; this feature has no standalone or
+ * optional-tab compatibility path.
  */
-interface QuotationFeatureProps {
-  tabId?: string;
-  tabTaskId?: string | null;
-  onTabTaskChange?: (taskId: string | null) => void;
-  tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
-}
-
 /**
  * Narrows task/action union responses to terminal quotation table results.
  * Used by: QuotationFeature fetch/search callbacks because generated quotation
@@ -77,13 +68,13 @@ function isQuotationAnalysisResponse(value: unknown): value is QuotationAnalysis
   );
 }
 
-function QuotationFeature({
-  tabId,
-  tabTaskId,
-  onTabTaskChange,
-  tabInputSets,
-  onTabInputSetChange,
-}: QuotationFeatureProps) {
+function QuotationFeature({ host }: AnalysisTabFeatureProps) {
+  const {
+    taskId: tabTaskId,
+    setTaskId: onTabTaskChange,
+    inputSets: tabInputSets,
+    setInputSet: onTabInputSetChange,
+  } = host;
   const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
@@ -104,7 +95,7 @@ function QuotationFeature({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.quotation,
     workspaceId: currentWorkspaceId,
-    taskId: tabTaskId ?? null,
+    taskId: tabTaskId,
   });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
@@ -201,7 +192,7 @@ function QuotationFeature({
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
-    hydrationTaskId: tabTaskId ?? null,
+    hydrationTaskId: tabTaskId,
     resultRef: quotationResultRef,
     // Loads the latest quotation result for polling and task resumption.
     fetchResult: async (taskId) => {
@@ -271,7 +262,7 @@ function QuotationFeature({
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
       // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange?.(null);
+      onTabTaskChange(null);
     },
   });
 
@@ -376,7 +367,7 @@ function QuotationFeature({
       // Persist the run's assigned task id onto the active tab so reload
       // rehydrates the same task.
       onTaskIdAssigned: (taskId) => {
-        if (tabId) onTabTaskChange?.(taskId);
+        onTabTaskChange(taskId);
       },
     },
     lock: {

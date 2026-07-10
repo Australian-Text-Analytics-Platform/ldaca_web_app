@@ -7,6 +7,7 @@ describe('useAnnotationTabSettings', () => {
   it('hydrates AI settings from persisted tab strings', () => {
     const { result } = renderHook(() =>
       useAnnotationTabSettings({
+        onTabSettingChange: vi.fn(),
         tabSettings: {
           annotationMode: 'ai',
           aiProvider: 'provider:openai:test',
@@ -35,7 +36,9 @@ describe('useAnnotationTabSettings', () => {
 
   it('writes discrete setting changes through to the tab sink', () => {
     const onTabSettingChange = vi.fn();
-    const { result } = renderHook(() => useAnnotationTabSettings({ onTabSettingChange }));
+    const { result } = renderHook(() =>
+      useAnnotationTabSettings({ tabSettings: {}, onTabSettingChange }),
+    );
 
     act(() => {
       result.current.setAnnotationMode('ai');
@@ -68,7 +71,9 @@ describe('useAnnotationTabSettings', () => {
 
   it('retains every target when two selectors persist before React rerenders', () => {
     const onTabSettingChange = vi.fn();
-    const { result } = renderHook(() => useAnnotationTabSettings({ onTabSettingChange }));
+    const { result } = renderHook(() =>
+      useAnnotationTabSettings({ tabSettings: {}, onTabSettingChange }),
+    );
 
     act(() => {
       result.current.setAnnotationTarget('source-one', 'label_one');
@@ -93,6 +98,7 @@ describe('useAnnotationTabSettings', () => {
 
     const { result } = renderHook(() =>
       useAnnotationTabSettings({
+        onTabSettingChange: vi.fn(),
         tabSettings: {
           aiProvider: 'openrouter',
           aiProviderModels: '{broken',

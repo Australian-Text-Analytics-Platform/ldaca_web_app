@@ -55,15 +55,15 @@ interface QuotationActions {
   setIsLoadingQuotations: (value: boolean) => void;
   setHasLoaded: (value: boolean) => void;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
+  setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setMaterializeTaskIds: Dispatch<SetStateAction<Record<string, string>>>;
   showErrorDialog: (message: string) => void;
   updateResultState: (nodeId: string, column: string, result: QuotationAnalysisResponse) => void;
   applyContextLengthPreferenceFromResult: (payload: QuotationAnalysisResponse) => void;
   setLocalTaskId: (id: string | null) => void;
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
-  onTaskIdAssigned?: (taskId: string | null) => void;
+  onTaskIdAssigned: (taskId: string | null) => void;
 }
 
 interface QuotationLock {
@@ -76,7 +76,7 @@ interface QuotationLock {
     taskId: string,
     request: QuotationDetachRequest,
   ) => Promise<AnalysisTaskActionResponse>;
-  materializeQuotation?: (
+  materializeQuotation: (
     taskId: string,
     request: QuotationMaterializeRequest,
   ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
@@ -225,7 +225,7 @@ export function useQuotationTaskFlow({
         return null;
       }
       const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
-      onTaskIdAssigned?.(assignedTaskId);
+      onTaskIdAssigned(assignedTaskId);
       applyContextLengthPreferenceFromResult(result);
       updateResultState(nodeId, column, result);
       return requestPayload;
@@ -415,19 +415,17 @@ export function useQuotationTaskFlow({
   const handleMaterialize = async (nodeId: string) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
     if (!selection?.column) return;
-    if (!materializeQuotation) return;
-
     const parentTaskId = await resolveTaskId();
     if (!parentTaskId) {
       showErrorDialog('No quotation task to materialize.');
       return;
     }
 
-    setNodeMaterializing?.((prev) => ({ ...prev, [nodeId]: true }));
+    setNodeMaterializing((prev) => ({ ...prev, [nodeId]: true }));
     try {
       const enginePayload = buildEngineRequest();
       if (!enginePayload) {
-        setNodeMaterializing?.((prev) => {
+        setNodeMaterializing((prev) => {
           if (!prev[nodeId]) return prev;
           const { [nodeId]: _removed, ...next } = prev;
           void _removed;
@@ -444,12 +442,12 @@ export function useQuotationTaskFlow({
             : { type: 'local' },
       });
       const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
-      if (taskId && setMaterializeTaskIds) {
+      if (taskId) {
         setMaterializeTaskIds((prev) => ({ ...prev, [nodeId]: taskId }));
       }
     } catch (e: unknown) {
       showErrorDialog(getErrorMessage(e));
-      setNodeMaterializing?.((prev) => {
+      setNodeMaterializing((prev) => {
         if (!prev[nodeId]) return prev;
         const { [nodeId]: _removed, ...next } = prev;
         void _removed;

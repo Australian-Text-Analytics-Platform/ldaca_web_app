@@ -1,26 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildDispersionRows,
+  getDispersionBarWidthPercent,
+} from '../concordanceDispersionDomain';
+import {
   buildConcordanceNodeColorMap,
   buildConcordanceSourceColorMap,
-  buildCombinedSlice,
-  buildDispersionRows,
   buildMatchedTextColorMap,
   collectConcordanceMatchedTexts,
-  CONCORDANCE_COMBINED_NODE_KEY,
   findConcordanceSourceNode,
-  flattenConcordanceGroups,
-  getDispersionBarWidthPercent,
   getConcordanceNodeIdsForKey,
   getConcordanceSourceColor,
   getMaterializedBinsForConcordanceKey,
   isConcordanceBlockMaterialized,
   normalizeConcordanceLabelToNodeMap,
   resolveConcordanceResultBlock,
-} from '../concordanceViewModels';
+} from '../concordanceSourceDomain';
+import {
+  buildCombinedSlice,
+  CONCORDANCE_COMBINED_NODE_KEY,
+  flattenConcordanceGroups,
+} from '../concordanceTableDomain';
 import type { ConcordanceNodeResult } from '@/api';
 
-describe('concordanceViewModels', () => {
+describe('concordanceDomains', () => {
   const grouped = [
     [
       {
@@ -87,7 +91,6 @@ describe('concordanceViewModels', () => {
     expect(getDispersionBarWidthPercent(rows[1]!, 'text', longestTextLength)).toBeCloseTo(68.75);
   });
 });
-
 describe('matched-text color view models', () => {
   const resultData = {
     'node-1': {

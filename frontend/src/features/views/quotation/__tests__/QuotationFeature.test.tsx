@@ -205,7 +205,18 @@ import QuotationFeature from '../QuotationFeature';
 
 describe('QuotationFeature detach dialog', () => {
   it('owns quotation copy and forwards the hook-owned handlers', () => {
-    render(<QuotationFeature onTabInputSetChange={vi.fn()} />);
+    render(
+      <QuotationFeature
+        host={{
+          taskId: null,
+          inputSets: {},
+          settings: {},
+          setTaskId: vi.fn(),
+          setInputSet: vi.fn(),
+          setSetting: vi.fn(),
+        }}
+      />,
+    );
 
     expect(detachDialogMocks.render).toHaveBeenCalledWith(
       expect.objectContaining({

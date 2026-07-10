@@ -1,4 +1,227 @@
+import type { CSSProperties } from 'react';
+
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../common/generatedColumns';
+
+const QUOTATION_HIGHLIGHT_TYPES = ['quote', 'speaker', 'verb'] as const;
+export type QuotationHighlightType = (typeof QUOTATION_HIGHLIGHT_TYPES)[number];
+
+const QUOTATION_HIGHLIGHT_COLORS: Record<QuotationHighlightType, string> = {
+  speaker: '#2563eb',
+  quote: '#059669',
+  verb: '#7c3aed',
+};
+
+export interface QuotationSpan {
+  /** JavaScript UTF-16 code-unit offset, ready for String.slice. */
+  start: number;
+  /** JavaScript UTF-16 code-unit offset, ready for String.slice. */
+  end: number;
+  type: QuotationHighlightType;
+}
+
+export interface QuotationSegment {
+  start: number;
+  end: number;
+  text: string;
+  types: QuotationHighlightType[];
+  primaryType: QuotationHighlightType | null;
+}
+
+export interface QuotationResultRow {
+  raw: Record<string, unknown>;
+  textColumn: string;
+  text: string;
+  quoteType: string;
+  hasQuote: boolean;
+  spans: QuotationSpan[];
+  cellText: (column: string) => string;
+}
+
+export interface QuotationMaterializeSummary {
+  recordCount: number;
+  uniqueDocuments: number;
+  totalDocuments: number;
+}
+
+export interface QuotationMaterialization {
+  path: string | null;
+  summary: QuotationMaterializeSummary | null;
+}
+
+const isQuotationHighlightType = (value: unknown): value is QuotationHighlightType =>
+  typeof value === 'string' && QUOTATION_HIGHLIGHT_TYPES.some((candidate) => candidate === value);
+
+/** Converts unknown backend scalar/JSON values into safe display text. */
+const toQuotationCellText = (value: unknown): string => {
+  if (value == null) return '';
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+};
+
+/** Returns the stable product palette entry for one canonical highlight type. */
+export const getQuotationHighlightColor = (type: QuotationHighlightType): string =>
+  QUOTATION_HIGHLIGHT_COLORS[type];
+
+/** Converts a canonical quotation color into the translucent hover color. */
+export const quotationColorWithAlpha = (type: QuotationHighlightType, alpha = 0.18): string => {
+  const hex = getQuotationHighlightColor(type).slice(1);
+  const value = Number.parseInt(hex, 16);
+  return `rgba(${String((value >> 16) & 255)}, ${String((value >> 8) & 255)}, ${String(
+    value & 255,
+  )}, ${String(alpha)})`;
+};
+
+/** Builds the shared stacked-underline style for table and detail adapters. */
+export const buildQuotationUnderlineStyle = (
+  types: readonly QuotationHighlightType[],
+): CSSProperties => {
+  if (types.length === 0) return {};
+  return {
+    textDecorationLine: types.map(() => 'underline').join(' '),
+    textDecorationColor: types.map(getQuotationHighlightColor).join(' '),
+    textDecorationThickness: '2px',
+    textUnderlineOffset: '4px',
+    textDecorationSkipInk: 'none',
+    display: 'inline',
+  };
+};
+
+/**
+ * Converts Python code-point offsets from the backend into JavaScript code-unit
+ * offsets once. This keeps astral Unicode characters aligned for every renderer.
+ */
+const buildCodePointOffsets = (text: string): number[] => {
+  const offsets = [0];
+  for (const character of text) {
+    offsets.push((offsets[offsets.length - 1] ?? 0) + character.length);
+  }
+  return offsets;
+};
+
+const normalizeSpan = (
+  offsets: number[],
+  start: unknown,
+  end: unknown,
+  type: unknown,
+): QuotationSpan | null => {
+  if (
+    !isQuotationHighlightType(type) ||
+    typeof start !== 'number' ||
+    typeof end !== 'number' ||
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    end <= start
+  ) {
+    return null;
+  }
+  const normalizedStart = offsets[start];
+  const normalizedEnd = offsets[end];
+  if (normalizedStart === undefined || normalizedEnd === undefined) return null;
+  return { start: normalizedStart, end: normalizedEnd, type };
+};
+
+/**
+ * Normalizes one raw backend row into the only row/span shape used by table,
+ * detail, filtering, and materialization-facing UI code.
+ */
+export const normalizeQuotationRow = (
+  raw: Record<string, unknown>,
+  textColumn: string,
+): QuotationResultRow => {
+  const text = toQuotationCellText(raw[textColumn]);
+  const offsets = buildCodePointOffsets(text);
+  const spans: QuotationSpan[] = [];
+  const addSpan = (start: unknown, end: unknown, type: unknown) => {
+    const span = normalizeSpan(offsets, start, end, type);
+    if (span) spans.push(span);
+  };
+
+  if (Array.isArray(raw.__spans)) {
+    for (const candidate of raw.__spans) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const span = candidate as Record<string, unknown>;
+      addSpan(span.start, span.end, span.type);
+    }
+  } else {
+    addSpan(
+      raw[QUOTATION_COLUMN_KEYS.speakerStartIdx],
+      raw[QUOTATION_COLUMN_KEYS.speakerEndIdx],
+      'speaker',
+    );
+    addSpan(
+      raw[QUOTATION_COLUMN_KEYS.quoteStartIdx],
+      raw[QUOTATION_COLUMN_KEYS.quoteEndIdx],
+      'quote',
+    );
+    addSpan(raw[QUOTATION_COLUMN_KEYS.verbStartIdx], raw[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
+  }
+
+  return {
+    raw,
+    textColumn,
+    text,
+    quoteType: toQuotationCellText(raw[QUOTATION_COLUMN_KEYS.quoteType]),
+    hasQuote: Boolean(raw[QUOTATION_COLUMN_KEYS.quote]),
+    spans,
+    cellText: (column) => toQuotationCellText(raw[column]),
+  };
+};
+
+/** Segments canonical spans once, preserving deterministic type/palette order. */
+export const buildQuotationSegments = (
+  text: string,
+  spans: readonly QuotationSpan[],
+): QuotationSegment[] => {
+  if (text.length === 0) return [];
+  const boundaries = new Set<number>([0, text.length]);
+  for (const span of spans) {
+    boundaries.add(span.start);
+    boundaries.add(span.end);
+  }
+  const points = Array.from(boundaries).sort((left, right) => left - right);
+  const segments: QuotationSegment[] = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (start === undefined || end === undefined || end <= start) continue;
+    const covering = new Set(
+      spans.filter((span) => span.start < end && span.end > start).map((span) => span.type),
+    );
+    const types = QUOTATION_HIGHLIGHT_TYPES.filter((type) => covering.has(type));
+    segments.push({
+      start,
+      end,
+      text: text.slice(start, end),
+      types,
+      primaryType: types[0] ?? null,
+    });
+  }
+  return segments;
+};
+
+const normalizeMaterializationCount = (value: unknown): number => {
+  const count = Number(value);
+  return Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
+};
+
+/** Parses the saved/materialized request fields at their one UI boundary. */
+export const normalizeQuotationMaterialization = (
+  path: unknown,
+  summary: Record<string, unknown> | undefined,
+): QuotationMaterialization => ({
+  path: typeof path === 'string' && path.length > 0 ? path : null,
+  summary: summary
+    ? {
+        recordCount: normalizeMaterializationCount(summary.record_count),
+        uniqueDocuments: normalizeMaterializationCount(summary.unique_documents_with_hits),
+        totalDocuments: normalizeMaterializationCount(summary.total_source_documents),
+      }
+    : null,
+});
 
 interface QuotationResultMetadataSource {
   metadata: {
@@ -74,6 +297,5 @@ export const buildQuotationDisplayColumns = (visibleMetadataColumns: string[]): 
  * Used by: QuotationFeature before handing rows to QuotationNodeBlock.
  */
 export const filterQuotationRowsWithQuotes = (
-  rows: Record<string, unknown>[] | null | undefined,
-): Record<string, unknown>[] =>
-  (rows ?? []).filter((row) => Boolean(row[QUOTATION_COLUMN_KEYS.quote]));
+  rows: QuotationResultRow[] | null | undefined,
+): QuotationResultRow[] => (rows ?? []).filter((row) => row.hasQuote);

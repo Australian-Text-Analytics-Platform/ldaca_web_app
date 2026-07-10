@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import type { AnalysisTabInput, TopicModelingResponse, TopicModelingTopic } from '@/api';
+import type { TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
@@ -28,33 +28,24 @@ import {
 } from './hooks/useTopicModelingParameters';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTopicModelingResultControls } from './hooks/useTopicModelingResultControls';
-import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabStateOps';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 
 /**
  * Renders the topic-modeling workflow for live BERTopic runs and result exploration.
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
- * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
- * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
- * id assignment/clear back to the tab record, and ``onTabInputSetChange`` owns
- * node-input persistence for add/remove/column actions.
+ * The required host supplies normalized task/input state and closure-bound
+ * persistence commands for the active tab; this feature has no standalone or
+ * optional-tab compatibility path.
  */
-interface TopicModelingFeatureProps {
-  tabId?: string;
-  tabTaskId?: string | null;
-  onTabTaskChange?: (taskId: string | null) => void;
-  tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
-}
-
-function TopicModelingFeature({
-  tabId,
-  tabTaskId,
-  onTabTaskChange,
-  tabInputSets,
-  onTabInputSetChange,
-}: TopicModelingFeatureProps) {
+function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
+  const {
+    taskId: tabTaskId,
+    setTaskId: onTabTaskChange,
+    inputSets: tabInputSets,
+    setInputSet: onTabInputSetChange,
+  } = host;
   const { currentWorkspaceId } = useWorkspaceData();
   const { setNodeColor: persistNodeColor } = useWorkspaceActions();
   const queryClient = useQueryClient();
@@ -78,7 +69,7 @@ function TopicModelingFeature({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
     workspaceId: currentWorkspaceId,
-    taskId: tabTaskId ?? null,
+    taskId: tabTaskId,
   });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
@@ -161,7 +152,7 @@ function TopicModelingFeature({
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
-    hydrationTaskId: tabTaskId ?? null,
+    hydrationTaskId: tabTaskId,
     resultRef,
     // Called by useAnalysisFeature polling and hydration to load the owned task result.
     fetchResult: async (taskId) => {
@@ -208,7 +199,7 @@ function TopicModelingFeature({
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
       // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange?.(null);
+      onTabTaskChange(null);
     },
     // Called by useAnalysisFeature clear handling to remove deleted task ids from the global list.
     pruneGlobalTasks: (taskIds) => {
@@ -389,7 +380,7 @@ function TopicModelingFeature({
       // Persist the run's assigned task id onto the active tab so reload
       // rehydrates the same task.
       onTaskIdAssigned: (taskId) => {
-        if (tabId) onTabTaskChange?.(taskId);
+        onTabTaskChange(taskId);
       },
     },
     lock: {

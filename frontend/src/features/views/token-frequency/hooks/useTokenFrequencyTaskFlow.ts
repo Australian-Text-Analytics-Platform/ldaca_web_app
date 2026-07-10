@@ -38,7 +38,7 @@ interface AnalysisActions {
   lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
-  onTaskIdAssigned?: (taskId: string | null) => void;
+  onTaskIdAssigned: (taskId: string | null) => void;
 }
 
 interface NavigationActions {

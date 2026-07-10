@@ -4,7 +4,7 @@ import type {
 } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceViewModels';
+import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 
 interface Section {
   columns: string[];

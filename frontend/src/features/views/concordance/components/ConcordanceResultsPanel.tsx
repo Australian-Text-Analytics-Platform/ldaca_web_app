@@ -7,13 +7,13 @@ import type { ConcordanceAnalysisResponse, WorkspaceGraphNode } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
-import {
-  CONCORDANCE_COMBINED_NODE_KEY,
-  resolveConcordanceResultBlock,
-  type ConcordanceDispersionChartMode,
-  type DispersionDisplayBinCount,
-  type TaggedBinRow,
-} from '../concordanceViewModels';
+import type {
+  ConcordanceDispersionChartMode,
+  DispersionDisplayBinCount,
+  TaggedBinRow,
+} from '../concordanceDispersionDomain';
+import { resolveConcordanceResultBlock } from '../concordanceSourceDomain';
+import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
@@ -25,29 +25,18 @@ interface Section {
 }
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
-export interface ConcordanceResultsPanelProps {
-  // Result + view orchestration
-  results: ConcordanceAnalysisResponse;
+interface ConcordanceResultsShell {
   resultsRef: RefObject<HTMLDivElement | null>;
   resultsViewportRef: RefObject<HTMLDivElement | null>;
   resultsViewportWidth: number;
-
   viewMode: 'separated' | 'combined';
   handleViewModeChange: (mode: 'separated' | 'combined') => void;
   combinedLoading: boolean;
+}
 
+interface ConcordanceResultsDisplay {
   concordanceView: 'table' | 'dispersion';
   setConcordanceView: Dispatch<SetStateAction<'table' | 'dispersion'>>;
-
-  // Display + metadata
-  showMetadata: boolean;
-  availableMetadataColumns: string[];
-  metadataColumnSections: Section[];
-  metadataDisabledReason: string | undefined;
-  selectedMetadataColumns: string[];
-  setSelectedMetadataColumns: Dispatch<SetStateAction<string[]>>;
-
-  // Dispersion-only state
   proportionalDispersionBars: boolean;
   setProportionalDispersionBars: Dispatch<SetStateAction<boolean>>;
   combinedSourceMode: 'aggregate' | 'split';
@@ -75,8 +64,18 @@ export interface ConcordanceResultsPanelProps {
   matchedTextColorMap: Record<string, string>;
   getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
   isBlockMaterialised: (nodeKey: string) => boolean;
+}
 
-  // Search + selection (for per-block dispatch)
+interface ConcordanceResultsMetadata {
+  showMetadata: boolean;
+  availableMetadataColumns: string[];
+  sections: Section[];
+  disabledReason: string | undefined;
+  selectedColumns: string[];
+  setSelectedColumns: Dispatch<SetStateAction<string[]>>;
+}
+
+interface ConcordanceResultsSources {
   searchWord: string;
   selectedNodes: WorkspaceGraphNode[];
   panelSelectedNodes: WorkspaceNodeMetadata[];
@@ -84,8 +83,10 @@ export interface ConcordanceResultsPanelProps {
   labelToNodeId: Record<string, string> | null;
   sourceColorMap: Record<string, string>;
   defaultPalette: string[];
+}
 
-  // Per-block pagination + state
+interface ConcordanceResultsSession {
+  results: ConcordanceAnalysisResponse;
   nodePagination: PaginationState;
   globalPageSize: number;
   /** Changes the single shared page size used by every result table footer. */
@@ -100,8 +101,9 @@ export interface ConcordanceResultsPanelProps {
     string,
     { recordCount: number; uniqueDocuments: number; totalDocuments: number }
   >;
+}
 
-  // Handlers
+interface ConcordanceResultsCommands {
   handleSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
   handlePageChange: (newPage: number, paginationKey: string, requestNodeId: string) => void;
   handleRowClick: (
@@ -129,70 +131,91 @@ export interface ConcordanceResultsPanelProps {
   ) => Promise<void> | void;
 }
 
+export interface ConcordanceResultsPanelProps {
+  shell: ConcordanceResultsShell;
+  display: ConcordanceResultsDisplay;
+  metadata: ConcordanceResultsMetadata;
+  sources: ConcordanceResultsSources;
+  session: ConcordanceResultsSession;
+  commands: ConcordanceResultsCommands;
+}
+
 /**
  * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks.
  */
 export function ConcordanceResultsPanel({
-  results,
-  resultsRef,
-  resultsViewportRef,
-  resultsViewportWidth,
-  viewMode,
-  handleViewModeChange,
-  combinedLoading,
-  concordanceView,
-  setConcordanceView,
-  showMetadata,
-  availableMetadataColumns,
-  metadataColumnSections,
-  metadataDisabledReason,
-  selectedMetadataColumns,
-  setSelectedMetadataColumns,
-  proportionalDispersionBars,
-  setProportionalDispersionBars,
-  combinedSourceMode,
-  setCombinedSourceMode,
-  dispersionChartMode,
-  setDispersionChartMode,
-  selectedBinIndices,
-  onBinSelect,
-  onBinRangeSelect,
-  onClearBinSelection,
-  colourMatches,
-  setColourMatches,
-  lowercaseMatches,
-  setLowercaseMatches,
-  hiddenMatchedTexts,
-  setHiddenMatchedTexts,
-  binCount,
-  setBinCount,
-  allMatchedTexts,
-  matchedTextColorMap,
-  getMaterializedBinsForKey,
-  isBlockMaterialised,
-  searchWord,
-  selectedNodes,
-  panelSelectedNodes,
-  effectiveNodeColumnSelections,
-  labelToNodeId,
-  sourceColorMap,
-  defaultPalette,
-  nodePagination,
-  globalPageSize,
-  onPageSizeChange,
-  combinedPage,
-  setCombinedPage,
-  nodeLoading,
-  nodeDetaching,
-  nodeMaterializing,
-  materializedPaths,
-  materializeSummaries,
-  handleSort,
-  handlePageChange,
-  handleRowClick,
-  handleMaterialize,
-  openDetachDialog,
-  onDispersionDetach,
+  shell: {
+    resultsRef,
+    resultsViewportRef,
+    resultsViewportWidth,
+    viewMode,
+    handleViewModeChange,
+    combinedLoading,
+  },
+  display: {
+    concordanceView,
+    setConcordanceView,
+    proportionalDispersionBars,
+    setProportionalDispersionBars,
+    combinedSourceMode,
+    setCombinedSourceMode,
+    dispersionChartMode,
+    setDispersionChartMode,
+    selectedBinIndices,
+    onBinSelect,
+    onBinRangeSelect,
+    onClearBinSelection,
+    colourMatches,
+    setColourMatches,
+    lowercaseMatches,
+    setLowercaseMatches,
+    hiddenMatchedTexts,
+    setHiddenMatchedTexts,
+    binCount,
+    setBinCount,
+    allMatchedTexts,
+    matchedTextColorMap,
+    getMaterializedBinsForKey,
+    isBlockMaterialised,
+  },
+  metadata: {
+    showMetadata,
+    availableMetadataColumns,
+    sections: metadataColumnSections,
+    disabledReason: metadataDisabledReason,
+    selectedColumns: selectedMetadataColumns,
+    setSelectedColumns: setSelectedMetadataColumns,
+  },
+  sources: {
+    searchWord,
+    selectedNodes,
+    panelSelectedNodes,
+    effectiveNodeColumnSelections,
+    labelToNodeId,
+    sourceColorMap,
+    defaultPalette,
+  },
+  session: {
+    results,
+    nodePagination,
+    globalPageSize,
+    onPageSizeChange,
+    combinedPage,
+    setCombinedPage,
+    nodeLoading,
+    nodeDetaching,
+    nodeMaterializing,
+    materializedPaths,
+    materializeSummaries,
+  },
+  commands: {
+    handleSort,
+    handlePageChange,
+    handleRowClick,
+    handleMaterialize,
+    openDetachDialog,
+    onDispersionDetach,
+  },
 }: ConcordanceResultsPanelProps) {
   const showDispersion = concordanceView === 'dispersion';
 

@@ -1,7 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AnnotationFeature from '../AnnotationFeature';
@@ -11,6 +10,7 @@ import type {
 } from '@/features/views/common/components/NodeInputsPanel';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
+import type { AnalysisFeatureHost } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import {
   projectWorkspaceNodeMetadata,
@@ -274,20 +274,32 @@ function nodeInputRequestsStore(
   return store;
 }
 
-function renderAnnotationFeature(props: Partial<ComponentProps<typeof AnnotationFeature>> = {}) {
+interface AnnotationFeatureTestOptions {
+  tabInputSets?: AnalysisFeatureHost['inputSets'];
+  onTabInputSetChange?: AnalysisFeatureHost['setInputSet'];
+  tabSettings?: AnalysisFeatureHost['settings'];
+  onTabSettingChange?: AnalysisFeatureHost['setSetting'];
+}
+
+function renderAnnotationFeature(props: AnnotationFeatureTestOptions = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  const onTabInputSetChange = vi.fn();
+  const onTabInputSetChange = props.onTabInputSetChange ?? vi.fn();
   return render(
     <QueryClientProvider client={queryClient}>
       <AnnotationFeature
-        tabInputSets={{
-          source: [{ node_id: 'source-node', column: 'text' }],
-          classDescriptions: [{ node_id: 'classes-node', column: 'class' }],
+        host={{
+          taskId: null,
+          inputSets: props.tabInputSets ?? {
+            source: [{ node_id: 'source-node', column: 'text' }],
+            classDescriptions: [{ node_id: 'classes-node', column: 'class' }],
+          },
+          settings: props.tabSettings ?? {},
+          setTaskId: vi.fn(),
+          setInputSet: onTabInputSetChange,
+          setSetting: props.onTabSettingChange ?? vi.fn(),
         }}
-        onTabInputSetChange={onTabInputSetChange}
-        {...props}
       />
     </QueryClientProvider>,
   );

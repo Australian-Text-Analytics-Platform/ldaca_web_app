@@ -3,7 +3,7 @@ import {
   type ConcordanceDispersionChartMode,
   DISPERSION_DEFAULT_BIN_COUNT,
   type DispersionDisplayBinCount,
-} from '../concordanceViewModels';
+} from '../concordanceDispersionDomain';
 
 export interface UseConcordanceDispersionControlsResult {
   concordanceView: 'table' | 'dispersion';

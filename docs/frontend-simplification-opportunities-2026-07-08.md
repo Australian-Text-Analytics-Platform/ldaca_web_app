@@ -90,27 +90,6 @@ settled before deletion.
 
 ### Deep modularity opportunities
 
-#### M3. Normalize quotation rows and highlights once
-
-- **Evidence / strength — Strong:** [quotationResultsModel.ts](../frontend/src/features/views/quotation/quotationResultsModel.ts), [quotationHighlight.ts](../frontend/src/features/views/quotation/quotationHighlight.ts), [quotationCellText.ts](../frontend/src/features/views/quotation/quotationCellText.ts), and renderer helpers repeat row/highlight/materialization parsing.
-- **Recommended direction:** define one typed row/span model with shared pure segmentation, palette, and materialization parsers; keep table/detail/render adapters distinct.
-- **Deletion test:** source payload interpretation occurs once and renderers no longer carry fallback parsing.
-- **Validation:** nested/overlapping spans, Unicode, empty text, palette stability, row detail, remote URLs, materialization, and export.
-
-#### M4. Create a Concordance results-session owner and split domains
-
-- **Evidence / strength — Strong:** [ConcordanceFeature.tsx](../frontend/src/features/views/concordance/ConcordanceFeature.tsx), [ConcordanceResultsPanel.tsx](../frontend/src/features/views/concordance/components/ConcordanceResultsPanel.tsx), and [useConcordanceResultViewModel.ts](../frontend/src/features/views/concordance/hooks/useConcordanceResultViewModel.ts) carry roughly 61-, 29-, and 47-prop handoffs around an 803-line view-model domain.
-- **Recommended direction:** own query/result/session commands at a deep context/hook boundary, then split pure combined/table, dispersion, and source/materialization domains; factor only genuinely shared node-shell/model/scroll behavior.
-- **Deletion test:** prop count falls because ownership moved, not because props were packed into an opaque bag, and each extracted module has cohesive tests.
-- **Validation:** combined/dispersion switch, tokenizer mode, paging, selection, scroll sync, row detail, materialization, detach, pending handoff, and stale results.
-
-#### M5. Let the analysis host own the canonical feature contract
-
-- **Evidence / strength — Strong:** six analysis feature components repeat near-identical prop interfaces and optional tab-ID callback guards around [AnalysisTabsHost.tsx](../frontend/src/features/views/common/tabs/AnalysisTabsHost.tsx).
-- **Recommended direction:** capture workspace/tab commands in the host closure and pass each feature a small canonical host contract plus its domain-specific inputs.
-- **Deletion test:** repeated feature interfaces and optional callback guards disappear without a new mega-prop object.
-- **Validation:** single/multi-tab modes, tab create/close/reorder, persisted IDs, feature switching, task banners, and disabled optional actions.
-
 #### M6. Split `main.rs` into deep internal modules
 
 - **Evidence / strength — Strong:** [main.rs](../frontend/src-tauri/src/main.rs#L126-L1156) combines runtime resolution, backend process/environment/port lifecycle, native download, platform behavior, and Tauri assembly; nested mutex/optional-child ownership obscures shutdown invariants.
@@ -723,6 +702,51 @@ unreachable callers. Product/external-contract caveats remain where noted.
       regeneration, and staged plus unstaged `git diff --check` passed. The
       separately tracked format baseline now reports 43 files; no Milestone 8
       file is among them.
+
+67. Normalize Quotation rows, spans, highlights, and materialization once (M3)
+    - Done 2026-07-11. `quotationResultsModel.ts` is now the sole raw response
+      boundary. It normalizes scalar cells, converts backend Python code-point
+      offsets to JavaScript code-unit offsets, validates custom or generated
+      speaker/quote/verb spans, segments overlaps in canonical palette order,
+      and parses materialized path/summary metadata. Table, clipped-cell, and
+      full-detail adapters consume the same typed row; Unicode, empty text,
+      overlapping spans, row detail, remote-engine validation, palette, and
+      materialization behavior have focused coverage.
+    - The duplicated `quotationCellText.ts` and `quotationHighlight.ts` layers
+      are deleted. Renderers no longer inspect `__spans` or generated index
+      columns and cannot fall back to a second payload interpretation.
+
+68. Establish one Concordance result session and cohesive domains (M4)
+    - Done 2026-07-11. `useConcordanceResultSession` now owns guarded result
+      identity, canonical `metadata.task_id`, page-size hydration, pagination,
+      loading/detach/materialize maps, materialized paths/summaries/bin caches,
+      abortable whole-corpus bin queries, source/color derivation, and atomic
+      clear. The adjacent result-controls and result-view-model hooks are
+      deleted; camelCase task-id compatibility is explicitly rejected.
+    - The former 803-line view model is split into table/combined,
+      dispersion, and source/materialization domains. The results panel now
+      accepts six named domain contracts instead of roughly 61 independent
+      props, while its child block interfaces stay explicit rather than hiding
+      behavior in an untyped context or `Record` bag.
+
+69. Make the analysis host contract required and canonical (M5)
+    - Done 2026-07-11. `AnalysisTabsHost` passes every analysis feature one
+      `AnalysisFeatureHost` with normalized task/input/settings state and
+      closure-bound persistence commands. All six repeated feature interfaces,
+      tab-id guards, optional task writers, redundant `?? null` hydration
+      adapters, and optional task-assignment/materialization branches are gone.
+      Direct feature tests now construct the real host contract instead of
+      relying on a standalone compatibility mode.
+
+    - Implementation validation: 193 frontend test files / 875 tests, lint,
+      configured Knip, production build (4,823 modules), docs drift (70
+      literals), focused Quotation/Concordance/host characterization suites,
+      feature import-cycle scan (477 files / zero cycles), and staged plus
+      unstaged `git diff --check` passed. The separately
+      tracked repository-wide format gate still fails (45 current diagnostics);
+      every newly added or substantively rewritten Milestone 9 file passes the
+      formatter, while the four touched baseline files remain in the existing
+      format-debt set scheduled under B9.
 
 ## Endpoint And Source-Of-Truth Notes
 

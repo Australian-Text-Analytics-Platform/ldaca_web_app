@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useUIStore } from '@/stores/uiStore';
@@ -40,10 +39,8 @@ import { SequentialAnalysisParameterPanel } from './components/panels/Sequential
 import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import { downloadChartAs, findSvgInContainer, type ChartImageFormat } from '@/lib/chartExport';
-import {
-  DEFAULT_TAB_INPUT_SET_ID,
-  type AnalysisTabInputSets,
-} from '@/features/views/common/tabs/tabStateOps';
+import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
@@ -54,26 +51,17 @@ const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
- * Tab props: ``tabId`` identifies the active tab, ``tabTaskId`` seeds
- * deterministic hydration of that tab's task, ``onTabTaskChange`` reports task
- * id assignment/clear back to the tab record, and ``onTabInputSetChange`` owns
- * node-input persistence for add/remove/column actions.
+ * The required host supplies normalized task/input state and closure-bound
+ * persistence commands for the active tab; this feature has no standalone or
+ * optional-tab compatibility path.
  */
-interface SequentialAnalysisFeatureProps {
-  tabId?: string;
-  tabTaskId?: string | null;
-  onTabTaskChange?: (taskId: string | null) => void;
-  tabInputSets?: AnalysisTabInputSets;
-  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
-}
-
-const SequentialAnalysisFeature = ({
-  tabId,
-  tabTaskId,
-  onTabTaskChange,
-  tabInputSets,
-  onTabInputSetChange,
-}: SequentialAnalysisFeatureProps) => {
+const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
+  const {
+    taskId: tabTaskId,
+    setTaskId: onTabTaskChange,
+    inputSets: tabInputSets,
+    setInputSet: onTabInputSetChange,
+  } = host;
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -107,7 +95,7 @@ const SequentialAnalysisFeature = ({
   const { serverRequest } = useLastRunRequest({
     analysisType: ANALYSIS_TAB_GROUPS.sequential,
     workspaceId: currentWorkspaceId,
-    taskId: tabTaskId ?? null,
+    taskId: tabTaskId,
   });
 
   const sequentialParameters = useSequentialAnalysisParameters();
@@ -169,7 +157,7 @@ const SequentialAnalysisFeature = ({
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
-    hydrationTaskId: tabTaskId ?? null,
+    hydrationTaskId: tabTaskId,
     resultRef,
     // Loads the latest sequential-analysis result for polling and task resumption.
     fetchResult: async (taskId) => {
@@ -263,7 +251,7 @@ const SequentialAnalysisFeature = ({
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
       // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange?.(null);
+      onTabTaskChange(null);
       setLockedSchema(null);
       setChartType('line');
       sequentialParameters.resetAfterClear();
@@ -411,7 +399,7 @@ const SequentialAnalysisFeature = ({
         // Persist the run's assigned task id onto the active tab so reload
         // rehydrates the same task.
         onTaskIdAssigned: (taskId) => {
-          if (tabId) onTabTaskChange?.(taskId);
+          onTabTaskChange(taskId);
         },
       },
     });

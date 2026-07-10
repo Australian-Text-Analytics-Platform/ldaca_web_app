@@ -28,23 +28,21 @@ import type { AnalysisTabInputSets } from './tabStateOps';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 
 /**
- * Tab props every analysis feature accepts so a tab can drive it. The input
- * writer is required because node additions must always have a real persistence
- * owner; task/settings props stay optional for feature-level tests that do not
- * exercise those persistence paths.
+ * Canonical owner passed to every analysis feature. Values are normalized at
+ * this boundary and persistence commands already capture the active tab id, so
+ * feature code never branches on whether it happens to be tab-mounted.
  */
-interface AnalysisTabFeatureProps {
-  tabId?: string;
-  tabTaskId?: string | null;
-  onTabTaskChange?: (taskId: string | null) => void;
-  /** All named input node sets owned by this tab. */
-  tabInputSets?: AnalysisTabInputSets;
-  /** Commit one named input node set for this tab (persists to tabs.json). */
-  onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
-  /** This tab's free-form scalar settings (Manual/AI mode, provider, ...). */
-  tabSettings?: Record<string, string>;
-  /** Commit one free-form scalar setting for this tab (persists to tabs.json). */
-  onTabSettingChange?: (key: string, value: string) => void;
+export interface AnalysisFeatureHost {
+  taskId: string | null;
+  inputSets: AnalysisTabInputSets;
+  settings: Record<string, string>;
+  setTaskId: (taskId: string | null) => void;
+  setInputSet: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  setSetting: (key: string, value: string) => void;
+}
+
+export interface AnalysisTabFeatureProps {
+  host: AnalysisFeatureHost;
 }
 
 export interface AnalysisTabsHostProps {
@@ -119,18 +117,19 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
         // (via tabTaskId) and keeps independent local panel state.
         <Feature
           key={activeTab.tab_id}
-          tabId={activeTab.tab_id}
-          tabTaskId={activeTab.task_id ?? null}
-          onTabTaskChange={(taskId) => {
-            setTabTask(activeTab.tab_id, taskId);
-          }}
-          tabInputSets={activeTab.input_sets}
-          onTabInputSetChange={(selectorId, inputs) => {
-            setTabInputSet(activeTab.tab_id, selectorId, inputs);
-          }}
-          tabSettings={activeTab.settings}
-          onTabSettingChange={(key, value) => {
-            setTabSetting(activeTab.tab_id, key, value);
+          host={{
+            taskId: activeTab.task_id ?? null,
+            inputSets: activeTab.input_sets,
+            settings: activeTab.settings,
+            setTaskId: (taskId) => {
+              setTabTask(activeTab.tab_id, taskId);
+            },
+            setInputSet: (selectorId, inputs) => {
+              setTabInputSet(activeTab.tab_id, selectorId, inputs);
+            },
+            setSetting: (key, value) => {
+              setTabSetting(activeTab.tab_id, key, value);
+            },
           }}
         />
       ) : null}

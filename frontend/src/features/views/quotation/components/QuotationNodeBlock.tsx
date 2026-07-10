@@ -15,10 +15,8 @@ import { ServerPaginationFooter } from '@/features/views/common/components/Serve
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import type { SourceRowPagination } from '@/api';
 import { QUOTATION_DOCUMENT_COLUMN } from '../../common/generatedColumns';
-import { toCellText } from '../quotationCellText';
+import type { QuotationResultRow } from '../quotationResultsModel';
 import { QuotationHighlightedCell, type QuotationHoverState } from './QuotationHighlightedCell';
-
-type QuotationRow = Record<string, unknown>;
 
 export interface QuotationNodeBlockProps {
   /** Identifier for the node whose quotation results are shown. */
@@ -28,7 +26,7 @@ export interface QuotationNodeBlockProps {
   /** Ordered display columns (document column first, then metadata). */
   cols: string[];
   /** Quotation rows for the current page (rows without quotations already filtered out). */
-  rows: QuotationRow[];
+  rows: QuotationResultRow[];
   /** Source-row pagination metadata returned by the backend. */
   pagination?: SourceRowPagination | null;
   /** Currently active sort column, if any. */
@@ -46,7 +44,7 @@ export interface QuotationNodeBlockProps {
   /** Requests a different documents-per-batch size. */
   onPageSizeChange: (pageSize: number) => void;
   /** Opens the row detail panel for a clicked row. */
-  onRowClick: (row: QuotationRow) => void;
+  onRowClick: (row: QuotationResultRow) => void;
   /** Documents-per-batch options for the footer selector. */
   pageSizeOptions: number[];
   /** Summary rendered beside the page-size selector. */
@@ -97,9 +95,10 @@ export function QuotationNodeBlock({
   const pageSize = pagination?.page_size ?? 50;
   const rowCount = pagination?.total_source_rows ?? 0;
 
-  const columns: ColumnDef<QuotationRow>[] = cols.map((columnName) => ({
+  const columns: ColumnDef<QuotationResultRow>[] = cols.map((columnName) => ({
     id: columnName,
-    accessorFn: (row) => row[columnName],
+    accessorFn: (row) =>
+      columnName === QUOTATION_DOCUMENT_COLUMN ? row.text : row.raw[columnName],
     header: () => {
       const active = sortBy === columnName;
       return (
@@ -117,11 +116,9 @@ export function QuotationNodeBlock({
     },
     cell: ({ row }) => {
       const data = row.original;
-      const value = columnName === QUOTATION_DOCUMENT_COLUMN ? data[textCol] : data[columnName];
       if (Boolean(textCol) && columnName === QUOTATION_DOCUMENT_COLUMN) {
         return (
           <QuotationHighlightedCell
-            text={typeof value === 'string' ? value : toCellText(value)}
             row={data}
             cellKey={`${nodeId}:${row.id}:${columnName}`}
             contextLength={contextLength}
@@ -130,11 +127,11 @@ export function QuotationNodeBlock({
           />
         );
       }
-      return value !== undefined && value !== null ? toCellText(value) : '';
+      return data.cellText(columnName);
     },
   }));
 
-  const table = useServerTable<QuotationRow>({
+  const table = useServerTable<QuotationResultRow>({
     data: rows,
     columns,
     rowCount,
