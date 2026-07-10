@@ -115,8 +115,10 @@ interface TokenFrequencyParameterPanelProps {
 }
 
 /**
- * Rendered by: TokenFrequencyFeature to show setup controls and selection locking because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by TokenFrequencyFeature as the setup surface for its active tab.
+ * Flow: render node, document-column, tokenizer, study-role, and colour
+ * controls, then gate run, stop, and clear actions from the supplied task and
+ * rerun state.
  */
 export const TokenFrequencyParameterPanel = ({
   nodeInputs,

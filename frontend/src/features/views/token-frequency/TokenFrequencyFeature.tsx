@@ -3,7 +3,11 @@ import type { AnalysisTabInput, TokenFrequencyResponse } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 
-import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest, useLastRunRequest } from '../common';
+import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
+import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
+import { useSafeResult } from '../common/useSafeResult';
+import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest } from '../common/utils';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
 import { useTabNodeInputs } from '../common/nodeInputs';
@@ -24,7 +28,6 @@ import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog'
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyResultModel } from './hooks/useTokenFrequencyResultModel';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
-import { useAnalysisFeature, useNodeColorControls, useSafeResult } from '../common';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
@@ -143,13 +146,11 @@ const TokenFrequencyFeature = ({
     hydrationTaskId: tabTaskId ?? null,
     resultRef,
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<TokenFrequencyResponse>(currentWorkspaceId, taskId);
     },
     /** Fetches the saved task request so a reopened task can restore panel state. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
@@ -159,7 +160,6 @@ const TokenFrequencyFeature = ({
       );
     },
     /** Pushes fetched task results into guarded component state. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onResultFetched: (result) => {
       // Restore the compared node ids from the authoritative result, not just
       // the raw result blob. onResultFetched and onHydratedResult race on a
@@ -179,8 +179,11 @@ const TokenFrequencyFeature = ({
       }
       setResultSafely(result);
     },
-    /** Rehydrates controls from a persisted result when the feature reconnects to a task. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    /**
+     * Rehydrates controls from a persisted result when the feature reconnects
+     * to a task. Flow: restore compared/study nodes, token limit, guarded
+     * results, and the normalized stop-word editor/filter state.
+     */
     onHydratedResult: (result) => {
       if (!result) return;
       const requestData = result.analysis_params ?? {};
@@ -199,8 +202,11 @@ const TokenFrequencyFeature = ({
         setStopWords(normalizedStops.join(', '));
       }
     },
-    /** Rehydrates node selections from a persisted request payload after task recovery. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    /**
+     * Rehydrates node selections from a persisted request payload after task
+     * recovery. Flow: unwrap the saved request, cap its node ids to the
+     * two-input contract, and restore the study-node role.
+     */
     onHydratedRequest: (requestPayload) => {
       const raw = requestPayload as Record<string, unknown> | null;
       const req = raw?.data ?? raw;
@@ -212,7 +218,6 @@ const TokenFrequencyFeature = ({
       setStudyNodeId(nodeIds[1] ?? null);
     },
     /** Clears local result and selection state when the feature reset action runs. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
       setResultSafely(null);
       if (options?.preserveLocalState) {
@@ -226,7 +231,6 @@ const TokenFrequencyFeature = ({
       resetPreferenceUiState();
     },
     /** Removes token-frequency tasks from the shared analysis store after local cleanup. */
-    // Called by: TokenFrequencyFeature through its owning hook, JSX prop, or analysis lifecycle config.
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
     },
@@ -373,10 +377,7 @@ const TokenFrequencyFeature = ({
     stopWords,
   });
 
-  /** Applies the textarea stop-word list to the displayed result filters. */
-  /**
-   * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
+  /** Passed to TokenFrequencyResultsPanel to apply its stop-word editor text. */
   const handleApplyStopWords = () => {
     applyStopSetFromText(stopWords);
   };
@@ -429,18 +430,15 @@ const TokenFrequencyFeature = ({
     workspaceId: currentWorkspaceId,
   });
 
-  /** Persists a selected document column for a node when live analysis is editable. */
-  /**
-   * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   */
+  /** Passed to TokenFrequencyParameterPanel to update and persist a node's document column. */
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
   };
 
-  /** Stores the tokenizer model selected for a node and persists it with its detected language. */
   /**
-   * Called by: TokenFrequencyFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to each parameter-panel tokenizer selector to update its live model
+   * and persist the model together with the detected language.
    */
   const handleTokenizerModelChange = (
     nodeId: string,
