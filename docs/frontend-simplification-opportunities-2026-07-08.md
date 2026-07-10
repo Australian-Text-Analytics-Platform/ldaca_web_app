@@ -668,12 +668,13 @@ unreachable callers. Product/external-contract caveats remain where noted.
 42. Give Data Loader mutations and dialogs one owner (D23)
     - Done 2026-07-10. Upload, delete, move, folder creation, and sample import
       each invalidate the file query once through their mutation owner; LDaCA
-      keeps terminal task-owned invalidation and claims successful task ids so
-      replayed events cannot refresh twice. The explicit Refresh button remains
-      a separate refetch command. `refetchFiles` prop threading and duplicate
-      immediate refetches are gone. File preview has one Dialog owner, and the
-      disabled no-workspace Add action no longer carries an unreachable
-      alert/state facade.
+      keeps terminal task-owned invalidation and claims successful task ids from
+      both reconnect snapshots and incremental events, so replayed records
+      cannot refresh twice. The explicit Refresh button remains a separate
+      refetch command. `refetchFiles` prop threading and duplicate immediate
+      refetches are gone. File preview has one Dialog owner, and the disabled
+      no-workspace Add action no longer carries an unreachable alert/state
+      facade.
 
 ## Endpoint And Source-Of-Truth Notes
 

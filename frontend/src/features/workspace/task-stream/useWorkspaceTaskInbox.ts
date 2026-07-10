@@ -227,9 +227,9 @@ export const useWorkspaceTaskInbox = (
   const pushMaterializedEvent = useAnalysisStore((state) => state.pushMaterializedEvent);
   const [transientError, setTransientError] = useState<string | null>(null);
   const eventSequenceRef = useRef(0);
-  // Successful task_changed events may be replayed by the stream. This set is
-  // imperative claim state: the task store remains the render source of truth,
-  // while each LDaCA task may invalidate the files query only once.
+  // Successful snapshot/task_changed records may be replayed by the stream.
+  // This set is imperative claim state: the task store remains the render
+  // source of truth, while each LDaCA task may invalidate files only once.
   const refreshedLdacaImportTaskIdsRef = useRef(new Set<string>());
 
   /**
@@ -240,6 +240,27 @@ export const useWorkspaceTaskInbox = (
   const nextEventSequence = () => {
     eventSequenceRef.current += 1;
     return eventSequenceRef.current;
+  };
+
+  /**
+   * Claims successful LDaCA task ids before invalidating the file tree.
+   * Called by: both snapshot and incremental task-event branches because an
+   * SSE reconnect may deliver completion only in its initial snapshot, while
+   * later replays must not refresh the same task twice.
+   */
+  const claimSuccessfulLdacaFileRefreshes = (candidateTasks: readonly TaskItem[]) => {
+    for (const task of candidateTasks) {
+      if (
+        task.task_type !== 'ldaca_import' ||
+        task.state !== 'successful' ||
+        refreshedLdacaImportTaskIdsRef.current.has(task.task_id)
+      ) {
+        continue;
+      }
+
+      refreshedLdacaImportTaskIdsRef.current.add(task.task_id);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.files });
+    }
   };
 
   /**
@@ -270,6 +291,7 @@ export const useWorkspaceTaskInbox = (
       case 'tasks_snapshot': {
         const snapshotTasks = payload.tasks;
         if (Array.isArray(snapshotTasks)) {
+          claimSuccessfulLdacaFileRefreshes(snapshotTasks);
           const seq = nextEventSequence();
           const eventTimestamp = normalizeTimestamp(payload.timestamp);
           setTasks((prevTasks: TaskItem[]) =>
@@ -301,14 +323,7 @@ export const useWorkspaceTaskInbox = (
             ]),
           );
 
-          if (
-            changedTask.task_type === 'ldaca_import' &&
-            changedTask.state === 'successful' &&
-            !refreshedLdacaImportTaskIdsRef.current.has(changedTask.task_id)
-          ) {
-            refreshedLdacaImportTaskIdsRef.current.add(changedTask.task_id);
-            void queryClient.invalidateQueries({ queryKey: queryKeys.files });
-          }
+          claimSuccessfulLdacaFileRefreshes([changedTask]);
 
           if (workspaceId && shouldRefreshGraphFallback(changedTask)) {
             void queryClient.invalidateQueries({

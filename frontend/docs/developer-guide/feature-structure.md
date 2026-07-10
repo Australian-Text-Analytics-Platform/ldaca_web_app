@@ -132,9 +132,10 @@ and `useFileBrowserActions` only performs the README fetch side effect.
 File-list server state stays in TanStack Query. Upload, delete, move, folder
 creation, and sample import owners call the shared file-query invalidation once
 after successful mutation; the task inbox claims each successful LDaCA task id
-before invalidating files, so replayed terminal events do not refresh twice.
-The toolbar Refresh button is the only explicit file-query refetch command, and
-must not be threaded back into mutation workflows.
+from reconnect snapshots or incremental task events before invalidating files,
+so replayed terminal records do not refresh twice. The toolbar Refresh button
+is the only explicit file-query refetch command, and must not be threaded back
+into mutation workflows.
 
 `FilePreviewContent` owns the shared preview Dialog for both inspect and
 add-to-workspace flows. `AddFilePanel` contributes confirmation state/content

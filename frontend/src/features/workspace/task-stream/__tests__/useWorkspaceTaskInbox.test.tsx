@@ -16,6 +16,7 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
   useAuth: () => ({ getAuthHeaders: () => ({}) }),
 }));
 
+/** Captures the real inbox event callback while replacing only the external SSE transport. */
 vi.mock('../useWorkspaceTaskStreamClient', () => ({
   useWorkspaceTaskStreamClient: (options: WorkspaceTaskStreamClientOptions) => {
     emitTaskEvent = options.onEvent;
@@ -35,7 +36,7 @@ describe('useWorkspaceTaskInbox file cache policy', () => {
     useAnalysisStore.setState({ tasks: [] });
   });
 
-  it('invalidates files once when a successful LDaCA task emission repeats', () => {
+  it('invalidates files once across a successful LDaCA snapshot and incremental replay', () => {
     const queryClient = new QueryClient();
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -43,24 +44,26 @@ describe('useWorkspaceTaskInbox file cache policy', () => {
     );
     renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
 
-    const payload: TaskEventPayload = {
-      type: 'task_changed',
-      task: {
-        task_id: 'ldaca-task-1',
-        task_type: 'ldaca_import',
-        workspace_id: 'workspace-1',
-        state: 'successful',
-      },
-      timestamp: 1,
+    const completedTask = {
+      task_id: 'ldaca-task-1',
+      task_type: 'ldaca_import',
+      workspace_id: 'workspace-1',
+      state: 'successful' as const,
     };
-    act(() => {
-      emitTaskEvent?.(payload);
-      emitTaskEvent?.(payload);
-    });
+    /** Counts file-cache effects without conflating the inbox's graph invalidations. */
+    const countFileInvalidations = () =>
+      invalidateQueries.mock.calls.filter(([filters]) => filters?.queryKey === queryKeys.files)
+        .length;
 
-    const fileInvalidations = invalidateQueries.mock.calls.filter(
-      ([filters]) => filters?.queryKey === queryKeys.files,
-    );
-    expect(fileInvalidations).toHaveLength(1);
+    act(() => {
+      emitTaskEvent?.({ type: 'tasks_snapshot', tasks: [completedTask], timestamp: 1 });
+    });
+    expect(countFileInvalidations()).toBe(1);
+
+    act(() => {
+      emitTaskEvent?.({ type: 'tasks_snapshot', tasks: [completedTask], timestamp: 2 });
+      emitTaskEvent?.({ type: 'task_changed', task: completedTask, timestamp: 3 });
+    });
+    expect(countFileInvalidations()).toBe(1);
   });
 });
