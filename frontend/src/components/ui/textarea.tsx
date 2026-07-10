@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 
 /**
  * Shared multiline input primitive used by form surfaces that need app-consistent focus/error styling.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
   return (

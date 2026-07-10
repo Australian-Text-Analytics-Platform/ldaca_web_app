@@ -119,7 +119,7 @@ interface UseAnalysisFeatureReturn {
 /**
  * Owns the common task lifecycle for analysis tabs: task id discovery, status
  * banners, hydration, stopping, result refresh, and clear/reset coordination.
- * Used by: task-backed analysis feature screens because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Used by: task-backed analysis feature screens.
  * Flow: resolve task identity and cached request state, then coordinate hydration, terminal refresh, cancellation, and clear callbacks.
  */
 export function useAnalysisFeature<TResult = unknown>(
@@ -206,7 +206,7 @@ export function useAnalysisFeature<TResult = unknown>(
   /**
    * Resolves the task id from explicit local/tab-owned sources, then records
    * the winning id for future clears.
-   * Called by: hydration, terminal result refresh, clear, and stop workflows because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Called by: hydration, terminal result refresh, clear, and stop workflows.
    * Flow: collect task-id candidates from refs, result metadata, last-run request cache, task status, and caller extras; then cache the resolved id.
    */
   const resolveTaskId = (): Promise<string | null> => {
@@ -249,8 +249,9 @@ export function useAnalysisFeature<TResult = unknown>(
   /**
    * Fetches and applies terminal results for task-flow refreshes while sharing
    * de-dupe refs with hydration so one task id only produces one result update.
-   * Called by: task refresh handling and consumers of useAnalysisFeature because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   * Called by: `handleTaskRefresh` when the owned task reaches a terminal state.
+   * Flow: reject inactive, foreign, or duplicate tasks; resolve the owned id;
+   * fetch and apply the result; then synchronize running and de-dupe refs.
    */
   const fetchAndApplyResult = async (
     taskId: string | null,
@@ -313,7 +314,7 @@ export function useAnalysisFeature<TResult = unknown>(
   /**
    * Bridges task-store terminal events into feature-specific result refreshes
    * only for active tabs and successful/failed terminal states.
-   * Called by: useAnalysisTaskFlow when the tracked task reaches terminal state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Called by: useAnalysisTaskFlow when the tracked task reaches terminal state.
    */
   const handleTaskRefresh = async (context: AnalysisTaskFlowRefreshContext): Promise<void> => {
     if (!configRef.current.isTabActive) return;
@@ -325,8 +326,9 @@ export function useAnalysisFeature<TResult = unknown>(
   /**
    * Builds a running banner from a feature's cached result when task-store state
    * has not yet observed the same task, keeping restored tasks visible on load.
-   * Called by: useAnalysisTaskFlow while deriving the banner fallback because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   * Called by: useAnalysisTaskFlow while deriving the banner fallback.
+   * Flow: confirm the cached result is running, then derive its task id and
+   * optional message from cached metadata plus current task status.
    */
   const fallbackRunningBanner = (status: AnalysisTaskStatus) => {
     const cfg = configRef.current;
@@ -404,7 +406,7 @@ export function useAnalysisFeature<TResult = unknown>(
     /**
      * Shares result fetching with terminal refreshes so hydration does not repeat
      * a result already applied for the same successful or failed task.
-     * Called by: useAnalysisHydration when loading persisted task results because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+     * Called by: useAnalysisHydration when loading persisted task results.
      * Flow: skip blank, duplicate, or already terminal task ids, call the feature result fetcher, then release the in-flight guard.
      */
     fetchResult: async (taskId) => {
@@ -454,7 +456,7 @@ export function useAnalysisFeature<TResult = unknown>(
   /**
    * Clears backend task records and every local source of task/result state so
    * feature panels can start a new analysis from an unlocked baseline.
-   * Called by: analysis feature clear buttons and task banner cleanup flows because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Called by: analysis feature clear buttons and task banner cleanup flows.
    * Flow: collect local/result/status task ids, call clearAnalysis with cleanup hooks, then clear local ids, fetch markers, running state, global tasks, and feature results.
    */
   const clearResults = async (options?: ClearAnalysisUiOptions): Promise<void> => {
@@ -478,7 +480,7 @@ export function useAnalysisFeature<TResult = unknown>(
         ...extraSources,
       ],
       resolveTaskId,
-      /** Called by: clearAnalysis after backend task-cache cleanup completes because callers need shared hook state and handlers without duplicating analysis lifecycle wiring. */
+      /** Called by: clearAnalysis after backend task-cache cleanup completes. */
       onCleanup: (taskIds) => {
         setLocalTaskId(null);
         lastFetchedRef.current = { taskId: null, state: null };
@@ -492,7 +494,7 @@ export function useAnalysisFeature<TResult = unknown>(
   /**
    * Cancels the best-known running task id for features whose long-running
    * backend jobs can be stopped from the shared analysis banner.
-   * Called by: analysis running banners through the hook return value because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Called by: analysis running banners through the hook return value.
    * Flow: choose the running/active/local/result task id, send the generated cancel request, then update stopping and running flags around failures.
    */
   const stopTask = async (): Promise<void> => {

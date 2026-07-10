@@ -30,15 +30,15 @@ const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>([
 ]);
 
 /** Lets hooks treat queued/submitted variants as one pending bucket. */
-/** Used by: src/features/views/data-loader/DataLoaderFeature.tsx, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
+/** Used by DataLoaderFeature and useAnalysisTaskStatus to classify accepted work consistently. */
 export const isPendingTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && PENDING_TASK_STATES.has(state));
 /** Lets task banners detect active worker execution. */
-/** Used by: src/features/views/data-loader/DataLoaderFeature.tsx because store consumers need the action and state contract documented at the mutation boundary. */
+/** Used by DataLoaderFeature to keep the active-workspace refresh indicator visible. */
 export const isRunningTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && RUNNING_TASK_STATES.has(state));
 /** Lets polling/result hooks stop watching states that cannot transition further. */
-/** Used by: src/features/views/common/tasks/policies.ts, src/hooks/useAnalysisTaskStatus.ts because store consumers need the action and state contract documented at the mutation boundary. */
+/** Used by task policies and useAnalysisTaskStatus to identify completed work. */
 export const isTerminalTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && TERMINAL_TASK_STATES.has(state));
 
@@ -109,29 +109,25 @@ export const useAnalysisStore = create<AnalysisState>()(
     tasks: [],
     pendingConcordance: null,
     materializedEvents: [],
-    /** Replaces or updates task summaries received from polling/SSE task streams. */
-    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    /** Used by the task inbox and analysis features to merge or prune shared task summaries. */
     setTasks: (tasks) => {
       set((state) => {
         state.tasks = typeof tasks === 'function' ? tasks(state.tasks) : tasks;
       });
     },
-    /** Stores the concordance payload that should be consumed after an auto-run handoff. */
-    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    /** Used by Token Frequency to stage the payload consumed by Concordance's auto-run handoff. */
     setPendingConcordance: (payload) => {
       set((state) => {
         state.pendingConcordance = { ...payload, timestamp: payload.timestamp ?? Date.now() };
       });
     },
-    /** Clears the concordance handoff once the destination feature consumes it. */
-    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    /** Called by the Concordance handoff hook after it consumes the staged payload. */
     clearPendingConcordance: () => {
       set((state) => {
         state.pendingConcordance = null;
       });
     },
-    /** Records worker materialization events so feature tabs can react without refetch races. */
-    /** Consumed by: useAnalysisStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    /** Called by the task inbox when SSE reports a materialized analysis result. */
     pushMaterializedEvent: (event) => {
       set((state) => {
         materializedEventSequence += 1;

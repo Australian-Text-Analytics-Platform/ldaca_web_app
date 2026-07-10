@@ -72,8 +72,7 @@ interface TokenFrequencyResultsPanelProps {
 }
 
 /**
- * Rendered by: TokenFrequencyFeature to show running status, controls, and token-frequency result sections because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: TokenFrequencyFeature to show running status, controls, and token-frequency result sections.
  */
 export const TokenFrequencyResultsPanel = ({
   results,

@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import { analysisTaskPreferences, runSequentialAnalysis } from '@/api';
 import type { SequentialAnalysisRequest } from '@/api';
 import { type ChartConfig } from '@/components/ui/chart';
-import { extractAndSetTaskId } from '../../common';
+import { extractAndSetTaskId } from '../../common/extractTaskId';
 import {
   getSequentialPaletteColor,
   isChartTypeOption,
@@ -17,7 +17,7 @@ const NON_SERIES_CHART_KEYS = new Set(['time_period', 'period_start', 'period_en
 
 // Compares period boundary values so grouped rows retain their earliest start and latest end.
 /**
- * Called by: useSequentialAnalysisTaskFlow hook during this analysis workflow.
+ * Called while coalescing chart rows that share the same time-period label.
  * Flow: order nullish values last, compare numeric bounds directly, compare parseable dates by time, then fall back to string ordering.
  */
 const comparePeriodBounds = (left: unknown, right: unknown): number => {
@@ -85,8 +85,9 @@ interface Params {
 
 /** Builds the submit, clear, chart-type, and chart-shaping logic for sequential analysis. */
 /**
- * Used by: SequentialChart.tsx, SequentialAnalysisFeature.tsx, and related files.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ * Used by: `SequentialAnalysisFeature`.
+ * Flow: validate and submit the analysis request, shape the returned rows for
+ * charting, clear the active result, and persist chart-type preferences.
  */
 export function useSequentialAnalysisTaskFlow({
   state: {
@@ -121,8 +122,9 @@ export function useSequentialAnalysisTaskFlow({
 }: Params) {
   // Validates current parameters, submits the analysis request, and locks the selected node.
   /**
-   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `SequentialAnalysisFeature` by `useSequentialAnalysisTaskFlow`.
+   * Flow: validate the selected node/time interval, submit the generated
+   * request, record task ownership, enrich result parameters, and lock schema.
    */
   const handleAnalyze = async () => {
     const nodeIdForAnalysis = activeNodeId;
@@ -236,7 +238,7 @@ export function useSequentialAnalysisTaskFlow({
 
   // Clears the active sequential-analysis result through the shared lifecycle.
   /**
-   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks.
+   * Returned to `SequentialAnalysisFeature` by `useSequentialAnalysisTaskFlow`.
    */
   const handleClearResults = async () => {
     await clearResults();
@@ -244,8 +246,7 @@ export function useSequentialAnalysisTaskFlow({
 
   // Persists chart-type changes onto both local result state and the stored task result.
   /**
-   * Called by: useSequentialAnalysisTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: derive display state, bind user actions, then render the analysis UI.
+   * Returned to `SequentialAnalysisFeature` by `useSequentialAnalysisTaskFlow`.
    */
   const handleChartTypeChange = async (value: ChartTypeOption) => {
     setChartType(value);

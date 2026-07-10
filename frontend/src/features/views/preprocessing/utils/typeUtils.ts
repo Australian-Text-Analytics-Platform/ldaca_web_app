@@ -4,7 +4,7 @@ export { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTy
 
 /**
  * Supplies condition operators for the Filter tab based on normalized dtype.
- * Used by: useFilterSubTabSections hook, typeUtils tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by filter condition state and rendering to choose dtype-aware operators.
  * Flow: normalize the dtype, choose operator sets for numeric/datetime/string/boolean/list
  * types, and return filter-builder options.
  */
@@ -60,7 +60,7 @@ export const getOperatorsForType = (dataType: string) => {
 
 /**
  * Formats arbitrary preview cell values for tables and checklist labels.
- * Used by: useFilterSubTabSections hook, PreviewTable component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by categorical-option helpers and `PreviewTable` for readable cell labels.
  * Steps: map nullish/empty primitives to readable labels, preserve scalar text, JSON-stringify
  * objects when possible, and fall back to String conversion.
  */
@@ -102,7 +102,7 @@ export const formatPreviewValue = (value: unknown): string => {
 
 /**
  * Checks whether filter condition values are complete enough to serialize.
- * Used by: serializers utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by filter request serialization to reject incomplete condition values.
  * Steps: reject nullish/blank values, accept scalar values, recurse arrays and ranges, and
  * inspect object entries for any non-empty value.
  */

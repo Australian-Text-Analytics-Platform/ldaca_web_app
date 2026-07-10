@@ -20,14 +20,14 @@ export interface TokenFrequencyNodeContext {
 
 /** Narrows unknown values to usable non-empty node or column identifiers. */
 /**
- * Called by: tokenFrequencyHelpers analysis helper module during this analysis workflow.
+ * Used by `TokenFrequencyFeature` request and result derivation.
  */
 const isValidId = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
 /** Removes duplicate node IDs while preserving the user's comparison order. */
 /**
- * Called by: tokenFrequencyHelpers analysis helper module during this analysis workflow.
+ * Used by `TokenFrequencyFeature` request and result derivation.
  */
 const dedupePreserveOrder = (ids: string[]): string[] => {
   const seen = new Set<string>();
@@ -44,7 +44,8 @@ const dedupePreserveOrder = (ids: string[]): string[] => {
 /** Resolves the node and column context needed when token clicks jump to concordance. */
 /**
  * Used by: useTokenFrequencyTaskFlow.ts.
- * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ * Flow: combine result, request, and live-selection ids in priority order,
+ * resolve the matching selected node, then return its active text column.
  */
 export function resolveTokenFrequencyNodeContext({
   lastCompareNodeIds = [],

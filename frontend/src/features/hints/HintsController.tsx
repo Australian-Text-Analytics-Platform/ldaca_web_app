@@ -13,7 +13,7 @@ const POLL_INTERVAL_MS = 400;
 /**
  * Keeps polling from churning React state when the same hint still targets the
  * same element. Used only by `HintsController` before committing active state.
- * Used by: local callers in hints/HintsController module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called by `HintsController` before replacing its current polled hint state.
  */
 function sameActiveHint(left: ActiveHint | null, right: ActiveHint | null): boolean {
   if (left === right) return true;

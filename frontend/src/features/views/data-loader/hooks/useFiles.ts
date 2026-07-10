@@ -13,7 +13,7 @@ interface UseFilesProps {
 
 /** Coordinates user file tree loading plus upload/delete/download actions for data-loader panels. */
 /**
- * Used by: src/features/views/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/data-loader/DataLoaderFeature.tsx.
  * Flow: fetch the file tree, wire upload/delete mutations to cache invalidation, then expose selection and file actions for data-loader panels.
  */
 export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
@@ -23,7 +23,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
     queryKey: queryKeys.files,
     /**
      * Fetches the user-visible file tree for data-loader consumers.
-     * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
+     * Called by: TanStack Query while the Data Loader's files query is enabled.
      */
     queryFn: async () => {
       const { data } = await getUserFiles({ throwOnError: true });
@@ -38,7 +38,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
 
   const uploadMutation = useMutation({
     /** Uploads a browser File object through the generated SDK for file panel actions. */
-    /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
+    /** Called by: the upload mutation when `handleUploadFile` invokes `mutateAsync`. */
     mutationFn: (file: File) =>
       uploadFile({ body: { file }, throwOnError: true }),
     onSuccess: () => invalidateFilesQuery(queryClient),
@@ -46,7 +46,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
 
   const deleteMutation = useMutation({
     /** Deletes the selected server-side file and lets mutation success refresh the tree. */
-    /** Called by: TanStack Mutation inside useFiles because mutation callers need one async action path for pending, success, and error handling. */
+    /** Called by: the delete mutation when `handleDeleteFile` invokes `mutateAsync`. */
     mutationFn: (filename: string) =>
       deleteFile({
         query: { path: filename },
@@ -63,7 +63,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   const refreshFiles = async () => (await filesQuery.refetch()).data ?? null;
 
   /** Uploads a selected file and returns a boolean so panels can update inline status. */
-  /** Used by: useFiles callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
+  /** Returned to: `DataLoaderFeature`, which passes it into `useUploadState`. */
   const handleUploadFile = async (file: File) => {
     try {
       await uploadMutation.mutateAsync(file);
@@ -75,7 +75,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   };
 
   /** Deletes a user file and clears selection if the deleted file was active. */
-  /** Used by: useFiles callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
+  /** Returned to: `DataLoaderFeature` for the file-tree delete action. */
   const handleDeleteFile = async (filename: string) => {
     try {
       await deleteMutation.mutateAsync(filename);
@@ -88,7 +88,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   };
 
   /** Downloads a user file through the shared browser/Tauri save helper. */
-  /** Used by: useFiles callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
+  /** Returned to: `DataLoaderFeature` for the file-tree download action. */
   const handleDownloadFile = async (filename: string) => {
     try {
       const { data } = await downloadFile({

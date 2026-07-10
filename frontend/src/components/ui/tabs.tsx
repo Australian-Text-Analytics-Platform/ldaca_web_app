@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 
 /**
  * Tabs root primitive used by feature panels with segmented content.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
@@ -47,7 +46,6 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
 
 /**
  * Tab content region used by feature panels to mount active tab bodies.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (

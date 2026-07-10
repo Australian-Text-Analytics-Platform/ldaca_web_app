@@ -20,7 +20,7 @@ type AggregateSubTabComponentProps = AggregateSubTabProps & {
 /**
  * Entry component for the computed-column builder. It exists to key the inner
  * content by selection so builder state resets when the active source changes.
- * Rendered by: DataPreprocessingFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by: DataPreprocessingFeature module.
  */
 export function AggregateSubTab(props: AggregateSubTabComponentProps) {
   return <AggregateSubTabContent key={getAggregateSelectionKey(props)} {...props} />;
@@ -30,7 +30,7 @@ export function AggregateSubTab(props: AggregateSubTabComponentProps) {
  * Derives the reset key for the aggregate builder from the most recent source
  * node. Only `AggregateSubTab` uses it to remount the content on selection
  * changes.
- * Used by: local callers in preprocessing/AggregateSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called by `AggregateSubTab` to key its state-owning content component.
  */
 const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string => {
   const [selectedNode] = takeMostRecent(props.selectedNodes, 1);
@@ -43,7 +43,7 @@ const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string 
 /**
  * Renders the computed-column builder UI. It consumes `useAggregateSubTab` so
  * layout remains separate from expression/token state and apply/preview logic.
- * Rendered by: preprocessing/AggregateSubTab module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `AggregateSubTab` with a key that resets state on selection changes.
  * Flow: split hook config into selection/builder/preview/apply props, render expression and
  * visual-builder modes, and keep table/apply controls tied to hook state.
  */

@@ -3,7 +3,7 @@ import { saveBlob } from '@/lib/download';
 
 /** Creates a filesystem-safe export filename for generated token-frequency artifacts. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const toSafeExportFilename = (label: string, suffix: string, extension: string) => {
   const base =
@@ -18,20 +18,20 @@ const toSafeExportFilename = (label: string, suffix: string, extension: string) 
 
 /** Pads timestamp fragments so exported filenames sort consistently. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const padFilenamePart = (value: number) => String(value).padStart(2, '0');
 
 /** Builds the timestamp prefix used for grouped export archive names. */
 /**
- * Called by: tokenFrequencyExport analysis helper module as a local helper in this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Called by token-frequency download builders in this module.
  */
 const buildTimestampFragment = (date: Date = new Date()) =>
   `${padFilenamePart(date.getMonth() + 1)}-${padFilenamePart(date.getDate())}_${padFilenamePart(date.getHours())}-${padFilenamePart(date.getMinutes())}-${padFilenamePart(date.getSeconds())}`;
 
 /** Preserves a human-readable standalone filename when the user downloads one file. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const toRawStandaloneFilename = (label: string, suffix: string, extension: string) => {
   const base = (label || 'token-frequency').trim() || 'token-frequency';
@@ -40,7 +40,7 @@ const toRawStandaloneFilename = (label: string, suffix: string, extension: strin
 
 /** Sanitizes a corpus label for use as a compact zip archive segment. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  * Flow: trim the label, keep the basename, replace forbidden filename characters and control codes, then truncate to a nonempty archive segment.
  */
 const toArchiveNameSegment = (label: string, maxLength = 20) => {
@@ -83,7 +83,7 @@ export interface ExportedDownloadFile {
 
 /** Delegates blob saving to the shared browser/Tauri download adapter. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const triggerBlobDownload = (blob: Blob, filename: string) => {
   // saveBlob handles Tauri (write to Downloads + toast) and browser (anchor)
@@ -93,7 +93,7 @@ const triggerBlobDownload = (blob: Blob, filename: string) => {
 
 /** Downloads a prepared export file while allowing callers to override its visible filename. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const downloadExportedFile = (file: ExportedDownloadFile, overrideFilename?: string) => {
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty override filename must fall back to the file's own name, so falsy '' must fall through
@@ -104,7 +104,7 @@ const DEFAULT_TOKEN_COLUMNS = ['token', 'frequency'] as const;
 
 /** Infers stable export columns from result rows while preserving the default token shape. */
 /**
- * Called by: tokenFrequencyExport analysis helper module as a local helper in this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Called by token-frequency download builders in this module.
  * Flow: collect first-seen row keys across all rows, fall back to token/frequency defaults when empty, then flag the default token shape.
  */
 const deriveExportColumns = (rows: Record<string, unknown>[]) => {
@@ -138,7 +138,7 @@ const deriveExportColumns = (rows: Record<string, unknown>[]) => {
 
 /** Selects human-facing headers for CSV and Markdown export formats. */
 /**
- * Called by: tokenFrequencyExport analysis helper module as a local helper in this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Called by token-frequency download builders in this module.
  */
 const getExportHeaders = (columns: string[], isDefaultTokenFrequencyShape: boolean) => {
   if (isDefaultTokenFrequencyShape) {
@@ -156,7 +156,7 @@ const getExportHeaders = (columns: string[], isDefaultTokenFrequencyShape: boole
 
 /** Converts unknown row values into export-safe cell text. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const toCellString = (value: unknown) => {
   if (value === null || value === undefined) {
@@ -173,7 +173,7 @@ const toCellString = (value: unknown) => {
 
 /** Orders row values according to the derived export columns and default token headers. */
 /**
- * Called by: tokenFrequencyExport analysis helper module as a local helper in this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Called by token-frequency download builders in this module.
  */
 const getRowValues = (
   row: Record<string, unknown>,
@@ -189,20 +189,20 @@ const getRowValues = (
 
 /** Escapes a value for RFC-style quoted CSV output. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const escapeCsvValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
 /** Escapes a value for Markdown table cells shown in exported reports. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const escapeMarkdownValue = (value: string) =>
   value.replace(/[\r\n]+/g, '<br />').replace(/\|/g, '\\|');
 
 /** Serializes frequency rows into CSV for spreadsheet-friendly downloads. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  */
 const serializeRowsAsCsv = (rows: Record<string, unknown>[]) => {
   const { columns, isDefaultTokenFrequencyShape } = deriveExportColumns(rows);
@@ -218,7 +218,7 @@ const serializeRowsAsCsv = (rows: Record<string, unknown>[]) => {
 
 /** Serializes frequency rows into a Markdown table for document-friendly downloads. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  * Flow: derive columns and headers, write the Markdown header and separator rows, escape each cell, then join table lines.
  */
 const serializeRowsAsMarkdown = (rows: Record<string, unknown>[]) => {
@@ -242,7 +242,7 @@ const serializeRowsAsMarkdown = (rows: Record<string, unknown>[]) => {
 
 /** Renders a serialized SVG word cloud into a bitmap blob for PNG and JPEG exports. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  * Flow: derive export names and columns, serialize rows or assets, build Blob/zip payloads, then delegate the browser/Tauri download.
  */
 const renderWordCloudBitmap = (
@@ -404,7 +404,7 @@ export type FrequencyFormat = 'csv' | 'markdown';
 
 /** Serializes the live word-cloud SVG with concrete dimensions for export rendering. */
 /**
- * Called by: tokenFrequencyExport analysis helper module during this analysis workflow because token-frequency downloads need consistent filename, serialization, and Blob-building behavior across direct and zip exports.
+ * Used by token-frequency download builders in this module.
  * Flow: read explicit/client/viewBox dimensions, clone the SVG with xmlns and dimensions, then serialize it with XMLSerializer.
  */
 const serializeSvg = (svg: SVGSVGElement): { svgString: string; width: number; height: number } => {

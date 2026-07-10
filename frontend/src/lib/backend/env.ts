@@ -31,7 +31,7 @@ export interface ApiEnvOptions {
 }
 
 /** Resolves the dev backend port used when the SPA is served separately from FastAPI. */
-/** Called by: getApiBase in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: getApiBase in this library module. */
 function getBackendPort(): string {
   const port = BACKEND_PORT.trim();
   if (port) return port;
@@ -54,8 +54,9 @@ export function getRuntimeGoogleClientId(): string | undefined {
 /**
  * Returns the `/api` base URL used by generated SDK clients and local fetches,
  * normalizing each runtime's way of telling the frontend where the backend is.
- * Why: API callers need one runtime boundary for backend URL, timeout, and response handling.
- * Flow: read runtime configuration, normalize request or response details, then return the backend-facing value.
+ * Used by: generated-client configuration and the backend-health startup gate.
+ * Flow: prefer explicit, desktop, and build-time overrides; then resolve the
+ * served runtime base path or local-development port before same-origin fallback.
  */
 export function getApiBase(options: ApiEnvOptions = {}): string {
   // 1. Explicit override (tests / callers)

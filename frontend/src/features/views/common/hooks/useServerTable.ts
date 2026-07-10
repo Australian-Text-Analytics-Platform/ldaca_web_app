@@ -39,10 +39,8 @@ export interface ServerTableOptions<TData> {
 
 /** Creates a TanStack Table instance whose sort/filter/page state drives backend queries. */
 /**
- * Used by: WorkspaceTable, PreviewTable, and the analysis result tables
- * (ConcordanceTableNodeBlock, QuotationFeature, etc.) because the
- * hook needs local steps to normalize inputs before exposing stable state to
- * consumers.
+ * Used by: Annotation preview/results, preprocessing `PreviewTable`,
+ * Concordance table/dispersion blocks, and `QuotationNodeBlock`.
  * Flow: initialize controlled or internal sorting/filter state, bridge table
  * change callbacks, then build a manual TanStack table for backend paging.
  */
@@ -68,7 +66,7 @@ export function useServerTable<TData>({
   const columnFilters = externalFilters ?? internalFilters;
 
   /** Bridges TanStack sorting updates into controlled or internal state. */
-  /** Used by: useServerTable callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
+  /** Passed to: TanStack Table as `onSortingChange`. */
   const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
     const next = typeof updater === 'function' ? updater(sorting) : updater;
     setInternalSorting(next);
@@ -76,7 +74,7 @@ export function useServerTable<TData>({
   };
 
   /** Converts table pagination updates into caller-owned backend paging params. */
-  /** Used by: useServerTable callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
+  /** Passed to: TanStack Table as `onPaginationChange`. */
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
     const current = { pageIndex, pageSize };
     const next = typeof updater === 'function' ? updater(current) : updater;
@@ -84,7 +82,7 @@ export function useServerTable<TData>({
   };
 
   /** Bridges column-filter updates into controlled or internal state for backend filtering. */
-  /** Used by: useServerTable callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
+  /** Passed to: TanStack Table as `onColumnFiltersChange`. */
   const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updater) => {
     const next = typeof updater === 'function' ? updater(columnFilters) : updater;
     setInternalFilters(next);

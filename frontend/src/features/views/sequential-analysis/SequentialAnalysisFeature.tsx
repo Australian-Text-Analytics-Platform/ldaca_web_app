@@ -11,12 +11,10 @@ import { normalizeSchemaFromInfo } from '@/features/workspace/common/hooks/useSc
 import { fetchNodeInfo } from '@/lib/nodeInfo';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
-import {
-  useLastRunRequest,
-  useAnalysisFeature,
-  useSafeResult,
-  executeAnalysisRerun,
-} from '../common';
+import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
+import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { useSafeResult } from '../common/useSafeResult';
+import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
@@ -171,13 +169,11 @@ const SequentialAnalysisFeature = ({
     hydrationTaskId: tabTaskId ?? null,
     resultRef,
     // Loads the latest sequential-analysis result for polling and task resumption.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<Record<string, unknown>>(currentWorkspaceId, taskId);
     },
     // Retrieves the submitted request so hydration can restore parameters and locks.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(
@@ -187,7 +183,7 @@ const SequentialAnalysisFeature = ({
       );
     },
     // Applies freshly fetched task results to chart state after lifecycle polling completes.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    // Reset result selection, merge the fetched payload, and adopt its chart type.
     onResultFetched: (resultData) => {
       chartControls.resetResultSelection();
       const resolvedChartType = isChartTypeOption(resultData.chart_type)
@@ -204,7 +200,7 @@ const SequentialAnalysisFeature = ({
       setChartType(resolvedChartType);
     },
     // Rebuilds chart state from a cached result payload and any hydrated request parameters.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    // Merge hydrated request parameters into the cached result before restoring chart state.
     onHydratedResult: (resultPayload) => {
       if (!resultPayload) return;
       chartControls.resetResultSelection();
@@ -260,7 +256,6 @@ const SequentialAnalysisFeature = ({
       }
     },
     // Clears sequential-specific state after the shared lifecycle removes the task result.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
       setResults(null);
       chartControls.resetAfterClear();
@@ -275,19 +270,16 @@ const SequentialAnalysisFeature = ({
       sequentialParameters.resetAfterClear();
     },
     // Finds task ids embedded in result metadata for status recovery.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
     getExtraTaskIdCandidates: () =>
       [resultRef.current?.metadata as Record<string, unknown> | undefined].map(
         (m) => m?.task_id as string | undefined,
       ),
     // Finds task ids embedded in result metadata for clear operations.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
     getClearTaskIdSources: () =>
       [resultRef.current?.metadata as Record<string, unknown> | undefined].map(
         (m) => m?.task_id as string | undefined,
       ),
     // Treats hydrated running results as active tasks for the shared banner/action state.
-    // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
     isResultRunning: (r: Record<string, unknown> | null) => Boolean(r) && r?.state === 'running',
   });
 
@@ -304,7 +296,7 @@ const SequentialAnalysisFeature = ({
     .sort((a, b) => {
       // Prioritizes datetime columns before numeric fallbacks in the default selector.
       /**
-       * Called by: SequentialAnalysisFeature during this analysis workflow.
+       * Called by the selectable-column sort comparator below.
        */
       const priority = (type: string) => (type === 'datetime' ? 0 : 1);
       return priority(a.dataType) - priority(b.dataType);
@@ -440,7 +432,7 @@ const SequentialAnalysisFeature = ({
 
   // Runs a fresh trends analysis or updates a locked task after parameter changes.
   /**
-   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to the analysis action button as its run/update handler.
    */
   const handleRunOrUpdate = async () => {
     await executeAnalysisRerun({
@@ -517,7 +509,7 @@ const SequentialAnalysisFeature = ({
 
   // Exports the rendered chart SVG with contextual title and legend metadata.
   /**
-   * Called by: SequentialAnalysisFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to the results panel as its chart-download handler.
    * Flow: validate the rendered chart, derive export metadata, then save the requested image format.
    */
   const handleDownloadChart = async (format: ChartImageFormat) => {
@@ -579,17 +571,14 @@ const SequentialAnalysisFeature = ({
         }}
         actions={{
           // Routes the Run button through live sequential analysis.
-          // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
           onRun: () => {
             void handleRunOrUpdate();
           },
           // Stops the active sequential-analysis task from the shared layout action.
-          // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
           onStop: () => {
             void stopTask();
           },
           // Clears live sequential-analysis results from the shared layout action.
-          // Called by: SequentialAnalysisFeature through its owning hook, JSX prop, or analysis lifecycle config.
           onClear: () => {
             void handleClearResults();
           },

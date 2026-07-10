@@ -13,8 +13,7 @@ export const DATA_TYPES = [
 
 /**
  * Normalizes node schema responses into a column-to-dtype map for headers.
- * Used by: useColumnMutations hook (rg call sites/imports).
- * Why: because column mutation UI needs backend schema types normalized before rendering cast options and labels.
+ * Used by useColumnMutations after schema refreshes to update cast controls.
  */
 export const extractColumnTypes = (
   nodeInfo: WorkspaceNodeInfo | null | undefined,
@@ -24,8 +23,7 @@ export const extractColumnTypes = (
 
 /**
  * Displays known dtype values with UI labels while preserving unknown types.
- * Used by: WorkspaceTable component (rg call sites/imports).
- * Why: because column mutation UI needs backend schema types normalized before rendering cast options and labels.
+ * Used by WorkspaceTable's column header cast menu.
  */
 export const getTypeDisplayName = (type: string): string => {
   const dataType = DATA_TYPES.find((entry) => entry.value === type);

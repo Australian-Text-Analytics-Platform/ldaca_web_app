@@ -200,7 +200,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Adds a new filter condition seeded from the first available column.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `conditionBuilder.onAddCondition` for `ConditionBuilder`.
    * Steps: pick the first column, choose its default operator/value, create a stable row id,
    * and append the new condition.
    */
@@ -211,7 +211,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Removes a condition row and its associated checklist search state.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `conditionBuilder.onRemoveCondition` for `ConditionBuilder`.
    */
   const handleRemoveCondition = (id: string) => {
     if (conditions.length > 1) {
@@ -223,7 +223,8 @@ export const useFilterSubTabSections = (
   /**
    * Updates one condition field while keeping operator defaults, typed values,
    * and lazy categorical/datetime/numeric prefill in sync.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Used by condition metadata controls and returned to `ConditionBuilder` as
+   * `onConditionChange`.
    * Steps: normalize a row change, reset incompatible value state when column/operator type
    * changes, and trigger categorical loading when needed.
    */
@@ -277,7 +278,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Renders row-level filter flags used by string and negated conditions.
-   * Rendered by: useFilterSubTabSections JSX render path because the parent needs this component boundary to keep feature controls and state presentation isolated.
+   * Rendered by: useFilterSubTabSections JSX render path.
    * Flow: inspect the condition type/operator, fetch checklist state when relevant, and
    * render loading/error/search metadata beside the condition.
    */
@@ -326,7 +327,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Categorical/list filters use checklist UI instead of an operator select.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `conditionBuilder.shouldHideOperatorSelect`.
    */
   const shouldHideOperatorSelect = (condition: FilterConditionWithId) =>
     condition.dataType === 'categorical' ||
@@ -337,7 +338,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Supplies type-aware operator options to the shared ConditionBuilder.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `conditionBuilder.getOperatorOptions`.
    */
   const getConditionOperatorOptions = (condition: FilterConditionWithId) =>
     // Empty dataType should fall back to 'string', so keep `||`.
@@ -346,7 +347,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Prefills datetime filters from column stats to reduce empty preview states.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by `handleConditionChange` when a datetime column/operator is selected.
    * Steps: reuse an existing date/time value when present, otherwise fetch column stats and
    * seed the condition from backend min/max values.
    */
@@ -403,7 +404,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Prefills numeric range filters from column min/max stats when available.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by `handleConditionChange` when a numeric column/operator is selected.
    * Steps: reuse existing numeric bounds when present, otherwise describe the column and seed
    * range/equality inputs from backend min/max values.
    */
@@ -469,7 +470,7 @@ export const useFilterSubTabSections = (
 
   /**
    * Validates and applies the configured filter as a new workspace node.
-   * Called by: useFilterSubTabSections internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `FilterSubTab` as `applyFilter` for the Apply button.
    * Steps: require a selected node and complete conditions, serialize the request, call the
    * filter mutation, and clear loading state.
    */

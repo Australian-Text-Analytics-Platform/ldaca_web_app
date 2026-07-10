@@ -49,8 +49,6 @@ interface QueriesOverrides {
 
 /**
  * Builds the core-hook contract used by orchestration tests.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: start from production-shaped defaults, then override only the fields a test scenario needs.
  */
 const buildCoreReturn = (overrides: CoreOverrides = {}) => ({
@@ -72,8 +70,6 @@ const buildCoreReturn = (overrides: CoreOverrides = {}) => ({
 
 /**
  * Builds the query-hook contract used by orchestration tests.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: fill query data/loading defaults first, then layer scenario-specific query results or errors.
  */
 const buildQueriesReturn = (overrides: QueriesOverrides = {}) => ({
@@ -90,8 +86,6 @@ const buildQueriesReturn = (overrides: QueriesOverrides = {}) => ({
 
 /**
  * Builds the mutation-hook contract with overridable action spies.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: create default action spies, then replace the individual actions asserted by each orchestration test.
  */
 const buildMutationsReturn = (actions: Record<string, unknown> = {}) => ({
@@ -134,8 +128,6 @@ const buildMutationsReturn = (actions: Record<string, unknown> = {}) => ({
 
 /**
  * Renders the hook under a query client so effects/invalidation can run.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const renderInternal = () => {
   const queryClient = new QueryClient({
@@ -143,8 +135,6 @@ const renderInternal = () => {
   });
   /**
    * Provides QueryClient context required by workspace internals under test.
-   * Used by: Vitest setup or assertions in workspace/useWorkspaceInternal.
-   * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
    */
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

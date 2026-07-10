@@ -5,9 +5,9 @@ import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTy
 import { nodeInfoQueryOptions } from '@/lib/nodeInfo';
 
 /**
- * Normalizes the generated node-info schema for sequential analysis and
- * workspace schema refreshes.
- * Used by: SequentialAnalysisFeature and workspaceSchemaRefresh.
+ * Normalizes the generated node-info schema for sequential analysis.
+ * Used by the hook's node-info query selector and SequentialAnalysisFeature
+ * when it hydrates a saved task schema.
  * Flow: read the generated `{ column: dtype }` map and normalize each dtype for
  * the handwritten column controls.
  */
@@ -49,7 +49,8 @@ interface SchemaManagementConfig {
  * @returns Schema state and utilities
  */
 /**
- * Used by: src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/hooks/__tests__/useSchemaManagement.test.tsx.
+ * Used by SequentialAnalysisFeature to lock the run schema and by focused hook
+ * tests that verify query, lock, and workspace-switch behavior.
  * Flow: subscribe to the canonical node-info query while unlocked, preserve locked schema during runs, then expose effective schema and column options.
  */
 export function useSchemaManagement(config: SchemaManagementConfig) {
@@ -94,7 +95,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
 
   /**
    * Freezes the schema used by an in-flight task so late refetches do not change params.
-   * Why: hook consumers need one stable boundary for state, effects, and cache coordination.
+   * Called by SequentialAnalysisFeature immediately before starting a run.
    */
   const lockCurrentSchema = (schemaToLock?: Record<string, string>) => {
     setLockedSchema(schemaToLock ?? currentSchema);

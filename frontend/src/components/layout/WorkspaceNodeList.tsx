@@ -84,7 +84,7 @@ function NodeRowName({ name }: { name: string }) {
   );
 }
 
-/** Called by: WorkspaceNodeList row onKeyDown handlers because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+/** Called by: WorkspaceNodeList row onKeyDown handlers. */
 const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
   event.key === 'Enter' || event.key === ' ';
 

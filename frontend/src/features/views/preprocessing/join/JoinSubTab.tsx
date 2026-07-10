@@ -27,7 +27,7 @@ type JoinSubTabComponentProps = JoinSubTabProps & {
 /**
  * Renders the Join preprocessing tab. It consumes `useJoinSubTab` for
  * two-node selection state, preview data, and apply behavior.
- * Rendered by: DataPreprocessingFeature module, SubTabActivityTag component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `DataPreprocessingFeature`; `useJoinSubTab` supplies its model.
  * Flow: consume join hook sections, render node/column selection, join type controls, preview
  * results, and apply state in one tab surface.
  */

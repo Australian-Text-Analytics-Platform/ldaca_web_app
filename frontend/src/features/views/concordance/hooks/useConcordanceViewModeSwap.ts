@@ -56,8 +56,7 @@ export interface UseConcordanceViewModeSwapResult {
  * a double-rAF so the new layout has had a chance to settle.
  */
 /**
- * Used by: ConcordanceFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: ConcordanceFeature.tsx.
  */
 export function useConcordanceViewModeSwap({
   viewMode,

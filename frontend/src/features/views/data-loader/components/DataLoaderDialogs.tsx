@@ -64,7 +64,7 @@ export interface DataLoaderDialogsProps {
  * Collects the modal/dialog surfaces owned by the Data Loader. The feature
  * passes state and callbacks here so destructive confirmations, token entry,
  * folder creation, citation viewing, and Oni imports stay visually colocated.
- * Rendered by: useFolderCreation hook, useDataLoaderWorkspaceActions hook, DataLoaderFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `DataLoaderFeature` with dialog state owned by its workflow hooks.
  * Flow: render each modal from hook-owned state, wire form fields to hook setters, then
  * delegate confirmations/import/search actions back to DataLoaderFeature hooks.
  */

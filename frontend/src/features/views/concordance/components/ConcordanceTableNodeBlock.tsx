@@ -7,7 +7,7 @@ import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { SortableHeader } from './SortableHeader';
@@ -141,7 +141,7 @@ function CombinedConcordanceTable({
     pageIndex: combinedPage - 1,
     pageSize: globalPageSize,
     // Bridges TanStack paging to the combined-view page + page-size handlers.
-    // Called by: useServerTable option object because consumers need this callback at the object boundary instead of recreating it inline.
+    // Invoked by useServerTable when combined-view pagination changes.
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
         onPageSizeChange(next.pageSize);
@@ -356,7 +356,7 @@ function PerNodeConcordanceTable({
     pageIndex: currentPage - 1,
     pageSize: globalPageSize,
     // Bridges TanStack paging to the per-node page + page-size handlers.
-    // Called by: useServerTable option object because consumers need this callback at the object boundary instead of recreating it inline.
+    // Invoked by useServerTable when this node's pagination changes.
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
         onPageSizeChange(next.pageSize);

@@ -1,7 +1,7 @@
 import { useCallback, useReducer, type Dispatch, type SetStateAction } from 'react';
 
 import type { QuotationAnalysisResponse, QuotationMetadata } from '@/api';
-import type { NodePaginationState } from '../../common';
+import type { NodePaginationState } from '../../common/tasks/types';
 import { QUOTATION_COLUMN_KEYS } from '../../common/generatedColumns';
 
 export interface QuotationResultState {

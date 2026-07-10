@@ -11,7 +11,6 @@ export const configResponse = (
 
 /**
  * Builds preference responses for auth/bootstrap consumers in frontend tests.
- * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
  */
 export const preferencesResponse = (overrides: Partial<UserPreferences> = {}): UserPreferences => ({
   hidden_views: [],

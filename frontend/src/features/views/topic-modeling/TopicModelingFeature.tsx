@@ -6,13 +6,11 @@ import type { AnalysisTabInput, TopicModelingResponse, TopicModelingTopic } from
 import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
-import {
-  useLastRunRequest,
-  useAnalysisFeature,
-  useNodeColorControls,
-  useSafeResult,
-  executeAnalysisRerun,
-} from '../common';
+import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
+import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
+import { useSafeResult } from '../common/useSafeResult';
+import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
@@ -32,8 +30,8 @@ import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocu
 import { useTopicModelingResultControls } from './hooks/useTopicModelingResultControls';
 import type { AnalysisTabInputSets } from '@/features/views/common/tabs/tabStateOps';
 
-/** Renders the topic-modeling workflow for live BERTopic runs and result exploration. */
 /**
+ * Renders the topic-modeling workflow for live BERTopic runs and result exploration.
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
@@ -165,20 +163,17 @@ function TopicModelingFeature({
     // resolution over transient local state.
     hydrationTaskId: tabTaskId ?? null,
     resultRef,
-    // Loads the latest topic-modeling result for polling and task resumption.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Called by useAnalysisFeature polling and hydration to load the owned task result.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<TopicModelingResponse>(currentWorkspaceId, taskId);
     },
-    // Retrieves the submitted request so hydration can restore parameter and lock state.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Called by useAnalysisFeature hydration to restore the task's submitted parameters.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.topicModeling, currentWorkspaceId, taskId);
     },
-    // Applies freshly fetched task results and surfaces failed/successful status messages.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Called by useAnalysisFeature after a poll returns a newer result for this task.
     onResultFetched: (resultData) => {
       setResultSafely(resultData);
       if (resultData.state === 'failed') {
@@ -187,8 +182,7 @@ function TopicModelingFeature({
         setError(null);
       }
     },
-    // Rebuilds live result state from a hydrated task payload after reload.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Called by useAnalysisFeature hydration to rebuild result/error state after reload.
     onHydratedResult: (resultData) => {
       if (!resultData) return;
       setResultSafely(resultData);
@@ -198,16 +192,14 @@ function TopicModelingFeature({
         setError(null);
       }
     },
-    // Restores selected nodes, columns, and topic parameters from the stored request.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config. Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+    // Called by useAnalysisFeature hydration to restore parameters from the stored request envelope.
     onHydratedRequest: (requestPayload) => {
       const raw = requestPayload as Record<string, unknown> | null;
       const req = (raw?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!req) return;
       hydrateParameters(req);
     },
-    // Clears topic-specific result and error state after the shared lifecycle deletes results.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Called by useAnalysisFeature after shared result deletion completes.
     onCleared: (_, options) => {
       setResultSafely(null);
       setError(null);
@@ -218,25 +210,21 @@ function TopicModelingFeature({
       // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange?.(null);
     },
-    // Removes completed topic tasks from the global task list after clear/delete operations.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Called by useAnalysisFeature clear handling to remove deleted task ids from the global list.
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
     },
-    // Finds task ids embedded in result metadata for status recovery.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Read by useAnalysisFeature while resolving status and polling candidates.
     getExtraTaskIdCandidates: () => [resultRef.current?.metadata?.task_id],
-    // Finds task ids embedded in result metadata for clear operations.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Read by useAnalysisFeature while collecting every task id to clear.
     getClearTaskIdSources: () => [resultRef.current?.metadata?.task_id],
-    // Treats hydrated running results as active tasks for shared banner/action state.
-    // Called by: TopicModelingFeature through its owning hook, JSX prop, or analysis lifecycle config.
+    // Called by useAnalysisFeature to derive running state from the hydrated result ref.
     isResultRunning: (r) => r?.state === 'running',
   });
 
-  // Clears live topic results while preserving user-tuned sampling only when explicitly set.
   /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Clears live topic results and result-view controls while preserving explicitly tuned parameters.
+   * Used by: TopicModelingParameterPanel's Clear action.
    */
   const handleClear = async () => {
     setIsClearing(true);
@@ -249,14 +237,11 @@ function TopicModelingFeature({
 
   const topicRunningTask = taskStatus.runningTask;
 
-  // Observe container width for responsive sizing
+  // Keeps the rendered bubble chart sized to its results container.
   useEffect(() => {
     const el = chartRef.current;
     if (!el) return;
-    // Debounces resize observer updates into a stable chart width state.
-    /**
-     * Called by: TopicModelingFeature during this analysis workflow.
-     */
+    // Called by ResizeObserver and once from the container's initial measured width.
     const updateChartWidth = (width: number) => {
       const nextWidth = Math.round(width);
       if (!nextWidth) return;
@@ -333,9 +318,9 @@ function TopicModelingFeature({
     hasResults: Boolean(result),
   });
 
-  // Updates a node's selected text column and persists it as the document column preference.
   /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Updates a selected node's text column and persists it as that node's document-column preference.
+   * Used by: TopicModelingParameterPanel's NodeInputsPanel column-change prop.
    */
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
@@ -463,9 +448,9 @@ function TopicModelingFeature({
     handleResetZoom,
   });
 
-  // Runs a fresh topic-modeling task or updates a locked task after parameter changes.
   /**
-   * Called by: TopicModelingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Runs a fresh topic-modeling task or replaces the prior result after parameter changes.
+   * Used by: TopicModelingParameterPanel's Run/Update action.
    */
   const handleRunOrUpdate = async () => {
     await ensureNodeColors();

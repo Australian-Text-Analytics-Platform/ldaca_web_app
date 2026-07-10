@@ -127,7 +127,7 @@ const DEFAULT_SLICE_FORM_VALUES: SliceFormValues = {
 /**
  * Owns Sample Rows tab state. `SliceSubTabContent` consumes this hook for form
  * controllers, preview fallback, validation messages, and apply behavior.
- * Used by: SliceSubTab module, useNodePreviewWithRawFallback hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `SliceSubTab` to own slice draft, preview, and apply state.
  * Flow: derive active node and schema, manage slice/sample inputs, request preview fallback
  * data, build request payloads, and apply the generated node.
  */
@@ -175,49 +175,49 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   /**
    * Adapts the segmented mode control to the local form state used by slice consumers.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.setMode` for `SliceSubTab`.
    */
   const setMode = (value: SamplingMode) => {
     setFormField('mode', value);
   };
   /**
    * Updates the zero-based offset input for preview and apply payload construction.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.setOffsetInput` for `SliceSubTab`.
    */
   const setOffsetInput = (value: string) => {
     setFormField('offsetInput', value);
   };
   /**
    * Updates the row-count input consumed by range validation and preview payloads.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.setLengthInput` for `SliceSubTab`.
    */
   const setLengthInput = (value: string) => {
     setFormField('lengthInput', value);
   };
   /**
    * Updates the sample-size input used by random sampling validation.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.setSampleSizeInput` for `SliceSubTab`.
    */
   const setSampleSizeInput = (value: string) => {
     setFormField('sampleSizeInput', value);
   };
   /**
    * Updates the optional random seed field passed to sampling requests.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.setRandomSeedInput` for `SliceSubTab`.
    */
   const setRandomSeedInput = (value: string) => {
     setFormField('randomSeedInput', value);
   };
   /**
    * Toggles seed omission so random samples can remain intentionally unseeded.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.setNoRandomSeed` for `SliceSubTab`.
    */
   const setNoRandomSeed = (value: boolean) => {
     setFormField('noRandomSeed', value);
   };
   /**
    * Updates the optional node name consumed when adding the sampled node.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.setNewNodeName` for `SliceSubTab`.
    */
   const setNewNodeName = (value: string) => {
     setFormField('newNodeName', value);
@@ -279,7 +279,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const lastResult = lastResultState?.signature === resultSignature ? lastResultState.result : null;
   /**
    * Scopes inline errors to the current form values so stale errors disappear.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by blur validation and `applySlice` failure paths.
    */
   const setCurrentInlineError = (message: string | null) => {
     setInlineErrorState(message ? { signature: formSignature, message } : null);
@@ -334,7 +334,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   /**
    * Clamps slice length after editing so preview/apply receives a valid range.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.onLengthBlur` for the length input.
    */
   const handleLengthBlur = () => {
     if (lengthInput.trim().length === 0) return;
@@ -348,7 +348,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   /**
    * Clamps absolute sample size to row count when the source shape is known.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `form.onSampleSizeBlur` for the sample-size input.
    */
   const handleSampleSizeBlur = () => {
     if (sampleSizeInput.trim().length === 0 || !sampleSizeValid) return;
@@ -364,7 +364,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   /**
    * Validates and applies the current slice/sample as a new workspace node.
-   * Called by: useSliceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `SliceSubTab` as `applySlice` for the Apply button.
    * Steps: build the payload, call the slice operation, refresh schema, update applied
    * snapshot state, and surface success/failure through alerts.
    */

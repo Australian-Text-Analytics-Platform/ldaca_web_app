@@ -28,10 +28,10 @@ interface CachedEnvelope {
   payload: PartialRemoteRegistry;
 }
 
-/** Validates only the loose shape the frontend needs before merging remote docs data. */
 /**
- * Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets.
- * Flow: validate registry input, merge local and remote metadata, then expose the documentation entries to UI consumers.
+ * Validates only the loose shape the frontend needs before merging remote docs
+ * data. Called by readCache and fetchRegistry before either payload reaches the
+ * registry store.
  */
 const isPartialRegistry = (value: unknown): value is PartialRemoteRegistry => {
   if (!value || typeof value !== 'object') return false;
@@ -45,7 +45,7 @@ const isPartialRegistry = (value: unknown): value is PartialRemoteRegistry => {
 };
 
 /** Restores a cached registry payload so docs links work before the network refresh finishes. */
-/** Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
+/** Called by loadRemoteRegistry during its synchronous startup hydration. */
 const readCache = (): PartialRemoteRegistry | null => {
   if (typeof localStorage === 'undefined') return null;
   try {
@@ -61,7 +61,7 @@ const readCache = (): PartialRemoteRegistry | null => {
 };
 
 /** Stores the last successful remote registry as a startup-latency optimization. */
-/** Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets. */
+/** Called by loadRemoteRegistry after a validated network refresh succeeds. */
 const writeCache = (payload: PartialRemoteRegistry): void => {
   if (typeof localStorage === 'undefined') return;
   try {
@@ -77,9 +77,9 @@ const writeCache = (payload: PartialRemoteRegistry): void => {
   }
 };
 
-/** Fetches the remote registry without throwing so bundled docs remain the correctness fallback. */
 /**
- * Called by: tutorial registry hydration and docs modal consumers because docs consumers need one registry path for bundled, cached, and remote documentation targets.
+ * Fetches the remote registry without throwing so bundled docs remain the
+ * correctness fallback. Called by loadRemoteRegistry's background refresh.
  * Flow: resolve `registry.json` against the remote base URL, fetch without cache, validate the loose registry shape, and return null on any failure.
  */
 const fetchRegistry = async (baseUrl: string): Promise<PartialRemoteRegistry | null> => {
@@ -107,7 +107,8 @@ let loadPromise: Promise<void> | null = null;
  */
 /**
  * Used by: src/App.tsx, src/tutorials/__tests__/registry.test.ts.
- * Flow: validate registry input, merge local and remote metadata, then expose the documentation entries to UI consumers.
+ * Flow: apply a valid cached payload synchronously, then fetch, validate,
+ * apply, and cache the remote registry when a docs base URL is configured.
  */
 export const loadRemoteRegistry = (): Promise<void> => {
   if (loadPromise) return loadPromise;

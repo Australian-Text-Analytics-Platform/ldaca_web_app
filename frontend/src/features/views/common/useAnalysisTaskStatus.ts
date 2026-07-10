@@ -3,7 +3,7 @@ import type { TaskItem } from '@/stores/analysisStore';
 import { getTaskTypeCandidates } from './analysisTaskUtils';
 
 /** Normalizes backend timestamp variants so streamed and fetched tasks sort together. */
-/** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Called by: useAnalysisTaskStatus in this hook module. */
 const normalizeTimestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -18,7 +18,7 @@ const normalizeTimestamp = (value: unknown): number => {
 };
 
 /** Picks the freshest timestamp available on a task, including stream-only event metadata. */
-/** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Called by: useAnalysisTaskStatus in this hook module. */
 const getTaskTimestamp = (task?: TaskItem | null) => {
   const anyTask = task;
   return (
@@ -30,7 +30,7 @@ const getTaskTimestamp = (task?: TaskItem | null) => {
 };
 
 /** Breaks timestamp ties using task-stream event order when events arrive in the same millisecond. */
-/** Called by: useAnalysisTaskStatus in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Called by: useAnalysisTaskStatus in this hook module. */
 const getTaskEventSequence = (task?: TaskItem | null) => {
   const anyTask = task;
   return typeof anyTask?.__event_sequence === 'number' && Number.isFinite(anyTask.__event_sequence)
@@ -66,7 +66,7 @@ export interface UseAnalysisTaskStatusOptions {
 
 /** Summarizes the latest task state for an analysis feature's banners and result panels. */
 /**
- * Used by: src/features/views/common/hooks/useMaterializeLifecycle.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/common/hooks/useMaterializeLifecycle.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts.
  * Flow: normalize task-type inputs, restrict tasks to the requested workspace
  * and optional owner ids, sort by timestamp/event order, then expose active,
  * terminal, and banner task summaries.

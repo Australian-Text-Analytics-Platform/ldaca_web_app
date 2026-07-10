@@ -6,8 +6,8 @@ import { useUIStore } from '@/stores/uiStore';
 
 /**
  * Reads the selection store fields the workspace feature owns.
- * Used by: workspace/useWorkspaceCore components or tests that consume this hook.
- * Why: the internal workspace hook needs one selection snapshot before query and mutation hooks are composed.
+ * Called only by useWorkspaceCore so query and mutation composition shares one
+ * shallow selection subscription.
  */
 const useSelectionSlice = () =>
   useSelectionStore(
@@ -27,8 +27,8 @@ const useSelectionSlice = () =>
 
 /**
  * Reads operation loading helpers from the UI store.
- * Used by: workspace/useWorkspaceCore components or tests that consume this hook.
- * Why: the internal workspace hook needs operation lifecycle state without subscribing to unrelated UI fields.
+ * Called only by useWorkspaceCore to avoid subscribing the workspace provider
+ * to unrelated UI fields.
  */
 const useUISlice = () =>
   useUIStore(

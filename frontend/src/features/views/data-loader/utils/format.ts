@@ -2,7 +2,7 @@
  * 1024-based byte formatter used by Data Loader file/workspace sizes.
  * `lib/utils.ts` exports a 1000-based variant; do not merge — they target
  * different displays.
- * Used by: Data Loader components and tests because those callers need a shared helper boundary for consistent file-size display formatting.
+ * Used by: Data Loader components and tests because file lists and progress surfaces must display byte counts consistently.
  * Steps: reject missing values, choose the largest 1024 unit, and format precision by display size.
  */
 export const formatBytes = (bytes?: number | null): string => {
@@ -16,7 +16,7 @@ export const formatBytes = (bytes?: number | null): string => {
 /**
  * Formats workspace timestamps for compact card metadata. Data Loader cards
  * call this for both backend epoch values and ISO strings.
- * Used by: RefreshStatusBanner component, authPhaseCopy component, ActiveWorkspaceCard component (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by Data Loader status copy and `ActiveWorkspaceCard` metadata.
  * Steps: normalize epoch seconds/milliseconds or ISO text into a Date, then fall back when parsing fails.
  */
 export const formatTimestamp = (value?: number | string | null): string => {

@@ -16,7 +16,7 @@ interface Props {
  * Header chip rendered while a sub-tab's apply mutation is in flight.
  * Replaces a near-identical `<Tag tone="muted"><Loader2 .../>{verb}…</Tag>`
  * snippet that lived in 7 sub-tab components.
- * Rendered by: JoinSubTab module, ConcatSubTab module, FilterSubTab module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered in preprocessing sub-tab headers to distinguish configured tabs.
  */
 export function SubTabActivityTag({ active, verb }: Props) {
   if (!active) return null;

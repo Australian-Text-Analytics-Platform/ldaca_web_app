@@ -42,7 +42,7 @@ const DEFAULT_PALETTE = ['#2563eb'];
  * Owns request-building and preview/apply state for the Polars expression tab.
  * The component consumes this hook to keep each context's editor state and
  * serialized backend request in one place.
- * Used by: CodeEditor module, PolarsExpressionSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `PolarsExpressionSubTab` to own expression draft, preview, and apply state.
  * Flow: manage expression item state per context, build request payloads, run preview/apply
  * APIs, and expose tab/editor actions to the component.
  */
@@ -167,7 +167,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   /**
    * Serializes the currently active context into a PolarsExpressionRequest for
    * preview and apply calls.
-   * Called by: usePolarsExpressionSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `PolarsExpressionSubTab` for its Preview action.
    * Steps: build the request payload from committed expressions, call preview for the current
    * node/page, and adapt backend rows into preview state.
    */
@@ -195,7 +195,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   /**
    * Applies the serialized expression to the selected node and refreshes schema
    * so downstream selectors can see new/changed columns.
-   * Called by: usePolarsExpressionSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `PolarsExpressionSubTab` for its Apply action.
    */
   const applyExpression = async () => {
     if (!nodeId || !serializedRequest) return;

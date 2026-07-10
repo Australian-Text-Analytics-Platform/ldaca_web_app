@@ -24,7 +24,8 @@ interface UseDataLoaderWorkspaceActionsParams {
  * Owns Data Loader workspace mutations and user-facing notifications. The
  * feature shell consumes this hook to keep workspace cards/dialogs free of API
  * and cache-invalidation details.
- * Used by: DataLoaderDialogs component, workspaceName module, DataLoaderFeature module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `DataLoaderFeature`, which passes the returned state and handlers to
+ * workspace cards and `DataLoaderDialogs`.
  * Flow: keep transient dialog/busy state, validate workspace names, call generated workspace
  * APIs, refresh workspace data, and return action handlers for cards/dialogs.
  */
@@ -44,7 +45,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Creates a workspace from the card form and reports validation errors back
    * through the dialog state the Data Loader owns.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `ActiveWorkspaceCard` as `onCreate`.
    * Flow: reject empty names, call the workspace action, surface invalid-name errors inline, and notify success or failure.
    */
   const handleCreateWorkspace = async (name: string, description: string): Promise<boolean> => {
@@ -67,7 +68,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Renames the active workspace while preserving the same invalid-name alert
    * path used by create.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `ActiveWorkspaceCard` as `onRename`.
    */
   const handleRenameWorkspace = async (value: string) => {
     try {
@@ -86,7 +87,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Saves the active workspace from either workspace card action, guarded so
    * empty selections never call the backend.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `ActiveWorkspaceCard` as `onSave`.
    */
   const handleSaveWorkspace = async () => {
     if (!hasWorkspaceSelected) return;
@@ -101,7 +102,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Loads or unloads the active workspace for the manager and active card. It
    * centralizes notification handling around the shared workspace action hook.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Used for `WorkspaceManagerCard.onLoadWorkspace` and `ActiveWorkspaceCard.onUnload`.
    */
   const handleSetCurrentWorkspace = async (workspaceId: string | null) => {
     try {
@@ -113,7 +114,7 @@ export function useDataLoaderWorkspaceActions({
 
   /**
    * Persists the active workspace description from the card's inline editor.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `ActiveWorkspaceCard` as `onUpdateDescription`.
    */
   const handleUpdateWorkspaceDescription = async (value: string) => {
     try {
@@ -127,7 +128,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Opens the delete confirmation with the display name looked up from the
    * current workspace list.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `WorkspaceManagerCard` as `onDeleteWorkspace`.
    */
   const openDeleteWorkspaceDialog = (workspaceId: string) => {
     const target = workspaces.find((workspace) => workspace.id === workspaceId);
@@ -137,7 +138,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Performs the confirmed delete and resets confirmation state for the dialog
    * used by `DataLoaderDialogs`.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to the delete dialog as its confirmation callback.
    */
   const handleConfirmDeleteWorkspace = async () => {
     if (!workspaceToDelete) return;
@@ -156,7 +157,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Refetches the workspace list for the manager refresh button without
    * changing the current workspace selection.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `WorkspaceManagerCard` as `onRefresh`.
    */
   const handleRefreshWorkspaces = async () => {
     setRefreshingWorkspaces(true);
@@ -176,7 +177,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Uploads a saved workspace archive and refreshes workspace summaries so the
    * manager can show the imported workspace immediately.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `WorkspaceManagerCard` as `onUploadZip`.
    * Flow: mark upload busy, send the ZIP through the generated API, refetch workspace summaries, notify the user, and always clear busy state.
    */
   const handleUploadWorkspaceZip = async (file: File) => {
@@ -195,7 +196,7 @@ export function useDataLoaderWorkspaceActions({
   /**
    * Adds a file-browser path to the active workspace and clears upload-followup
    * hints when the selected file matches the last uploaded path.
-   * Called by: useDataLoaderWorkspaceActions internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `FileTree` as its add-file action.
    */
   const handleAddFileToWorkspace = async (filename: string, selectedSheet?: string | null) => {
     await workspaceActions.createNodeFromFile(filename, selectedSheet ?? undefined);
@@ -214,13 +215,13 @@ export function useDataLoaderWorkspaceActions({
     uploadingWorkspaceZip,
     // Dialog close handlers are returned with the state they clear because
     // `DataLoaderDialogs` owns only presentation, not workspace state.
-    // Consumed by: useDataLoaderWorkspaceActions return object for feature components because consumers need this returned value or action without owning the hook internals.
+    // Passed to DataLoaderDialogs as workspaceNameAlert.onClose.
     closeWorkspaceNameAlert: () => {
       setWorkspaceNameAlert(null);
     },
     /**
      * Clears the workspace pending deletion target after cancel or success.
-     * Consumed by: useDataLoaderWorkspaceActions return object for feature components because consumers need this returned value or action without owning the hook internals.
+     * Passed to DataLoaderDialogs as the delete dialog's cancel action.
      */
     closeDeleteWorkspaceDialog: () => {
       setWorkspaceToDelete(null);

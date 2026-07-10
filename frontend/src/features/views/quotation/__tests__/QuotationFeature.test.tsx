@@ -45,9 +45,15 @@ vi.mock('../../common/nodeInputs', () => ({
   }),
 }));
 
-vi.mock('../../common', () => ({
+vi.mock('../../common/parameterComparison', () => ({
   getServerEngineConfig: () => ({ type: 'local', url: null }),
+}));
+
+vi.mock('../../common/hooks/useLastRunRequest', () => ({
   useLastRunRequest: () => ({ serverRequest: null }),
+}));
+
+vi.mock('../../common/hooks/useAnalysisFeature', () => ({
   useAnalysisFeature: () => ({
     resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
     setLocalTaskId: vi.fn(),
@@ -56,6 +62,9 @@ vi.mock('../../common', () => ({
     stopTask: vi.fn(() => Promise.resolve()),
     isStopping: false,
   }),
+}));
+
+vi.mock('../../common/rerunAnalysis', () => ({
   executeAnalysisRerun: vi.fn(),
 }));
 

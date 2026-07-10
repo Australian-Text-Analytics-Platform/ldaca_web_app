@@ -24,7 +24,7 @@ type InternalTask = TaskItem & {
 
 /**
  * Converts task timestamps from SSE payloads into sortable milliseconds.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because task events can arrive with numeric or string timestamps.
+ * Used by task sorting, merge ordering, and materialization event ingestion.
  * Flow: accept finite numeric timestamps, parse date strings, and fall back to zero for unsortable event times.
  */
 const normalizeTimestamp = (value: unknown): number => {
@@ -42,7 +42,7 @@ const normalizeTimestamp = (value: unknown): number => {
 
 /**
  * Sorts task inbox entries by the newest event or lifecycle timestamp.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because sidebar task indicators need newest work first.
+ * Called by mergeTaskUpdates for both unchanged and newly merged task lists.
  * Flow: read synthetic event metadata first, fall back to task lifecycle timestamps, and sort newest entries ahead of older inbox rows.
  */
 const sortTasksByTime = (tasks: TaskItem[] = []) =>
@@ -58,7 +58,7 @@ const sortTasksByTime = (tasks: TaskItem[] = []) =>
 
 /**
  * Builds a task_id lookup used when merging incremental SSE updates.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because incremental SSE payloads need to merge onto existing task rows.
+ * Called by mergeTaskUpdates before snapshot or delta records are applied.
  * Flow: skip tasks without ids, key the rest by task_id, and return the map used by snapshot and delta merges.
  */
 const buildTaskMap = (tasks: TaskItem[] = []) => {
@@ -83,7 +83,7 @@ const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
 
 /**
  * Normalizes backend task state strings for terminal-state comparisons.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because backend states must be compared case-insensitively.
+ * Called by chooseByEventOrder for the existing and incoming task states.
  * Flow: coerce missing states to an empty string and lowercase the result before terminal-state checks.
  */
 const normalizeState = (value: unknown): string =>
@@ -92,7 +92,7 @@ const normalizeState = (value: unknown): string =>
 
 /**
  * Reads the synthetic event timestamp attached during merge.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because merged tasks carry client ordering metadata.
+ * Used by chooseByEventOrder and mergeTaskUpdates to preserve event ordering.
  * Flow: extract the client-only timestamp marker from merged task rows and normalize it through the same timestamp parser.
  */
 const getEventTimestamp = (task: TaskItem | undefined): number =>
@@ -100,7 +100,7 @@ const getEventTimestamp = (task: TaskItem | undefined): number =>
 
 /**
  * Reads the synthetic event sequence used to break same-timestamp ties.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because same-millisecond task events still need deterministic ordering.
+ * Used by chooseByEventOrder and mergeTaskUpdates when timestamps tie.
  * Flow: read the client-only sequence marker, accept only finite numbers, and default missing metadata to zero.
  */
 const getEventSequence = (task: TaskItem | undefined): number => {
@@ -110,7 +110,7 @@ const getEventSequence = (task: TaskItem | undefined): number => {
 
 /**
  * Chooses the newest task update while preventing terminal-state regression.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because out-of-order SSE updates must not reopen completed tasks.
+ * Called by mergeTaskUpdates once for each incoming task record.
  * Flow: keep a terminal task closed, otherwise compare event timestamps and sequence numbers before preferring the newest update.
  */
 const chooseByEventOrder = (existing: TaskItem | undefined, incoming: TaskItem): TaskItem => {
@@ -157,7 +157,7 @@ const chooseByEventOrder = (existing: TaskItem | undefined, incoming: TaskItem):
 
 /**
  * Merges snapshots/incremental task events into the analysis-store task list.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because full snapshots and deltas share one analysis-store update path.
+ * Called by the tasks_snapshot and task_changed SSE handlers.
  * Flow: build previous and next task maps, merge incoming partial fields with synthetic ordering metadata, choose the newest row per id, and return sorted tasks.
  */
 const mergeTaskUpdates = (
@@ -199,7 +199,7 @@ const TERMINAL_TASK_STATES = new Set(['successful', 'failed', 'cancelled']);
 
 /**
  * Decides when non-tab task completion should refresh the workspace graph.
- * Used by: local callers in workspace/useWorkspaceTaskInbox module because background tasks can change graph state outside analysis tabs.
+ * Called by the task_changed handler after it merges a terminal task.
  * Flow: ignore missing and tab-owned task types, then refresh only terminal background tasks that can mutate graph data.
  */
 const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
@@ -215,7 +215,7 @@ const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
 /**
  * Connects task-stream events to the analysis store and workspace query cache.
  * Analysis panels consume its client state for connection status.
- * Used by: Sidebar component, SidebarViewVisibilityMenu tests (rg call sites/imports) because the sidebar owns the global task inbox indicator.
+ * Used by `Sidebar` to keep shared task state current and show stream status.
  * Flow: subscribe to the authenticated SSE client, route payloads into task/cache/materialization handlers, claim LDaCA terminal file refreshes by task id, and expose transient stream errors as inbox status.
  */
 export const useWorkspaceTaskInbox = (
@@ -234,8 +234,7 @@ export const useWorkspaceTaskInbox = (
 
   /**
    * Assigns a local sequence to incoming SSE events for deterministic merges.
-   * Called by: useWorkspaceTaskInbox internal event, effect, or helper flow.
-   * Why: because the inbox reducer needs shared helpers to keep streaming events ordered and unread state consistent.
+   * Called by snapshot and incremental task-event merge branches.
    */
   const nextEventSequence = () => {
     eventSequenceRef.current += 1;
@@ -265,8 +264,7 @@ export const useWorkspaceTaskInbox = (
 
   /**
    * Routes each SSE payload to task state, cache invalidation, or user error state.
-   * Called by: useWorkspaceTaskInbox internal event, effect, or helper flow.
-   * Why: because the inbox reducer needs shared helpers to keep streaming events ordered and unread state consistent.
+   * Passed to `useWorkspaceTaskStreamClient` as its `onEvent` callback.
    * Flow: clear transient errors, branch by event type, merge task updates, then invalidate affected workspace queries.
    */
   const handlePayload = (payload: TaskEventPayload) => {

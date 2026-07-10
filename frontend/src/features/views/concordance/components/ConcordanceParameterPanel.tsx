@@ -11,7 +11,7 @@ import {
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { RerunActionState } from '@/features/views/common/rerunActionState';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
@@ -57,8 +57,7 @@ export interface ConcordanceParameterPanelProps {
 }
 
 /**
- * Rendered by: ConcordanceFeature to own concordance parameters because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: ConcordanceFeature to own concordance parameters.
  */
 export function ConcordanceParameterPanel({
   nodeInputs,

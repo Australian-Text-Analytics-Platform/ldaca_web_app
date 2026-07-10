@@ -25,8 +25,9 @@ interface SequentialAnalysisDetachParams {
 
 /** Coordinates adding a selected sequential-analysis chart slice back into the workspace. */
 /**
- * Used by: SequentialAnalysisFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: SequentialAnalysisFeature.tsx.
+ * Flow: derive visible group filters and a default node name, then expose the
+ * detach action and pending state for the selected chart periods.
  */
 export function useSequentialAnalysisDetach({
   currentWorkspaceId,
@@ -75,8 +76,9 @@ export function useSequentialAnalysisDetach({
 
   // Sends the selected periods and visible groups to the backend detach task.
   /**
-   * Called by: useSequentialAnalysisDetach through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   * Returned to `SequentialAnalysisFeature` by `useSequentialAnalysisDetach`.
+   * Flow: validate the selection, resolve the source task, submit selected
+   * periods/groups, invalidate workspace queries, and report the outcome.
    */
   const handleDetach = async () => {
     if (!currentWorkspaceId) return;

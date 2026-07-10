@@ -106,7 +106,7 @@ const DEFAULT_PERCENT_MIN = 0.15;
 const DEFAULT_PERCENT_MAX = 0.85;
 
 /** Reads a persisted split value while tolerating private-mode/localStorage failures. */
-/** Called by: useResizableSplit in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Called by: useResizableSplit in this hook module. */
 const readPersisted = (key: string | undefined, fallback: number): number => {
   if (!key || typeof window === 'undefined') return fallback;
   try {
@@ -120,7 +120,7 @@ const readPersisted = (key: string | undefined, fallback: number): number => {
 };
 
 /** Persists committed split values so layout sizing survives reloads. */
-/** Called by: useResizableSplit in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Called by: useResizableSplit in this hook module. */
 const writePersisted = (key: string | undefined, value: number) => {
   if (!key || typeof window === 'undefined') return;
   try {
@@ -132,7 +132,8 @@ const writePersisted = (key: string | undefined, value: number) => {
 
 /** Provides state, DOM refs, keyboard handlers, and pointer handlers for resizable panes. */
 /**
- * Used by: src/App.tsx, src/components/layout/WorkspaceView.tsx, src/features/views/data-loader/DataLoaderFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used directly by: `WorkspaceView`, `DataLoaderFeature`, and the
+ * `useRightPanelResize`/`useSidebarResize` layout wrappers.
  * Flow: initialize persisted split value, clamp pointer and keyboard updates, capture splitter events, then expose value, drag state, refs, and ARIA props.
  */
 export function useResizableSplit({

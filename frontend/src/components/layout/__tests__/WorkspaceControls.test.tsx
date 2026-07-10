@@ -23,7 +23,6 @@ const selectionState = { selectedNodeIds: [] as string[] };
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   /**
    * Supplies workspace identity and graph roots consumed by `WorkspaceControls`.
-   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
    */
   useWorkspaceData: () => ({
     currentWorkspace: { id: 'ws-1', name: 'Main Workspace' },

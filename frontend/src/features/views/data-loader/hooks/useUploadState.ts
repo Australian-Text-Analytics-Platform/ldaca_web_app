@@ -13,7 +13,7 @@ interface UseUploadStateParams {
 /**
  * Detects native file drags so Data Loader does not intercept unrelated text or
  * internal file-tree move drags.
- * Used by: local callers in data-loader/useUploadState module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called by the upload area's drag-over, drag-leave, and drop handlers.
  */
 function isFileDrag(event: DragEvent<HTMLElement>) {
   // dataTransfer/types are typed non-null by React but can be absent on some browsers/synthetic drags
@@ -25,7 +25,7 @@ function isFileDrag(event: DragEvent<HTMLElement>) {
  * Owns upload picker/drop-zone state for Data Loader. The feature consumes the
  * returned handlers for both the hidden file input and drag-and-drop upload
  * area.
- * Used by: DataLoaderFeature module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `DataLoaderFeature` for its upload button, hidden input, and drop zone.
  * Flow: normalize picker/drop input into file arrays, serialize uploads through the provided
  * upload function, manage drag/busy state, and notify success/failure counts.
  */
@@ -36,7 +36,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
 
   /**
    * Opens the hidden file input from the visible Upload files button.
-   * Called by: useUploadState internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `DataLoaderFeature` as the button's click handler.
    */
   const openFilePicker = () => {
     fileInputRef.current?.click();
@@ -45,7 +45,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
   /**
    * Uploads one or more selected files sequentially, tracks partial failures,
    * and records the last successful upload for contextual hints.
-   * Called by: useUploadState internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Shared by the picker-change and drop handlers below.
    * Steps: copy the selected list, skip empty batches, upload files sequentially so
    * notifications match actual outcomes, then reset busy/drop state.
    */
@@ -113,7 +113,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
   /**
    * Activates the drop-zone state for native file drags and tells the browser
    * this target accepts copy drops.
-   * Called by: useUploadState internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the upload area's `onDragOver` prop.
    */
   const handleFileAreaDragOver = (event: DragEvent<HTMLDivElement>) => {
     if (!isFileDrag(event)) {
@@ -128,7 +128,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
   /**
    * Clears drop-zone highlighting once the native file drag leaves the upload
    * area rather than a child element inside it.
-   * Called by: useUploadState internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the upload area's `onDragLeave` prop.
    */
   const handleFileAreaDragLeave = (event: DragEvent<HTMLDivElement>) => {
     if (!isFileDrag(event)) {
@@ -146,7 +146,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
   /**
    * Accepts dropped native files from the upload area and reuses the same batch
    * upload path as the picker.
-   * Called by: useUploadState internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the upload area's `onDrop` prop.
    */
   const handleFileAreaDrop = async (event: DragEvent<HTMLDivElement>) => {
     if (!isFileDrag(event)) {
@@ -161,7 +161,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
   /**
    * Handles the hidden file input change event and clears its value so the same
    * files can be selected again later.
-   * Called by: useUploadState internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the hidden input's `onChange` prop.
    */
   const handleFileInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
     try {

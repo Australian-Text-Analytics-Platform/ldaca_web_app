@@ -141,7 +141,7 @@ export function QuotationNodeBlock({
     pageIndex: page - 1,
     pageSize,
     // Bridges TanStack's zero-based paging to the feature's one-based source-row handlers.
-    // Called by: useServerTable option object because consumers need this callback at the object boundary instead of recreating it inline.
+    // Invoked by useServerTable when quotation pagination changes.
     onPaginationChange: (next) => {
       if (next.pageSize !== pageSize) {
         onPageSizeChange(next.pageSize);

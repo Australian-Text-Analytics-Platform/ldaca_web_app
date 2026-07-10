@@ -62,7 +62,7 @@ export function isStaleAnalysisResult(
 /**
  * Wraps result state for analysis hooks that poll tasks, giving them a setter
  * that protects terminal outcomes from late stale responses.
- * Used by: analysis feature screens that keep live task results in React state because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Used by: analysis feature screens that keep live task results in React state.
  */
 export function useSafeResult<T extends ResultLike | null>() {
   const [result, setResultState] = useState<T | null>(null);

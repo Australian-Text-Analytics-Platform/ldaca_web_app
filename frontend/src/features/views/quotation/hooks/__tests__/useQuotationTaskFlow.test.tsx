@@ -5,10 +5,6 @@ import type { QuotationAnalysisResponse } from '@/api';
 import { useQuotationTaskFlow } from '../useQuotationTaskFlow';
 
 // Builds the minimal successful quotation response shape consumed by task-flow assertions.
-/**
- * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
- * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
- */
 const buildQuotationResponse = (): QuotationAnalysisResponse => ({
   data: [],
   columns: [],
@@ -60,7 +56,6 @@ describe('useQuotationTaskFlow', () => {
         },
         lock: {
           // Keeps task resolution empty so this test isolates initial request shaping.
-          // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           resolveTaskId: vi.fn(() => Promise.resolve(null)),
           quotationSearch,
           detachQuotation: vi.fn(() =>
@@ -130,7 +125,6 @@ describe('useQuotationTaskFlow', () => {
         },
         lock: {
           // Keeps task resolution deterministic while this test isolates pagination shaping.
-          // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
           resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
           quotationSearch,
           detachQuotation: vi.fn(() =>

@@ -42,9 +42,9 @@ interface Params {
   handleResetZoom: () => void;
 }
 
-// Resolves the corpus colour for one bubble segment from assigned node colours or defaults.
 /**
- * Called by: useTopicModelingBubbleChart hook as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Resolves the corpus colour for one bubble segment from persisted node colours or defaults.
+ * Called by: renderSizeComposition for chips and the topic loop for bubble fills.
  */
 const resolvePanelColor = (
   index: number,
@@ -61,10 +61,11 @@ const resolvePanelColor = (
   return fallback;
 };
 
-/** Builds topic bubble chart SVG elements and shared rendering helpers for the results panel. */
 /**
- * Used by: checklistSearch.ts and TopicModelingFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Builds topic bubble-chart SVG elements and the size-composition renderer.
+ * Used by: TopicModelingFeature, which passes both results through TopicModelingResultsPanel.
+ * Flow: scale topics into the active domain, render brush/selection/search
+ * states into SVG, and expose corpus-size chips for the tooltip and topic list.
  */
 export function useTopicModelingBubbleChart({
   topics,
@@ -94,9 +95,9 @@ export function useTopicModelingBubbleChart({
   const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
   const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
 
-  // Renders per-corpus size chips using the same colours as the node palette.
   /**
-   * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Renders per-corpus size chips using the same colours as the node palette.
+   * Used by: the bubble tooltip and TopicSelectionPanel through TopicModelingBubbleChartSection.
    * Flow: handle missing or single-corpus sizes, resolve palette colors and readable text, then render colored corpus size chips with totals.
    */
   const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => {
@@ -164,18 +165,12 @@ export function useTopicModelingBubbleChart({
 
     const width = chartWidth;
     const height = chartHeight;
-    // Maps topic embedding x-coordinates into the SVG plotting area.
-    /**
-     * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-     */
+    // Called for each topic to map its embedding x-coordinate into the SVG plot.
     const scaleX = (x: number) =>
       ((x - activeDomain.xMin) / (activeDomain.xMax - activeDomain.xMin || 1)) *
         (width - 2 * chartPadding) +
       chartPadding;
-    // Maps topic embedding y-coordinates into the SVG plotting area.
-    /**
-     * Called by: useTopicModelingBubbleChart during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-     */
+    // Called for each topic to map its embedding y-coordinate into the SVG plot.
     const scaleY = (y: number) =>
       ((y - activeDomain.yMin) / (activeDomain.yMax - activeDomain.yMin || 1)) *
         (height - 2 * chartPadding) +

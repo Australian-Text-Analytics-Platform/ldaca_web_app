@@ -66,7 +66,7 @@ export function DocLinkIcon<Kind extends DocLinkKind>({
   const tooltipText = tooltip ?? resolvedLabel;
   const Icon = config.Icon;
 
-  /** Called by: the DocLinkIcon button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+  /** Called by: the DocLinkIcon button onClick prop. */
   const handleClick = () => {
     const target = getDocumentTarget(kind, targetKey);
     if (!target) {

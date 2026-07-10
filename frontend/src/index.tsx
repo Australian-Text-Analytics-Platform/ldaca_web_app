@@ -18,7 +18,7 @@ initSentry();
 // chart/sidebar/hint code legitimately hit it on rapid re-layout.
 if (typeof window !== 'undefined') {
   /** Filters only the ResizeObserver loop warning that Vite should ignore. */
-  /** Called by: the global error listener before React renders the router because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+  /** Called by: the global error listener before React renders the router. */
   const isResizeObserverLoopMessage = (msg: unknown): boolean =>
     typeof msg === 'string' && msg.includes('ResizeObserver loop');
   window.addEventListener('error', (event) => {

@@ -31,7 +31,7 @@ export interface ReplaceSubTabProps {
 /**
  * Owns regex replace/extract state for the Find sub-tab. The component consumes
  * this hook for string-column selection, preview data, and apply controls.
- * Used by: ReplaceSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `ReplaceSubTab` to own replacement draft, preview, and apply state.
  * Flow: manage find/replace form state, build replacement request payloads, request preview
  * data, and apply/refresh the output node.
  */
@@ -122,7 +122,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   /**
    * Applies the replace/extract operation to the selected node and refreshes
    * schema so output-column changes are visible to downstream tools.
-   * Called by: useReplaceSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `ReplaceSubTab` as the Apply button action.
    * Steps: guard required inputs, build the replace request, call the mutation, refresh schema,
    * and clear apply loading.
    */

@@ -51,7 +51,8 @@ const DEFAULT_PAGE_SIZE = 10;
  * Shared debounced preview loader for preprocessing tabs. Operation-specific
  * hooks supply the request and fetcher so pagination, cancellation, loading,
  * and error state behave consistently across tabs.
- * Used by: useJoinSubTab hook, useNodePreviewWithRawFallback hook, useConcatSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used directly by Join and Concat, and by `useNodePreviewWithRawFallback` for
+ * operation previews in the remaining preprocessing tabs.
  * Flow: debounce request signatures, bind pagination to the active signature,
  * call the latest provided fetcher through a React effect event, and drop
  * stale responses through effect cleanup.
@@ -96,7 +97,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
 
   /**
    * Stores pagination with the active request signature to avoid stale pages.
-   * Called by: usePreprocessingPreview internal event, effect, or helper flow.
+   * Called by the public `setPage` action below.
    */
   const setPaginationDraft = (nextPage: number, nextPageSize: number) => {
     dispatch({
@@ -109,7 +110,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
 
   /**
    * Updates only the current page while preserving the active page size.
-   * Called by: usePreprocessingPreview internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to preview tables as `setPage`.
    */
   const setPage = (nextPage: number) => {
     setPaginationDraft(nextPage, pageSize);
@@ -180,7 +181,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
 
   /**
    * Resets preview paging when consumers choose a different page size.
-   * Called by: usePreprocessingPreview internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to preview tables as `setPageSize`.
    */
   const handleSetPageSize = (size: number) => {
     dispatch({ type: 'set-page-size', context: signatureContext, pageSize: size });
@@ -188,7 +189,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
 
   /**
    * Forces a refetch without changing the current request or pagination.
-   * Called by: usePreprocessingPreview internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to feature hooks as the manual `refresh` action.
    */
   const refresh = () => {
     dispatch({ type: 'refresh' });

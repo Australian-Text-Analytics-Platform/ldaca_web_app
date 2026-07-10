@@ -30,7 +30,7 @@ export interface DownloadChartOptions {
 }
 
 /** Builds filesystem-safe chart filenames that still identify the source node and tool. */
-/** Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: `buildChartBlob`. */
 const toChartFilename = (
   nodeName: string,
   toolSuffix: string,
@@ -48,14 +48,13 @@ const toChartFilename = (
 };
 
 /** Escapes user/content labels before embedding them into composed SVG downloads. */
-/** Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: `buildCompositeSvg` for header, legend, and color content. */
 const escSvg = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Clones the chart SVG at its rendered size so export code does not mutate the live chart. */
 /**
- * Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Called by: `buildChartBlob` before SVG or bitmap composition.
  */
 const serializeChartSvg = (
   svg: SVGSVGElement,
@@ -100,7 +99,7 @@ const SWATCH_TEXT_GAP = 6;
 const APPROX_LEGEND_ITEM_W = 140;
 
 /** Reserves vertical space for the optional export header above the chart body. */
-/** Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: SVG and bitmap composition paths. */
 const computeHeaderH = (items: ChartExportHeaderItem[]): number => {
   if (!items.length) return 0;
   const hasInfo = items.length > 1;
@@ -108,7 +107,7 @@ const computeHeaderH = (items: ChartExportHeaderItem[]): number => {
 };
 
 /** Sizes the export legend based on chart width so SVG and bitmap exports align. */
-/** Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: SVG and bitmap composition paths. */
 const computeLegendH = (items: ChartExportLegendItem[], chartWidth: number): number => {
   if (!items.length) return 0;
   const perRow = Math.max(1, Math.floor(chartWidth / APPROX_LEGEND_ITEM_W));
@@ -119,8 +118,7 @@ const computeLegendH = (items: ChartExportLegendItem[], chartWidth: number): num
 
 /** Rasterizes the serialized SVG into a canvas for PNG/JPEG export paths. */
 /**
- * Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Called by: `renderCompositeBitmap` after the export canvas is prepared.
  */
 const drawSvgOnCanvas = (
   ctx: CanvasRenderingContext2D,
@@ -148,8 +146,7 @@ const drawSvgOnCanvas = (
 
 /** Renders chart, header, and legend into a single bitmap blob for download. */
 /**
- * Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Called by: `buildChartBlob` for PNG and JPEG requests.
  */
 const renderCompositeBitmap = async (
   svgString: string,
@@ -282,8 +279,7 @@ const renderCompositeBitmap = async (
 
 /** Wraps the source chart SVG with export-only header and legend markup. */
 /**
- * Called by: CHART_IMAGE_FORMATS and buildChartBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Called by: `buildChartBlob` for SVG requests.
  */
 const buildCompositeSvg = (
   svgString: string,
@@ -374,8 +370,7 @@ const buildCompositeSvg = (
  * Use this when you need to bundle the chart with other files (e.g. a ZIP).
  */
 /**
- * Used by: src/features/views/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Used by: src/features/views/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx.
  */
 export const buildChartBlob = async (
   svg: SVGSVGElement,
@@ -408,7 +403,7 @@ export const buildChartBlob = async (
 };
 
 /** Build and immediately save a chart image, with browser/Tauri toast handling. */
-/** Used by: src/features/views/concordance/components/ConcordanceDispersionSummary.tsx, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Used by: src/features/views/concordance/components/ConcordanceDispersionSummary.tsx, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx. */
 export const downloadChartAs = async (
   svg: SVGSVGElement,
   options: DownloadChartOptions,
@@ -418,7 +413,7 @@ export const downloadChartAs = async (
 };
 
 /** Finds the chart SVG inside a feature panel while ignoring icon SVGs inside controls. */
-/** Used by: src/features/views/concordance/components/ConcordanceDispersionSummary.tsx, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/views/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Used by: src/features/views/concordance/components/ConcordanceDispersionSummary.tsx, src/features/views/sequential-analysis/SequentialAnalysisFeature.tsx, src/features/views/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx. */
 export const findSvgInContainer = (container: HTMLElement): SVGSVGElement | null => {
   const svgs = container.querySelectorAll<SVGSVGElement>('svg');
   return Array.from(svgs).find((svg) => !svg.closest('button')) ?? null;

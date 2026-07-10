@@ -57,12 +57,12 @@ const requestNodeInfos = async (args: NodeInfosQueryArgs): Promise<WorkspaceNode
  * Build the `useQuery` options for a (workspace, node) pair.
  * Generated client configuration resolves auth for each request.
  */
-/** Used by: schema and hydration hooks because they need one shared node-info query shape. */
+/** Used by: `useSchemaManagement` and the non-hook `fetchNodeInfo` helper. */
 export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
   queryKey: queryKeys.nodeInfo(args.workspaceId, args.nodeId),
   /**
    * Fetches fresh node metadata for query consumers while resolving auth at execution time.
-   * Why: importers need one shared normalization boundary to keep behavior consistent.
+   * Called by: TanStack Query from the hook and imperative fetch paths above.
    */
   queryFn: async (): Promise<WorkspaceNodeInfo> => {
     const nodeInfos = await requestNodeInfos({
@@ -107,7 +107,7 @@ interface FetchNodeInfoArgs {
  * and other async work outside React's render tree. Returns the cached
  * value when present and fresh; otherwise runs the collection node-info
  * request once and caches the result for future hook subscriptions.
- * Why: importers need one shared normalization boundary to keep behavior consistent.
+ * Used by: workspace schema refresh and Sequential Analysis schema locking.
  * Flow: optionally remove the cached node entry, build the canonical query options, then fetch through TanStack Query; generated-client configuration owns request auth.
  */
 export const fetchNodeInfo = async ({
@@ -128,7 +128,8 @@ export const fetchNodeInfo = async ({
  * `invalidateNodeInfo` API.
  */
 /**
- * Used by: src/features/workspace/common/hooks/useWorkspaceNodeMutations.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Used by: `workspaceMutationCache` and `usePersistNodeDocumentColumn` after
+ * mutations that make cached node metadata stale.
  * Flow: invalidate one node-info key when provided, otherwise predicate-match every node-info query under the workspace.
  */
 export const invalidateNodeInfoQuery = (

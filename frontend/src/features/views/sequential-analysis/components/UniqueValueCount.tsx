@@ -9,8 +9,9 @@ interface UniqueValueCountProps {
 }
 
 /**
- * Rendered by: SequentialAnalysisParameterPanel to show cardinality hints for candidate group-by columns because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+ * Rendered by: SequentialAnalysisParameterPanel to show cardinality hints for candidate group-by columns.
+ * Flow: query distinct values for the selected column, then render loading,
+ * error, or the returned count.
  */
 export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValueCountProps) {
   const { data, isLoading, error } = useQuery({

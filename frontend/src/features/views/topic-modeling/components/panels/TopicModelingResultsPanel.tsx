@@ -61,8 +61,10 @@ interface Props {
 }
 
 /**
- * Rendered by: TopicModelingFeature to show results, controls, detach dialog, and chart export affordances because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Maps topic-modeling task state to running, error, or successful result content.
+ * Rendered by: TopicModelingFeature whenever a banner, result, or local error exists.
+ * Flow: derive the task-state card, render TopicModelingBubbleChartSection for
+ * successful results, and host the Add to Workspace controls and detach dialog.
  */
 export function TopicModelingResultsPanel({
   topicWaitingBanner,

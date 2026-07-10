@@ -101,7 +101,7 @@ function Sidebar() {
   const { currentWorkspaceId } = useWorkspaceData();
   const { user, logout, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
-  /** Called by: the Sidebar footer/header Logout button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+  /** Called by: the Sidebar footer/header Logout button onClick prop. */
   const handleLogout = async () => {
     // Drop all cached query data so the next signed-in user never sees the
     // previous user's files, workspaces, nodes, or preferences.

@@ -17,7 +17,7 @@ import { isTauri } from '@/lib/isTauri';
  */
 
 /** Converts an API/backend base URL into the health endpoint URL the startup gate polls. */
-/** Called by: useBackendHealth in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Called by: useBackendHealth in this hook module. */
 const normalizeToHealthUrl = (backendUrl: string) => {
   const trimmed = backendUrl.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed.replace(/\/api$/, '/health') : `${trimmed}/health`;
@@ -79,7 +79,7 @@ export const useBackendHealth = () => {
     let timeoutId: number | null = null;
 
     /** Applies the health-poll backoff after failed attempts. */
-    /** Called by: useBackendHealth in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+    /** Called by: `poll` after an unsuccessful health check. */
     const scheduleNext = () => {
       if (cancelled) return;
       const nextDelay = attempt <= 6 ? 500 : Math.min(5000, 1000 * 2 ** Math.min(5, attempt - 6));

@@ -111,7 +111,6 @@ function Calendar({
       components={{
         /**
          * Wraps DayPicker's root so shadcn consumers keep the expected calendar data slot.
-         * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
          */
         Root: ({ className, rootRef, ...props }) => {
           return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />;

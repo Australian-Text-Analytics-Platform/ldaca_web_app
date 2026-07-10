@@ -18,8 +18,7 @@ import { isTauri } from '@/lib/isTauri';
  * Caps attempts at 1000 to avoid pathological loops.
  */
 /**
- * Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Called by: saveBlob in this library module.
  */
 const resolveUniqueFilename = async (
   filename: string,
@@ -39,8 +38,7 @@ const resolveUniqueFilename = async (
 
 /** Uses native browser download UI for web builds where destination/progress are already visible. */
 /**
- * Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Called by: saveBlob in this library module.
  */
 const browserDownload = (blob: Blob, filename: string) => {
   if (typeof document === 'undefined') return;
@@ -65,7 +63,7 @@ const browserDownload = (blob: Blob, filename: string) => {
  * strip these for `<a download>`, but Tauri's `writeFile` would interpret
  * them as nested directories under Downloads (which don't exist) and fail.
  */
-/** Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: saveBlob in this library module. */
 const toBasename = (filename: string): string => {
   const trimmed = filename.replace(/[/\\]+$/, '');
   const idx = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
@@ -74,8 +72,7 @@ const toBasename = (filename: string): string => {
 
 /** Writes bytes through Tauri plugins so desktop users get a real file in Downloads. */
 /**
- * Called by: saveBlob in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Called by: saveBlob in this library module.
  */
 const tauriDownload = async (blob: Blob, filename: string) => {
   // Dynamic imports keep these out of browser bundles.
@@ -110,8 +107,8 @@ export interface SaveBlobOptions {
  * shows progress and the destination in the browser chrome — no toast needed.
  */
 /**
- * Used by: src/features/views/export/ExportFeature.tsx, src/features/views/token-frequency/tokenFrequencyExport.ts, src/features/views/topic-modeling/components/results/TopicModelingBubbleChartSection.tsx and 3 other importers because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Used by: chart export, Data Loader file downloads, workspace archive
+ * downloads, Export, Token Frequency, and Topic Modeling.
  */
 export const saveBlob = async (
   blob: Blob,
@@ -133,7 +130,6 @@ export const saveBlob = async (
         action: {
           label: 'Show in folder',
           /** Lets desktop users reveal the saved file from the success toast action. */
-          /** Used by: the toast action onClick handler in this module because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
           onClick: () => {
             void opener.revealItemInDir(fullPath).catch(() => {
               // Reveal failures are non-fatal — the file still exists.

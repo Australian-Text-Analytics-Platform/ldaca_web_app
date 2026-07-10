@@ -46,7 +46,7 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
   const innerRef = React.useRef<HTMLInputElement | null>(null);
   /**
    * Keeps the internal input ref and forwarded ref aligned for callers.
-   * Called by: dateTimeUtils internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the ISO input's `ref` prop.
    */
   const setRefs = (el: HTMLInputElement | null) => {
     innerRef.current = el;
@@ -59,7 +59,7 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
 
   /**
    * Normalizes and validates draft text before notifying the parent field.
-   * Called by: dateTimeUtils internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by blur, change, paste, and Enter-key input paths.
    */
   const commitNormalized = (text: string, { syncDraft = false }: { syncDraft?: boolean } = {}) => {
     const trimmed = text.trim();
@@ -137,7 +137,7 @@ interface DateTimePickerFieldProps {
 /**
  * Calendar/time editor used by datetime filter value inputs. It keeps text,
  * calendar, and time state synchronized around a single ISO string value.
- * Rendered by: useFilterSubTabSections hook, dateTimeHelpers utilities (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `FilterConditionValueInput` for datetime condition values.
  * Flow: split ISO values into date/time draft state, keep both inputs synchronized, normalize
  * blur/Tab behavior, and emit UTC ISO strings.
  */
@@ -156,7 +156,7 @@ export function DateTimePickerField({
 
   /**
    * Rehydrates calendar/time drafts when the committed ISO value changes.
-   * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called before opening the picker and after an ISO text commit.
    */
   const syncDraftFromValue = (nextValue: string) => {
     const nextDate = nextValue ? parseIsoToLocalDate(nextValue) : null;
@@ -166,7 +166,7 @@ export function DateTimePickerField({
 
   /**
    * Opens the popover after syncing drafts from the latest committed value.
-   * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the ISO input's focus and click callbacks.
    */
   const openPicker = () => {
     if (!open) {
@@ -177,7 +177,7 @@ export function DateTimePickerField({
 
   /**
    * Commits text-entry changes and syncs the calendar/time draft state.
-   * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `IsoDateInput` as `onCommit`.
    */
   const handleIsoCommit = (nextValue: string) => {
     onChange(nextValue);
@@ -190,7 +190,7 @@ export function DateTimePickerField({
     }
     /**
      * Closes the picker when the user clicks outside its container.
-     * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     * Installed by this effect as the document `mousedown` listener.
      */
     const handlePointerDown = (event: MouseEvent) => {
       if (!containerRef.current) return;
@@ -200,7 +200,7 @@ export function DateTimePickerField({
     };
     /**
      * Closes the picker on Escape for keyboard users.
-     * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+     * Installed by this effect as the document `keydown` listener.
      */
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -217,7 +217,7 @@ export function DateTimePickerField({
 
   /**
    * Commits a calendar/time draft back to the parent ISO string value.
-   * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by both calendar selection and time-input changes.
    */
   const commitDate = (date: Date | undefined) => {
     if (!date) {
@@ -229,7 +229,7 @@ export function DateTimePickerField({
 
   /**
    * Handles calendar day selection while preserving the current time value.
-   * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `Calendar` as `onSelect`.
    */
   const handleSelectDate = (day: Date | undefined) => {
     if (!day) {
@@ -244,7 +244,7 @@ export function DateTimePickerField({
 
   /**
    * Handles time input changes while preserving the current calendar date.
-   * Called by: DateTimePickerField internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the popover time input's `onChange` callback.
    */
   const handleTimeChange = (nextValue: string) => {
     const normalized = normalizeTimeValue(nextValue);
@@ -294,7 +294,7 @@ export function DateTimePickerField({
                 formatters={{
                   /**
                    * Renders month names in the date picker dropdown for readers.
-                   * Called by: DateTimePickerField object consumers because consumers need this callback at the object boundary instead of recreating it inline.
+                   * Invoked by Calendar for the month dropdown label.
                    */
                   formatMonthDropdown: (date) => date.toLocaleString('default', { month: 'long' }),
                 }}

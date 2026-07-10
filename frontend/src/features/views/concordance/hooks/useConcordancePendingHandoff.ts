@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import type { WorkspaceGraphNode } from '@/api';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { HydrationState } from '../../common/useAnalysisHydration';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 interface Params {
@@ -42,8 +42,7 @@ export interface UseConcordancePendingHandoffResult {
  * `handleSearch`, which the parent already has wired up.
  */
 /**
- * Used by: ConcordanceFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: ConcordanceFeature.tsx.
  */
 export function useConcordancePendingHandoff({
   pendingConcordance,

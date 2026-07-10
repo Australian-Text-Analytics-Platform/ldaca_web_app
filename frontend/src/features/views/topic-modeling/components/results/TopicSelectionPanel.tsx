@@ -29,8 +29,11 @@ function isTopicInDomain(topic: TopicModelingTopic, domain: ZoomDomain): boolean
 }
 
 /**
- * Rendered by: TopicModelingBubbleChartSection to show selected and available topic lists because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Renders selected and available topic lists beneath the bubble chart.
+ * Rendered by: TopicModelingBubbleChartSection, which shares chart hover,
+ * selection, search, and zoom-domain state with this list.
+ * Flow: sort by size, apply zoom/search filters, then keep list hover and
+ * selection actions synchronized with the chart.
  */
 export function TopicSelectionPanel({
   topics,

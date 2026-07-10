@@ -32,7 +32,6 @@ export interface NodeColumnSelectorProps {
  * Renders the shared column selector used by analysis parameter panels,
  * including disabled-reason tooltips for unavailable controls.
  * Used by: node input/selection panels and feature-specific column selection controls.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function NodeColumnSelector({
   columns,

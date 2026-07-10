@@ -31,7 +31,6 @@ export const useWorkspaceQueries = ({
     queryKey: queryKeys.workspaces,
     /**
      * Loads workspace summaries for selectors and launch screens.
-     * Called by: useQuery option object inside useWorkspaceQueries.
      * Why: the list must wait for authenticated readiness and share one canonical cache key.
      */
     queryFn: async () => {
@@ -46,7 +45,6 @@ export const useWorkspaceQueries = ({
     queryKey: queryKeys.currentWorkspace,
     /**
      * Restores the backend-selected workspace during authenticated startup.
-     * Called by: useQuery option object inside useWorkspaceQueries.
      * Why: startup needs one authenticated, cached source for the backend-selected workspace id.
      */
     queryFn: async () => {
@@ -63,7 +61,6 @@ export const useWorkspaceQueries = ({
       : ['workspaces', 'graph'],
     /**
      * Fetches graph topology for the active workspace view.
-     * Called by: useQuery option object inside useWorkspaceQueries.
      * Why: graph consumers need one cache entry gated by authenticated workspace identity.
      */
     queryFn: async () => {

@@ -33,7 +33,6 @@ const buildUnderlineStyle = (types: string[]): React.CSSProperties => {
  * Called by: QuotationFeature detail panel renderDocumentText to render highlighted full text.
  * Shows speaker (blue), quote (green), and verb (purple) spans
  * with underline decorations and inline label badges. No clipping.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const renderQuotationDetailText = (
   text: string,

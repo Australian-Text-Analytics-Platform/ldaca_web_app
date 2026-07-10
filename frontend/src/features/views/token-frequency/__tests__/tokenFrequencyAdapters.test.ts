@@ -2,18 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { deriveNodeDisplayResults, type NormalizedNodeResult } from '../tokenFrequencyAdapters';
 
 /** Builds descending token-frequency rows for adapter boundary tests. */
-/**
- * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
- * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
- */
 const buildRows = (tokens: string[]) =>
   tokens.map((token, i) => ({ token, frequency: tokens.length - i }));
 
 /** Wraps fixture rows in the normalized node shape consumed by display adapters. */
-/**
- * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
- * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
- */
 const makeNode = (rows: ReturnType<typeof buildRows>): NormalizedNodeResult => ({
   nodeId: 'n1',
   displayName: 'Node 1',

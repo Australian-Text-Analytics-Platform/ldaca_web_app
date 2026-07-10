@@ -123,7 +123,6 @@ const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
  * Wraps the project's Recharts usage for analysis trend/result charts so line,
  * bar, area, tooltip, and point-selection behavior stay consistent.
  * Used by: concordance dispersion and sequential analysis chart panels.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function MultiSeriesChart({
   data,

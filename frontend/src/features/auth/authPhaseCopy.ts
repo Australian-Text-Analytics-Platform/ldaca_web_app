@@ -11,7 +11,6 @@ export interface BlockingCopy {
 
 /**
  * Formats auth retry timestamps for startup copy consumed by blocking banners and screens.
- * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
  */
 export const formatTimestamp = (value?: number | null): string | null => {
   if (!value) return null;

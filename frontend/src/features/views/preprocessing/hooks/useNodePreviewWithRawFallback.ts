@@ -13,7 +13,7 @@ interface RawishResponse {
 
 /**
  * Normalizes generated/raw preview responses before table components consume them.
- * Used by: local callers in preprocessing/useNodePreviewWithRawFallback module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called by the hook's raw and operation-preview response branches.
  */
 const normaliseResponse = (response: RawishResponse | null | undefined) => ({
   data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
@@ -70,7 +70,8 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
  * Replaces ~5 hand-rolled copies of: request shape with `payload: null`,
  * a manual signature builder with `disabled`/`::raw`/`::<json>` branches,
  * and a fetcher that branches on `payload === null` to call node-data.
- * Used by: useFilterSubTabSections hook, useAggregateSubTab hook, useSliceSubTab hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by Filter, Aggregate, Expression, Replace, and Slice hooks that can
+ * preview either an operation or the raw selected node.
  * Flow: call preprocessing preview first, fall back to raw node preview when no request is
  * ready, and expose one preview state shape to callers.
  */
@@ -107,7 +108,7 @@ export const useNodePreviewWithRawFallback = <P>(
     debounceMs,
     // Routes complete operation payloads to the operation preview endpoint and
     // incomplete ones to raw node data so users always have rows to inspect.
-    // Called by: usePreprocessingPreview option object inside useNodePreviewWithRawFallback because consumers need this callback at the object boundary instead of recreating it inline.
+    // Invoked by usePreprocessingPreview after debounce/cancellation setup.
     fetcher: async ({ request: req, page, pageSize, signal }) => {
       if (req.payload) {
         return normaliseResponse(

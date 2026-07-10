@@ -34,7 +34,7 @@ const CONTEXT_LABELS: Record<string, string> = {
  * Shows context-specific expression examples next to each CodeEditor. The
  * Polars expression tab uses it to keep backend syntax hints near the active
  * context without hard-coding them into every tab panel.
- * Rendered by: preprocessing/PolarsExpressionSubTab module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `PolarsExpressionSubTab` to switch among expression editors.
  */
 function CodeHint({ context }: { context: string }) {
   const hints: Record<string, string> = {
@@ -118,7 +118,7 @@ function ExpressionListEditor({
 /**
  * Renders the general Polars-expression preprocessing tab. It delegates request
  * serialization, preview, and apply behavior to `usePolarsExpressionSubTab`.
- * Rendered by: DataPreprocessingFeature module, CodeEditor module, PreviewTable component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `DataPreprocessingFeature`; it composes `CodeEditor` and `PreviewTable`.
  * Flow: manage expression tabs and shared context, render editors/preview table, evaluate
  * expressions for preview, and apply column/sort/group operations through hook actions.
  */

@@ -13,7 +13,7 @@ const VALID_CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
 ];
 // Narrows unknown request values to the custom interval units supported by the UI.
 /**
- * Called by: useSequentialResultSummary hook during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Called by `useSequentialResultSummary` when deriving display state.
  */
 const isCustomIntervalUnit = (value: unknown): value is SequentialCustomIntervalUnit =>
   typeof value === 'string' &&
@@ -56,7 +56,7 @@ export interface SequentialResultSummaryFallbacks {
 }
 
 /**
- * Used by: SequentialAnalysisResultsPanel.tsx, SequentialAnalysisFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Called by: `useSequentialResultSummary`; covered directly by its unit test.
  * Flow: read the task result's analysis_params, fall back to live form values
  * when no result exists, normalize numeric-only fields, and format the
  * frequency label shown by the results panel.
@@ -115,7 +115,7 @@ export const deriveSequentialResultSummary = (
 
 /**
  * Derives the displayed sequential-result summary for the active analysis tab.
- * Used by: SequentialAnalysisFeature.tsx because the results panel needs a
+ * Used by: `SequentialAnalysisFeature` because the results panel needs a
  * compact description of the result's saved request without re-deriving
  * `analysis_params` fallbacks inline.
  * Flow: delegate to the pure derivation helper; React Compiler handles routine

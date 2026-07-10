@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { analysisTaskDispersionBins } from '@/api';
 import type { ConcordanceAnalysisResponse, ConcordanceDispersionBinRow } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { VIZ_PALETTE } from '../../common';
+import { VIZ_PALETTE } from '../../common/vizPalette';
 import {
   buildConcordanceNodeColorMap,
   buildConcordanceSourceColorMap,

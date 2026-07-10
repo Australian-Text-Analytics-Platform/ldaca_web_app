@@ -73,7 +73,6 @@ const formatMetadataValue = (value: unknown): string => {
  * Opens the shared row-detail dialog used by analysis tables to inspect full
  * document text, custom summary fields, and remaining row metadata.
  * Used by: concordance and quotation result row detail flows.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function RowDetailPanel({
   open,

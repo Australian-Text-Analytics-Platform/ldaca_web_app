@@ -6,7 +6,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 
 /** Manages paginated file preview state for the data-loader preview dialog. */
 /**
- * Used by: src/components/panels/AddFilePanel.tsx, src/components/panels/FilePreviewPanel.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: `AddFilePanel` and `FilePreviewPanel`.
  * Flow: reset page/sheet state when the dialog closes, query the requested preview page, then expose rows, columns, paging, and sheet controls.
  */
 export const useFilePreview = (filename: string | null, isOpen: boolean) => {
@@ -49,8 +49,6 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  /** Resets preview paging/sheet state when a caller closes or switches the preview. */
-  /** Used by: useFilePreview callback wiring in this module because the component or hook needs a named callback boundary for effect and prop handoff steps. */
   const reset = () => {
     setPage(0);
     setSelectedSheet(null);

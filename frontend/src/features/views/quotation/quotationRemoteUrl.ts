@@ -19,7 +19,8 @@ const NORMALIZED_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
  * isn't an http(s) endpoint. Returns the normalized URL plus a structured
  * reason on failure so the UI can show a specific error message.
  * Used by: QuotationFeature remote-engine controls because user-entered service URLs may omit schemes but must resolve to http(s) before task submission.
- * Flow: normalize inputs, apply the analysis-specific branch, then return the derived value consumed by the caller.
+ * Flow: trim the input, accept valid HTTP(S) URLs, try an HTTP prefix when no
+ * scheme was supplied, then classify scheme, protocol, or format failures.
  */
 export const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
   const trimmed = value.trim();

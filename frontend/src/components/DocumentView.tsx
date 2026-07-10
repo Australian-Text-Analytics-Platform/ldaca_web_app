@@ -178,13 +178,12 @@ function DocumentView({
     },
     /**
      * Rewrites markdown anchors so document consumers stay inside the modal navigation flow.
-     * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
      * Flow: resolve relative markdown hrefs against the current file, route internal `.md` links through navigation state, and pass external links through.
      */
     a: ({ node: _node, children, href, target: linkTarget, rel, ...props }) => {
       const baseFile = currentTarget.file;
       /**
-       * Called by: the markdown anchor onClick prop to route internal links through DocumentView state because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+       * Called by: the markdown anchor onClick prop to route internal links through DocumentView state.
        * Flow: parse the clicked href path/hash, resolve the next markdown file, prevent default navigation, then store the next file/anchor target.
        */
       const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {

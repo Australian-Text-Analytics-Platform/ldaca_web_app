@@ -8,8 +8,9 @@ import type {
   QuotationMaterializeRequest,
   AnalysisTaskActionResponse,
 } from '@/api';
-import { extractAndSetTaskId } from '../../common';
-import type { NodeColumnSelection, NodePaginationState } from '../../common';
+import { extractAndSetTaskId } from '../../common/extractTaskId';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
+import type { NodePaginationState } from '../../common/tasks/types';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
 
@@ -17,7 +18,7 @@ const DEFAULT_PAGE_SIZE = 50;
 
 /** Extracts the most useful backend error detail for quotation dialogs. */
 /**
- * Called by: useQuotationTaskFlow hook as a local helper in this analysis workflow.
+ * Called by other request and result handlers in `useQuotationTaskFlow`.
  * Flow: inspect response.data, error.data, and body detail fields, stringify object details when possible, then fall back to message or a quotation-specific default.
  */
 function getErrorMessage(error: unknown): string {
@@ -90,7 +91,8 @@ interface Params {
 /** Bundles quotation task lifecycle handlers so the feature component stays render-focused. */
 /**
  * Used by: QuotationFeature.tsx, useQuotationTaskFlow.test.tsx.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ * Flow: run the initial search, page/sort persisted results, persist context
+ * length, and dispatch detach/materialize requests for the locked source node.
  */
 export function useQuotationTaskFlow({
   state: {
@@ -118,7 +120,7 @@ export function useQuotationTaskFlow({
 }: Params) {
   // Builds deterministic output names for detach operations from display labels.
   /**
-   * Called by: useQuotationTaskFlow as a local helper in this analysis workflow.
+   * Called by other request and result handlers in `useQuotationTaskFlow`.
    */
   const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
     const trimmed = nodeLabel.trim();
@@ -129,7 +131,7 @@ export function useQuotationTaskFlow({
 
   // Resolves a node label from the active locked or live node list for generated output names.
   /**
-   * Called by: useQuotationTaskFlow as a local helper in this analysis workflow.
+   * Called by other request and result handlers in `useQuotationTaskFlow`.
    */
   const resolveNodeLabel = (nodeId: string): string => {
     const match = displayedNodes.find((node) => node.id === nodeId);
@@ -139,7 +141,7 @@ export function useQuotationTaskFlow({
 
   // Locates the locked node and column that should receive stored-result updates.
   /**
-   * Called by: useQuotationTaskFlow as a local helper in this analysis workflow.
+   * Called by other request and result handlers in `useQuotationTaskFlow`.
    */
   const resolveLockedNodeContext = (): {
     nodeId: string;
@@ -156,7 +158,7 @@ export function useQuotationTaskFlow({
 
   // Persists the user's context-length preference onto the stored quotation task result.
   /**
-   * Called by: useQuotationTaskFlow during this analysis workflow.
+   * Called by request and task handlers in `useQuotationTaskFlow`.
    */
   const persistContextLengthPreference = async (value: number) => {
     if (!currentWorkspaceId) return;
@@ -171,8 +173,9 @@ export function useQuotationTaskFlow({
 
   // Runs or refreshes quotation extraction for one node using active paging and engine state.
   /**
-   * Called by: useQuotationTaskFlow as a local helper in this analysis workflow.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Called by other request and result handlers in `useQuotationTaskFlow`.
+   * Flow: resolve the live node/column/page and engine, submit a quotation
+   * search, capture its task id, then apply context and result state.
    */
   const fetchQuotations = async (
     nodeId: string,
@@ -235,8 +238,9 @@ export function useQuotationTaskFlow({
 
   // Updates an existing stored task result without creating a new quotation task.
   /**
-   * Called by: useQuotationTaskFlow during this analysis workflow.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Called by request and task handlers in `useQuotationTaskFlow`.
+   * Flow: resolve the locked task/source context, query the requested page or
+   * sort state, then replace the stored result and mark it loaded.
    */
   const updateStoredQuotationResult = async (overrides: Partial<QuotationResultQuery> = {}) => {
     if (!currentWorkspaceId) return null;
@@ -281,8 +285,9 @@ export function useQuotationTaskFlow({
 
   // Starts the initial quotation search and locks the selected node/column context afterward.
   /**
-   * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
+   * Flow: run page one for the displayed node and lock result mode only after
+   * the initial search succeeds.
    */
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
@@ -301,7 +306,7 @@ export function useQuotationTaskFlow({
 
   // Handles page changes by updating the stored task result.
   /**
-   * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks.
+   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
    */
   const handlePageChange = async (newPage: number) => {
     const targetNode = displayedNodes[0];
@@ -312,7 +317,7 @@ export function useQuotationTaskFlow({
 
   // Handles page-size changes while preserving the stored task as the source of truth in locked mode.
   /**
-   * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks.
+   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
    */
   const handlePageSizeChange = async (pageSize: number) => {
     const targetNode = displayedNodes[0];
@@ -326,7 +331,7 @@ export function useQuotationTaskFlow({
 
   // Applies sortable-column requests either through a fresh search or stored result update.
   /**
-   * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks.
+   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
    * Flow: ignore non-sortable columns, toggle sort direction for repeated columns, then fetch fresh unlocked results or update locked stored results.
    */
   const handleSort = async (nodeId: string, column: string) => {
@@ -357,7 +362,7 @@ export function useQuotationTaskFlow({
 
   // Detaches quotation results into a workspace node, including optional source columns.
   /**
-   * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks.
+   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
    * Flow: find the active node column, build local or remote engine payload, send the quotation detach request with optional columns/path, then clear node detaching state.
    */
   const handleDetach = async (
@@ -403,8 +408,9 @@ export function useQuotationTaskFlow({
 
   // Starts backend materialization for full quotation results before detach use.
   /**
-   * Called by: useQuotationTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
+   * Flow: resolve the parent task and engine, submit materialization for the
+   * active node/column, and track the returned child task id for completion.
    */
   const handleMaterialize = async (nodeId: string) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);

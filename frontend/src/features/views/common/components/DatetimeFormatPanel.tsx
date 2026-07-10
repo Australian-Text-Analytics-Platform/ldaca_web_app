@@ -29,7 +29,6 @@ interface DatetimeFormatPanelProps {
  * Modal wrapper used by preprocessing flows before converting a column to
  * datetime. It keeps open/close ownership with the caller while mounting the
  * form only when the dialog is visible.
- * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
  */
 export function DatetimeFormatPanel({ open, onClose, ...contentProps }: DatetimeFormatPanelProps) {
   return (
@@ -66,12 +65,12 @@ function DatetimeFormatPanelContent({
     sampleValues.length > 0 && !initialFormat ? 'Could not infer format' : null,
   );
 
-  /** Called by: DatetimeFormatPanelContent Cancel button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+  /** Called by: DatetimeFormatPanelContent Cancel button. */
   const handleCancel = () => {
     onClose();
   };
 
-  /** Called by: DatetimeFormatPanelContent Auto Fill button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+  /** Called by: DatetimeFormatPanelContent Auto Fill button. */
   const handleAutoFill = () => {
     setAutoFillTried(true);
     setAutoFillError(null);
@@ -83,7 +82,7 @@ function DatetimeFormatPanelContent({
     }
   };
 
-  /** Called by: DatetimeFormatPanelContent Convert button because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+  /** Called by: DatetimeFormatPanelContent Convert button. */
   const handleConfirm = () => {
     const trimmed = customFormat.trim();
     onConfirm(trimmed.length ? trimmed : undefined);

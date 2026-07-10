@@ -533,7 +533,7 @@ function DataLoaderFeature() {
           onCancel: closeDeleteWorkspaceDialog,
           /**
            * Confirms the pending workspace delete from the presentation dialog.
-           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           * Invoked by `DataLoaderDialogs` when workspace deletion is confirmed.
            */
           onConfirm: () => void handleConfirmDeleteWorkspace(),
         }}
@@ -559,7 +559,7 @@ function DataLoaderFeature() {
           errorMessage: ldacaErrorMessage,
           // These handlers adapt dialog-level token/search/import controls to
           // the feature hooks and preference store that own their side effects.
-          // Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+          // Invoked by DataLoaderDialogs when an Oni token is saved.
           onTokenSave: (token) => {
             const trimmed = token.trim();
             if (!trimmed) {
@@ -572,7 +572,7 @@ function DataLoaderFeature() {
           },
           /**
            * Deletes the stored Oni token and refreshes featured collections anonymously.
-           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           * Invoked by `DataLoaderDialogs` when the saved Oni token is deleted.
            */
           onTokenDelete: () => {
             setLdacaOniApiToken(null);
@@ -581,12 +581,12 @@ function DataLoaderFeature() {
           },
           /**
            * Routes dialog search submission through the feature's guarded search handler.
-           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           * Invoked by `DataLoaderDialogs` when its Oni search form submits.
            */
           onSearch: () => void handleLdacaSearch(),
           /**
            * Routes row-level imports through the feature's import task handler.
-           * Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+           * Invoked by `DataLoaderDialogs` from an Oni result/import action.
            */
           onImport: (recordId) => void handleLdacaImport(recordId),
         }}
@@ -600,7 +600,7 @@ function DataLoaderFeature() {
           creating: creatingFolder,
           // The dialog only knows about form state; folder creation stays in
           // the hook so file-list refetch and alerts share one owner.
-          // Consumed by: DataLoaderFeature return object for feature components because consumers need this returned value or action without owning the hook internals.
+          // Invoked by DataLoaderDialogs when its create-folder form submits.
           onCreate: () => void handleCreateFolder(),
         }}
         citation={{

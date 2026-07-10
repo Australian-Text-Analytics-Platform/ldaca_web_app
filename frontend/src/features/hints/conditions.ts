@@ -13,7 +13,7 @@ import type { HintConditionMap, HintResolverContext } from './types';
  * This hook is the single place where new condition ids are wired up to
  * existing app state. Keep it cheap — it runs on every render of the
  * `HintsController`.
- * Used by: HintsController module, conditions tests, types module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `HintsController` to decide which registered coach mark may render.
  * Flow: read UI/workspace stores, derive each coach-mark condition from current app state, and
  * provide resolver context for anchor lookup/action handlers.
  */

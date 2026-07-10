@@ -35,7 +35,6 @@ interface TokenizerModelSelectorProps {
  * Lets token-based analysis panels choose a tokenizer model for the selected
  * source column, using sampled text to group backend models by detected language.
  * Used by: concordance and token-frequency parameter panels.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 function TokenizerModelSelector({
   workspaceId,

@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 
 /**
  * Pagination navigation landmark used by table and analysis pagination controls.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
   return (
@@ -78,13 +77,12 @@ export function PaginationJump({
 
     /**
      * Closes the page-size selector when consumers click outside the control.
-     * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
      */
     const handlePointerDown = (event: MouseEvent) => {
       if (!containerRef.current || containerRef.current.contains(event.target as Node)) return;
       setOpen(false);
     };
-    /** Called by: the PaginationJump document keydown listener because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+    /** Called by: the PaginationJump document keydown listener. */
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
     };
@@ -112,7 +110,7 @@ export function PaginationJump({
   }, [open]);
 
   /**
-   * Called by: the PaginationJump form onSubmit prop because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+   * Called by: the PaginationJump form onSubmit prop.
    * Flow: trim and validate numeric input, report range errors, emit the parsed page to onPageChange, then close the popover.
    */
   const handleSubmit = (event: React.SyntheticEvent<HTMLFormElement>) => {
@@ -217,7 +215,6 @@ function PaginationLink({ className, isActive, size = 'icon', ...props }: Pagina
 
 /**
  * Previous-page link wrapper used by paginated tables and analysis results.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function PaginationPrevious({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
   return (
@@ -235,7 +232,6 @@ function PaginationPrevious({ className, ...props }: React.ComponentProps<typeof
 
 /**
  * Next-page link wrapper used by paginated tables and analysis results.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function PaginationNext({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
   return (

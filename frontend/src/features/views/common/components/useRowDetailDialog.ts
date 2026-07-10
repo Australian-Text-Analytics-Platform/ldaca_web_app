@@ -5,8 +5,9 @@ import type { RowDetailPayload } from './RowDetailPanel';
 /**
  * Owns the open/payload pair for analysis tables that share RowDetailPanel but
  * need feature-local click handlers.
- * Used by: analysis result tables that open RowDetailPanel from row clicks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: workspace and preprocessing tables plus Concordance/Quotation row-detail hooks.
+ * Flow: store the clicked row payload, open the shared panel, and expose its
+ * controlled open state to the rendering owner.
  */
 export function useRowDetailDialog() {
   const [detailPayload, setDetailPayload] = useState<RowDetailPayload | null>(null);

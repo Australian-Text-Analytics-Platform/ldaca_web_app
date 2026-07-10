@@ -12,7 +12,7 @@ const CORE_COLUMN_SET = new Set<string>(CONCORDANCE_CORE_COLUMNS);
 
 /** Normalizes concordance offsets that may arrive from local rows or server JSON. */
 /**
- * Called by: concordanceViewModels analysis helper module as a local helper in this analysis workflow.
+ * Called by concordance view-model builders in this module.
  */
 const getNumericIndex = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -255,7 +255,7 @@ export const DISPERSION_AGGREGATE_KEY = '__dispersion_total__';
  * would visually skip empty bins instead of dropping to zero.
  */
 /**
- * Called by: concordanceViewModels analysis helper module during this analysis workflow.
+ * Used by concordance view-model builders in this module.
  */
 const fillEmptyBins = (bins: DispersionBinDatum[], totalsByKey: Record<string, number>): void => {
   const keys = Object.keys(totalsByKey);
@@ -275,7 +275,8 @@ export interface BuildDispersionBinsResult {
 /** Builds normalized hit-count bins from raw grouped rows for client-side previews. */
 /**
  * Used by: ConcordanceDispersionSummary.tsx.
- * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ * Flow: assign hits to percentage bins, optionally split series by source,
+ * accumulate totals, then fill missing series/bin pairs with zero.
  */
 export function buildDispersionBins(
   rows: ConcordanceDispersionRow[],
@@ -651,7 +652,7 @@ export type ConcordanceDispersionChartMode = (typeof CONCORDANCE_DISPERSION_CHAR
 
 /** Guards user or persisted preferences before re-binning server dispersion data. */
 /**
- * Called by: concordanceViewModels analysis helper module during this analysis workflow.
+ * Used by concordance view-model builders in this module.
  */
 const isValidDisplayBinCount = (n: number): n is DispersionDisplayBinCount =>
   (DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(n);
@@ -663,7 +664,8 @@ const isValidDisplayBinCount = (n: number): n is DispersionDisplayBinCount =>
  */
 /**
  * Used by: ConcordanceDispersionSummary.tsx, ConcordanceDispersionNodeBlock.tsx.
- * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ * Flow: validate the requested display-bin count, fold each of the 100 server
+ * bins into its display bucket, accumulate series totals, then fill gaps.
  */
 export function buildDispersionBinsFromBinned(
   rows: TaggedBinRow[],
@@ -723,7 +725,8 @@ export function buildDispersionBinsFromBinned(
  */
 /**
  * Used by: useConcordanceTaskFlow.ts.
- * Flow: normalize raw analysis values, apply filtering or mapping rules, then return the view model consumed by components or tests.
+ * Flow: sort selected bin indices, collapse adjacent indices into spans, and
+ * render each span as a percentage range.
  */
 export function formatBinIndicesAsRangeLabel(
   binIndices: ReadonlySet<number> | readonly number[],

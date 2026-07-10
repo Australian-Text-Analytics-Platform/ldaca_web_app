@@ -82,8 +82,7 @@ interface SequentialChartProps {
 const CHART_HEIGHT_PX = 400;
 
 /**
- * Rendered by: SequentialAnalysisResultsPanel to show the chart and detach/selection controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: SequentialAnalysisResultsPanel to show the chart and detach/selection controls.
  */
 export function SequentialChart({
   chartType,

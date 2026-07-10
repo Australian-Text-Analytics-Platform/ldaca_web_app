@@ -81,7 +81,7 @@ function HeaderNodeLabel({ label }: { label: string }) {
 
 /**
  * Renders selected-node title, rename, query-plan, undo, and redo controls.
- * Rendered by: WorkspaceDataTableFeature component, WorkspaceDataHeader tests (rg call sites/imports).
+ * Rendered by `WorkspaceDataTableFeature` above `WorkspaceTable`.
  * Why: the data table feature needs the active node label and node-level actions
  * grouped in one compact line above the table state.
  * Flow: derive editable header state from node info, keep long labels clipped
@@ -106,8 +106,7 @@ export const WorkspaceDataHeader = ({
 
   /**
    * Commits a node rename when the inline editor blurs or submits.
-   * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
-   * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+   * Attached to the rename form's submit and input blur paths.
    */
   const handleRenameCommit = () => {
     if (!isRenaming) {
@@ -122,8 +121,7 @@ export const WorkspaceDataHeader = ({
 
   /**
    * Opens inline node rename mode and focuses the draft input.
-   * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
-   * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+   * Attached to the node-name edit button.
    */
   const startRename = () => {
     setRenameDraft({ baseLabel: info.nodeLabel, value: info.nodeLabel });
@@ -135,8 +133,7 @@ export const WorkspaceDataHeader = ({
 
   /**
    * Fetches and opens the Polars query plan dialog for the active node.
-   * Called by: WorkspaceDataHeader internal event, effect, or helper flow.
-   * Why: because the data table feature needs node title, save, refresh, and collapse actions grouped above the table state.
+   * Attached to the query-plan button.
    */
   const handleOpenQueryPlan = async () => {
     setQueryPlanOpen(true);

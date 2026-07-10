@@ -80,8 +80,7 @@ let refreshFailures = 0;
 let inFlight: Promise<void> | null = null;
 let refreshIntervalId: number | null = null;
 
-/** Creates a bounded signal for auth probes so startup does not hang indefinitely. */
-/** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+/** Called by `runAuthFetch` to bound the startup auth-info probe. */
 const timeoutSignal = (timeoutMs: number): AbortSignal => AbortSignal.timeout(timeoutMs);
 
 export const useAuthStore = create<AuthStore>()(
@@ -90,9 +89,9 @@ export const useAuthStore = create<AuthStore>()(
     config: null,
     phase: { status: 'bootstrapping', attempts: 0 },
 
-    /** Runs config/auth-info fetches as a single coalesced auth state-machine transition. */
     /**
-     * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Called by `AuthBootstrap`, refresh actions, and login/logout transitions to
+     * run config/auth-info fetches as one coalesced state-machine transition.
      * Flow: coalesce in-flight fetches, set bootstrap or refresh phase, load config/auth info, then record ready, degraded, or fatal outcomes.
      */
     runAuthFetch: (reason) => {
@@ -198,8 +197,7 @@ export const useAuthStore = create<AuthStore>()(
       return inFlight;
     },
 
-    /** Starts the background refresh loop once so long-lived sessions stay warm. */
-    /** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    /** Called by `AuthBootstrap` to start the single background refresh loop. */
     ensureRefreshInterval: () => {
       if (refreshIntervalId != null || typeof window === 'undefined') return;
       refreshIntervalId = window.setInterval(() => {
@@ -210,8 +208,8 @@ export const useAuthStore = create<AuthStore>()(
     },
 
     /**
-     * Public refresh entry point used by retry buttons and the `useAuth` hook.
-     * Why: store consumers need one typed boundary for shared state reads, updates, and persistence.
+     * Used by auth retry surfaces and data-folder settings to refresh the
+     * current session after a recoverable failure or configuration change.
      */
     refreshAuth: async () => {
       const { authInfo, phase } = get();
@@ -219,9 +217,9 @@ export const useAuthStore = create<AuthStore>()(
       await get().runAuthFetch(reason);
     },
 
-    /** Exchanges Google credentials for the app token and refreshes the auth snapshot. */
     /**
-     * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Used through `useAuth` by the login surface to exchange Google
+     * credentials for the app token and refresh the auth snapshot.
      * Flow: require multi-user mode, exchange the Google token, persist the app access token, then bootstrap auth state or rethrow a user-facing error.
      */
     loginWithGoogle: async (idToken) => {
@@ -242,9 +240,9 @@ export const useAuthStore = create<AuthStore>()(
       }
     },
 
-    /** Ends a multi-user session locally and server-side, then reboots anonymous auth state. */
     /**
-     * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Called from `Sidebar` through `useAuth` to end a multi-user session
+     * locally and server-side, then reboot anonymous auth state.
      * Flow: skip single-user mode, attempt server logout, clear local token and counters, reset phase, then bootstrap anonymous auth.
      */
     logout: async () => {
@@ -267,15 +265,17 @@ export const useAuthStore = create<AuthStore>()(
       }
     },
 
-    /** Returns headers for raw/native boundaries while suppressing tokens in single-user mode. */
-    /** Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+    /**
+     * Used by export, preview, task-stream, and native-download callers that
+     * cannot rely on the generated SDK's request interceptor.
+     */
     getAuthHeaders: (): Record<string, string> => {
       return getAuthHeaders();
     },
 
-    /** Captures redirect-token login results and scrubs secrets from the visible URL. */
     /**
-     * Consumed by: useAuthStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+     * Called by `AuthBootstrap` before its first fetch to capture a redirect
+     * token and scrub the secret from the visible URL.
      * Flow: parse `auth_token` from the query string, persist it for SDK headers, remove the secret param, and replace the URL without navigation.
      */
     processGoogleRedirectToken: () => {

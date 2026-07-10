@@ -33,7 +33,7 @@ interface FilterValueChecklistProps {
  * Renders searchable categorical/list-string filter values. The filter hook
  * uses this component when a condition operator needs multi-value selection
  * backed by backend-provided unique values.
- * Rendered by: useFilterSubTabSections hook, FilterValueChecklist tests, checklistSearch utilities (rg call sites/imports).
+ * Rendered by `FilterConditionValueInput` for categorical condition values.
  * Flow: filter and rank option labels by search query, render select-all/null/value checkboxes,
  * and emit value arrays that preserve backend primitive types.
  */

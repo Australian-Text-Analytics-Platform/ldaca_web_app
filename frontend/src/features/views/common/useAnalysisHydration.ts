@@ -54,8 +54,9 @@ interface UseAnalysisHydrationReturn {
 
 /**
  * Restores an explicit task's request/result pair for an analysis tab.
- * Used by: useAnalysisFeature and analysis hydration tests because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: useAnalysisFeature and analysis hydration tests.
+ * Flow: deduplicate hydration per workspace, resolve the task id, fetch request
+ * and result independently, apply available values, and publish terminal state.
  */
 export function useAnalysisHydration<TRequest = unknown, TResult = unknown>(
   config: UseAnalysisHydrationConfig<TRequest, TResult>,

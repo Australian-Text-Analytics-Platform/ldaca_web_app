@@ -24,7 +24,7 @@ const SYNC_DEBOUNCE_MS = 800;
  * stay in `localStorage` until the user signs in).
  */
 /**
- * Used by: src/App.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: `WorkspaceShell`, after the authenticated app shell mounts.
  * Flow: load backend preferences once auth state is known, then subscribe after hydration and debounce authenticated syncs back to the server.
  */
 export function usePreferencesInit() {

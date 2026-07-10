@@ -64,9 +64,9 @@ interface Params {
   lock: TopicModelingLock;
 }
 
-// Builds deterministic topic-result node names, including sampling context when present.
 /**
- * Used by: useTopicModelingTaskFlow.test.ts.
+ * Builds deterministic topic-result node names, including sampling context when present.
+ * Used by: handleDetachConfirm for each detached source node and focused naming tests.
  */
 export const buildTopicDetachNodeName = (
   nodeLabel: string,
@@ -87,10 +87,12 @@ export const buildTopicDetachNodeName = (
   return baseName;
 };
 
-/** Bundles topic-modeling run and detach lifecycle handlers for the feature component. */
 /**
- * Used by: useTopicModelingTaskFlow.test.ts, autoNodeNames.ts, TopicModelingFeature.tsx.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ * Owns topic-modeling run submission and result-detachment handlers.
+ * Used by: TopicModelingFeature, which connects the run handler to the shared
+ * rerun flow and the detach handlers/state to TopicModelingResultsPanel.
+ * Flow: submit the run envelope, load detach options, build displayed-topic
+ * overrides, create detached nodes, and invalidate workspace graph queries.
  */
 export function useTopicModelingTaskFlow({
   state: {
@@ -129,10 +131,11 @@ export function useTopicModelingTaskFlow({
     deselectAllDetachColumns,
   } = useDetachColumnsState(detachNodeOptions);
 
-  // Submits the topic-modeling request and restores the analysis lock for the requested nodes.
   /**
-   * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Submits the topic-modeling request and restores the analysis lock for the requested nodes.
+   * Used by: TopicModelingFeature.handleRunOrUpdate as executeAnalysisRerun's fresh-run callback.
+   * Flow: validate selected inputs, build the generated API request, and let
+   * runAnalysisTaskEnvelope coordinate task ids, running state, and results.
    */
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
@@ -190,10 +193,11 @@ export function useTopicModelingTaskFlow({
     });
   };
 
-  // Loads available detach columns before opening the topic-modeling detach dialog.
   /**
-   * Called by: useTopicModelingTaskFlow during this analysis workflow.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Loads available detach columns before opening the topic-modeling detach dialog.
+   * Used by: TopicModelingResultsPanel's Add to Workspace button.
+   * Flow: resolve the owned task, fetch its detach options, apply backend
+   * default columns, and open the dialog.
    */
   const openDetachDialog = async () => {
     if (!currentWorkspaceId) return;
@@ -230,10 +234,11 @@ export function useTopicModelingTaskFlow({
     }
   };
 
-  // Confirms topic detach with selected source columns and displayed representative-word overrides.
   /**
-   * Called by: useTopicModelingTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Confirms topic detach with selected source columns and displayed representative-word overrides.
+   * Used by: DetachColumnsDialog's confirm action through TopicModelingResultsPanel.
+   * Flow: build deterministic node names and visible-topic overrides, submit
+   * the detach request, then refresh graph/node queries and close the dialog.
    */
   const handleDetachConfirm = async () => {
     if (!currentWorkspaceId) return;

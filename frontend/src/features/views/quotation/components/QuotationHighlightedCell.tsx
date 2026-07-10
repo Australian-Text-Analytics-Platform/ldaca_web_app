@@ -35,13 +35,12 @@ const choosePriorityType = (types: string[]): QuotationHighlightType => {
 };
 
 /**
- * Rendered by: QuotationFeature. Renders a quotation source cell with multi-coloured underlines for the because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * speaker / quote / verb spans, label badges, and hover-driven highlight.
+ * Rendered by `QuotationFeature` for each quotation source cell. It draws
+ * multi-coloured speaker/quote/verb underlines, labels, and hover highlights.
  *
  * Extracted from the 116-LoC closure in QuotationFeature.tsx so the cell
  * has a stable component identity and the hover handlers no longer
  * capture the parent's `setHoverState` directly.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function QuotationHighlightedCell({
   text,

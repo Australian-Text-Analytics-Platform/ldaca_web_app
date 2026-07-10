@@ -6,12 +6,10 @@ import { TopicModelingParameterPanel } from '../TopicModelingParameterPanel';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 vi.mock('../../../../../../components/help/InfoIcon', () => ({
-  // Used by: InfoIcon mock module factory so tests focus on parameter behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
 }));
 
 vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
-  // Used by: NodeInputsPanel mock module factory to provide a stable marker because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   NodeInputsPanel: ({
     resolvedNodes,
     renderColumnAddon,
@@ -91,13 +89,11 @@ const nodeInputsFixture = (
 };
 
 vi.mock('../../../../common/components/AnalysisCardLayout', () => ({
-  // Used by: AnalysisCardLayout mock module factory to preserve children under test because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   AnalysisCardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 /**
  * Used by: focused TopicModelingParameterPanel tests because the shared fixture keeps required props stable while each test overrides only the behavior under assertion.
- * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
  */
 const baseProps = {
   nodeInputs: nodeInputsFixture(),

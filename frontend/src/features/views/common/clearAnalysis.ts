@@ -23,7 +23,8 @@ export interface ClearAnalysisOptions {
  * Clears backend task records, local task state, and the last-run request cache so
  * analysis feature hooks can reset without leaving stale running-task metadata.
  * Used by: useAnalysisFeature clear/cleanup flows because every task-backed tab must delete known task ids, invalidate task caches, and release local state together.
- * Flow: normalize inputs, apply the analysis-specific branch, then return the derived value consumed by the caller.
+ * Flow: collect known/resolved task ids, clear them concurrently, report
+ * individual failures, then invalidate the last-run query and invoke cleanup.
  */
 export async function clearAnalysis({
   analysisType,

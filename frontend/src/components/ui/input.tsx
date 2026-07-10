@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 
 /**
  * Shared text input primitive used by forms, pagination jump controls, and settings dialogs.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
   return (

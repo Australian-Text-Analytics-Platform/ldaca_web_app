@@ -14,9 +14,7 @@ const nodeOption = {
 };
 const nodeOptions = [nodeOption];
 
-const renderDialog = (
-  overrides: Partial<ComponentProps<typeof DetachColumnsDialog>> = {},
-) => {
+const renderDialog = (overrides: Partial<ComponentProps<typeof DetachColumnsDialog>> = {}) => {
   const props: ComponentProps<typeof DetachColumnsDialog> = {
     open: true,
     onOpenChange: vi.fn() as Dispatch<SetStateAction<boolean>>,

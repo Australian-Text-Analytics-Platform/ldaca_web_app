@@ -17,7 +17,6 @@
  * - WorkspaceSelectionTabs (activate/close/reorder for multi-selected nodes).
  */
 import {
-  useCallback,
   useEffect,
   useReducer,
   useRef,
@@ -207,26 +206,26 @@ export function ChromeTabs({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by layout signature; maps updated functionally
   }, [titlesKey, widthsKey, containerWidth]);
 
-  const finishRename = useCallback(() => {
+  const finishRename = () => {
     if (renamingId) {
       const trimmed = draftTitle.trim();
       if (trimmed) onRename?.(renamingId, trimmed);
     }
     dispatchInteraction({ type: 'renameCancelled' });
-  }, [draftTitle, onRename, renamingId]);
+  };
 
-  const cancelRename = useCallback(() => {
+  const cancelRename = () => {
     dispatchInteraction({ type: 'renameCancelled' });
-  }, []);
+  };
 
-  const beginRename = useCallback((tab: ChromeTabItem) => {
+  const beginRename = (tab: ChromeTabItem) => {
     dispatchInteraction({ type: 'renameStarted', tabId: tab.id, title: tab.title });
-  }, []);
+  };
 
-  const clearDrag = useCallback(() => {
+  const clearDrag = () => {
     dragRef.current = null;
     dispatchInteraction({ type: 'dragCleared' });
-  }, []);
+  };
 
   const handlePointerDown = (tab: ChromeTabItem, event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || renamingId) return;

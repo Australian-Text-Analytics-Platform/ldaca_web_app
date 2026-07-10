@@ -58,8 +58,6 @@ import { useWorkspaceNodeMutations } from '../useWorkspaceNodeMutations';
 
 /**
  * Creates a no-retry QueryClient for deterministic mutation-hook tests.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const createTestClient = () =>
   new QueryClient({
@@ -68,14 +66,10 @@ const createTestClient = () =>
 
 /**
  * Wraps hook renders with the query client under test.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const wrapWithClient = (client: QueryClient) => {
   /**
    * Provides the caller's QueryClient to the mutation hook render.
-   * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
-   * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
    */
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -94,27 +88,19 @@ type OperationFnSpy = ReturnType<typeof vi.fn> & ((operationId: string) => void)
 
 /**
  * Creates a typed current-workspace setter spy for hook args.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const mkSetWorkspaceId = () => vi.fn() as unknown as SetWorkspaceIdSpy;
 /**
  * Creates a typed selected-nodes setter spy for hook args.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const mkReplaceSelectedNodes = () => vi.fn() as unknown as ReplaceSelectedNodesSpy;
 const mkRemoveNode = () => vi.fn() as unknown as RemoveNodeSpy;
 /**
  * Creates a typed selection-clear spy for hook args.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const mkClearSelection = () => vi.fn() as unknown as ClearSelectionSpy;
 /**
  * Creates a typed operation lifecycle spy for hook args.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const mkOperationFn = () => vi.fn() as unknown as OperationFnSpy;
 interface BuildArgs {
@@ -129,8 +115,6 @@ interface BuildArgs {
 
 /**
  * Builds hook params while preserving explicit null workspace test cases.
- * Used by: Vitest setup or assertions in workspace/useWorkspaceNodeMutations.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  * Flow: merge default spies and ids with overrides, preserving explicit nulls for no-workspace branches.
  */
 const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => ({

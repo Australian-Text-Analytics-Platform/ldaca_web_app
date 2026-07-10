@@ -124,7 +124,7 @@ export interface UseAggregateSubTabResult {
 /**
  * Creates stable token ids for the visual expression builder. Token lists use
  * these ids for React keys and drag/drop targeting.
- * Used by: local callers in preprocessing/useAggregateSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called when adding column or custom tokens to the aggregate builder.
  */
 const createTokenId = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -197,7 +197,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Updates the text expression and its latest ref together so debounced commit
    * and apply logic read the same normalized value.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by token-list updates and custom-token commits.
    */
   const setExpressionAndMarkDirty = (nextExpression: string) => {
     const normalizedExpression = normalizeSmartCharacters(nextExpression);
@@ -208,7 +208,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Applies token-list edits and mirrors them into the generated expression.
    * All token add/remove/move/operation handlers route through this helper.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by every mutating action returned through `basicBuilder`.
    * Steps: run the token updater, rebuild the expression preview, preserve no-op token
    * references, and mark expression state dirty when needed.
    */
@@ -232,14 +232,14 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Builds the backend request from the latest expression/column refs. Preview
    * and apply paths use the same alias-wrapping behavior.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by `handleApply`; the preview payload uses the same request builder.
    */
   const buildRequest = (): PolarsExpressionRequest =>
     buildAggregateExpressionRequest(latestExpressionRef.current, latestColumnNameRef.current);
 
   /**
    * Commits the current expression/name into the debounced preview payload.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by `scheduleCommit` and the output-name blur handler.
    */
   const commitExpression = () => {
     setCommittedExpression(latestExpressionRef.current.trim());
@@ -260,7 +260,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Debounces expression commits so typing/dragging does not fire preview calls
    * for every intermediate token state.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called after builder mutations that should refresh the preview.
    */
   const scheduleCommit = () => {
     if (!hasSelection) return;
@@ -310,7 +310,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Adds a selected source column to the builder, optionally at a drag/drop
    * insertion index.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.addColumnToken` and used by builder drag handlers.
    */
   const addColumnToken = (column: string, dtype: string, index?: number) => {
     if (basicDisabled || !column) return;
@@ -329,7 +329,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Adds an editable literal token and puts it into edit mode for immediate
    * typing.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.addCustomToken` for the visual builder controls.
    */
   const addCustomToken = (index?: number) => {
     if (basicDisabled) return;
@@ -342,7 +342,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   /**
    * Removes a builder token by id. Token chip delete buttons call this handler.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.removeToken`.
    */
   const removeBasicToken = (tokenId: string) => {
     if (basicDisabled) return;
@@ -357,7 +357,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Reorders an existing token after drag/drop. The visual builder calls this
    * with the calculated insertion index.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.moveToken` and used by builder drag handlers.
    * Steps: resolve the token index, move it through shared index math, suppress no-op
    * reference churn, and schedule a preview commit.
    */
@@ -378,7 +378,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   /**
    * Appends a backend-advertised operation to a column token.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.addOperation` for `OperationPopover` selections.
    */
   const addOperation = (tokenId: string, operation: string) => {
     if (basicDisabled) return;
@@ -396,7 +396,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Removes one operation from a column token. Operation chips use this to undo
    * method additions.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.removeOperation`.
    */
   const removeOperation = (tokenId: string, index: number) => {
     if (basicDisabled) return;
@@ -416,7 +416,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Opens a custom token for editing with a normalized draft. Escape/cancel
    * only discards the draft, leaving the token's stored value unchanged.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.startEditingCustom` for custom token chips.
    */
   const startEditingCustomToken = (tokenId: string) => {
     if (basicDisabled) return;
@@ -432,7 +432,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Commits or cancels the custom-token draft. Keyboard and blur handlers use
    * this shared path.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.finishCustomEdit` and called by keyboard handling.
    * Steps: apply committed text when requested, discard the draft on cancel,
    * schedule preview updates, and clear edit state.
    */
@@ -461,7 +461,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   /**
    * Clears all builder tokens and the generated expression for the Clear button.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.clearBuilder`.
    */
   const clearBasicBuilder = () => {
     if (basicDisabled) return;
@@ -490,7 +490,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Applies the current expression to the active node, refreshes schema, and
    * refreshes preview so the sub-tab reflects the created column.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `apply.handleApply` for the Add to data block button.
    * Flow: guard missing node or expression, build the request, apply it, announce the created node, refresh schema/preview, and clear loading.
    */
   const handleApply = async () => {
@@ -515,7 +515,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Updates the output column name while keeping the latest ref in sync for
    * delayed preview commits.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `expression.onChange.columnName` for the name input.
    */
   const handleColumnNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const next = normalizeSmartCharacters(event.target.value);
@@ -525,7 +525,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   /**
    * Forces the preview payload to commit when the column-name field blurs.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `expression.onColumnNameBlur`.
    */
   const handleColumnBlur = () => {
     commitExpression();
@@ -533,7 +533,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   /**
    * Normalizes smart characters while editing a custom literal token.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.handlers.customDraftChange`.
    */
   const handleCustomDraftChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     dispatchBuilderUi({
@@ -545,7 +545,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   /**
    * Handles Enter/Escape for custom-token editing so keyboard interactions
    * share the same commit/cancel path as pointer interactions.
-   * Called by: useAggregateSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `basicBuilder.handlers.customInputKeyDown`.
    */
   const handleCustomInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {

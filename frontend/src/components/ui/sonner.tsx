@@ -2,7 +2,6 @@ import { Toaster as SonnerToaster, type ToasterProps } from 'sonner';
 
 /**
  * App-configured toast host used by providers so feature code can call Sonner consistently.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 export function Toaster({ ...props }: ToasterProps) {
   return (

@@ -11,8 +11,9 @@ import {
   type AnalysisTaskActionResponse,
 } from '@/api';
 import { formatBinIndicesAsRangeLabel } from '../concordanceViewModels';
-import { extractAndSetTaskId } from '../../common';
-import type { NodeColumnSelection, NodePaginationState } from '../../common';
+import { extractAndSetTaskId } from '../../common/extractTaskId';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
+import type { NodePaginationState } from '../../common/tasks/types';
 
 export type PaginationState = Record<string, NodePaginationState>;
 
@@ -77,8 +78,9 @@ interface Params {
 
 /** Centralizes concordance submit, pagination, sorting, detach, and materialize actions. */
 /**
- * Used by: ConcordanceFeature.tsx, concordanceViewModels.ts, ConcordanceFeature.test.tsx, and related files.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ * Used by: `ConcordanceFeature`; its feature test mocks this hook boundary.
+ * Flow: submit concordance requests, refetch stored results after paging/sort
+ * changes, persist result preferences, and expose detach/materialize actions.
  */
 export function useConcordanceTaskFlow({
   state: {
@@ -119,7 +121,7 @@ export function useConcordanceTaskFlow({
 }: Params) {
   /** Builds stable derived node names for workspace outputs created by concordance actions. */
   /**
-   * Called by: useConcordanceTaskFlow as a local helper in this analysis workflow.
+   * Called by per-hit and dispersion detach request builders.
    */
   const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
     const trimmed = nodeLabel.trim();
@@ -130,7 +132,7 @@ export function useConcordanceTaskFlow({
 
   /** Refetches the stored concordance task result after preference or page changes. */
   /**
-   * Called by: useConcordanceTaskFlow during this analysis workflow.
+   * Called by sort/page/preference handlers and returned for view-mode swaps.
    *
    * When ``mergeNodeData`` is set, the response is treated as a partial,
    * single-node update (separated view per-node page/sort): only the returned
@@ -171,8 +173,9 @@ export function useConcordanceTaskFlow({
 
   /** Starts a fresh concordance analysis or targeted update while preserving the analysis lock. */
   /**
-   * Called by: useConcordanceTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
+   * Flow: validate search text and node columns, reset relevant pagination,
+   * run the analysis, record the assigned task id, and publish result/error state.
    */
   const handleSearch = async (
     resetPage = true,
@@ -286,8 +289,9 @@ export function useConcordanceTaskFlow({
 
   /** Applies a column sort for a node block and refetches that result page. */
   /**
-   * Called by: useConcordanceTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
+   * Flow: toggle the selected column's direction, reset that node to page one,
+   * and merge its refetched slice without disturbing sibling node pages.
    */
   const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
     const currentNodePagination = nodePagination[nodeKey] ?? {
@@ -332,7 +336,7 @@ export function useConcordanceTaskFlow({
 
   /** Moves a node block to a new source page and refreshes the persisted result. */
   /**
-   * Called by: useConcordanceTaskFlow through JSX event props or task lifecycle callbacks.
+   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
    * Flow: read current node pagination, update the target page locally, then refetch stored results with page/sort overrides while toggling node loading.
    */
   const handlePageChange = (newPage: number, nodeKey: string, requestNodeId?: string) => {
@@ -373,7 +377,7 @@ export function useConcordanceTaskFlow({
 
   /** Persists result display preferences so refetches keep the current user-facing shape. */
   /**
-   * Called by: useConcordanceTaskFlow during this analysis workflow.
+   * Called by request and task handlers in `useConcordanceTaskFlow`.
    * Flow: build page-size preference updates, merge view-mode fetch params, call updateStoredResult, then surface failures to the caller.
    */
   const persistResultPreferences = async (partial: { pageSize?: number }) => {
@@ -410,7 +414,7 @@ export function useConcordanceTaskFlow({
 
   /** Requests a per-hit concordance workspace node for the selected source block. */
   /**
-   * Called by: useConcordanceTaskFlow through JSX event props or task lifecycle callbacks.
+   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
    * Flow: require workspace and search text, build a concordance detach request with context/window/search options and explicit columns/path, then clear node detaching state.
    */
   const handleDetach = async (
@@ -461,8 +465,9 @@ export function useConcordanceTaskFlow({
 
   /** Requests a per-document aggregated workspace node from the dispersion view. */
   /**
-   * Called by: useConcordanceTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
+   * Flow: validate selected columns, resolve the parent task, translate active
+   * bin/legend filters into the detach request, and start the aggregate task.
    */
   const handleDispersionDetach = async (
     nodeId: string,
@@ -546,8 +551,9 @@ export function useConcordanceTaskFlow({
 
   /** Starts the backend materialization task that caches all concordance hits for a node. */
   /**
-   * Called by: useConcordanceTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
+   * Flow: resolve the parent task, submit the current search contract for one
+   * node, and register its materialization task id for terminal tracking.
    */
   const handleMaterialize = async (nodeId: string, column: string) => {
     if (!currentWorkspaceId || !searchWord.trim()) {

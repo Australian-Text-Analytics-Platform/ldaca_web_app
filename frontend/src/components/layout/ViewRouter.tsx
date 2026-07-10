@@ -6,7 +6,6 @@ import { useUIStore } from '@/stores';
 
 /**
  * Suspense fallback used by `ViewRouter` while a feature bundle is loading.
- * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
  */
 const Fallback = () => (
   <div className="flex items-center justify-center py-12">
@@ -21,7 +20,7 @@ const Fallback = () => (
  * Renders the active analysis/data feature selected by the global UI store.
  * App shell routes users here so feature modules can remain lazy-loaded and
  * isolated behind a shared error boundary.
- * Rendered by: App inside the workspace content pane.
+ * Rendered by `WorkspaceShell` inside the workspace content pane.
  */
 export function ViewRouter() {
   const currentView = useUIStore((state) => state.currentView);

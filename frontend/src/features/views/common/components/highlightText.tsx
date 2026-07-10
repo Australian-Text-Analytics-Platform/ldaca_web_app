@@ -4,7 +4,6 @@ import React from 'react';
  * Highlight matching text regions given explicit start/end index ranges,
  * with an optional fallback plain-text search.
  * Used by: concordance row detail rendering.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export const highlightMatchInText = (
   textValue: string,

@@ -100,6 +100,11 @@ the workspace loads. Do not add sidebar-level effects that reset
 `currentView`; they can race direct links and leave the URL and rendered view
 out of sync.
 
+The dependency-light `features/views/viewSearch.ts` module owns pure validation
+and canonical search shaping. Both the root route and `ViewRouteSync` consume
+that contract, while the sync component uses TanStack's route hooks directly;
+it must not import the router instance back through the app shell.
+
 ## Auth Bootstrap
 
 `hooks/useAuth.ts` is a subscription-only React-facing auth hook.

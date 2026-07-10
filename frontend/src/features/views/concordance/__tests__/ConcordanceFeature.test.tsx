@@ -3,10 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/** Wraps concordance renders with a no-retry query client for deterministic assertions. */
 /**
- * Called by: Vitest cases in this file to exercise the scoped analysis behavior because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
- * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
+ * Wraps Concordance feature tests with a no-retry query client so failed
+ * request fixtures settle immediately instead of scheduling background retries.
  */
 const renderWithClient = (ui: React.ReactElement) => {
   const queryClient = new QueryClient({
@@ -89,19 +88,16 @@ vi.mock('../../common/nodeInputs', () => ({
 
 vi.mock('@/components/help/HelpIcon', () => ({
   /** Replaces help popovers with a stable marker for component rendering tests. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => <span data-testid="help-icon" />,
 }));
 
 vi.mock('@/components/help/InfoIcon', () => ({
   /** Replaces informational popovers with a stable marker for component rendering tests. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => <span data-testid="info-icon" />,
 }));
 
 vi.mock('@/features/views/common/components/AnalysisTaskBanner', () => ({
   /** Removes lifecycle banner rendering so button and handoff assertions stay focused. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   default: () => null,
 }));
 
@@ -116,7 +112,6 @@ vi.mock('@/components/ui/tabs', () => {
   );
   return {
     /** Captures tab value changes while keeping Radix markup out of this unit test. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     Tabs: ({
       children,
       onValueChange,
@@ -130,10 +125,8 @@ vi.mock('@/components/ui/tabs', () => {
       </TabsValueChangeContext.Provider>
     ),
     /** Simplifies tab-list structure without changing child rendering. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     /** Converts tab triggers into plain buttons that still fire their own Tabs' value change. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     TabsTrigger: ({ children, value }: { children: React.ReactNode; value: string }) => {
       const onValueChange = React.useContext(TabsValueChangeContext);
       return (
@@ -147,23 +140,17 @@ vi.mock('@/components/ui/tabs', () => {
 
 vi.mock('@/components/ui/dialog', () => ({
   /** Keeps dialog content mounted so confirmation text is directly queryable. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   /** Removes Radix portal behavior for local test rendering. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   /** Preserves dialog heading grouping without layout dependencies. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   /** Renders dialog titles as plain text for screen queries. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/ui/confirm-dialog', () => ({
   /** Provides a minimal confirm dialog that exercises confirm/cancel callbacks. */
-  // Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   ConfirmDialog: ({
     open,
     title,
@@ -208,7 +195,6 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   /** Supplies one selected text node as the default concordance test fixture. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceSelection: () => ({
     selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
   }),
@@ -216,19 +202,16 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   /** Keeps workspace loading false so the feature renders immediately. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceStatus: () => ({ isLoading: { graph: false } }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   /** Supplies a stable workspace id required by concordance actions. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceData: () => ({ currentWorkspaceId: 'ws-1' }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Stubs workspace mutations that are outside this feature-level test boundary. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
     materializeConcordance: vi.fn(),
@@ -238,27 +221,22 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
   /** Provides auth shape expected by generated API calls without real credentials. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useAuth: () => ({
     /** Supplies empty headers because every network boundary is mocked. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     getAuthHeaders: () => ({}),
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   /** Supplies the text column needed for auto-selection and parameter rendering. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useNodeColumnInfos: () => ({
     /** Reports a single string column so concordance has a valid target. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     getColumnInfos: () => [{ name: 'text' }],
   }),
 }));
 
 vi.mock('@/stores/analysisStore', () => ({
   /** Feeds pending handoff state and materialized events into the feature under test. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useAnalysisStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       pendingConcordance: mockPendingConcordance,
@@ -270,7 +248,6 @@ vi.mock('@/stores/analysisStore', () => ({
 
 vi.mock('@/stores', () => ({
   /** Pins the UI store to the concordance tab so lifecycle hooks stay active. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({ currentView: 'concordance' }),
 }));
@@ -278,10 +255,8 @@ vi.mock('@/stores', () => ({
 vi.mock('@/hooks/analysisTaskUtils', () => ({
   pruneTasksById: vi.fn((tasks) => tasks),
   /** Keeps task dedupe candidates scoped to the requested type. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   getTaskTypeCandidates: (taskType: string) => [taskType],
   /** Produces deterministic task dedupe keys for lifecycle assertions. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   normalizeTaskDedupeKey: (taskId: string | null, state: string | null) =>
     taskId && state ? `${taskId}:${state}` : null,
 }));
@@ -300,7 +275,6 @@ vi.mock('../generatedColumns', () => ({
 
 vi.mock('../hooks/useConcordanceTaskFlow', () => ({
   /** Captures task-flow inputs while exposing controllable action mocks. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   useConcordanceTaskFlow: (params: { state?: Record<string, unknown> }) => {
     latestTaskFlowParams = params;
     return {
@@ -343,41 +317,44 @@ vi.mock('../../common/components/DetachColumnsDialog', () => ({
   },
 }));
 
-vi.mock('../../common', async () => {
+vi.mock('../../common/hooks/useLastRunRequest', () => ({
+  /** Supplies the last-run request used only for Run/Re-run button diffing. */
+  useLastRunRequest: () => ({
+    serverRequest: {
+      node_ids: ['node-1'],
+      node_columns: { 'node-1': 'text' },
+      search_word: 'old value',
+      num_left_tokens: 10,
+      num_right_tokens: 10,
+      regex: false,
+      case_sensitive: false,
+    },
+    hasServerRequest: true,
+    taskId: null,
+    isLoading: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock('../../common/hooks/useAnalysisFeature', () => ({
+  /** Supplies analysis lifecycle state and mockable clear behavior for feature tests. */
+  useAnalysisFeature: () => ({
+    resolveTaskId: vi.fn(() => 'task-1'),
+    setLocalTaskId: vi.fn(),
+    isRunning: false,
+    setIsRunning: vi.fn(),
+    taskStatus: { tasks: [] },
+    banner: null,
+    hydrationState: mockHydrationState,
+    clearResults: clearResultsMock,
+  }),
+}));
+
+vi.mock('../../common/useSafeResult', async () => {
   const ReactModule = await import('react');
   return {
-    /** Mirrors the shared node-id helper with a deterministic fallback for fixtures. */
-    /** Supplies the last-run request used only for Run/Re-run button diffing. */
-    useLastRunRequest: () => ({
-      serverRequest: {
-        node_ids: ['node-1'],
-        node_columns: { 'node-1': 'text' },
-        search_word: 'old value',
-        num_left_tokens: 10,
-        num_right_tokens: 10,
-        regex: false,
-        case_sensitive: false,
-      },
-      hasServerRequest: true,
-      taskId: null,
-      isLoading: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    }),
-    /** Supplies analysis lifecycle state and mockable clear behavior for feature tests. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-    useAnalysisFeature: () => ({
-      resolveTaskId: vi.fn(() => 'task-1'),
-      setLocalTaskId: vi.fn(),
-      isRunning: false,
-      setIsRunning: vi.fn(),
-      taskStatus: { tasks: [] },
-      banner: null,
-      hydrationState: mockHydrationState,
-      clearResults: clearResultsMock,
-    }),
     /** Emulates the shared safe-result hook while exposing the setter to tests. */
-    // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
     useSafeResult: () => {
       const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(
         mockInitialResult,
@@ -389,33 +366,38 @@ vi.mock('../../common', async () => {
       }, [result, setResult]);
       return [result, ref, setResult];
     },
-    /** Supplies deterministic source colours for feature tests that mock the shared analysis module. */
-    useNodeColorControls: () => ({
-      defaultPalette: ['#000000'],
-      nodeColors: { 'node-1': '#000000' },
-      nodeColorOverrides: {},
-      ensureNodeColors: vi.fn(),
-      setNodeColor: vi.fn(),
-    }),
-    VIZ_PALETTE: ['#000000'],
-    executeAnalysisRerun: vi.fn(
-      async ({
-        hasUnrunChanges,
-        clearResults,
-        runFreshAnalysis,
-      }: {
-        hasUnrunChanges: boolean;
-        clearResults: () => Promise<void>;
-        runFreshAnalysis: () => Promise<void>;
-      }) => {
-        if (hasUnrunChanges) {
-          await clearResults();
-        }
-        await runFreshAnalysis();
-      },
-    ),
   };
 });
+
+vi.mock('../../common/hooks/useNodeColorControls', () => ({
+  /** Supplies deterministic source colours for feature tests. */
+  useNodeColorControls: () => ({
+    defaultPalette: ['#000000'],
+    nodeColors: { 'node-1': '#000000' },
+    nodeColorOverrides: {},
+    ensureNodeColors: vi.fn(),
+    setNodeColor: vi.fn(),
+  }),
+}));
+
+vi.mock('../../common/rerunAnalysis', () => ({
+  executeAnalysisRerun: vi.fn(
+    async ({
+      hasUnrunChanges,
+      clearResults,
+      runFreshAnalysis,
+    }: {
+      hasUnrunChanges: boolean;
+      clearResults: () => Promise<void>;
+      runFreshAnalysis: () => Promise<void>;
+    }) => {
+      if (hasUnrunChanges) {
+        await clearResults();
+      }
+      await runFreshAnalysis();
+    },
+  ),
+}));
 
 import ConcordanceFeature from '../ConcordanceFeature';
 

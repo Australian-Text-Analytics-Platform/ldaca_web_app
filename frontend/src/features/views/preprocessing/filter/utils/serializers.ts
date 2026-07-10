@@ -10,7 +10,7 @@ import { hasNonEmptyValue } from '../../utils/typeUtils';
 /**
  * Converts UI-only filter condition records into the backend request condition
  * shape. Filter preview and apply paths both call this serializer.
- * Used by: local callers in preprocessing/serializers module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called by `buildFilterRequestPayload` for preview and apply requests.
  * Steps: drop incomplete rows, normalize range/date/list values, and preserve boolean/regex
  * flags for backend request payloads.
  */
@@ -33,7 +33,7 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
       const range = condition.value;
       /**
        * Normalizes one range edge to the nullable ISO/string payload expected by the API.
-       * Called by: serializeConditionsForRequest internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+       * Called for both `start` and `end` while serializing a between condition.
        */
       const normalizeEdge = (edge: ConditionRange['start']): string | null => {
         if (!edge) return null;
@@ -67,7 +67,7 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
 /**
  * Builds a complete FilterRequest from UI conditions, logic, and optional auto
  * node name. Filter preview and apply share this payload builder.
- * Used by: useFilterSubTabSections hook (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by: useFilterSubTabSections hook.
  */
 export const buildFilterRequestPayload = (
   conditions: FilterConditionWithId[],
@@ -82,7 +82,7 @@ export const buildFilterRequestPayload = (
 /**
  * Determines whether a condition is ready to send to preview/apply. Filter
  * buttons and preview payload construction use this validation gate.
- * Used by: useFilterSubTabSections hook, autoNodeNames utilities (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by: useFilterSubTabSections hook, autoNodeNames utilities.
  * Flow: require a column, allow null checks without values, accept either side of between ranges, and otherwise require a non-empty value.
  */
 export const isConditionComplete = (condition: FilterConditionWithId): boolean => {

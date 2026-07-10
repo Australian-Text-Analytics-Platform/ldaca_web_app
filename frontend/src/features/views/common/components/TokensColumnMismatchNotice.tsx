@@ -31,7 +31,6 @@ const collectTokenizerModelSources = (tokenizerModels: unknown): string[] => {
  * nodes and the first is enough to detect the mismatch pattern (typically a
  * user previously cached tokens for a different column).
  * Used by: token-frequency and concordance parameter panels.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function TokensColumnMismatchNotice({
   nodes,

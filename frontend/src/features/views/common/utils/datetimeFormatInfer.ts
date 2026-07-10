@@ -3,8 +3,8 @@
 // Returns null if not confident enough (e.g., missing year).
 
 /**
- * Used by: src/components/panels/DatetimeFormatPanel.tsx, src/utils/__tests__/datetimeFormatInfer.test.ts.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Used by DatetimeFormatPanel to seed date/time controls and by its focused
+ * utility tests for supported timestamp shapes.
  */
 export function inferDatetimeFormat(
   samples: string[],

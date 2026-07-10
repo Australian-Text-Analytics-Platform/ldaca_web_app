@@ -1,5 +1,5 @@
 import type { TokenFrequencyResponse } from '@/api';
-import { isNonEmptyString } from '../common';
+import { isNonEmptyString } from '../common/utils';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 export interface NodeNameEntry {
@@ -15,7 +15,6 @@ export interface TokenFrequencyStudyNodeOrder {
 /** Builds a node-id to display-name lookup from selection sources. */
 /**
  * Used by: TokenFrequencyFeature.tsx, tokenFrequencyUtils.test.ts.
- * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export const buildSelectionNameById = (
   selectedNodes: (NodeNameEntry | null | undefined)[],

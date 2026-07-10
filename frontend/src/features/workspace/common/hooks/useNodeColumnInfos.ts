@@ -29,7 +29,8 @@ export interface UseNodeColumnInfosResult {
  * through the TanStack client used everywhere else in the app.
  */
 /**
- * Used by: add-node-as-needed input hooks and analysis feature screens because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: `useTabNodeInputs` to hydrate selected graph nodes with typed
+ * column and full node metadata.
  * Flow: resolve live node ids, issue one batch node-info query, build typed metadata caches, then return cached getters and loading flag.
  */
 export const useNodeColumnInfos = (params: {
@@ -61,7 +62,7 @@ export const useNodeColumnInfos = (params: {
   });
 
   /** Returns typed cached columns when available, otherwise derives from the node snapshot. */
-  /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+  /** Returned to: `useTabNodeInputs` for selector and request hydration. */
   const getColumnInfos = (node: WorkspaceNodeMetadata | null | undefined): ColumnInfo[] => {
     if (!node) return [];
     const cached = columnInfoCache[node.id];
@@ -72,7 +73,7 @@ export const useNodeColumnInfos = (params: {
   };
 
   /** Returns cached node metadata for consumers that need full node-info fields. */
-  /** Called by: useNodeColumnInfos in this hook module because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+  /** Returned to: `useTabNodeInputs` for full metadata projection. */
   const getNodeInfo = (
     node: WorkspaceNodeMetadata | null | undefined,
   ): WorkspaceNodeInfo | undefined => (node ? nodeInfoCache[node.id] : undefined);

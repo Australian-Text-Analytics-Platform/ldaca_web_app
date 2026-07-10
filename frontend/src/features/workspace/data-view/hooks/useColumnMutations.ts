@@ -57,7 +57,7 @@ export interface ColumnMutationsApi {
  * bootstrap effect. Keeps WorkspaceTable.tsx focused on rendering while a
  * reducer keeps related modal, rename, delete, and busy-state transitions
  * together.
- * Used by: WorkspaceTable component (rg call sites/imports) because table rendering needs mutation state separated from column UI structure.
+ * Used by: WorkspaceTable component because table rendering needs mutation state separated from column UI structure.
  * Flow: column UI calls workspace actions, the shared mutation facade persists schema changes, and toast feedback reports results.
  */
 export const useColumnMutations = ({

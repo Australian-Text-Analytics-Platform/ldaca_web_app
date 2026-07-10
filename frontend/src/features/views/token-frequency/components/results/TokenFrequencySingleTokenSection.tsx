@@ -166,8 +166,7 @@ const SingleNodeWordCloud = memo(
 SingleNodeWordCloud.displayName = 'SingleNodeWordCloud';
 
 /**
- * Rendered by: TokenFrequencyResultsPanel to show per-node word clouds or synchronized token lists because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: TokenFrequencyResultsPanel to show per-node word clouds or synchronized token lists.
  */
 const TokenFrequencySingleTokenSectionInner = ({
   nodeDisplayResults,

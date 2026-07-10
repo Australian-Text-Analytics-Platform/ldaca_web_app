@@ -73,7 +73,7 @@ const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
 
 /**
  * Creates one tab descriptor for the multi-selected-node tab strip.
- * Used by: local callers in workspace/useWorkspaceDataTable module because selected nodes need normalized tab labels before rendering.
+ * Called while mapping selected node ids into WorkspaceSelectionTabs props.
  * Flow: accept a selected node id, fall back to that id when no label is available, and attach the active-tab flag.
  */
 const buildTabDescriptor = (
@@ -94,7 +94,7 @@ interface WorkspaceNodeDisplayLike {
 
 /**
  * Resolves the display label for data-view headers and selection tabs.
- * Used by: local callers in workspace/useWorkspaceDataTable module because node records can expose either names or ids.
+ * Used for the active-node header and each selected-node tab label.
  * Flow: return undefined for missing node data, otherwise prefer the display name and fall back to the node id.
  */
 const resolveNodeDisplayLabel = (

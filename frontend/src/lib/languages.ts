@@ -5,7 +5,7 @@ export type LanguageModelOption = TokenizerModelInfo;
 
 /**
  * Normalizes stored/user language strings to the two-letter codes used by UI controls.
- * Why: importers need one shared normalization boundary to keep behavior consistent.
+ * Used by: language detection, tokenizer-model partitioning, and direct normalization tests.
  */
 export function normaliseIso6391LanguageCode(code: string | null | undefined): string | null {
   if (typeof code !== 'string') return null;

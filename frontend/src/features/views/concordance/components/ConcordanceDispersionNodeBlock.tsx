@@ -10,7 +10,7 @@ import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import {
@@ -133,8 +133,7 @@ export interface ConcordanceDispersionNodeBlockProps {
 }
 
 /**
- * Rendered by: ConcordanceResultsPanel for each concordance dispersion result block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: ConcordanceResultsPanel for each concordance dispersion result block.
  */
 export function ConcordanceDispersionNodeBlock({
   nodeKey,

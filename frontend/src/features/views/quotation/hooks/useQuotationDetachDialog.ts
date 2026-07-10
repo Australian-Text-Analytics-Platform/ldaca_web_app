@@ -2,7 +2,7 @@ import { useState, type SetStateAction } from 'react';
 
 import { analysisTaskDetachOptions } from '@/api';
 import type { DetachNodeOption } from '@/api';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { useDetachColumnsState } from '../../common/hooks/useDetachColumnsState';
 
 type QuotationDetachHandler = (

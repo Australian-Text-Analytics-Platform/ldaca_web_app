@@ -12,7 +12,6 @@ const { cancelTaskMock, clearAnalysisMock, hydrateFromServerMock, taskFlowOption
   }));
 
 vi.mock('@tanstack/react-query', () => ({
-  /** Called by: useAnalysisFeature under test when it requests a query client because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useQueryClient: () => ({
     invalidateQueries: vi.fn(() => undefined),
   }),
@@ -27,7 +26,6 @@ vi.mock('@/api/generated/sdk.gen', () => ({
 }));
 
 vi.mock('../useAnalysisHydration', () => ({
-  /** Called by: useAnalysisFeature under test while keeping hydration inert because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useAnalysisHydration: () => ({
     hydrateFromServer: hydrateFromServerMock,
     hydrationState: { status: 'idle' as const },
@@ -35,7 +33,6 @@ vi.mock('../useAnalysisHydration', () => ({
 }));
 
 vi.mock('../tasks/useAnalysisTaskFlow', () => ({
-  /** Called by: useAnalysisFeature under test to provide empty task-flow state because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion. */
   useAnalysisTaskFlow: (options: unknown) => {
     taskFlowOptionsMock(options);
     return {

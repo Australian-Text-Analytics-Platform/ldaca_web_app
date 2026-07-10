@@ -27,7 +27,6 @@ const useAuthMock = vi.hoisted(() =>
   vi.fn(() => ({
     /**
      * Supplies stable headers for preview fallback SDK calls under test.
-     * Used by: test mock object in preprocessing/useNodePreviewWithRawFallback because the test needs a stable fixture or assertion helper for this scenario.
      */
     getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
   })),
@@ -43,7 +42,6 @@ import { useNodePreviewWithRawFallback } from '../useNodePreviewWithRawFallback'
 
 /**
  * Returns the latest mocked preview options so tests can inspect routing.
- * Used by: Vitest setup or assertions in preprocessing/useNodePreviewWithRawFallback because the test needs a stable fixture or assertion helper for this scenario.
  */
 const lastCapturedOptions = (): CapturedOptions => {
   const calls = usePreprocessingPreviewMock.mock.calls;

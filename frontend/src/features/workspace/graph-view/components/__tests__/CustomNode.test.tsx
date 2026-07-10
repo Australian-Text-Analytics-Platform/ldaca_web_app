@@ -10,15 +10,11 @@ let mockZoom = 1;
 vi.mock('@xyflow/react', () => ({
   /**
    * Stubs React Flow handles so CustomNode can render outside a graph canvas.
-   * Used by: test mock object in workspace/CustomNode.
-   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
    */
   Handle: () => <div data-testid="handle" />,
   Position: { Left: 'left', Right: 'right' },
   /**
    * Lets tests control zoom-dependent rendering without a React Flow store.
-   * Used by: test mock object in workspace/CustomNode.
-   * Why: because the mock needs the production-shaped dependency while the test isolates this feature path.
    */
   useStore: (selector: (state: { transform: [number, number, number] }) => number) =>
     selector({ transform: [0, 0, mockZoom] }),
@@ -42,8 +38,6 @@ vi.mock('@xyflow/react', () => ({
 
 /**
  * Returns the visible settings button when portal/menu render duplicates occur.
- * Used by: Vitest setup or assertions in workspace/CustomNode.
- * Why: because the test needs a stable fixture or assertion target for this scoped behavior without live workspace state.
  */
 const getLatestNodeSettingsButton = () => {
   const buttons = screen.getAllByRole('button', { name: /node settings/i });

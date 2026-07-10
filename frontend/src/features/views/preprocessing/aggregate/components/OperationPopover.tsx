@@ -21,7 +21,7 @@ interface OperationPopoverProps {
  * Lazy-loads column operations for one aggregate-builder token. Column chips
  * use it to let users append generated Polars method calls without baking the
  * operation catalogue into the main sub-tab render.
- * Rendered by: AggregateSubTab module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by: AggregateSubTab module.
  * Flow: keep the operation menu open around a selected token, add operations from the dropdown,
  * and expose removal controls for existing operations.
  */
@@ -59,7 +59,7 @@ export function OperationPopover({
 
   /**
    * Applies the chosen operation to the parent token and closes the popover.
-   * Called by: OperationPopover internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by each operation menu item's click handler.
    */
   const handleSelect = (method: string) => {
     onSelect(method);
@@ -68,7 +68,7 @@ export function OperationPopover({
 
   /**
    * Converts backend operation namespaces into labels for collapsible groups.
-   * Called by: OperationPopover internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called while rendering each grouped operation section.
    */
   const namespaceLabel = (ns: string) => {
     if (ns === '') return 'General';

@@ -8,13 +8,11 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import {
-  useLastRunRequest,
-  useAnalysisFeature,
-  useNodeColorControls,
-  useSafeResult,
-  executeAnalysisRerun,
-} from '../common';
+import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
+import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
+import { useSafeResult } from '../common/useSafeResult';
+import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
@@ -53,7 +51,7 @@ import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
 
 /** Orchestrates the full concordance analysis UI, task lifecycle, and detach flows. */
 /**
- * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: the analysis feature registry when this panel is selected.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
  * Tab props (optional): when rendered inside an analysis tab by the
@@ -246,7 +244,7 @@ function ConcordanceFeature({
 
     /** Keeps dispersion column sizing synced with the rendered results viewport. */
     /**
-     * Called by: ConcordanceFeature during this analysis workflow.
+     * Called by the layout effect and its ResizeObserver callback.
      */
     const updateWidth = () => {
       setResultsViewportWidth(element.clientWidth);
@@ -343,24 +341,20 @@ function ConcordanceFeature({
     hydrationTaskId: tabTaskId ?? null,
     resultRef: concordanceResultsRef,
     /** Fetches a completed concordance task result for polling and hydration. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskResult<ConcordanceAnalysisResponse>(currentWorkspaceId, taskId);
     },
     /** Fetches the saved request so hydration can restore parameters and materialized state. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.concordance, currentWorkspaceId, taskId);
     },
     /** Copies freshly fetched task results into the feature's safe-result state. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onResultFetched: (resultData) => {
       setResults(resultData);
     },
     /** Accepts restored result payloads from persisted analysis tasks. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onHydratedResult: (resultPayload) => {
       const res = resultPayload?.data ?? resultPayload;
       if (res) {
@@ -397,7 +391,6 @@ function ConcordanceFeature({
       resultControls.applyHydratedMaterializeSummaries(summaries);
     },
     /** Clears result-specific state while preserving local controls when requested by handoff flows. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     onCleared: (_, options) => {
       setResults(null);
       resultControls.resetAfterClear();
@@ -412,7 +405,6 @@ function ConcordanceFeature({
       onTabTaskChange?.(null);
     },
     /** Keeps the global task list free of concordance task duplicates after lifecycle updates. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev) => {
         if (!Array.isArray(prev)) return prev;
@@ -420,7 +412,6 @@ function ConcordanceFeature({
       });
     },
     /** Lets the shared analysis lifecycle recognize in-flight concordance responses. */
-    // Called by: ConcordanceFeature through its owning hook, JSX prop, or analysis lifecycle config.
     isResultRunning: (r) => r?.state === 'running',
   });
 
@@ -588,7 +579,7 @@ function ConcordanceFeature({
   // Color assignment now handled by stack allocator - no auto-fill effect needed
 
   /**
-   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to the concordance node-input panel as its column-change handler.
    */
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
@@ -600,7 +591,7 @@ function ConcordanceFeature({
 
   /** Persists the tokenizer model chosen for a node/column when tokens mode is available. */
   /**
-   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to the tokenizer selector in the node-input panel.
    */
   const handleTokenizerModelChange = (
     nodeId: string,
@@ -628,7 +619,7 @@ function ConcordanceFeature({
 
   /** Delegates clearing to the shared analysis lifecycle only when a workspace is active. */
   /**
-   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to the analysis action controls as the clear handler.
    */
   const handleClearResults = async () => {
     if (!currentWorkspaceId) return;
@@ -637,7 +628,7 @@ function ConcordanceFeature({
 
   /** Runs or updates concordance after shared update checks pass. */
   /**
-   * Called by: ConcordanceFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to the analysis action controls as the run/update handler.
    */
   const handleRunOrUpdate = async () => {
     await ensureNodeColors();
@@ -645,7 +636,6 @@ function ConcordanceFeature({
       hasUnrunChanges: hasChanges,
       clearResults: handleClearResults,
       /** Starts the feature-specific concordance search after shared update checks pass. */
-      // Called by: handleRunOrUpdate through its owning hook, JSX prop, or analysis lifecycle config.
       runFreshAnalysis: () => handleSearch(true, undefined, undefined, undefined, undefined, true),
     });
   };

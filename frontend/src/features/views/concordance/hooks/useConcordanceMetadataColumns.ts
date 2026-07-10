@@ -2,7 +2,7 @@ import type {
   ConcordanceAnalysisResponse,
   ConcordanceNodeResult as ConcordanceResultEntry,
 } from '@/api';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceViewModels';
 
@@ -39,8 +39,9 @@ interface Params {
  * "Show metadata" UI when there are no columns common to all blocks.
  */
 /**
- * Used by: ConcordanceFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: ConcordanceFeature.tsx.
+ * Flow: read result metadata or selected-node schemas, partition shared versus
+ * source-exclusive columns, and disable exclusive sections in Combined view.
  */
 export function useConcordanceMetadataColumns({
   results,

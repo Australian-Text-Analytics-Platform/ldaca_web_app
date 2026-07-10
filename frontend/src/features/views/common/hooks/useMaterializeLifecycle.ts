@@ -6,7 +6,7 @@ type TerminalState = 'successful' | 'failed' | 'cancelled';
 /** Terminal states that require clearing per-node materialization spinners. */
 const TERMINAL_STATES: ReadonlySet<TerminalState> = new Set(['successful', 'failed', 'cancelled']);
 
-/** Called by: useMaterializeLifecycle before dispatching materialize task callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring. */
+/** Called by: useMaterializeLifecycle before dispatching materialize task callbacks. */
 const isTerminalState = (value: unknown): value is TerminalState =>
   typeof value === 'string' && TERMINAL_STATES.has(value as TerminalState);
 
@@ -52,8 +52,7 @@ export interface UseMaterializeLifecycleParams {
  *     global page size to 20.
  *   - Quotation (single-node): the success callback writes the singular
  *     materialized_path / summary and calls handlePageSizeChange(20).
- * Used by: concordance and quotation materialization flows because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: concordance and quotation materialization flows.
  */
 export function useMaterializeLifecycle({
   workspaceId,

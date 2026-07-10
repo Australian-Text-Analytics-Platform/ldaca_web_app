@@ -69,8 +69,7 @@ const parseStatisticsNumericValue = (value: unknown): number => {
 };
 
 /**
- * Rendered by: TokenFrequencyResultsPanel to show comparative token-frequency output because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: TokenFrequencyResultsPanel to show comparative token-frequency output.
  */
 const TokenFrequencyUnifiedTokenSectionInner = ({
   normalizedNodeResults,
@@ -179,7 +178,8 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   const colorB = hexToRgb(nodeBColor);
   /**
    * Used by: unified word-cloud Text fill to blend between study and reference colors.
-   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Flow: interpolate each RGB channel, round it, and convert the blended color
+   * back to a hex swatch.
    */
   const blend = (t: number) => {
     /** Used by: blend to interpolate one RGB channel for the unified cloud gradient. */

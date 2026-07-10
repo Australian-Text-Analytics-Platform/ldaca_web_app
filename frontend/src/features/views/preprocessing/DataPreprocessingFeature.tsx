@@ -49,7 +49,7 @@ const PolarsExpressionFallback = () => (
 
 // Hosts preprocessing subtabs and passes the active input node context into each tool.
 /**
- * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: the analysis feature registry when this panel is selected.
  * Flow: read workspace/auth state, derive inputs and analysis parameters,
  * render the active preprocessing subtab, and lazy-load the CodeMirror-backed
  * expression editor only when users open that subtab.
@@ -115,7 +115,7 @@ function DataPreprocessingFeature() {
 
   // Gives child subtabs one shared alert surface for validation and backend errors.
   /**
-   * Called by: DataPreprocessingFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to preprocessing sub-tabs as the shared alert callback.
    */
   const handleAlert = (message: string) => {
     setAlertMessage(message);

@@ -28,8 +28,8 @@ type TopicModelingParameterAction =
 /**
  * Creates the topic-modeling parameter snapshot used before any node defaults
  * or saved requests have been applied.
- * Used by: useTopicModelingParameters and reducer tests so the run-parameter
- * model has one documented default shape.
+ * Used by: useTopicModelingParameters for reducer initialization and focused
+ * reducer tests as the canonical default state.
  */
 export const createTopicModelingParameterState = (): TopicModelingParameterState => ({
   corpusSamples: [],

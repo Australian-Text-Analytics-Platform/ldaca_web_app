@@ -109,7 +109,6 @@ const ChartImageDownloadDialogContent = ({
 
 /**
  * Alert-dialog wrapper used by chart result actions before exporting PNG/SVG/JPEG images.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 export const ChartImageDownloadDialog = ({
   open,

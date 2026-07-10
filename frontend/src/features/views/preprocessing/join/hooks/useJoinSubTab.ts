@@ -99,7 +99,7 @@ export interface UseJoinSubTabResult {
 /**
  * Formats the shared-column notice shown below the selection panel. Join uses
  * it to nudge users toward matching columns without dumping long schema lists.
- * Used by: local callers in preprocessing/useJoinSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called by `useJoinSubTab` when building its shared-column status message.
  */
 const describeSharedColumns = (count: number, columns: string[]): string => {
   const preview = columns.slice(0, 4).join(', ');
@@ -110,14 +110,14 @@ const describeSharedColumns = (count: number, columns: string[]): string => {
 
 /**
  * Creates a stable key for the current column set used by draft preservation.
- * Used by: local callers in preprocessing/useJoinSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called when storing and validating a join-column draft.
  */
 const columnsKey = (columns: string[]): string => columns.join('\0');
 
 /**
  * Resolves the selected join column for one node, preserving a still-valid user
  * draft and otherwise falling back to the preferred shared/default column.
- * Used by: local callers in preprocessing/useJoinSubTab module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called for both join sides whenever node schemas or drafts change.
  * Flow: reject missing node or columns, validate the draft against the current column signature, then fall back to shared or first column.
  */
 const resolveJoinColumn = (
@@ -137,7 +137,7 @@ const resolveJoinColumn = (
 /**
  * Owns Join sub-tab state. The component consumes this hook for node pairing,
  * join-column choices, preview fetching, and apply controls.
- * Used by: usePreprocessingPreview hook, JoinSubTab module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `JoinSubTab` to own join selections, preview, and apply state.
  * Flow: derive left/right nodes and columns, build join payloads, run preview/apply requests,
  * and keep auto-generated node names in sync with selections.
  */
@@ -173,7 +173,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   /**
    * Reads available columns for a node selected in the join panel.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Used to resolve both join sides and returned through `selectionPanel.getNodeColumns`.
    */
   const getNodeColumnsForJoin = (nodeId: string): string[] => {
     const node = workspaceNodeMap.get(nodeId);
@@ -182,7 +182,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   /**
    * Labels the left and right column selectors in the shared node panel.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned through `selectionPanel.columnLabelFn`.
    */
   const columnLabelFn = (node: WorkspaceNodeMetadata) => {
     const nodeId = node.id;
@@ -300,7 +300,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   /**
    * Adapts the generated join preview endpoint to the shared preprocessing
    * preview hook result shape.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Passed to `usePreprocessingPreviewState` as its request fetcher.
    * Steps: translate the request into generated-client query params, call the preview API,
    * and normalize rows/columns/pagination for the shared preview table.
    */
@@ -361,7 +361,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   /**
    * Updates preview rows-per-page for the join preview table.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `preview.onPageSizeChange`.
    */
   const handleJoinPreviewPageSizeChange = (size: number) => {
     setJoinPreviewPageSize(size);
@@ -372,7 +372,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   /**
    * Persists the user's left/right join column override for the active schema.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned through `selectionPanel.onColumnChange`.
    */
   const handleJoinColumnChange = (nodeId: string, column: string) => {
     if (nodeId === joinLeftNodeId) {
@@ -384,14 +384,14 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   /**
    * Placeholder color handler because join uses fixed left/right colors.
-   * Called by: useJoinSubTab internal event, effect, or helper flow.
+   * Returned through `selectionPanel.onColorChange` to satisfy the shared panel contract.
    */
   const handleJoinColorChange = () => undefined;
 
   /**
    * Applies the join with the current node pair, join type, selected columns,
    * and optional output name.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned as `apply.run` for `JoinSubTab`.
    * Steps: validate join readiness, derive column arrays and output name, run the mutation,
    * and restore loading state.
    */
@@ -423,7 +423,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   /**
    * Packages join selection state for the shared preprocessing panel consumer.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `JoinSubTab` as `selectionPanel`.
    */
   const selectionPanel: JoinSelectionPanelConfig = {
     selectedNodes: joinSelectedNodes,
@@ -438,7 +438,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     onColorChange: handleJoinColorChange,
     // Lets the preprocessing input panel render column options from the hook's normalized
     // workspace-node map instead of reading raw node metadata itself.
-    // Called by: useJoinSubTab object consumers because consumers need this callback at the object boundary instead of recreating it inline.
+    // Invoked by the shared node-input panel for each selected join node.
     getNodeColumns: (node: WorkspaceNodeMetadata) => {
       return getNodeColumnsForJoin(node.id);
     },
@@ -481,7 +481,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   /**
    * Wraps join type state so the return object exposes a named setter.
-   * Called by: useJoinSubTab internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `JoinSubTab` as `setJoinType`.
    */
   const handleSetJoinType = (value: JoinType) => {
     setJoinType(value);

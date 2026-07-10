@@ -58,7 +58,6 @@ DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 /**
  * Header layout helper used by dialogs for title/description grouping.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)} {...props} />
@@ -67,7 +66,6 @@ DialogHeader.displayName = 'DialogHeader';
 
 /**
  * Footer layout helper used by dialogs for action button rows.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div

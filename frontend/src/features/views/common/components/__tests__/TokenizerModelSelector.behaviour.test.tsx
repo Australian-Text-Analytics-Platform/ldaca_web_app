@@ -18,8 +18,6 @@ vi.mock('@/lib/languageDetection', () => ({
 /**
  * Renders TokenizerModelSelector with a fresh query client so lazy model loading
  * and language detection cache state cannot leak between behavior tests.
- * Used by: TokenizerModelSelector behavior tests because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
- * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
  */
 const renderSelector = ({
   value = '',

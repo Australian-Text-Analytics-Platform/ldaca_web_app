@@ -45,8 +45,7 @@ interface TokenFrequencyDownloadDialogContentProps {
 }
 
 /**
- * Rendered by: TokenFrequencyDownloadDialog as the modal body for format and stop-word options because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: TokenFrequencyDownloadDialog as the modal body for format and stop-word options.
  */
 const TokenFrequencyDownloadDialogContent = ({
   mode,
@@ -117,7 +116,7 @@ const TokenFrequencyDownloadDialogContent = ({
   );
 };
 
-/** Rendered by: TokenFrequencyFeature to host the token-frequency download dialog because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface. */
+/** Rendered by: TokenFrequencyFeature to host the token-frequency download dialog. */
 export const TokenFrequencyDownloadDialog = ({
   open,
   onOpenChange,

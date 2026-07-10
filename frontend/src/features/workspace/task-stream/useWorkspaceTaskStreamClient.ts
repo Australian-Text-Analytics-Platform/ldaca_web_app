@@ -42,7 +42,7 @@ const STREAM_RETRY_MAX_MS = 30000;
 
 /**
  * Caps task-stream reconnect backoff so errors recover without busy looping.
- * Used by: local callers in workspace/useWorkspaceTaskStreamClient module because retry attempts need bounded reconnect delay.
+ * Called by the stream effect's reconnect scheduler after an EventSource error.
  * Flow: multiply the retry base by the current attempt, enforce a minimum first delay, and cap retries at the maximum interval.
  */
 const clampRetryDelay = (attempt: number) => {
@@ -52,7 +52,7 @@ const clampRetryDelay = (attempt: number) => {
 
 /**
  * Opens the backend task SSE stream and exposes reconnect/status state.
- * Used by: useWorkspaceTaskInbox module (rg call sites/imports) because the inbox hook needs connection state and task events from one client.
+ * Used by: useWorkspaceTaskInbox module because the inbox hook needs connection state and task events from one client.
  * Flow: initialize connection state and callback refs, keep the latest event handler installed, run the EventSource lifecycle effect, and expose manual reconnect.
  */
 export const useWorkspaceTaskStreamClient = (
@@ -78,8 +78,7 @@ export const useWorkspaceTaskStreamClient = (
   const reconnect = (() => {
     /**
      * Keeps the reconnect callback stable while the ref target changes.
-     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     * Returned to the task inbox so retry UI always invokes the active effect instance.
      */
     const fn = () => {
       reconnectRef.current();
@@ -103,8 +102,7 @@ export const useWorkspaceTaskStreamClient = (
 
     /**
      * Clears any pending manual reconnect timer.
-     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     * Called before rescheduling and whenever the stream closes.
      */
     const cleanupTimers = () => {
       if (reconnectTimer !== null) {
@@ -115,8 +113,7 @@ export const useWorkspaceTaskStreamClient = (
 
     /**
      * Closes the current EventSource and pending reconnect work.
-     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     * Called before connecting, on manual reconnect, and during effect cleanup.
      */
     const closeStream = () => {
       if (es) {
@@ -128,8 +125,7 @@ export const useWorkspaceTaskStreamClient = (
 
     /**
      * Schedules the next connection attempt using capped backoff.
-     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     * Called by both EventSource and connection-construction error paths.
      */
     const scheduleReconnect = (attempt: number) => {
       cleanupTimers();
@@ -142,8 +138,7 @@ export const useWorkspaceTaskStreamClient = (
 
     /**
      * Delivers a parsed stream payload to the latest caller callback.
-     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     * Called by the EventSource message handler after JSON parsing succeeds.
      */
     const invokeOnEvent = (payload: TaskEventPayload) => {
       const rawTimestamp = (payload as { timestamp?: number }).timestamp;
@@ -158,8 +153,7 @@ export const useWorkspaceTaskStreamClient = (
 
     /**
      * Opens an EventSource connection for one reconnect attempt.
-     * Called by: useWorkspaceTaskStreamClient internal event, effect, or helper flow.
-     * Why: because the stream client needs helpers that keep event parsing, connection state, and cleanup in one resilient flow.
+     * Called on effect startup, manual reconnect, and backoff timer expiry.
      * Flow: close any prior stream, build the authenticated URL, wire EventSource handlers, and schedule reconnects on failure.
      */
     const connect = (attempt: number) => {

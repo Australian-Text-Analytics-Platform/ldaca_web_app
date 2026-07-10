@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 
 /**
  * Progress bar wrapper used by task rows and feature status UIs to render Radix progress styling.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function Progress({
   className,

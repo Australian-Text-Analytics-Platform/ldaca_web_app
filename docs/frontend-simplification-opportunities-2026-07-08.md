@@ -88,34 +88,6 @@ settled before deletion.
 
 ### Deletion and simplification
 
-#### D19. Break the route import cycle without removing URL behavior
-
-- **Evidence / strength — Strong:** the cycle is [router.tsx](../frontend/src/router.tsx) → [App.tsx](../frontend/src/App.tsx) → [WorkspaceShell.tsx](../frontend/src/components/layout/WorkspaceShell.tsx) → [ViewRouteSync.tsx](../frontend/src/components/layout/ViewRouteSync.tsx) → `router.tsx`.
-- **Recommended direction:** extract typed/pure search contracts or narrow router hooks; keep deep links, back/forward behavior, and pending-workspace synchronization intact.
-- **Deletion test:** cycle detection no longer reports the chain and no second navigation state machine is introduced.
-- **Validation:** cold deep links, invalid workspace/view, pending workspace load, replace vs push, back/forward, hidden views, and auth transitions.
-
-#### D20. Replace stale boilerplate comments with verified ownership notes
-
-- **Evidence / strength — Strong:** handwritten files still contain repeated placeholders such as `typed store boundary` in [selectionStore.ts](../frontend/src/stores/selectionStore.ts#L53-L99), `(rg call sites/imports)` in [HintsController.tsx](../frontend/src/features/hints/HintsController.tsx#L95), `internal event/effect/helper flow`, `parent component boundary`, and route boilerplate, alongside stale caller claims.
-- **Recommended direction:** treat this as targeted regression cleanup: update the nearest changed unit with verified caller/why/flow context and remove only placeholder narration.
-- **Deletion test:** placeholder patterns reach zero without reducing useful lifecycle, side-effect, or identity documentation.
-- **Validation:** structured comment audit plus targeted `rg`; spot-check named callers against imports/tests before claiming coverage.
-
-#### D21. Remove memo/callback residue only in local identity-insensitive code
-
-- **Evidence / strength — Worth exploring:** local helpers such as [ChromeTabs.tsx](../frontend/src/components/tabs/ChromeTabs.tsx), [useResizableSplit.ts](../frontend/src/hooks/useResizableSplit.ts), and [useStackedSplits.ts](../frontend/src/components/layout/sidebar/useStackedSplits.ts) contain candidates the React Compiler can own, but other memoization is identity-sensitive.
-- **Recommended direction:** make narrow removals after confirming no effect dependency, library contract, or expensive-model identity requirement; explicitly reject a blanket sweep.
-- **Deletion test:** removed wrappers reduce code without increasing effects, listener churn, or third-party reconciliation.
-- **Validation:** render-count/effect-focused tests where relevant, drag/reorder/resize smoke, full tests, and build.
-
-#### D22. Narrow over-broad internal barrels
-
-- **Evidence / strength — Strong:** [features/views/common/index.ts](../frontend/src/features/views/common/index.ts) exports unrelated feature helpers through one wide surface and can hide ownership/cycles.
-- **Recommended direction:** prefer direct imports for internal feature code while retaining the deliberate public API barrel and meaningful feature seams.
-- **Deletion test:** the common barrel exports only a coherent contract or is no longer used internally, with fewer cycle/unused-export edges.
-- **Validation:** import-cycle scan, Knip, typecheck/build, and no change to generated/API barrel ownership.
-
 ### Deep modularity opportunities
 
 #### M1. Extract an Annotation AI preview-session boundary
@@ -679,6 +651,49 @@ unreachable callers. Product/external-contract caveats remain where noted.
       `git diff --check` passed. The separately tracked format baseline still
       reports the same 49 files.
 
+61. Break the route import cycle without duplicating URL state (D19)
+    - Done 2026-07-11. Pure view-search validation and canonical search shaping
+      now live in the dependency-light `features/views/viewSearch.ts` contract.
+      `ViewRouteSync` uses TanStack's typed route hooks directly, so the former
+      `router -> App -> WorkspaceShell -> ViewRouteSync -> router` cycle is
+      gone while the sync component remains the sole URL/store state machine.
+      Invalid, hidden, and explicit-default URL states are repaired with history
+      replacement; store/sidebar changes use push navigation. Route regressions
+      cover cold deep links, workspace-gated hydration, back/forward to the
+      default URL, cancellation of pending links, and auth-owner remounts.
+
+62. Replace generated comment boilerplate with verified ownership notes (D20)
+    - Done 2026-07-11. Structured scans removed the named placeholder families
+      and their mechanically equivalent hook, component, library, object,
+      interaction, and test-fixture variants from handwritten code. Trivial
+      test/mock narration was deleted; non-trivial units now name verified
+      consumers, callback roles, lifecycle effects, or branch flow. Existing
+      third-party, listener, cancellation, task-lifecycle, and identity
+      explanations were preserved instead of being flattened into generic
+      caller prose.
+
+63. Remove only compiler-owned local memoization (D21)
+    - Done 2026-07-11. `ChromeTabs` no longer wraps four local rename/drag
+      helpers in `useCallback`, and `useStackedSplits` now computes its small
+      active-section total plus local collapse/style accessors directly. The
+      resize ref and window-listener callbacks remain explicitly stable, as do
+      `useResizableSplit`'s pointer/rAF chain and React Flow, TanStack,
+      Recharts/d3, context, effect, and drag-integration identity boundaries.
+      Focused tab rename/reorder and stacked collapse/resize tests passed.
+
+64. Remove the over-broad internal analysis barrel (D22)
+    - Done 2026-07-11. All analysis features and tests now import shared hooks,
+      types, policies, and utilities from their owning modules. The residual
+      one-consumer Token Frequency imports were made direct and
+      `features/views/common/index.ts` was deleted. The intentional handwritten
+      `@/api` application seam and focused feature/module entrypoints remain.
+
+    - Implementation validation: 191 test files / 830 tests, lint, configured
+      Knip, production build, docs drift (70 literals), handwritten import-cycle
+      scan (616 files / zero cycles), comment-template/path/empty-block scans,
+      and staged plus unstaged `git diff --check` passed. The separately tracked
+      format baseline still reports the same 49 files.
+
 ## Endpoint And Source-Of-Truth Notes
 
 The 2026-07-09 cleanup remains the starting contract for this refresh:
@@ -705,8 +720,9 @@ The 2026-07-09 cleanup remains the starting contract for this refresh:
   context would broaden update fan-out and erase a useful identity boundary.
 - **URL synchronization behavior:** retain deep links, back/forward handling,
   pending-workspace resolution, and invalid-route repair in `ViewRouteSync`.
-  Break only the import cycle identified in D19; replacing it with local mirror
-  state would duplicate router truth.
+  D19 broke the router import cycle through the pure view-search contract;
+  replacing the remaining state machine with local mirror state would duplicate
+  router truth.
 - **View ID / registry / component split:** retain light IDs for stores/routes,
   metadata for navigation, and lazy component loading in a Fast Refresh-safe
   module. The three layers have different import and runtime constraints; the

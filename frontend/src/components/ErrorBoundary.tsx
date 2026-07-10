@@ -15,7 +15,8 @@ interface ErrorBoundaryProps {
  * Reusable React error boundary for isolating failures around login and
  * workspace surfaces. Callers can provide feature-specific fallbacks while the
  * default keeps the SPA recoverable with retry/reload actions.
- * Rendered by: App, LoginScreen, and ViewRouter because auth/workspace crashes should swap to recovery UI without blanking the whole SPA.
+ * Rendered by `WorkspaceShell`, `LoginScreen`, and `ViewRouter` so failures are
+ * contained at workspace, auth-widget, and active-feature recovery scopes.
  * Flow: catch child render errors into state, choose a caller fallback or the default panel, then let fallbacks reset the boundary.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {

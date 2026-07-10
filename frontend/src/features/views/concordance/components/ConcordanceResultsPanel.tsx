@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import type { ConcordanceAnalysisResponse, WorkspaceGraphNode } from '@/api';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
 import {
@@ -130,8 +130,7 @@ export interface ConcordanceResultsPanelProps {
 }
 
 /**
- * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks.
  */
 export function ConcordanceResultsPanel({
   results,

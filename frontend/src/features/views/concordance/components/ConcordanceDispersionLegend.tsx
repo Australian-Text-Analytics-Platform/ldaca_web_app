@@ -26,8 +26,7 @@ interface Props {
 const DEFAULT_COLOR = '#0284c7';
 
 /**
- * Rendered by: ConcordanceDispersionNodeBlock to show matched-text visibility controls and bin counts because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: ConcordanceDispersionNodeBlock to show matched-text visibility controls and bin counts.
  */
 export function ConcordanceDispersionLegend({
   matchedTexts,

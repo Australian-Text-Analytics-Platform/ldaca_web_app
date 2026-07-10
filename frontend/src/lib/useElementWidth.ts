@@ -12,8 +12,7 @@ import { useEffect, useState } from 'react';
  * which case the width stays at its initial measurement after mount.
  */
 /**
- * Used by: src/features/views/token-frequency/components/results/TokenFrequencySingleTokenSection.tsx, src/features/views/token-frequency/components/results/TokenFrequencyUnifiedTokenSection.tsx because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: validate inputs, normalize values, branch on runtime conditions, then return the shared result.
+ * Used by: src/features/views/token-frequency/components/results/TokenFrequencySingleTokenSection.tsx, src/features/views/token-frequency/components/results/TokenFrequencyUnifiedTokenSection.tsx.
  */
 export function useElementWidth(ref: React.RefObject<HTMLElement | null>): number {
   const [width, setWidth] = useState(0);
@@ -24,7 +23,7 @@ export function useElementWidth(ref: React.RefObject<HTMLElement | null>): numbe
 
     /**
      * Feeds consumers the current element width without forcing layout logic into each feature.
-     * Why: importers need one shared normalization boundary to keep behavior consistent.
+     * Called on mount and by the observer whenever the element is resized.
      */
     const measure = () => {
       setWidth(element.clientWidth);

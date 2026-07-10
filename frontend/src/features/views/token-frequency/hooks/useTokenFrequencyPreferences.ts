@@ -2,7 +2,11 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { analysisTaskPreferences } from '@/api';
 import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
-import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
+import {
+  clampDisplayTokenLimit,
+  DEFAULT_TOKEN_LIMIT,
+  toFiniteNumber,
+} from '../../common/utils';
 import {
   formatStopWords,
   mergeStopWordsText,
@@ -27,8 +31,10 @@ interface UseTokenFrequencyPreferencesParams {
 
 /** Owns token-frequency preference UI state and persistence for stop words and display limits. */
 /**
- * Used by: loadMergedStopwords.ts, useTokenFrequencyPreferences.test.tsx, TokenFrequencyFeature.tsx because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by `TokenFrequencyFeature`; focused hook tests cover local preference
+ * parsing and persistence behavior.
+ * Flow: synchronize backend preferences into reducer state, persist validated
+ * updates to the active task, patch the displayed result, and expose UI handlers.
  */
 export const useTokenFrequencyPreferences = ({
   currentWorkspaceId,
@@ -213,8 +219,9 @@ export const useTokenFrequencyPreferences = ({
 
   /** Validates and persists the cloud display limit entered in the parameter UI. */
   /**
-   * Called by: useTokenFrequencyPreferences as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
-   * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+   * Called by preference handlers in `useTokenFrequencyPreferences`.
+   * Flow: parse and clamp the input, short-circuit unchanged/local-only state,
+   * otherwise persist the limit and apply it to reducer and result metadata.
    */
   const applyTokenLimitWithValidation = async () => {
     const parsed = toFiniteNumber(tokenLimitInput);
@@ -303,7 +310,7 @@ export const useTokenFrequencyPreferences = ({
 
   /** Sorts the current stop-word text so users can review and export a stable list. */
   /**
-   * Called by: useTokenFrequencyPreferences during this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Called by preference handlers in `useTokenFrequencyPreferences`.
    */
   const sortStopWords = () => {
     const words = parseStopWordsText(stopWords);
@@ -314,7 +321,7 @@ export const useTokenFrequencyPreferences = ({
 
   /** Mirrors token-limit keystrokes into state while clearing stale validation errors. */
   /**
-   * Called by: useTokenFrequencyPreferences through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Returned to `TokenFrequencyFeature` by `useTokenFrequencyPreferences`.
    * Flow: accept empty input, clamp over-limit numeric edits to the max, mirror raw text state, then clear stale validation errors.
    */
   const handleTokenLimitInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -343,7 +350,7 @@ export const useTokenFrequencyPreferences = ({
 
   /** Applies token-limit validation when the numeric input loses focus. */
   /**
-   * Called by: useTokenFrequencyPreferences through JSX event props or task lifecycle callbacks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Returned to `TokenFrequencyFeature` by `useTokenFrequencyPreferences`.
    */
   const handleTokenLimitBlur = () => {
     void applyTokenLimitWithValidation();
@@ -354,7 +361,7 @@ export const useTokenFrequencyPreferences = ({
   // the cloud limit at 100, and we want that to flow through the same
   // persistence + state path as the cloud input itself).
   /**
-   * Called by: useTokenFrequencyPreferences as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Called by preference handlers in `useTokenFrequencyPreferences`.
    * Flow: normalize and cap the requested limit, update local input/error state, persist when results exist and value changed, then mirror preferences locally.
    */
   const applyTokenLimit = async (value: number) => {
@@ -424,7 +431,7 @@ export const useTokenFrequencyPreferences = ({
 
   /** Resets transient preference errors when results or selection state are cleared. */
   /**
-   * Called by: useTokenFrequencyPreferences as a local helper in this analysis workflow because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+   * Called by preference handlers in `useTokenFrequencyPreferences`.
    */
   const resetPreferenceUiState = () => {
     dispatchPreference({ type: 'preferenceErrorsReset' });

@@ -280,8 +280,7 @@ const enhanceRows = (statistics: TokenFrequencyStatisticsEntry[]): EnhancedStati
   });
 
 /**
- * Rendered by: TokenFrequencyUnifiedTokenSection to show the paginated comparative statistics table for keyness results because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: TokenFrequencyUnifiedTokenSection to show the paginated comparative statistics table for keyness results.
  */
 export const TokenFrequencyStatisticsTable = ({
   statistics,

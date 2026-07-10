@@ -1,6 +1,6 @@
 /**
  * Extracts backend invalid-name messages so workspace forms can show them inline.
- * Used by: WorkspaceControls component, useDataLoaderWorkspaceActions hook (rg call sites/imports).
+ * Used by: WorkspaceControls component, useDataLoaderWorkspaceActions hook.
  * Why: because workspace controls need backend validation failures translated into user-facing name errors.
  * Flow: inspect top-level message text first, then fall back to nested detail payloads before returning no inline error.
  */

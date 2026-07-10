@@ -71,7 +71,7 @@ export interface WorkspaceTableProps {
 /**
  * Server-backed data table for the selected workspace node. It owns table UI
  * state while delegating column mutations and row detail display to helpers.
- * Rendered by: useColumnMutations hook, useWorkspaceDataTable hook, ServerTablePagination component (rg call sites/imports) because selected nodes need one server-backed row surface.
+ * Rendered by `WorkspaceDataTableFeature` as the selected node's server-backed row surface.
  * Flow: server rows enter TanStack Table, UI handlers update sorting/filtering/pagination, and column actions call workspace mutations.
  */
 export function WorkspaceTable({
@@ -176,8 +176,7 @@ export function WorkspaceTable({
 
   /**
    * Applies a server-side column filter and resets pagination.
-   * Called by: WorkspaceTable internal event, effect, or helper flow.
-   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   * Passed to `WorkspaceColumnHeader` as `onApplyFilter`.
    */
   const applyFilter = (col: string, value: string, op: FilterOperator) => {
     if (!value.trim()) {
@@ -190,8 +189,7 @@ export function WorkspaceTable({
 
   /**
    * Clears server-side filters and returns to the first page.
-   * Called by: WorkspaceTable internal event, effect, or helper flow.
-   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   * Passed to `WorkspaceColumnHeader` as `onClearFilter`.
    */
   const clearFilter = (_col: string) => {
     onColumnFiltersChange?.([]);
@@ -200,8 +198,7 @@ export function WorkspaceTable({
 
   /**
    * Cycles one column through ascending, descending, and unsorted states.
-   * Called by: WorkspaceTable internal event, effect, or helper flow.
-   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   * Passed to `WorkspaceColumnHeader` as `onSort`.
    * Flow: inspect the current column sort state, choose the next asc/desc/none state, emit sorting changes, and reset to page one.
    */
   const handleSort = (columnId: string) => {
@@ -242,8 +239,7 @@ export function WorkspaceTable({
 
     /**
      * Toggles wide-column expansion without storing false entries.
-     * Called by: WorkspaceTable internal event, effect, or helper flow.
-     * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+     * Passed to this column's `WorkspaceColumnHeader` as `onToggleExpand`.
      */
     const onToggleExpand = () => {
       setExpandedColumns((prev) => {
@@ -259,14 +255,12 @@ export function WorkspaceTable({
       id: column,
       /**
        * Reads row values by dynamic workspace column name for TanStack Table.
-       * Called by: WorkspaceTable object consumers.
-       * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+       * Invoked by TanStack Table for each row in this column.
        */
       accessorFn: (row) => row[column],
       /**
        * Renders the interactive workspace column header controls.
-       * Called by: WorkspaceTable object consumers.
-       * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+       * Invoked by TanStack Table for this column's header cell.
        * Flow: pass column state, filter state, and mutation handlers into the lifted header component.
        */
       header: ({ column: colInst }) => (
@@ -309,8 +303,7 @@ export function WorkspaceTable({
       ),
       /**
        * Renders a compact display value while preserving full text in the title.
-       * Called by: WorkspaceTable object consumers.
-       * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+       * Called by TanStack Table for each visible body cell in this column.
        */
       cell: ({ getValue }) => {
         const cellValue = getValue();
@@ -353,8 +346,7 @@ export function WorkspaceTable({
 
   /**
    * Bridges TanStack pagination updates to server pagination callbacks.
-   * Called by: WorkspaceTable internal event, effect, or helper flow.
-   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   * Passed to `useReactTable` as `onPaginationChange`.
    */
   const handlePaginationChange = (
     updater: TanstackPaginationState | ((prev: TanstackPaginationState) => TanstackPaginationState),
@@ -367,8 +359,7 @@ export function WorkspaceTable({
 
   /**
    * Bridges TanStack sorting updates to server sorting callbacks.
-   * Called by: WorkspaceTable internal event, effect, or helper flow.
-   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   * Passed to `useReactTable` as `onSortingChange`.
    */
   const handleSortingChangeInternal = (
     updater: SortingState | ((prev: SortingState) => SortingState),
@@ -400,8 +391,7 @@ export function WorkspaceTable({
 
   /**
    * Computes sticky styles for pinned TanStack columns.
-   * Called by: WorkspaceTable internal event, effect, or helper flow.
-   * Why: because the table needs helper handlers that translate UI events into server-backed query state and column actions.
+   * Called while rendering pinned header and body cells.
    * Flow: read the column pin state, set sticky offsets, then add edge shadows for pinned sides.
    */
   const getPinnedStyles = (

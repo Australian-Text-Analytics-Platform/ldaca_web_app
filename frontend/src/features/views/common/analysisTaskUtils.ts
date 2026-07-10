@@ -1,14 +1,14 @@
 import type { TaskItem } from '@/stores/analysisStore';
 
 /** Returns the canonical task type a UI feature should watch. */
-/** Used by: src/features/views/common/tasks/policies.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts, src/hooks/useAnalysisTaskStatus.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: task policies, `useAnalysisTaskFlow`, and `useAnalysisTaskStatus`. */
 export const getTaskTypeCandidates = (taskType: string): string[] => {
   const normalized = taskType.trim();
   return normalized ? [normalized] : [];
 };
 
 /** Builds a stable key for deduping repeated task-state events from task streams. */
-/** Used by: src/features/views/common/tasks/useAnalysisTaskFlow.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: src/features/views/common/tasks/useAnalysisTaskFlow.ts. */
 export const normalizeTaskDedupeKey = (
   taskId: string | null | undefined,
   state: string | null | undefined,
@@ -33,7 +33,7 @@ const normalizeTaskId = (value: unknown): string | null => {
 };
 
 /** Collects unique valid task ids from local state, route params, or server responses. */
-/** Used by: src/features/views/common/clearAnalysis.ts, src/features/views/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: src/features/views/common/clearAnalysis.ts, src/features/views/common/hooks/useAnalysisFeature.ts. */
 export const collectTaskIds = (candidateIds: (string | null | undefined)[]): string[] => {
   const ids = candidateIds
     .map((value) => normalizeTaskId(value))
@@ -48,7 +48,7 @@ interface ResolveAnalysisTaskIdOptions {
 
 /** Resolves the best explicit task id for cleanup/result-fetch flows. */
 /**
- * Used by: src/features/views/common/hooks/useAnalysisFeature.ts because the hook needs local steps to normalize inputs before exposing stable state to consumers.
+ * Used by: src/features/views/common/hooks/useAnalysisFeature.ts.
  * Flow: prefer valid local candidate ids, then notify the resolver callback.
  */
 export const resolveAnalysisTaskId = ({
@@ -66,7 +66,7 @@ export const resolveAnalysisTaskId = ({
 };
 
 /** Removes completed/cleared tasks from the Zustand task list after task cleanup succeeds. */
-/** Used by: src/features/views/concordance/ConcordanceFeature.tsx, src/features/views/token-frequency/TokenFrequencyFeature.tsx, src/features/views/topic-modeling/TopicModelingFeature.tsx because the hook needs local steps to normalize inputs before exposing stable state to consumers. */
+/** Used by: src/features/views/concordance/ConcordanceFeature.tsx, src/features/views/token-frequency/TokenFrequencyFeature.tsx, src/features/views/topic-modeling/TopicModelingFeature.tsx. */
 export const pruneTasksById = <T extends Pick<TaskItem, 'task_id'>>(
   tasks: T[],
   taskIds: string[],

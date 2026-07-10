@@ -52,7 +52,7 @@ const defaultMessages = {
  * Shared condition-editor UI for preprocessing filters. Filter sub-tab hooks
  * supply typed condition state and renderer callbacks so this component can
  * stay generic across condition value types.
- * Rendered by: useFilterSubTabSections hook, FilterSubTab module, index component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `FilterSubTab` with sections assembled by `useFilterSubTabSections`.
  * Flow: render each condition row through caller-provided renderers, wire add/remove/change
  * controls, and keep AND/OR logic selection above the condition list.
  */

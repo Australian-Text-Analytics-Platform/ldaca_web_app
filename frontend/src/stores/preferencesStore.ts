@@ -61,9 +61,9 @@ interface PreferencesActions {
 
 type PreferencesStore = PreferencesState & PreferencesActions;
 
-/** Hydrates persisted preference fields into the immer draft after a successful backend load. */
 /**
- * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+ * Called by `loadFromBackend` to hydrate persisted preference fields into the
+ * immer draft after a successful backend load.
  * Flow: copy resolved backend preference fields into the draft store state, then mark hydration complete for subscribers.
  */
 function applyServerState(state: PreferencesState, data: DurablePreferences) {
@@ -92,8 +92,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
         syncing: false,
         lastSyncError: null,
 
-        /** Hides or reveals optional views while keeping Data Loader always reachable. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+        /** Used by Sidebar and SettingsDialog to hide optional views while keeping Data Loader reachable. */
         setViewHidden: (view, hidden) => {
           if (view === 'data-loader') return;
           set((state) => {
@@ -106,8 +105,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
-        /** Toggles a workspace in the user's quick-access favorites list. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+        /** Used by workspace-management surfaces to toggle quick-access favorites. */
         toggleFavorite: (workspaceId) => {
           set((state) => {
             const idx = state.favoriteWorkspaces.indexOf(workspaceId);
@@ -119,13 +117,12 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
-        /** Checks favorite status for sidebar/workspace picker rendering. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+        /** Used by WorkspaceManagerCard to choose each workspace's favorite action and icon. */
         isFavorite: (workspaceId) => get().favoriteWorkspaces.includes(workspaceId),
 
         /**
-         * Stores the preferred tokenizer model used by tokenization-aware tools.
-         * Why: store consumers need one typed boundary for shared state reads, updates, and persistence.
+         * Used by SettingsDialog to store the tokenizer model inherited by
+         * tokenization-aware analysis tools.
          */
         setDefaultTokenizerModel: (model) => {
           const value = typeof model === 'string' && model.trim() ? model.trim() : null;
@@ -134,8 +131,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
-        /** Persists the user's optional LDaCA Oni API token for portal import flows. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+        /** Used by SettingsDialog and DataLoaderFeature to persist the optional Oni import token. */
         setLdacaOniApiToken: (token) => {
           const value = typeof token === 'string' && token.trim() ? token.trim() : null;
           set((state) => {
@@ -218,8 +214,7 @@ export const usePreferencesStore = create<PreferencesStore>()(
           });
         },
 
-        /** Loads preferences from the backend once auth is available, falling back to local state. */
-        /** Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates. */
+        /** Called by `usePreferencesInit` once auth is available; local state remains on failure. */
         loadFromBackend: async () => {
           try {
             const { data: preferences } = await getPreferences({
@@ -238,9 +233,9 @@ export const usePreferencesStore = create<PreferencesStore>()(
           }
         },
 
-        /** Pushes the latest persisted preference subset to the backend from the debounce subscriber. */
         /**
-         * Consumed by: usePreferencesStore selectors and actions because UI callers need one typed store boundary for reading shared state and committing updates.
+         * Called by `usePreferencesInit`'s debounced subscriber to push the
+         * latest durable preference projection to the backend.
          * Flow: guard concurrent syncs, build the partial preferences payload, call the backend update, then clear syncing even if the request fails.
          */
         syncToBackend: async () => {

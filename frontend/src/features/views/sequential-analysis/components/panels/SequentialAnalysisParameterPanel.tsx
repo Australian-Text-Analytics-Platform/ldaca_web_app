@@ -100,12 +100,11 @@ export interface SequentialAnalysisParameterPanelProps {
 }
 
 /**
- * Rendered by: SequentialAnalysisFeature. Sequential Analysis parameter panel: NodeInputsPanel + the configuration block because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: SequentialAnalysisFeature. Sequential Analysis parameter panel: NodeInputsPanel + the configuration block.
  * frequency/numeric-interval/group-by configuration block. Extracted
  * from SequentialAnalysisFeature.tsx; the surrounding AnalysisCardLayout
  * frame stays in the parent because run/clear actions belong to
  * orchestration state.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function SequentialAnalysisParameterPanel({
   nodeInputs,

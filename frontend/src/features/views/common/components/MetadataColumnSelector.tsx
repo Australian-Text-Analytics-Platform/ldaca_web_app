@@ -55,7 +55,6 @@ interface MetadataColumnSelectorProps {
  * Renders the shared metadata-column dropdown used by analysis result tables to
  * choose which row metadata survives in visible and combined views.
  * Used by: concordance and quotation result tables.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function MetadataColumnSelector({
   availableColumns,

@@ -64,11 +64,10 @@ export interface SequentialAnalysisResultsPanelProps {
 }
 
 /**
- * Rendered by: SequentialAnalysisFeature. Trends and Sequence results card: summary stat grid + chart + detach because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: SequentialAnalysisFeature. Trends and Sequence results card: summary stat grid + chart + detach.
  * controls. Extracted from SequentialAnalysisFeature.tsx — receives the
  * derived summary values from `useSequentialResultSummary` plus the chart
  * machinery from `useSequentialAnalysisTaskFlow` as props.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function SequentialAnalysisResultsPanel({
   resultsSummary,

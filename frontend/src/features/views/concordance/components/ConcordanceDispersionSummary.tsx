@@ -234,8 +234,7 @@ const parseActiveTooltipIndex = (
 };
 
 /**
- * Rendered by: ConcordanceDispersionNodeBlock to build the dispersion chart and export payload because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Rendered by: ConcordanceDispersionNodeBlock to build the dispersion chart and export payload.
  */
 export function ConcordanceDispersionSummary({
   rows,

@@ -23,7 +23,6 @@ const countGroupedResultDocuments = (groups: Record<string, unknown>[][]): numbe
  * Supplies the shared page-size summary copy for grouped analysis result tables,
  * using materialized totals when available and group counts otherwise.
  * Used by: concordance and quotation paginated grouped result tables.
- * Flow: derive display state, bind user actions, then render the analysis UI.
  */
 export function GroupedResultsPageSizeSummary<Row extends Record<string, unknown>>({
   groups,

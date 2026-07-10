@@ -18,7 +18,7 @@ interface FeedbackPanelProps {
  * Feedback survey modal opened from the sidebar footer. It builds a contextual
  * Qualtrics URL only while visible so the embedded survey receives the current
  * view, deployment, build, and auth role at the moment of submission.
- * Rendered by: App when the global feedback modal opens so survey metadata reflects the current user role and view.
+ * Rendered lazily by `GlobalHosts` when global feedback intent opens the survey modal.
  * Flow: capture feedback context while open, build the Qualtrics iframe URL, then render the survey or a closed-state placeholder.
  */
 export const FeedbackPanel: FC<FeedbackPanelProps> = ({ open, onClose }) => {

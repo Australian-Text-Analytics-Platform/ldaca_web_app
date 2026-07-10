@@ -1,7 +1,10 @@
 import { useCallback, useReducer } from 'react';
 
 import type { SequentialAnalysisRequest } from '@/api';
-import { normalizeStringArray, normalizeUnknownStringArray } from '../../common';
+import {
+  normalizeStringArray,
+  normalizeUnknownStringArray,
+} from '../../common/parameterComparison';
 
 export type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 export type SequentialCustomIntervalUnit = NonNullable<

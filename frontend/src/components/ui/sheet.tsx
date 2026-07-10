@@ -88,7 +88,6 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
 
 /**
  * Accessible sheet title primitive used by sheet content.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Title>) {
   return (
@@ -102,7 +101,6 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
 
 /**
  * Accessible sheet description primitive used by sheet content.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function SheetDescription({
   className,

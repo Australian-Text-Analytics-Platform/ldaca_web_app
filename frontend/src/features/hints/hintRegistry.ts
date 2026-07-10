@@ -39,7 +39,7 @@ export const hintRegistry: HintDefinition[] = [
     learnMoreTarget: 'data-loader.upload.button',
     // Locates the specific uploaded-file row because this hint follows a
     // runtime path rather than a static page control.
-    // Called by: hintRegistry object consumers because consumers need this callback at the object boundary instead of recreating it inline.
+    // Invoked by hint policy when this runtime-path hint is evaluated.
     resolveAnchor: ({ lastUploadedFilePath }) => {
       if (!lastUploadedFilePath) return null;
       const row = document.querySelector(
@@ -75,7 +75,7 @@ export const hintRegistry: HintDefinition[] = [
     placement: 'bottom',
     // Finds the first empty condition-column control so the Filter onboarding
     // hint points at the field the user needs to fill next.
-    // Called by: hintRegistry object consumers because consumers need this callback at the object boundary instead of recreating it inline.
+    // Invoked by hint policy when the empty-column condition is evaluated.
     resolveAnchor: () => {
       const anchor = document.querySelector(
         '[data-hint-id="preprocessing.filter.condition-column"][data-filter-column-empty="true"]',

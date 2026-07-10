@@ -56,7 +56,7 @@ function getActiveWorkspaceDraftKey(workspace: WorkspaceListItem) {
  * Renders the active-workspace/create-workspace panel. `DataLoaderFeature`
  * uses it to keep workspace creation and currently loaded workspace controls
  * in one card while delegating persistence to workspace hooks.
- * Rendered by: DataLoaderFeature module (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by: DataLoaderFeature module.
  * Flow: sync local editable drafts to the active workspace identity, choose create vs
  * active-workspace controls, gate unsafe unloads while tasks run, then forward
  * save/rename/create events to parent actions.

@@ -99,7 +99,7 @@ export function WorkspaceControls({ onToggleCollapse }: { onToggleCollapse?: () 
     }
   };
 
-  /** Called by: the WorkspaceControls Rename button onClick prop because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+  /** Called by: the WorkspaceControls Rename button onClick prop. */
   const startRename = () => {
     if (!currentWorkspaceName) {
       return;

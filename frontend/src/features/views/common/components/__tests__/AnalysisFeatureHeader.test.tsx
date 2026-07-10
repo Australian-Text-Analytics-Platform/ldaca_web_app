@@ -5,8 +5,6 @@ import { AnalysisFeatureHeader } from '../AnalysisFeatureHeader';
 
 /**
  * Renders the header with tooltip context for icon assertions.
- * Used by: AnalysisFeatureHeader tests because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
- * Steps: arrange fixtures and mocks, run the hook or component path under test, then assert the visible behavior or generated payload.
  */
 function renderHeader() {
   return render(

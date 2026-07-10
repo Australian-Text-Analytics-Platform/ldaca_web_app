@@ -35,20 +35,20 @@ const FORMATS = [
 
 // Pads timestamp segments so generated export names sort consistently.
 /**
- * Called by: ExportFeature analysis panel during this analysis workflow.
+ * Called by `buildTimestampedName` for every date/time segment.
  */
 const padFilenamePart = (value: number) => String(value).padStart(2, '0');
 
 // Creates the timestamp prefix used for multi-node export archive filenames.
 /**
- * Called by: ExportFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ * Called by `handleDownloadAll` to stamp multi-node archive filenames.
  */
 const buildTimestampFragment = (date: Date = new Date()) =>
   `${padFilenamePart(date.getMonth() + 1)}-${padFilenamePart(date.getDate())}_${padFilenamePart(date.getHours())}-${padFilenamePart(date.getMinutes())}-${padFilenamePart(date.getSeconds())}`;
 
 // Sanitizes workspace names for filenames accepted by common desktop filesystems.
 /**
- * Called by: ExportFeature analysis panel during this analysis workflow.
+ * Called by archive filename builders before web or native download.
  */
 const toSafeArchiveLabel = (value: string) =>
   Array.from((value || 'workspace').trim())
@@ -58,14 +58,15 @@ const toSafeArchiveLabel = (value: string) =>
 
 // Maps backend format ids to the extension users expect on downloaded files.
 /**
- * Called by: ExportFeature analysis panel as a local helper in this analysis workflow because the feature needs this local normalization step before building requests, labels, or display state.
+ * Called by all-node and per-node download handlers to map backend format ids
+ * to the extension used in the saved filename.
  */
 const getDownloadExtension = (selectedFormat: string) =>
   selectedFormat === 'ipc' ? 'arrow' : selectedFormat;
 
 // Renders export controls for downloading the selected workspace nodes.
 /**
- * Rendered by: the analysis feature registry when this panel is selected because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
+ * Rendered by: the analysis feature registry when this panel is selected.
  * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  */
 function ExportFeature() {
@@ -81,7 +82,7 @@ function ExportFeature() {
 
   // Best-effort helpers for node display
   /**
-   * Called by: ExportFeature during this analysis workflow.
+   * Called while rendering each selected node's export row.
    * Flow: read node id/name from the lightweight graph summary, then return the compact export display model.
    */
   const toDisplay = (n: GraphNode) => {
@@ -100,7 +101,7 @@ function ExportFeature() {
 
   // Invokes the Tauri-side streaming downloader used when WebView cannot carry large bodies.
   /**
-   * Called by: ExportFeature during this analysis workflow.
+   * Called by both all-node and single-node desktop download paths.
    */
   const tauriDownloadToDisk = async (
     url: string,
@@ -116,8 +117,9 @@ function ExportFeature() {
   // surface real backend errors (e.g. Polars sink failure on Windows) in the
   // download/export failure toasts instead of a generic "Failed to ...".
   /**
-   * Called by: ExportFeature during this analysis workflow.
-   * Flow: normalize inputs, derive state, then return the analysis result expected by callers.
+   * Called by web download failure paths before showing a toast.
+   * Flow: read response text, prefer FastAPI's string `detail`, then fall back
+   * to the body or HTTP status.
    */
   const describeResponseError = async (resp: Response): Promise<string> => {
     try {
@@ -137,8 +139,9 @@ function ExportFeature() {
 
   // Export all selected nodes in the requested format (zip when multiple)
   /**
-   * Called by: ExportFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
-   * Flow: read workspace/auth state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
+   * Passed to the Export all format buttons.
+   * Flow: build the multi-node archive or single-node filename, stream through
+   * Tauri on desktop or fetch/save a Blob on web, then clear export state.
    */
   const handleExportAll = async () => {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
@@ -184,7 +187,7 @@ function ExportFeature() {
 
   // Download a single node in the selected format
   /**
-   * Called by: ExportFeature through JSX event props or task lifecycle callbacks because those event paths need to translate user actions or task lifecycle changes into feature state.
+   * Passed to each node row's format download buttons.
    * Flow: resolve node id/name, build the workspace export URL and filename, stream via Tauri on desktop or fetch a Blob in web, then reset per-node download state.
    */
   const handleDownloadOne = async (node: GraphNode) => {

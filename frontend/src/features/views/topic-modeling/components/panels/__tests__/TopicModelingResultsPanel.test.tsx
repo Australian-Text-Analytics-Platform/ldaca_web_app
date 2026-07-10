@@ -7,19 +7,16 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { TopicModelingResultsPanel } from '../TopicModelingResultsPanel';
 
 vi.mock('../results/TopicModelingBubbleChartSection', () => ({
-  // Used by: TopicModelingBubbleChartSection mock module factory to expose the control row slot because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   TopicModelingBubbleChartSection: ({ controlRowSlot }: { controlRowSlot?: React.ReactNode }) => (
     <div data-testid="topic-bubble-chart-section">{controlRowSlot}</div>
   ),
 }));
 
 vi.mock('../../../common/components/AnalysisCardLayout', () => ({
-  // Used by: AnalysisCardLayout mock module factory to preserve children under test because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   AnalysisCardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('../../../common/components/AnalysisRunningStateCard', () => ({
-  // Used by: AnalysisRunningStateCard mock module factory to provide a stable marker because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   AnalysisRunningStateCard: () => <div data-testid="analysis-running-state" />,
 }));
 

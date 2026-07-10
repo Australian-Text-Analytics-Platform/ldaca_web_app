@@ -18,7 +18,6 @@ vi.mock('sonner', () => ({
 
 /**
  * Mutable auth fixture consumed by the mocked `useAuth` hook across sidebar visibility tests.
- * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
  */
 const authState = {
   getAuthHeaders: () => ({}),
@@ -64,7 +63,6 @@ vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
 vi.mock('@/features/auth/hooks/useAuth', () => ({
   /**
    * Returns the mutable auth fixture used by sidebar account and action controls.
-   * Why: tests need stable fixtures and mocks before exercising the behavior under assertion.
    */
   useAuth: () => authState,
 }));

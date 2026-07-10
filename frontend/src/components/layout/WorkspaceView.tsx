@@ -38,7 +38,6 @@ function WorkspaceView({
     persistKey: 'ldaca.layout.workspaceGraphRatio',
     /**
      * Applies drag feedback directly to panes so graph/table consumers avoid render churn mid-resize.
-     * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
      */
     onLiveUpdate: (next) => {
       if (topRef.current) topRef.current.style.height = `${String(next * 100)}%`;

@@ -29,7 +29,7 @@ const SUPER_SOURCE_ID = '__dagre_super_source_2f7c3a__';
 
 /**
  * Computes React Flow node positions from workspace graph nodes and edges.
- * Used by: graphLayout tests, useWorkspaceGraph hook (rg call sites/imports).
+ * Used by `useWorkspaceGraph` to derive stable React Flow node positions.
  * Why: because the graph hook needs deterministic Dagre positions before React Flow receives node coordinates.
  * Flow: build a Dagre graph, add nodes and edges, run layout, then map positions back onto React Flow nodes.
  */

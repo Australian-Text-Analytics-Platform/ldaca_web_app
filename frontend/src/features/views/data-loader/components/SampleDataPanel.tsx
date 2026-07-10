@@ -34,7 +34,7 @@ const TOOL_LABELS: Record<string, string> = {
 /**
  * Formats sample-data collection sizes in the import dialog. Kept local because
  * sample catalogue entries always include concrete byte counts.
- * Used by: local callers in data-loader/SampleDataPanel module.
+ * Used by `SampleDataPanel` when rendering each collection's download size.
  */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`;
@@ -45,7 +45,7 @@ function formatBytes(bytes: number): string {
 /**
  * Renders local availability for a sample-data collection so users understand
  * which rows are bundled, downloaded, partial, or pending download.
- * Rendered by: data-loader/SampleDataPanel module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `SampleDataPanel` beside each collection's availability label.
  * Flow: map backend availability states to compact labels and color classes for the collection row.
  */
 function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
@@ -64,7 +64,7 @@ function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
 /**
  * Finds the collection README file used by the citation viewer. The sample
  * import list calls this per row to decide whether to show the README action.
- * Used by: local callers in data-loader/SampleDataPanel module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Used by `SampleDataPanel` to enable the README action for each collection.
  */
 function readmePath(col: SampleDataCollection): string | null {
   return col.files.find((f) => f.path.endsWith('README.md'))?.path ?? null;
@@ -80,7 +80,7 @@ interface ReadmeViewerProps {
 
 /**
  * Displays collection README markdown so users can inspect sample citations.
- * Rendered by: data-loader/SampleDataPanel module JSX because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `SampleDataPanel` when a collection README is selected.
  * Flow: load README markdown for a collection, show loading/error states, and render fetched text
  * only after the request resolves.
  */
@@ -142,7 +142,7 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
 /**
  * Opens the sample-content import workflow from Data Loader. It manages local
  * dataset selection and owns the file-query invalidation after import.
- * Rendered by: DataLoaderFeature module because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by: DataLoaderFeature module.
  * Flow: request available sample categories, render the dataset dialog, then
  * import selected collections and invalidate the shared file query once.
  */
@@ -164,7 +164,7 @@ export function SampleDataPanel() {
   /**
    * Treats bundled collections as always selected. Checkbox rendering and
    * import payload creation both use this helper to stay consistent.
-   * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by collection checkbox rendering and `handleImport`.
    */
   const getChecked = (col: SampleDataCollection) => {
     if (col.bundled) return true;
@@ -173,7 +173,7 @@ export function SampleDataPanel() {
 
   /**
    * Toggles optional remote collections in the dataset import dialog.
-   * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to each optional collection checkbox.
    */
   const toggle = (id: string) => {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -182,7 +182,7 @@ export function SampleDataPanel() {
   /**
    * Imports selected sample datasets and invalidates the shared file browser
    * once the backend reports the import has started or completed.
-   * Called by: SampleDataPanel internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Attached to the sample-data dialog's Import button.
    * Steps: collect selected IDs, show import progress, call the backend, report remote-download
    * state, invalidate files, then reset dialog state.
    */

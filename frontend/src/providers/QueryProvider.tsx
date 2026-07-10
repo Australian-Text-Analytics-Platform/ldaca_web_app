@@ -28,7 +28,7 @@ interface QueryProviderProps {
 }
 
 /** Wraps the SPA with the shared query client and devtools during local development. */
-/** Used by: src/App.tsx because those importers need shared behavior from one implementation rather than divergent local copies. */
+/** Rendered by `WorkspaceShell` to provide one query-client lifetime for workspace features. */
 export function QueryProvider({ children }: QueryProviderProps) {
   return (
     <QueryClientProvider client={queryClient}>

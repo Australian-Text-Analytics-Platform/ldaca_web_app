@@ -144,7 +144,6 @@ describe('loadRemoteRegistry — network path', () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
       /** Returns a remote registry payload so the loader can merge and cache it. */
-      /** Called by: mocked fetch responses in these tests. */
       json: () =>
         Promise.resolve({
           tutorial: {
@@ -198,7 +197,6 @@ describe('loadRemoteRegistry — network path', () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
       /** Returns an empty remote registry so repeated loads can share one in-flight request. */
-      /** Called by: mocked fetch responses in these tests. */
       json: () => Promise.resolve({ tutorial: {} }),
     });
     vi.stubGlobal('fetch', fetchSpy);

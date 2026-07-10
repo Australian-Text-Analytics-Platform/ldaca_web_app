@@ -64,8 +64,10 @@ interface Props {
   resultState?: string;
 }
 /**
- * Rendered by: TopicModelingFeature to show the topic-modeling parameter form and shared actions because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Renders topic-modeling node inputs, sampling controls, run parameters, and shared actions.
+ * Rendered by: TopicModelingFeature, which owns the selected-node and task state supplied here.
+ * Flow: keep numeric input drafts editable until blur, clamp committed values,
+ * attach per-corpus sampling to NodeInputsPanel, and delegate run/stop/clear actions.
  */
 export function TopicModelingParameterPanel({
   nodeInputs,

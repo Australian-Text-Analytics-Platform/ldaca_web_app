@@ -72,7 +72,7 @@ function SidebarProvider({
   // Supports both controlled and uncontrolled sidebar state for app shell consumers.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
-  /** Called by: SidebarProvider consumers and mobile sheet onOpenChange handlers because the component or hook needs a named callback boundary for effect and prop handoff steps. */
+  /** Called by: SidebarProvider consumers and mobile sheet onOpenChange handlers. */
   const setOpen = (value: boolean | ((value: boolean) => boolean)) => {
     const openState = typeof value === 'function' ? value(open) : value;
     if (setOpenProp) {
@@ -229,7 +229,6 @@ function Sidebar({
 
 /**
  * Icon button used by mobile chrome and callers to toggle the sidebar provider state.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  * Flow: read the provider toggle, run any caller onClick first, toggle sidebar state, then render the panel icon with sr-only text.
  */
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
@@ -254,7 +253,7 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
   );
 }
 
-/** Used by: App sidebar layouts that keep the shadcn desktop rail affordance. */
+/** Rendered by `Sidebar` to keep the shadcn desktop rail affordance. */
 function SidebarRail({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -326,7 +325,6 @@ function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
 
 /**
  * Menu list primitive used by the app sidebar view navigation.
- * Why: shared UI callers need a stable primitive boundary for layout, accessibility, and composition.
  */
 function SidebarMenu({ className, ...props }: React.ComponentProps<'ul'>) {
   return (

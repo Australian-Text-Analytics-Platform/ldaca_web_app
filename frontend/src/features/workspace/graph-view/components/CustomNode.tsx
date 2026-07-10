@@ -145,7 +145,7 @@ function customNodeUiReducer(
 /**
  * React Flow node renderer for a workspace node. Shows a compact card when zoomed
  * out, and a full card with metadata + action menu when zoomed in.
- * Rendered by: workspace/CustomNode module JSX because React Flow needs this custom node type for workspace data blocks.
+ * Rendered within `CustomNode` because React Flow needs this custom node type for workspace data blocks.
  * Flow: React Flow passes node data, zoom and selection choose compact or full rendering, and actions invoke workspace mutations.
  */
 function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {

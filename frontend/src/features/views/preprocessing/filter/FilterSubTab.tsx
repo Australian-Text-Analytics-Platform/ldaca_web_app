@@ -18,7 +18,7 @@ type FilterSubTabComponentProps = FilterSubTabProps & {
 /**
  * Renders the Filter preprocessing tab. It relies on `useFilterSubTabSections`
  * for condition state, categorical options, preview data, and apply behavior.
- * Rendered by: useFilterSubTabSections hook, DataPreprocessingFeature module, SubTabActivityTag component (rg call sites/imports) because the parent needs this component boundary to keep feature controls and state presentation isolated.
+ * Rendered by `DataPreprocessingFeature`; its hook supplies condition-builder sections.
  * Flow: read grouped configs from the hook, render selection/condition/preview panels, and send
  * condition edits/apply requests through hook actions.
  */

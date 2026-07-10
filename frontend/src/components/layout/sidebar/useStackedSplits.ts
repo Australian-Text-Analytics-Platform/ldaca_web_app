@@ -1,7 +1,6 @@
 import {
   useCallback,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -102,34 +101,29 @@ export const useStackedSplits = <KeyT extends string>(
     };
   }, []);
 
-  const activeSectionTotal = useMemo(() => {
-    const total = keys.reduce((sum, key) => {
+  const activeSectionTotal =
+    keys.reduce((sum, key) => {
       if (collapsedSections[key]) return sum;
       return sum + (sectionHeights[key] ?? 0);
-    }, 0);
-    return total || 1;
-  }, [keys, collapsedSections, sectionHeights]);
+    }, 0) || 1;
 
-  const isCollapsed = useCallback(
-    (key: KeyT) => Boolean(collapsedSections[key]),
-    [collapsedSections],
-  );
+  const isCollapsed = (key: KeyT) => Boolean(collapsedSections[key]);
 
-  const toggleSection = useCallback((key: KeyT) => {
+  const toggleSection = (key: KeyT) => {
     setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+  };
 
-  const getSectionFlexStyle = useCallback(
-    (key: KeyT): CSSProperties => {
-      if (collapsedSections[key]) {
-        return { flex: '0 0 auto' };
-      }
-      const ratio = (sectionHeights[key] ?? 0) / activeSectionTotal;
-      return { flexGrow: ratio, flexShrink: 0, flexBasis: 0 };
-    },
-    [collapsedSections, sectionHeights, activeSectionTotal],
-  );
+  const getSectionFlexStyle = (key: KeyT): CSSProperties => {
+    if (collapsedSections[key]) {
+      return { flex: '0 0 auto' };
+    }
+    const ratio = (sectionHeights[key] ?? 0) / activeSectionTotal;
+    return { flexGrow: ratio, flexShrink: 0, flexBasis: 0 };
+  };
 
+  // These callbacks cross ref/listener boundaries: React invokes the ref during
+  // attach/detach, and a resize gesture installs window listeners that must
+  // share one captured interaction until mouseup removes them.
   const assignSectionScrollRef = useCallback((key: KeyT, node: HTMLDivElement | null) => {
     sectionScrollRefs.current[key] = node;
   }, []);
@@ -181,7 +175,7 @@ export const useStackedSplits = <KeyT extends string>(
       }
 
       /**
-       * Called by: the window mousemove listener installed by handleResizeStart because the interaction needs a single handler that validates state, runs the action, and updates feedback.
+       * Called by the window mousemove listener installed below for this drag.
        * Flow: convert mouse delta to section ratios, clamp the upper/lower pair, update heights, then scroll overflow when the drag hits a minimum bound.
        */
       const onMove = (moveEvent: MouseEvent) => {
@@ -214,7 +208,7 @@ export const useStackedSplits = <KeyT extends string>(
         }
       };
 
-      /** Called by: the window mouseup listener installed by handleResizeStart because the interaction needs a single handler that validates state, runs the action, and updates feedback. */
+      /** Removes this drag's window listeners when the mouse is released. */
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);

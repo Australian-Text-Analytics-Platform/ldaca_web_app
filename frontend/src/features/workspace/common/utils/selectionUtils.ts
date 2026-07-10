@@ -5,7 +5,7 @@
  * index 0 and the most recent selection is at the end. When more items are
  * selected than a feature allows, this helper keeps the *most recent* ones.
  */
-/** Used by: src/features/views/concordance/components/ConcordanceDispersionNodeBlock.tsx, src/features/views/concordance/components/ConcordanceTableNodeBlock.tsx, src/features/views/quotation/QuotationFeature.tsx and other importers. */
+/** Used by Concordance result blocks/handoffs and single-node preprocessing tabs. */
 export function takeMostRecent<T>(items: T[], max: number): T[] {
   if (items.length <= max) return items;
   return items.slice(-max);
@@ -16,7 +16,6 @@ export function takeMostRecent<T>(items: T[], max: number): T[] {
  *
  * Used by multi-node preprocessing sub-tabs (concat/join) where the upstream
  * selection store can briefly contain repeats during reordering.
- * Why: importers need one shared normalization boundary to keep behavior consistent.
  */
 export const dedupeNodeIds = (nodeIds: string[]): string[] => {
   const seen = new Set<string>();

@@ -93,8 +93,10 @@ const TM_CSV_OPTION = {
 } as const;
 
 /**
- * Rendered by: TopicModelingResultsPanel to show the topic bubble chart and export controls because the analysis route needs this component to assemble the selected tab state, controls, task lifecycle, and results surface.
- * Flow: derive display state, bind user actions, then render the analysis UI.
+ * Composes the topic bubble chart, zoom/export overlay, tooltip, controls, and topic lists.
+ * Rendered by: TopicModelingResultsPanel for successful task results.
+ * Flow: host the SVG and tooltip, export the visible topic data with the
+ * chart image, render post-fit controls, then pass shared interaction state to TopicSelectionPanel.
  */
 export function TopicModelingBubbleChartSection({
   topics,

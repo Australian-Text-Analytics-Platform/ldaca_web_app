@@ -58,7 +58,6 @@ export const captureFeedbackContext = (
 
 /**
  * Encodes captured feedback metadata into the Qualtrics URL consumed by the iframe.
- * Why: callers need a focused rendering boundary for layout, accessibility, and state handoff.
  */
 export const buildSurveyUrl = (base: string, ctx: FeedbackContext): string => {
   const url = new URL(base);

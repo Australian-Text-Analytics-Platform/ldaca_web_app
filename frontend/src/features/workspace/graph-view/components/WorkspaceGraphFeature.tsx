@@ -16,7 +16,7 @@ export interface WorkspaceGraphFeatureProps {
 
 /**
  * Control button that toggles the React Flow minimap overview.
- * Rendered by: workspace/WorkspaceGraphFeature module JSX because graph controls need a compact overview toggle.
+ * Rendered within `WorkspaceGraphFeature` because graph controls need a compact overview toggle.
  * Flow: receive the overview state, choose the button title/icon opacity, and invoke the supplied toggle handler from React Flow controls.
  */
 const OverviewToggle = ({ active, onToggle }: { active: boolean; onToggle: () => void }) => (
@@ -32,7 +32,7 @@ const OverviewToggle = ({ active, onToggle }: { active: boolean; onToggle: () =>
 
 /**
  * Control button that clears selected workspace nodes.
- * Rendered by: workspace/WorkspaceGraphFeature module JSX because multi-select graph sessions need a one-click clear action.
+ * Rendered within `WorkspaceGraphFeature` because multi-select graph sessions need a one-click clear action.
  * Flow: receive disabled state and clear callback, render a React Flow control button, and block the clear action when no selection can be cleared.
  */
 const DeselectButton = ({ disabled, onClear }: { disabled: boolean; onClear: () => void }) => (
@@ -50,7 +50,7 @@ const DeselectButton = ({ disabled, onClear }: { disabled: boolean; onClear: () 
 
 /**
  * Floating selection count shown over the graph canvas.
- * Rendered by: workspace/WorkspaceGraphFeature module JSX because graph users need visible multi-selection feedback.
+ * Rendered within `WorkspaceGraphFeature` because graph users need visible multi-selection feedback.
  * Flow: skip the overlay when no nodes exist, otherwise render selected and total counts over the graph canvas.
  */
 const GraphSelectionOverlay = ({ selected, total }: { selected: number; total: number }) => {
@@ -66,7 +66,7 @@ const GraphSelectionOverlay = ({ selected, total }: { selected: number; total: n
 
 /**
  * Placeholder shown while the workspace graph query is loading.
- * Rendered by: workspace/WorkspaceGraphFeature module JSX because graph loading needs a canvas-shaped skeleton.
+ * Rendered within `WorkspaceGraphFeature` because graph loading needs a canvas-shaped skeleton.
  * Flow: render graph-card skeleton blocks first, then show a spinner label so the loading state preserves the canvas footprint.
  */
 const GraphLoadingState = () => (
@@ -88,7 +88,7 @@ const GraphLoadingState = () => (
 
 /**
  * Empty state shown before a workspace graph is available.
- * Rendered by: workspace/WorkspaceGraphFeature module JSX because the graph feature needs an idle state before workspace data exists.
+ * Rendered within `WorkspaceGraphFeature` because the graph feature needs an idle state before workspace data exists.
  * Flow: render a centered card with the graph icon, title, and Data Loader prompt when no workspace graph can be displayed.
  */
 const GraphEmptyState = () => (
@@ -105,7 +105,7 @@ const GraphEmptyState = () => (
 
 /**
  * Renders the interactive workspace graph and its React Flow controls.
- * Rendered by: WorkspaceView component, useWorkspaceGraph hook, index module (rg call sites/imports) because the workspace view needs one graph feature shell.
+ * Rendered by `WorkspaceView`; `useWorkspaceGraph` supplies its React Flow model.
  * Flow: read the graph view model, branch to loading or empty fallback states, then wire nodes, edges, handlers, controls, and optional minimap into React Flow.
  */
 export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) {

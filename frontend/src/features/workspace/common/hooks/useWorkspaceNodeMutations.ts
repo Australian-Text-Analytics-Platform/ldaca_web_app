@@ -89,8 +89,8 @@ export const useWorkspaceNodeMutations = ({
       ...analysisActions,
       /**
        * Gives table and graph consumers a guarded schema refresh action.
-       * Consumed by: useWorkspaceNodeMutations return object for feature components.
-       * Why: because feature components need one stable action facade for generated API mutations, cache refreshes, and operation state.
+       * Used by useWorkspaceDataTable and the Aggregate, Expression, and Replace
+       * preprocessing flows after a schema-changing mutation.
        * Flow: verify the node still exists, fetch fresh node info, normalize schema, and return null on stale nodes.
        */
       refreshNodeSchema: (nodeId: string) =>

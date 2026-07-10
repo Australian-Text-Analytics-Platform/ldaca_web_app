@@ -9,7 +9,7 @@
 
 /**
  * Clamp `value` into `[0, max]`. NaN and out-of-range values fall back to `max`.
- * Used by: tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by the helpers below to clamp drag-and-drop insertion indexes.
  */
 export const clampIndex = (value: number, max: number): number => {
   if (Number.isNaN(value)) return max;
@@ -21,7 +21,7 @@ export const clampIndex = (value: number, max: number): number => {
 /**
  * Insert `item` into a copy of `items` at `targetIndex`, clamped to
  * `[0, items.length]`. `undefined` for `targetIndex` appends.
- * Used by: useAggregateSubTab hook, tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `useAggregateSubTab` when adding builder tokens.
  */
 export const insertItemAt = <T>(
   items: readonly T[],
@@ -37,7 +37,7 @@ export const insertItemAt = <T>(
 /**
  * Remove the entry at `index`. Out-of-range indexes return the array
  * unchanged.
- * Used by: useAggregateSubTab hook, tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `useAggregateSubTab` when removing builder tokens and operations.
  */
 export const removeItemAt = <T>(items: readonly T[], index: number): T[] => {
   if (index < 0 || index >= items.length) return [...items];
@@ -54,7 +54,7 @@ export const removeItemAt = <T>(items: readonly T[], index: number): T[] => {
  * source item has been removed*. When `fromIndex < toIndex` we therefore
  * decrement `toIndex` by one — without that adjustment, the moved item
  * would land one slot too far to the left.
- * Used by: useAggregateSubTab hook, tokenIndexMath tests (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `useAggregateSubTab` when reordering builder tokens.
  * Steps: reject invalid moves, remove the source item, adjust the post-removal target, and
  * reinsert only when the order changes.
  */

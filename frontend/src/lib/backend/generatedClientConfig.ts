@@ -16,12 +16,12 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const TIMEOUT_OVERRIDE_HEADER = 'x-client-timeout-ms';
 
 /** Detects Request objects so generated SDK calls can preserve caller-provided headers and signals. */
-/** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: request-signal, timeout-override, and request-construction helpers. */
 const isRequest = (input: RequestInfo | URL): input is Request =>
   typeof Request !== 'undefined' && input instanceof Request;
 
 /** Resolves the abort signal that should be chained into the generated-client timeout. */
-/** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+/** Called by: `createGeneratedApiFetch` before it creates the chained timeout. */
 const getRequestSignal = (
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -31,14 +31,15 @@ const getRequestSignal = (
 };
 
 /** Adapts the app's `/api` base to hey-api's expectation of the server origin. */
-/** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts. */
+/** Used by: generated-client setup plus auth, export, and task-stream URL builders. */
 export const getGeneratedApiBase = (apiBase = getApiBase()): string =>
   apiBase.replace(/\/api\/?$/, '');
 
 /** Creates the per-request timeout and propagates upstream caller aborts into one signal. */
 /**
- * Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: read runtime configuration, normalize request or response details, then return the backend-facing value.
+ * Called by: `createGeneratedApiFetch` for every generated request.
+ * Flow: arm the configured timeout, mirror the caller's abort into the same
+ * signal, and expose timeout classification plus deterministic cleanup.
  */
 const createTimeout = (sourceSignal?: AbortSignal, timeoutMs: number = DEFAULT_TIMEOUT_MS) => {
   const controller = new AbortController();
@@ -51,7 +52,7 @@ const createTimeout = (sourceSignal?: AbortSignal, timeoutMs: number = DEFAULT_T
         }, timeoutMs)
       : undefined;
   /** Preserves the caller's abort reason when we chain their signal. */
-  /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+  /** Registered on the caller signal and also invoked for an already-aborted signal. */
   const abortFromSource = () => {
     controller.abort(sourceSignal?.reason);
   };
@@ -65,11 +66,11 @@ const createTimeout = (sourceSignal?: AbortSignal, timeoutMs: number = DEFAULT_T
   return {
     signal: controller.signal,
     /** Distinguishes our timeout abort from an abort requested by the original caller. */
-    /** Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+    /** Read by: the generated fetch wrapper's error classifier. */
     didTimeOut: () =>
       timeoutId !== undefined && controller.signal.aborted && !sourceSignal?.aborted,
     /** Removes timeout/listener resources once fetch resolves or rejects. */
-    /** Used by: src/test/setup.ts because the library needs this local step to isolate browser, data, or runtime edge cases for importers. */
+    /** Called by: the generated fetch wrapper's `finally` block. */
     cleanup: () => {
       if (timeoutId !== undefined) clearTimeout(timeoutId);
       sourceSignal?.removeEventListener('abort', abortFromSource);
@@ -99,7 +100,7 @@ const resolveTimeoutOverride = (
 
 /** Injects auth headers into a Request while leaving explicit caller headers untouched. */
 /**
- * Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
+ * Called by: `createGeneratedApiFetch` after timeout resolution.
  * Flow: start from caller or Request headers, fill missing auth headers lazily, then create a Request with the chained timeout signal.
  */
 const createRequest = (
@@ -118,8 +119,9 @@ const createRequest = (
 
 /** Converts non-2xx generated SDK responses into the shared `ApiError` shape. */
 /**
- * Called by: getGeneratedApiBase and createClientConfig in this library module because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: read runtime configuration, normalize request or response details, then return the backend-facing value.
+ * Called by: `createGeneratedApiFetch` for non-success responses.
+ * Flow: prefer structured JSON details, fall back to response text/status,
+ * and preserve status plus raw detail on the shared error.
  */
 const parseErrorResponse = async (response: Response): Promise<ApiError> => {
   let detail: unknown;
@@ -148,8 +150,9 @@ const parseErrorResponse = async (response: Response): Promise<ApiError> => {
 /**
  * Builds the fetch implementation passed to hey-api so generated calls inherit
  * auth, timeouts, network error shaping, and MSW-test fetch substitution.
- * Called by: createClientConfig when wiring hey-api's runtime fetch option because the library needs this local step to isolate browser, data, or runtime edge cases for importers.
- * Flow: read runtime configuration, normalize request or response details, then return the backend-facing value.
+ * Called by: createClientConfig when wiring hey-api's runtime fetch option.
+ * Flow: strip the client-only timeout override, chain abort signals, inject
+ * current auth, normalize HTTP/network/timeout failures, and always clean up.
  */
 const createGeneratedApiFetch = (fetchImpl?: typeof fetch): typeof fetch => {
   return async (input, init) => {
@@ -180,7 +183,7 @@ const createGeneratedApiFetch = (fetchImpl?: typeof fetch): typeof fetch => {
 };
 
 /** Supplies hey-api's runtime config for every generated SDK call site. */
-/** Used by: src/lib/backend/__tests__/generatedClientConfig.test.ts. */
+/** Used by: the generated `client.gen.ts` initializer; covered by config tests. */
 export const createClientConfig: CreateClientConfig = (config) => ({
   ...config,
   baseUrl: getGeneratedApiBase(config?.baseUrl),

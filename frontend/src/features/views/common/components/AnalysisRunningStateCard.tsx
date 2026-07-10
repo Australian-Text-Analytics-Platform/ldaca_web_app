@@ -17,7 +17,7 @@ const toMs = (v: number) => (v < 1e12 ? v * 1000 : v);
 /**
  * Tracks elapsed task runtime for running-state cards without requiring every
  * feature to own an interval timer.
- * Used by: AnalysisRunningStateCard because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Used by: AnalysisRunningStateCard.
  * Flow: initialize elapsed seconds from started_at, tick every second while a valid start exists, then clear the interval when the card unmounts or task changes.
  */
 function useElapsedSeconds(startedAt: string | number | null | undefined): number {
@@ -57,7 +57,6 @@ function formatElapsed(seconds: number): string {
  * Displays progress and elapsed time for an analysis task that is still running
  * when the feature panel renders or hydrates from task state.
  * Used by: token-frequency and topic-modeling result panels.
- * Flow: normalize incoming props, derive display state, connect event handlers, then render the shared analysis UI.
  */
 export function AnalysisRunningStateCard({
   title = 'Task running',

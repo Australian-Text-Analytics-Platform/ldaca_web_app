@@ -30,7 +30,7 @@ function toGraphNodeSummary(nodeInfo: WorkspaceNodeInfo): WorkspaceGraphNode {
 /**
  * Updates node-info and graph-summary caches after node preference writes so
  * graph panels and analysis selectors immediately see the persisted metadata.
- * Called by: node document-column and tokenization preference persistence hooks because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Called by: node document-column and tokenization preference persistence hooks.
  * Flow: write full node-info into the node-info query, write only graph-facing
  * fields into the workspace-graph query, then invalidate both caches so
  * selectors and graph panels refetch if needed.
@@ -63,7 +63,7 @@ function updateWorkspaceNodeInfoCache(
 /**
  * Returns the mutation used by node/column selectors to persist a preferred
  * document column and keep cached workspace metadata in sync.
- * Used by: analysis selectors that let users choose a document column per node because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
+ * Used by: analysis selectors that let users choose a document column per node.
  * Flow: capture QueryClient and workspace identity, return a document-column mutation that trims empty values, writes the backend preference, updates caches, and shows a toast on failure.
  */
 export function usePersistNodeDocumentColumn({
@@ -96,8 +96,9 @@ export function usePersistNodeDocumentColumn({
 /**
  * Returns the mutation used by tokenizer selectors to persist per-column model
  * preferences that later analyses use when choosing tokenized columns.
- * Used by: token model selectors in analysis parameter panels because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: token model selectors in analysis parameter panels.
+ * Flow: normalize the selected model/language, persist the preference, project
+ * the returned metadata into node-info/graph caches, and toast on failure.
  */
 export function usePersistNodeTokenizationPreference({
   workspaceId,

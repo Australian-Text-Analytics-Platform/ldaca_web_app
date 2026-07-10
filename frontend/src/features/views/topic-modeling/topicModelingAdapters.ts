@@ -7,16 +7,13 @@ export interface ZoomDomain {
   yMax: number;
 }
 
-/** Interpolates between two hex colours for topic bubble intensity scales. */
 /**
- * Used by: useTopicModelingBubbleChart.tsx.
+ * Interpolates between two hex colours for topic bubble intensity scales.
+ * Used by: useTopicModelingBubbleChart to blend two corpus colours for each bubble.
  * Flow: parse both hex colors into RGB triples, linearly interpolate each channel by t, then return an rgb() string.
  */
 export function interpolateColor(colorA: string, colorB: string, t: number): string {
-  // Parses six-character hex colours into RGB triples for interpolation.
-  /**
-   * Called by: interpolateColor as a local helper in this analysis workflow.
-   */
+  // Called twice by interpolateColor to parse the two endpoint colours into RGB channels.
   const parse = (color: string): [number, number, number] => {
     const parts = color
       .replace('#', '')
@@ -35,9 +32,9 @@ export function interpolateColor(colorA: string, colorB: string, t: number): str
   return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
 }
 
-/** Chooses readable text colour for chips rendered on arbitrary node colours. */
 /**
- * Used by: useTopicModelingBubbleChart.tsx.
+ * Chooses readable text colour for chips rendered on arbitrary node colours.
+ * Used by: useTopicModelingBubbleChart.renderSizeComposition for corpus-size chips.
  * Flow: reject missing or non-six-digit colors to white, compute RGB luminance, then choose dark text for light fills or white text otherwise.
  */
 export function getReadableTextColor(hexColor: string): string {
@@ -53,9 +50,9 @@ export function getReadableTextColor(hexColor: string): string {
   return luminance > 160 ? '#1e293b' : '#ffffff';
 }
 
-/** Computes the full zoom domain needed to fit all topic points in the chart. */
 /**
- * Used by: useTopicModelingZoomBrush.ts.
+ * Computes the full zoom domain needed to fit all topic points in the chart.
+ * Used by: useTopicModelingZoomBrush to derive the initial and reset domains.
  * Flow: collect topic x/y coordinates, compute min/max bounds, widen flat axes with epsilon, then return the zoom domain.
  */
 export function computeZoomDomain(

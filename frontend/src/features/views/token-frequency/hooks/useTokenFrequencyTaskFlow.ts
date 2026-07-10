@@ -57,7 +57,8 @@ interface UseTokenFrequencyTaskFlowParams {
 /** Owns submit, result hydration, and cross-feature navigation for token-frequency tasks. */
 /**
  * Used by: TokenFrequencyFeature.tsx.
- * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+ * Flow: submit token-frequency requests from the selected nodes, apply returned
+ * results/stop words, and create a fresh Concordance tab for token navigation.
  */
 export const useTokenFrequencyTaskFlow = ({
   state: {
@@ -97,8 +98,9 @@ export const useTokenFrequencyTaskFlow = ({
 
   /** Builds and submits a token-frequency request from the current selection state. */
   /**
-   * Called by: useTokenFrequencyTaskFlow through JSX event props or task lifecycle callbacks.
-   * Flow: normalize caller params, build the backend request, submit or update the task, then merge terminal results and preferences back into UI state.
+   * Returned to `TokenFrequencyFeature` by `useTokenFrequencyTaskFlow`.
+   * Flow: validate columns/tokenizers, build the two-node request, run the
+   * workspace mutation, record its task id, and apply result/stop-word state.
    */
   const handleAnalyze = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) {

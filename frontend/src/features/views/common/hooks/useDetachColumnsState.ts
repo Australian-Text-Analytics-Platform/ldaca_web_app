@@ -23,8 +23,9 @@ export interface UseDetachColumnsStateResult {
  * `detachNodeOptions` is read fresh on every "select all" / "deselect all"
  * call (it's typically populated asynchronously when the user opens the
  * dialog), so callers don't need to memoise it.
- * Used by: concordance, quotation, and topic-modeling detach-column dialogs because callers need shared hook state and handlers without duplicating analysis lifecycle wiring.
- * Flow: read caller config, derive local analysis state, call store/API helpers as needed, then return state and handlers to the feature.
+ * Used by: concordance, quotation, and topic-modeling detach-column dialogs.
+ * Flow: maintain per-node column arrays and expose toggle, select-all,
+ * deselect-all, and reset operations over the current dialog options.
  */
 export const useDetachColumnsState = (
   detachNodeOptions: DetachNodeOption[],

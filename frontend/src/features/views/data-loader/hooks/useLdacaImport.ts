@@ -17,7 +17,7 @@ type LdacaSearchRequest = Omit<OniSearchRequest, 'method' | 'query'> & {
 /**
  * Adds an optional Oni API token to generated-client headers. LDaCA search,
  * featured records, and import calls all share this adapter.
- * Used by: local callers in data-loader/useLdacaImport module because nearby helpers need the same normalization, formatting, or adapter rule without duplicating it.
+ * Called by featured, search, and import request paths in `useLdacaImport`.
  */
 function withLdacaApiToken(token?: string | null): Record<string, string> {
   const trimmed = token?.trim();
@@ -35,7 +35,7 @@ interface UseLdacaImportParams {
  * Owns the LDaCA Oni import workflow for the Data Loader. It keeps search,
  * filters, staff picks, token-aware headers, and import progress outside the
  * dialog presentation component.
- * Used by: useLdacaImport tests, DataLoaderFeature module (rg call sites/imports) because those callers need a shared helper boundary for consistent feature state, formatting, or request payloads.
+ * Used by `DataLoaderFeature` to supply Oni search/import state to `DataLoaderDialogs`.
  * Flow: load featured records, run ONI search from dialog filters, import selected records
  * through backend APIs, and keep loading/error state isolated for DataLoaderDialogs.
  */
@@ -45,7 +45,7 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
   /**
    * Lazily loads staff-picked collections for the import dialog, with an
    * optional token override after saving/deleting an Oni token.
-   * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Called by the dialog-open path and `reloadFeaturedRecords` after token changes.
    * Steps: skip cached loads, apply token-aware headers, request featured records, update cached
    * results, and surface load errors through the dialog state.
    */
@@ -69,7 +69,6 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
   /**
    * Forces staff picks to reload after token changes so the dialog reflects the
    * current authentication context.
-   * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const reloadFeaturedRecords = async (tokenOverride = ldacaApiToken) => {
     dispatch({ type: 'featuredInvalidated' });
@@ -79,7 +78,6 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
   /**
    * Opens/closes the import dialog and triggers the initial staff-picks load on
    * first open.
-   * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
    */
   const setLdacaImportOpen = (open: boolean) => {
     dispatch({ type: 'setOpen', open });
@@ -107,7 +105,7 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
   /**
    * Searches the Oni portal using the current method/query and resets local
    * filters so result filtering starts from the full response.
-   * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `DataLoaderDialogs` as the search-form submit action.
    * Steps: trim the query, clear stale results/filters, submit the search request, then publish
    * results or an error message for DataLoaderDialogs.
    */
@@ -138,7 +136,7 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
 
   /**
    * Starts a backend import for a selected Oni record or typed identifier.
-   * Called by: useLdacaImport internal event, effect, or helper flow because the named handler keeps state updates, backend calls, and cleanup in one predictable path.
+   * Returned to `DataLoaderDialogs` for search-result and typed-id import actions.
    * Steps: resolve the selected record, call the import endpoint, close/reset dialog state,
    * and clear the row-level importing flag. The workspace task inbox owns the
    * single file-query invalidation when the background import reaches success.
