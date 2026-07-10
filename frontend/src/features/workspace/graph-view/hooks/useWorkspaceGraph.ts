@@ -393,10 +393,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const newEdgesSignature = JSON.stringify(initialEdges.map(edgePresentationFor));
   const nodesPresentationChanged = newNodesSignature !== currentNodesSignature;
   const edgesPresentationChanged = newEdgesSignature !== currentEdgesSignature;
+  const renderedWorkspaceIdRef = useRef(currentWorkspaceId);
 
   const updateRafRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!nodesPresentationChanged && !edgesPresentationChanged) {
+    const workspaceChanged = renderedWorkspaceIdRef.current !== currentWorkspaceId;
+    if (!workspaceChanged && !nodesPresentationChanged && !edgesPresentationChanged) {
       return;
     }
 
@@ -405,10 +407,17 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     }
 
     updateRafRef.current = requestAnimationFrame(() => {
-      if (nodesPresentationChanged) {
+      if (workspaceChanged) {
+        // A workspace is a separate React Flow identity domain. Even when ids
+        // and presentation signatures overlap, use only the incoming graph so
+        // position, selection, measurement, and dragging cannot cross over.
+        setNodes(initialNodes);
+        setEdges(initialEdges);
+        renderedWorkspaceIdRef.current = currentWorkspaceId;
+      } else if (nodesPresentationChanged) {
         setNodes((existingNodes) => reconcileProjectedNodes(existingNodes, initialNodes));
       }
-      if (edgesPresentationChanged) {
+      if (!workspaceChanged && edgesPresentationChanged) {
         setEdges(initialEdges);
       }
     });
@@ -421,6 +430,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   }, [
     currentEdgesSignature,
     currentNodesSignature,
+    currentWorkspaceId,
     edgesPresentationChanged,
     initialEdges,
     initialNodes,

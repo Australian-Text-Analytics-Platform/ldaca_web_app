@@ -124,6 +124,34 @@ describe('useWorkspaceGraph', () => {
     expect(result.current.edges[0]?.label).toBe('second label');
   });
 
+  it('resets React Flow-owned state when a new workspace reuses the same node id', () => {
+    const { result, rerender } = renderHook(() => useWorkspaceGraph());
+
+    act(() => {
+      result.current.handleNodesChange([
+        {
+          id: 'node-1',
+          type: 'position',
+          position: { x: 420, y: 315 },
+          dragging: true,
+        },
+      ]);
+    });
+
+    useSelectionStore.setState({ currentWorkspaceId: 'workspace-b' });
+    useWorkspaceDataMock.mockReturnValue({
+      currentWorkspaceId: 'workspace-b',
+      workspaceGraph: makeGraph('#ff0000', 'workspace B label'),
+    });
+    rerender();
+
+    expect(result.current.nodes[0]?.position).toEqual({ x: 0, y: 50 });
+    expect(result.current.nodes[0]?.dragging).toBeUndefined();
+    expect(result.current.nodes[0]?.selected).toBe(false);
+    expect((result.current.nodes[0]?.data as unknown as TestNodeData).node.color).toBe('#ff0000');
+    expect(result.current.edges[0]?.label).toBe('workspace B label');
+  });
+
   it('reads the workspace at invocation time for cached graph commands', () => {
     const { result, rerender } = renderHook(() => useWorkspaceGraph());
     const cachedAddCommand = (result.current.nodes[0]?.data as unknown as TestNodeData)
