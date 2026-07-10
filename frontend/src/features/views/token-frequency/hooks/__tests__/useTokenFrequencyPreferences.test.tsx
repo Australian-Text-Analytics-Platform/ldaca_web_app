@@ -18,9 +18,6 @@ const baseArgs = {
   currentWorkspaceId: 'ws-1',
   results: null,
   setResults: vi.fn(),
-  /** Supplies deterministic auth headers for generated API calls. */
-  // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
-  getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
   /** Resolves a stable task ID so persistence code can address a result. */
   // Called by: the Vitest cases in this file through its owning hook, JSX prop, or analysis lifecycle config because the test needs a deterministic fixture, mock, or helper before exercising the behavior under assertion.
   resolveTokenFrequencyTaskId: () => Promise.resolve('task-1'),
