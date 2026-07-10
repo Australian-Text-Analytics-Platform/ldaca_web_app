@@ -80,14 +80,18 @@ function normalizeRelativeTarget(sourcePath, { kind, rawTarget }) {
   if (!target || EXTERNAL_LINK_RE.test(target)) return null;
 
   const hashIndex = target.indexOf('#');
-  const rawPath = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
-  const rawAnchor = hashIndex >= 0 ? target.slice(hashIndex + 1) : '';
+  const rawPath = (hashIndex >= 0 ? target.slice(0, hashIndex) : target).trim();
+  const rawAnchor = (hashIndex >= 0 ? target.slice(hashIndex + 1) : '').trim();
+  const runtimePath = rawPath
+    ? rawPath.startsWith('/')
+      ? posix.normalize(rawPath.replace(/^\/+/, ''))
+      : posix.normalize(posix.join(posix.dirname(sourcePath), rawPath))
+    : sourcePath;
+  const resolvedKind = kind !== 'image' && runtimePath.endsWith('.md') ? 'document' : 'asset';
   const pathWithoutQuery = rawPath.split('?')[0];
   let decodedPath;
-  let decodedAnchor;
   try {
     decodedPath = decodeURIComponent(pathWithoutQuery);
-    decodedAnchor = decodeURIComponent(rawAnchor);
   } catch {
     return { invalid: true, rawTarget };
   }
@@ -95,16 +99,12 @@ function normalizeRelativeTarget(sourcePath, { kind, rawTarget }) {
   // DocumentView intercepts only Markdown documents (plus hash-only links).
   // Images and non-Markdown hrefs pass through to the browser and follow the
   // public-root asset convention used by the bundled documentation.
-  const resolvedKind =
-    kind === 'image' || (decodedPath && !decodedPath.toLowerCase().endsWith('.md'))
-      ? 'asset'
-      : 'document';
   const targetPath = decodedPath
     ? resolvedKind === 'asset' || decodedPath.startsWith('/')
       ? posix.normalize(decodedPath.replace(/^\/+/, ''))
       : posix.normalize(posix.join(posix.dirname(sourcePath), decodedPath))
     : sourcePath;
-  return { kind: resolvedKind, targetPath, anchor: decodedAnchor };
+  return { kind: resolvedKind, targetPath, anchor: rawAnchor };
 }
 
 /**

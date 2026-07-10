@@ -122,6 +122,84 @@ describe('documentation drift validation', () => {
     expect(problems).toEqual([]);
   });
 
+  it('does not intercept uppercase Markdown extensions as document navigation', () => {
+    const problems = collectDocumentationProblems({
+      registry: {
+        tutorial: {
+          current: {
+            file: 'tutorials/guides/current.md',
+            anchor: 'help-current',
+          },
+        },
+        info: {},
+        reference: {},
+      },
+      documents: new Map([
+        [
+          'tutorials/guides/current.md',
+          '<h1 id="help-current">Current</h1>\n[Next](next.MD#next)',
+        ],
+        ['tutorials/guides/next.MD', '<h2 id="next">Next</h2>'],
+      ]),
+    });
+
+    expect(problems).toContain(
+      'tutorials/guides/current.md links to missing relative file next.MD',
+    );
+  });
+
+  it('does not intercept query-suffixed Markdown hrefs as document navigation', () => {
+    const problems = collectDocumentationProblems({
+      registry: {
+        tutorial: {
+          current: {
+            file: 'tutorials/guides/current.md',
+            anchor: 'help-current',
+          },
+        },
+        info: {},
+        reference: {},
+      },
+      documents: new Map([
+        [
+          'tutorials/guides/current.md',
+          '<h1 id="help-current">Current</h1>\n[Next](next.md?mode=1#next)',
+        ],
+        ['tutorials/guides/next.md', '<h2 id="next">Next</h2>'],
+      ]),
+    });
+
+    expect(problems).toContain(
+      'tutorials/guides/current.md links to missing relative file next.md',
+    );
+  });
+
+  it('keeps encoded document anchors literal like the rendered viewer', () => {
+    const problems = collectDocumentationProblems({
+      registry: {
+        tutorial: {
+          current: {
+            file: 'tutorials/guides/current.md',
+            anchor: 'help-current',
+          },
+        },
+        info: {},
+        reference: {},
+      },
+      documents: new Map([
+        [
+          'tutorials/guides/current.md',
+          '<h1 id="help-current">Current</h1>\n[Next](next.md#next%20section)',
+        ],
+        ['tutorials/guides/next.md', '<h2 id="next section">Next</h2>'],
+      ]),
+    });
+
+    expect(problems).toContain(
+      'tutorials/guides/current.md links to missing anchor #next%20section in tutorials/guides/next.md',
+    );
+  });
+
   it('resolves nested document images from the public root with or without a leading slash', () => {
     const documents = new Map([
       [
