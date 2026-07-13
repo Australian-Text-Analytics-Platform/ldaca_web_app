@@ -6,8 +6,8 @@ This repository (previously `ldaca_web_app`) contains the LDaCA Wordflow web app
 
 - `frontend/`: React 19 + Vite frontend, shared UI, and Tauri desktop shell in `src-tauri/`
 - `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import: `ldaca_wordflow`) and workspace/task APIs
-- `docworkspace/`: lazy workspace graph library built around `Workspace` and `Node`
 - `polars-text/`: Rust/PyO3 Polars plugin package for concordance, quotation, tokenization, and related text analysis
+- `polars-source-utils/`: Rust/PyO3 utilities for inspecting and relocating serialized Polars plans
 
 ## Architecture Summary
 
@@ -16,17 +16,22 @@ This repository (previously `ldaca_web_app`) contains the LDaCA Wordflow web app
 The backend lives under `backend/src/ldaca_wordflow/` and is organized around:
 
 - `api/`: FastAPI routers, mounted under `/api`
-- `analysis/`: in-memory task storage and request schemas
-- `core/`: worker tasks, business logic, and utilities
+- `domain/workspace/`: workspace graph aggregate and crash-safe snapshot store
+- `services/`: use cases and runtime-owned state boundaries
+- `analysis/`: framework-neutral analysis algorithms
+- `workers/`: picklable process-worker entrypoints and implementations
+- `infrastructure/`: database, storage, provider, and process adapters
+- `shared/`: dependency-light errors, JSON types, names, and serialization
 - `settings.py`: `pydantic-settings` configuration
-- `db.py`: SQLAlchemy user and session models
-- `main.py`: app lifecycle and router composition
+- `runtime.py`: lifespan construction and shutdown ownership
+- `main.py`: side-effect-free FastAPI application factory
 
-Workspace-related APIs are composed under `api/workspaces/`, with one module per analysis type under `api/workspaces/analyses/`.
+Workspace-related APIs are composed under `api/workspaces/`; routers remain
+thin and delegate to services.
 
 ### Data Model
 
-`docworkspace` is the core data model used by the backend.
+The workspace domain is integrated into the backend package.
 
 - `Workspace` stores a graph of `Node` objects keyed by UUID.
 - `Node.data` must always be a Polars `LazyFrame`.
@@ -38,9 +43,10 @@ This repository is lazy-first. Avoid eager `collect()` calls except at I/O bound
 
 Heavy analyses such as topic modeling and `polars-text`-backed tasks run out of process:
 
-`API Router -> Task Manager -> ProcessPoolExecutor -> worker task -> Parquet artifacts -> API result retrieval`
+`API Router -> TaskService -> ProcessTaskExecutor -> worker -> task artifacts -> typed result retrieval`
 
-Worker functions are registered in `backend/src/ldaca_wordflow/core/worker.py`.
+Worker functions live under `backend/src/ldaca_wordflow/workers/` and are
+registered through canonical task definitions.
 
 ### Frontend Commands
 
@@ -93,17 +99,14 @@ pnpm -C frontend test -- --run
 ### Backend Commands
 
 ```sh
-cd backend && uv run uvicorn ldaca_wordflow.main:app --reload --port 8001
+cd backend && uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
 cd backend && uv run pytest -q
 cd backend && uvx ty check
 ```
 
-### Shared Python Packages
+### Supporting Packages
 
 ```sh
-cd docworkspace && uv run pytest -q
-cd docworkspace && uvx ty check
-
 cd polars-text && uv run pytest -q
 cd polars-text && uvx ty check
 ```
@@ -129,14 +132,18 @@ pnpm -C frontend test -- --run
 ## Key Conventions
 
 - All backend routes are mounted under `/api`.
-- Use `Depends(get_current_user)` in backend routers; do not bypass auth checks.
-- Keep FastAPI routers thin and move business logic into `core/`.
+- Use the established session or current-user security dependency in protected
+  backend routers; do not bypass authentication checks.
+- Keep FastAPI routers thin and move application behavior into the owning
+  service, domain, or analysis layer.
 - For new worker tasks, call `configure_worker_environment()` first and import heavy dependencies inside the worker function.
 - Do not hardcode `localhost` in frontend API code; use the backend URL detection utilities in `frontend/src/api/env.ts`.
 - Do not add manual React memoization by default. This repo uses React Compiler.
 
 ## Documentation
 
-- Backend docs: `backend/docs/index.md`
-- Frontend docs: `frontend/docs/index.md`
-- Agent workflow and repo-specific coding guidance: `AGENTS.md`
+- Engineering documentation: [`docs/index.md`](docs/index.md)
+- Domain glossary: [`CONTEXT.md`](CONTEXT.md)
+- Change-spec lifecycle: [`specs/README.md`](specs/README.md)
+- Frontend user and UI documentation: [`frontend/docs/index.md`](frontend/docs/index.md)
+- Agent workflow and repository guidance: [`AGENTS.md`](AGENTS.md)

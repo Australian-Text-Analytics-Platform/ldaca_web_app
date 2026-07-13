@@ -1,0 +1,31 @@
+name: Check context documentation
+
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - 'CONTEXT.md'
+      - 'README.md'
+      - 'docs/**'
+      - 'specs/**'
+      - 'backend'
+      - 'frontend'
+      - 'polars-text'
+      - 'polars-source-utils'
+      - 'package.json'
+      - 'scripts/check-markdown-links.mjs'
+      - '.github/workflows/check-context-docs.yml'
+  workflow_dispatch:
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: pnpm docs:links

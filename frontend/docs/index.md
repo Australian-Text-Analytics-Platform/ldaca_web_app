@@ -1,6 +1,8 @@
 # LDaCA Frontend Documentation
 
-**Scope statement:** This doc set covers the React frontend and UI state flow. Backend API specifics are documented in the backend docs.
+**Scope statement:** This doc set covers user-facing UI behavior, tutorials,
+and frontend configuration. Current engineering architecture is centralized in
+the repository-level [`docs/`](../../docs/index.md) system.
 
 ## Start here
 
@@ -14,13 +16,12 @@
 
 **Answer:** Yes — `user-guide/app-tour.md`.
 
-## Developer reference
+## Engineering reference
 
 **Question:** *Where is the architecture overview?*
 
-**Answer:** Start with `developer-guide/index.md`. The guide is split into
-architecture, feature structure, state/data flow, workspace hooks, analysis
-features, node colors, and Tauri desktop.
+**Answer:** Start with the repository-level
+[`frontend architecture overview`](../../docs/architecture/frontend/overview.md).
 
 ## Configuration
 

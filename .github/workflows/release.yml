@@ -39,7 +39,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
           # backend/pyproject.toml lives in the backend submodule, so the
           # gate needs the submodule trees on disk before it can read all
-          # five version sources. Default checkout omits submodules; the
+          # six version sources. Default checkout omits submodules; the
           # build-windows / build-macos jobs already opt in, so this
           # mirrors them.
           submodules: recursive
