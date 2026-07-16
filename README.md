@@ -1,11 +1,15 @@
 # LDaCA Wordflow Monorepo
 
-This repository (previously `ldaca_web_app`) contains the LDaCA Wordflow web app and desktop app, plus the shared Python and Rust packages they depend on. The main product is a multi-platform text analytics application with a FastAPI backend, a React frontend, and a Tauri desktop shell.
+This repository contains the LDaCA Wordflow web and desktop application plus
+the shared Python and Rust packages it depends on. The product is a
+multi-platform text analytics application with a FastAPI backend, a React
+frontend, and a Tauri desktop shell.
 
 ## Repository Overview
 
 - `frontend/`: React 19 + Vite frontend, shared UI, and Tauri desktop shell in `src-tauri/`
-- `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import: `ldaca_wordflow`) and workspace/task APIs
+- `backend/`: FastAPI backend (PyPI: `ldaca-wordflow`, import:
+  `ldaca_wordflow`) and Workspace, Analysis, and User File APIs
 - `polars-text/`: Rust/PyO3 Polars plugin package for concordance, quotation, tokenization, and related text analysis
 - `polars-source-utils/`: Rust/PyO3 utilities for inspecting and relocating serialized Polars plans
 
@@ -16,7 +20,7 @@ This repository (previously `ldaca_web_app`) contains the LDaCA Wordflow web app
 The backend lives under `backend/src/ldaca_wordflow/` and is organized around:
 
 - `api/`: FastAPI routers, mounted under `/api`
-- `domain/workspace/`: workspace graph aggregate and crash-safe snapshot store
+- `domain/workspace/`: Workspace aggregate and its Nodes, Tabs, and Analyses
 - `services/`: use cases and runtime-owned state boundaries
 - `analysis/`: framework-neutral analysis algorithms
 - `workers/`: picklable process-worker entrypoints and implementations
@@ -35,18 +39,22 @@ The workspace domain is integrated into the backend package.
 
 - `Workspace` stores a graph of `Node` objects keyed by UUID.
 - `Node.data` must always be a Polars `LazyFrame`.
-- Node operations such as filtering or selection produce child nodes and preserve lineage.
+- Node operations such as filtering or selection produce child Nodes and
+  preserve typed provenance.
+- Tabs and their Analyses are part of the Workspace snapshot.
 
 This repository is lazy-first. Avoid eager `collect()` calls except at I/O boundaries such as artifact writing or final API serialization.
 
 ### Background Processing
 
-Heavy analyses such as topic modeling and `polars-text`-backed tasks run out of process:
+Heavy Analyses such as topic modeling run out of process:
 
-`API Router -> TaskService -> ProcessTaskExecutor -> worker -> task artifacts -> typed result retrieval`
+`API router -> AnalysisService -> AnalysisScheduler -> AnalysisProcessExecutor -> worker -> Analysis-owned Artifacts`
 
 Worker functions live under `backend/src/ldaca_wordflow/workers/` and are
-registered through canonical task definitions.
+decorated with the canonical `@process_entrypoint` boundary. User File Imports
+have a separate resource-specific lifecycle and scheduler; both resource types
+publish progress through the shared event stream.
 
 ### Frontend Commands
 
@@ -60,7 +68,8 @@ The frontend uses:
 - Zustand
 - Shadcn/Radix with Tailwind CSS v4
 
-Feature code is organized under `frontend/src/features/`, with analysis tabs following a shared feature pattern built around task lifecycle hooks and result panels.
+Feature code is organized under `frontend/src/features/`. TanStack Query owns
+server state and Zustand owns transient client state.
 
 ### Desktop Shell
 
@@ -99,9 +108,12 @@ pnpm -C frontend test -- --run
 ### Backend Commands
 
 ```sh
-cd backend && uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
-cd backend && uv run pytest -q
-cd backend && uvx ty check
+cd backend
+CORS_ALLOWED_ORIGINS='["http://localhost:3000"]' \
+  uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
+uv run ruff check .
+uv run ty check
+uv run pytest -q
 ```
 
 ### Supporting Packages
@@ -115,12 +127,16 @@ cd polars-text && uvx ty check
 
 Run checks from the affected package directory, not from the repo root, unless the command explicitly targets a package with `pnpm -C`.
 
-For Python package changes, the expected verification is:
+For backend changes, the expected verification is:
 
 ```sh
-uvx ty check
-uv run pytest
+cd backend
+uv run ruff check .
+uv run ty check
+uv run pytest -q
 ```
+
+Use the nearest package `AGENTS.md` for supporting-package gates.
 
 For typical frontend changes, use:
 
@@ -136,8 +152,10 @@ pnpm -C frontend test -- --run
   backend routers; do not bypass authentication checks.
 - Keep FastAPI routers thin and move application behavior into the owning
   service, domain, or analysis layer.
-- For new worker tasks, call `configure_worker_environment()` first and import heavy dependencies inside the worker function.
-- Do not hardcode `localhost` in frontend API code; use the backend URL detection utilities in `frontend/src/api/env.ts`.
+- Decorate process-worker entrypoints with `@process_entrypoint`, and import
+  heavy computation dependencies inside the worker function.
+- Do not hardcode `localhost` in frontend API code; use the backend URL
+  detection utilities in `frontend/src/lib/backend/env.ts`.
 - Do not add manual React memoization by default. This repo uses React Compiler.
 
 ## Documentation
