@@ -15,6 +15,7 @@ const renderWithClient = (ui: React.ReactElement) => {
 };
 
 const handleSearchMock = vi.fn();
+const handleHandoffSearchMock = vi.fn();
 const clearResultsMock = vi.fn(async () => {
   /* mock: resolves immediately */
 });
@@ -279,6 +280,7 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
     latestTaskFlowParams = params;
     return {
       handleSearch: handleSearchMock,
+      handleHandoffSearch: handleHandoffSearchMock,
       updateStoredResult: vi.fn(),
       handleSort: vi.fn(),
       handlePageChange: vi.fn(),
@@ -483,14 +485,7 @@ describe('ConcordanceFeature', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /re-?run/i })[0]!);
 
     return waitFor(() => {
-      expect(handleSearchMock).toHaveBeenCalledWith(
-        true,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        true,
-      );
+      expect(handleSearchMock).toHaveBeenCalledWith();
     }).finally(unmount);
   });
 
@@ -530,6 +525,29 @@ describe('ConcordanceFeature', () => {
         'keyword',
       );
     });
+
+    unmount();
+  });
+
+  it('submits an auto-run token handoff once with the handed-off inputs', async () => {
+    mockPendingConcordance = {
+      searchWord: 'keyword',
+      selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
+      nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
+      autoRun: true,
+      timestamp: 3,
+    };
+
+    const { unmount } = renderConcordanceFeature();
+
+    await waitFor(() => {
+      expect(handleHandoffSearchMock).toHaveBeenCalledWith({
+        searchWord: 'keyword',
+        nodeIds: ['node-1'],
+        nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
+      });
+    });
+    expect(handleHandoffSearchMock).toHaveBeenCalledTimes(1);
 
     unmount();
   });

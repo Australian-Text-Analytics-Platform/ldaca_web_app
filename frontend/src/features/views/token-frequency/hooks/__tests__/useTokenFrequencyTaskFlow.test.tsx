@@ -5,8 +5,9 @@ import { useTokenFrequencyTaskFlow } from '../useTokenFrequencyTaskFlow';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/features/views/viewIds';
 
-const { calculateTokenFrequenciesMock } = vi.hoisted(() => ({
+const { calculateTokenFrequenciesMock, createConcordanceTabMock } = vi.hoisted(() => ({
   calculateTokenFrequenciesMock: vi.fn(),
+  createConcordanceTabMock: vi.fn(),
 }));
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -15,12 +16,13 @@ vi.mock('@/api', async (importOriginal) => ({
 }));
 
 vi.mock('@/features/views/common/tabs/useWorkspaceTabs', () => ({
-  useWorkspaceTabs: () => ({ createTab: vi.fn() }),
+  useWorkspaceTabs: () => ({ createTab: createConcordanceTabMock }),
 }));
 
 describe('useTokenFrequencyTaskFlow', () => {
   beforeEach(() => {
     calculateTokenFrequenciesMock.mockReset();
+    createConcordanceTabMock.mockReset();
     calculateTokenFrequenciesMock.mockResolvedValue({
       data: { state: 'running', metadata: { task_id: 'task-1' } },
     });
@@ -161,6 +163,7 @@ describe('useTokenFrequencyTaskFlow', () => {
       }),
     );
     expect(setCurrentView).toHaveBeenCalledWith('concordance');
+    expect(createConcordanceTabMock).toHaveBeenCalledWith('hello');
   });
 
   it('keeps both compared nodes when no source id is given', () => {

@@ -402,6 +402,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
 
   const {
     handleSearch,
+    handleHandoffSearch,
     updateStoredResult,
     handleSort,
     handlePageChange,
@@ -429,7 +430,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     actions: {
       setNodePagination,
       setViewMode,
-      setCombinedPage,
       setIsSearching,
       setResults,
       setLocalTaskId: setLocalConcordanceTaskId,
@@ -532,7 +532,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     }
   }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
-  const { shouldAutoSearch, setShouldAutoSearch } = useConcordancePendingHandoff({
+  const { autoSearchRequest } = useConcordancePendingHandoff({
     pendingConcordance,
     clearPendingConcordance,
     hydrationState,
@@ -574,19 +574,14 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     void persistTokenizerPreference(nodeId, column, model, language);
   };
 
+  const submittedAutoSearchRef = useRef<typeof autoSearchRequest>(null);
   useEffect(() => {
-    if (!shouldAutoSearch) {
+    if (!autoSearchRequest || submittedAutoSearchRef.current === autoSearchRequest) {
       return;
     }
-    // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
-    const id = requestAnimationFrame(() => {
-      setShouldAutoSearch(false);
-      void handleSearch(true);
-    });
-    return () => {
-      cancelAnimationFrame(id);
-    };
-  }, [shouldAutoSearch, handleSearch, setShouldAutoSearch]);
+    submittedAutoSearchRef.current = autoSearchRequest;
+    void handleHandoffSearch(autoSearchRequest);
+  }, [autoSearchRequest, handleHandoffSearch]);
 
   /** Delegates clearing to the shared analysis lifecycle only when a workspace is active. */
   /**
@@ -607,7 +602,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       hasUnrunChanges: hasChanges,
       clearResults: handleClearResults,
       /** Starts the feature-specific concordance search after shared update checks pass. */
-      runFreshAnalysis: () => handleSearch(true, undefined, undefined, undefined, undefined, true),
+      runFreshAnalysis: () => handleSearch(),
     });
   };
 

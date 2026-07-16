@@ -17,6 +17,13 @@ import type { NodePaginationState } from '../../common/tasks/types';
 
 export type PaginationState = Record<string, NodePaginationState>;
 
+/** Runnable token-handoff snapshot used by the pending-handoff hook and direct submission path to bypass not-yet-rendered form state. */
+export interface ConcordanceHandoffSearchRequest {
+  searchWord: string;
+  nodeIds: string[];
+  nodeColumnSelections: NodeColumnSelection[];
+}
+
 interface ConcordanceState {
   currentWorkspaceId: string | null;
   searchWord: string;
@@ -38,7 +45,6 @@ interface ConcordanceState {
 interface ConcordanceActions {
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
   setViewMode: (mode: 'separated' | 'combined') => void;
-  setCombinedPage: (page: number) => void;
   setIsSearching: (value: boolean) => void;
   setResults: Dispatch<SetStateAction<ConcordanceAnalysisResponse | null>>;
   setLocalTaskId: (id: string | null) => void;
@@ -102,7 +108,6 @@ export function useConcordanceTaskFlow({
   actions: {
     setNodePagination,
     setViewMode,
-    setCombinedPage,
     setIsSearching,
     setResults,
     setLocalTaskId,
@@ -172,35 +177,22 @@ export function useConcordanceTaskFlow({
    * Flow: validate search text and node columns, reset relevant pagination,
    * run the analysis, record the assigned task id, and publish result/error state.
    */
-  const handleSearch = async (
-    resetPage = true,
-    targetNodeId?: string,
-    forceMode?: 'separated' | 'combined',
-    overrideSortBy?: string,
-    _overrideDescending?: boolean,
-    allowWhenLocked = false,
-  ) => {
+  const handleSearch = async (handoffRequest?: ConcordanceHandoffSearchRequest) => {
     if (!currentWorkspaceId) return;
 
-    const trimmedSearch = searchWord.trim();
+    const trimmedSearch = (handoffRequest?.searchWord ?? searchWord).trim();
     if (!trimmedSearch) {
       toast.error('Please enter a search word.');
       return;
     }
 
-    const requestNodeIds = (() => {
-      const baseIds = activeNodeIds.slice(0, 2);
-      if (targetNodeId && !baseIds.includes(targetNodeId)) {
-        return [...baseIds, targetNodeId];
-      }
-      return baseIds;
-    })();
+    const requestNodeIds = (handoffRequest?.nodeIds ?? activeNodeIds).slice(0, 2);
 
     if (requestNodeIds.length === 0) return;
 
-    const effectiveSelections = effectiveNodeColumnSelections.filter((sel) =>
-      requestNodeIds.includes(sel.nodeId),
-    );
+    const effectiveSelections = (
+      handoffRequest?.nodeColumnSelections ?? effectiveNodeColumnSelections
+    ).filter((sel) => requestNodeIds.includes(sel.nodeId));
 
     const incompleteSelections = effectiveSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
@@ -216,19 +208,9 @@ export function useConcordanceTaskFlow({
         sortBy: '',
         descending: false,
       };
-      if (resetPage && (!targetNodeId || targetNodeId === nodeId)) {
-        updatedPagination[nodeId].currentPage = 1;
-      }
+      updatedPagination[nodeId].currentPage = 1;
     });
     setNodePagination(updatedPagination);
-
-    const shouldForceSeparated = resetPage && !allowWhenLocked && !forceMode;
-    if (shouldForceSeparated && viewMode !== 'separated') {
-      setViewMode('separated');
-    }
-    if (shouldForceSeparated && combinedPage !== 1) {
-      setCombinedPage(1);
-    }
 
     const firstNodeId = requestNodeIds[0];
     if (firstNodeId === undefined) return;
@@ -253,9 +235,8 @@ export function useConcordanceTaskFlow({
         case_sensitive: caseSensitive,
         search_mode: searchMode,
       };
-      const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
-      if (requestedSortBy) {
-        request.sort_by = requestedSortBy;
+      if (firstNodePagination.sortBy) {
+        request.sort_by = firstNodePagination.sortBy;
       }
 
       const { data: response } = await runConcordance({
@@ -281,6 +262,9 @@ export function useConcordanceTaskFlow({
       setIsSearching(false);
     }
   };
+
+  /** Used by ConcordanceFeature to run a token-frequency handoff from its immutable input snapshot. */
+  const handleHandoffSearch = (request: ConcordanceHandoffSearchRequest) => handleSearch(request);
 
   /** Applies a column sort for a node block and refetches that result page. */
   /**
@@ -592,6 +576,7 @@ export function useConcordanceTaskFlow({
 
   return {
     handleSearch,
+    handleHandoffSearch,
     updateStoredResult,
     handleSort,
     handlePageChange,

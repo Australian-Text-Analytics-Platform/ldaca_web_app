@@ -3,6 +3,7 @@ import type { WorkspaceGraphNode } from '@/api';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { HydrationState } from '../../common/useAnalysisHydration';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
+import type { ConcordanceHandoffSearchRequest } from './useConcordanceTaskFlow';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 interface Params {
@@ -19,8 +20,7 @@ interface Params {
 }
 
 export interface UseConcordancePendingHandoffResult {
-  shouldAutoSearch: boolean;
-  setShouldAutoSearch: Dispatch<SetStateAction<boolean>>;
+  autoSearchRequest: ConcordanceHandoffSearchRequest | null;
 }
 
 /**
@@ -30,8 +30,8 @@ export interface UseConcordancePendingHandoffResult {
  *   1. Queue: copy `pendingConcordance` from the analysis store into local
  *      state (deferred via rAF) so hydration has a chance to finish first.
  *   2. Apply: once hydration settles, fill the search box / sync the selection /
- *      sync column selections, optionally arming the
- *      auto-search flag.
+ *      sync column selections, and optionally publish one runnable request
+ *      snapshot for automatic submission.
  *
  * Token clicks always open a brand-new concordance tab (see
  * useTokenFrequencyTaskFlow.handleTokenClick), so the consuming feature instance
@@ -55,7 +55,8 @@ export function useConcordancePendingHandoff({
 }: Params): UseConcordancePendingHandoffResult {
   const [queuedPendingConcordance, setQueuedPendingConcordance] =
     useState<PendingConcordance | null>(pendingConcordance);
-  const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
+  const [autoSearchRequest, setAutoSearchRequest] =
+    useState<ConcordanceHandoffSearchRequest | null>(null);
   const lastPendingConcordanceRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -122,19 +123,41 @@ export function useConcordancePendingHandoff({
       setNodeColumnSelections(queuedPendingConcordance.nodeColumnSelections, { replace: true });
     }
 
-    let timeoutId: number | null = null;
+    const selectedNodeIds = takeMostRecent(
+      (queuedPendingConcordance.selectedNodes ?? [])
+        .map((node) => (typeof node.id === 'string' ? node.id : ''))
+        .filter((id): id is string => id.trim().length > 0),
+      2,
+    );
+    const handoffSelections = (queuedPendingConcordance.nodeColumnSelections ?? []).filter(
+      (selection) => Boolean(selection.column),
+    );
+    const runnableNodeIds =
+      selectedNodeIds.length > 0
+        ? selectedNodeIds
+        : takeMostRecent(
+            handoffSelections.map((selection) => selection.nodeId),
+            2,
+          );
     const hasNodeTargets =
-      selectedNodes.length > 0 ||
-      (queuedPendingConcordance.selectedNodes?.length ?? 0) > 0 ||
-      (queuedPendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
+      runnableNodeIds.length > 0 &&
+      runnableNodeIds.every((nodeId) =>
+        handoffSelections.some((selection) => selection.nodeId === nodeId),
+      );
     if (
       queuedPendingConcordance.autoRun === true &&
       queuedPendingConcordance.searchWord &&
       hasNodeTargets
     ) {
-      timeoutId = window.setTimeout(() => {
-        setShouldAutoSearch(true);
-      }, 50);
+      rafIds.push(
+        requestAnimationFrame(() => {
+          setAutoSearchRequest({
+            searchWord: queuedPendingConcordance.searchWord ?? '',
+            nodeIds: runnableNodeIds,
+            nodeColumnSelections: handoffSelections.map((selection) => ({ ...selection })),
+          });
+        }),
+      );
     }
 
     const resetId = requestAnimationFrame(() => {
@@ -142,9 +165,6 @@ export function useConcordancePendingHandoff({
     });
 
     return () => {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
       rafIds.forEach(cancelAnimationFrame);
       cancelAnimationFrame(resetId);
     };
@@ -159,7 +179,6 @@ export function useConcordancePendingHandoff({
   ]);
 
   return {
-    shouldAutoSearch,
-    setShouldAutoSearch,
+    autoSearchRequest,
   };
 }
