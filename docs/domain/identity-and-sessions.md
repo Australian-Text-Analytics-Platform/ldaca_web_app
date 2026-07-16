@@ -1,5 +1,23 @@
 # Identity And Sessions
 
+Hosted and desktop deployments share protected API dependencies but establish
+identity and unsafe-request proof differently.
+
+```mermaid
+flowchart TB
+    REQUEST["Protected API request"] --> PROFILE{"Deployment profile"}
+
+    PROFILE -->|"hosted multi-user"| COOKIE["HttpOnly Session cookie"]
+    COOKIE --> SESSION["Server-side Session and user"]
+    SESSION --> HOSTED_PROOF["Session CSRF token and exact Origin"]
+
+    PROFILE -->|"desktop single-user"| PROCESS["Process identity"]
+    PROCESS --> DESKTOP_PROOF["Process-scoped CSRF token and verified Tauri Origin"]
+
+    HOSTED_PROOF --> AUTHORIZED["Current protected identity"]
+    DESKTOP_PROOF --> AUTHORIZED
+```
+
 ## Hosted Mode
 
 Hosted multi-user Wordflow is a same-site browser deployment. A successful
