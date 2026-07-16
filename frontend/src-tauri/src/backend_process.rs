@@ -1,12 +1,31 @@
 use crate::platform;
 use crate::runtime::BackendRuntime;
+use serde::Deserialize;
+use std::fs;
 use std::io::{self, BufRead, BufReader};
-use std::net::{TcpListener, TcpStream};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub(crate) const BACKEND_HOST: &str = "127.0.0.1";
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(7);
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[derive(Debug, Deserialize)]
+struct StartupRecord {
+    schema_version: u32,
+    status: String,
+    pid: u32,
+    host: Option<String>,
+    port: Option<u16>,
+    version: String,
+    code: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ReadyBackend {
+    pub(crate) url: String,
+}
 
 /// Sole owner of the local backend child process.
 ///
@@ -23,20 +42,29 @@ impl BackendProcess {
     ///
     /// Called during Tauri setup. Environment construction consumes manifest
     /// fields directly; no path scanning or venv fallback occurs here.
-    pub(crate) fn spawn(runtime: &BackendRuntime, port: u16) -> io::Result<Self> {
+    pub(crate) fn spawn(
+        runtime: &BackendRuntime,
+        startup_file: &Path,
+        data_root: Option<&Path>,
+    ) -> io::Result<Self> {
         let mut command = runtime_command(runtime);
         command
             .arg("-m")
             .arg("ldaca_wordflow.cli")
             .arg("--backend")
+            .arg("--port")
+            .arg("0")
+            .arg("--startup-file")
+            .arg(startup_file)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .env("BACKEND_PORT", port.to_string())
-            .env("LDACA_BACKEND_PORT", port.to_string());
+            .stderr(Stdio::piped());
+        if let Some(data_root) = data_root {
+            command.env("DATA_ROOT", data_root);
+        }
         platform::configure_backend_command(&mut command);
 
         println!(
-            "Launching backend via {} (runtime: {}) on port {port}",
+            "Launching backend via {} (runtime: {})",
             runtime.python.display(),
             runtime.root.display()
         );
@@ -58,6 +86,72 @@ impl BackendProcess {
         self.pid
     }
 
+    /// Wait for the Python launcher record that is published after ASGI lifespan.
+    ///
+    /// This runs before the process enters shared Tauri state, so no mutex is
+    /// held while polling the filesystem or child status.
+    pub(crate) fn wait_until_ready(&mut self, startup_file: &Path) -> io::Result<ReadyBackend> {
+        let deadline = Instant::now() + STARTUP_TIMEOUT;
+        loop {
+            if let Some(status) = self
+                .child
+                .as_mut()
+                .ok_or_else(|| io::Error::other("Backend process is not owned"))?
+                .try_wait()?
+            {
+                return Err(io::Error::other(format!(
+                    "Backend exited before readiness with {status}"
+                )));
+            }
+            if startup_file.is_file() {
+                let record: StartupRecord = serde_json::from_slice(&fs::read(startup_file)?)
+                    .map_err(|error| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("Invalid backend startup record: {error}"),
+                        )
+                    })?;
+                if record.schema_version != 1
+                    || record.pid != self.pid
+                    || record.version != env!("CARGO_PKG_VERSION")
+                {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Backend startup identity does not match the desktop process",
+                    ));
+                }
+                if record.status == "failed" {
+                    return Err(io::Error::other(format!(
+                        "Backend startup failed ({})",
+                        record.code.as_deref().unwrap_or("startup_failed")
+                    )));
+                }
+                let Some(port) = record.port else {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Backend startup record is incomplete",
+                    ));
+                };
+                if record.status != "ready" || record.host.as_deref() != Some(BACKEND_HOST) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Backend startup record is incomplete",
+                    ));
+                }
+                return Ok(ReadyBackend {
+                    url: format!("http://{BACKEND_HOST}:{port}"),
+                });
+            }
+            if Instant::now() >= deadline {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "Backend did not complete startup before the deadline",
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    }
+
     /// Shut down the owned process tree once and wait for it to be reaped.
     ///
     /// Called by both close and exit handlers. Returning `Result` keeps process
@@ -71,7 +165,15 @@ impl BackendProcess {
         let Some(mut child) = self.child.take() else {
             return Ok(());
         };
-        platform::terminate_process_tree(&mut child, self.pid, timeout)
+        match platform::terminate_process_tree(&mut child, self.pid, timeout) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                if child.try_wait()?.is_none() {
+                    self.child = Some(child);
+                }
+                Err(error)
+            }
+        }
     }
 
     #[cfg(test)]
@@ -83,38 +185,51 @@ impl BackendProcess {
     }
 }
 
+impl Drop for BackendProcess {
+    fn drop(&mut self) {
+        if self.child.is_some() {
+            if let Err(error) = self.shutdown() {
+                eprintln!("Backend cleanup during owner drop failed: {error}");
+            }
+        }
+    }
+}
+
 /// Build the exact packaged-Python command environment shared by launch and CI.
 ///
 /// Production adds backend CLI arguments and process-group flags; the ignored
 /// packaged-runtime test adds an import probe. Sharing this function prevents
 /// validation from drifting back to a venv launcher or partial environment.
 fn runtime_command(runtime: &BackendRuntime) -> Command {
-    let host = server_host();
     let mut command = Command::new(&runtime.python);
     command
         .current_dir(&runtime.root)
         .env("PYTHONUNBUFFERED", "1")
         .env("LDACA_BACKEND_RUNTIME", &runtime.root)
-        .env("LDACA_BACKEND_PYTHON", &runtime.python)
         .env("LDACA_PARENT_PID", std::process::id().to_string())
         .env("PYTHONHOME", &runtime.python_home)
         .env("PYTHONPATH", &runtime.site_packages)
         .env("PYTHONNOUSERSITE", "1")
-        .env("SERVER_HOST", &host)
-        .env("LDACA_SERVER_HOST", host);
-    if std::env::var_os("LDACA_CONFIG_PROFILE").is_none() {
-        command.env("LDACA_CONFIG_PROFILE", "desktop");
-    }
+        .env("SERVER_HOST", BACKEND_HOST)
+        .env("TRUSTED_HOSTS", format!(r#"["{BACKEND_HOST}"]"#))
+        .env(
+            "CORS_ALLOWED_ORIGINS",
+            format!(r#"["{}"]"#, desktop_origin()),
+        )
+        .env("MULTI_USER", "false");
     #[cfg(target_os = "windows")]
     prepend_python_home_to_path(&mut command, &runtime.python_home);
     command
 }
 
-fn server_host() -> String {
-    std::env::var("SERVER_HOST")
-        .ok()
-        .or_else(|| std::env::var("LDACA_SERVER_HOST").ok())
-        .unwrap_or_else(|| BACKEND_HOST.to_owned())
+fn desktop_origin() -> &'static str {
+    if cfg!(debug_assertions) {
+        "http://127.0.0.1:3001"
+    } else if cfg!(target_os = "windows") {
+        "https://tauri.localhost"
+    } else {
+        "tauri://localhost"
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -144,23 +259,6 @@ where
             }
         }
     });
-}
-
-fn port_has_listener(port: u16) -> bool {
-    TcpStream::connect((BACKEND_HOST, port)).is_ok()
-}
-
-fn can_bind_port(port: u16) -> bool {
-    TcpListener::bind((BACKEND_HOST, port)).is_ok()
-}
-
-/// Find the first port that is neither listening nor reserved by another bind.
-///
-/// Called once by Tauri assembly before spawning Python. Checking both states
-/// avoids selecting an active service while still treating bind failures as
-/// unavailable.
-pub(crate) fn find_available_port(start: u16, end: u16) -> Option<u16> {
-    (start..=end).find(|port| !port_has_listener(*port) && can_bind_port(*port))
 }
 
 #[cfg(all(test, unix))]
@@ -204,14 +302,18 @@ mod tests {
         );
         let mut process = shell_process(&script);
         let deadline = std::time::Instant::now() + Duration::from_secs(1);
-        while !pidfile.is_file() && std::time::Instant::now() < deadline {
+        let descendant = loop {
+            if let Ok(value) = std::fs::read_to_string(&pidfile) {
+                if let Ok(pid) = value.trim().parse::<u32>() {
+                    break pid;
+                }
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "descendant pid was not published"
+            );
             std::thread::sleep(Duration::from_millis(10));
-        }
-        let descendant = std::fs::read_to_string(&pidfile)
-            .expect("descendant pidfile")
-            .trim()
-            .parse::<u32>()
-            .expect("descendant pid");
+        };
 
         process
             .shutdown_with_timeout(Duration::from_millis(75))
@@ -240,6 +342,8 @@ mod packaged_runtime_test {
     #[test]
     #[ignore = "requires LDACA_TEST_RUNTIME_ROOT from a packaged desktop bundle"]
     fn packaged_runtime_matches_launcher_environment() {
+        use std::io::{Read, Write};
+
         let root = std::env::var_os("LDACA_TEST_RUNTIME_ROOT")
             .expect("LDACA_TEST_RUNTIME_ROOT must point to the bundled runtime");
         let runtime = BackendRuntime::from_root(root).expect("resolve packaged runtime");
@@ -255,5 +359,42 @@ mod packaged_runtime_test {
             "packaged imports failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
+
+        let fixture = std::env::temp_dir().join(format!(
+            "wordflow-packaged-supervisor-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let data_root = fixture.join("data");
+        std::fs::create_dir_all(&data_root).expect("create packaged data root");
+        let startup_file = fixture.join("startup.json");
+        let mut process = BackendProcess::spawn(&runtime, &startup_file, Some(&data_root))
+            .expect("spawn packaged backend");
+        let ready = process
+            .wait_until_ready(&startup_file)
+            .expect("packaged backend readiness");
+        let port = ready
+            .url
+            .rsplit_once(':')
+            .expect("ready URL port")
+            .1
+            .parse::<u16>()
+            .expect("numeric port");
+        let mut connection =
+            std::net::TcpStream::connect((BACKEND_HOST, port)).expect("connect ready backend");
+        connection
+            .write_all(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+            .expect("write health request");
+        let mut response = String::new();
+        connection
+            .read_to_string(&mut response)
+            .expect("read health response");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(response.contains(r#""status":"ready""#), "{response}");
+        process.shutdown().expect("shutdown packaged backend");
+        std::fs::remove_dir_all(fixture).expect("clean packaged fixture");
     }
 }

@@ -5,14 +5,8 @@ const EXPORT_NODES_PATH: ExportNodesData['url'] = '/api/workspaces/{workspace_id
 
 type ExportDownloadRequest = Pick<ExportNodesData, 'path' | 'query'>;
 
-/**
- * Builds the raw export URL used by browser and Tauri blob downloads.
- * Used by: ExportFeature because those download paths need a URL string while
- * still sharing the generated endpoint's workspace path and query contract.
- * Flow: start from the generated-client API base, substitute the workspace path
- * parameter, serialize the generated query shape, then return the fetchable URL.
- */
-export function buildExportNodesDownloadUrl({ path, query }: ExportDownloadRequest): string {
+/** Builds the relative API path accepted by the supervised desktop downloader. */
+export function buildExportNodesDownloadPath({ path, query }: ExportDownloadRequest): string {
   const endpoint = EXPORT_NODES_PATH.replace(
     '{workspace_id}',
     encodeURIComponent(path.workspace_id),
@@ -23,5 +17,10 @@ export function buildExportNodesDownloadUrl({ path, query }: ExportDownloadReque
     params.set('format', query.format);
   }
 
-  return `${getGeneratedApiBase()}${endpoint}?${params.toString()}`;
+  return `${endpoint}?${params.toString()}`;
+}
+
+/** Adds the configured backend origin for an ordinary browser fetch. */
+export function buildExportNodesDownloadUrl(request: ExportDownloadRequest): string {
+  return `${getGeneratedApiBase()}${buildExportNodesDownloadPath(request)}`;
 }

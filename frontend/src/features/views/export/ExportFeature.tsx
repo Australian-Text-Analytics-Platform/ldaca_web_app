@@ -19,7 +19,7 @@ import { saveBlob } from '@/lib/download';
 import { isTauri } from '@/lib/isTauri';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import { buildExportNodesDownloadUrl } from './exportDownloadUrl';
+import { buildExportNodesDownloadPath, buildExportNodesDownloadUrl } from './exportDownloadUrl';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -100,13 +100,9 @@ function ExportFeature() {
   /**
    * Called by both all-node and single-node desktop download paths.
    */
-  const tauriDownloadToDisk = async (
-    url: string,
-    headers: Record<string, string>,
-    filename: string,
-  ): Promise<string> => {
+  const tauriDownloadToDisk = async (apiPath: string, filename: string): Promise<string> => {
     const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<string>('download_to_downloads', { url, headers, filename });
+    return invoke<string>('download_to_downloads', { apiPath, filename });
   };
 
   // Pull a human-readable error description out of a non-OK Response. FastAPI
@@ -144,11 +140,11 @@ function ExportFeature() {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
     setExporting(true);
     try {
-      const url = buildExportNodesDownloadUrl({
+      const request = {
         path: { workspace_id: currentWorkspaceId },
         query: { node_ids: nodeIds.join(','), format },
-      });
-      const headers = getAuthHeaders();
+      };
+      const url = buildExportNodesDownloadUrl(request);
       const multiple = nodeIds.length > 1;
       const ext = multiple ? 'zip' : getDownloadExtension(format);
       const filename = multiple
@@ -161,11 +157,12 @@ function ExportFeature() {
           `${(toDisplay(selectedNodes[0]!).name || nodeIds[0]) ?? ''}.${ext}`;
 
       if (isDesktopApp) {
-        const fullPath = await tauriDownloadToDisk(url, headers, filename);
+        const fullPath = await tauriDownloadToDisk(buildExportNodesDownloadPath(request), filename);
         toast.success(`Saved ${filename} to Downloads`, { description: fullPath });
         return;
       }
 
+      const headers = getAuthHeaders();
       const resp = await fetch(url, { headers });
       if (!resp.ok) {
         const description = await describeResponseError(resp);
@@ -193,20 +190,21 @@ function ExportFeature() {
     if (!id) return;
     setDownloadingIds((s) => ({ ...s, [id]: 'downloading' }));
     try {
-      const url = buildExportNodesDownloadUrl({
+      const request = {
         path: { workspace_id: currentWorkspaceId },
         query: { node_ids: id, format },
-      });
-      const headers = getAuthHeaders();
+      };
+      const url = buildExportNodesDownloadUrl(request);
       const ext = getDownloadExtension(format);
       const filename = `${name || id}.${ext}`;
 
       if (isDesktopApp) {
-        const fullPath = await tauriDownloadToDisk(url, headers, filename);
+        const fullPath = await tauriDownloadToDisk(buildExportNodesDownloadPath(request), filename);
         toast.success(`Saved ${filename} to Downloads`, { description: fullPath });
         return;
       }
 
+      const headers = getAuthHeaders();
       const resp = await fetch(url, { headers });
       if (!resp.ok) {
         const description = await describeResponseError(resp);

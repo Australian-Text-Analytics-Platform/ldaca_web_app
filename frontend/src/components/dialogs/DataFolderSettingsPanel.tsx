@@ -1,71 +1,67 @@
-import { type SyntheticEvent, useState } from 'react';
+import { type SyntheticEvent, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { updateAdminConfig } from '@/api';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { isTauri } from '@/lib/isTauri';
-import { queryKeys } from '@/lib/queryKeys';
+import { setRuntimeBackendUrl } from '@/lib/backend/runtimeBackend';
 
 /**
- * Renders the live working-directory settings form inside `SettingsDialog`.
- * Changing the backend data root affects auth-derived configuration, workspace
- * selection, and both workspace/file caches, so this panel owns that complete
- * transition rather than exposing callbacks to an orphan dialog shell.
- *
- * Flow: seed the path from auth state, optionally browse in Tauri, unload the
- * active workspace before a path change, update admin config, refresh auth and
- * server-state queries, then report the result through the global toaster.
+ * Renders the Tauri-owned working-directory form inside `SettingsDialog`.
+ * The native supervisor validates the path, restarts the local backend, and
+ * rolls back on failure. This panel only rebinds frontend state to the ready
+ * backend URL returned by that transaction.
  */
 export function DataFolderSettingsPanel() {
   const queryClient = useQueryClient();
-  const { dataFolder, refreshAuth } = useAuth();
-  const { currentWorkspaceId } = useWorkspaceData();
-  const { setCurrentWorkspace } = useWorkspaceActions();
-  const [path, setPath] = useState(dataFolder ?? '');
+  const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [path, setPath] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+    void import('@tauri-apps/api/core')
+      .then(({ invoke }) => invoke<string | null>('get_data_root'))
+      .then((configuredPath) => {
+        if (!active) return;
+        setCurrentPath(configuredPath);
+        setPath(configuredPath ?? '');
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to read working directory:', error);
+        toast.error('Failed to read working directory');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   /**
-   * Opens the native directory picker for the Settings path field. Called by:
-   * this panel's Browse button; web builds retain typed-path input and explain
-   * why a native picker is unavailable.
+   * Opens the native directory picker for the Settings path field.
    */
   const handleBrowse = async () => {
-    if (isTauri()) {
-      try {
-        const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
-        const selected = await openDialog({
-          directory: true,
-          title: 'Select Working Directory',
-          defaultPath: path || undefined,
-        });
-        if (selected) {
-          setPath(selected);
-        }
-      } catch (error) {
-        console.error('Failed to open folder picker:', error);
-        toast.error('Failed to open folder picker');
+    try {
+      const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+      const selected = await openDialog({
+        directory: true,
+        title: 'Select Working Directory',
+        defaultPath: path || undefined,
+      });
+      if (selected) {
+        setPath(selected);
       }
-    } else {
-      toast.info(
-        'Type the full path to your data folder, or use the desktop app for a folder picker.',
-      );
+    } catch (error) {
+      console.error('Failed to open folder picker:', error);
+      toast.error('Failed to open folder picker');
     }
   };
 
   /**
-   * Commits a data-root change from `SettingsDialog` without leaving workspace
-   * or file queries pointed at the old root.
-   *
-   * Steps: validate the trimmed path, unload an active workspace only when the
-   * directory changes, update backend config, refresh auth, then refetch the
-   * workspace and file query families before releasing the busy state.
+   * Commits one native data-root switch and rebinds all cached server state.
+   * If the switch rolls back, rediscover the replacement backend port before
+   * reporting the original error.
    */
   const handleSubmit = async (event: SyntheticEvent) => {
     event.preventDefault();
@@ -74,27 +70,23 @@ export function DataFolderSettingsPanel() {
 
     setIsLoading(true);
     try {
-      const currentPath = dataFolder?.trim() ?? '';
-      const isDirectoryChanging = nextPath !== currentPath;
-
-      if (isDirectoryChanging && currentWorkspaceId) {
-        await setCurrentWorkspace(null);
-      }
-
-      await updateAdminConfig({ body: { data_root: nextPath }, throwOnError: true });
+      await queryClient.cancelQueries();
+      const { invoke } = await import('@tauri-apps/api/core');
+      const backendUrl = await invoke<string>('set_data_root', { dataRoot: nextPath });
+      setRuntimeBackendUrl(backendUrl);
+      setCurrentPath(nextPath);
+      await queryClient.resetQueries();
       toast.success('Working directory updated');
-      await refreshAuth();
-      await Promise.all([
-        queryClient.refetchQueries({
-          queryKey: queryKeys.workspaces,
-          exact: true,
-        }),
-        queryClient.refetchQueries({
-          queryKey: queryKeys.files,
-        }),
-      ]);
     } catch (error: unknown) {
-      console.error('Failed to update config:', error);
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const backendUrl = await invoke<string>('get_backend_url');
+        setRuntimeBackendUrl(backendUrl);
+        await queryClient.resetQueries();
+      } catch (rebindError) {
+        console.error('Failed to rediscover backend after data-root error:', rebindError);
+      }
+      console.error('Failed to update working directory:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update working directory');
     } finally {
       setIsLoading(false);
@@ -108,6 +100,9 @@ export function DataFolderSettingsPanel() {
       }}
     >
       <div className="grid gap-4 py-4">
+        <p className="break-all text-sm text-muted-foreground">
+          Current: {currentPath ?? 'Not configured'}
+        </p>
         <div className="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
           <Label htmlFor="path" className="sm:text-right">
             Path

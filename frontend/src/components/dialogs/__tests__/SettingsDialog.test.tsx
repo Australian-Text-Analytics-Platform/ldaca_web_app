@@ -3,26 +3,16 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type * as GeneratedSdk from '@/api';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { SettingsDialog } from '../SettingsDialog';
 
 const mocks = vi.hoisted(() => ({
-  getWorkspaceTabs: vi.fn(),
-  useAuth: vi.fn(),
+  isTauri: vi.fn(),
   useWorkspaceData: vi.fn(),
 }));
 
-vi.mock('@/api', async (importOriginal) => {
-  const actual = await importOriginal<typeof GeneratedSdk>();
-  return {
-    ...actual,
-    getWorkspaceTabs: mocks.getWorkspaceTabs,
-  };
-});
-
-vi.mock('@/features/auth/hooks/useAuth', () => ({
-  useAuth: mocks.useAuth,
+vi.mock('@/lib/isTauri', () => ({
+  isTauri: mocks.isTauri,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
@@ -70,12 +60,7 @@ describe('SettingsDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetPreferenceState();
-    mocks.useAuth.mockReturnValue({
-      dataFolder: '/tmp/ldaca-wordflow',
-      getAuthHeaders: () => ({ Authorization: 'Bearer t' }),
-      isMultiUserMode: false,
-    });
-    mocks.getWorkspaceTabs.mockResolvedValue({ data: { groups: {} } });
+    mocks.isTauri.mockReturnValue(false);
     mocks.useWorkspaceData.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
       workspaces: [],
@@ -105,7 +90,16 @@ describe('SettingsDialog', () => {
 
     expect(usePreferencesStore.getState().analysisMultiTabEnabled).toBe(false);
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(mocks.getWorkspaceTabs).not.toHaveBeenCalled();
+  });
+
+  it('keeps the working directory server-owned outside Tauri', async () => {
+    const user = userEvent.setup();
+    renderSettingsDialog();
+
+    await user.click(screen.getByRole('tab', { name: 'Workspace' }));
+
+    expect(screen.getByText('Managed by server')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Path')).not.toBeInTheDocument();
   });
 
   it('renders the AI providers panel in the AI tab', async () => {

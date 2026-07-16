@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DataFolderSettingsPanel } from '@/components/dialogs/DataFolderSettingsPanel';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
 import { useVisibleViews } from '@/features/views/useVisibleViews';
@@ -23,6 +22,7 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
 import { toast } from 'sonner';
 import { Bot, Eye, FolderOpen, Hash, KeyRound, RotateCcw, Sparkles } from 'lucide-react';
+import { isTauri } from '@/lib/isTauri';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -46,8 +46,8 @@ const SETTINGS_TABS = [
  * Flow: hydrate draft inputs from stores when opened, route tab controls to the existing preference/UI/hints stores, and reuse the working-directory backend config panel in single-user mode.
  */
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const { dataFolder, isMultiUserMode } = useAuth();
   const { workspaces } = useWorkspaceData();
+  const desktopRuntime = isTauri();
   const visibleViews = useVisibleViews();
   const sessionDismissedHints = useHintsStore((state) => state.sessionDismissedHints);
   const hintsEnabled = useHintsStore((state) => state.hintsEnabled);
@@ -241,14 +241,16 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <section className="space-y-3">
                   <div>
                     <h3 className="text-sm font-semibold">Working Directory</h3>
-                    <p className="break-all text-sm text-muted-foreground">
-                      Current: {dataFolder?.trim() ? dataFolder : 'Not configured'}
+                    <p className="text-sm text-muted-foreground">
+                      {desktopRuntime
+                        ? 'The desktop runtime owns this setting and restarts the local backend after a change.'
+                        : 'The backend launcher owns this setting for hosted and notebook deployments.'}
                     </p>
                   </div>
-                  {isMultiUserMode ? (
-                    <Badge variant="secondary">Managed by server</Badge>
-                  ) : (
+                  {desktopRuntime ? (
                     <DataFolderSettingsPanel />
+                  ) : (
+                    <Badge variant="secondary">Managed by server</Badge>
                   )}
                 </section>
                 <section className="space-y-3 border-t border-border/60 pt-4">

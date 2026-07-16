@@ -1893,6 +1893,7 @@ dependencies = [
 name = "ldaca-wordflow"
 version = "0.6.0"
 dependencies = [
+ "dunce",
  "futures-util",
  "libc",
  "reqwest 0.12.28",
@@ -1904,6 +1905,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tokio",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
