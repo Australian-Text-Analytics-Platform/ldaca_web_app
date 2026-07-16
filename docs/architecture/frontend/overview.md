@@ -2,7 +2,26 @@
 
 The frontend is a React 19, Vite, and TypeScript single-page application used
 both in a browser and inside Tauri. It renders Workspace and Analysis features,
-consumes the backend's generated OpenAPI client, and observes Tasks over SSE.
+consumes the backend's generated OpenAPI client, and observes resource refresh
+events over SSE.
+
+```mermaid
+flowchart LR
+    SHELL["Application shell and providers"] --> FEATURES["Feature workflows"]
+    FEATURES --> API["src/api public barrel"]
+    API --> GENERATED["Generated OpenAPI client and types"]
+    GENERATED --> RUNTIME["Backend runtime configuration"]
+    RUNTIME --> BACKEND["FastAPI resources"]
+
+    BACKEND -->|"resources and queries"| QUERY["TanStack Query cache"]
+    BACKEND -->|"resource refresh SSE"| QUERY
+    QUERY --> FEATURES
+    STORES["Zustand interaction stores"] <--> FEATURES
+    LOCAL["Local form and panel state"] <--> FEATURES
+    FEATURES --> UI["Shared components and Workspace surfaces"]
+
+    TAURI["Tauri supervisor"] -. "injects runtime URL" .-> RUNTIME
+```
 
 ## Boundaries
 
@@ -10,7 +29,8 @@ consumes the backend's generated OpenAPI client, and observes Tasks over SSE.
 - `src/lib/backend/` owns generated-client runtime configuration and API-base
   resolution.
 - `src/features/` owns user workflows; `views/` contains sidebar features and
-  `workspace/` contains the persistent graph/data/task surfaces.
+  `workspace/` contains the persistent graph, data, and background-work
+  surfaces.
 - `src/providers/` owns app-level providers.
 - `src/stores/` owns client interaction state that is not server-derived.
 - `src/tutorials/` and `frontend/public/` own the in-app documentation

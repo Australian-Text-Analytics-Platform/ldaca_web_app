@@ -4,8 +4,25 @@
 
 TanStack Query owns server-derived resources, request identity, and cache
 invalidation. Zustand owns cross-feature client interaction state such as the
-active view, selected Workspace/Data Blocks, preferences, and transient Task
-presentation. Local component state owns form and panel interaction.
+active view, selected Workspace/Data Blocks, preferences, and transient
+background-work presentation. Local component state owns form and panel
+interaction.
+
+```mermaid
+flowchart TB
+    BACKEND["Backend resources and refresh events"] --> QUERY["TanStack Query<br/>server-state authority"]
+    QUERY --> FEATURES["Feature hooks and components"]
+
+    ZUSTAND["Zustand<br/>cross-feature interaction authority"] <--> FEATURES
+    LOCAL["Component state<br/>forms and panels"] <--> FEATURES
+    URL["URL search state<br/>view identity"] <--> ZUSTAND
+
+    FEATURES --> GRAPH["React Flow Workspace graph"]
+    FEATURES --> TABLES["Result and data tables"]
+    FEATURES --> PANELS["Analysis and preprocessing panels"]
+
+    GRAPH -. "volatile callbacks read live state" .-> ZUSTAND
+```
 
 Feature code consumes generated SDK functions and generated types through
 `@/api`. Raw network calls are limited to boundaries the generator cannot
@@ -24,12 +41,12 @@ depend on volatile UI state must read that state when invoked unless the value
 is part of the graph's resynchronization signature; otherwise a view switch can
 leave a cached callback stale.
 
-## Analysis And Tasks
+## Analysis Lifecycle
 
-Analysis features own their selected Data Blocks, submitted Task identity,
-request hydration, and Result projection. Task events update the query cache;
-the owning feature retains workflow controls because it knows the parent/child
-resource relationship.
+Analysis features own their selected Data Blocks, current Tab and Analysis
+identity, request hydration, and Result projection. Resource refresh events
+invalidate the query cache; the owning feature retains workflow controls
+because it knows the root/child Analysis relationship.
 
 Preprocessing preview identity includes every serialized input. Switching an
 input cancels the previous request and late responses cannot replace the new
