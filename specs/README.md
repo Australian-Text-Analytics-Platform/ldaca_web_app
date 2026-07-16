@@ -17,6 +17,24 @@ Create `specs/active/<issue>-<slug>/` containing:
 Link the GitHub issue from `spec.md`. The issue coordinates ownership and
 discussion; the files record the accepted change contract.
 
+```mermaid
+flowchart LR
+    ISSUE["GitHub Issue"] --> ACTIVE["specs/active/issue-slug/"]
+    ACTIVE --> SPEC["spec.md<br/>what and why"]
+    ACTIVE --> PLAN["plan.md<br/>how and risks"]
+    ACTIVE --> TASKS["tasks.md<br/>execution and verification"]
+    SPEC --> IMPLEMENT["Implementation and tests"]
+    PLAN --> IMPLEMENT
+    TASKS --> IMPLEMENT
+    IMPLEMENT --> DURABLE["Update durable architecture, domain, reference, runbook, and ADR docs"]
+    DURABLE --> ARCHIVE["specs/archive/issue-slug/"]
+```
+
+Use Mermaid inside a change specification only when it clarifies that change's
+relationships, sequence, states, or data flow. Keep the diagram at the change
+level: refer to durable architecture pages for system-wide context instead of
+copying their diagrams into the specification.
+
 ## Completion
 
 Before archiving, make code/tests pass and update current architecture, domain,
