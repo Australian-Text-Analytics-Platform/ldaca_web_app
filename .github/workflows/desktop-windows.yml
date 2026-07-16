@@ -106,6 +106,27 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile
 
+      - name: Validate backend package
+        shell: pwsh
+        working-directory: backend
+        run: |
+          Set-StrictMode -Version Latest
+          uv sync --frozen --group dev
+          uv run ruff check .
+          uv run ty check
+          uv run pytest -q
+
+      - name: Validate desktop supervisor and runtime contract
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          Set-StrictMode -Version Latest
+          node --test ../scripts/prepare-backend-runtime.test.mjs
+          node --test scripts/stage-backend-runtime.test-node.mjs
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          cargo test --manifest-path src-tauri/Cargo.toml --lib
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features --locked -- -D warnings
+
       - name: Prepare backend runtime
         shell: pwsh
         working-directory: frontend

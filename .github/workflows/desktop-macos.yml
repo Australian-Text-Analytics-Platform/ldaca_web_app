@@ -98,6 +98,23 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile
 
+      - name: Validate backend package
+        working-directory: backend
+        run: |
+          uv sync --frozen --group dev
+          uv run ruff check .
+          uv run ty check
+          uv run pytest -q
+
+      - name: Validate desktop supervisor and runtime contract
+        working-directory: frontend
+        run: |
+          node --test ../scripts/prepare-backend-runtime.test.mjs
+          node --test scripts/stage-backend-runtime.test-node.mjs
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          cargo test --manifest-path src-tauri/Cargo.toml --lib
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features --locked -- -D warnings
+
       - name: Prepare backend runtime
         shell: bash
         working-directory: frontend
@@ -119,7 +136,7 @@ jobs:
 
           test -d "$runtime_path"
           test -f "$runtime_path/runtime-manifest.json"
-          test -f "$runtime_path/python/lib/libpython3.14t.dylib"
+          test -f "$runtime_path/python/lib/libpython3.14.dylib"
 
           # Exercise the same manifest resolver and environment builder used by launch.
           LDACA_TEST_RUNTIME_ROOT="$runtime_path" \
