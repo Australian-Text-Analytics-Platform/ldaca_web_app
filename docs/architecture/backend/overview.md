@@ -4,6 +4,30 @@ Wordflow's backend is a single-process FastAPI service with one canonical
 resource API. Analysis algorithms live behind the runtime and HTTP boundaries
 described here.
 
+```mermaid
+flowchart TB
+    SETTINGS["Immutable Settings"] --> APP["create_app()<br/>side-effect-free FastAPI construction"]
+    APP -. "lifespan creates" .-> RUNTIME["Runtime<br/>one application composition root"]
+
+    CLIENT["Browser or desktop client"] --> EDGE["HTTP edge<br/>request identity, Host, CORS, CSRF, safe errors"]
+    EDGE --> API["api/<br/>thin routers and typed HTTP contracts"]
+    API --> SERVICES["services/<br/>use cases and coordination authorities"]
+
+    RUNTIME -. "owns" .-> SERVICES
+    RUNTIME -. "owns" .-> INFRA["infrastructure/<br/>database, storage, providers, processes"]
+    RUNTIME -. "owns" .-> EXEC["task group, I/O limiter, schedulers, executors, maintenance"]
+
+    SERVICES --> DOMAIN["domain/workspace/<br/>pure Workspace aggregate and graph invariants"]
+    SERVICES --> STORE["infrastructure/storage/<br/>Workspace, import, and filesystem adapters"]
+    SERVICES --> ANALYSIS["analysis/<br/>framework-independent computation helpers"]
+    EXEC --> WORKERS["workers/<br/>picklable process entrypoints"]
+    WORKERS --> ANALYSIS
+
+    API -. "public schemas" .-> MODELS["models/"]
+    DOMAIN -. "dependency-light types and errors" .-> SHARED["shared/"]
+    SERVICES -. "dependency-light types and errors" .-> SHARED
+```
+
 ## Layers
 
 1. `main.py` constructs a side-effect-free FastAPI application from immutable
@@ -11,12 +35,12 @@ described here.
 2. `api/` declares routes, resolves request dependencies, and shapes HTTP
    responses.
 3. `services/` owns use cases and lifespan-owned coordination state.
-4. `domain/workspace/` owns the framework-neutral Workspace aggregate and
-   snapshot store.
+4. `domain/workspace/` owns only the framework-neutral Workspace aggregate and
+   graph invariants. It does not know about persistence, services, or HTTP.
 5. `analysis/` owns framework-neutral computation helpers; `workers/` owns
    picklable process entry points.
-6. `infrastructure/` owns databases, providers, storage adapters, and process
-   utilities.
+6. `infrastructure/` owns databases, providers, Workspace and User File Import
+   persistence adapters, durable filesystem primitives, and process edges.
 7. `models/` contains strict public request/resource schemas; `shared/`
    contains dependency-light errors and serialization types.
 
@@ -26,10 +50,15 @@ this direction and the absence of removed facades.
 
 ## Runtime Authorities
 
-- `Runtime` owns the database, services, executor, event hub, task group, and
-  I/O limiter for one app lifespan.
+- `Runtime` owns readiness, the database, services, event hub, task group,
+  schedulers, executors, and I/O limiter for one app lifespan.
 - `WorkspaceService` owns Workspace residency and every mutation.
-- `TaskService` owns every durable Task record and event.
+- `AnalysisService` owns Workspace-contained Analysis lifecycle state, while
+  `AnalysisExecutionRuntime` owns only private scheduling and process handles.
+- `UserFileImportService` independently owns retained remote-import lifecycle,
+  scheduling, persistence, and cleanup.
+- `EventHub` is the single live refresh transport for Workspaces, Tabs,
+  Analyses, and User File Imports; it is not durable state.
 - `SessionService` and `OAuthService` own identity state and provider exchange.
 - `UserFileStore` and `WorkspaceArchiveService` own their respective storage
   boundaries.
@@ -42,7 +71,8 @@ and licenses, not nested projects or submodules.
 
 - [Runtime](runtime.md)
 - [Workspaces](workspaces.md)
-- [Tasks](tasks.md)
+- [Background work](background-work.md)
 - [HTTP API](http-api.md)
+- [Analysis data flow](analysis-data-flow.md)
 - [Exact endpoint reference](../../reference/backend-api.md)
 - [Settings reference](../../reference/backend-settings.md)
