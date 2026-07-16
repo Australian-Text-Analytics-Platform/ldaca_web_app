@@ -34,10 +34,10 @@ import {
 
 /**
  * Query key for the whole-workspace tab state (shared across analysis types).
- * Used by: useWorkspaceTabs and workspace-level cleanup hooks so all tab
- * sidecar mutations reconcile the same React Query cache entry.
+ * Used only within useWorkspaceTabs so every tab mutation reconciles the same
+ * React Query cache entry.
  */
-export function workspaceTabsQueryKey(workspaceId: string): string[] {
+function workspaceTabsQueryKey(workspaceId: string): string[] {
   return ['workspace-tabs', workspaceId];
 }
 
