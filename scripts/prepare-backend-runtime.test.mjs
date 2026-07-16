@@ -8,17 +8,17 @@ import {
 
 test('one runtime command owns packaging, version selection, and staging', () => {
     const steps = runtimePreparationSteps('/repo');
-    assert.equal(BACKEND_RUNTIME_PYTHON, '3.14t');
+    assert.equal(BACKEND_RUNTIME_PYTHON, '3.14');
     assert.deepEqual(steps[0].args, [
         'run',
         '--no-project',
         '--python',
-        '3.14t',
+        '3.14',
         'python',
         'scripts/package_backend_runtime.py',
         '--clean',
         '--python-version',
-        '3.14t',
+        '3.14',
     ]);
     assert.deepEqual(steps[1].args, ['frontend/scripts/stage-backend-runtime.mjs']);
 });

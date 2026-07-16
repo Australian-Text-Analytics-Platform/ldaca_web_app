@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -11,12 +12,12 @@ import stat
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 BACKEND_PROJECT_ROOT = PROJECT_ROOT / "backend"
+PACKAGED_PYTHON_SELECTOR = "3.14"
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,7 +38,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--python-version",
         type=str,
-        default="3.14t",
+        default=PACKAGED_PYTHON_SELECTOR,
+        choices=(PACKAGED_PYTHON_SELECTOR,),
         help="Python version to vendor inside the runtime",
     )
     return parser.parse_args()
@@ -239,7 +241,8 @@ def ensure_venv_libpython(
         print("[INFO] Skipping libpython copy (not required on Windows)")
         return
 
-    major_minor = ".".join(python_version.split(".")[:2])
+    base_version = python_version.split("+", maxsplit=1)[0]
+    major_minor = ".".join(base_version.split(".")[:2])
     if sys.platform == "darwin":
         libpython_name = f"libpython{major_minor}.dylib"
     else:
@@ -295,24 +298,54 @@ def write_runtime_manifest(
     three paths against the relocated ``backend-runtime`` root and does no
     interpreter, Python-home, or site-packages scanning of its own.
     """
-    try:
-        git_sha = run(
-            ["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, capture_output=True
-        ).stdout.strip()
-    except Exception:
-        git_sha = "unknown"
-
     python_home = find_runtime_python_home(output_dir)
     site_packages = find_runtime_site_packages(output_dir / "python")
+    interpreter = json.loads(
+        run(
+            [
+                str(python_bin),
+                "-c",
+                (
+                    "import json,platform,sys,sysconfig;"
+                    "print(json.dumps({'version':platform.python_version(),"
+                    "'free_threaded':bool(sysconfig.get_config_var('Py_GIL_DISABLED')),"
+                    "'platform':sys.platform,'machine':platform.machine().lower()}))"
+                ),
+            ],
+            capture_output=True,
+        ).stdout
+    )
+    if not interpreter["version"].startswith("3.14.") or interpreter["free_threaded"]:
+        raise RuntimeError(
+            "Packaged runtime must use standard (GIL-enabled) CPython 3.14"
+        )
+    target_os = {
+        "darwin": "macos",
+        "win32": "windows",
+        "linux": "linux",
+    }.get(interpreter["platform"])
+    target_arch = {
+        "arm64": "aarch64",
+        "aarch64": "aarch64",
+        "amd64": "x86_64",
+        "x86_64": "x86_64",
+    }.get(interpreter["machine"])
+    if target_os is None or target_arch is None:
+        raise RuntimeError("Unsupported packaged Python target platform")
+    lock_hash = hashlib.sha256(
+        (BACKEND_PROJECT_ROOT / "uv.lock").read_bytes()
+    ).hexdigest()
     manifest = {
-        "schema_version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "python_version": python_version,
+        "schema_version": 2,
+        "target_os": target_os,
+        "target_arch": target_arch,
+        "python_selector": python_version,
+        "python_version": interpreter["version"],
+        "python_free_threaded": interpreter["free_threaded"],
+        "uv_lock_sha256": lock_hash,
         "python_executable": relative_runtime_path(python_bin, output_dir),
         "python_home": relative_runtime_path(python_home, output_dir),
         "site_packages": relative_runtime_path(site_packages, output_dir),
-        "git_sha": git_sha,
-        "install_method": "uv-sync",
     }
     manifest_path = output_dir / "runtime-manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

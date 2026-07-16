@@ -94,30 +94,40 @@ def test_runtime_manifest_owns_a_relative_relocatable_layout(
     runtime_root = tmp_path / "build" / "backend-runtime"
     python_home = runtime_root / "managed-python" / "cpython-3.14-test"
     python_bin = python_home / "bin" / "python3"
-    site_packages = runtime_root / "python" / "lib" / "python3.14t" / "site-packages"
-    (python_home / "lib" / "python3.14t" / "encodings").mkdir(parents=True)
+    site_packages = runtime_root / "python" / "lib" / "python3.14" / "site-packages"
+    (python_home / "lib" / "python3.14" / "encodings").mkdir(parents=True)
     python_bin.parent.mkdir(parents=True, exist_ok=True)
     python_bin.touch()
     site_packages.mkdir(parents=True)
 
-    class GitResult:
-        stdout = "test-sha\n"
+    class InterpreterResult:
+        stdout = json.dumps(
+            {
+                "version": "3.14.0",
+                "free_threaded": False,
+                "platform": __import__("sys").platform,
+                "machine": __import__("platform").machine().lower(),
+            }
+        )
 
-    monkeypatch.setattr(module, "run", lambda *args, **kwargs: GitResult())
+    monkeypatch.setattr(module, "run", lambda *args, **kwargs: InterpreterResult())
 
     module.write_runtime_manifest(
         output_dir=runtime_root,
         python_bin=python_bin,
-        python_version="3.14t",
+        python_version="3.14",
     )
 
     manifest = json.loads((runtime_root / "runtime-manifest.json").read_text())
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
+    assert manifest["python_selector"] == "3.14"
+    assert manifest["python_version"] == "3.14.0"
+    assert manifest["python_free_threaded"] is False
     assert manifest["python_executable"] == (
         "managed-python/cpython-3.14-test/bin/python3"
     )
     assert manifest["python_home"] == "managed-python/cpython-3.14-test"
-    assert manifest["site_packages"] == "python/lib/python3.14t/site-packages"
+    assert manifest["site_packages"] == "python/lib/python3.14/site-packages"
     assert not any(str(tmp_path) in str(value) for value in manifest.values())
 
     relocated_root = tmp_path / "relocated" / "backend-runtime"

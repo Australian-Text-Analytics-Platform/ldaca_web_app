@@ -15,6 +15,12 @@ const RUNTIME_MANIFEST: &str = "runtime-manifest.json";
 #[derive(Debug, Deserialize)]
 struct RuntimeManifest {
     schema_version: u32,
+    target_os: String,
+    target_arch: String,
+    python_selector: String,
+    python_version: String,
+    python_free_threaded: bool,
+    uv_lock_sha256: String,
     python_executable: String,
     python_home: String,
     site_packages: String,
@@ -25,7 +31,7 @@ struct RuntimeManifest {
 /// Constructed only by [`BackendRuntime::from_root`]. All fields originate in
 /// one relative manifest and are resolved once against the runtime resource
 /// root, so consumers never repeat platform directory scans.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct BackendRuntime {
     pub(crate) root: PathBuf,
     pub(crate) python: PathBuf,
@@ -54,13 +60,43 @@ impl BackendRuntime {
                 format!("Invalid {}: {error}", manifest_path.display()),
             )
         })?;
-        if manifest.schema_version != 1 {
+        if manifest.schema_version != 2 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
                     "Unsupported runtime manifest schema {}",
                     manifest.schema_version
                 ),
+            )
+            .into());
+        }
+        if manifest.target_os != std::env::consts::OS
+            || manifest.target_arch != std::env::consts::ARCH
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Runtime target {}/{} does not match {}/{}",
+                    manifest.target_os,
+                    manifest.target_arch,
+                    std::env::consts::OS,
+                    std::env::consts::ARCH
+                ),
+            )
+            .into());
+        }
+        if manifest.python_selector != "3.14"
+            || !manifest.python_version.starts_with("3.14.")
+            || manifest.python_free_threaded
+            || manifest.uv_lock_sha256.len() != 64
+            || !manifest
+                .uv_lock_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Runtime Python or lock provenance is incompatible",
             )
             .into());
         }
@@ -180,14 +216,14 @@ mod tests {
     fn write_layout(root: &Path) {
         let python = root.join("managed-python/cpython-test/bin/python3");
         let home = root.join("managed-python/cpython-test");
-        let site_packages = root.join("python/lib/python3.14t/site-packages");
+        let site_packages = root.join("python/lib/python3.14/site-packages");
         fs::create_dir_all(python.parent().expect("python parent")).expect("python dir");
         fs::write(&python, b"fixture").expect("python fixture");
         fs::create_dir_all(&home).expect("home dir");
         fs::create_dir_all(&site_packages).expect("site packages");
         fs::write(
             root.join(RUNTIME_MANIFEST),
-            r#"{"schema_version":1,"python_executable":"managed-python/cpython-test/bin/python3","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14t/site-packages"}"#,
+            format!(r#"{{"schema_version":2,"target_os":"{}","target_arch":"{}","python_selector":"3.14","python_version":"3.14.0","python_free_threaded":false,"uv_lock_sha256":"{}","python_executable":"managed-python/cpython-test/bin/python3","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14/site-packages"}}"#, std::env::consts::OS, std::env::consts::ARCH, "a".repeat(64)),
         )
         .expect("manifest");
     }
@@ -218,9 +254,22 @@ mod tests {
         assert!(BackendRuntime::from_root(&root).is_err());
 
         write_layout(&root);
+        let manifest_path = root.join(RUNTIME_MANIFEST);
+        let manifest = fs::read_to_string(&manifest_path).expect("read manifest");
+        fs::write(
+            &manifest_path,
+            manifest.replace(
+                r#""python_free_threaded":false"#,
+                r#""python_free_threaded":true"#,
+            ),
+        )
+        .expect("free-threaded manifest");
+        assert!(BackendRuntime::from_root(&root).is_err());
+
+        write_layout(&root);
         fs::write(
             root.join(RUNTIME_MANIFEST),
-            r#"{"schema_version":1,"python_executable":"../python","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14t/site-packages"}"#,
+            format!(r#"{{"schema_version":2,"target_os":"{}","target_arch":"{}","python_selector":"3.14","python_version":"3.14.0","python_free_threaded":false,"uv_lock_sha256":"{}","python_executable":"../python","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14/site-packages"}}"#, std::env::consts::OS, std::env::consts::ARCH, "a".repeat(64)),
         )
         .expect("escaping manifest");
         let error = BackendRuntime::from_root(&root).expect_err("escape must fail");

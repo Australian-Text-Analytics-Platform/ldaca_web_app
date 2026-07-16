@@ -13,7 +13,7 @@ function createRuntime(root) {
   const paths = {
     python_executable: 'managed-python/cpython-test/bin/python3',
     python_home: 'managed-python/cpython-test',
-    site_packages: 'python/lib/python3.14t/site-packages',
+    site_packages: 'python/lib/python3.14/site-packages',
   };
   for (const relativePath of Object.values(paths)) {
     const absolutePath = path.join(root, relativePath);
@@ -26,7 +26,16 @@ function createRuntime(root) {
   }
   fs.writeFileSync(
     path.join(root, 'runtime-manifest.json'),
-    JSON.stringify({ schema_version: 1, ...paths }),
+    JSON.stringify({
+      schema_version: 2,
+      target_os: { darwin: 'macos', win32: 'windows', linux: 'linux' }[process.platform],
+      target_arch: { arm64: 'aarch64', x64: 'x86_64' }[process.arch],
+      python_selector: '3.14',
+      python_version: '3.14.0',
+      python_free_threaded: false,
+      uv_lock_sha256: 'a'.repeat(64),
+      ...paths,
+    }),
   );
 }
 
@@ -68,4 +77,17 @@ test('runtime layout rejects corrupt, absolute, escaping, and missing paths', ()
   manifest.python_home = 'managed-python/missing';
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));
   assert.throws(() => resolveRuntimeLayout(root), /does not exist/);
+});
+
+test('runtime layout rejects free-threaded Python', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'runtime-abi-'));
+  const root = path.join(temp, 'runtime');
+  createRuntime(root);
+
+  const manifestPath = path.join(root, 'runtime-manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.python_free_threaded = true;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+
+  assert.throws(() => resolveRuntimeLayout(root), /provenance is invalid/);
 });

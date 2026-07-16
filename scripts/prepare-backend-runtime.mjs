@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const BACKEND_RUNTIME_PYTHON = '3.14t';
+export const BACKEND_RUNTIME_PYTHON = '3.14';
 
 export function runtimePreparationSteps(repoRoot) {
     return [

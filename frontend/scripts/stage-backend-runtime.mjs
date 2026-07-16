@@ -38,8 +38,24 @@ export function resolveRuntimeLayout(runtimeRoot) {
     throw new Error(`Cannot read runtime manifest at ${manifestPath}: ${error.message}`);
   }
 
-  if (manifest.schema_version !== 1) {
+  if (manifest.schema_version !== 2) {
     throw new Error(`Unsupported runtime manifest schema: ${manifest.schema_version}`);
+  }
+  const expectedOs = { darwin: 'macos', win32: 'windows', linux: 'linux' }[process.platform];
+  const expectedArch = { arm64: 'aarch64', x64: 'x86_64' }[process.arch];
+  if (manifest.target_os !== expectedOs || manifest.target_arch !== expectedArch) {
+    throw new Error(
+      `Runtime target ${manifest.target_os}/${manifest.target_arch} does not match ${expectedOs}/${expectedArch}`,
+    );
+  }
+  if (
+    manifest.python_selector !== '3.14'
+    || typeof manifest.python_version !== 'string'
+    || !manifest.python_version.startsWith('3.14.')
+    || manifest.python_free_threaded !== false
+    || !/^[0-9a-f]{64}$/.test(manifest.uv_lock_sha256)
+  ) {
+    throw new Error('Runtime manifest Python or lock provenance is invalid');
   }
 
   const resolved = {};
