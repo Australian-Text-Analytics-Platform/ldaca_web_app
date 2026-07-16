@@ -184,7 +184,7 @@ describe('AnalysisTabsHost', () => {
     expect(screen.getByRole('tab')).toHaveTextContent('Analysis 1');
   });
 
-  it('renders the first tab while single-tab cleanup is pending', () => {
+  it('shows multi-tab chrome and preserves the active tab when disabled mode has multiple tabs', () => {
     mocks.useWorkspaceTabs.mockReturnValue(
       makeTabsResult({
         tabs: [tab, secondTab],
@@ -194,7 +194,10 @@ describe('AnalysisTabsHost', () => {
 
     render(<AnalysisTabsHost tabGroup="token_frequencies" Feature={FeatureWithTask} />);
 
-    expect(screen.getByText('Active task none')).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: /analysis tabs/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /new tab/i })).toBeInTheDocument();
+    expect(screen.getByText('Active task task-2')).toBeInTheDocument();
   });
 
   it('binds required feature commands to the active persisted tab', () => {

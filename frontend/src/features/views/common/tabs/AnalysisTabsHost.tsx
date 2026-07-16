@@ -14,10 +14,10 @@
  * ViewRouter resolves from the active view id.
  * Flow: resolve workspace and preference state, load this workspace's tab group, auto-create
  * one empty tab only when entering an empty group, render the shared tab bar
- * only when the user preference enables it, then mount ``Feature`` keyed by the
+ * when the preference enables it or the group has multiple tabs, then mount ``Feature`` keyed by the
  * active tab id so switching tabs gives each tab a fresh, independently-hydrated
- * panel instance. WorkspaceShell owns the global single-tab cleanup pass when
- * the preference is off.
+ * panel instance. The preference is presentation-only: it never changes tab
+ * ownership or persisted state.
  */
 import { useEffect, useRef, type ComponentType } from 'react';
 import type { AnalysisTabInput } from '@/api';
@@ -94,12 +94,11 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     }
   }, [currentWorkspaceId, tabGroup, isLoading, tabs.length, createTab]);
 
-  // The workspace-level cleanup removes extra persisted tabs. Until that async
-  // pass reconciles this group, single-tab mode displays the first tab instead
-  // of an arbitrary previously-active tab.
-  const singleTabModeActiveId =
-    !analysisMultiTabEnabled && tabs.length > 0 ? (tabs[0]?.tab_id ?? null) : activeTabId;
-  const activeTab = tabs.find((t) => t.tab_id === singleTabModeActiveId) ?? null;
+  // Disabled mode hides chrome only for the ordinary one-tab case. Programmatic
+  // flows may still create additional tabs, which must immediately reveal the
+  // complete tab UI so every persisted tab stays reachable.
+  const showTabChrome = analysisMultiTabEnabled || tabs.length > 1;
+  const activeTab = tabs.find((t) => t.tab_id === activeTabId) ?? null;
 
   return (
     <AnalysisTabbedPanel
@@ -110,7 +109,7 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
       onCreate={() => createTab()}
       onRename={renameTab}
       onReorder={reorderTabs}
-      multiTabEnabled={analysisMultiTabEnabled}
+      multiTabEnabled={showTabChrome}
     >
       {activeTab ? (
         // key forces a fresh mount per tab so each tab hydrates its own task

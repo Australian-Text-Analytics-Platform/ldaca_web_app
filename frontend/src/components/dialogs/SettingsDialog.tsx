@@ -1,11 +1,7 @@
-import { useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { getWorkspaceTabs } from '@/api';
-import type { WorkspaceTabsState } from '@/api';
+import { useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -20,11 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DataFolderSettingsPanel } from '@/components/dialogs/DataFolderSettingsPanel';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import {
-  EMPTY_TABS_STATE,
-  countTabsRemovedBySingleTabMode,
-} from '@/features/views/common/tabs/tabStateOps';
-import { workspaceTabsQueryKey } from '@/features/views/common/tabs/useWorkspaceTabs';
 import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
 import { useVisibleViews } from '@/features/views/useVisibleViews';
 import { useHintsStore } from '@/stores/hintsStore';
@@ -56,8 +47,7 @@ const SETTINGS_TABS = [
  */
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { dataFolder, isMultiUserMode } = useAuth();
-  const { currentWorkspaceId, workspaces } = useWorkspaceData();
-  const queryClient = useQueryClient();
+  const { workspaces } = useWorkspaceData();
   const visibleViews = useVisibleViews();
   const sessionDismissedHints = useHintsStore((state) => state.sessionDismissedHints);
   const hintsEnabled = useHintsStore((state) => state.hintsEnabled);
@@ -80,56 +70,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const lastSyncError = usePreferencesStore((state) => state.lastSyncError);
   const tokenInputRef = useRef<HTMLInputElement>(null);
   const tokenizerInputRef = useRef<HTMLInputElement>(null);
-  const [pendingMultiTabDeleteCount, setPendingMultiTabDeleteCount] = useState(0);
-  const [checkingMultiTabDisable, setCheckingMultiTabDisable] = useState(false);
-
-  /** Called by: the multi-tab warning check because Settings must inspect the fresh current workspace sidecar before allowing destructive cleanup. */
-  const loadWorkspaceTabsForWarning = async (): Promise<WorkspaceTabsState> => {
-    if (!currentWorkspaceId) return EMPTY_TABS_STATE;
-    const queryKey = workspaceTabsQueryKey(currentWorkspaceId);
-    const { data: payload } = await getWorkspaceTabs({
-      path: { workspace_id: currentWorkspaceId },
-      throwOnError: true,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- API payload may be undefined at runtime
-    const tabsState = payload ?? EMPTY_TABS_STATE;
-    queryClient.setQueryData(queryKey, tabsState);
-    return tabsState;
-  };
-
   /**
    * Called by: the shadcn Switch for the analysis multi-tab preference.
-   * Flow: enabling writes immediately; disabling first checks whether any
-   * existing tabs would be pruned, then either opens the warning dialog or
-   * commits the preference directly when there is nothing to delete.
+   * The preference controls chrome visibility only, so both directions write
+   * immediately without reading or changing persisted analysis tabs.
    */
-  const handleAnalysisMultiTabChange = async (enabled: boolean) => {
-    if (enabled) {
-      setPendingMultiTabDeleteCount(0);
-      setAnalysisMultiTabEnabled(true);
-      return;
-    }
-    setCheckingMultiTabDisable(true);
-    try {
-      const tabsState = await loadWorkspaceTabsForWarning();
-      const tabsToDelete = countTabsRemovedBySingleTabMode(tabsState);
-      if (tabsToDelete > 0) {
-        setPendingMultiTabDeleteCount(tabsToDelete);
-      } else {
-        setAnalysisMultiTabEnabled(false);
-      }
-    } catch (error) {
-      console.warn('[settings] Failed to inspect analysis tabs before disabling multi-tab:', error);
-      toast.error('Unable to check existing analysis tabs. Multi-tab remains enabled.');
-    } finally {
-      setCheckingMultiTabDisable(false);
-    }
-  };
-
-  /** Called by: the alert dialog confirm button after the user accepts deleting extra analysis tabs. */
-  const confirmDisableMultiTab = () => {
-    setPendingMultiTabDeleteCount(0);
-    setAnalysisMultiTabEnabled(false);
+  const handleAnalysisMultiTabChange = (enabled: boolean) => {
+    setAnalysisMultiTabEnabled(enabled);
   };
 
   /** Called by: Settings hint reset button because browser-local permanent and session hint dismissals need one reset action. */
@@ -167,11 +114,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       : hydrated
         ? { label: 'Synced', variant: 'outline' as const }
         : { label: 'Loading', variant: 'secondary' as const };
-
-  const pendingMultiTabDeleteText =
-    pendingMultiTabDeleteCount === 1
-      ? '1 extra tab will be deleted.'
-      : `${String(pendingMultiTabDeleteCount)} extra tabs will be deleted.`;
 
   return (
     <>
@@ -229,10 +171,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     <Switch
                       id="settings-analysis-multi-tab"
                       checked={analysisMultiTabEnabled}
-                      disabled={checkingMultiTabDisable}
-                      onCheckedChange={(enabled) => {
-                        void handleAnalysisMultiTabChange(enabled);
-                      }}
+                      onCheckedChange={handleAnalysisMultiTabChange}
                     />
                   </div>
                 </section>
@@ -409,18 +348,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </Tabs>
         </DialogContent>
       </Dialog>
-      <ConfirmDialog
-        open={pendingMultiTabDeleteCount > 0}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) setPendingMultiTabDeleteCount(0);
-        }}
-        title="Disable multi-tab?"
-        description={`${pendingMultiTabDeleteText} Wordflow will keep the first tab in each analysis and clear backend tasks owned by deleted tabs.`}
-        confirmText="Disable multi-tab"
-        cancelText="Keep multi-tab"
-        onConfirm={confirmDisableMultiTab}
-        variant="destructive"
-      />
     </>
   );
 }

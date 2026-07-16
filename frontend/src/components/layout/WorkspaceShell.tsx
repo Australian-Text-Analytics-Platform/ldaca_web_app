@@ -10,9 +10,6 @@ import Sidebar from '@/components/layout/Sidebar';
 import { InsetCard } from '@/components/layout/InsetCard';
 import { RefreshStatusBanner } from '@/features/auth/components/RefreshStatusBanner';
 import { useUIStore } from '@/stores';
-import { usePreferencesStore } from '@/stores/preferencesStore';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useSingleTabModeWorkspaceCleanup } from '@/features/views/common/tabs/useSingleTabModeWorkspaceCleanup';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
@@ -23,19 +20,6 @@ const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 const HintsController = lazy(() =>
   import('@/features/hints/HintsController').then((m) => ({ default: m.HintsController })),
 );
-
-/**
- * Headless bridge between the global multi-tab preference and workspace tab
- * persistence.
- * Rendered by: WorkspaceShell under WorkspaceProvider so it can see the current
- * workspace even when no analysis view is mounted.
- */
-function SingleTabModeWorkspaceCleanup() {
-  const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
-  const { currentWorkspaceId } = useWorkspaceData();
-  useSingleTabModeWorkspaceCleanup(currentWorkspaceId, analysisMultiTabEnabled);
-  return null;
-}
 
 export function WorkspaceShell() {
   usePreferencesInit();
@@ -63,7 +47,6 @@ export function WorkspaceShell() {
   return (
     <QueryProvider>
       <WorkspaceProvider>
-        <SingleTabModeWorkspaceCleanup />
         <ViewRouteSync />
         <ErrorBoundary>
           <SidebarProvider
