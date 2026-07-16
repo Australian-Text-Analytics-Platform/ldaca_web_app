@@ -10,7 +10,7 @@ import { isTauri } from '@/lib/isTauri';
  * build we derive it from `getApiBase()` so dev proxies work unchanged.
  *
  * Returns `{ ready, error }`. `ready` flips once the server answers 2xx with
- * `{ status: 'healthy' | 'operational' }`; `error` surfaces the most recent
+ * `{ status: 'ready' }`; `error` surfaces the most recent
  * failure reason but polling continues until `ready` is true.
  *
  * Backoff: six fast attempts (500 ms) then exponential up to 5 s.
@@ -91,7 +91,7 @@ export const useBackendHealth = () => {
     /** Performs one health check and schedules another unless the backend is ready. */
     /**
      * Called by: the polling effect because backend startup can lag behind the frontend shell in desktop and dev modes.
-     * Flow: fetch the health URL without cache, accept healthy/operational statuses, otherwise store the failure and schedule the next retry.
+     * Flow: fetch the health URL without cache, accept the backend's exact readiness status, otherwise store the failure and schedule the next retry.
      */
     const poll = async () => {
       attempt += 1;
@@ -103,7 +103,7 @@ export const useBackendHealth = () => {
             typeof body === 'object' &&
             body !== null &&
             'status' in body &&
-            (body.status === 'healthy' || body.status === 'operational');
+            body.status === 'ready';
           if (healthy) {
             if (!cancelled) {
               setReady(true);
