@@ -469,7 +469,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
         onStudyNodeChange={(nodeId: string) => {
           setStudyNodeId(nodeId);
         }}
-        getColorForNode={getColorForNode}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
           void setNodeColor(nodeId, color);

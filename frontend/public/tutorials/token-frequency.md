@@ -18,11 +18,11 @@ When two are selected, the tool runs in comparison mode and produces the Juxtorp
 
 For each selected block, choose the **text column** that contains the documents you want to count. Only columns that hold plain text are available.
 
-<h3 id="help-token-frequency-reference">Step 2 — Reference Data Block (comparison mode)</h3>
+<h3 id="help-token-frequency-reference">Step 2 — Study and reference corpora (comparison mode)</h3>
 
-When two data blocks are selected, a **Reference Data Block** toggle appears below the data-block selectors. Click the coloured circle next to a block to designate it as the reference (Corpus 1).
+When two data blocks are selected, each selected-node card shows a **Study Corpus / Reference Corpus** switch. Switching one card to **Study Corpus** automatically makes the other card the reference, and switching one card to **Reference Corpus** makes the paired card the study corpus.
 
-The reference block provides the baseline for the statistical keyword analysis: its frequencies appear as **O1** and **%1** in the statistics table, and the other block appears as **O2** and **%2**. Swapping the reference flips which side each statistic measures from, which can change the sign of directional measures like LogRatio.
+The reference block provides the baseline for the statistical keyword analysis: its frequencies appear as **O1** and **%1** in the statistics table, and the study block appears as **O2** and **%2**. Swapping the corpus roles flips which side each statistic measures from, which can change the sign of directional measures like LogRatio.
 
 <h3 id="help-token-frequency-stop-words">Step 3 — Stop words</h3>
 
@@ -139,7 +139,7 @@ Token Frequency results are saved in the backend so the tab can reload and retai
 | Setting              | Default              | Notes                                                                                                                                         |
 | -------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | Data blocks          | None                 | Up to 2; comparison mode activates when 2 are selected. If more than 2 are selected workspace-wide, only the 2 most recent show in the panel. |
-| Reference Data Block | First selected block | Changes O1/O2 assignment in the statistics table                                                                                              |
+| Corpus role switches | First selected block is Study Corpus | Changes O1/O2 assignment in the statistics table                                                                                  |
 | Stop words           | Empty                | Click **Fill Default** for language-matched default stop words                                                                                |
 | Cloud display limit  | 50                   | Range 10–100; mirrors to list limit                                                                                                           |
 | List display limit   | 50                   | Range 10 – vocabulary size; values > 100 diverge from cloud                                                                                   |
@@ -149,7 +149,7 @@ Token Frequency results are saved in the backend so the tab can reload and retai
 1. Select a data block and click **Analyze** with the default settings.
 2. Click **Fill Default** to apply language-matched default stop words, then **Apply Stop Words** and compare the top tokens.
 3. Right-click one of the remaining high-frequency words in the cloud to add it as a custom stop word. Confirm it appears at the start of the stop-word list.
-4. Select a second data block. Use the **Reference Data Block** toggle to set which block is the baseline, then re-run.
+4. Select a second data block. Use the card-level **Study Corpus / Reference Corpus** switches to set which block is the baseline, then re-run.
 5. Switch to **List view** and use **Filter tokens** with a wildcard pattern (e.g. `*ing`) to find all gerund-form tokens.
 6. In **List view**, scroll one frequency list and observe that the other list scrolls in sync.
 7. Sort the statistics table by **LogRatio** to find the words most distinctively associated with each data block.

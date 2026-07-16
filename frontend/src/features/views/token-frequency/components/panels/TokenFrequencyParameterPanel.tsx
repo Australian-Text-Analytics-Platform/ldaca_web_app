@@ -6,84 +6,60 @@ import { TokensColumnMismatchNotice } from '@/features/views/common/components/T
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
-import { Label } from '@/components/ui/label';
-import HelpIcon from '@/components/help/HelpIcon';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { Check } from 'lucide-react';
 
 interface StudyNodeOption {
   id: string;
   label: string;
-  color: string;
 }
 
 /**
- * Study-corpus selector shown immediately under the selected-node cards.
- * Rendered by: TokenFrequencyParameterPanel when two nodes are selected because
- * keyword statistics need one node marked as the study corpus while preserving
- * the selected-node card layout for column/tokenizer/color parameters.
- * Flow: resolve the effective study id, render a compact segmented swatch
- * group, mark the active swatch with a check icon, and notify the feature when
- * the user switches the study block.
+ * Per-card corpus-role switch for two-node token-frequency comparisons.
+ * Rendered by: TokenFrequencyParameterPanel inside each selected-node card so
+ * the study/reference role sits next to the node it applies to.
+ * Flow: unchecked means this card is Study Corpus, checked means Reference
+ * Corpus. Toggling a card to Study stores that node id; toggling it to
+ * Reference stores the paired node id as the study corpus, keeping both cards
+ * synchronized through the single `studyNodeId` value.
  */
-function StudyDataBlockToggle({
-  nodeOptions,
-  studyNodeId,
+function CorpusRoleSwitch({
+  nodeOption,
+  pairedNodeId,
+  isStudy,
   onStudyNodeChange,
 }: {
-  nodeOptions: StudyNodeOption[];
-  studyNodeId: string | null;
+  nodeOption: StudyNodeOption;
+  pairedNodeId: string;
+  isStudy: boolean;
   onStudyNodeChange: (nodeId: string) => void;
 }) {
-  if (nodeOptions.length < 2) return null;
-  const activeNodeId = studyNodeId ?? nodeOptions[0]?.id ?? null;
-
   return (
-    <div className="px-3 pt-2">
-      <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-        <Label className="whitespace-nowrap text-sm font-medium">Study Data Block</Label>
-        <div
-          role="radiogroup"
-          aria-label="Study Data Block"
-          className="inline-flex items-center gap-1 rounded-lg bg-muted p-1"
-        >
-          {nodeOptions.map((option) => {
-            const isActive = activeNodeId === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={isActive}
-                aria-label={`Use ${option.label} as study data block`}
-                title={option.label}
-                className={cn(
-                  'relative inline-flex size-8 items-center justify-center rounded-md p-0.5 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-                  isActive ? 'bg-background shadow-sm' : 'hover:bg-background/70',
-                )}
-                onClick={() => {
-                  onStudyNodeChange(option.id);
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  className="block size-full rounded-sm shadow-sm"
-                  style={{ backgroundColor: option.color }}
-                >
-                  {isActive ? (
-                    <Check className="absolute inset-0 m-auto h-4 w-4 text-white drop-shadow" />
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <HelpIcon
-          targetKey="analysis.token-frequency.reference"
-          label="Study Data Block"
-          tooltip="The study block is treated as Corpus 2 (O2/%2) in the keyword statistics; the other block is the reference (Corpus 1). Switching it flips the direction of measures like LogRatio."
-        />
-      </div>
+    <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+      <span
+        className={cn(
+          'whitespace-nowrap text-xs font-medium',
+          isStudy ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        Study Corpus
+      </span>
+      <Switch
+        size="sm"
+        checked={!isStudy}
+        aria-label={`${nodeOption.label} corpus role`}
+        onCheckedChange={(isReference) => {
+          onStudyNodeChange(isReference ? pairedNodeId : nodeOption.id);
+        }}
+      />
+      <span
+        className={cn(
+          'whitespace-nowrap text-xs font-medium',
+          isStudy ? 'text-muted-foreground' : 'text-foreground',
+        )}
+      >
+        Reference Corpus
+      </span>
     </div>
   );
 }
@@ -107,7 +83,6 @@ interface TokenFrequencyParameterPanelProps {
   runLabel?: string;
   studyNodeId: string | null;
   onStudyNodeChange: (nodeId: string) => void;
-  getColorForNode: (nodeId: string, index?: number) => string;
   nodeColors?: Record<string, string>;
   onNodeColorChange?: (nodeId: string, color: string) => void;
   computeDisplayName: (nodeId: string) => string;
@@ -134,7 +109,6 @@ export const TokenFrequencyParameterPanel = ({
   runLabel,
   studyNodeId,
   onStudyNodeChange,
-  getColorForNode,
   nodeColors,
   onNodeColorChange,
   computeDisplayName,
@@ -142,18 +116,34 @@ export const TokenFrequencyParameterPanel = ({
 }: TokenFrequencyParameterPanelProps) => {
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const effectiveNodeColumnSelections: NodeColumnSelection[] = nodeInputs.nodeColumnSelections;
-  const hasMultipleNodes = panelSelectedNodes.length >= 2;
   const nodeOptions = panelSelectedNodes
-    .map((node, index) => {
+    .map((node) => {
       const nodeId = typeof node.id === 'string' ? node.id : '';
       if (!nodeId) return null;
       return {
         id: nodeId,
         label: computeDisplayName(nodeId),
-        color: getColorForNode(nodeId, index),
       };
     })
-    .filter((option): option is { id: string; label: string; color: string } => Boolean(option));
+    .filter((option): option is StudyNodeOption => Boolean(option));
+  const showCorpusRoleSwitches = nodeOptions.length === 2;
+  const activeStudyNodeId = studyNodeId ?? nodeOptions[0]?.id ?? null;
+
+  const renderCorpusRoleSwitch = showCorpusRoleSwitches
+    ? ({ nodeId }: NodeInputColumnAddonArgs) => {
+        const nodeOption = nodeOptions.find((option) => option.id === nodeId);
+        const pairedNode = nodeOptions.find((option) => option.id !== nodeId);
+        if (!nodeOption || !pairedNode) return null;
+        return (
+          <CorpusRoleSwitch
+            nodeOption={nodeOption}
+            pairedNodeId={pairedNode.id}
+            isStudy={activeStudyNodeId === nodeId}
+            onStudyNodeChange={onStudyNodeChange}
+          />
+        );
+      }
+    : undefined;
 
   return (
     <AnalysisCardLayout
@@ -201,14 +191,8 @@ export const TokenFrequencyParameterPanel = ({
         nodeColors={nodeColors}
         onNodeColorChange={onNodeColorChange}
         renderColumnAddon={renderTokenizerModelSelector}
+        renderExtraNodeContent={renderCorpusRoleSwitch}
       />
-      {hasMultipleNodes ? (
-        <StudyDataBlockToggle
-          nodeOptions={nodeOptions}
-          studyNodeId={studyNodeId}
-          onStudyNodeChange={onStudyNodeChange}
-        />
-      ) : null}
       <TokensColumnMismatchNotice
         nodes={panelSelectedNodes}
         selections={effectiveNodeColumnSelections}

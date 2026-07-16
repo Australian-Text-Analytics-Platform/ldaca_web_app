@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TokenFrequencyParameterPanel } from '../TokenFrequencyParameterPanel';
@@ -29,7 +29,42 @@ vi.mock('@/features/views/common/components/AnalysisCardLayout', () => ({
 
 vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
   // Used by: placement tests as the stable boundary for the selected-node selector.
-  NodeInputsPanel: () => <div data-testid="node-inputs-panel" />,
+  NodeInputsPanel: ({
+    resolvedNodes,
+    nodeColors,
+    renderExtraNodeContent,
+  }: {
+    resolvedNodes: {
+      id: string;
+      node: { id: string; name: string };
+      column: string;
+      columnOptions: { name: string }[];
+    }[];
+    nodeColors?: Record<string, string>;
+    renderExtraNodeContent?: (args: {
+      node: { id: string; name: string };
+      nodeId: string;
+      index: number;
+      color: string;
+      column: string;
+      columns: string[];
+    }) => React.ReactNode;
+  }) => (
+    <div data-testid="node-inputs-panel">
+      {resolvedNodes.map((resolved, index) => (
+        <div key={resolved.id} data-testid={`node-card-${resolved.id}`}>
+          {renderExtraNodeContent?.({
+            node: resolved.node,
+            nodeId: resolved.id,
+            index,
+            color: nodeColors?.[resolved.id] ?? '#000000',
+            column: resolved.column,
+            columns: resolved.columnOptions.map((column) => column.name),
+          })}
+        </div>
+      ))}
+    </div>
+  ),
 }));
 
 const nodeInputsFixture = (): UseTabNodeInputsResult => {
@@ -91,34 +126,34 @@ const baseProps = {
   runLabel: 'Run',
   studyNodeId: 'node-a',
   onStudyNodeChange: vi.fn(),
-  getColorForNode: (nodeId: string) => (nodeId === 'node-a' ? '#2563eb' : '#dc2626'),
   nodeColors: { 'node-a': '#2563eb', 'node-b': '#dc2626' },
   onNodeColorChange: vi.fn(),
   computeDisplayName: (nodeId: string) => (nodeId === 'node-a' ? 'Corpus A' : 'Corpus B'),
 };
 
 describe('TokenFrequencyParameterPanel', () => {
-  it('renders the study block toggle under the node selector and switches the study node', () => {
+  it('renders synced corpus role switches inside the selected-node cards', () => {
     const onStudyNodeChange = vi.fn();
-    render(
-      <TokenFrequencyParameterPanel {...baseProps} onStudyNodeChange={onStudyNodeChange} />,
-    );
+    render(<TokenFrequencyParameterPanel {...baseProps} onStudyNodeChange={onStudyNodeChange} />);
 
-    const nodeSelector = screen.getByTestId('node-inputs-panel');
-    const studyToggle = screen.getByRole('radiogroup', { name: 'Study Data Block' });
-    expect(
-      nodeSelector.compareDocumentPosition(studyToggle) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: 'Study Data Block' })).not.toBeInTheDocument();
     expect(screen.getByTestId('action-extra')).toBeEmptyDOMElement();
 
-    expect(screen.getByRole('radio', { name: /Use Corpus A/i })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
-    const corpusB = screen.getByRole('radio', { name: /Use Corpus B/i });
-    expect(corpusB).toHaveAttribute('aria-checked', 'false');
+    const cardA = within(screen.getByTestId('node-card-node-a'));
+    const cardB = within(screen.getByTestId('node-card-node-b'));
+    expect(cardA.getByText('Study Corpus')).toBeInTheDocument();
+    expect(cardA.getByText('Reference Corpus')).toBeInTheDocument();
+    expect(cardB.getByText('Study Corpus')).toBeInTheDocument();
+    expect(cardB.getByText('Reference Corpus')).toBeInTheDocument();
 
-    fireEvent.click(corpusB);
+    expect(cardA.getByRole('switch', { name: /Corpus A corpus role/i })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    const corpusBSwitch = cardB.getByRole('switch', { name: /Corpus B corpus role/i });
+    expect(corpusBSwitch).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(corpusBSwitch);
 
     expect(onStudyNodeChange).toHaveBeenCalledWith('node-b');
   });

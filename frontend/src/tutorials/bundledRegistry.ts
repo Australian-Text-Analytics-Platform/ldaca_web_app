@@ -276,7 +276,7 @@ const tutorial = {
   'analysis.token-frequency.reference': {
     file: 'tutorials/token-frequency.md',
     anchor: 'help-token-frequency-reference',
-    label: 'Study Data Block',
+    label: 'Study and reference corpora',
   },
   'analysis.token-frequency.token-limit': {
     file: 'tutorials/token-frequency.md',
