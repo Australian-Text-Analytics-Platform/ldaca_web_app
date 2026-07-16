@@ -22,6 +22,18 @@ document conflicts with executable configuration.
 Start with [the documentation index](docs/index.md), then read only the context
 needed for the task:
 
+```mermaid
+flowchart TB
+    TASK["Current engineering question"] --> KIND{"What kind of truth is needed?"}
+    KIND -->|"Product language"| GLOSSARY["CONTEXT.md"]
+    KIND -->|"Current ownership or flow"| ARCH["docs/architecture/"]
+    KIND -->|"State meaning or invariants"| DOMAIN["docs/domain/"]
+    KIND -->|"Why a durable choice exists"| ADR["docs/adr/"]
+    KIND -->|"Exact interface or inventory"| REF["docs/reference/"]
+    KIND -->|"Executable procedure"| RUNBOOK["docs/runbooks/"]
+    KIND -->|"Current substantial change"| SPEC["specs/active/"]
+```
+
 - Domain vocabulary and relationships: [CONTEXT.md](CONTEXT.md)
 - Current system structure: [docs/architecture/](docs/architecture/)
 - Product invariants and state semantics: [docs/domain/](docs/domain/)
@@ -72,6 +84,26 @@ stubs or duplicate an explanation across document classes.
 Run `pnpm docs:links` after changing engineering Markdown. Follow
 [the issue-tracker guide](docs/agents/issue-tracker.md) when a change is
 coordinated through GitHub Issues.
+
+### Mermaid diagrams
+
+Use Mermaid when ownership, hierarchy, sequence, state transitions, or data
+flow are materially clearer as a graph than as prose. Each diagram must answer
+the question owned by its page and stay at that page's abstraction level; link
+to a deeper page instead of expanding one diagram to cover the whole system.
+
+- Keep exact inventories, commands, and nuanced invariants in prose or tables.
+  A diagram explains their relationships and is not a second source of truth.
+- Prefer small GitHub-compatible `flowchart`, `sequenceDiagram`, and
+  `stateDiagram-v2` diagrams without custom themes, initialization directives,
+  icons, or renderer-specific extensions.
+- Treat semicolons as Mermaid statement separators rather than label
+  punctuation. Use plain conjunctions or commas inside messages and notes.
+- Do not add a diagram for decoration or duplicate an adjacent paragraph
+  node-for-sentence. Remove a diagram when prose or a short list is clearer.
+- Update a diagram in the same change whenever its represented contract changes.
+- After editing Mermaid, run `pnpm docs:links` and inspect the rendered Markdown
+  to confirm labels, direction, and grouping remain legible.
 
 ## Agent skills
 

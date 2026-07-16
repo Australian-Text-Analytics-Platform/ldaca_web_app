@@ -1,8 +1,10 @@
 /**
- * Validate repository-owned Markdown links without third-party dependencies.
+ * Validate repository-owned Markdown links and Mermaid fences without
+ * third-party dependencies.
  *
  * Used by `pnpm docs:links` and CI so the centralized engineering context and
- * package-local user documentation cannot retain missing files or anchors.
+ * package-local user documentation cannot retain missing files, anchors, or
+ * structurally incomplete diagrams.
  * The scanner deliberately excludes generated, vendored, dependency, and build
  * trees; those files have their own sources or are not maintained here.
  */
@@ -16,6 +18,8 @@ import {
 } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { mermaidFenceProblems } from "./markdown-checks.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const excludedDirectories = new Set([
@@ -156,10 +160,13 @@ const failures = [];
 
 for (const source of markdownFiles) {
   const markdown = readFileSync(source, "utf8");
+  const sourceLabel = relative(repositoryRoot, source);
+  for (const problem of mermaidFenceProblems(markdown)) {
+    failures.push(`${sourceLabel}: ${problem}`);
+  }
   for (const rawTarget of markdownTargets(markdown)) {
     if (!rawTarget || isExternal(rawTarget)) continue;
     const decoded = decodeTarget(rawTarget);
-    const sourceLabel = relative(repositoryRoot, source);
     if (decoded === null) {
       failures.push(`${sourceLabel}: invalid percent encoding in ${rawTarget}`);
       continue;
@@ -214,5 +221,7 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log(`Checked internal links in ${markdownFiles.length} Markdown files.`);
+  console.log(
+    `Checked internal links and Mermaid fences in ${markdownFiles.length} Markdown files.`,
+  );
 }
