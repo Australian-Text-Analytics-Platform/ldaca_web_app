@@ -20,7 +20,8 @@ into the bundle.
 
 ```bash
 cd backend
-uvx ty check
+uv run ruff check .
+uv run ty check
 uv run pytest -q
 uv build --no-sources
 ```
@@ -54,4 +55,4 @@ version strings or reuse a published package version.
   ldaca-wordflow --help`.
 - Confirm desktop assets exist for both platforms.
 - Deploy the tagged root commit and current submodule pointers.
-- Verify `/health`, hosted login, one Workspace read, and one Task event stream.
+- Verify `/health`, hosted login, one Workspace read, and `/api/events` delivery.

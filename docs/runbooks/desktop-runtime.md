@@ -8,10 +8,10 @@ Use the root-owned command for local and CI packaging:
 pnpm prepare:backend-runtime
 ```
 
-`scripts/package_backend_runtime.py` creates a clean managed Python `3.14t`
-runtime, installs the backend without editable links, copies platform runtime
-support, and writes `runtime-manifest.json`. The frontend staging script
-validates and copies that complete runtime into Tauri resources without
+`scripts/package_backend_runtime.py` creates a clean managed standard Python
+`3.14` runtime, installs the backend without editable links, copies platform
+runtime support, and writes `runtime-manifest.json`. The frontend staging
+script validates and copies that complete runtime into Tauri resources without
 rewriting the manifest.
 
 Do not set `PYTHONPATH` manually or create a separate desktop development

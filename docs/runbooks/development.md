@@ -18,9 +18,11 @@ package root.
 
 ```bash
 cd backend
+uv run ruff check .
 uv run pytest -q
-uvx ty check
-uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
+uv run ty check
+CORS_ALLOWED_ORIGINS='["http://localhost:3000"]' \
+  uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
 ```
 
 ## Frontend
@@ -29,6 +31,13 @@ uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
 pnpm -C frontend dev
 pnpm -C frontend check
 ```
+
+Run the backend and frontend commands in separate terminals. Vite serves the
+frontend on `http://localhost:3000` and connects directly to the backend on
+port `8001`; the exact backend Origin allowlist is therefore required for
+unsafe CSRF-protected requests. Production does not use this split arrangement:
+the release workflow builds the SPA into the backend package and the backend
+serves both surfaces from one origin.
 
 Use `pnpm -C frontend docs:check` for the bundled user-document registry. After
 an OpenAPI change, export the backend schema and regenerate the frontend client

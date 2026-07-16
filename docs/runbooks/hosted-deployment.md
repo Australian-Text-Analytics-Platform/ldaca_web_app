@@ -12,9 +12,9 @@ cd ldaca-wordflow
 git checkout <release-ref>
 git submodule sync --recursive
 git submodule update --init --recursive --checkout
-uv sync --frozen
 pnpm install --frozen-lockfile
 pnpm deploy_frontend_to_backend
+uv sync --project backend --frozen --no-dev --no-editable
 ```
 
 The current submodules are `backend`, `polars-text`, and
@@ -44,8 +44,9 @@ The secret file supplies only `CILOGON_CLIENT_SECRET`. See
 
 ## systemd
 
-Use the backend submodule as the working directory so uv resolves its package
-and sibling sources:
+The preparation command builds the backend and sibling sources into the
+backend-owned environment without editable checkout links. Run that prepared
+entry point directly:
 
 ```ini
 [Unit]
@@ -59,7 +60,7 @@ User=wordflow
 WorkingDirectory=/srv/ldaca-wordflow/backend
 EnvironmentFile=/etc/ldaca-wordflow/app.env
 EnvironmentFile=/etc/ldaca-wordflow/secrets.env
-ExecStart=/home/wordflow/.local/bin/uv run ldaca-wordflow --port 8001
+ExecStart=/srv/ldaca-wordflow/backend/.venv/bin/ldaca-wordflow --port 8001
 Restart=on-failure
 RestartSec=5
 
@@ -73,7 +74,7 @@ Run one service process. Do not add Uvicorn workers; see
 ## Reverse Proxy And Readiness
 
 Terminate TLS at the reverse proxy, preserve the original Host and scheme, use
-long read timeouts for SSE, and disable buffering for `/api/tasks/events`.
+long read timeouts for SSE, and disable buffering for `/api/events`.
 Forward to `127.0.0.1:8001` and verify:
 
 ```bash
@@ -90,6 +91,9 @@ git checkout <release-ref>
 git pull --ff-only
 git submodule sync --recursive
 git submodule update --init --recursive --checkout
+pnpm install --frozen-lockfile
+pnpm deploy_frontend_to_backend
+uv sync --project backend --frozen --no-dev --no-editable
 sudo systemctl restart ldaca-wordflow
 curl --fail --silent https://analytics.ldaca.edu.au/health
 ```
