@@ -102,7 +102,7 @@
         {
             "label": "Test All",
             "type": "shell",
-            "command": "(cd docworkspace && uv run pytest && uvx ty check) && (cd backend && uv run pytest && uvx ty check) && (cd polars-text && uv run pytest && uvx ty check) && (cd frontend && pnpm test -- --run && pnpm lint && pnpm build)",
+            "command": "(cd backend && uv run pytest && uvx ty check) && (cd polars-text && uv run pytest && uvx ty check) && (cd frontend && pnpm test -- --run && pnpm lint && pnpm build)",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

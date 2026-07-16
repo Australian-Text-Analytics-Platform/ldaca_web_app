@@ -1,9 +1,6 @@
 [submodule "polars-text"]
 	path = polars-text
 	url = https://github.com/Australian-Text-Analytics-Platform/polars-text
-[submodule "docworkspace"]
-	path = docworkspace
-	url = https://github.com/Australian-Text-Analytics-Platform/docworkspace
 [submodule "ldaca_wordflow_backend"]
 	path = backend
 	url = https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow-backend.git

@@ -204,7 +204,7 @@ node_modules/
 frontend/node_modules/
 frontend/package-lock.json
 
-# Development artifacts from docframe/docworkspace integration
+# Development artifacts from workspace and NLP processing
 *.pkl
 *.joblib
 .spacy/
