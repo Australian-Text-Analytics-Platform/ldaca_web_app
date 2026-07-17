@@ -3,9 +3,8 @@ import type { ReactNode } from 'react';
 import '@xyflow/react/dist/style.css';
 
 import { Background, BackgroundVariant, Controls, MiniMap, ReactFlow } from '@xyflow/react';
-import { CircleOff, Loader2, Map, Network } from 'lucide-react';
+import { CircleOff, Loader2, Map } from 'lucide-react';
 
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { useWorkspaceGraph } from '../hooks/useWorkspaceGraph';
@@ -89,18 +88,17 @@ const GraphLoadingState = () => (
 /**
  * Empty state shown before a workspace graph is available.
  * Rendered within `WorkspaceGraphFeature` because the graph feature needs an idle state before workspace data exists.
- * Flow: render a centered card with the graph icon, title, and Data Loader prompt when no workspace graph can be displayed.
+ * Flow: render a centered title and Data Loader prompt directly on the graph surface when no workspace graph can be displayed.
  */
 const GraphEmptyState = () => (
-  <Card className="mx-auto mt-12 max-w-lg text-center">
-    <CardHeader className="flex flex-col items-center space-y-3">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Network className="h-6 w-6" />
-      </div>
-      <CardTitle>No workspace loaded</CardTitle>
-      <CardDescription>Open or create a workspace in Data Loader to see the graph.</CardDescription>
-    </CardHeader>
-  </Card>
+  <div className="flex h-full items-center justify-center p-6 text-center">
+    <div>
+      <h3 className="text-sm font-semibold text-foreground">No workspace loaded</h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Open or create a workspace in Data Loader to see the graph.
+      </p>
+    </div>
+  </div>
 );
 
 /**

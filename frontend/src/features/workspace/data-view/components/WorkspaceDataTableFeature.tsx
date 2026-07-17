@@ -1,4 +1,4 @@
-import { Clipboard, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WorkspaceDataHeader } from './WorkspaceDataHeader';
 import { WorkspaceSelectionTabs } from './WorkspaceSelectionTabs';
@@ -41,13 +41,12 @@ const LoadingState = () => (
 /**
  * Empty placeholder shown until a workspace graph node is selected.
  * Rendered within `WorkspaceDataTableFeature` because the feature needs an idle state before node selection.
- * Flow: render the idle panel with an icon, heading, and prompt when the workspace has no active data block selection.
+ * Flow: render the heading and prompt directly on the data surface when the workspace has no active data block selection.
  */
 const EmptyState = () => (
-  <div className="p-6">
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/50 bg-muted/40 p-6 text-center">
-      <Clipboard className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-      <h3 className="mt-3 text-sm font-semibold text-foreground">No Data Block Selected</h3>
+  <div className="flex h-full items-center justify-center p-6 text-center">
+    <div>
+      <h3 className="text-sm font-semibold text-foreground">No Data Block Selected</h3>
       <p className="mt-1 text-xs text-muted-foreground">
         Select a data block from the graph to view its data.
       </p>
