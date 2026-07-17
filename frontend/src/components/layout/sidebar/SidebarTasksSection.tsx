@@ -8,7 +8,7 @@ import type { SidebarTaskRecord } from './types';
 /** Task states treated as attention-worthy in the sidebar task list. */
 const PROBLEMATIC_STATES = new Set(['failed', 'cancelled']);
 /** Task states considered live/in-progress for sorting and status display. */
-const ACTIVE_STATES = new Set(['pending', 'queued', 'submitted', 'running']);
+const ACTIVE_STATES = new Set(['queued', 'running']);
 
 /** Display metadata consumed by task rows to keep icon, label, and color consistent. */
 const DEFAULT_STATUS_META = {
@@ -18,10 +18,10 @@ const DEFAULT_STATUS_META = {
 };
 const STATUS_META: Record<string, { icon: typeof Clock; className: string; label: string }> = {
   running: { icon: Clock, className: 'text-amber-600', label: 'Running' },
+  queued: { icon: Clock, className: 'text-muted-foreground', label: 'Queued' },
   successful: { icon: CheckCircle, className: 'text-green-600', label: 'Successful' },
   failed: { icon: XCircle, className: 'text-red-600', label: 'Failed' },
   cancelled: { icon: Square, className: 'text-muted-foreground', label: 'Cancelled' },
-  pending: { icon: Clock, className: 'text-muted-foreground', label: 'Pending' },
   default: DEFAULT_STATUS_META,
 };
 

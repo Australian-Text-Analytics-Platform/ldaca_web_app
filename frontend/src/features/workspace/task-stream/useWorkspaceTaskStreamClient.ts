@@ -1,24 +1,50 @@
 import { useEffect, useRef, useState } from 'react';
-import type { TaskItem } from '@/stores/analysisStore';
-import { buildTaskStreamUrl } from './taskStreamUrl';
+import { buildBackendEventsUrl } from './taskStreamUrl';
 
-export type TaskEventPayload =
-  | { type: 'tasks_snapshot'; tasks?: TaskItem[]; timestamp?: number }
-  | { type: 'task_changed'; task?: TaskItem; timestamp?: number }
-  | { type: 'task_removed'; task_id?: string; workspace_id?: string; timestamp?: number }
-  | { type: 'analysis_save_failed'; task_type?: string; message?: string }
+export type BackendEvent =
+  | { type: 'stream_ready'; sequence: number; occurred_at: string }
   | {
-      type: 'analysis_materialized';
-      task_type?: string;
-      task_id?: string;
-      parent_task_id?: string;
-      parent_node_id?: string;
-      materialized_path?: string;
-      timestamp?: number;
+      type: 'resource_changed';
+      sequence: number;
+      occurred_at: string;
+      resource_type: 'workspace' | 'tab' | 'analysis' | 'user_file_import';
+      resource_id: string;
+      workspace_id: string | null;
+      state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null;
+      progress: { fraction: number | null; message: string | null } | null;
+      revision: number;
     }
-  | { type: 'error'; message?: string }
-  | { type: 'heartbeat' }
-  | { type: 'workspace_updated' };
+  | {
+      type: 'resource_progress';
+      sequence: number;
+      occurred_at: string;
+      resource_type: 'analysis' | 'user_file_import';
+      resource_id: string;
+      workspace_id: string | null;
+      state: 'running';
+      progress: { fraction: number | null; message: string | null };
+      revision: null;
+    }
+  | {
+      type: 'resource_removed';
+      sequence: number;
+      occurred_at: string;
+      resource_type: 'workspace' | 'tab' | 'analysis' | 'user_file_import';
+      resource_id: string;
+      workspace_id: string | null;
+      revision: number | null;
+    }
+  | {
+      type: 'workspace_runtime_changed';
+      sequence: number;
+      occurred_at: string;
+      resource_type: 'workspace';
+      resource_id: string;
+      workspace_id: string;
+      runtime_state: 'closed' | 'open' | 'closing';
+      revision: null;
+    }
+  | { type: 'resync_required'; sequence: number; occurred_at: string };
 
 interface TaskStreamState {
   status: 'idle' | 'connecting' | 'open' | 'error';
@@ -33,147 +59,110 @@ export interface WorkspaceTaskStreamClientState extends TaskStreamState {
 
 export interface WorkspaceTaskStreamClientOptions {
   enabled?: boolean;
-  getAuthHeaders?: () => Record<string, string>;
-  onEvent?: (payload: TaskEventPayload) => void;
+  onEvent?: (payload: BackendEvent) => void;
 }
 
 const STREAM_RETRY_BASE_MS = 5000;
 const STREAM_RETRY_MAX_MS = 30000;
+const EVENT_TYPES: BackendEvent['type'][] = [
+  'stream_ready',
+  'resource_changed',
+  'resource_progress',
+  'resource_removed',
+  'workspace_runtime_changed',
+  'resync_required',
+];
 
-/**
- * Caps task-stream reconnect backoff so errors recover without busy looping.
- * Called by the stream effect's reconnect scheduler after an EventSource error.
- * Flow: multiply the retry base by the current attempt, enforce a minimum first delay, and cap retries at the maximum interval.
- */
-const clampRetryDelay = (attempt: number) => {
-  const backoff = STREAM_RETRY_BASE_MS * Math.max(1, attempt);
-  return Math.min(backoff, STREAM_RETRY_MAX_MS);
+const clampRetryDelay = (attempt: number) =>
+  Math.min(STREAM_RETRY_BASE_MS * Math.max(1, attempt), STREAM_RETRY_MAX_MS);
+
+const eventTimestamp = (event: BackendEvent): number => {
+  const value = Date.parse(event.occurred_at);
+  return Number.isNaN(value) ? Date.now() : value;
 };
 
-/**
- * Opens the backend task SSE stream and exposes reconnect/status state.
- * Used by: useWorkspaceTaskInbox module because the inbox hook needs connection state and task events from one client.
- * Flow: initialize connection state and callback refs, keep the latest event handler installed, run the EventSource lifecycle effect, and expose manual reconnect.
- */
+/** Opens the single cookie-authenticated backend event stream. */
 export const useWorkspaceTaskStreamClient = (
   options: WorkspaceTaskStreamClientOptions = {},
 ): WorkspaceTaskStreamClientState => {
-  const { enabled = true, getAuthHeaders = () => ({}), onEvent } = options;
+  const { enabled = true, onEvent } = options;
   const [state, setState] = useState<TaskStreamState>({
     status: 'idle',
     error: null,
     reconnectAttempt: 0,
     lastEventTimestamp: null,
   });
-
-  const reconnectRef = useRef<() => void>(() => {
-    // No-op until the connect effect installs the real reconnect handler.
-  });
-  const onEventRef = useRef<typeof onEvent>(onEvent);
+  const reconnectRef = useRef<() => void>(() => undefined);
+  const onEventRef = useRef(onEvent);
 
   useEffect(() => {
     onEventRef.current = onEvent;
   }, [onEvent]);
 
-  const reconnect = (() => {
-    /**
-     * Keeps the reconnect callback stable while the ref target changes.
-     * Returned to the task inbox so retry UI always invokes the active effect instance.
-     */
-    const fn = () => {
-      reconnectRef.current();
-    };
-    return fn;
-  })();
+  const reconnect = () => {
+    reconnectRef.current();
+  };
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Resetting stream state when disabled; single unconditional reset */
+  /* eslint-disable react-hooks/set-state-in-effect -- stream lifecycle owns its status reset */
   useEffect(() => {
     if (!enabled) {
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
-      reconnectRef.current = () => {
-        // No-op: stream is disabled, so there is nothing to reconnect.
-      };
+      reconnectRef.current = () => undefined;
       return;
     }
 
     let active = true;
-    let es: EventSource | null = null;
-    let reconnectTimer: number | null = null;
+    let source: EventSource | null = null;
+    let retryTimer: number | null = null;
 
-    /**
-     * Clears any pending manual reconnect timer.
-     * Called before rescheduling and whenever the stream closes.
-     */
-    const cleanupTimers = () => {
-      if (reconnectTimer !== null) {
-        window.clearTimeout(reconnectTimer);
-        reconnectTimer = null;
+    const clearRetry = () => {
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+        retryTimer = null;
       }
     };
 
-    /**
-     * Closes the current EventSource and pending reconnect work.
-     * Called before connecting, on manual reconnect, and during effect cleanup.
-     */
-    const closeStream = () => {
-      if (es) {
-        es.close();
-        es = null;
-      }
-      cleanupTimers();
+    const closeSource = () => {
+      source?.close();
+      source = null;
+      clearRetry();
     };
 
-    /**
-     * Schedules the next connection attempt using capped backoff.
-     * Called by both EventSource and connection-construction error paths.
-     */
     const scheduleReconnect = (attempt: number) => {
-      cleanupTimers();
-      const delay = clampRetryDelay(attempt);
-      reconnectTimer = window.setTimeout(() => {
-        reconnectTimer = null;
+      clearRetry();
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
         connect(attempt + 1);
-      }, delay);
+      }, clampRetryDelay(attempt));
     };
 
-    /**
-     * Delivers a parsed stream payload to the latest caller callback.
-     * Called by the EventSource message handler after JSON parsing succeeds.
-     */
-    const invokeOnEvent = (payload: TaskEventPayload) => {
-      const rawTimestamp = (payload as { timestamp?: number }).timestamp;
-      const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : Date.now();
-      setState((prev) => ({ ...prev, lastEventTimestamp: timestamp }));
+    const handleEvent = (event: MessageEvent<string>) => {
+      if (!active) return;
       try {
+        const payload = JSON.parse(event.data) as BackendEvent;
+        if (typeof payload.type !== 'string') return;
+        setState((previous) => ({ ...previous, lastEventTimestamp: eventTimestamp(payload) }));
         onEventRef.current?.(payload);
       } catch (error) {
-        console.error('Task stream event handler failed', error);
+        console.warn('Failed to parse backend event', event.data, error);
       }
     };
 
-    /**
-     * Opens an EventSource connection for one reconnect attempt.
-     * Called on effect startup, manual reconnect, and backoff timer expiry.
-     * Flow: close any prior stream, build the authenticated URL, wire EventSource handlers, and schedule reconnects on failure.
-     */
     const connect = (attempt: number) => {
       if (!active) return;
-      closeStream();
+      closeSource();
       setState({
         status: 'connecting',
         error: null,
         reconnectAttempt: attempt,
         lastEventTimestamp: null,
       });
-
       try {
-        const url = buildTaskStreamUrl(getAuthHeaders());
-        const source = new EventSource(url, { withCredentials: true });
-        es = source;
-
-        source.onopen = () => {
+        const nextSource = new EventSource(buildBackendEventsUrl(), { withCredentials: true });
+        source = nextSource;
+        nextSource.onopen = () => {
           if (!active) {
-            source.close();
+            nextSource.close();
             return;
           }
           setState({
@@ -183,45 +172,25 @@ export const useWorkspaceTaskStreamClient = (
             lastEventTimestamp: Date.now(),
           });
         };
-
-        source.onmessage = (event: MessageEvent<string>) => {
-          if (!active) {
-            source.close();
-            return;
-          }
-          try {
-            const parsed = JSON.parse(event.data) as TaskEventPayload;
-            invokeOnEvent(parsed);
-          } catch (error) {
-            console.warn('Failed to parse SSE payload', event.data, error);
-          }
-        };
-
-        // Disable EventSource auto-reconnect — use our own backoff logic.
-        source.onerror = () => {
-          if (!active) {
-            source.close();
-            return;
-          }
-          source.close();
-          es = null;
+        for (const eventType of EVENT_TYPES) {
+          nextSource.addEventListener(eventType, handleEvent as EventListener);
+        }
+        nextSource.onerror = () => {
+          if (!active) return;
+          nextSource.close();
+          source = null;
           setState({
             status: 'error',
-            error: 'EventSource connection error',
+            error: 'Backend event stream connection error',
             reconnectAttempt: attempt,
             lastEventTimestamp: Date.now(),
           });
           scheduleReconnect(attempt);
         };
       } catch (error) {
-        // `active` is flipped to false by the cleanup closure during async teardown; TS narrows it
-        // to `true` here and can't see that mutation, so keep this cancellation guard.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (!active) return;
-        const message = error instanceof Error ? error.message : 'Connection error';
         setState({
           status: 'error',
-          error: message,
+          error: error instanceof Error ? error.message : 'Connection error',
           reconnectAttempt: attempt,
           lastEventTimestamp: Date.now(),
         });
@@ -231,21 +200,18 @@ export const useWorkspaceTaskStreamClient = (
 
     reconnectRef.current = () => {
       if (!active) return;
-      closeStream();
+      closeSource();
       connect(0);
     };
-
     connect(0);
 
     return () => {
       active = false;
-      reconnectRef.current = () => {
-        // No-op after teardown so a stale reconnect call does nothing.
-      };
-      closeStream();
+      reconnectRef.current = () => undefined;
+      closeSource();
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
     };
-  }, [enabled, getAuthHeaders]);
+  }, [enabled]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   return { ...state, reconnect };

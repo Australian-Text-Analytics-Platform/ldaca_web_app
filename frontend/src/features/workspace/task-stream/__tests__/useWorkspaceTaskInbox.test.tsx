@@ -1,25 +1,17 @@
 import type { ReactNode } from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryKeys } from '@/lib/queryKeys';
+
 import { useAnalysisStore } from '@/stores/analysisStore';
+import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
 import { useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
-import type {
-  TaskEventPayload,
-  WorkspaceTaskStreamClientOptions,
-} from '../useWorkspaceTaskStreamClient';
 
-let emitTaskEvent: ((payload: TaskEventPayload) => void) | undefined;
+let emitEvent: ((payload: unknown) => void) | undefined;
 
-vi.mock('@/features/auth/hooks/useAuth', () => ({
-  useAuth: () => ({ getAuthHeaders: () => ({}) }),
-}));
-
-/** Captures the real inbox event callback while replacing only the external SSE transport. */
 vi.mock('../useWorkspaceTaskStreamClient', () => ({
   useWorkspaceTaskStreamClient: (options: WorkspaceTaskStreamClientOptions) => {
-    emitTaskEvent = options.onEvent;
+    emitEvent = options.onEvent;
     return {
       status: 'open',
       error: null,
@@ -30,40 +22,38 @@ vi.mock('../useWorkspaceTaskStreamClient', () => ({
   },
 }));
 
-describe('useWorkspaceTaskInbox file cache policy', () => {
+describe('useWorkspaceTaskInbox', () => {
   beforeEach(() => {
-    emitTaskEvent = undefined;
-    useAnalysisStore.setState({ tasks: [] });
+    emitEvent = undefined;
+    useAnalysisStore.setState({ tasks: [], pendingConcordance: null });
   });
 
-  it('invalidates files once across a successful LDaCA snapshot and incremental replay', () => {
-    const queryClient = new QueryClient();
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+  it('refreshes the workspace analysis projection when the canonical SSE event arrives', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
 
-    const completedTask = {
-      task_id: 'ldaca-task-1',
-      task_type: 'ldaca_import',
+    await waitFor(() => expect(useAnalysisStore.getState().tasks.length).toBeGreaterThan(0));
+    act(() => {
+      emitEvent?.({
+        type: 'resource_changed',
+        sequence: 2,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'analysis',
+        resource_id: 'analysis-1',
+        workspace_id: 'workspace-1',
+        state: 'succeeded',
+        progress: { fraction: 1, message: 'done' },
+        revision: 2,
+      });
+    });
+
+    await waitFor(() => expect(useAnalysisStore.getState().tasks[0]?.task_id).toBe('analysis-1'));
+    expect(useAnalysisStore.getState().tasks[0]).toMatchObject({
+      state: 'successful',
       workspace_id: 'workspace-1',
-      state: 'successful' as const,
-    };
-    /** Counts file-cache effects without conflating the inbox's graph invalidations. */
-    const countFileInvalidations = () =>
-      invalidateQueries.mock.calls.filter(([filters]) => filters?.queryKey === queryKeys.files)
-        .length;
-
-    act(() => {
-      emitTaskEvent?.({ type: 'tasks_snapshot', tasks: [completedTask], timestamp: 1 });
     });
-    expect(countFileInvalidations()).toBe(1);
-
-    act(() => {
-      emitTaskEvent?.({ type: 'tasks_snapshot', tasks: [completedTask], timestamp: 2 });
-      emitTaskEvent?.({ type: 'task_changed', task: completedTask, timestamp: 3 });
-    });
-    expect(countFileInvalidations()).toBe(1);
   });
 });

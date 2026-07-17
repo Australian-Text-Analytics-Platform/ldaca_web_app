@@ -1,5 +1,5 @@
 type SidebarTaskStatus =
-  | 'pending'
+  | 'queued'
   | 'running'
   | 'successful'
   | 'failed'

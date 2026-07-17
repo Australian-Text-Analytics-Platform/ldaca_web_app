@@ -80,9 +80,22 @@ export const handlers = [
   http.post(apiPath('/data-portal/search'), () => HttpResponse.json(dataPortalResponse())),
   http.post(apiPath('/data-portal/imports'), () => HttpResponse.json(acceptedAnalysis())),
   http.get(apiPath('/user-files'), () => HttpResponse.json([])),
-  http.get(apiPath('/user-file-imports'), () =>
-    HttpResponse.json({ items: [], page: 1, page_size: 500, total_items: 0, total_pages: 0 }),
-  ),
+  http.get(apiPath('/user-file-imports'), ({ request }) => {
+    const pageSize = new URL(request.url).searchParams.get('page_size');
+    if (pageSize !== '100') {
+      return HttpResponse.json(
+        { code: 'request_validation_failed', message: 'Request validation failed' },
+        { status: 422 },
+      );
+    }
+    return HttpResponse.json({
+      items: [],
+      page: 1,
+      page_size: 100,
+      total_items: 0,
+      total_pages: 0,
+    });
+  }),
   http.get(apiPath('/user-file-imports/:import_id'), () => HttpResponse.json(acceptedAnalysis())),
   http.post(apiPath('/user-file-imports/:import_id/cancel'), () =>
     HttpResponse.json(acceptedAnalysis()),

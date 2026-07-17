@@ -1,397 +1,211 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/features/auth/hooks/useAuth';
+import { getAnalysis, getUserFileImport, listAnalyses, listUserFileImports } from '@/api';
+import type { Analysis, CorruptAnalysis, UserFileImport } from '@/api';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { queryKeys } from '@/lib/queryKeys';
-import { ANALYSIS_TASK_TYPES } from '@/features/views/common/analysisIds';
 import type { TaskItem } from '@/stores/analysisStore';
 import {
-  type TaskEventPayload,
+  type BackendEvent,
   useWorkspaceTaskStreamClient,
   type WorkspaceTaskStreamClientState,
 } from './useWorkspaceTaskStreamClient';
 
-interface TaskMergeUpdate {
-  task: Partial<TaskItem> & { task_id?: string };
-  eventTimestamp?: number;
-  eventSequence?: number;
-}
+const toTaskState = (state: Analysis['state']): TaskItem['state'] =>
+  state === 'succeeded' ? 'successful' : state;
 
-type InternalTask = TaskItem & {
-  __event_timestamp?: number;
-  __event_sequence?: number;
+const failureMessage = (value: unknown): string | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const message = (value as { message?: unknown }).message;
+  return typeof message === 'string' ? message : undefined;
 };
 
-/**
- * Converts task timestamps from SSE payloads into sortable milliseconds.
- * Used by task sorting, merge ordering, and materialization event ingestion.
- * Flow: accept finite numeric timestamps, parse date strings, and fall back to zero for unsortable event times.
- */
-const normalizeTimestamp = (value: unknown): number => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
+const toTaskItem = (
+  resource: Analysis | CorruptAnalysis | UserFileImport,
+  workspaceId?: string,
+): TaskItem => {
+  if ('request' in resource) {
+    const kind = resource.request.kind;
+    const progress = 'progress' in resource ? resource.progress : null;
+    return {
+      task_id: resource.id,
+      task_type: kind,
+      workspace_id: workspaceId,
+      state: toTaskState(resource.state),
+      progress: progress?.fraction ?? undefined,
+      progress_message: progress?.message ?? undefined,
+      message: failureMessage(resource.error) ?? progress?.message ?? undefined,
+      created_at: resource.created_at,
+      started_at: resource.started_at,
+      finished_at: resource.finished_at,
+      error: failureMessage(resource.error) ?? null,
+    };
   }
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value);
-    if (!Number.isNaN(parsed)) {
-      return parsed;
-    }
-  }
-  return 0;
+
+  return {
+    task_id: resource.id,
+    task_type: 'analysis_corrupt',
+    workspace_id: workspaceId,
+    state: 'failed',
+    message: 'This analysis record is corrupt and must be cleared.',
+    error: resource.code ?? 'analysis_corrupt',
+  };
 };
 
-/**
- * Sorts task inbox entries by the newest event or lifecycle timestamp.
- * Called by mergeTaskUpdates for both unchanged and newly merged task lists.
- * Flow: read synthetic event metadata first, fall back to task lifecycle timestamps, and sort newest entries ahead of older inbox rows.
- */
-const sortTasksByTime = (tasks: TaskItem[] = []) =>
-  tasks.toSorted((a, b) => {
-    const tb = normalizeTimestamp(
-      (b as InternalTask).__event_timestamp ?? b.finished_at ?? b.started_at ?? b.created_at ?? 0,
-    );
-    const ta = normalizeTimestamp(
-      (a as InternalTask).__event_timestamp ?? a.finished_at ?? a.started_at ?? a.created_at ?? 0,
-    );
-    return tb - ta;
+const toImportTask = (resource: UserFileImport): TaskItem => {
+  const progress = resource.progress;
+  const taskType = resource.request.kind === 'sample' ? 'sample_import' : 'data_portal_import';
+  return {
+    task_id: resource.id,
+    task_type: taskType,
+    state: toTaskState(resource.state),
+    progress: progress.fraction ?? undefined,
+    progress_message: progress.message ?? undefined,
+    message: failureMessage(resource.error) ?? progress.message ?? undefined,
+    created_at: resource.created_at,
+    started_at: resource.started_at,
+    finished_at: resource.finished_at,
+    error: failureMessage(resource.error) ?? null,
+  };
+};
+
+const upsertTask = (task: TaskItem, previous: TaskItem[]): TaskItem[] => {
+  const next = previous.filter((entry) => entry.task_id !== task.task_id);
+  return [task, ...next].sort((left, right) => {
+    const leftTime = Date.parse(left.finished_at ?? left.started_at ?? left.created_at ?? '');
+    const rightTime = Date.parse(right.finished_at ?? right.started_at ?? right.created_at ?? '');
+    return rightTime - leftTime;
   });
-
-/**
- * Builds a task_id lookup used when merging incremental SSE updates.
- * Called by mergeTaskUpdates before snapshot or delta records are applied.
- * Flow: skip tasks without ids, key the rest by task_id, and return the map used by snapshot and delta merges.
- */
-const buildTaskMap = (tasks: TaskItem[] = []) => {
-  const map = new Map<string, TaskItem>();
-  tasks.forEach((task) => {
-    const taskId = task.task_id;
-    if (taskId) {
-      map.set(taskId, task);
-    }
-  });
-  return map;
 };
 
-const TAB_ASSOCIATED_TASK_TYPES = new Set<string>([
-  ANALYSIS_TASK_TYPES.tokenFrequencies,
-  ANALYSIS_TASK_TYPES.concordance,
-  ANALYSIS_TASK_TYPES.topicModeling,
-  ANALYSIS_TASK_TYPES.quotation,
-]);
-
-const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
-
-/**
- * Normalizes backend task state strings for terminal-state comparisons.
- * Called by chooseByEventOrder for the existing and incoming task states.
- * Flow: coerce missing states to an empty string and lowercase the result before terminal-state checks.
- */
-const normalizeState = (value: unknown): string =>
-  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- value may be a non-string state; default coercion is intended
-  String(value ?? '').toLowerCase();
-
-/**
- * Reads the synthetic event timestamp attached during merge.
- * Used by chooseByEventOrder and mergeTaskUpdates to preserve event ordering.
- * Flow: extract the client-only timestamp marker from merged task rows and normalize it through the same timestamp parser.
- */
-const getEventTimestamp = (task: TaskItem | undefined): number =>
-  normalizeTimestamp(task?.__event_timestamp ?? 0);
-
-/**
- * Reads the synthetic event sequence used to break same-timestamp ties.
- * Used by chooseByEventOrder and mergeTaskUpdates when timestamps tie.
- * Flow: read the client-only sequence marker, accept only finite numbers, and default missing metadata to zero.
- */
-const getEventSequence = (task: TaskItem | undefined): number => {
-  const value = task?.__event_sequence;
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+/** Rebuilds the task projection from authoritative resources after stream ready/resync. */
+const loadTasks = async (workspaceId: string | null): Promise<TaskItem[]> => {
+  const [importsResponse, analysesResponse] = await Promise.all([
+    listUserFileImports({ query: { page: 1, page_size: 100 }, throwOnError: true }),
+    workspaceId
+      ? listAnalyses({
+          path: { workspace_id: workspaceId },
+          query: { page: 1, page_size: 500 },
+          throwOnError: true,
+        })
+      : Promise.resolve(null),
+  ]);
+  const imports = importsResponse.data.items.map(toImportTask);
+  const analyses = analysesResponse
+    ? analysesResponse.data.items.map((analysis) => toTaskItem(analysis, workspaceId ?? undefined))
+    : [];
+  return [...imports, ...analyses];
 };
 
-/**
- * Chooses the newest task update while preventing terminal-state regression.
- * Called by mergeTaskUpdates once for each incoming task record.
- * Flow: keep a terminal task closed, otherwise compare event timestamps and sequence numbers before preferring the newest update.
- */
-const chooseByEventOrder = (existing: TaskItem | undefined, incoming: TaskItem): TaskItem => {
-  if (!existing) {
-    return incoming;
-  }
-
-  const existingState = normalizeState(existing.state);
-  const incomingState = normalizeState(incoming.state);
-  const existingIsTerminal = TERMINAL_STATES.has(existingState);
-  const incomingIsTerminal = TERMINAL_STATES.has(incomingState);
-
-  // State machine guard: never regress a task_id from terminal back to non-terminal,
-  // even if events are delivered out of order.
-  if (existingIsTerminal && !incomingIsTerminal) {
-    return existing;
-  }
-  if (incomingIsTerminal && !existingIsTerminal) {
-    return incoming;
-  }
-
-  const existingTs = getEventTimestamp(existing);
-  const incomingTs = getEventTimestamp(incoming);
-
-  if (incomingTs > existingTs) {
-    return incoming;
-  }
-
-  if (incomingTs < existingTs) {
-    return existing;
-  }
-
-  const existingSeq = getEventSequence(existing);
-  const incomingSeq = getEventSequence(incoming);
-  if (incomingSeq > existingSeq) {
-    return incoming;
-  }
-  if (incomingSeq < existingSeq) {
-    return existing;
-  }
-
-  return incoming;
-};
-
-/**
- * Merges snapshots/incremental task events into the analysis-store task list.
- * Called by the tasks_snapshot and task_changed SSE handlers.
- * Flow: build previous and next task maps, merge incoming partial fields with synthetic ordering metadata, choose the newest row per id, and return sorted tasks.
- */
-const mergeTaskUpdates = (
-  previousTasks: TaskItem[] = [],
-  updates: TaskMergeUpdate[] = [],
-  options: { replaceAll?: boolean } = {},
-) => {
-  if (!updates.length && !options.replaceAll) {
-    return sortTasksByTime(previousTasks);
-  }
-
-  const previousMap = buildTaskMap(previousTasks);
-  const nextMap = options.replaceAll ? new Map<string, TaskItem>() : new Map(previousMap);
-
-  updates.forEach(({ task, eventTimestamp, eventSequence }) => {
-    if (!task.task_id) return;
-
-    const existing = nextMap.get(task.task_id) ?? previousMap.get(task.task_id);
-    const merged: InternalTask = {
-      ...existing,
-      ...task,
-      __event_timestamp:
-        typeof eventTimestamp === 'number' && Number.isFinite(eventTimestamp)
-          ? eventTimestamp
-          : getEventTimestamp(existing),
-      __event_sequence:
-        typeof eventSequence === 'number' && Number.isFinite(eventSequence)
-          ? eventSequence
-          : getEventSequence(existing),
-    } as InternalTask;
-
-    nextMap.set(task.task_id, chooseByEventOrder(existing, merged));
-  });
-
-  return sortTasksByTime(Array.from(nextMap.values()));
-};
-
-const TERMINAL_TASK_STATES = new Set(['successful', 'failed', 'cancelled']);
-
-/**
- * Decides when non-tab task completion should refresh the workspace graph.
- * Called by the task_changed handler after it merges a terminal task.
- * Flow: ignore missing and tab-owned task types, then refresh only terminal background tasks that can mutate graph data.
- */
-const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
-  if (!task?.task_type || !task.state) {
-    return false;
-  }
-  if (TAB_ASSOCIATED_TASK_TYPES.has(task.task_type)) {
-    return false;
-  }
-  return TERMINAL_TASK_STATES.has(task.state);
-};
-
-/**
- * Connects task-stream events to the analysis store and workspace query cache.
- * Analysis panels consume its client state for connection status.
- * Used by `Sidebar` to keep shared task state current and show stream status.
- * Flow: subscribe to the authenticated SSE client, route payloads into task/cache/materialization handlers, claim LDaCA terminal file refreshes by task id, and expose transient stream errors as inbox status.
- */
+/** Connects authoritative analysis/import resources to the shared activity UI. */
 export const useWorkspaceTaskInbox = (
   workspaceId: string | null,
 ): WorkspaceTaskStreamClientState => {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
   const setTasks = useAnalysisStore((state) => state.setTasks);
-  const pushMaterializedEvent = useAnalysisStore((state) => state.pushMaterializedEvent);
   const [transientError, setTransientError] = useState<string | null>(null);
-  const eventSequenceRef = useRef(0);
-  // Successful snapshot/task_changed records may be replayed by the stream.
-  // This set is imperative claim state: the task store remains the render
-  // source of truth, while each LDaCA task may invalidate files only once.
-  const refreshedLdacaImportTaskIdsRef = useRef(new Set<string>());
 
-  /**
-   * Assigns a local sequence to incoming SSE events for deterministic merges.
-   * Called by snapshot and incremental task-event merge branches.
-   */
-  const nextEventSequence = () => {
-    eventSequenceRef.current += 1;
-    return eventSequenceRef.current;
-  };
-
-  /**
-   * Claims successful LDaCA task ids before invalidating the file tree.
-   * Called by: both snapshot and incremental task-event branches because an
-   * SSE reconnect may deliver completion only in its initial snapshot, while
-   * later replays must not refresh the same task twice.
-   */
-  const claimSuccessfulLdacaFileRefreshes = (candidateTasks: readonly TaskItem[]) => {
-    for (const task of candidateTasks) {
-      if (
-        task.task_type !== 'ldaca_import' ||
-        task.state !== 'successful' ||
-        refreshedLdacaImportTaskIdsRef.current.has(task.task_id)
-      ) {
-        continue;
-      }
-
-      refreshedLdacaImportTaskIdsRef.current.add(task.task_id);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.files });
-    }
-  };
-
-  /**
-   * Routes each SSE payload to task state, cache invalidation, or user error state.
-   * Passed to `useWorkspaceTaskStreamClient` as its `onEvent` callback.
-   * Flow: clear transient errors, branch by event type, merge task updates, then invalidate affected workspace queries.
-   */
-  const handlePayload = (payload: TaskEventPayload) => {
-    if (payload.type !== 'analysis_save_failed' && payload.type !== 'error') {
+  const refreshTasks = useCallback(async () => {
+    try {
+      const tasks = await loadTasks(workspaceId);
+      setTasks(tasks);
       setTransientError(null);
+    } catch (error) {
+      setTransientError(error instanceof Error ? error.message : 'Could not refresh activity');
     }
+  }, [setTasks, workspaceId]);
 
-    switch (payload.type) {
-      case 'workspace_updated': {
-        if (workspaceId) {
-          // invalidateQueries with the default refetchType:'active' already
-          // refetches any observed query, so we do not also call refetchQueries.
-          void queryClient.invalidateQueries({
-            queryKey: queryKeys.workspaceGraph(workspaceId),
+  const refreshResource = useCallback(
+    async (event: Extract<BackendEvent, { type: 'resource_changed' | 'resource_progress' }>) => {
+      if (event.resource_type === 'analysis') {
+        if (!workspaceId || event.workspace_id !== workspaceId) return;
+        try {
+          const { data } = await getAnalysis({
+            path: { workspace_id: workspaceId, analysis_id: event.resource_id },
+            throwOnError: true,
           });
-          void queryClient.invalidateQueries({
-            queryKey: queryKeys.workspaceNodes(workspaceId),
+          setTasks((previous) => upsertTask(toTaskItem(data, workspaceId), previous));
+        } catch (error) {
+          console.warn('Could not refresh analysis activity', error);
+        }
+        return;
+      }
+
+      if (event.resource_type === 'user_file_import') {
+        try {
+          const { data } = await getUserFileImport({
+            path: { import_id: event.resource_id },
+            throwOnError: true,
           });
-        }
-        break;
-      }
-      case 'tasks_snapshot': {
-        const snapshotTasks = payload.tasks;
-        if (Array.isArray(snapshotTasks)) {
-          claimSuccessfulLdacaFileRefreshes(snapshotTasks);
-          const seq = nextEventSequence();
-          const eventTimestamp = normalizeTimestamp(payload.timestamp);
-          setTasks((prevTasks: TaskItem[]) =>
-            mergeTaskUpdates(
-              prevTasks,
-              snapshotTasks.map((task: TaskItem) => ({
-                task,
-                eventTimestamp,
-                eventSequence: seq,
-              })),
-              { replaceAll: true },
-            ),
-          );
-        }
-        break;
-      }
-      case 'task_changed': {
-        if (payload.task) {
-          const changedTask = payload.task;
-          const seq = nextEventSequence();
-          const eventTimestamp = normalizeTimestamp(payload.timestamp);
-          setTasks((prevTasks: TaskItem[]) =>
-            mergeTaskUpdates(prevTasks, [
-              {
-                task: changedTask,
-                eventTimestamp,
-                eventSequence: seq,
-              },
-            ]),
-          );
-
-          claimSuccessfulLdacaFileRefreshes([changedTask]);
-
-          if (workspaceId && shouldRefreshGraphFallback(changedTask)) {
-            void queryClient.invalidateQueries({
-              queryKey: queryKeys.workspaceGraph(workspaceId),
-            });
+          setTasks((previous) => upsertTask(toImportTask(data), previous));
+          if (data.state === 'succeeded') {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.files });
           }
+        } catch (error) {
+          console.warn('Could not refresh user-file import activity', error);
         }
-        break;
       }
-      case 'task_removed': {
-        if (payload.task_id) {
-          setTasks((prevTasks: TaskItem[]) =>
-            prevTasks.filter((task) => task.task_id !== payload.task_id),
-          );
-        }
-        break;
-      }
-      case 'analysis_materialized': {
-        const taskType = typeof payload.task_type === 'string' ? payload.task_type : '';
-        const taskId = typeof payload.task_id === 'string' ? payload.task_id : '';
-        const parentTaskId =
-          typeof payload.parent_task_id === 'string' ? payload.parent_task_id : '';
-        const parentNodeId =
-          typeof payload.parent_node_id === 'string' ? payload.parent_node_id : '';
-        const materializedPath =
-          typeof payload.materialized_path === 'string' ? payload.materialized_path : '';
-        if (taskType && parentTaskId && parentNodeId && materializedPath) {
-          pushMaterializedEvent({
-            taskType,
-            taskId,
-            parentTaskId,
-            parentNodeId,
-            materializedPath,
-            timestamp: normalizeTimestamp(payload.timestamp),
-          });
-        }
-        break;
-      }
-      case 'analysis_save_failed': {
-        if (payload.task_type === ANALYSIS_TASK_TYPES.topicModeling) {
-          // Empty/missing message falls back to a generic label, so `||` is intentional.
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-          setTransientError(payload.message || 'Analysis save failed');
-        }
-        break;
-      }
-      case 'error': {
-        // Empty/missing message falls back to a generic label, so `||` is intentional.
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        setTransientError(payload.message || 'Task stream error');
-        break;
-      }
-      default: {
-        // noop
-        break;
-      }
-    }
-  };
+    },
+    [queryClient, setTasks, workspaceId],
+  );
 
-  const clientState = useWorkspaceTaskStreamClient({
-    enabled: true,
-    getAuthHeaders,
-    onEvent: handlePayload,
-  });
-
-  return transientError
-    ? {
-        ...clientState,
-        status: 'error',
-        error: transientError,
+  const removeResource = useCallback(
+    (event: Extract<BackendEvent, { type: 'resource_removed' }>) => {
+      if (
+        event.resource_type === 'analysis' &&
+        workspaceId &&
+        event.workspace_id !== null &&
+        event.workspace_id !== workspaceId
+      ) {
+        return;
       }
-    : clientState;
+      setTasks((previous) => previous.filter((task) => task.task_id !== event.resource_id));
+    },
+    [setTasks, workspaceId],
+  );
+
+  const handleEvent = useCallback(
+    (event: BackendEvent) => {
+      switch (event.type) {
+        case 'stream_ready':
+        case 'resync_required':
+          void refreshTasks();
+          break;
+        case 'resource_changed':
+        case 'resource_progress':
+          void refreshResource(event);
+          if (
+            event.resource_type === 'workspace' &&
+            workspaceId &&
+            event.workspace_id === workspaceId
+          ) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(workspaceId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceNodes(workspaceId) });
+          }
+          break;
+        case 'resource_removed':
+          removeResource(event);
+          if (event.resource_type === 'workspace' && event.workspace_id === workspaceId) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+          }
+          break;
+        case 'workspace_runtime_changed':
+          if (event.workspace_id === workspaceId) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(workspaceId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceNodes(workspaceId) });
+          }
+          break;
+      }
+    },
+    [queryClient, refreshResource, refreshTasks, removeResource, workspaceId],
+  );
+
+  /* eslint-disable react-hooks/set-state-in-effect -- Initial synchronization hydrates the store from the backend resource list. */
+  useEffect(() => {
+    void refreshTasks();
+  }, [refreshTasks]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const clientState = useWorkspaceTaskStreamClient({ enabled: true, onEvent: handleEvent });
+  return transientError ? { ...clientState, status: 'error', error: transientError } : clientState;
 };
