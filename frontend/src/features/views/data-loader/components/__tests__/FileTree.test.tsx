@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FileTree } from '../FileTree';
 
 describe('FileTree workspace routing', () => {
-  it('keeps Add visibly labelled while disabling it when no workspace is selected', () => {
+  it('keeps the responsive Add action disabled when no workspace is selected', () => {
     const onAddFile = vi.fn();
     render(
       <FileTree
@@ -28,7 +28,11 @@ describe('FileTree workspace routing', () => {
       'title',
       'Load a workspace to add this file as a Data Block',
     );
-    expect(screen.getByText('Add')).not.toHaveClass('hidden');
+    expect(screen.getByText('Add')).toHaveClass('hidden', '@min-[40rem]/file-row:inline');
+    expect(screen.getByTestId('file-row-records.csv').children[1]).toHaveClass(
+      '@container/file-row',
+      'flex-wrap',
+    );
     fireEvent.click(addButton);
     expect(onAddFile).not.toHaveBeenCalled();
   });

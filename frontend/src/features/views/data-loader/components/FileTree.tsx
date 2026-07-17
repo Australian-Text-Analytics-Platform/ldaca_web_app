@@ -231,7 +231,7 @@ export function FileTree({
         handleDirectoryDragLeave(`file:${file.path}`, event);
       }}
       onDrop={(event) => void handleDirectoryDrop(parentDirectoryPath, event)}
-      className={`group flex flex-wrap items-start gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 sm:flex-nowrap sm:items-center ${
+      className={`group flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
         selectedFile === file.path ? 'bg-muted/50' : ''
       } ${
         isFileMoveTargetActive(`file:${file.path}`, parentDirectoryPath)
@@ -240,8 +240,8 @@ export function FileTree({
       }`}
     >
       <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <div className="flex min-w-0 flex-[1_1_14rem] flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="@container/file-row flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-[1_1_14rem]">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-medium text-foreground">{file.name}</span>
           </div>
@@ -249,22 +249,24 @@ export function FileTree({
             <span>{formatBytes(file.size)}</span>
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1 sm:flex-nowrap">
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             size="sm"
             variant="ghost"
             className="h-7 px-2"
+            aria-label="Preview"
             onClick={() => {
               onPreviewFile(file.path);
             }}
           >
             <Eye className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Preview</span>
+            <span className="hidden @min-[40rem]/file-row:inline">Preview</span>
           </Button>
           <Button
             size="sm"
             variant="ghost"
             className="h-7 px-2"
+            aria-label="Add"
             disabled={!hasWorkspaceSelected}
             title={
               hasWorkspaceSelected
@@ -278,7 +280,7 @@ export function FileTree({
             }}
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Add</span>
+            <span className="hidden @min-[40rem]/file-row:inline">Add</span>
           </Button>
           <Button
             size="sm"
