@@ -39,9 +39,9 @@ export interface ConditionRange {
   start: string | Date | null;
   end: string | Date | null;
 }
-/** Value shape for a TMDist (topic-distribution) filter condition: keep rows
+/** Value shape for a Topic Distribution filter condition: keep rows
  * where one topic's proportion (0..1) compares against the threshold. */
-interface TmdistConditionValue {
+interface TopicDistributionConditionValue {
   topic_id: number;
   threshold: number;
 }
@@ -51,7 +51,7 @@ export type ConditionValue =
   | boolean
   | Date
   | ConditionRange
-  | TmdistConditionValue
+  | TopicDistributionConditionValue
   | null
   | (string | number | boolean | Date | null)[];
 

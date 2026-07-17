@@ -3,10 +3,12 @@ import {
   FixedSizeList,
   Float64,
   Int64,
+  LargeList,
   Schema,
   Struct,
   Table,
   Utf8,
+  Utf8View,
   tableFromArrays,
   tableToIPC,
   vectorFromArray,
@@ -45,6 +47,30 @@ describe('Arrow table transport', () => {
     expect(decoded.rows).toEqual([
       { token: 'one', count: '1' },
       { token: 'two', count: '2' },
+    ]);
+  });
+
+  it('classifies Utf8View and LargeList<Utf8View> from native Arrow types', async () => {
+    const strings = vectorFromArray(['one', 'two'], new Utf8View());
+    const stringListType = new LargeList(new Field('item', new Utf8View(), true));
+    const stringLists = vectorFromArray(
+      [
+        ['one', 'two'],
+        ['three'],
+      ],
+      stringListType,
+    );
+    const source = new Table({ strings, stringLists });
+
+    const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
+
+    expect(decoded.schema.map(({ name, kind }) => ({ name, kind }))).toEqual([
+      { name: 'strings', kind: 'string' },
+      { name: 'stringLists', kind: 'string-list' },
+    ]);
+    expect(decoded.rows).toEqual([
+      { strings: 'one', stringLists: ['one', 'two'] },
+      { strings: 'two', stringLists: ['three'] },
     ]);
   });
 
@@ -124,5 +150,19 @@ describe('Arrow table transport', () => {
       'http://127.0.0.1:49152/api/workspaces/workspace-1/analyses/analysis-1/result/tables/main',
       { credentials: 'include' },
     );
+  });
+
+  it('adds table context to decoder errors and preserves the Arrow cause', async () => {
+    const validStream = stream(tableFromArrays({ value: ['one'] }));
+    const truncatedStream = validStream.slice(0, 16).buffer as ArrayBuffer;
+
+    try {
+      await decodeArrowTable(truncatedStream);
+      expect.fail('Expected invalid Arrow IPC to be rejected');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(/^Arrow table decode failed: /);
+      expect((error as Error).cause).toBeDefined();
+    }
   });
 });

@@ -20,12 +20,17 @@ second Parquet-over-HTTP table representation. Semantic custom values use
 stable Arrow extension names over documented storage types; an unregistered
 client can still read the physical storage value.
 
-The frontend uses the official `apache-arrow` JavaScript implementation. Topic
-Distribution uses extension name
+The backend writes native Polars Arrow IPC without downgrading its compatibility
+level or rewriting valid Arrow storage types for a particular client. The
+frontend uses the official `apache-arrow` JavaScript implementation and derives
+UI column behavior from decoded Arrow types and extension metadata. A type that
+the decoder does not support fails that table request clearly; there is no JSON
+fallback, backend type profile, or alternate decoder.
+
+Topic Distribution uses extension name
 `org.ldaca.wordflow.topic_distribution.v1` over
 `fixed-size-list[N+1]<struct<topic_id: int64, proportion: float64>>`, where the
 entries are outlier `-1` followed by real topics `0..N-1`. Fixed-size storage
-matches the domain invariant and avoids a variable-offset list encoding that
-the supported Apache Arrow JavaScript release cannot decode. Frontend code
-dispatches semantic rendering from the extension name and does not redefine
-the storage type.
+expresses that domain invariant; it is not a client-compatibility workaround.
+Frontend code dispatches semantic rendering from the extension name and does
+not redefine the storage type.

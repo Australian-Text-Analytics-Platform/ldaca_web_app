@@ -29,10 +29,14 @@ flowchart TB
 Feature code consumes generated SDK functions and generated types through
 `@/api`. The narrow table adapter decodes generated-client binary responses
 with `apache-arrow`; complete Result table URLs use the same decoder directly.
+It classifies columns through official Arrow types, including view and
+large-offset representations emitted natively by Polars. Decoder failures stay
+ordinary errors on the affected table query and retain the underlying Arrow
+cause.
 Raw network calls are limited to boundaries the generator cannot express
 conveniently, such as complete table URLs, native downloads, or SSE, and still
 follow the backend's cookie, CSRF, Origin, and typed resource contracts. There
-is no JSON table decoder or compatibility fallback.
+is no JSON table decoder, backend compatibility rewrite, or alternate decoder.
 
 ## Workspace Composition
 

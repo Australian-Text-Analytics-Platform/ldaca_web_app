@@ -47,10 +47,10 @@ export interface ArrowTablePage extends ArrowTableData {
 }
 
 const isStringType = (type: ArrowDataType): boolean =>
-  DataType.isUtf8(type) || DataType.isLargeUtf8(type);
+  DataType.isUtf8(type) || DataType.isLargeUtf8(type) || DataType.isUtf8View(type);
 
 const listChild = (type: ArrowDataType): ArrowField | undefined => {
-  if (!DataType.isList(type) && !DataType.isFixedSizeList(type)) {
+  if (!DataType.isList(type) && !DataType.isLargeList(type) && !DataType.isFixedSizeList(type)) {
     return undefined;
   }
   return type.children[0];
@@ -105,21 +105,26 @@ const normalizeArrowValue = (value: unknown): unknown => {
 };
 
 export const decodeArrowTable = async (source: Blob | ArrayBuffer): Promise<ArrowTableData> => {
-  const buffer = source instanceof Blob ? await source.arrayBuffer() : source;
-  const table = tableFromIPC<TypeMap>(buffer);
-  const schema = table.schema.fields.map((field) => ({
-    name: field.name,
-    kind: columnKind(field as ArrowField),
-    field: field as ArrowField,
-  }));
-  const columns = schema.map((column) => column.name);
-  const rows = table.toArray().map((row) => {
-    const normalized = normalizeArrowValue(row);
-    return normalized && typeof normalized === 'object' && !Array.isArray(normalized)
-      ? (normalized as Record<string, unknown>)
-      : {};
-  });
-  return { table, columns, schema, rows };
+  try {
+    const buffer = source instanceof Blob ? await source.arrayBuffer() : source;
+    const table = tableFromIPC<TypeMap>(buffer);
+    const schema = table.schema.fields.map((field) => ({
+      name: field.name,
+      kind: columnKind(field as ArrowField),
+      field: field as ArrowField,
+    }));
+    const columns = schema.map((column) => column.name);
+    const rows = table.toArray().map((row) => {
+      const normalized = normalizeArrowValue(row);
+      return normalized && typeof normalized === 'object' && !Array.isArray(normalized)
+        ? (normalized as Record<string, unknown>)
+        : {};
+    });
+    return { table, columns, schema, rows };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Arrow table decode failed: ${message}`, { cause: error });
+  }
 };
 
 export const decodeArrowPage = async (
