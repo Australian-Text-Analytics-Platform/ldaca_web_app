@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
-import { type ReplaceApplyResponse, type ReplaceRequest } from '@/api';
-import { mapColumnsToInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import type { WorkspaceNodeInfo } from '@/api';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
@@ -14,17 +14,19 @@ import {
   type ReplaceMode,
   type ReplaceRequestDraft,
 } from './replaceRequestModel';
+import type { ReplaceRequest } from './replaceRequestModel';
 
 export interface ReplaceSubTabProps {
   currentWorkspaceId: string | null;
   selectedColumn?: string;
   selectedNodes: WorkspaceNodeMetadata[];
+  getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[];
   isLoading: {
     operations: boolean;
   };
   onAlert: (message: string) => void;
   replaceTextPreview: OperationPreviewFetcher<ReplaceRequest>;
-  replaceText: (nodeId: string, request: ReplaceRequest) => Promise<ReplaceApplyResponse>;
+  replaceText: (nodeId: string, request: ReplaceRequest) => Promise<WorkspaceNodeInfo>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
 
@@ -52,7 +54,8 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const activeNode = effectiveNodes[0] ?? null;
   const activeNodeId = activeNode?.id ?? null;
   const stringColumns = activeNode
-    ? mapColumnsToInfo(activeNode)
+    ? props
+        .getColumnInfos(activeNode)
         .filter((column) => column.dataType === 'string')
         .map((column) => column.name)
     : [];
@@ -132,7 +135,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     setApplyLoading(true);
     try {
       const response = await replaceText(activeNodeId, request);
-      onAlert(response.message || `Updated column ${response.column_name}`);
+      onAlert(`Created ${response.name}`);
       await refreshNodeSchema(activeNodeId);
     } catch {
       // Error is shown via preview refresh

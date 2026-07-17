@@ -1,4 +1,3 @@
-import type { SliceRequest as SliceRequestPayload } from '@/api';
 import { buildSamplingAutoNodeName } from '@/features/views/common/samplingAutoNodeName';
 
 export type SamplingMode = 'slice' | 'random_sample';
@@ -15,6 +14,15 @@ export interface SliceFormModelInput {
   noRandomSeed: boolean;
   isSlicing: boolean;
   isOperationsLoading: boolean;
+}
+
+export interface SliceRequestPayload {
+  mode?: 'slice' | 'random_sample' | 'shuffle';
+  offset?: number;
+  length?: number;
+  sample_size?: number;
+  random_seed?: number;
+  name?: string;
 }
 
 export interface SliceFormModel {

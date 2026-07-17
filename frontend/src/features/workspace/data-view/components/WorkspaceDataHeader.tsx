@@ -1,13 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Info, Pencil, Redo2, Undo2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { Pencil } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { cn } from '@/lib/utils';
 
@@ -15,12 +7,7 @@ import type { WorkspaceDataTableHeaderInfo } from '../hooks/useWorkspaceDataTabl
 
 interface WorkspaceDataHeaderProps {
   info: WorkspaceDataTableHeaderInfo;
-  onUndo?: () => void;
-  onRedo?: () => void;
   onRename?: (newName: string) => void;
-  onQueryPlan?: () => Promise<string | null>;
-  canUndo?: boolean;
-  canRedo?: boolean;
 }
 
 /**
@@ -80,7 +67,7 @@ function HeaderNodeLabel({ label }: { label: string }) {
 }
 
 /**
- * Renders selected-node title, rename, query-plan, undo, and redo controls.
+ * Renders selected-node title and rename controls.
  * Rendered by `WorkspaceDataTableFeature` above `WorkspaceTable`.
  * Why: the data table feature needs the active node label and node-level actions
  * grouped in one compact line above the table state.
@@ -88,19 +75,8 @@ function HeaderNodeLabel({ label }: { label: string }) {
  * with a leading fade, run inline rename, and expose icon-only actions beside
  * the table.
  */
-export const WorkspaceDataHeader = ({
-  info,
-  onUndo,
-  onRedo,
-  onRename,
-  onQueryPlan,
-  canUndo = false,
-  canRedo = false,
-}: WorkspaceDataHeaderProps) => {
+export const WorkspaceDataHeader = ({ info, onRename }: WorkspaceDataHeaderProps) => {
   const [renameDraft, setRenameDraft] = useState<{ baseLabel: string; value: string }>();
-  const [queryPlanOpen, setQueryPlanOpen] = useState(false);
-  const [queryPlan, setQueryPlan] = useState<string | null>(null);
-  const [queryPlanLoading, setQueryPlanLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isRenaming = renameDraft?.baseLabel === info.nodeLabel;
 
@@ -129,22 +105,6 @@ export const WorkspaceDataHeader = ({
       inputRef.current?.focus();
       inputRef.current?.select();
     }, 10);
-  };
-
-  /**
-   * Fetches and opens the Polars query plan dialog for the active node.
-   * Attached to the query-plan button.
-   */
-  const handleOpenQueryPlan = async () => {
-    setQueryPlanOpen(true);
-    setQueryPlan(null);
-    setQueryPlanLoading(true);
-    try {
-      const plan = onQueryPlan ? await onQueryPlan() : null;
-      setQueryPlan(plan);
-    } finally {
-      setQueryPlanLoading(false);
-    }
   };
 
   return (
@@ -194,72 +154,8 @@ export const WorkspaceDataHeader = ({
           )}
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 rounded-full"
-            onClick={() => {
-              void handleOpenQueryPlan();
-            }}
-            disabled={!onQueryPlan}
-            aria-label="Info"
-            title="Info"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 rounded-full"
-            onClick={onUndo}
-            disabled={!canUndo}
-            aria-label="Undo"
-            title="Undo"
-          >
-            <Undo2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 rounded-full"
-            onClick={onRedo}
-            disabled={!canRedo}
-            aria-label="Redo"
-            title="Redo"
-          >
-            <Redo2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5" />
       </div>
-
-      <Dialog open={queryPlanOpen} onOpenChange={setQueryPlanOpen}>
-        <DialogContent className="flex h-[88vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden p-0 sm:max-w-[96vw]">
-          <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-            <DialogTitle>Query Plan</DialogTitle>
-            <DialogDescription>
-              Polars LazyFrame execution plan for <strong>{info.nodeLabel}</strong>
-            </DialogDescription>
-          </DialogHeader>
-          {queryPlanLoading ? (
-            <div className="flex flex-1 items-center gap-2 px-6 pb-6 text-sm text-muted-foreground">
-              <div className="size-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-              Loading query plan…
-            </div>
-          ) : (
-            <div className="min-h-0 flex-1 px-6 pb-6">
-              <div className="h-full overflow-x-scroll overflow-y-auto rounded-md bg-muted p-4">
-                <pre className="min-w-max whitespace-pre text-xs font-mono leading-relaxed">
-                  {queryPlan ?? 'No plan available.'}
-                </pre>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

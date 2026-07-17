@@ -4,7 +4,7 @@ import type { ConditionColumnOption, FilterConditionWithId } from '../../../type
 
 const columns: ConditionColumnOption[] = [
   { name: 'Category', dataType: 'categorical' },
-  { name: 'Topics', dataType: 'tmdist' },
+  { name: 'Topics', dataType: 'topic-distribution' },
   { name: 'Created', dataType: 'datetime' },
   { name: 'Score', dataType: 'float' },
 ];
@@ -41,12 +41,15 @@ describe('conditionState', () => {
 
     expect(result.condition).toMatchObject({
       column: 'Topics',
-      dataType: 'tmdist',
+      dataType: 'topic-distribution',
       value: { topic_id: 0, threshold: 0.05 },
       regex: false,
       caseSensitive: false,
     });
-    expect(result.checklistLoadRequest).toEqual({ column: 'Topics', dataType: 'tmdist' });
+    expect(result.checklistLoadRequest).toEqual({
+      column: 'Topics',
+      dataType: 'topic-distribution',
+    });
     expect(result.shouldResetSearch).toBe(true);
   });
 

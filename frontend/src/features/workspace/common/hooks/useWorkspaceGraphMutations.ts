@@ -2,19 +2,17 @@ import { useMemo } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  addNodeToWorkspace,
-  cloneNode,
-  concatNodes,
-  concatNodesPreview,
+  createNode,
   deleteNode,
-  joinNodes,
-  redoNodeOperation,
   reorderWorkspaceNodesById,
-  setNodeColor as setNodeColorRequest,
-  undoNodeOperation,
-  updateNodeName,
+  previewNodeCreationTable,
+  updateNode,
 } from '@/api';
-import { type WorkspaceGraphResponse, type WorkspaceNodeInfo as NodeInfoResponse } from '@/api';
+import type {
+  JoinNodeCreateRequest,
+  WorkspaceGraphResponse,
+  WorkspaceNodeInfo as NodeInfoResponse,
+} from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   invalidateNodeWorkspaceQueries,
@@ -74,11 +72,13 @@ export const useWorkspaceGraphMutations = ({
 
   const renameNodeMutation = useMutation({
     mutationFn: ({ nodeId, newName }: { nodeId: string; newName: string }) =>
-      updateNodeName({
+      updateNode({
+        body: { name: newName },
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
-        query: { new_name: newName },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => {
+        return data;
+      }),
     onMutate: operationLifecycle.onMutate('renameNode'),
     onSuccess: operationLifecycle.onSuccess('renameNode', () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
@@ -88,10 +88,13 @@ export const useWorkspaceGraphMutations = ({
 
   const copyNodeMutation = useMutation({
     mutationFn: ({ nodeId }: { nodeId: string }) =>
-      cloneNode({
-        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+      createNode({
+        body: { kind: 'clone', source_node_id: nodeId },
+        path: { workspace_id: ensureWorkspaceSelected() },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => {
+        return data;
+      }),
     onMutate: operationLifecycle.onMutate('copyNode'),
     onSuccess: operationLifecycle.onSuccess('copyNode', () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
@@ -102,11 +105,13 @@ export const useWorkspaceGraphMutations = ({
 
   const setNodeColorMutation = useMutation({
     mutationFn: ({ nodeId, color }: { nodeId: string; color: string }) =>
-      setNodeColorRequest({
+      updateNode({
         body: { color },
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => {
+        return data;
+      }),
     onMutate: operationLifecycle.onMutate('setNodeColor'),
     onSuccess: operationLifecycle.onSuccess('setNodeColor', (_data, { nodeId }) => {
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
@@ -121,7 +126,10 @@ export const useWorkspaceGraphMutations = ({
       deleteNode({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => {
+        if (data !== undefined) throw new Error('Node deletion returned a body');
+        return undefined;
+      }),
     onMutate: operationLifecycle.onMutate('deleteNode'),
     onSuccess: operationLifecycle.onSuccess('deleteNode', (_, { nodeId }) => {
       removeNode(nodeId);
@@ -133,51 +141,15 @@ export const useWorkspaceGraphMutations = ({
     onError: operationLifecycle.onError('deleteNode'),
   });
 
-  const undoNodeMutation = useMutation({
-    mutationFn: ({ nodeId }: { nodeId: string }) =>
-      undoNodeOperation({
-        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
-        throwOnError: true,
-      }).then(({ data }) => data),
-    onMutate: operationLifecycle.onMutate('undoNode'),
-    onSuccess: operationLifecycle.onSuccess('undoNode', (_data, variables) => {
-      invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, variables.nodeId, {
-        includeNodeInfo: true,
-        includeData: true,
-        includeSchema: true,
-      });
-    }),
-    onError: operationLifecycle.onError('undoNode'),
-  });
-
-  const redoNodeMutation = useMutation({
-    mutationFn: ({ nodeId }: { nodeId: string }) =>
-      redoNodeOperation({
-        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
-        throwOnError: true,
-      }).then(({ data }) => data),
-    onMutate: operationLifecycle.onMutate('redoNode'),
-    onSuccess: operationLifecycle.onSuccess('redoNode', (_data, variables) => {
-      invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, variables.nodeId, {
-        includeNodeInfo: true,
-        includeData: true,
-        includeSchema: true,
-      });
-    }),
-    onError: operationLifecycle.onError('redoNode'),
-  });
-
   const createNodeMutation = useMutation({
     mutationFn: ({ filename, sheetName }: { filename: string; sheetName?: string }) =>
-      addNodeToWorkspace({
+      createNode({
         path: { workspace_id: ensureWorkspaceSelected() },
-        body: {
-          filename,
-          mode: 'LazyFrame',
-          ...(sheetName ? { sheet_name: sheetName } : {}),
-        },
+        body: { kind: 'file', file_path: filename, sheet_name: sheetName },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => {
+        return data;
+      }),
     onMutate: operationLifecycle.onMutate('createNode'),
     onSuccess: operationLifecycle.onSuccess('createNode', (response: NodeInfoResponse) => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
@@ -211,23 +183,26 @@ export const useWorkspaceGraphMutations = ({
     }: {
       leftNodeId: string;
       rightNodeId: string;
-      joinType: string;
+      joinType: JoinNodeCreateRequest['how'];
       leftColumns: string[];
       rightColumns: string[];
       newNodeName?: string;
     }) =>
-      joinNodes({
+      createNode({
         path: { workspace_id: ensureWorkspaceSelected() },
-        query: {
+        body: {
+          kind: 'join',
           left_node_id: leftNodeId,
           right_node_id: rightNodeId,
           left_on: leftColumns[0] ?? '',
           right_on: rightColumns[0] ?? '',
           how: joinType,
-          new_node_name: newNodeName,
+          name: newNodeName,
         },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => {
+        return data;
+      }),
     onMutate: operationLifecycle.onMutate('joinNodes', () => {
       clearSelection();
     }),
@@ -248,11 +223,13 @@ export const useWorkspaceGraphMutations = ({
       newNodeName?: string;
       deduplicate?: boolean;
     }) =>
-      concatNodes({
-        body: { node_ids: nodeIds, new_node_name: newNodeName, deduplicate },
+      createNode({
+        body: { kind: 'concat', source_node_ids: nodeIds, name: newNodeName, deduplicate },
         path: { workspace_id: ensureWorkspaceSelected() },
         throwOnError: true,
-      }).then(({ data }) => data),
+      }).then(({ data }) => {
+        return data;
+      }),
     onMutate: operationLifecycle.onMutate('concatNodes', () => {
       clearSelection();
     }),
@@ -264,7 +241,7 @@ export const useWorkspaceGraphMutations = ({
   });
 
   const reorderNodesMutation = useMutation<
-    WorkspaceGraphResponse | undefined,
+    undefined,
     Error,
     { orderedIds: string[] },
     { previousGraph: WorkspaceGraphResponse | undefined }
@@ -277,7 +254,7 @@ export const useWorkspaceGraphMutations = ({
         body: { ordered_ids: orderedIds },
         path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
-      }).then(({ data }) => data);
+      }).then(() => undefined);
     },
     onMutate: operationLifecycle.onMutate('reorderNodes', async ({ orderedIds }) => {
       if (!currentWorkspaceId) {
@@ -317,8 +294,6 @@ export const useWorkspaceGraphMutations = ({
     () => ({
       renameNode: (nodeId: string, newName: string) =>
         renameNodeMutation.mutateAsync({ nodeId, newName }),
-      undoNode: (nodeId: string) => undoNodeMutation.mutateAsync({ nodeId }),
-      redoNode: (nodeId: string) => redoNodeMutation.mutateAsync({ nodeId }),
       copyNode: (nodeId: string) => copyNodeMutation.mutateAsync({ nodeId }),
       setNodeColor: (nodeId: string, color: string) =>
         setNodeColorMutation.mutateAsync({ nodeId, color }),
@@ -332,7 +307,7 @@ export const useWorkspaceGraphMutations = ({
       joinNodes: (
         leftNodeId: string,
         rightNodeId: string,
-        joinType: string,
+        joinType: JoinNodeCreateRequest['how'],
         leftColumns: string[],
         rightColumns: string[],
         newNodeName?: string,
@@ -355,13 +330,22 @@ export const useWorkspaceGraphMutations = ({
         deduplicate,
         signal,
       }: WorkspaceConcatPreviewRequest) =>
-        concatNodesPreview({
-          body: { node_ids: nodeIds, deduplicate },
+        previewNodeCreationTable({
+          body: { kind: 'concat', source_node_ids: nodeIds, deduplicate },
           path: { workspace_id: workspaceId },
           query: { page, page_size: pageSize },
           signal,
-          throwOnError: true,
-        }).then(({ data }) => data),
+        }).then((data) => {
+          return {
+            data: data.rows,
+            columns: data.columns,
+            pagination: {
+              page,
+              page_size: pageSize,
+              has_next: data.hasNext,
+            },
+          };
+        }),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutation refs intentionally omitted; mutateAsync identities are stable
     [currentWorkspaceId, queryClient],

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { util, type DataType, type Field, type Type, type TypeMap } from 'apache-arrow';
 
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
@@ -13,6 +14,10 @@ import type {
 } from '../../types';
 import { MAX_CONCAT_NODES } from '../../types';
 import { dedupeNodeIds } from '@/features/workspace/common/utils/selectionUtils';
+
+type ComparableArrowType = DataType<Type, TypeMap>;
+
+const comparableType = (field: Field): ComparableArrowType => field.type as ComparableArrowType;
 
 const DEFAULT_CONCAT_PALETTE = [
   '#2563eb',
@@ -126,25 +131,16 @@ const buildConcatNodeSummaries = (
 
     const columnInfos = getColumnInfos(node);
     const columns = columnInfos.map((column) => column.name);
-    const rawDtypes = Object.fromEntries(
-      columnInfos.map((column) => [column.name, column.dataType]),
-    );
+    const fields = Object.fromEntries(columnInfos.map((column) => [column.name, column.field]));
 
     const uniqueColumns = Array.from(new Set(columns));
     const normalizedColumns = uniqueColumns.toSorted((a, b) => a.localeCompare(b));
-    const normalizedDtypes = normalizedColumns.reduce<Record<string, string>>((acc, column) => {
-      const dtype = rawDtypes[column];
-      acc[column] = dtype ? dtype.toLowerCase() : '';
-      return acc;
-    }, {});
-
     return {
       nodeId,
       displayName,
       columns: uniqueColumns,
       normalizedColumns,
-      dtypes: normalizedDtypes,
-      rawDtypes,
+      fields,
       columnCount: uniqueColumns.length,
     };
   });
@@ -189,20 +185,21 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
   result.baseColumnCount = base.normalizedColumns.length;
 
   const baseColumnSet = new Set(base.normalizedColumns);
-  const baseDtypes = base.normalizedColumns.reduce<Record<string, string>>((acc, column) => {
-    acc[column] = base.dtypes[column] ?? '';
-    return acc;
-  }, {});
-
   summaries.slice(1).forEach((summary) => {
     const summaryColumnSet = new Set(summary.normalizedColumns);
     const missing = Array.from(baseColumnSet).filter((column) => !summaryColumnSet.has(column));
     const extra = Array.from(summaryColumnSet).filter((column) => !baseColumnSet.has(column));
     const typeMismatches = Array.from(baseColumnSet).filter((column) => {
       if (!summaryColumnSet.has(column)) return false;
-      const baseType = baseDtypes[column] ?? '';
-      const summaryType = summary.dtypes[column] ?? '';
-      return baseType && summaryType && baseType !== summaryType;
+      const baseField = base.fields[column];
+      const summaryField = summary.fields[column];
+      return (
+        !baseField ||
+        !summaryField ||
+        !util.compareTypes(comparableType(baseField), comparableType(summaryField)) ||
+        baseField.metadata.get('ARROW:extension:name') !==
+          summaryField.metadata.get('ARROW:extension:name')
+      );
     });
 
     const details: string[] = [];
@@ -213,16 +210,7 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
       details.push(`Extra columns: ${extra.sort().join(', ')}`);
     }
     if (typeMismatches.length) {
-      const mismatchText = typeMismatches
-        .sort()
-        .map(
-          (column) =>
-            // Empty dtype strings should display as 'unknown', so keep `||`.
-            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-            `${column} (${baseDtypes[column] || 'unknown'} vs ${summary.dtypes[column] || 'unknown'})`,
-        )
-        .join(', ');
-      details.push(`Type mismatches: ${mismatchText}`);
+      details.push(`Type mismatches: ${typeMismatches.sort().join(', ')}`);
     }
 
     if (details.length) {

@@ -15,18 +15,10 @@ describe('useNodeInputs', () => {
     initialCount,
   }) => {
     const allNodes = Array.from({ length: maxNodes + 1 }, (_, index) =>
-      projectWorkspaceNodeMetadata(
-        {
-          id: `node-${String(index + 1)}`,
-          name: `Node ${String(index + 1)}`,
-        },
-        {
-          id: `node-${String(index + 1)}`,
-          name: `Node ${String(index + 1)}`,
-          columns: ['text'],
-          schema: { text: 'String' },
-        },
-      ),
+      projectWorkspaceNodeMetadata({
+        id: `node-${String(index + 1)}`,
+        name: `Node ${String(index + 1)}`,
+      }),
     );
     const initialValue: NodeInput[] = allNodes
       .slice(0, initialCount)

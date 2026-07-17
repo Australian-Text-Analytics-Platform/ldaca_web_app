@@ -75,8 +75,8 @@ export const buildFilterRequestPayload = (
   newNodeName?: string,
 ): FilterRequest => ({
   conditions: serializeConditionsForRequest(conditions),
-  logic,
-  new_node_name: newNodeName?.trim() ? newNodeName : undefined,
+  logic: logic === 'or' ? 'or' : 'and',
+  name: newNodeName?.trim() ? newNodeName : undefined,
 });
 
 /**

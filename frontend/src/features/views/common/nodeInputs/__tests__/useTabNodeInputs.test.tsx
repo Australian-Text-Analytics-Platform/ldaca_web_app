@@ -83,8 +83,6 @@ describe('useTabNodeInputs', () => {
         {
           id: 'node-a',
           name: 'Node A',
-          columns: ['text'],
-          schema: { text: 'String' },
         },
       ],
     });
@@ -151,7 +149,6 @@ describe('useTabNodeInputs', () => {
         {
           id: 'node-a',
           name: 'Node A',
-          columns: [],
         },
       ],
     });
@@ -189,8 +186,6 @@ describe('useTabNodeInputs', () => {
             id: 'node-a',
             name: 'Node A',
             document: 'document',
-            columns: ['document', 'speaker'],
-            schema: { document: 'String', speaker: 'String' },
             tokenizer_models: { document: 'native:plain_words_en' },
           }
         : undefined;
@@ -241,7 +236,6 @@ describe('useTabNodeInputs', () => {
       id: 'node-a',
       name: 'Node A',
       document: 'document',
-      columns: ['document', 'speaker'],
       tokenizerModels: { document: 'native:plain_words_en' },
     });
     expect(result.current.nodeColumnSelections).toEqual([{ nodeId: 'node-a', column: 'document' }]);
@@ -256,14 +250,10 @@ describe('useTabNodeInputs', () => {
         {
           id: 'node-a',
           name: 'Node A',
-          columns: ['text'],
-          schema: { text: 'String' },
         },
         {
           id: 'node-b',
           name: 'Node B',
-          columns: ['text'],
-          schema: { text: 'String' },
         },
       ],
     });
@@ -291,8 +281,6 @@ describe('useTabNodeInputs', () => {
     const nodes = Array.from({ length: maxNodes + 1 }, (_, index) => ({
       id: `node-${String(index + 1)}`,
       name: `Node ${String(index + 1)}`,
-      columns: ['text'],
-      schema: { text: 'String' },
     }));
     const consume = vi.fn();
     const onTabInputSetChange = vi.fn();
@@ -332,8 +320,6 @@ describe('useTabNodeInputs', () => {
     const nodes = Array.from({ length: 12 }, (_, index) => ({
       id: `node-${String(index + 1)}`,
       name: `Node ${String(index + 1)}`,
-      columns: ['text'],
-      schema: { text: 'String' },
     }));
     const rawInputs = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
     const tabInputSets = { source: rawInputs };
@@ -387,8 +373,6 @@ describe('useTabNodeInputs', () => {
     const nodes = Array.from({ length: 12 }, (_, index) => ({
       id: `node-${String(index + 1)}`,
       name: `Node ${String(index + 1)}`,
-      columns: ['text'],
-      schema: { text: 'String' },
     }));
     const source = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
     const constraints = { allowedDataTypes: ['string'], maxNodes: 2 };
@@ -423,8 +407,6 @@ describe('useTabNodeInputs', () => {
     const nodes = Array.from({ length: 13 }, (_, index) => ({
       id: `node-${String(index + 1)}`,
       name: `Node ${String(index + 1)}`,
-      columns: ['text'],
-      schema: { text: 'String' },
     }));
     const constraints = { allowedDataTypes: ['string'], maxNodes: 2 };
     const onTabInputSetChange = vi.fn();

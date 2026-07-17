@@ -626,18 +626,6 @@ export function buildSequentialChartModel({
   const chosenRows = shownRows.filter((row) => selectedPeriodKeys.has(row.periodKey));
   const sumCounts = (rows: SequentialCanonicalRow[]) =>
     rows.reduce((total, row) => total + row.count, 0);
-  const resultTotal = results?.total_records;
-  const hasValidResultTotal =
-    typeof resultTotal === 'number' &&
-    Number.isFinite(resultTotal) &&
-    Number.isInteger(resultTotal) &&
-    resultTotal >= 0;
-  if (resultTotal !== undefined && resultTotal !== null && !hasValidResultTotal) {
-    diagnostics.push({
-      code: 'invalid-count',
-      message: 'Result total-record count was not a non-negative whole number.',
-    });
-  }
   const hasValidSourceDocumentCount =
     typeof sourceDocumentCount === 'number' &&
     Number.isFinite(sourceDocumentCount) &&
@@ -650,7 +638,7 @@ export function buildSequentialChartModel({
     });
   }
   const counts: SequentialVisibilityCounts = {
-    totalPointCount: hasValidResultTotal ? resultTotal : canonicalRows.length,
+    totalPointCount: canonicalRows.length,
     totalDocumentCount: hasValidSourceDocumentCount
       ? sourceDocumentCount
       : sumCounts(canonicalRows),

@@ -1,25 +1,15 @@
-import { getNodeDataByWorkspaceId } from '@/api';
+import { getNodeRowsTable } from '@/api';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {
   usePreprocessingPreview,
   type UsePreprocessingPreviewResult,
 } from './usePreprocessingPreview';
 
-interface RawishResponse {
-  data?: unknown;
-  columns?: unknown;
-  pagination?: unknown;
+interface OperationPreviewResult {
+  data: PreviewRow[];
+  columns: string[];
+  pagination: PreviewPagination;
 }
-
-/**
- * Normalizes generated/raw preview responses before table components consume them.
- * Called by the hook's raw and operation-preview response branches.
- */
-const normaliseResponse = (response: RawishResponse | null | undefined) => ({
-  data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-  columns: Array.isArray(response?.columns) ? (response.columns as string[]) : [],
-  pagination: (response?.pagination as PreviewPagination | undefined) ?? null,
-});
 
 interface PreviewRequest<P> {
   workspaceId: string;
@@ -34,7 +24,7 @@ export type OperationPreviewFetcher<P> = (params: {
   page: number;
   pageSize: number;
   signal: AbortSignal;
-}) => Promise<RawishResponse>;
+}) => Promise<OperationPreviewResult>;
 
 export interface UseNodePreviewWithRawFallbackOptions<P> {
   /** Currently-active workspace id, or null if no workspace is selected. */
@@ -109,24 +99,25 @@ export const useNodePreviewWithRawFallback = <P>(
     // Invoked by usePreprocessingPreview after debounce/cancellation setup.
     fetcher: async ({ request: req, page, pageSize, signal }) => {
       if (req.payload) {
-        return normaliseResponse(
-          await operationFetch({
-            workspaceId: req.workspaceId,
-            nodeId: req.nodeId,
-            payload: req.payload,
-            page,
-            pageSize,
-            signal,
-          }),
-        );
+        return operationFetch({
+          workspaceId: req.workspaceId,
+          nodeId: req.nodeId,
+          payload: req.payload,
+          page,
+          pageSize,
+          signal,
+        });
       }
-      const { data } = await getNodeDataByWorkspaceId({
+      const data = await getNodeRowsTable({
         path: { workspace_id: req.workspaceId, node_id: req.nodeId },
         query: { page, page_size: pageSize },
         signal,
-        throwOnError: true,
       });
-      return normaliseResponse(data);
+      return {
+        data: data.rows,
+        columns: data.columns,
+        pagination: { page, page_size: pageSize, has_next: data.hasNext },
+      };
     },
   });
 };

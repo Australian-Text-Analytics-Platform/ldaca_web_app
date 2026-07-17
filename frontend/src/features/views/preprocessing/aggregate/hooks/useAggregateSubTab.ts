@@ -16,10 +16,7 @@ import { useAggregateBuilderDragHandlers } from './useAggregateBuilderDrag';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { type PolarsExpressionRequest, type PolarsExpressionApplyResponse } from '@/api';
-import {
-  mapColumnsToInfo,
-  type ColumnInfo,
-} from '@/features/workspace/data-view/utils/columnTypes';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
@@ -29,6 +26,7 @@ import type { PreviewPagination, PreviewRow } from '../../types';
 export interface AggregateSubTabProps {
   currentWorkspaceId: string | null;
   selectedNodes: WorkspaceNodeMetadata[];
+  getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[];
   isLoading: {
     operations: boolean;
   };
@@ -189,9 +187,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const availableColumns: ColumnInfo[] = (() => {
     if (!activeNode) return [];
-    return mapColumnsToInfo(activeNode).filter(
-      (info) => typeof info.name === 'string' && info.name.length > 0,
-    );
+    return props
+      .getColumnInfos(activeNode)
+      .filter((info) => typeof info.name === 'string' && info.name.length > 0);
   })();
 
   /**
@@ -501,7 +499,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       const payload = buildRequest();
       const response = await polarsExpressionApply(activeNodeId, payload);
       setLastAppliedExpression(currentExpression);
-      onAlert(`Applied expression to ${response.node_name}`);
+      onAlert(`Applied expression to ${response.name}`);
       void refreshNodeSchema(activeNodeId);
       commitExpression();
       refreshPreview();

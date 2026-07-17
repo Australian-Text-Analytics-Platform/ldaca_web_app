@@ -9,11 +9,8 @@ import {
 
 const pagination = (page: number, pageSize = 10): PreviewPagination => ({
   has_next: page < 3,
-  has_prev: page > 1,
   page,
   page_size: pageSize,
-  total_pages: 3,
-  total_rows: 25,
 });
 
 const context: PreviewRequestContext = {

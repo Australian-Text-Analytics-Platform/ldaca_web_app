@@ -6,10 +6,9 @@ import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspa
 import { useUIStore } from '@/stores/uiStore';
 import { useSchemaManagement } from '@/features/workspace/common/hooks/useSchemaManagement';
 
-import { normalizeSchemaFromInfo } from '@/features/workspace/common/hooks/useSchemaManagement';
-import { fetchNodeInfo } from '@/lib/nodeInfo';
+import { arrowSchemaToKinds } from '@/features/workspace/common/hooks/useSchemaManagement';
+import { fetchNodeSchema } from '@/lib/nodeSchema';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
 import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useSafeResult } from '../common/useSafeResult';
@@ -18,10 +17,9 @@ import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds'
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
+import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { useSequentialAnalysisTaskFlow } from './hooks/useSequentialAnalysisTaskFlow';
-import { useSequentialAnalysisDetach } from './hooks/useSequentialAnalysisDetach';
 import { buildSequentialChartExportMetadata } from './hooks/sequentialChartExport';
 import {
   buildSequentialChartModel,
@@ -125,8 +123,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     downloadDialogOpen,
     setDownloadDialogOpen,
     selectedPeriodIndices,
-    detachNodeName,
-    setDetachNodeName,
   } = chartControls;
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -142,7 +138,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const hydratedParamsRef = useRef<SequentialHydratedParams | null>(null);
 
   const {
-    resolveTaskId,
     setLocalTaskId,
     isRunning: isAnalyzing,
     isStopping,
@@ -154,6 +149,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     analysisType: ANALYSIS_TAB_GROUPS.sequential,
     taskType: ANALYSIS_TASK_TYPES.sequential,
     workspaceId: currentWorkspaceId,
+    tabId: host.tabId,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
@@ -162,12 +158,12 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     // Loads the latest sequential-analysis result for polling and task resumption.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskResult<Record<string, unknown>>(currentWorkspaceId, taskId);
+      return getAnalysisResultResource<Record<string, unknown>>(currentWorkspaceId, taskId);
     },
     // Retrieves the submitted request so hydration can restore parameters and locks.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.sequential, currentWorkspaceId, taskId);
+      return getAnalysisRequest(currentWorkspaceId, taskId);
     },
     // Applies freshly fetched task results to chart state after lifecycle polling completes.
     // Reset result selection, merge the fetched payload, and adopt its chart type.
@@ -231,12 +227,12 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         const nodeIdStr = hydrated.nodeId;
         hydratedParamsRef.current = hydrated.hydratedParams;
         if (nodeIdStr && currentWorkspaceId) {
-          const info = await fetchNodeInfo({
+          const schema = await fetchNodeSchema({
             queryClient,
             workspaceId: currentWorkspaceId,
             nodeId: nodeIdStr,
           });
-          setLockedSchema(normalizeSchemaFromInfo(info));
+          setLockedSchema(arrowSchemaToKinds(schema));
         }
       } finally {
         setHydratingSelection(false);
@@ -273,10 +269,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const results: Record<string, unknown> | null = liveResults;
 
   const timeCompatibleColumns = availableColumns
-    .map((column) => ({
-      ...column,
-      dataType: normalizeTypeName(column.dataType),
-    }))
     .filter((column) =>
       TIME_COMPATIBLE_TYPES.includes(column.dataType as (typeof TIME_COMPATIBLE_TYPES)[number]),
     )
@@ -304,9 +296,8 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   })();
 
   const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
-  const activeColumnType = normalizeTypeName(
-    activeColumnInfo?.dataType ?? timeCompatibleColumns[0]?.dataType ?? 'datetime',
-  );
+  const activeColumnType =
+    activeColumnInfo?.dataType ?? timeCompatibleColumns[0]?.dataType ?? 'datetime';
   const derivedColumnType: 'datetime' | 'numeric' = NUMERIC_TYPE_SET.has(activeColumnType)
     ? 'numeric'
     : 'datetime';
@@ -369,6 +360,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     useSequentialAnalysisTaskFlow({
       state: {
         currentWorkspaceId,
+        tabId: host.tabId,
         activeNodeId,
         nodeColumnSelections,
         timeColumn,
@@ -394,7 +386,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         },
         setTimeColumn,
         lockCurrentSchema,
-        resolveTaskId,
         clearResults,
         // Persist the run's assigned task id onto the active tab so reload
         // rehydrates the same task.
@@ -436,15 +427,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     sourceDocumentCount,
   });
   const { summary } = chartModel;
-
-  const { handleDetach, isDetaching, defaultNodeName } = useSequentialAnalysisDetach({
-    currentWorkspaceId,
-    resolveTaskId,
-    panelSelectedNodes,
-    model: chartModel,
-    requestedNodeName: detachNodeName,
-    queryClient,
-  });
 
   const resultsSummary = summary.timeColumn
     ? summary.columnType === 'numeric'
@@ -577,24 +559,17 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           resultsSummary={resultsSummary}
           model={chartModel}
           onChartTypeChange={(value) => {
-            void handleChartTypeChange(value);
+            handleChartTypeChange(value);
           }}
           onXAxisTypeChange={setXAxisType}
           onDownloadClick={() => {
             setDownloadDialogOpen(true);
           }}
-          isDetaching={isDetaching}
           onToggleKey={chartControls.toggleKey}
           onPeriodClick={(index, shiftHeld) => {
             chartControls.selectPeriod(index, shiftHeld, chartModel.chartData.length);
           }}
           onClearSelection={chartControls.clearPeriodSelection}
-          detachNodeName={detachNodeName}
-          detachNodeNamePlaceholder={defaultNodeName}
-          onDetachNodeNameChange={setDetachNodeName}
-          onDetach={() => {
-            void handleDetach();
-          }}
           containerRef={chartContainerRef}
         />
       )}

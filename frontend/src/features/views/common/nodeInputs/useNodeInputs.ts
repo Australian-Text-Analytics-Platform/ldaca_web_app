@@ -22,7 +22,7 @@ export interface UseNodeInputsConfig {
   allNodes: WorkspaceNodeMetadata[];
   /** Per-view constraints (allowed column types, max nodes, document-only). */
   constraints: NodeInputConstraints;
-  /** Optional typed-column getter from ``useNodeColumnInfos`` for accurate dtypes. */
+  /** Optional typed-column getter from ``useNodeColumnInfos`` for Arrow-derived kinds. */
   getColumnInfos?: ColumnInfoGetter;
 }
 

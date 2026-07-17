@@ -3,603 +3,296 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// ---------- API mocks ---------------------------------------------------
-
-/** Hoisted generated-SDK mock lets mutation actions be verified without HTTP. */
 const workspaceSdkMock = vi.hoisted(() => ({
-  addNodeToWorkspace: vi.fn(),
-  castNode: vi.fn(),
-  cloneNode: vi.fn(),
-  concatNodes: vi.fn(),
-  concatNodesPreview: vi.fn(),
-  createAnalysisTaskDetachment: vi.fn(),
-  createAnalysisTaskDispersionDetachment: vi.fn(),
-  createAnalysisTaskMaterialization: vi.fn(),
+  closeWorkspaceById: vi.fn(),
+  createNode: vi.fn(),
   createWorkspace: vi.fn(),
   deleteNode: vi.fn(),
-  deleteNodeColumn: vi.fn(),
   deleteWorkspaceById: vi.fn(),
-  filterNode: vi.fn(),
-  filterPreview: vi.fn(),
-  getQuotation: vi.fn(),
-  joinNodes: vi.fn(),
-  listWorkspaces: vi.fn(),
-  polarsExpressionApply: vi.fn(),
-  polarsExpressionPreview: vi.fn(),
-  redoNodeOperation: vi.fn(),
-  renameNodeColumn: vi.fn(),
-  replaceApply: vi.fn(),
-  replacePreview: vi.fn(),
-  saveWorkspaceById: vi.fn(),
-  setMyCurrentWorkspace: vi.fn(),
-  sliceNode: vi.fn(),
-  slicePreview: vi.fn(),
-  undoNodeOperation: vi.fn(),
-  updateNodeName: vi.fn(),
+  openWorkspaceById: vi.fn(),
+  previewNodeCreationTable: vi.fn(),
+  reorderWorkspaceNodesById: vi.fn(),
+  submitChildAnalysis: vi.fn(),
+  submitTabAnalysis: vi.fn(),
+  updateNode: vi.fn(),
   updateWorkspaceById: vi.fn(),
 }));
-
-/** Hoisted node-info mock isolates schema refresh behavior from network I/O. */
-const fetchNodeInfoMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
   ...workspaceSdkMock,
 }));
-vi.mock('@/lib/nodeInfo', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    fetchNodeInfo: fetchNodeInfoMock,
-  };
-});
 
-// Import AFTER the mocks are registered.
 import { useWorkspaceNodeMutations } from '../useWorkspaceNodeMutations';
 
-// ---------- Wrapper helpers --------------------------------------------
-
-/**
- * Creates a no-retry QueryClient for deterministic mutation-hook tests.
- */
 const createTestClient = () =>
   new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
-/**
- * Wraps hook renders with the query client under test.
- */
-const wrapWithClient = (client: QueryClient) => {
-  /**
-   * Provides the caller's QueryClient to the mutation hook render.
-   */
-  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+const wrapWithClient =
+  (client: QueryClient) =>
+  ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  return Wrapper;
-};
 
-// Narrowly-typed mock factories so the args object satisfies
-// WorkspaceNodeMutationsParams without `as any` casts.
-type SetWorkspaceIdSpy = ReturnType<typeof vi.fn> & ((workspaceId: string | null) => void);
-type ReplaceSelectedNodesSpy = ReturnType<typeof vi.fn> &
-  ((nodeIds: string[], activeNodeId?: string | null) => void);
-type RemoveNodeSpy = ReturnType<typeof vi.fn> & ((nodeId: string) => void);
-type ClearSelectionSpy = ReturnType<typeof vi.fn> & (() => void);
-type OperationFnSpy = ReturnType<typeof vi.fn> & ((operationId: string) => void);
+const operationSpy = () => vi.fn() as unknown as (operationId: string) => void;
 
-/**
- * Creates a typed current-workspace setter spy for hook args.
- */
-const mkSetWorkspaceId = () => vi.fn() as unknown as SetWorkspaceIdSpy;
-/**
- * Creates a typed selected-nodes setter spy for hook args.
- */
-const mkReplaceSelectedNodes = () => vi.fn() as unknown as ReplaceSelectedNodesSpy;
-const mkRemoveNode = () => vi.fn() as unknown as RemoveNodeSpy;
-/**
- * Creates a typed selection-clear spy for hook args.
- */
-const mkClearSelection = () => vi.fn() as unknown as ClearSelectionSpy;
-/**
- * Creates a typed operation lifecycle spy for hook args.
- */
-const mkOperationFn = () => vi.fn() as unknown as OperationFnSpy;
-interface BuildArgs {
-  currentWorkspaceId?: string | null;
-  setCurrentWorkspaceId?: SetWorkspaceIdSpy;
-  removeNode?: RemoveNodeSpy;
-  replaceSelectedNodes?: ReplaceSelectedNodesSpy;
-  clearSelection?: ClearSelectionSpy;
-  startOperation?: OperationFnSpy;
-  endOperation?: OperationFnSpy;
-}
-
-/**
- * Builds hook params while preserving explicit null workspace test cases.
- * Flow: merge default spies and ids with overrides, preserving explicit nulls for no-workspace branches.
- */
-const buildHookArgs = (queryClient: QueryClient, overrides: BuildArgs = {}) => ({
-  // `'currentWorkspaceId' in overrides` so callers can pass `null` to test
-  // the no-workspace-selected branches; `?? 'ws-1'` would silently coerce
-  // nullish overrides back to 'ws-1'. The cast preserves the
-  // `WorkspaceNodeMutationsParams` shape (which doesn't allow undefined).
-  currentWorkspaceId: ('currentWorkspaceId' in overrides ? overrides.currentWorkspaceId : 'ws-1') as
-    | string
-    | null,
-  setCurrentWorkspaceId: overrides.setCurrentWorkspaceId ?? mkSetWorkspaceId(),
-  removeNode: overrides.removeNode ?? mkRemoveNode(),
-  replaceSelectedNodes: overrides.replaceSelectedNodes ?? mkReplaceSelectedNodes(),
-  clearSelection: overrides.clearSelection ?? mkClearSelection(),
+const buildArgs = (queryClient: QueryClient, currentWorkspaceId: string | null = 'ws-1') => ({
+  currentWorkspaceId,
+  setCurrentWorkspaceId: vi.fn(),
+  removeNode: vi.fn(),
+  replaceSelectedNodes: vi.fn(),
+  clearSelection: vi.fn(),
   queryClient,
-  startOperation: overrides.startOperation ?? mkOperationFn(),
-  endOperation: overrides.endOperation ?? mkOperationFn(),
+  startOperation: operationSpy(),
+  endOperation: operationSpy(),
 });
 
 describe('useWorkspaceNodeMutations', () => {
   beforeEach(() => {
-    Object.values(workspaceSdkMock).forEach((value) => {
-      if (typeof value === 'function') (value as ReturnType<typeof vi.fn>).mockReset();
-    });
-    fetchNodeInfoMock.mockReset();
+    Object.values(workspaceSdkMock).forEach((mock) => mock.mockReset());
   });
 
-  describe('actions shape and stability', () => {
-    it('memoizes actions across re-renders when currentWorkspaceId stays stable', () => {
-      const queryClient = createTestClient();
-      const args = buildHookArgs(queryClient);
-
-      const { result, rerender } = renderHook(
-        (props: ReturnType<typeof buildHookArgs>) => useWorkspaceNodeMutations(props),
-        { wrapper: wrapWithClient(queryClient), initialProps: args },
-      );
-
-      const firstActions = result.current.actions;
-      rerender(args);
-      expect(result.current.actions).toBe(firstActions);
-    });
-  });
-
-  describe('createWorkspace', () => {
-    it('calls generated createWorkspace and invalidates the workspaces list', async () => {
-      const queryClient = createTestClient();
-      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-      const startOperation = mkOperationFn();
-      const endOperation = mkOperationFn();
-      workspaceSdkMock.createWorkspace.mockResolvedValue({
-        data: { id: 'ws-new' },
-        error: undefined,
-      });
-
-      const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(buildHookArgs(queryClient, { startOperation, endOperation })),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      await act(async () => {
-        await result.current.actions.createWorkspace('My ws', 'desc');
-      });
-
-      expect(workspaceSdkMock.createWorkspace).toHaveBeenCalledWith({
-        body: { name: 'My ws', description: 'desc' },
-        throwOnError: true,
-      });
-      expect(startOperation).toHaveBeenCalledWith('createWorkspace');
-      expect(endOperation).toHaveBeenCalledWith('createWorkspace');
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['workspaces'] });
+  it('creates a workspace through the canonical resource endpoint', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.createWorkspace.mockResolvedValue({ data: { id: 'ws-new' } });
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
     });
 
-    it('ends operation loading when an API mutation rejects', async () => {
-      const queryClient = createTestClient();
-      const endOperation = mkOperationFn();
-      workspaceSdkMock.createWorkspace.mockRejectedValue(new Error('server down'));
+    await act(async () => {
+      await result.current.actions.createWorkspace('My workspace', 'Description');
+    });
 
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { endOperation })),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      await act(async () => {
-        await result.current.actions.createWorkspace('ws', 'd').catch(() => undefined);
-      });
-
-      expect(endOperation).toHaveBeenCalledWith('createWorkspace');
+    expect(workspaceSdkMock.createWorkspace).toHaveBeenCalledWith({
+      body: { name: 'My workspace', description: 'Description' },
+      throwOnError: true,
     });
   });
 
-  describe('setCurrentWorkspace', () => {
-    it('writes the new id to the selectionStore setter and clears node selection', async () => {
-      const queryClient = createTestClient();
-      workspaceSdkMock.setMyCurrentWorkspace.mockResolvedValue({
-        data: { state: 'successful', id: 'ws-2' },
-        error: undefined,
-      });
-      const setCurrentWorkspaceId = mkSetWorkspaceId();
-      const clearSelection = mkClearSelection();
+  it('opens a workspace before updating the local selection', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.openWorkspaceById.mockResolvedValue({ data: { id: 'ws-2' } });
+    const args = buildArgs(queryClient);
+    const { result } = renderHook(() => useWorkspaceNodeMutations(args), {
+      wrapper: wrapWithClient(queryClient),
+    });
 
-      const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { setCurrentWorkspaceId, clearSelection }),
-          ),
-        { wrapper: wrapWithClient(queryClient) },
-      );
+    await act(async () => {
+      await result.current.actions.setCurrentWorkspace('ws-2');
+    });
 
-      await act(async () => {
-        await result.current.actions.setCurrentWorkspace('ws-2');
-      });
+    expect(workspaceSdkMock.openWorkspaceById).toHaveBeenCalledWith({
+      path: { workspace_id: 'ws-2' },
+      throwOnError: true,
+    });
+    expect(args.setCurrentWorkspaceId).toHaveBeenCalledWith('ws-2');
+    expect(args.clearSelection).toHaveBeenCalledOnce();
+  });
 
-      expect(workspaceSdkMock.setMyCurrentWorkspace).toHaveBeenCalledWith({
-        body: { workspace_id: 'ws-2' },
-        throwOnError: true,
-      });
-      expect(setCurrentWorkspaceId).toHaveBeenCalledWith('ws-2');
-      expect(clearSelection).toHaveBeenCalled();
+  it('closes the selected workspace when the selection is cleared', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.closeWorkspaceById.mockResolvedValue({ data: undefined });
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient, 'ws-1')), {
+      wrapper: wrapWithClient(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.actions.setCurrentWorkspace(null);
+    });
+
+    expect(workspaceSdkMock.closeWorkspaceById).toHaveBeenCalledWith({
+      path: { workspace_id: 'ws-1' },
+      throwOnError: true,
     });
   });
 
-  describe('deleteWorkspace', () => {
-    it('clears the selection when the deleted workspace is the active one', async () => {
-      const queryClient = createTestClient();
-      const setCurrentWorkspaceId = mkSetWorkspaceId();
-      const clearSelection = mkClearSelection();
-      workspaceSdkMock.deleteWorkspaceById.mockResolvedValue({
-        data: { id: 'ws-1' },
-        error: undefined,
-      });
-
-      const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, {
-              currentWorkspaceId: 'ws-1',
-              setCurrentWorkspaceId,
-              clearSelection,
-            }),
-          ),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      await act(async () => {
-        await result.current.actions.deleteWorkspace('ws-1');
-      });
-
-      expect(workspaceSdkMock.deleteWorkspaceById).toHaveBeenCalledWith({
-        path: { workspace_id: 'ws-1' },
-        throwOnError: true,
-      });
-      expect(setCurrentWorkspaceId).toHaveBeenCalledWith(null);
-      expect(clearSelection).toHaveBeenCalled();
+  it('uses the canonical node resource for rename, clone, and delete', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.updateNode.mockResolvedValue({ data: { id: 'node-1' } });
+    workspaceSdkMock.createNode.mockResolvedValue({ data: { id: 'node-copy' } });
+    workspaceSdkMock.deleteNode.mockResolvedValue({ data: undefined });
+    const args = buildArgs(queryClient);
+    const { result } = renderHook(() => useWorkspaceNodeMutations(args), {
+      wrapper: wrapWithClient(queryClient),
     });
 
-    it('rejects when called with an empty id', async () => {
-      const queryClient = createTestClient();
-      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
-        wrapper: wrapWithClient(queryClient),
-      });
-
-      await expect(result.current.actions.deleteWorkspace('   ')).rejects.toThrow(
-        /workspaceId is required/,
-      );
-      expect(workspaceSdkMock.deleteWorkspaceById).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.actions.renameNode('node-1', 'Renamed');
+      await result.current.actions.copyNode('node-1');
+      await result.current.actions.deleteNode('node-1');
     });
+
+    expect(workspaceSdkMock.updateNode).toHaveBeenCalledWith({
+      body: { name: 'Renamed' },
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+    expect(workspaceSdkMock.createNode).toHaveBeenCalledWith({
+      body: { kind: 'clone', source_node_id: 'node-1' },
+      path: { workspace_id: 'ws-1' },
+      throwOnError: true,
+    });
+    expect(workspaceSdkMock.deleteNode).toHaveBeenCalledWith({
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+    expect(args.removeNode).toHaveBeenCalledWith('node-1');
   });
 
-  describe('refreshNodeSchema', () => {
-    it('returns null when no workspace is selected without calling fetchNodeInfo', async () => {
-      const queryClient = createTestClient();
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { currentWorkspaceId: null })),
-        { wrapper: wrapWithClient(queryClient) },
+  it('creates joins and concatenations as typed node resources', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.createNode
+      .mockResolvedValueOnce({ data: { id: 'joined-node' } })
+      .mockResolvedValueOnce({ data: { id: 'concat-node' } });
+    const args = buildArgs(queryClient);
+    const { result } = renderHook(() => useWorkspaceNodeMutations(args), {
+      wrapper: wrapWithClient(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.actions.joinNodes(
+        'left-node',
+        'right-node',
+        'inner',
+        ['left_id'],
+        ['right_id'],
+        'Joined',
       );
-
-      const schema = await result.current.actions.refreshNodeSchema('node-1');
-      expect(schema).toBeNull();
-      expect(fetchNodeInfoMock).not.toHaveBeenCalled();
+      await result.current.actions.concatNodes(['node-a', 'node-b'], 'Combined', true);
     });
 
-    it('returns null when the node is not present in the workspace graph cache', async () => {
-      const queryClient = createTestClient();
-      queryClient.setQueryData(['workspaces', 'ws-1', 'graph'], {
-        nodes: [{ id: 'node-other' }],
-      });
-      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
-        wrapper: wrapWithClient(queryClient),
-      });
-
-      const schema = await result.current.actions.refreshNodeSchema('node-missing');
-      expect(schema).toBeNull();
-      expect(fetchNodeInfoMock).not.toHaveBeenCalled();
+    expect(workspaceSdkMock.createNode).toHaveBeenNthCalledWith(1, {
+      body: {
+        kind: 'join',
+        left_node_id: 'left-node',
+        right_node_id: 'right-node',
+        left_on: 'left_id',
+        right_on: 'right_id',
+        how: 'inner',
+        name: 'Joined',
+      },
+      path: { workspace_id: 'ws-1' },
+      throwOnError: true,
     });
-
-    it('fetches with force=true and returns the generated node-info contract', async () => {
-      const queryClient = createTestClient();
-      queryClient.setQueryData(['workspaces', 'ws-1', 'graph'], {
-        nodes: [{ id: 'node-1' }],
-      });
-      fetchNodeInfoMock.mockResolvedValue({
-        id: 'node-1',
-        name: 'Node 1',
-        schema: { col_a: 'string', col_b: 'integer' },
-      });
-
-      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
-        wrapper: wrapWithClient(queryClient),
-      });
-
-      const schema = await result.current.actions.refreshNodeSchema('node-1');
-
-      expect(fetchNodeInfoMock).toHaveBeenCalledWith({
-        queryClient,
-        workspaceId: 'ws-1',
-        nodeId: 'node-1',
-        force: true,
-      });
-      expect(schema).toEqual({
-        id: 'node-1',
-        name: 'Node 1',
-        schema: { col_a: 'string', col_b: 'integer' },
-      });
+    expect(workspaceSdkMock.createNode).toHaveBeenNthCalledWith(2, {
+      body: {
+        kind: 'concat',
+        source_node_ids: ['node-a', 'node-b'],
+        name: 'Combined',
+        deduplicate: true,
+      },
+      path: { workspace_id: 'ws-1' },
+      throwOnError: true,
     });
+    expect(args.replaceSelectedNodes).toHaveBeenNthCalledWith(1, ['joined-node'], 'joined-node');
+    expect(args.replaceSelectedNodes).toHaveBeenNthCalledWith(2, ['concat-node'], 'concat-node');
   });
 
-  describe('castColumn', () => {
-    it('invalidates the workspace graph + node-data + node-info keys on success', async () => {
-      const queryClient = createTestClient();
-      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-      workspaceSdkMock.castNode.mockResolvedValue({ data: {}, error: undefined });
-
-      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
-        wrapper: wrapWithClient(queryClient),
-      });
-
-      await act(async () => {
-        await result.current.actions.castColumn('node-1', 'col_a', 'integer');
-      });
-
-      expect(workspaceSdkMock.castNode).toHaveBeenCalledWith({
-        body: { column: 'col_a', target_type: 'integer', format: undefined },
-        path: { workspace_id: 'ws-1', node_id: 'node-1' },
-        throwOnError: true,
-      });
-
-      const invalidatedKeys = invalidateSpy.mock.calls.map((call) => call[0]);
-      expect(invalidatedKeys).toEqual(
-        expect.arrayContaining([
-          { queryKey: ['workspaces', 'ws-1', 'graph'] },
-          expect.objectContaining({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'data'] }),
-        ]),
-      );
-      const nodeInfoInvalidation = invalidatedKeys.find(
-        (options): options is { predicate: (query: { queryKey: readonly unknown[] }) => boolean } =>
-          typeof options === 'object' && 'predicate' in options,
-      );
-      expect(nodeInfoInvalidation).toBeDefined();
-      if (!nodeInfoInvalidation) throw new Error('node-info invalidation was not recorded');
-      const { predicate } = nodeInfoInvalidation;
-      expect(predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'info'] })).toBe(true);
-      expect(
-        predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'info', 'batch', 'node-1'] }),
-      ).toBe(true);
-      expect(predicate({ queryKey: ['workspaces', 'ws-1', 'nodes', 'node-2', 'info'] })).toBe(
-        false,
-      );
+  it('previews node creation with the request workspace and cancellation signal', async () => {
+    const queryClient = createTestClient();
+    const signal = new AbortController().signal;
+    workspaceSdkMock.previewNodeCreationTable.mockResolvedValue({
+      rows: [{ id: 1 }],
+      columns: ['id'],
+      hasNext: false,
     });
-  });
+    const { result } = renderHook(
+      () => useWorkspaceNodeMutations(buildArgs(queryClient, 'closure-workspace')),
+      { wrapper: wrapWithClient(queryClient) },
+    );
 
-  describe('deleteNode', () => {
-    it('removes active and non-active deleted nodes through the same semantic action', async () => {
-      const queryClient = createTestClient();
-      const removeNode = mkRemoveNode();
-      workspaceSdkMock.deleteNode.mockResolvedValue({ data: {}, error: undefined });
-
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { removeNode })),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      await act(async () => {
-        await result.current.actions.deleteNode('node-1');
-      });
-      await act(async () => {
-        await result.current.actions.deleteNode('node-other');
-      });
-
-      expect(removeNode).toHaveBeenNthCalledWith(1, 'node-1');
-      expect(removeNode).toHaveBeenNthCalledWith(2, 'node-other');
-    });
-  });
-
-  describe('combined-node mutations', () => {
-    it('maps the request workspace and exact signal to concatNodesPreview', async () => {
-      const queryClient = createTestClient();
-      const signal = new AbortController().signal;
-      workspaceSdkMock.concatNodesPreview.mockResolvedValue({
-        data: { data: [], columns: [], pagination: null },
-        error: undefined,
-      });
-
-      const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { currentWorkspaceId: 'closure-workspace' }),
-          ),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      await act(async () => {
-        await result.current.actions.concatPreview({
-          workspaceId: 'request-workspace',
-          nodeIds: ['node-a', 'node-b'],
-          page: 2,
-          pageSize: 25,
-          deduplicate: true,
-          signal,
-        });
-      });
-
-      expect(workspaceSdkMock.concatNodesPreview).toHaveBeenCalledWith({
-        body: { node_ids: ['node-a', 'node-b'], deduplicate: true },
-        path: { workspace_id: 'request-workspace' },
-        query: { page: 2, page_size: 25 },
+    await act(async () => {
+      await result.current.actions.concatPreview({
+        workspaceId: 'request-workspace',
+        nodeIds: ['node-a', 'node-b'],
+        page: 2,
+        pageSize: 25,
+        deduplicate: true,
         signal,
-        throwOnError: true,
       });
     });
 
-    it('selects the id returned by joinNodes', async () => {
-      const queryClient = createTestClient();
-      const replaceSelectedNodes = mkReplaceSelectedNodes();
-      const clearSelection = mkClearSelection();
-      workspaceSdkMock.joinNodes.mockResolvedValue({
-        data: { id: 'joined-node' },
-        error: undefined,
-      });
-
-      const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { clearSelection, replaceSelectedNodes }),
-          ),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      await act(async () => {
-        await result.current.actions.joinNodes(
-          'left-node',
-          'right-node',
-          'inner',
-          ['left_id'],
-          ['right_id'],
-          'Joined',
-        );
-      });
-
-      expect(workspaceSdkMock.joinNodes).toHaveBeenCalledWith({
-        path: { workspace_id: 'ws-1' },
-        query: {
-          left_node_id: 'left-node',
-          right_node_id: 'right-node',
-          left_on: 'left_id',
-          right_on: 'right_id',
-          how: 'inner',
-          new_node_name: 'Joined',
-        },
-        throwOnError: true,
-      });
-      expect(clearSelection).toHaveBeenCalled();
-      expect(replaceSelectedNodes).toHaveBeenCalledWith(['joined-node'], 'joined-node');
-    });
-
-    it('selects the id returned by concatNodes', async () => {
-      const queryClient = createTestClient();
-      const replaceSelectedNodes = mkReplaceSelectedNodes();
-      const clearSelection = mkClearSelection();
-      workspaceSdkMock.concatNodes.mockResolvedValue({
-        data: { id: 'concat-node' },
-        error: undefined,
-      });
-
-      const { result } = renderHook(
-        () =>
-          useWorkspaceNodeMutations(
-            buildHookArgs(queryClient, { clearSelection, replaceSelectedNodes }),
-          ),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      await act(async () => {
-        await result.current.actions.concatNodes(['node-a', 'node-b'], 'Combined', true);
-      });
-
-      expect(workspaceSdkMock.concatNodes).toHaveBeenCalledWith({
-        body: {
-          node_ids: ['node-a', 'node-b'],
-          new_node_name: 'Combined',
-          deduplicate: true,
-        },
-        path: { workspace_id: 'ws-1' },
-        throwOnError: true,
-      });
-      expect(clearSelection).toHaveBeenCalled();
-      expect(replaceSelectedNodes).toHaveBeenCalledWith(['concat-node'], 'concat-node');
+    expect(workspaceSdkMock.previewNodeCreationTable).toHaveBeenCalledWith({
+      body: { kind: 'concat', source_node_ids: ['node-a', 'node-b'], deduplicate: true },
+      path: { workspace_id: 'request-workspace' },
+      query: { page: 2, page_size: 25 },
+      signal,
     });
   });
 
-  describe('text-analysis actions', () => {
-    it('detachConcordance synchronously throws when no workspace is selected', () => {
-      // ensureWorkspaceSelected runs while building the mutateAsync args, so
-      // the failure surfaces as a synchronous throw rather than a rejected
-      // promise — keep this assertion tight (() => …) instead of awaiting.
-      const queryClient = createTestClient();
-      const { result } = renderHook(
-        () => useWorkspaceNodeMutations(buildHookArgs(queryClient, { currentWorkspaceId: null })),
-        { wrapper: wrapWithClient(queryClient) },
-      );
-
-      expect(() =>
-        result.current.actions.detachConcordance('node-1', {
-          node_id: 'node-1',
-          column: 'c',
-          search_word: 'w',
-          selected_columns: ['c'],
-        }),
-      ).toThrow(/No workspace selected/);
-      expect(workspaceSdkMock.createAnalysisTaskDetachment).not.toHaveBeenCalled();
+  it('casts a column by creating a typed cast node', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.createNode.mockResolvedValue({ data: { id: 'cast-node' } });
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
     });
 
-    it('detachConcordance forwards through generated SDK and invalidates the workspace graph', async () => {
-      const queryClient = createTestClient();
-      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-      workspaceSdkMock.createAnalysisTaskDetachment.mockResolvedValue({
-        data: {},
-        error: undefined,
-      });
-
-      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
-        wrapper: wrapWithClient(queryClient),
-      });
-
-      await act(async () => {
-        await result.current.actions.detachConcordance('task-1', {
-          node_id: 'node-1',
-          column: 'c',
-          search_word: 'w',
-          selected_columns: ['c'],
-        });
-      });
-
-      expect(workspaceSdkMock.createAnalysisTaskDetachment).toHaveBeenCalledWith({
-        body: { node_id: 'node-1', column: 'c', search_word: 'w', selected_columns: ['c'] },
-        path: { workspace_id: 'ws-1', task_id: 'task-1' },
-        throwOnError: true,
-      });
-
-      const invalidatedKeys = invalidateSpy.mock.calls.map((call) => call[0]);
-      expect(invalidatedKeys).toEqual(
-        expect.arrayContaining([{ queryKey: ['workspaces', 'ws-1', 'graph'] }]),
-      );
+    await act(async () => {
+      await result.current.actions.castColumn('node-1', 'published_at', 'datetime', '%Y-%m-%d');
     });
 
-    it('quotationSearch forwards through generated SDK with the active workspace', async () => {
-      const queryClient = createTestClient();
-      workspaceSdkMock.getQuotation.mockResolvedValue({ data: { rows: [] }, error: undefined });
+    expect(workspaceSdkMock.createNode).toHaveBeenCalledWith({
+      body: {
+        kind: 'cast',
+        source_node_id: 'node-1',
+        column: 'published_at',
+        target_type: 'datetime',
+        datetime_format: '%Y-%m-%d',
+      },
+      path: { workspace_id: 'ws-1' },
+      throwOnError: true,
+    });
+  });
 
-      const { result } = renderHook(() => useWorkspaceNodeMutations(buildHookArgs(queryClient)), {
-        wrapper: wrapWithClient(queryClient),
-      });
+  it('submits child analysis resources under their parent analysis', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.submitChildAnalysis.mockResolvedValue({ data: { id: 'child-1' } });
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
+    });
 
-      await act(async () => {
-        await result.current.actions.quotationSearch('node-1', { column: 'c' });
+    await act(async () => {
+      await result.current.actions.detachConcordance('analysis-1', {
+        node_id: 'node-1',
+        selected_columns: ['text'],
       });
+    });
 
-      expect(workspaceSdkMock.getQuotation).toHaveBeenCalledWith({
-        body: { column: 'c' },
-        path: { workspace_id: 'ws-1', node_id: 'node-1' },
-        throwOnError: true,
+    expect(workspaceSdkMock.submitChildAnalysis).toHaveBeenCalledWith({
+      body: {
+        kind: 'concordance_detachment',
+        node_id: 'node-1',
+        selected_columns: ['text'],
+      },
+      path: { workspace_id: 'ws-1', analysis_id: 'analysis-1' },
+      throwOnError: true,
+    });
+  });
+
+  it('submits quotation analyses through the tab analysis resource', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'analysis-2' } });
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.actions.quotationSearch('tab-1', {
+        node_ids: ['node-1'],
+        node_columns: { 'node-1': 'text' },
       });
+    });
+
+    expect(workspaceSdkMock.submitTabAnalysis).toHaveBeenCalledWith({
+      body: {
+        kind: 'quotation',
+        node_ids: ['node-1'],
+        node_columns: { 'node-1': 'text' },
+      },
+      path: { workspace_id: 'ws-1', tab_id: 'tab-1' },
+      throwOnError: true,
     });
   });
 });

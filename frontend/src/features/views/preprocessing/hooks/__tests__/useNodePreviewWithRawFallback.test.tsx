@@ -23,20 +23,10 @@ vi.mock('../usePreprocessingPreview', () => ({
   usePreprocessingPreview: usePreprocessingPreviewMock,
 }));
 
-const useAuthMock = vi.hoisted(() =>
-  vi.fn(() => ({
-    /**
-     * Supplies stable headers for preview fallback SDK calls under test.
-     */
-    getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
-  })),
-);
-vi.mock('@/features/auth/hooks/useAuth', () => ({ useAuth: useAuthMock }));
-
-const getNodeDataByWorkspaceIdMock = vi.hoisted(() => vi.fn());
+const getNodeRowsTableMock = vi.hoisted(() => vi.fn());
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  getNodeDataByWorkspaceId: getNodeDataByWorkspaceIdMock,
+  getNodeRowsTable: getNodeRowsTableMock,
 }));
 
 import { useNodePreviewWithRawFallback } from '../useNodePreviewWithRawFallback';
@@ -53,7 +43,7 @@ const lastCapturedOptions = (): CapturedOptions => {
 describe('useNodePreviewWithRawFallback', () => {
   beforeEach(() => {
     usePreprocessingPreviewMock.mockReset();
-    getNodeDataByWorkspaceIdMock.mockReset();
+    getNodeRowsTableMock.mockReset();
     usePreprocessingPreviewMock.mockReturnValue({});
   });
 
@@ -127,9 +117,11 @@ describe('useNodePreviewWithRawFallback', () => {
 
   describe('fetcher routing', () => {
     it('routes through operationFetch when the payload is present', async () => {
-      const operationFetch = vi
-        .fn()
-        .mockResolvedValue({ data: [{ a: 1 }], columns: ['a'], pagination: null });
+      const operationFetch = vi.fn().mockResolvedValue({
+        data: [{ a: 1 }],
+        columns: ['a'],
+        pagination: { page: 2, page_size: 25, has_next: false },
+      });
 
       renderHook(() =>
         useNodePreviewWithRawFallback({
@@ -158,19 +150,20 @@ describe('useNodePreviewWithRawFallback', () => {
         pageSize: 25,
         signal,
       });
-      expect(getNodeDataByWorkspaceIdMock).not.toHaveBeenCalled();
-      expect(result).toEqual({ data: [{ a: 1 }], columns: ['a'], pagination: null });
+      expect(getNodeRowsTableMock).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        data: [{ a: 1 }],
+        columns: ['a'],
+        pagination: { page: 2, page_size: 25, has_next: false },
+      });
     });
 
     it('falls back to explicit node data when the payload is null', async () => {
       const operationFetch = vi.fn();
-      getNodeDataByWorkspaceIdMock.mockResolvedValue({
-        data: {
-          data: [{ raw: 1 }],
-          columns: ['raw'],
-          pagination: null,
-        },
-        error: undefined,
+      getNodeRowsTableMock.mockResolvedValue({
+        rows: [{ raw: 1 }],
+        columns: ['raw'],
+        hasNext: false,
       });
 
       renderHook(() =>
@@ -193,47 +186,16 @@ describe('useNodePreviewWithRawFallback', () => {
       });
 
       expect(operationFetch).not.toHaveBeenCalled();
-      expect(getNodeDataByWorkspaceIdMock).toHaveBeenCalledWith({
+      expect(getNodeRowsTableMock).toHaveBeenCalledWith({
         path: { workspace_id: 'workspace-1', node_id: 'node-1' },
         query: { page: 1, page_size: 10 },
         signal,
-        throwOnError: true,
       });
       expect(result).toEqual({
         data: [{ raw: 1 }],
         columns: ['raw'],
-        pagination: null,
+        pagination: { page: 1, page_size: 10, has_next: false },
       });
-    });
-
-    it('normalises a malformed response into empty arrays + null pagination', async () => {
-      // operationFetch returns garbage shape — fetcher should still produce
-      // `{ data: [], columns: [], pagination: null }` instead of propagating it.
-      const operationFetch = vi.fn().mockResolvedValue({
-        data: 'not an array',
-        columns: 42,
-        pagination: undefined,
-      });
-
-      renderHook(() =>
-        useNodePreviewWithRawFallback({
-          workspaceId: 'workspace-1',
-          nodeId: 'node-1',
-          operationPayload: { foo: 1 },
-          operationFetch,
-          signaturePrefix: 'filter',
-        }),
-      );
-
-      const opts = lastCapturedOptions();
-      const result = await opts.fetcher({
-        request: { workspaceId: 'workspace-1', nodeId: 'node-1', payload: { foo: 1 } },
-        page: 1,
-        pageSize: 10,
-        signal: new AbortController().signal,
-      });
-
-      expect(result).toEqual({ data: [], columns: [], pagination: null });
     });
   });
 

@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { describeColumn } from '@/api';
+import { getNodeRowsTable } from '@/api';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { normalizeTypeName, getOperatorsForType } from '../../utils/typeUtils';
+import { getOperatorsForType } from '../../utils/typeUtils';
 import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
 import {
   useNodePreviewWithRawFallback,
@@ -89,6 +89,29 @@ export interface UseFilterSubTabSectionsResult {
   preview: FilterPreviewConfig;
 }
 
+async function sampleColumnBounds(workspaceId: string, nodeId: string, column: string) {
+  const data = await getNodeRowsTable({
+    path: { workspace_id: workspaceId, node_id: nodeId },
+    query: { page: 1, page_size: 1000 },
+  });
+  const values = data.rows
+    .map((row) => row[column])
+    .filter(
+      (value): value is string | number => typeof value === 'string' || typeof value === 'number',
+    );
+  if (values.length === 0) return { min: undefined, max: undefined, median: undefined };
+  const sorted = [...values].sort((left, right) =>
+    typeof left === 'number' && typeof right === 'number'
+      ? left - right
+      : String(left).localeCompare(String(right)),
+  );
+  return {
+    min: sorted[0],
+    max: sorted.at(-1),
+    median: sorted[Math.floor(sorted.length / 2)],
+  };
+}
+
 /**
  * Owns the Filter sub-tab state and backend request wiring. `FilterSubTab`
  * consumes this hook for condition editing, preview fallback, and apply state.
@@ -146,7 +169,7 @@ export const useFilterSubTabSections = (
     .filter((option) => option.name.length > 0)
     .map((option) => ({
       ...option,
-      dataType: normalizeTypeName(option.dataType || 'unknown'),
+      dataType: option.dataType,
     }));
 
   const hasSelection = Boolean(selectedNodeId);
@@ -331,10 +354,10 @@ export const useFilterSubTabSections = (
    */
   const shouldHideOperatorSelect = (condition: FilterConditionWithId) =>
     condition.dataType === 'categorical' ||
-    condition.dataType === 'list[string]' ||
-    // tmdist renders its own topic + operator + value controls together so the
+    condition.dataType === 'string-list' ||
+    // Topic Distribution renders its own topic + operator + value controls together so the
     // topic dropdown can sit before the operator.
-    condition.dataType === 'tmdist';
+    condition.dataType === 'topic-distribution';
 
   /**
    * Supplies type-aware operator options to the shared ConditionBuilder.
@@ -359,10 +382,7 @@ export const useFilterSubTabSections = (
     if (!selectedNodeId || !currentWorkspaceId) return;
 
     try {
-      const { data: describeData } = await describeColumn({
-        path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
-        throwOnError: true,
-      });
+      const describeData = await sampleColumnBounds(currentWorkspaceId, selectedNodeId, column);
 
       setConditions((prev) =>
         prev.map((c) => {
@@ -416,10 +436,7 @@ export const useFilterSubTabSections = (
     if (!selectedNodeId || !currentWorkspaceId) return;
 
     try {
-      const { data: describeData } = await describeColumn({
-        path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
-        throwOnError: true,
-      });
+      const describeData = await sampleColumnBounds(currentWorkspaceId, selectedNodeId, column);
 
       setConditions((prev) =>
         prev.map((c) => {
@@ -429,14 +446,10 @@ export const useFilterSubTabSections = (
 
           switch (operator) {
             case 'gte':
-              if (describeData.min !== undefined && describeData.min !== null) {
-                newValue = describeData.min;
-              }
+              if (describeData.min !== undefined) newValue = describeData.min;
               break;
             case 'lte':
-              if (describeData.max !== undefined && describeData.max !== null) {
-                newValue = describeData.max;
-              }
+              if (describeData.max !== undefined) newValue = describeData.max;
               break;
           }
 

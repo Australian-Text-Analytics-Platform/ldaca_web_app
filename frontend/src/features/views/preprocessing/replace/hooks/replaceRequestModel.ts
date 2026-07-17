@@ -1,6 +1,16 @@
-import type { ReplaceRequest } from '@/api';
-
 export type ReplaceMode = 'replace' | 'extract';
+
+export interface ReplaceRequest {
+  source_column: string;
+  pattern: string;
+  replacement?: string;
+  output_column?: string;
+  mode?: ReplaceMode;
+  count?: 'all' | 'first';
+  match_limit?: number;
+  connector?: string;
+  name?: string;
+}
 
 export interface ReplaceRequestDraft {
   selectedColumn: string;
@@ -42,10 +52,10 @@ export const buildReplaceRequest = (draft: ReplaceRequestDraft): ReplaceRequest 
     source_column: draft.selectedColumn,
     pattern: draft.pattern,
     replacement: draft.replacement,
-    output_column_name: resolveReplaceOutputColumnName(draft),
+    output_column: resolveReplaceOutputColumnName(draft),
     mode: draft.mode,
     count,
-    n: count === 'first' ? (draft.n ?? 1) : undefined,
+    match_limit: count === 'first' ? (draft.n ?? 1) : undefined,
     connector: draft.mode === 'extract' ? connector : undefined,
   };
 };

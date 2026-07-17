@@ -1,7 +1,7 @@
-import type { WorkspaceGraphNode, WorkspaceNodeInfo } from '@/api';
+import type { WorkspaceNodeInfo } from '@/api';
 
 /**
- * Handwritten view model shared by node selectors and document/schema consumers.
+ * Handwritten view model shared by node selectors and document consumers.
  * It is projected only from generated graph/node-info responses, so UI code does
  * not need transport aliases or nested fallback shapes.
  */
@@ -10,12 +10,8 @@ export interface WorkspaceNodeMetadata {
   name: string;
   color: string | null;
   document: string | null;
-  columns: string[];
-  schema: Record<string, string>;
   shape: WorkspaceNodeInfo['shape'];
   tokenizerModels: Record<string, string>;
-  canUndo: boolean;
-  canRedo: boolean;
 }
 
 /**
@@ -24,21 +20,18 @@ export interface WorkspaceNodeMetadata {
  *
  * Used by: `useTabNodeInputs`, after its batched node-info request resolves.
  * Graph state owns current identity and action availability; node info owns
- * columns, schema, document preference, shape, and tokenizer metadata. This
+ * document preference, shape, and tokenizer metadata. Arrow schema is fetched
+ * independently through the node-schema query. This
  * keeps a stale hydrated node-info response from masking a newer graph rename.
  */
 export const projectWorkspaceNodeMetadata = (
-  graphNode: WorkspaceGraphNode,
+  graphNode: WorkspaceNodeInfo,
   nodeInfo?: WorkspaceNodeInfo,
 ): WorkspaceNodeMetadata => ({
   id: graphNode.id,
   name: graphNode.name,
   color: nodeInfo?.color ?? graphNode.color ?? null,
   document: nodeInfo?.document ?? graphNode.document ?? null,
-  columns: nodeInfo?.columns ?? [],
-  schema: nodeInfo?.schema ?? {},
   shape: nodeInfo?.shape,
   tokenizerModels: nodeInfo?.tokenizer_models ?? {},
-  canUndo: Boolean(graphNode.can_undo),
-  canRedo: Boolean(graphNode.can_redo),
 });

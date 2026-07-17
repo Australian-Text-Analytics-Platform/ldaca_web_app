@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getColumnUniqueValues } from '@/api';
+import { getNodeRowsTable } from '@/api';
 import {
   buildCategoricalOptionEntries,
   type CategoricalOptionsByKey,
@@ -22,7 +22,7 @@ interface UseFilterCategoricalOptionsResult {
   removeOptionSearchQuery: (conditionId: string) => void;
 }
 
-const CHECKLIST_DATA_TYPES = new Set(['categorical', 'list[string]', 'tmdist']);
+const CHECKLIST_DATA_TYPES = new Set(['categorical', 'string-list', 'topic-distribution']);
 
 const usesChecklistOptions = (dataType: string | undefined): dataType is string =>
   Boolean(dataType && CHECKLIST_DATA_TYPES.has(dataType));
@@ -80,18 +80,13 @@ export function useFilterCategoricalOptions({
       });
 
       try {
-        const { data: response } = await getColumnUniqueValues({
-          path: { workspace_id: currentWorkspaceId, column_name: column, node_id: selectedNodeId },
-          throwOnError: true,
+        const response = await getNodeRowsTable({
+          path: { workspace_id: currentWorkspaceId, node_id: selectedNodeId },
+          query: { page: 1, page_size: 1000 },
         });
-        // response is the typed API body; guard defensively against a null payload.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        const rawValues: unknown[] = Array.isArray(response?.unique_values)
-          ? response.unique_values
-          : [];
+        const rawValues = response.rows.map((row) => row[column]);
         const includeNullOption = dataType === 'categorical';
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        const hasNullFromResponse = includeNullOption && response?.has_null;
+        const hasNullFromResponse = includeNullOption && rawValues.some((value) => value === null);
         const optionList = buildCategoricalOptionEntries(rawValues, hasNullFromResponse);
 
         setCategoricalOptions((prev) => ({

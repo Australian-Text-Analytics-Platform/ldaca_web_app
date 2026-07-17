@@ -1,25 +1,21 @@
-import type { WorkspaceNodeInfo } from '@/api';
+import type { ArrowColumn, ColumnKind } from '@/lib/arrow/arrowTable';
 
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },
-  { value: 'annotation', label: 'annotation' },
   { value: 'categorical', label: 'categorical' },
   { value: 'integer', label: 'integer' },
   { value: 'float', label: 'float' },
-  { value: 'boolean', label: 'boolean' },
   { value: 'datetime', label: 'datetime' },
-  { value: 'list[string]', label: 'list[string]' },
 ] as const;
 
 /**
- * Normalizes node schema responses into a column-to-dtype map for headers.
+ * Projects Arrow schema fields into UI semantic kinds for headers.
  * Used by useColumnMutations after schema refreshes to update cast controls.
  */
 export const extractColumnTypes = (
-  nodeInfo: WorkspaceNodeInfo | null | undefined,
-): Record<string, string> => {
-  return nodeInfo?.schema ?? {};
-};
+  schema: ArrowColumn[] | null | undefined,
+): Record<string, ColumnKind> =>
+  Object.fromEntries((schema ?? []).map((column) => [column.name, column.kind]));
 
 /**
  * Displays known dtype values with UI labels while preserving unknown types.

@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { Field, Utf8 } from 'apache-arrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useConcatSubTab } from '../useConcatSubTab';
@@ -6,11 +7,8 @@ import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/worksp
 
 const pagination = {
   has_next: false,
-  has_prev: false,
   page: 1,
   page_size: 10,
-  total_pages: 1,
-  total_rows: 1,
 };
 
 describe('useConcatSubTab preview adapter', () => {
@@ -32,14 +30,8 @@ describe('useConcatSubTab preview adapter', () => {
       .mockImplementationOnce(() => firstResponse)
       .mockResolvedValueOnce({ data: [{ id: 2 }], columns: ['id'], pagination });
     const workspaceNodes = [
-      projectWorkspaceNodeMetadata(
-        { id: 'node-1', name: 'One' },
-        { id: 'node-1', name: 'One', columns: ['id'], schema: { id: 'String' } },
-      ),
-      projectWorkspaceNodeMetadata(
-        { id: 'node-2', name: 'Two' },
-        { id: 'node-2', name: 'Two', columns: ['id'], schema: { id: 'String' } },
-      ),
+      projectWorkspaceNodeMetadata({ id: 'node-1', name: 'One' }),
+      projectWorkspaceNodeMetadata({ id: 'node-2', name: 'Two' }),
     ];
 
     const { rerender } = renderHook(
@@ -48,7 +40,9 @@ describe('useConcatSubTab preview adapter', () => {
           selectedNodeIds: ['node-1', 'node-2'],
           currentWorkspaceId: workspaceId,
           workspaceNodes,
-          getColumnInfos: () => [{ name: 'id', dataType: 'string' }],
+          getColumnInfos: () => [
+            { name: 'id', dataType: 'string', field: new Field('id', new Utf8()) },
+          ],
           concatPreview,
           concatNodes: vi.fn(),
           isLoading: { operations: false },

@@ -1,17 +1,12 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const joinNodesPreviewMock = vi.hoisted(() => vi.fn());
+const previewNodeCreationTableMock = vi.hoisted(() => vi.fn());
 const usePreprocessingPreviewMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/api', () => ({
-  joinNodesPreview: joinNodesPreviewMock,
-}));
-
-vi.mock('@/features/auth/hooks/useAuth', () => ({
-  useAuth: () => ({
-    getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
-  }),
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  previewNodeCreationTable: previewNodeCreationTableMock,
 }));
 
 vi.mock('../../hooks/usePreprocessingPreview', () => ({
@@ -38,24 +33,16 @@ const previewState = {
 
 describe('direct preprocessing preview adapters', () => {
   beforeEach(() => {
-    joinNodesPreviewMock.mockReset();
+    previewNodeCreationTableMock.mockReset();
     usePreprocessingPreviewMock.mockReset();
     usePreprocessingPreviewMock.mockReturnValue(previewState);
   });
 
   it('maps the Join request workspace and exact signal to the generated client', async () => {
-    joinNodesPreviewMock.mockResolvedValue({
-      data: { data: [], columns: [], pagination: null },
-    });
+    previewNodeCreationTableMock.mockResolvedValue({ rows: [], columns: [], hasNext: false });
     const workspaceNodes = [
-      projectWorkspaceNodeMetadata(
-        { id: 'left', name: 'Left' },
-        { id: 'left', name: 'Left', columns: ['id'], schema: { id: 'String' } },
-      ),
-      projectWorkspaceNodeMetadata(
-        { id: 'right', name: 'Right' },
-        { id: 'right', name: 'Right', columns: ['id'], schema: { id: 'String' } },
-      ),
+      projectWorkspaceNodeMetadata({ id: 'left', name: 'Left' }),
+      projectWorkspaceNodeMetadata({ id: 'right', name: 'Right' }),
     ];
 
     renderHook(() =>
@@ -95,7 +82,7 @@ describe('direct preprocessing preview adapters', () => {
       signal,
     });
 
-    expect(joinNodesPreviewMock).toHaveBeenCalledWith(
+    expect(previewNodeCreationTableMock).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { workspace_id: 'request-workspace' },
         query: expect.objectContaining({ page: 2, page_size: 25 }),
@@ -107,14 +94,8 @@ describe('direct preprocessing preview adapters', () => {
   it('maps the Stack request workspace and exact signal to its workspace action', async () => {
     const concatPreview = vi.fn().mockResolvedValue({ data: [], columns: [], pagination: null });
     const workspaceNodes = [
-      projectWorkspaceNodeMetadata(
-        { id: 'node-1', name: 'One' },
-        { id: 'node-1', name: 'One', columns: ['id'], schema: { id: 'String' } },
-      ),
-      projectWorkspaceNodeMetadata(
-        { id: 'node-2', name: 'Two' },
-        { id: 'node-2', name: 'Two', columns: ['id'], schema: { id: 'String' } },
-      ),
+      projectWorkspaceNodeMetadata({ id: 'node-1', name: 'One' }),
+      projectWorkspaceNodeMetadata({ id: 'node-2', name: 'Two' }),
     ];
 
     renderHook(() =>

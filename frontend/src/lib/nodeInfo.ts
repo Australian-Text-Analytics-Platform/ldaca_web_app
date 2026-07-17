@@ -6,28 +6,20 @@
  * single client owns every cache slot. These entry points cover the common
  * call patterns:
  *
- *   - `nodeInfoQueryOptions({ workspaceId, nodeId, ... })` — pass to
- *     `useQuery` for single-node hook-context subscriptions.
  *   - `nodeInfosQueryOptions({ workspaceId, nodeIds, ... })` — pass to
  *     `useQuery` for batched hook-context subscriptions.
- *   - `fetchNodeInfo({ queryClient, ... })` — non-hook helper backed by
- *     `queryClient.fetchQuery`. Built-in inflight dedup + cache reuse.
  *   - `invalidateNodeInfoQuery(queryClient, workspaceId, nodeId?)` —
  *     drop one node's entry, or every entry under a workspace.
  */
 import type { QueryClient } from '@tanstack/react-query';
 
-import { getWorkspaceNodesInfoById } from '@/api';
+import { getNode } from '@/api';
 import type { WorkspaceNodeInfo } from '@/api';
 import { queryKeys } from './queryKeys';
 
 interface WorkspaceQueryArgs {
   workspaceId: string;
 }
-
-type NodeInfoQueryArgs = WorkspaceQueryArgs & {
-  nodeId: string;
-};
 
 type NodeInfosQueryArgs = WorkspaceQueryArgs & {
   nodeIds: string[];
@@ -45,37 +37,17 @@ const normalizeNodeIds = (nodeIds: string[]): string[] =>
 const requestNodeInfos = async (args: NodeInfosQueryArgs): Promise<WorkspaceNodeInfo[]> => {
   const nodeIds = normalizeNodeIds(args.nodeIds);
   if (nodeIds.length === 0) return [];
-  const { data } = await getWorkspaceNodesInfoById({
-    path: { workspace_id: args.workspaceId },
-    body: { nodes: nodeIds },
-    throwOnError: true,
-  });
-  return data.nodes;
+  const values = await Promise.all(
+    nodeIds.map(async (nodeId) => {
+      const { data } = await getNode({
+        path: { workspace_id: args.workspaceId, node_id: nodeId },
+        throwOnError: true,
+      });
+      return data;
+    }),
+  );
+  return values;
 };
-
-/**
- * Build the `useQuery` options for a (workspace, node) pair.
- * Generated client configuration resolves auth for each request.
- */
-/** Used by: `useSchemaManagement` and the non-hook `fetchNodeInfo` helper. */
-export const nodeInfoQueryOptions = (args: NodeInfoQueryArgs) => ({
-  queryKey: queryKeys.nodeInfo(args.workspaceId, args.nodeId),
-  /**
-   * Fetches fresh node metadata for query consumers while resolving auth at execution time.
-   * Called by: TanStack Query from the hook and imperative fetch paths above.
-   */
-  queryFn: async (): Promise<WorkspaceNodeInfo> => {
-    const nodeInfos = await requestNodeInfos({
-      ...args,
-      nodeIds: [args.nodeId],
-    });
-    const nodeInfo = nodeInfos[0];
-    if (!nodeInfo) {
-      throw new Error(`Node info response did not include ${args.nodeId}`);
-    }
-    return nodeInfo;
-  },
-});
 
 /**
  * Build the `useQuery` options for a batch of workspace nodes.
@@ -92,34 +64,6 @@ export const nodeInfosQueryOptions = (args: NodeInfosQueryArgs) => {
      */
     queryFn: async (): Promise<WorkspaceNodeInfo[]> => requestNodeInfos({ ...args, nodeIds }),
   };
-};
-
-interface FetchNodeInfoArgs {
-  queryClient: QueryClient;
-  workspaceId: string;
-  nodeId: string;
-  /** When true, drop any cached value first so the next read re-fetches. */
-  force?: boolean;
-}
-
-/**
- * Non-hook fetcher used by mutation success handlers, hydration callbacks,
- * and other async work outside React's render tree. Returns the cached
- * value when present and fresh; otherwise runs the collection node-info
- * request once and caches the result for future hook subscriptions.
- * Used by: workspace schema refresh and Sequential Analysis schema locking.
- * Flow: optionally remove the cached node entry, build the canonical query options, then fetch through TanStack Query; generated-client configuration owns request auth.
- */
-export const fetchNodeInfo = async ({
-  queryClient,
-  workspaceId,
-  nodeId,
-  force,
-}: FetchNodeInfoArgs): Promise<WorkspaceNodeInfo> => {
-  if (force) {
-    queryClient.removeQueries({ queryKey: queryKeys.nodeInfo(workspaceId, nodeId) });
-  }
-  return queryClient.fetchQuery(nodeInfoQueryOptions({ workspaceId, nodeId }));
 };
 
 /**

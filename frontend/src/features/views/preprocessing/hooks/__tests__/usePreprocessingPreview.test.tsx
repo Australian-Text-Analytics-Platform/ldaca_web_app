@@ -5,11 +5,8 @@ import { usePreprocessingPreview } from '../usePreprocessingPreview';
 
 const pagination = (page: number, pageSize = 10): PreviewPagination => ({
   has_next: false,
-  has_prev: page > 1,
   page,
   page_size: pageSize,
-  total_pages: page,
-  total_rows: pageSize,
 });
 
 const flushPreviewTimer = async (ms: number) => {

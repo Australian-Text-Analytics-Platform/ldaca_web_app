@@ -268,6 +268,7 @@ function DataPreprocessingFeature() {
             currentWorkspaceId={currentWorkspaceId}
             selectedColumn={selectedNodeId ? (selectedNodeColumns[selectedNodeId] ?? '') : ''}
             selectedNodes={selectedNodes}
+            getColumnInfos={nodeInputs.getColumnInfos}
             isLoading={isLoading}
             onAlert={handleAlert}
             replaceTextPreview={replaceTextPreview}
@@ -281,6 +282,7 @@ function DataPreprocessingFeature() {
             renderNodeInputsPanel={renderNodeInputsPanel}
             currentWorkspaceId={currentWorkspaceId}
             selectedNodes={selectedNodes}
+            getColumnInfos={nodeInputs.getColumnInfos}
             isLoading={isLoading}
             onAlert={handleAlert}
             polarsExpressionPreview={polarsExpressionPreview}

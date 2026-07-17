@@ -11,6 +11,7 @@ describe('WorkspaceTable', () => {
     render(
       <WorkspaceTable
         columns={['document', 'speaker', 'year']}
+        columnKinds={{ document: 'string', speaker: 'string', year: 'integer' }}
         data={[
           {
             document: 'This is the full document body.',

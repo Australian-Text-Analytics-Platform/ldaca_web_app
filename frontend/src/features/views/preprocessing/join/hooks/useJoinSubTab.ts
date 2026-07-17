@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
-import { joinNodesPreview } from '@/api';
+import { previewNodeCreationTable } from '@/api';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
@@ -315,30 +315,30 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     pageSize: number;
     signal: AbortSignal;
   }) => {
-    const { data: response } = await joinNodesPreview({
+    const response = await previewNodeCreationTable({
       path: { workspace_id: request.workspaceId },
-      query: {
+      body: {
+        kind: 'join',
         left_node_id: request.leftNodeId,
         right_node_id: request.rightNodeId,
         left_on: request.leftOn,
         right_on: request.rightOn,
         how: request.joinType,
+      },
+      query: {
         page,
         page_size: pageSize,
       },
       signal,
-      throwOnError: true,
     });
-
     return {
-      // response comes from the generated API client; guard defensively against a
-      // malformed/empty payload that the typed contract does not capture.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      columns: Array.isArray(response?.columns) ? response.columns : [],
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      pagination: response?.pagination ?? null,
+      data: response.rows as PreviewRow[],
+      columns: response.columns,
+      pagination: {
+        page,
+        page_size: pageSize,
+        has_next: response.hasNext,
+      },
     };
   };
 
@@ -457,9 +457,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     joinPreviewReady &&
     !joinPreviewLoading &&
     !joinPreviewError &&
-    (joinPreviewPagination !== null
-      ? joinPreviewPagination.total_rows === 0
-      : joinPreviewData.length === 0);
+    joinPreviewData.length === 0;
 
   const applyDisabled =
     !joinConfigReady ||

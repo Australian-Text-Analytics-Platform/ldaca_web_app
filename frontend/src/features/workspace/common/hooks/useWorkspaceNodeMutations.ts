@@ -91,7 +91,7 @@ export const useWorkspaceNodeMutations = ({
        * Gives table and graph consumers a guarded schema refresh action.
        * Used by useWorkspaceDataTable and the Aggregate, Expression, and Replace
        * preprocessing flows after a schema-changing mutation.
-       * Flow: verify the node still exists, fetch fresh node info, normalize schema, and return null on stale nodes.
+       * Flow: verify the node still exists, then fetch its authoritative Arrow schema.
        */
       refreshNodeSchema: (nodeId: string) =>
         refreshWorkspaceNodeSchema({

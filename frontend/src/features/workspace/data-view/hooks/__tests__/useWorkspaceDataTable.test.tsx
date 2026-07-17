@@ -3,19 +3,14 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const getNodeDataByWorkspaceIdMock = vi.hoisted(() => vi.fn());
-const getNodeQueryPlanMock = vi.hoisted(() => vi.fn());
+const getNodeRowsTableMock = vi.hoisted(() => vi.fn());
 const useWorkspaceDataMock = vi.hoisted(() => vi.fn());
 const useWorkspaceSelectionMock = vi.hoisted(() => vi.fn());
 const useWorkspaceStatusMock = vi.hoisted(() => vi.fn());
 const useWorkspaceActionsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api', () => ({
-  getNodeDataByWorkspaceId: getNodeDataByWorkspaceIdMock,
-  getNodeQueryPlan: getNodeQueryPlanMock,
-}));
-vi.mock('@/features/auth/hooks/useAuth', () => ({
-  useAuth: () => ({ getAuthHeaders: () => ({ Authorization: 'Bearer test' }) }),
+  getNodeRowsTable: getNodeRowsTableMock,
 }));
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: useWorkspaceDataMock,
@@ -37,19 +32,12 @@ const reorderSelectedNodes = vi.fn();
 const removeNode = vi.fn();
 
 const makeNodeDataResponse = () => ({
-  data: [{ text: 'row' }],
-  pagination: {
-    page: 1,
-    page_size: 20,
-    total_rows: 1,
-    total_pages: 1,
-    has_next: false,
-    has_prev: false,
-  },
+  rows: [{ text: 'row' }],
+  page: 1,
+  page_size: 20,
   columns: ['text'],
   dtypes: { text: 'String' },
-  sorting: { sort_by: null, descending: false },
-  filtering: { column: null, value: null, op: 'contains' },
+  hasNext: false,
 });
 
 const createWrapper = (queryClient: QueryClient) =>
@@ -62,8 +50,8 @@ describe('useWorkspaceDataTable', () => {
     activateNode.mockReset();
     reorderSelectedNodes.mockReset();
     removeNode.mockReset();
-    getNodeDataByWorkspaceIdMock.mockReset();
-    getNodeDataByWorkspaceIdMock.mockResolvedValue({ data: makeNodeDataResponse() });
+    getNodeRowsTableMock.mockReset();
+    getNodeRowsTableMock.mockResolvedValue(makeNodeDataResponse());
     useWorkspaceDataMock.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
       nodeData: makeNodeDataResponse(),
@@ -120,34 +108,16 @@ describe('useWorkspaceDataTable', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    const { result } = renderHook(() => useWorkspaceDataTable(), {
+    renderHook(() => useWorkspaceDataTable(), {
       wrapper: createWrapper(queryClient),
     });
 
     await waitFor(() => {
-      expect(getNodeDataByWorkspaceIdMock).toHaveBeenCalledTimes(1);
+      expect(getNodeRowsTableMock).toHaveBeenCalledTimes(1);
     });
 
-    act(() => {
-      result.current.table.onColumnFiltersChange?.([
-        { id: 'text', value: { value: 'Ada', op: 'equals' } },
-      ]);
-    });
-
-    await waitFor(() => {
-      expect(getNodeDataByWorkspaceIdMock).toHaveBeenCalledTimes(2);
-    });
-
-    const request = {
-      page: 1,
-      page_size: 20,
-      sort_by: null,
-      descending: false,
-      filter_column: 'text',
-      filter_value: 'Ada',
-      filter_op: 'equals',
-    };
-    expect(getNodeDataByWorkspaceIdMock).toHaveBeenLastCalledWith(
+    const request = { page: 1, page_size: 20, sort_by: null, descending: false };
+    expect(getNodeRowsTableMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ query: request }),
     );
     expect(

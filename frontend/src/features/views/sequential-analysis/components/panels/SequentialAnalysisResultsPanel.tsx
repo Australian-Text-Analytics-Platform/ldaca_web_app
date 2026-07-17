@@ -26,22 +26,17 @@ export interface SequentialAnalysisResultsPanelProps {
   onXAxisTypeChange: (value: SequentialXAxisType) => void;
   onDownloadClick: () => void;
 
-  isDetaching: boolean;
   onToggleKey: (key: string) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
-  detachNodeName: string;
-  detachNodeNamePlaceholder: string;
-  onDetachNodeNameChange: (value: string) => void;
-  onDetach: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
  * Rendered by: `SequentialAnalysisFeature` as the Trends result card. It reads
  * summary, counts, chart, legend, and selection metadata from one canonical
- * `SequentialChartModel`, while keeping chart-type/axis interactions and async
- * detach commands outside the pure model.
+ * `SequentialChartModel`, while keeping chart-type/axis interactions outside
+ * the pure model.
  */
 export function SequentialAnalysisResultsPanel({
   resultsSummary,
@@ -49,14 +44,9 @@ export function SequentialAnalysisResultsPanel({
   onChartTypeChange,
   onXAxisTypeChange,
   onDownloadClick,
-  isDetaching,
   onToggleKey,
   onPeriodClick,
   onClearSelection,
-  detachNodeName,
-  detachNodeNamePlaceholder,
-  onDetachNodeNameChange,
-  onDetach,
   containerRef,
 }: SequentialAnalysisResultsPanelProps) {
   const { summary, counts } = model;
@@ -183,14 +173,9 @@ export function SequentialAnalysisResultsPanel({
 
         <SequentialChart
           model={model}
-          isDetaching={isDetaching}
           onToggleKey={onToggleKey}
           onPeriodClick={onPeriodClick}
           onClearSelection={onClearSelection}
-          detachNodeName={detachNodeName}
-          detachNodeNamePlaceholder={detachNodeNamePlaceholder}
-          onDetachNodeNameChange={onDetachNodeNameChange}
-          onDetach={onDetach}
           containerRef={containerRef}
         />
       </CardContent>

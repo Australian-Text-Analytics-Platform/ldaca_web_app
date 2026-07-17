@@ -1,172 +1,110 @@
 import React from 'react';
+import { Field, Int64, Utf8 } from 'apache-arrow';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fetchNodeInfoMock = vi.hoisted(() => vi.fn());
+const fetchNodeSchemaMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/nodeInfo', async (importOriginal) => {
+vi.mock('@/lib/nodeSchema', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
-    nodeInfoQueryOptions: (args: { workspaceId: string; nodeId: string }) => ({
-      queryKey: ['workspaces', args.workspaceId, 'nodes', args.nodeId, 'info'] as const,
-      queryFn: () =>
-        fetchNodeInfoMock({
-          workspaceId: args.workspaceId,
-          nodeId: args.nodeId,
-        }),
+    nodeSchemaQueryOptions: (args: { workspaceId: string; nodeId: string }) => ({
+      queryKey: ['workspaces', args.workspaceId, 'nodes', args.nodeId, 'schema'] as const,
+      queryFn: () => fetchNodeSchemaMock(args),
     }),
   };
 });
 
-import { normalizeSchemaFromInfo, useSchemaManagement } from '../useSchemaManagement';
+import { arrowSchemaToKinds, useSchemaManagement } from '../useSchemaManagement';
 
-/** Renders schema hooks under an isolated query client for cache/invalidation assertions. */
-/** Used by: tests in this file. */
+const integerColumn = {
+  name: 'col_a',
+  kind: 'integer' as const,
+  field: new Field('col_a', new Int64()),
+};
+const stringColumn = {
+  name: 'col_b',
+  kind: 'string' as const,
+  field: new Field('col_b', new Utf8()),
+};
+
 const renderWithClient = <T,>(callback: () => T) => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  /** Provides the per-test query client to hook renders without leaking cache between tests. */
-  /** Used by: tests in this file. */
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
   return { queryClient, ...renderHook(callback, { wrapper: Wrapper }) };
 };
 
-describe('normalizeSchemaFromInfo', () => {
-  it('returns {} when info is null/undefined or has no schema field', () => {
-    expect(normalizeSchemaFromInfo(null)).toEqual({});
-    expect(normalizeSchemaFromInfo(undefined)).toEqual({});
-    expect(normalizeSchemaFromInfo({ id: 'node-1', name: 'Node 1' })).toEqual({});
-  });
-
-  it('normalizes object-shape schemas via normalizeTypeName', () => {
-    const result = normalizeSchemaFromInfo({
-      id: 'node-1',
-      name: 'Node 1',
-      schema: { id: 'Int64', name: 'Utf8', is_active: 'Boolean' },
-    });
-    // `Int64` → 'integer', `Utf8` → 'string', `Boolean` → 'boolean'.
-    expect(result).toEqual({
-      id: 'integer',
-      name: 'string',
-      is_active: 'boolean',
+describe('arrowSchemaToKinds', () => {
+  it('projects only UI semantic kinds from authoritative Arrow fields', () => {
+    expect(arrowSchemaToKinds([integerColumn, stringColumn])).toEqual({
+      col_a: 'integer',
+      col_b: 'string',
     });
   });
 });
 
 describe('useSchemaManagement', () => {
-  beforeEach(() => {
-    fetchNodeInfoMock.mockReset();
-  });
+  beforeEach(() => fetchNodeSchemaMock.mockReset());
 
-  describe('availableColumns', () => {
-    it('uses currentSchema once the query resolves', async () => {
-      fetchNodeInfoMock.mockResolvedValue({
-        schema: { col_a: 'integer', col_b: 'string' },
-      });
+  it('uses the Arrow schema once the query resolves', async () => {
+    fetchNodeSchemaMock.mockResolvedValue([integerColumn, stringColumn]);
+    const { result } = renderWithClient(() =>
+      useSchemaManagement({ nodeId: 'node-1', isLocked: false, workspaceId: 'ws-1' }),
+    );
 
-      const { result } = renderWithClient(() =>
-        useSchemaManagement({
-          nodeId: 'node-1',
-          isLocked: false,
-          workspaceId: 'ws-1',
-        }),
-      );
-
-      await waitFor(() => {
-        expect(result.current.availableColumns).toEqual([
-          { name: 'col_a', dataType: 'integer' },
-          { name: 'col_b', dataType: 'string' },
-        ]);
-      });
-    });
-
-    it('returns no columns when no node-info query is available', () => {
-      const { result } = renderWithClient(() =>
-        useSchemaManagement({
-          nodeId: null,
-          isLocked: false,
-          workspaceId: undefined,
-        }),
-      );
-
-      expect(result.current.availableColumns).toEqual([]);
+    await waitFor(() => {
+      expect(result.current.availableColumns).toEqual([
+        { name: 'col_a', dataType: 'integer' },
+        { name: 'col_b', dataType: 'string' },
+      ]);
     });
   });
 
-  describe('lock controls', () => {
-    it('keeps the captured schema visible when the feature becomes locked', async () => {
-      fetchNodeInfoMock.mockResolvedValue({ schema: { col_a: 'integer' } });
-      let isLocked = false;
+  it('returns no columns without a selected node', () => {
+    const { result } = renderWithClient(() =>
+      useSchemaManagement({ nodeId: null, isLocked: false, workspaceId: undefined }),
+    );
+    expect(result.current.availableColumns).toEqual([]);
+  });
 
-      const { result, rerender } = renderWithClient(() =>
-        useSchemaManagement({
-          nodeId: 'node-1',
-          isLocked,
-          workspaceId: 'ws-1',
-        }),
-      );
-
-      await waitFor(() => {
-        expect(result.current.availableColumns).toEqual([{ name: 'col_a', dataType: 'integer' }]);
-      });
-
-      act(() => {
-        result.current.lockCurrentSchema();
-      });
-      isLocked = true;
-      rerender();
-
+  it('keeps the captured schema visible while locked', async () => {
+    fetchNodeSchemaMock.mockResolvedValue([integerColumn]);
+    let isLocked = false;
+    const { result, rerender } = renderWithClient(() =>
+      useSchemaManagement({ nodeId: 'node-1', isLocked, workspaceId: 'ws-1' }),
+    );
+    await waitFor(() => {
       expect(result.current.availableColumns).toEqual([{ name: 'col_a', dataType: 'integer' }]);
     });
-
-    it('accepts an explicit schema restored for a locked task', () => {
-      let isLocked = false;
-      const { result, rerender } = renderWithClient(() =>
-        useSchemaManagement({
-          nodeId: null,
-          isLocked,
-          workspaceId: undefined,
-        }),
-      );
-
-      act(() => {
-        result.current.setLockedSchema({ explicit: 'integer' });
-      });
-      isLocked = true;
-      rerender();
-
-      expect(result.current.availableColumns).toEqual([{ name: 'explicit', dataType: 'integer' }]);
-    });
+    act(() => result.current.lockCurrentSchema());
+    isLocked = true;
+    rerender();
+    expect(result.current.availableColumns).toEqual([{ name: 'col_a', dataType: 'integer' }]);
   });
 
-  describe('schema query gating', () => {
-    it('does not fetch when nodeId is null', () => {
-      renderWithClient(() =>
-        useSchemaManagement({
-          nodeId: null,
-          isLocked: false,
-          workspaceId: 'ws-1',
-        }),
-      );
-      expect(fetchNodeInfoMock).not.toHaveBeenCalled();
-    });
+  it('accepts an explicitly restored semantic schema', () => {
+    let isLocked = false;
+    const { result, rerender } = renderWithClient(() =>
+      useSchemaManagement({ nodeId: null, isLocked, workspaceId: undefined }),
+    );
+    act(() => result.current.setLockedSchema({ explicit: 'integer' }));
+    isLocked = true;
+    rerender();
+    expect(result.current.availableColumns).toEqual([{ name: 'explicit', dataType: 'integer' }]);
+  });
 
-    it('does not fetch while locked, even when a node is selected', async () => {
-      renderWithClient(() =>
-        useSchemaManagement({
-          nodeId: 'node-1',
-          isLocked: true,
-          workspaceId: 'ws-1',
-        }),
-      );
-      // give react-query a tick — even so, enabled=false should keep it idle
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(fetchNodeInfoMock).not.toHaveBeenCalled();
-    });
+  it('does not fetch without a selected node or while locked', async () => {
+    renderWithClient(() =>
+      useSchemaManagement({ nodeId: null, isLocked: false, workspaceId: 'ws-1' }),
+    );
+    renderWithClient(() =>
+      useSchemaManagement({ nodeId: 'node-1', isLocked: true, workspaceId: 'ws-1' }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchNodeSchemaMock).not.toHaveBeenCalled();
   });
 });

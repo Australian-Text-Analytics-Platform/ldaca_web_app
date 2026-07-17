@@ -1,6 +1,6 @@
-import type { GetNodeDataByWorkspaceIdData } from '@/api';
+import type { GetNodeRowsData } from '@/api';
 
-type GeneratedNodeDataQuery = NonNullable<GetNodeDataByWorkspaceIdData['query']>;
+type GeneratedNodeDataQuery = NonNullable<GetNodeRowsData['query']>;
 
 export type NodeDataRequest = Required<GeneratedNodeDataQuery>;
 
@@ -19,9 +19,6 @@ export const createNodeDataRequest = (
   page_size: request.page_size,
   sort_by: request.sort_by ?? null,
   descending: request.descending ?? false,
-  filter_column: request.filter_column ?? null,
-  filter_value: request.filter_value ?? null,
-  filter_op: request.filter_op ?? 'contains',
 });
 
 /**
@@ -38,9 +35,6 @@ export const queryKeys = {
   /** All workspace-related queries (broad invalidation). */
   workspaces: ['workspaces'] as const,
 
-  /** Authenticated user's selected workspace id. */
-  currentWorkspace: ['users', 'me', 'current-workspace'] as const,
-
   /** Nodes list for a workspace; invalidated after graph-changing workspace mutations. */
   workspaceNodes: (workspaceId: string) => ['workspaces', workspaceId, 'nodes'] as const,
 
@@ -53,6 +47,10 @@ export const queryKeys = {
     const base = ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const;
     return request ? ([...base, request] as const) : base;
   },
+
+  /** Authoritative Arrow schema for one data block. */
+  nodeSchema: (workspaceId: string, nodeId: string) =>
+    ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
 
   /** Annotation class-description rows for one selected class table node. */
   annotationClassDescriptions: (
@@ -72,9 +70,7 @@ export const queryKeys = {
     ] as const,
 
   /**
-   * Full backend node info — schema, columns, shape, undo/redo flags.
-   * Replaces the previous `lib/nodeInfoCache.ts` parallel cache and is also
-   * the source of truth for schema-only readers.
+   * Full backend node metadata excluding its Arrow schema.
    */
   nodeInfo: (workspaceId: string, nodeId: string) =>
     ['workspaces', workspaceId, 'nodes', nodeId, 'info'] as const,

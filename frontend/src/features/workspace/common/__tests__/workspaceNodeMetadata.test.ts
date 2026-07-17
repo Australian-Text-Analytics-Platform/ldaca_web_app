@@ -9,16 +9,12 @@ describe('projectWorkspaceNodeMetadata', () => {
       name: 'Renamed graph node',
       color: '#2563eb',
       document: 'graph_text',
-      can_undo: true,
-      can_redo: false,
     };
     const nodeInfo: WorkspaceNodeInfo = {
       id: 'node-1',
       name: 'Stale pre-rename name',
       color: '#dc2626',
       document: 'document',
-      columns: ['document', 'year'],
-      schema: { document: 'String', year: 'Int64' },
       shape: [12, 2],
       tokenizer_models: { document: 'native:plain_words_en' },
     };
@@ -28,12 +24,8 @@ describe('projectWorkspaceNodeMetadata', () => {
       name: 'Renamed graph node',
       color: '#dc2626',
       document: 'document',
-      columns: ['document', 'year'],
-      schema: { document: 'String', year: 'Int64' },
       shape: [12, 2],
       tokenizerModels: { document: 'native:plain_words_en' },
-      canUndo: true,
-      canRedo: false,
     });
   });
 
@@ -48,12 +40,8 @@ describe('projectWorkspaceNodeMetadata', () => {
       name: 'Graph only',
       color: null,
       document: null,
-      columns: [],
-      schema: {},
       shape: undefined,
       tokenizerModels: {},
-      canUndo: false,
-      canRedo: false,
     });
   });
 });

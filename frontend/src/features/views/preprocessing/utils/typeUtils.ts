@@ -1,7 +1,3 @@
-// Canonical implementation lives in `@/utils/columnTypes`. Re-exported
-// here so preprocessing call sites can keep their existing import.
-export { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
-
 /**
  * Supplies condition operators for the Filter tab based on normalized dtype.
  * Used by filter condition state and rendering to choose dtype-aware operators.
@@ -20,9 +16,9 @@ export const getOperatorsForType = (dataType: string) => {
       ];
     case 'categorical':
       return [{ value: 'in', label: 'is one of' }];
-    case 'list[string]':
+    case 'string-list':
       return [{ value: 'in', label: 'contains any of' }];
-    case 'tmdist':
+    case 'topic-distribution':
       // Topic-distribution: compare one topic's proportion against a threshold.
       return [
         { value: 'gte', label: '≥' },

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Field, Int64, Utf8 } from 'apache-arrow';
 import {
   projectWorkspaceNodeMetadata,
   type WorkspaceNodeMetadata,
@@ -12,29 +13,25 @@ import {
   validateAdd,
 } from '../nodeInputsCore';
 
-const stringNode = (
-  id: string,
-  columns: string[],
-  extra?: Partial<WorkspaceNodeMetadata>,
-): WorkspaceNodeMetadata => ({
-  ...projectWorkspaceNodeMetadata(
-    { id, name: id },
-    {
-      id,
-      name: id,
-      columns,
-      schema: Object.fromEntries(columns.map((column) => [column, 'String'])),
-    },
-  ),
+const stringNode = (id: string, extra?: Partial<WorkspaceNodeMetadata>): WorkspaceNodeMetadata => ({
+  ...projectWorkspaceNodeMetadata({ id, name: id }),
   ...extra,
 });
 
 const nodes: WorkspaceNodeMetadata[] = [
-  stringNode('n1', ['text', 'id']),
-  stringNode('n2', ['body'], { document: 'body' }),
-  // numeric-only node: schema marks the column as integer
-  stringNode('n3', ['count'], { schema: { count: 'Int64' } }),
+  stringNode('n1'),
+  stringNode('n2', { document: 'body' }),
+  stringNode('n3'),
 ];
+
+const columnInfos = (node: WorkspaceNodeMetadata) => {
+  const names = node.id === 'n1' ? ['text', 'id'] : node.id === 'n2' ? ['body'] : ['count'];
+  return names.map((name) => ({
+    name,
+    dataType: node.id === 'n3' ? ('integer' as const) : ('string' as const),
+    field: new Field(name, node.id === 'n3' ? new Int64() : new Utf8()),
+  }));
+};
 
 const map = buildNodeMap(nodes);
 
@@ -79,15 +76,19 @@ describe('validateAdd', () => {
 
 describe('defaultColumnForNode', () => {
   it('prefers the document column when allowed', () => {
-    expect(defaultColumnForNode(nodes[1]!, { allowedDataTypes: ['string'] })).toBe('body');
+    expect(defaultColumnForNode(nodes[1]!, { allowedDataTypes: ['string'] }, columnInfos)).toBe(
+      'body',
+    );
   });
 
   it('falls back to first allowed column when not document-only', () => {
-    expect(defaultColumnForNode(nodes[0]!, { allowedDataTypes: ['string'] })).toBe('text');
+    expect(defaultColumnForNode(nodes[0]!, { allowedDataTypes: ['string'] }, columnInfos)).toBe(
+      'text',
+    );
   });
 
   it('leaves the column empty when no allowed column exists', () => {
-    expect(defaultColumnForNode(nodes[2]!, { allowedDataTypes: ['string'] })).toBe('');
+    expect(defaultColumnForNode(nodes[2]!, { allowedDataTypes: ['string'] }, columnInfos)).toBe('');
   });
 
   it('returns empty when document-only and no document column', () => {
@@ -101,20 +102,20 @@ describe('resolveNodeInputs', () => {
       { node_id: 'n1', column: 'id' },
       { node_id: 'gone', column: 'x' },
     ];
-    const resolved = resolveNodeInputs(inputs, map, {});
+    const resolved = resolveNodeInputs(inputs, map, {}, columnInfos);
     expect(resolved.map((r) => r.id)).toEqual(['n1']);
     expect(resolved[0]!.column).toBe('id');
   });
 
   it('re-defaults a column that is no longer valid', () => {
     const inputs: NodeInput[] = [{ node_id: 'n1', column: 'nope' }];
-    const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] });
+    const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] }, columnInfos);
     expect(resolved[0]!.column).toBe('text');
   });
 
   it('resolves an added node with empty options when no allowed column exists', () => {
     const inputs: NodeInput[] = [{ node_id: 'n3', column: null }];
-    const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] });
+    const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] }, columnInfos);
 
     expect(resolved[0]!.column).toBe('');
     expect(resolved[0]!.columnOptions).toEqual([]);

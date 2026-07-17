@@ -1,32 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { getOperatorsForType, normalizeTypeName as normalizePreprocessingType } from '../typeUtils';
-import { normalizeTypeName as normalizeSharedType } from '@/features/workspace/data-view/utils/columnTypes';
+
+import { getOperatorsForType } from '../typeUtils';
 
 describe('preprocessing type utils', () => {
-  it('normalizes list string dtype to list_string', () => {
-    expect(normalizePreprocessingType('List(String)')).toBe('list[string]');
-    expect(normalizePreprocessingType('list_string')).toBe('list[string]');
+  it('offers checklist operators for Arrow-derived string-list columns', () => {
+    expect(getOperatorsForType('string-list')).toEqual([{ value: 'in', label: 'contains any of' }]);
   });
 
-  it('maps non-string list/array dtypes to unknown', () => {
-    expect(normalizePreprocessingType('List(Int64)')).toBe('unknown');
-    expect(normalizePreprocessingType('Array(Int64, 2)')).toBe('unknown');
-  });
-
-  it('offers checklist operator set for list_string', () => {
-    expect(getOperatorsForType('list[string]')).toEqual([
-      { value: 'in', label: 'contains any of' },
+  it('offers proportion operators for Topic Distribution columns', () => {
+    expect(getOperatorsForType('topic-distribution')).toEqual([
+      { value: 'gte', label: '≥' },
+      { value: 'gt', label: '>' },
+      { value: 'lte', label: '≤' },
+      { value: 'lt', label: '<' },
     ]);
-  });
-});
-
-describe('shared column type utils', () => {
-  it('normalizes list string dtype to list_string', () => {
-    expect(normalizeSharedType('List(String)')).toBe('list[string]');
-  });
-
-  it('maps non-string list/array dtypes to unknown', () => {
-    expect(normalizeSharedType('List(Int64)')).toBe('unknown');
-    expect(normalizeSharedType('Array(Int64, 3)')).toBe('unknown');
   });
 });

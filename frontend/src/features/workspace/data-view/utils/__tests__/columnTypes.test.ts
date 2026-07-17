@@ -1,40 +1,24 @@
+import { Field, Int64, Utf8 } from 'apache-arrow';
 import { describe, expect, it } from 'vitest';
-import { filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../columnTypes';
 
-describe('column type normalization', () => {
-  it('maps known backend dtypes to canonical UI types', () => {
-    expect(normalizeTypeName('Utf8')).toBe('string');
-    expect(normalizeTypeName('Int64')).toBe('integer');
-    expect(normalizeTypeName('List(String)')).toBe('list[string]');
-  });
+import { filterColumnsByType, mapArrowColumnsToInfo } from '../columnTypes';
 
-  it('keeps missing and unrecognized dtypes unknown instead of assuming string', () => {
-    expect(normalizeTypeName(undefined)).toBe('unknown');
-    expect(normalizeTypeName('mystery')).toBe('unknown');
-  });
-});
+describe('Arrow column metadata', () => {
+  const fields = [
+    { name: 'title', kind: 'string' as const, field: new Field('title', new Utf8()) },
+    { name: 'count', kind: 'integer' as const, field: new Field('count', new Int64()) },
+  ];
 
-describe('mapColumnsToInfo', () => {
-  it('uses the generated schema map and preserves column order', () => {
-    expect(
-      mapColumnsToInfo({
-        columns: ['title', 'count'],
-        schema: { title: 'Utf8', count: 'Int64' },
-      }),
-    ).toEqual([
-      { name: 'title', dataType: 'string' },
-      { name: 'count', dataType: 'integer' },
+  it('preserves Arrow field order and semantic kinds', () => {
+    expect(mapArrowColumnsToInfo(fields)).toEqual([
+      { name: 'title', dataType: 'string', field: fields[0]?.field },
+      { name: 'count', dataType: 'integer', field: fields[1]?.field },
     ]);
   });
 
-  it('does not treat a bare columns list as string evidence', () => {
-    expect(mapColumnsToInfo({ columns: ['title'] })).toEqual([
-      { name: 'title', dataType: 'unknown' },
+  it('filters only by semantic kinds derived from Arrow', () => {
+    expect(filterColumnsByType(mapArrowColumnsToInfo(fields), ['string'])).toEqual([
+      { name: 'title', dataType: 'string', field: fields[0]?.field },
     ]);
-  });
-
-  it('therefore leaves string-only filters empty without dtype evidence', () => {
-    const columns = mapColumnsToInfo({ columns: ['title'] });
-    expect(filterColumnsByType(columns, ['string'])).toEqual([]);
   });
 });

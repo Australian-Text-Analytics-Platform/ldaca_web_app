@@ -10,7 +10,9 @@ interaction.
 
 ```mermaid
 flowchart TB
-    BACKEND["Backend resources and refresh events"] --> QUERY["TanStack Query<br/>server-state authority"]
+    BACKEND["Backend JSON resources and refresh events"] --> QUERY["TanStack Query<br/>server-state authority"]
+    ARROW["Backend Arrow IPC tables"] --> DECODER["Official Apache Arrow decoder<br/>rows, fields, has-next"]
+    DECODER --> FEATURES
     QUERY --> FEATURES["Feature hooks and components"]
 
     ZUSTAND["Zustand<br/>cross-feature interaction authority"] <--> FEATURES
@@ -25,9 +27,12 @@ flowchart TB
 ```
 
 Feature code consumes generated SDK functions and generated types through
-`@/api`. Raw network calls are limited to boundaries the generator cannot
-express conveniently, such as native downloads or SSE, and still follow the
-backend's cookie, CSRF, Origin, and typed resource contracts.
+`@/api`. The narrow table adapter decodes generated-client binary responses
+with `apache-arrow`; complete Result table URLs use the same decoder directly.
+Raw network calls are limited to boundaries the generator cannot express
+conveniently, such as complete table URLs, native downloads, or SSE, and still
+follow the backend's cookie, CSRF, Origin, and typed resource contracts. There
+is no JSON table decoder or compatibility fallback.
 
 ## Workspace Composition
 

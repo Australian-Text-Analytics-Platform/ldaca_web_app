@@ -1,16 +1,11 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { WorkspaceDataHeader } from '../WorkspaceDataHeader';
 
 describe('WorkspaceDataHeader', () => {
-  it('shows compact icon-only info undo redo controls', async () => {
-    const user = userEvent.setup();
-    const onUndo = vi.fn();
-    const onRedo = vi.fn();
-
+  it('shows the data-view help control', () => {
     render(
       <TooltipProvider>
         <WorkspaceDataHeader
@@ -20,26 +15,11 @@ describe('WorkspaceDataHeader', () => {
             totalTabs: 1,
             isEmptyTable: false,
           }}
-          onUndo={onUndo}
-          onRedo={onRedo}
-          canUndo
-          canRedo={false}
         />
       </TooltipProvider>,
     );
 
-    const infoButton = screen.getByRole('button', { name: 'Info' });
-    const undoButton = screen.getByRole('button', { name: 'Undo' });
-    const redoButton = screen.getByRole('button', { name: 'Redo' });
-
-    expect(infoButton.textContent).toBe('');
-    expect(undoButton.textContent).toBe('');
-    expect(redoButton.textContent).toBe('');
-
-    await user.click(undoButton);
-    expect(onUndo).toHaveBeenCalledTimes(1);
-
-    expect(redoButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Data Viewer' })).toBeInTheDocument();
   });
 
   it('keeps the selected node name in a leading-fade single-line wrapper', () => {

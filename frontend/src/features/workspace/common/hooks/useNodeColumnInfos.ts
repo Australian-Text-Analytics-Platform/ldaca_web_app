@@ -1,20 +1,19 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   type ColumnInfo,
-  mapColumnsToInfo,
+  mapArrowColumnsToInfo,
 } from '@/features/workspace/data-view/utils/columnTypes';
 import type { WorkspaceGraphNode, WorkspaceNodeInfo } from '@/api';
 import type { WorkspaceNodeMetadata } from '../workspaceNodeMetadata';
 import { nodeInfosQueryOptions } from '@/lib/nodeInfo';
+import { nodeSchemaQueryOptions } from '@/lib/nodeSchema';
 
 export interface UseNodeColumnInfosResult {
   columnInfoCache: Record<string, ColumnInfo[]>;
   /** Full node-info responses keyed by node id for metadata beyond columns. */
   nodeInfoCache: Record<string, WorkspaceNodeInfo>;
   /**
-   * Returns cached column infos for the provided node. Falls back to any dtype
-   * evidence already present on the node snapshot; graph-only nodes usually
-   * have no column metadata until node-info has hydrated.
+   * Returns cached column infos for the provided node.
    */
   getColumnInfos: (node: WorkspaceNodeMetadata | null | undefined) => ColumnInfo[];
   /** Returns the cached node-info response for consumers that need shape or tokenizer metadata. */
@@ -24,9 +23,7 @@ export interface UseNodeColumnInfosResult {
 }
 
 /**
- * Fetch typed column info for a set of workspace nodes. Backed by
- * one batched node-info query — request dedup, caching, and invalidation flow
- * through the TanStack client used everywhere else in the app.
+ * Fetch typed column info from each node's authoritative Arrow schema.
  */
 /**
  * Used by: `useTabNodeInputs` to hydrate selected graph nodes with typed
@@ -47,6 +44,13 @@ export const useNodeColumnInfos = (params: {
     enabled: queryEnabled,
     staleTime: 60_000,
   });
+  const schemaQueries = useQueries({
+    queries: nodeIds.map((nodeId) => ({
+      ...nodeSchemaQueryOptions({ workspaceId: workspaceId ?? '', nodeId }),
+      enabled: queryEnabled,
+      staleTime: 60_000,
+    })),
+  });
 
   const nodeInfoCache: Record<string, WorkspaceNodeInfo> = {};
   for (const nodeInfo of nodeInfosQuery.data ?? []) {
@@ -54,22 +58,16 @@ export const useNodeColumnInfos = (params: {
   }
 
   const columnInfoCache: Record<string, ColumnInfo[]> = {};
-  nodeIds.forEach((nodeId) => {
-    const data = nodeInfoCache[nodeId];
-    if (data) {
-      columnInfoCache[nodeId] = mapColumnsToInfo(data);
-    }
+  nodeIds.forEach((nodeId, index) => {
+    const schema = schemaQueries[index]?.data;
+    if (schema) columnInfoCache[nodeId] = mapArrowColumnsToInfo(schema);
   });
 
-  /** Returns typed cached columns when available, otherwise derives from the node snapshot. */
+  /** Returns typed cached columns when available. */
   /** Returned to: `useTabNodeInputs` for selector and request hydration. */
   const getColumnInfos = (node: WorkspaceNodeMetadata | null | undefined): ColumnInfo[] => {
     if (!node) return [];
-    const cached = columnInfoCache[node.id];
-    if (cached?.length) {
-      return cached;
-    }
-    return mapColumnsToInfo(node);
+    return columnInfoCache[node.id] ?? [];
   };
 
   /** Returns cached node metadata for consumers that need full node-info fields. */
@@ -78,7 +76,7 @@ export const useNodeColumnInfos = (params: {
     node: WorkspaceNodeMetadata | null | undefined,
   ): WorkspaceNodeInfo | undefined => (node ? nodeInfoCache[node.id] : undefined);
 
-  const isLoading = nodeInfosQuery.isFetching;
+  const isLoading = nodeInfosQuery.isFetching || schemaQueries.some((query) => query.isFetching);
 
   return { columnInfoCache, nodeInfoCache, getColumnInfos, getNodeInfo, isLoading };
 };

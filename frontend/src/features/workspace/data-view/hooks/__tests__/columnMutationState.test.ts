@@ -3,86 +3,34 @@ import { describe, expect, it } from 'vitest';
 import { columnMutationReducer, createColumnMutationState } from '../columnMutationState';
 
 describe('columnMutationReducer', () => {
-  it('uses the selected delete column as the delete-dialog source of truth', () => {
-    const requested = columnMutationReducer(createColumnMutationState(), {
-      type: 'deleteRequested',
-      column: 'title',
-    });
-
-    expect(requested.columnToDelete).toBe('title');
-
-    const stillClosed = columnMutationReducer(createColumnMutationState(), {
-      type: 'deleteDialogChanged',
-      open: true,
-    });
-    expect(stillClosed.columnToDelete).toBeNull();
-
-    const dismissed = columnMutationReducer(requested, {
-      type: 'deleteDialogChanged',
-      open: false,
-    });
-    expect(dismissed.columnToDelete).toBeNull();
-  });
-
-  it('keeps busy maps sparse when cast and column actions complete', () => {
+  it('keeps sparse cast-loading state', () => {
     const casting = columnMutationReducer(createColumnMutationState(), {
       type: 'castLoadingChanged',
       column: 'published_at',
       active: true,
     });
-    const mutating = columnMutationReducer(casting, {
-      type: 'columnActionLoadingChanged',
-      column: 'title',
-      active: true,
-    });
+    expect(casting.loadingCast).toEqual({ published_at: true });
 
-    expect(mutating.loadingCast).toEqual({ published_at: true });
-    expect(mutating.columnActionLoading).toEqual({ title: true });
-
-    const settledCast = columnMutationReducer(mutating, {
+    const settled = columnMutationReducer(casting, {
       type: 'castLoadingChanged',
       column: 'published_at',
       active: false,
     });
-    const settledAll = columnMutationReducer(settledCast, {
-      type: 'columnActionLoadingChanged',
-      column: 'title',
-      active: false,
-    });
-
-    expect(settledAll.loadingCast).toEqual({});
-    expect(settledAll.columnActionLoading).toEqual({});
+    expect(settled.loadingCast).toEqual({});
   });
 
-  it('removes local dtype metadata and clears matching rename after delete', () => {
+  it('keeps canonical schema and datetime modal state together', () => {
     const withSchema = columnMutationReducer(createColumnMutationState(), {
       type: 'schemaApplied',
       columnTypes: { title: 'string', count: 'integer' },
     });
-    const renaming = columnMutationReducer(withSchema, {
-      type: 'renameStarted',
-      column: 'title',
-    });
-    const withoutColumnType = columnMutationReducer(renaming, {
-      type: 'columnTypeRemoved',
-      column: 'title',
-    });
-    const deleted = columnMutationReducer(withoutColumnType, {
-      type: 'columnDeleteSucceeded',
-      column: 'title',
-    });
+    expect(withSchema.columnTypes).toEqual({ title: 'string', count: 'integer' });
 
-    expect(deleted.columnTypes).toEqual({ count: 'integer' });
-    expect(deleted.renamingColumn).toBeNull();
-  });
-
-  it('keeps datetime modal state together', () => {
-    const requested = columnMutationReducer(createColumnMutationState(), {
+    const requested = columnMutationReducer(withSchema, {
       type: 'datetimeRequested',
       column: 'created_at',
       targetType: 'datetime',
     });
-
     expect(requested.datetimeModal).toEqual({
       isOpen: true,
       column: 'created_at',
@@ -90,7 +38,6 @@ describe('columnMutationReducer', () => {
     });
 
     const closed = columnMutationReducer(requested, { type: 'datetimeClosed' });
-
     expect(closed.datetimeModal).toEqual({
       isOpen: false,
       column: '',

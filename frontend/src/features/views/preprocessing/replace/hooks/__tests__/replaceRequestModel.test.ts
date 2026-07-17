@@ -18,10 +18,10 @@ describe('replaceRequestModel', () => {
       source_column: 'Body',
       pattern: String.raw`\d+`,
       replacement: '#',
-      output_column_name: 'Body',
+      output_column: 'Body',
       mode: 'replace',
       count: 'all',
-      n: undefined,
+      match_limit: undefined,
       connector: undefined,
     });
   });
@@ -39,10 +39,10 @@ describe('replaceRequestModel', () => {
       source_column: 'Body',
       pattern: String.raw`\d+`,
       replacement: '#',
-      output_column_name: 'matches',
+      output_column: 'matches',
       mode: 'extract',
       count: 'first',
-      n: 2,
+      match_limit: 2,
       connector: '; ',
     });
   });

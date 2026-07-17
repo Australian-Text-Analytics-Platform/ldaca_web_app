@@ -103,14 +103,14 @@ export function PreviewTable({
   const columnsToRender = columns;
   const tableColSpan = Math.max(columnsToRender.length, 1);
   const currentPage = pagination?.page ?? page;
-  const displayTotalPages = pagination?.total_pages ?? Math.max(1, currentPage);
+  const hasNext = pagination?.has_next ?? false;
 
   const columnDefs = buildColumnDefs(columnsToRender);
 
   const table = useServerTable<PreviewRow>({
     data,
     columns: columnDefs,
-    rowCount: pagination?.total_rows ?? data.length,
+    rowCount: data.length,
     pageIndex: currentPage - 1,
     pageSize,
     // Bridges TanStack's zero-based pagination model to the one-based preview
@@ -266,11 +266,7 @@ export function PreviewTable({
       </CardContent>
       {ready && !error && data.length > 0 && (
         <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 py-4">
-          <div className="text-sm text-muted-foreground">
-            {pagination
-              ? `${String(pagination.total_rows)} row${pagination.total_rows === 1 ? '' : 's'} · page ${String(currentPage)} of ${String(displayTotalPages)}`
-              : 'Preview ready'}
-          </div>
+          <div className="text-sm text-muted-foreground">Page {currentPage}</div>
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -289,7 +285,7 @@ export function PreviewTable({
               onClick={() => {
                 table.setPageIndex(currentPage);
               }}
-              disabled={currentPage >= displayTotalPages || loading}
+              disabled={!hasNext || loading}
               variant="outline"
               size="sm"
             >

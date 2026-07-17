@@ -1,9 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const getColumnUniqueValuesMock = vi.hoisted(() => vi.fn());
+const getNodeRowsTableMock = vi.hoisted(() => vi.fn());
 vi.mock('@/api', () => ({
-  getColumnUniqueValues: getColumnUniqueValuesMock,
+  getNodeRowsTable: getNodeRowsTableMock,
 }));
 
 import { NULL_OPTION_KEY } from '../../utils/categoricalOptions';
@@ -23,15 +23,14 @@ const categoricalCondition: FilterConditionWithId = {
 
 describe('useFilterCategoricalOptions', () => {
   beforeEach(() => {
-    getColumnUniqueValuesMock.mockReset();
+    getNodeRowsTableMock.mockReset();
   });
 
   it('loads and stores categorical options for the active workspace/node/column key', async () => {
-    getColumnUniqueValuesMock.mockResolvedValue({
-      data: {
-        unique_values: ['Alice', 'Bob'],
-        has_null: true,
-      },
+    getNodeRowsTableMock.mockResolvedValue({
+      rows: [{ speaker: 'Alice' }, { speaker: 'Bob' }, { speaker: null }],
+      columns: ['speaker'],
+      hasNext: false,
     });
 
     const { result } = renderHook(() =>
@@ -47,9 +46,9 @@ describe('useFilterCategoricalOptions', () => {
     });
 
     const key = result.current.getCategoricalKey('speaker');
-    expect(getColumnUniqueValuesMock).toHaveBeenCalledWith({
-      path: { workspace_id: 'workspace-1', column_name: 'speaker', node_id: 'node-1' },
-      throwOnError: true,
+    expect(getNodeRowsTableMock).toHaveBeenCalledWith({
+      path: { workspace_id: 'workspace-1', node_id: 'node-1' },
+      query: { page: 1, page_size: 1000 },
     });
     expect(result.current.categoricalOptions[key]).toMatchObject({
       hasNull: true,
@@ -76,16 +75,15 @@ describe('useFilterCategoricalOptions', () => {
       await result.current.ensureCategoricalOptions('speaker', 'categorical');
     });
 
-    expect(getColumnUniqueValuesMock).not.toHaveBeenCalled();
+    expect(getNodeRowsTableMock).not.toHaveBeenCalled();
     expect(result.current.categoricalOptions).toEqual({});
   });
 
   it('auto-loads checklist-backed conditions and resets search state when node changes', async () => {
-    getColumnUniqueValuesMock.mockResolvedValue({
-      data: {
-        unique_values: ['Alice'],
-        has_null: false,
-      },
+    getNodeRowsTableMock.mockResolvedValue({
+      rows: [{ speaker: 'Alice' }],
+      columns: ['speaker'],
+      hasNext: false,
     });
 
     const { result, rerender } = renderHook(
@@ -104,9 +102,9 @@ describe('useFilterCategoricalOptions', () => {
     );
 
     await waitFor(() => {
-      expect(getColumnUniqueValuesMock).toHaveBeenCalledWith(
+      expect(getNodeRowsTableMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          path: { workspace_id: 'workspace-1', column_name: 'speaker', node_id: 'node-1' },
+          path: { workspace_id: 'workspace-1', node_id: 'node-1' },
         }),
       );
     });

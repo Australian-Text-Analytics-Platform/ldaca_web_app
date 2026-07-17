@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
-import { analysisTaskPreferences, runSequentialAnalysis } from '@/api';
+import { submitTabAnalysis } from '@/api';
 import type { SequentialAnalysisRequest } from '@/api';
+import type { ColumnKind } from '@/lib/arrow/arrowTable';
 import { extractAndSetTaskId } from '../../common/extractTaskId';
 import { isChartTypeOption, type ChartTypeOption } from './sequentialChartModel';
 
@@ -9,6 +10,7 @@ type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custo
 
 interface SequentialAnalysisState {
   currentWorkspaceId: string | null;
+  tabId: string;
   activeNodeId: string | null;
   nodeColumnSelections: { nodeId: string; column: string }[];
   timeColumn: string;
@@ -37,8 +39,7 @@ interface SequentialAnalysisActions {
   setLocalTaskId: (value: string | null) => void;
   setNodeColumnSelections: (selections: { nodeId: string; column: string }[]) => void;
   setTimeColumn: (value: string) => void;
-  lockCurrentSchema: (schema?: Record<string, string>) => void;
-  resolveTaskId: () => Promise<string | null>;
+  lockCurrentSchema: (schema?: Record<string, ColumnKind>) => void;
   clearResults: () => Promise<void>;
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
@@ -61,6 +62,7 @@ interface Params {
 export function useSequentialAnalysisTaskFlow({
   state: {
     currentWorkspaceId,
+    tabId,
     activeNodeId,
     nodeColumnSelections,
     timeColumn,
@@ -84,7 +86,6 @@ export function useSequentialAnalysisTaskFlow({
     setNodeColumnSelections,
     setTimeColumn,
     lockCurrentSchema,
-    resolveTaskId,
     clearResults,
     onTaskIdAssigned,
   },
@@ -149,8 +150,9 @@ export function useSequentialAnalysisTaskFlow({
     }
 
     const request: SequentialAnalysisRequest = {
+      node_id: nodeIdForAnalysis,
       time_column: picked,
-      group_by_columns: validGroupByColumns.length > 0 ? validGroupByColumns : null,
+      group_by_columns: validGroupByColumns.length > 0 ? validGroupByColumns : undefined,
       frequency,
       sort_by_time: true,
       column_type: derivedColumnType,
@@ -163,9 +165,9 @@ export function useSequentialAnalysisTaskFlow({
 
     try {
       setIsAnalyzing(true);
-      const { data: result } = await runSequentialAnalysis({
-        body: request,
-        path: { workspace_id: currentWorkspaceId, node_id: nodeIdForAnalysis },
+      const { data: result } = await submitTabAnalysis({
+        body: { kind: 'sequential', ...request },
+        path: { workspace_id: currentWorkspaceId, tab_id: tabId },
         throwOnError: true,
       });
       const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
@@ -217,24 +219,13 @@ export function useSequentialAnalysisTaskFlow({
   /**
    * Returned to `SequentialAnalysisFeature` by `useSequentialAnalysisTaskFlow`.
    */
-  const handleChartTypeChange = async (value: ChartTypeOption) => {
+  const handleChartTypeChange = (value: ChartTypeOption) => {
     setChartType(value);
     setResults((prev: Record<string, unknown> | null) =>
       prev ? { ...prev, chart_type: value } : prev,
     );
 
-    if (!currentWorkspaceId) return;
-    try {
-      const taskId = await resolveTaskId();
-      if (!taskId) return;
-      await analysisTaskPreferences({
-        body: { chart_type: value },
-        path: { workspace_id: currentWorkspaceId, task_id: taskId },
-        throwOnError: true,
-      });
-    } catch (error) {
-      console.error('Failed to update sequential analysis chart type:', error);
-    }
+    // Chart type is presentation state and remains local to the frontend.
   };
 
   return {

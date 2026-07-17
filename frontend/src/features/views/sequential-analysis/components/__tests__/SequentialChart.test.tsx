@@ -74,17 +74,13 @@ describe('SequentialChart', () => {
         onToggleKey={vi.fn()}
         onPeriodClick={vi.fn()}
         onClearSelection={vi.fn()}
-        detachNodeName=""
-        detachNodeNamePlaceholder="data_trend"
-        onDetachNodeNameChange={vi.fn()}
-        onDetach={vi.fn()}
         containerRef={containerRef}
       />,
     );
 
     expect(screen.getByRole('button', { name: 'Hide Sequential Count' })).toBeInTheDocument();
     expect(containerRef.current).toBeInstanceOf(HTMLDivElement);
-    expect(screen.getByRole('button', { name: 'Add to Workspace (1)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Clear Selection' })).toBeEnabled();
     expect(screen.getByText(/2 data points but only 1 px/)).toBeInTheDocument();
 
     width = 100;

@@ -31,7 +31,7 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
   const {
     previewData,
     columns,
-    totalRows,
+    hasNext,
     fileType,
     sheetNames,
     selectedSheet,
@@ -44,12 +44,12 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
     setPageSize,
   } = useFilePreview(filename, open);
 
-  const canPrev = page > 0;
-  const canNext = totalRows ? (page + 1) * pageSize < totalRows : previewData.length > 0;
+  const canPrev = page > 1;
+  const canNext = hasNext;
 
   const handlePrev = () => {
     if (!filename || !canPrev) return;
-    setPage((p) => p - 1);
+    setPage((p) => Math.max(1, p - 1));
   };
 
   const handleNext = () => {
@@ -59,16 +59,13 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
 
   const handleSheetChange = (sheet: string | null) => {
     setSelectedSheet(sheet);
-    setPage(0);
+    setPage(1);
   };
 
   const footer = (
     <CardFooter className="border-t px-6 py-4">
       <div className="flex w-full flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">
-          Page {page + 1}
-          {totalRows ? ` of ~${String(Math.ceil(totalRows / pageSize))}` : ''}
-        </div>
+        <div className="text-xs text-muted-foreground">Page {page}</div>
         <div className="flex items-center gap-2">
           <Button onClick={handlePrev} disabled={!canPrev || loading} variant="outline" size="sm">
             Prev

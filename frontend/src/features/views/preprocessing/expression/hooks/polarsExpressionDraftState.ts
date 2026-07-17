@@ -172,7 +172,7 @@ export const buildPolarsExpressionRequest = (
       expressions: groupByState.aggExpressions
         .filter((it) => it.code.trim())
         .map((it) => ({ code: it.code.trim() })),
-      group_by_keys: [{ code: groupByState.keyCode.trim() }],
+      group_by: [{ expression: { op: 'literal', value: groupByState.keyCode.trim() } }],
     };
   }
 

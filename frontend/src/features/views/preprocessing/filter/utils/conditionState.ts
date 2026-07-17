@@ -6,7 +6,7 @@ import type {
   FilterConditionWithId,
 } from '../../types';
 
-type ChecklistDataType = 'categorical' | 'list[string]' | 'tmdist';
+type ChecklistDataType = 'categorical' | 'string-list' | 'topic-distribution';
 
 interface FilterConditionPrefillRequest {
   kind: 'datetime' | 'numeric';
@@ -39,13 +39,13 @@ const getDefaultOperatorForFilterType = (dataType: string): FilterCondition['ope
 };
 
 const isChecklistDataType = (dataType: string | undefined): dataType is ChecklistDataType =>
-  dataType === 'categorical' || dataType === 'list[string]' || dataType === 'tmdist';
+  dataType === 'categorical' || dataType === 'string-list' || dataType === 'topic-distribution';
 
 const getDefaultValueForColumn = (
   dataType: string,
   operator: FilterCondition['operator'],
 ): ConditionValue => {
-  if (dataType === 'tmdist') return { topic_id: 0, threshold: 0.05 };
+  if (dataType === 'topic-distribution') return { topic_id: 0, threshold: 0.05 };
   return operator === 'in' ? [] : '';
 };
 

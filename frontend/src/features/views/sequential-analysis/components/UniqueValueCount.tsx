@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getColumnUniqueValues } from '@/api';
+import { getNodeRowsTable } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 
 interface UniqueValueCountProps {
@@ -18,11 +18,15 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
     queryKey: queryKeys.columnUniqueValues(workspaceId, nodeId, columnName),
     // Used by: UniqueValueCount query to fetch metadata that informs group-by decisions.
     queryFn: async () => {
-      const { data: response } = await getColumnUniqueValues({
-        path: { workspace_id: workspaceId, column_name: columnName, node_id: nodeId },
-        throwOnError: true,
+      const response = await getNodeRowsTable({
+        path: { workspace_id: workspaceId, node_id: nodeId },
+        query: { page: 1, page_size: 1000 },
       });
-      return response;
+      const values = response.rows.map((row) => row[columnName]);
+      return {
+        unique_count: new Set(values.filter((value) => value !== null)).size,
+        has_null: values.some((value) => value === null),
+      };
     },
     enabled: !!workspaceId && !!nodeId && !!columnName,
   });

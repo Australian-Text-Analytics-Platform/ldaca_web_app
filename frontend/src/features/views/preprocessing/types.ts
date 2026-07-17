@@ -2,10 +2,8 @@
  * Shared types for data preprocessing features
  */
 
-import type {
-  FilterCondition as GeneratedFilterCondition,
-  FilterRequest as GeneratedFilterRequest,
-} from '@/api';
+import type { FilterConditionInput, JsonDataInput } from '@/api';
+import type { Field } from 'apache-arrow';
 
 type FilterOperator =
   | 'eq'
@@ -20,18 +18,16 @@ type FilterOperator =
   | 'between'
   | 'in';
 
-export type FilterCondition = Omit<GeneratedFilterCondition, 'operator'> & {
+export type FilterCondition = Omit<FilterConditionInput, 'operator' | 'value'> & {
   operator: FilterOperator;
+  value?: JsonDataInput;
 };
 
-export type FilterRequest = Omit<
-  GeneratedFilterRequest,
-  'conditions' | 'logic' | 'new_node_name'
-> & {
+export interface FilterRequest {
   conditions: FilterCondition[];
-  logic?: string;
-  new_node_name?: string;
-};
+  logic?: 'and' | 'or';
+  name?: string;
+}
 
 /**
  * UI-side narrowing of the value space — what the filter form actually
@@ -82,7 +78,11 @@ export interface FilterConditionWithId {
   [key: string]: ConditionValue | undefined;
 }
 
-export { type NodeDataPagination as PreviewPagination } from '@/features/workspace/data-view/types';
+export interface PreviewPagination {
+  page: number;
+  page_size: number;
+  has_next: boolean;
+}
 
 export type PreviewRow = Record<string, unknown>;
 
@@ -108,8 +108,7 @@ export interface ConcatNodeSummary {
   displayName: string;
   columns: string[];
   normalizedColumns: string[];
-  dtypes: Record<string, string>;
-  rawDtypes: Record<string, string>;
+  fields: Record<string, Field>;
   columnCount: number;
 }
 

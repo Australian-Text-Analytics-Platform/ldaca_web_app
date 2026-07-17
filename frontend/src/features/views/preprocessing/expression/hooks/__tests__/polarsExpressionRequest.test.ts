@@ -76,7 +76,7 @@ describe('buildPolarsExpressionRequest', () => {
       }),
     ).toEqual({
       context: 'group_by_agg',
-      group_by_keys: [{ code: 'pl.col("speaker")' }],
+      group_by: [{ expression: { op: 'literal', value: 'pl.col("speaker")' } }],
       expressions: [{ code: 'pl.len()' }],
     });
   });

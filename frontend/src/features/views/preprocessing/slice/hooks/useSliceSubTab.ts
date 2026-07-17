@@ -1,29 +1,23 @@
 import { useState } from 'react';
-import type { SliceRequest as SliceRequestPayload } from '@/api';
+import type { WorkspaceNodeInfo } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import {
   useNodePreviewWithRawFallback,
   type OperationPreviewFetcher,
 } from '../../hooks/useNodePreviewWithRawFallback';
-import { buildSlicePayload, deriveSliceFormModel, type SamplingMode } from './sliceFormModel';
-
-interface SliceOperationResult {
-  success?: boolean;
-  message?: string;
-  node_id?: string;
-  node_name?: string;
-  data?: {
-    node_name?: string;
-    data_type?: string;
-  };
-}
+import {
+  buildSlicePayload,
+  deriveSliceFormModel,
+  type SamplingMode,
+  type SliceRequestPayload,
+} from './sliceFormModel';
 
 export interface SliceSubTabProps {
   currentWorkspaceId: string | null;
   selectedNodeId: string | null;
   selectedNode: WorkspaceNodeMetadata | null;
-  sliceNode: (nodeId: string, request: SliceRequestPayload) => Promise<SliceOperationResult>;
+  sliceNode: (nodeId: string, request: SliceRequestPayload) => Promise<WorkspaceNodeInfo>;
   slicePreview: OperationPreviewFetcher<SliceRequestPayload>;
   isLoading: {
     operations: boolean;
@@ -403,7 +397,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     });
     const requestedName = newNodeName.trim() || autoNodeName;
     if (requestedName) {
-      payload.new_node_name = requestedName;
+      payload.name = requestedName;
     }
 
     setCurrentInlineError(null);
@@ -412,27 +406,15 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       const response = await sliceNode(selectedNodeId, payload);
       const operationLabel =
         mode === 'slice' ? 'Slice' : isFullShuffle ? 'Shuffle' : 'Random sample';
-      if (response.success === false) {
-        // Empty API messages should fall back to a default label, so keep `||`.
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        const message = response.message || `${operationLabel} operation failed`;
-        setCurrentInlineError(message);
-        onAlert(`${operationLabel} failed: ${message}`);
-        return;
-      }
-      // Empty API name values should fall through to the next candidate, so keep `||`.
-      /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
       const responseName =
-        response.node_name?.trim() ||
-        response.data?.node_name?.trim() ||
+        response.name.trim() ||
         requestedName ||
         `${selectedNodeLabel || selectedNodeId}_${mode === 'slice' ? 'sliced' : isFullShuffle ? 'shuffled' : 'sampled'}`;
-      /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
-      const resultNodeId = response.node_id;
+      const resultNodeId = response.id;
       setLastResultState({
         signature: resultSignature,
         result: {
-          nodeId: resultNodeId ?? undefined,
+          nodeId: resultNodeId,
           nodeName: responseName,
           mode,
           offset: mode === 'slice' ? offsetNumber : undefined,

@@ -50,6 +50,13 @@ The typed, queryable outcome of a successful Analysis. A Result is distinct
 from any retained file that carries its large data.
 _Avoid_: payload, artifact when referring to the typed outcome
 
+**Topic Distribution**:
+The ordered per-document proportions for the outlier topic `-1` followed by
+every real topic in ascending ID order. Every entry is present, absent
+proportions are zero, and the proportions sum to approximately one. It is
+distinct from the single dominant topic assigned to the document.
+_Avoid_: variable topic list, dominant topic
+
 **Artifact**:
 A named retained file owned by an Analysis and exposed without revealing its
 host filesystem path.

@@ -16,7 +16,6 @@
 import {
   type ColumnInfo,
   filterColumnsByType,
-  mapColumnsToInfo,
 } from '@/features/workspace/data-view/utils/columnTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
@@ -60,7 +59,7 @@ export interface NodeAddRejection {
   reason: string;
 }
 
-/** Optional typed-column getter (from ``useNodeColumnInfos``); falls back to node snapshot. */
+/** Optional typed-column getter from ``useNodeColumnInfos``. */
 export type ColumnInfoGetter = (node: WorkspaceNodeMetadata) => ColumnInfo[] | undefined;
 
 /**
@@ -94,8 +93,8 @@ export function buildNodeMap(
  * Computes the typed columns a view will accept for a node.
  * Called by: defaultColumnForNode, validateAdd, and resolveNodeInputs because
  * column options drive both add-time validation and the per-node picker.
- * Flow: prefer the typed getter, fall back to the node snapshot schema, then
- * filter by ``allowedDataTypes`` (keeping the unfiltered set only when the
+ * Flow: read the authoritative Arrow-backed getter, then filter by
+ * ``allowedDataTypes`` (keeping the unfiltered set only when the
  * filter would empty an otherwise non-empty list is NOT desired — an empty
  * filtered set means the column picker should render empty).
  */
@@ -104,8 +103,7 @@ function allowedColumnsForNode(
   constraints: NodeInputConstraints,
   getColumnInfos?: ColumnInfoGetter,
 ): ColumnInfo[] {
-  const fromGetter = getColumnInfos?.(node);
-  const infos = fromGetter?.length ? fromGetter : mapColumnsToInfo(node);
+  const infos = getColumnInfos?.(node) ?? [];
   if (!constraints.allowedDataTypes?.length) return infos;
   return filterColumnsByType(infos, constraints.allowedDataTypes);
 }

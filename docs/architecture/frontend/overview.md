@@ -10,7 +10,9 @@ flowchart LR
     SHELL["Application shell and providers"] --> FEATURES["Feature workflows"]
     FEATURES --> API["src/api public barrel"]
     API --> GENERATED["Generated OpenAPI client and types"]
+    GENERATED --> TABLES["Arrow table adapter"]
     GENERATED --> RUNTIME["Backend runtime configuration"]
+    TABLES --> RUNTIME
     RUNTIME --> BACKEND["FastAPI resources"]
 
     BACKEND -->|"resources and queries"| QUERY["TanStack Query cache"]
@@ -28,6 +30,9 @@ flowchart LR
 - `src/api/` is the public barrel for generated SDK functions and types.
 - `src/lib/backend/` owns generated-client runtime configuration and API-base
   resolution.
+- `src/lib/arrow/` owns official Apache Arrow IPC decoding and semantic field
+  classification; `src/api/tableApi.ts` is the narrow
+  generated-client adapter for binary row pages.
 - `src/features/` owns user workflows; `views/` contains sidebar features and
   `workspace/` contains the persistent graph, data, and background-work
   surfaces.

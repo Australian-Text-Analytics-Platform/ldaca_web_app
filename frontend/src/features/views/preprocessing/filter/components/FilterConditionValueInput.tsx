@@ -74,7 +74,7 @@ export function FilterConditionValueInput({
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   const dataType = condition.dataType || 'string';
 
-  if (dataType === 'tmdist') {
+  if (dataType === 'topic-distribution') {
     // Topic-distribution column: render [topic dropdown] [operator] [value %].
     // The generic operator select is hidden in the parent ConditionBuilder so
     // the topic dropdown can sit before the operator here.
@@ -92,7 +92,7 @@ export function FilterConditionValueInput({
       .map((opt) => Number(opt.value))
       .filter((n) => Number.isFinite(n))
       .sort((a, b) => a - b);
-    const operatorOptions = getOperatorsForType('tmdist');
+    const operatorOptions = getOperatorsForType('topic-distribution');
 
     return (
       <div className="flex flex-1 flex-wrap items-center gap-1.5">
@@ -153,7 +153,7 @@ export function FilterConditionValueInput({
     );
   }
 
-  if (dataType === 'categorical' || dataType === 'list[string]') {
+  if (dataType === 'categorical' || dataType === 'string-list') {
     const column = condition.column;
     const key = column ? getCategoricalKey(column) : null;
     const optionState = key ? categoricalOptions[key] : undefined;

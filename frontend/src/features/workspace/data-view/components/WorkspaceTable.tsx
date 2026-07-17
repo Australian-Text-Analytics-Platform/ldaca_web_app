@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import type {
   Column as TableColumn,
   SortingState,
-  ColumnFiltersState,
   PaginationState as TanstackPaginationState,
 } from '@tanstack/react-table';
 import {
@@ -24,15 +23,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DatetimeFormatPanel } from '@/features/views/common/components/DatetimeFormatPanel';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RowDetailPanel } from '@/features/views/common/components/RowDetailPanel';
 import { useRowDetailDialog } from '@/features/views/common/components/useRowDetailDialog';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
 import { TopicDistributionBar } from './TopicDistributionBar';
-import type { DataRow, FilterOperator, PaginationInfo } from '../types';
+import type { DataRow, NodeTablePagination } from '../types';
+import type { ColumnKind } from '@/lib/arrow/arrowTable';
 import { DATA_TYPES, getTypeDisplayName } from '../services/schemaMutations';
-import { normalizeTypeName } from '../utils/columnTypes';
 import { useColumnMutations } from '../hooks/useColumnMutations';
 
 // --- Constants ---
@@ -45,25 +43,24 @@ const WIDE_COLUMN_SAMPLE_LIMIT = 25;
 export interface WorkspaceTableProps {
   data: DataRow[];
   columns: string[];
+  columnKinds: Record<string, ColumnKind>;
   loading?: boolean;
   workspaceId?: string;
   nodeId?: string;
   documentColumn?: string;
   onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
-  onRenameColumn?: (column: string, nextName: string) => Promise<void>;
-  onDeleteColumn?: (column: string) => Promise<void>;
   onRefreshSchema?: () => Promise<unknown>;
 
   /** Server-side pagination info (1-indexed page from backend). */
-  pagination?: PaginationInfo | null;
+  pagination?: NodeTablePagination;
   /** Total row count from backend (used by TanStack for page count). */
   rowCount?: number;
+  /** Whether the Arrow page lookahead found another page. */
+  hasNext?: boolean;
 
   // Server-side state callbacks
   sorting?: SortingState;
   onSortingChange?: (sorting: SortingState) => void;
-  columnFilters?: ColumnFiltersState;
-  onColumnFiltersChange?: (filters: ColumnFiltersState) => void;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
 }
@@ -77,20 +74,18 @@ export interface WorkspaceTableProps {
 export function WorkspaceTable({
   data,
   columns: responseColumns,
+  columnKinds,
   loading = false,
   workspaceId,
   nodeId,
   documentColumn,
   onCast,
-  onRenameColumn,
-  onDeleteColumn,
   onRefreshSchema,
   pagination,
   rowCount,
+  hasNext,
   sorting = [],
   onSortingChange,
-  columnFilters = [],
-  onColumnFiltersChange,
   onPageChange,
   onPageSizeChange,
 }: WorkspaceTableProps) {
@@ -112,30 +107,18 @@ export function WorkspaceTable({
   const mutations = useColumnMutations({
     workspaceId,
     nodeId,
-    columns: backendColumns,
+    columnKinds,
     onCast,
-    onRenameColumn,
-    onDeleteColumn,
     onRefreshSchema,
   });
 
   const {
     columnTypes,
     loadingCast,
-    columnActionLoading,
-    renamingColumn,
     datetimeModal,
     closeDatetimeModal,
     handleDatetimeFormatConfirm,
-    deleteColumnDialogOpen,
-    setDeleteColumnDialogOpen,
-    columnToDelete,
-    requestDeleteColumn,
-    confirmDeleteColumn,
     handleTypeChange,
-    startRename,
-    cancelRename,
-    submitRename,
   } = mutations;
 
   const columns = useMemo(() => {
@@ -167,35 +150,6 @@ export function WorkspaceTable({
     return result;
   }, [columns, sanitizedData]);
 
-  // Filter helpers
-  const activeFilter = columnFilters.length > 0 ? columnFilters[0] : null;
-  const activeFilterColumn = activeFilter ? activeFilter.id : null;
-  const activeFilterParts = activeFilter?.value as
-    | { value: string; op: FilterOperator }
-    | undefined;
-
-  /**
-   * Applies a server-side column filter and resets pagination.
-   * Passed to `WorkspaceColumnHeader` as `onApplyFilter`.
-   */
-  const applyFilter = (col: string, value: string, op: FilterOperator) => {
-    if (!value.trim()) {
-      clearFilter(col);
-      return;
-    }
-    onColumnFiltersChange?.([{ id: col, value: { value: value.trim(), op } }]);
-    onPageChange?.(1);
-  };
-
-  /**
-   * Clears server-side filters and returns to the first page.
-   * Passed to `WorkspaceColumnHeader` as `onClearFilter`.
-   */
-  const clearFilter = (_col: string) => {
-    onColumnFiltersChange?.([]);
-    onPageChange?.(1);
-  };
-
   /**
    * Cycles one column through ascending, descending, and unsorted states.
    * Passed to `WorkspaceColumnHeader` as `onSort`.
@@ -217,25 +171,19 @@ export function WorkspaceTable({
 
   // Build column definitions
   const columnDefs: ColumnDef<DataRow>[] = columns.map((column) => {
-    const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
+    const currentType = columnTypes[column] ?? 'unknown';
     const isColumnLoading = Boolean(loadingCast[column]);
-    const isColumnMutating = Boolean(columnActionLoading[column]);
-    const isColumnBusy = isColumnLoading || isColumnMutating;
+    const isColumnBusy = isColumnLoading;
     const displayLabel = getTypeDisplayName(currentType);
     const availableTypes = [
       { value: currentType, label: displayLabel },
       ...DATA_TYPES.filter((t) => t.value !== currentType),
     ];
-    const isRenaming = renamingColumn === column;
-    const canRename = Boolean(onRenameColumn);
-    const canDelete = Boolean(onDeleteColumn);
     const isWideColumn = wideColumns.has(column);
     const isExpandedColumn = expandedColumns[column] === true;
     const isCollapsedColumn = isWideColumn && !isExpandedColumn;
 
     const sortState = sorting.find((s) => s.id === column);
-    const isFiltered = activeFilterColumn === column;
-    const isStringLike = ['string', 'categorical', 'unknown'].includes(currentType);
 
     /**
      * Toggles wide-column expansion without storing false entries.
@@ -271,11 +219,7 @@ export function WorkspaceTable({
           displayLabel={displayLabel}
           availableTypes={availableTypes}
           isColumnBusy={isColumnBusy}
-          isRenaming={isRenaming}
           canCast={Boolean(onCast)}
-          canRename={canRename}
-          canDelete={canDelete}
-          isStringLike={isStringLike}
           isWideColumn={isWideColumn}
           isCollapsedColumn={isCollapsedColumn}
           onToggleExpand={onToggleExpand}
@@ -283,21 +227,8 @@ export function WorkspaceTable({
           onSort={() => {
             handleSort(column);
           }}
-          isFiltered={isFiltered}
-          currentFilterOp={isFiltered && activeFilterParts ? activeFilterParts.op : 'contains'}
-          currentFilterValue={isFiltered && activeFilterParts ? activeFilterParts.value : ''}
-          onApplyFilter={applyFilter}
-          onClearFilter={clearFilter}
-          onStartRename={() => {
-            startRename(column);
-          }}
-          onSubmitRename={submitRename}
-          onCancelRename={cancelRename}
           onTypeChange={(newType) => {
             handleTypeChange(column, newType);
-          }}
-          onRequestDelete={() => {
-            requestDeleteColumn(column);
           }}
         />
       ),
@@ -309,7 +240,7 @@ export function WorkspaceTable({
         const cellValue = getValue();
         // Topic-distribution columns render as a stacked proportion bar rather
         // than stringified struct text.
-        if (currentType === 'tmdist') {
+        if (currentType === 'topic-distribution') {
           return <TopicDistributionBar value={cellValue} />;
         }
         // Cell values may be structs/objects; default stringification preserves prior display text.
@@ -342,7 +273,7 @@ export function WorkspaceTable({
   // TanStack Table instance (server-side)
   const pageIndex = pagination ? pagination.page - 1 : 0;
   const pageSize = pagination?.page_size ?? 20;
-  const totalRows = rowCount ?? pagination?.total_rows ?? 0;
+  const totalRows = rowCount;
 
   /**
    * Bridges TanStack pagination updates to server pagination callbacks.
@@ -376,12 +307,11 @@ export function WorkspaceTable({
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
-    manualFiltering: true,
     rowCount: totalRows,
+    pageCount: hasNext === undefined ? undefined : pageIndex + 1 + (hasNext ? 1 : 0),
     state: {
       pagination: { pageIndex, pageSize },
       sorting,
-      columnFilters,
       columnPinning,
     },
     onPaginationChange: handlePaginationChange,
@@ -550,6 +480,7 @@ export function WorkspaceTable({
           pageIndex={pageIndex}
           pageSize={pageSize}
           rowCount={totalRows}
+          hasNext={hasNext}
           compact
         />
       </div>
@@ -568,19 +499,6 @@ export function WorkspaceTable({
             return v == null ? '' : String(v);
           })
           .filter(Boolean)}
-      />
-
-      <ConfirmDialog
-        open={deleteColumnDialogOpen}
-        onOpenChange={setDeleteColumnDialogOpen}
-        title="Delete Column"
-        description={`Are you sure you want to delete column "${String(columnToDelete)}"? You can undo this action afterwards.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        variant="destructive"
-        onConfirm={() => {
-          void confirmDeleteColumn();
-        }}
       />
 
       <RowDetailPanel open={detailOpen} onOpenChange={setDetailOpen} payload={detailPayload} />

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { WorkspaceNodeInfo } from '@/api';
-import { normalizeTypeName } from '@/features/workspace/data-view/utils/columnTypes';
-import { nodeInfoQueryOptions } from '@/lib/nodeInfo';
+import type { ArrowColumn, ColumnKind } from '@/lib/arrow/arrowTable';
+import { nodeSchemaQueryOptions } from '@/lib/nodeSchema';
 
 /**
  * Normalizes the generated node-info schema for sequential analysis.
@@ -11,13 +10,8 @@ import { nodeInfoQueryOptions } from '@/lib/nodeInfo';
  * Flow: read the generated `{ column: dtype }` map and normalize each dtype for
  * the handwritten column controls.
  */
-export function normalizeSchemaFromInfo(
-  info: WorkspaceNodeInfo | null | undefined,
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(info?.schema ?? {}).map(([name, dtype]) => [name, normalizeTypeName(dtype)]),
-  );
-}
+export const arrowSchemaToKinds = (schema: ArrowColumn[]): Record<string, ColumnKind> =>
+  Object.fromEntries(schema.map(({ name, kind }) => [name, kind]));
 
 interface SchemaManagementConfig {
   /**
@@ -56,16 +50,16 @@ interface SchemaManagementConfig {
 export function useSchemaManagement(config: SchemaManagementConfig) {
   const { nodeId, isLocked, workspaceId } = config;
 
-  const [currentSchema, setCurrentSchema] = useState<Record<string, string>>({});
-  const [lockedSchema, setLockedSchema] = useState<Record<string, string> | null>(null);
+  const [currentSchema, setCurrentSchema] = useState<Record<string, ColumnKind>>({});
+  const [lockedSchema, setLockedSchema] = useState<Record<string, ColumnKind> | null>(null);
 
   // Fetch schema via the node-info query so schema readers share the same metadata cache.
   const schemaQuery = useQuery({
-    ...nodeInfoQueryOptions({
+    ...nodeSchemaQueryOptions({
       workspaceId: workspaceId ?? '',
       nodeId: nodeId ?? '',
     }),
-    select: normalizeSchemaFromInfo,
+    select: arrowSchemaToKinds,
     /** Fetches schema through node info so cast/preprocessing invalidations refresh column types. */
     /** Called by: TanStack Query inside useSchemaManagement. */
     enabled: !!nodeId && !isLocked && !!workspaceId,
@@ -97,7 +91,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
    * Freezes the schema used by an in-flight task so late refetches do not change params.
    * Called by SequentialAnalysisFeature immediately before starting a run.
    */
-  const lockCurrentSchema = (schemaToLock?: Record<string, string>) => {
+  const lockCurrentSchema = (schemaToLock?: Record<string, ColumnKind>) => {
     setLockedSchema(schemaToLock ?? currentSchema);
   };
 

@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react';
-import type { SortingState, ColumnFiltersState } from '@tanstack/react-table';
+import type { SortingState } from '@tanstack/react-table';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
-import { getNodeDataByWorkspaceId, getNodeQueryPlan, type NodeDataResponse } from '@/api';
+import { getNodeRowsTable } from '@/api';
+import type { NodeDataResponse } from '@/api/frontendModels';
 import { createNodeDataRequest, queryKeys, type NodeDataRequest } from '@/lib/queryKeys';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
-import type { FilterOperator } from '../types';
 
 export interface WorkspaceDataTableHeaderInfo {
   nodeLabel: string;
@@ -17,13 +17,8 @@ export interface WorkspaceDataTableHeaderInfo {
 }
 
 interface WorkspaceDataTableNodeActions {
-  onUndo?: () => void;
-  onRedo?: () => void;
   onDelete?: () => void;
   onRename?: (newName: string) => void;
-  onQueryPlan?: () => Promise<string | null>;
-  canUndo: boolean;
-  canRedo: boolean;
 }
 
 interface WorkspaceSelectionTab {
@@ -56,20 +51,12 @@ export interface WorkspaceDataTableViewModel {
 const DEFAULT_NODE_TABLE_REQUEST = createNodeDataRequest({ page: 1, page_size: 20 });
 
 const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
-  data: [],
-  revision: '',
-  pagination: {
-    page: 0,
-    page_size: 20,
-    total_rows: 0,
-    total_pages: 0,
-    has_next: false,
-    has_prev: false,
-  },
+  page: 1,
+  page_size: 20,
+  rows: [],
   columns: [],
-  dtypes: {},
-  sorting: { sort_by: null, descending: false },
-  filtering: { column: null, value: null, op: 'contains' },
+  columnKinds: {},
+  has_next: false,
 });
 
 /**
@@ -124,13 +111,9 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const { activeNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
   const {
     castColumn,
-    renameColumn,
-    deleteColumn,
     refreshNodeSchema,
     deleteNode,
     renameNode,
-    undoNode,
-    redoNode,
     activateNode,
     reorderSelectedNodes,
     removeNode,
@@ -225,51 +208,35 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       if (!currentWorkspaceId || !activeNodeId) {
         throw new Error('Missing workspace or node ID');
       }
-      const { data } = await getNodeDataByWorkspaceId({
+      const data = await getNodeRowsTable({
         path: { workspace_id: currentWorkspaceId, node_id: activeNodeId },
         query: nodeTableRequest,
-        throwOnError: true,
       });
-      return data;
+      return {
+        page: nodeTableRequest.page,
+        page_size: nodeTableRequest.page_size,
+        rows: data.rows,
+        columns: data.columns,
+        columnKinds: Object.fromEntries(data.schema.map((column) => [column.name, column.kind])),
+        has_next: data.hasNext,
+      } satisfies NodeDataResponse;
     },
     staleTime: 30 * 1000,
   });
   const nodeData = nodeDataQuery.data ?? EMPTY_NODE_DATA;
 
-  const selectedNodeCapabilities = selectedNode as {
-    id?: string;
-    can_undo?: boolean;
-    can_redo?: boolean;
-  } | null;
-  const canUndo = Boolean(selectedNodeCapabilities?.can_undo);
-  const canRedo = Boolean(selectedNodeCapabilities?.can_redo);
-
   const header: WorkspaceDataTableHeaderInfo = {
     nodeLabel: resolveNodeDisplayLabel(selectedNode) ?? 'Unknown node',
     tabPosition,
     totalTabs: selectedNodeIds.length,
-    isEmptyTable: Array.isArray(nodeData.data) && nodeData.data.length === 0,
+    isEmptyTable: nodeData.rows.length === 0,
   };
 
   const nodeActions: WorkspaceDataTableNodeActions = {
-    onUndo: selectedNode?.id ? () => void undoNode(selectedNode.id) : undefined,
-    onRedo: selectedNode?.id ? () => void redoNode(selectedNode.id) : undefined,
     onDelete: selectedNode?.id ? () => void deleteNode(selectedNode.id) : undefined,
     onRename: selectedNode?.id
       ? (newName: string) => void renameNode(selectedNode.id, newName)
       : undefined,
-    onQueryPlan: selectedNode?.id
-      ? async () => {
-          if (!currentWorkspaceId) return null;
-          const { data: resp } = await getNodeQueryPlan({
-            path: { workspace_id: currentWorkspaceId, node_id: selectedNode.id },
-            throwOnError: true,
-          });
-          return resp.plan;
-        }
-      : undefined,
-    canUndo,
-    canRedo,
   };
 
   const tabs: WorkspaceSelectionTabsState = {
@@ -287,19 +254,6 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const sorting: SortingState = nodeTableRequest.sort_by
     ? [{ id: nodeTableRequest.sort_by, desc: nodeTableRequest.descending }]
     : [];
-
-  const columnFilters: ColumnFiltersState =
-    nodeTableRequest.filter_column && nodeTableRequest.filter_value
-      ? [
-          {
-            id: nodeTableRequest.filter_column,
-            value: {
-              value: nodeTableRequest.filter_value,
-              op: nodeTableRequest.filter_op as FilterOperator,
-            },
-          },
-        ]
-      : [];
 
   /**
    * Adapts TanStack sorting into the active node's complete request.
@@ -319,18 +273,6 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
    * Adapts TanStack column filters into the active node's complete request.
    * Called by: `WorkspaceTable` through its controlled filter callback.
    */
-  const onColumnFiltersChange = (next: ColumnFiltersState) => {
-    const filter = next[0];
-    const parts = filter?.value as { value: string; op: string } | undefined;
-    updateNodeTableRequest((request) => ({
-      ...request,
-      page: 1,
-      filter_column: filter?.id ?? null,
-      filter_value: parts?.value ?? null,
-      filter_op: parts?.op ?? 'contains',
-    }));
-  };
-
   // Mutation callbacks are stable per active node id so the WorkspaceTable
   // effect that depends on `onRefreshSchema` only fires when the selection
   // actually changes, not on every parent render.
@@ -345,24 +287,6 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     [selectedNodeIdForCallbacks, castColumn],
   );
 
-  /** Renames a column on the active node. */
-  const handleRenameColumn = useCallback(
-    async (column: string, nextName: string) => {
-      if (!selectedNodeIdForCallbacks) return;
-      await renameColumn(selectedNodeIdForCallbacks, column, nextName);
-    },
-    [selectedNodeIdForCallbacks, renameColumn],
-  );
-
-  /** Deletes a column from the active node. */
-  const handleDeleteColumn = useCallback(
-    async (column: string) => {
-      if (!selectedNodeIdForCallbacks) return;
-      await deleteColumn(selectedNodeIdForCallbacks, column);
-    },
-    [selectedNodeIdForCallbacks, deleteColumn],
-  );
-
   /** Refreshes schema for the active node after column mutations. */
   const handleRefreshSchema = useCallback(async () => {
     if (!selectedNodeIdForCallbacks) return undefined;
@@ -370,22 +294,19 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   }, [selectedNodeIdForCallbacks, refreshNodeSchema]);
 
   const table: WorkspaceTableProps = {
-    data: nodeData.data,
+    data: nodeData.rows,
     columns: nodeData.columns,
+    columnKinds: nodeData.columnKinds,
     loading: nodeDataQuery.isLoading,
     workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,
     documentColumn: selectedNode?.document ?? undefined,
     onCast: selectedNodeIdForCallbacks ? handleCast : undefined,
-    onRenameColumn: selectedNodeIdForCallbacks ? handleRenameColumn : undefined,
-    onDeleteColumn: selectedNodeIdForCallbacks ? handleDeleteColumn : undefined,
     onRefreshSchema: selectedNodeIdForCallbacks ? handleRefreshSchema : undefined,
-    pagination: nodeData.pagination,
-    rowCount: nodeData.pagination.total_rows,
+    pagination: { page: nodeData.page, page_size: nodeData.page_size },
+    hasNext: nodeData.has_next,
     sorting,
     onSortingChange,
-    columnFilters,
-    onColumnFiltersChange,
     onPageChange: (page) => {
       updateNodeTableRequest((request) => ({ ...request, page }));
     },

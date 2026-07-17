@@ -27,6 +27,10 @@ const mockSelectedNode = {
     Body: 'Utf8',
     Count: 'Int64',
   },
+  dtypes: {
+    Body: 'Utf8',
+    Count: 'Int64',
+  },
   shape: [2, 2] as [number, number],
 };
 
@@ -41,7 +45,6 @@ vi.mock('@/api', async (importOriginal) => {
 vi.mock('@/features/auth/hooks/useAuth', () => ({
   useAuth: () => ({
     isAuthenticated: true,
-    getAuthHeaders: () => ({ Authorization: 'Bearer test' }),
   }),
 }));
 
@@ -186,8 +189,7 @@ describe('DataPreprocessingFeature replace tab', () => {
         pagination: {
           page: 1,
           page_size: 10,
-          total_rows: 1,
-          total_pages: 1,
+          has_next: false,
         },
       },
     });
@@ -197,8 +199,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       pagination: {
         page: 1,
         page_size: 10,
-        total_rows: 1,
-        total_pages: 1,
+        has_next: false,
       },
     });
     mockFilterNode.mockResolvedValue(undefined);
@@ -208,8 +209,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       pagination: {
         page: 1,
         page_size: 10,
-        total_rows: 1,
-        total_pages: 1,
+        has_next: false,
       },
     });
     mockSliceNode.mockResolvedValue({
@@ -224,8 +224,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       pagination: {
         page: 1,
         page_size: 10,
-        total_rows: 1,
-        total_pages: 1,
+        has_next: false,
       },
     });
     mockReplaceText.mockResolvedValue({
@@ -259,7 +258,7 @@ describe('DataPreprocessingFeature replace tab', () => {
           source_column: 'Body',
           pattern: regexPattern,
           replacement: '#',
-          output_column_name: 'Body',
+          output_column: 'Body',
         },
       });
     });
@@ -275,7 +274,7 @@ describe('DataPreprocessingFeature replace tab', () => {
         source_column: 'Body',
         pattern: regexPattern,
         replacement: '#',
-        output_column_name: 'Body',
+        output_column: 'Body',
       });
     });
   });
@@ -355,7 +354,7 @@ describe('DataPreprocessingFeature replace tab', () => {
         mode: 'random_sample',
         sample_size: 0.4,
         random_seed: 7,
-        new_node_name: 'Corpus_sampled_fr_0_4_rs_7',
+        name: 'Corpus_sampled_fr_0_4_rs_7',
       });
     });
   });
@@ -476,7 +475,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       expect(nodeId).toBe('node-1');
       expect(payload).toMatchObject({
         logic: 'and',
-        new_node_name: 'custom_filter_name',
+        name: 'custom_filter_name',
       });
       expect(payload.conditions).toMatchObject([
         {
@@ -497,8 +496,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       pagination: {
         page: 1,
         page_size: 10,
-        total_rows: 0,
-        total_pages: 1,
+        has_next: false,
       },
     });
 
@@ -537,8 +535,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       pagination: {
         page: 1,
         page_size: 10,
-        total_rows: 1,
-        total_pages: 1,
+        has_next: false,
       },
     });
 

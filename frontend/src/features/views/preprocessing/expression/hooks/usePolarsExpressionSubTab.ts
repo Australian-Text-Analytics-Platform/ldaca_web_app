@@ -203,7 +203,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     try {
       const req: PolarsExpressionRequest = {
         ...serializedRequest,
-        new_node_name: newNodeName.trim() || newNodeNamePlaceholder,
+        name: newNodeName.trim() || newNodeNamePlaceholder,
       };
       await polarsExpressionApply(nodeId, req);
       await refreshNodeSchema(nodeId);

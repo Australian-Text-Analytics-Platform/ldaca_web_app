@@ -50,12 +50,12 @@ Token-frequency submission resolves one exact source column and tokenizer
 model per selected Data Block. The worker validates those mappings against the
 immutable snapshot; there is no Workspace-wide tokenizer override.
 
-## Result Projection And Artifacts
+## Result Projection, Tables, And Artifacts
 
 Every successful Analysis stores one strict kind-specific Result payload in its
 per-Analysis record. Large tables or model data publish atomically beneath the
-Analysis Artifact directory and are referenced by portable name and relative
-path. Public resources never expose host paths.
+Analysis Artifact directory and are referenced by portable semantic identity.
+Public resources never expose host paths.
 
 ```mermaid
 flowchart LR
@@ -65,16 +65,27 @@ flowchart LR
     STORED --> SERVICE["AnalysisResultService"]
     FILES --> SERVICE
     SERVICE --> DEFAULT["GET result"]
-    SERVICE --> QUERY["POST result/query"]
-    DEFAULT --> PUBLIC["Typed public Result projection"]
+    SERVICE --> QUERY["POST result/query<br/>small semantic projections"]
+    DEFAULT --> PUBLIC["Typed JSON Result control resource"]
     QUERY --> PUBLIC
-    FILES --> DOWNLOAD["Named Artifact download snapshot"]
+    PUBLIC --> COMPLETE["Complete table URL<br/>token frequency, sequential"]
+    PUBLIC --> PAGED["Paged table URLs<br/>topic assignments"]
+    COMPLETE --> IPC["Arrow IPC stream"]
+    PAGED --> IPC
+    FILES --> DOWNLOAD["Named non-table Artifact download snapshot"]
 ```
 
-Result queries are side-effect free and carry all projection parameters. The
-backend persists no presentation preferences or materialized-result cache. A
-query may make a bounded response-lifetime snapshot, but it does not change the
-Analysis, Tab, or Workspace Revision.
+Result queries are side-effect free and carry all semantic projection
+parameters. The backend persists no presentation preferences or
+materialized-result cache. Token-frequency and sequential tables are complete
+Arrow streams; topic assignments are independent Arrow pages with zero-row
+schema streams. Topic Distribution is a fixed-size semantic Arrow extension
+whose entries are outlier `-1` followed by every real topic. A read may make a
+bounded response-lifetime snapshot, but it
+does not change the Analysis, Tab, or Workspace Revision.
+Topic artifacts with any other physical distribution schema fail integrity
+validation and remain clearable; they are not migrated or decoded through a
+compatibility path.
 
 ## Child Analyses
 

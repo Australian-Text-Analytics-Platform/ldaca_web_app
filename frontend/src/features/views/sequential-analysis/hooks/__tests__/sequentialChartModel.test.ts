@@ -272,7 +272,6 @@ describe('buildSequentialChartModel', () => {
           sequential_count: 4,
         },
       ],
-      total_records: 10,
       analysis_params: { column_type: 'datetime', group_by_columns: ['group'] },
     });
     const hiddenId = initial.groups.find((group) => group.label === 'B')?.id ?? '';
@@ -301,7 +300,6 @@ describe('buildSequentialChartModel', () => {
             sequential_count: 4,
           },
         ],
-        total_records: 10,
         analysis_params: { column_type: 'datetime', group_by_columns: ['group'] },
       },
       {
@@ -312,7 +310,7 @@ describe('buildSequentialChartModel', () => {
     );
 
     expect(model.counts).toEqual({
-      totalPointCount: 10,
+      totalPointCount: 3,
       totalDocumentCount: 20,
       shownPointCount: 2,
       shownDocumentCount: 6,
@@ -592,7 +590,7 @@ describe('buildSequentialChartModel', () => {
     expect(model.selection.visibleGroups).toEqual([{ values: { group: 'A' } }]);
   });
 
-  it('rejects negative or fractional aggregate metadata and uses canonical counts', () => {
+  it('rejects invalid source counts and uses canonical result rows', () => {
     const model = build(
       {
         data: [
@@ -603,7 +601,6 @@ describe('buildSequentialChartModel', () => {
             sequential_count: 3,
           },
         ],
-        total_records: -2,
         analysis_params: { column_type: 'datetime' },
       },
       { sourceDocumentCount: 1.5 },
@@ -611,6 +608,6 @@ describe('buildSequentialChartModel', () => {
 
     expect(model.counts.totalPointCount).toBe(1);
     expect(model.counts.totalDocumentCount).toBe(3);
-    expect(model.diagnostics.filter((item) => item.code === 'invalid-count')).toHaveLength(2);
+    expect(model.diagnostics.filter((item) => item.code === 'invalid-count')).toHaveLength(1);
   });
 });

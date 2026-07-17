@@ -5,367 +5,155 @@ export type ClientOptions = {
 };
 
 /**
- * AdminCleanupResponse
+ * Analysis
  *
- * Response schema for the admin session-cleanup route.
+ * Exact valid public Analysis representation.
  */
-export type AdminCleanupResponse = {
+export type Analysis = {
     /**
-     * Message
+     * Cancellation Requested At
      */
-    message: string;
-    /**
-     * Performed By
-     */
-    performed_by: string;
-};
-
-/**
- * AdminConfigResponse
- *
- * Admin-only runtime configuration response.
- *
- * Used by:
- * - admin config mutation routes and generated API clients because changing
- * process-local configuration should return the newly effective storage root.
- */
-export type AdminConfigResponse = {
-    /**
-     * Data Root
-     */
-    data_root: string;
-    /**
-     * Google Client Id
-     */
-    google_client_id?: string;
-    /**
-     * Multi User Mode
-     */
-    multi_user_mode: boolean;
-};
-
-/**
- * AdminConfigUpdate
- *
- * Request schema for admin-only process-local runtime config updates.
- *
- * Used by:
- * - admin config mutation routes because the frontend settings form only needs
- * to change the data root.
- */
-export type AdminConfigUpdate = {
-    /**
-     * Data Root
-     */
-    data_root: string;
-};
-
-/**
- * AdminUserResponse
- *
- * Admin-visible user summary with active session count.
- *
- * Used by:
- * - ``list_users`` because the admin user table returns DB-backed user rows
- * plus a computed active-session count.
- */
-export type AdminUserResponse = {
-    /**
-     * Active Sessions
-     */
-    active_sessions: number;
+    cancellation_requested_at: string | null;
     /**
      * Created At
      */
-    created_at: string | null;
+    created_at: string;
+    error: Failure | null;
     /**
-     * Email
+     * Finished At
      */
-    email: string;
+    finished_at: string | null;
     /**
      * Id
      */
     id: string;
     /**
-     * Last Login
+     * Integrity
      */
-    last_login: string | null;
+    integrity: ({
+        status: 'valid';
+    } & ValidAnalysisIntegrity) | ({
+        status: 'invalid';
+    } & InvalidAnalysisIntegrity);
     /**
-     * Name
+     * Parent Analysis Id
      */
-    name: string | null;
+    parent_analysis_id: string | null;
+    progress: Progress;
+    /**
+     * Request
+     */
+    request: ({
+        kind: 'token_frequency';
+    } & TokenFrequencyAnalysisRequest) | ({
+        kind: 'topic_modeling';
+    } & TopicModelingAnalysisRequest) | ({
+        kind: 'concordance';
+    } & ConcordanceAnalysisRequest) | ({
+        kind: 'quotation';
+    } & QuotationAnalysisRequest) | ({
+        kind: 'sequential';
+    } & SequentialAnalysisRequest) | ({
+        kind: 'annotation';
+    } & AnnotationAnalysisRequest) | ({
+        kind: 'concordance_detachment';
+    } & ConcordanceDetachmentAnalysisRequest) | ({
+        kind: 'concordance_dispersion_detachment';
+    } & ConcordanceDispersionDetachmentAnalysisRequest) | ({
+        kind: 'quotation_detachment';
+    } & QuotationDetachmentAnalysisRequest);
+    /**
+     * Revision
+     */
+    revision: number;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    state: BackgroundState;
 };
 
 /**
- * AdminUsersResponse
+ * AnalysisKind
  *
- * Response schema for the admin user list route.
+ * Function identity fixed when a Workspace Tab is created.
  */
-export type AdminUsersResponse = {
+export type AnalysisKind = 'annotation' | 'concordance' | 'quotation' | 'sequential' | 'token_frequency' | 'topic_modeling';
+
+/**
+ * AnalysisPage
+ *
+ * One-based stable page of live valid and corrupt Analyses.
+ */
+export type AnalysisPage = {
     /**
-     * Requested By
+     * Items
      */
-    requested_by: string;
+    items: Array<Analysis | CorruptAnalysis>;
     /**
-     * Total
+     * Page
      */
-    total: number;
+    page: number;
     /**
-     * Users
+     * Page Size
      */
-    users: Array<AdminUserResponse>;
+    page_size: number;
+    /**
+     * Total Items
+     */
+    total_items: number;
+    /**
+     * Total Pages
+     */
+    total_pages: number;
 };
 
 /**
- * AnalysisClearResponse
+ * AnnotationAnalysisRequest
  *
- * Response schema returned by API routes and consumed by generated clients for analysis clear response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Secret-free immutable Annotation request stored in a Workspace.
  */
-export type AnalysisClearResponse = {
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
-};
-
-/**
- * AnalysisSorting
- *
- * API schema used by routes and generated clients for analysis sorting.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AnalysisSorting = {
-    /**
-     * Descending
-     */
-    descending: boolean;
-    /**
-     * Sort By
-     */
-    sort_by?: string | null;
-};
-
-/**
- * AnalysisTab
- *
- * A single analysis tab.
- *
- * Carries identity (``tab_id``), a pointer to the analysis result it shows
- * (``task_id``), a display ``title``, selector state, and free-form view
- * settings. ``input_sets`` is keyed by selector id (for example, ``source``
- * or ``classDescriptions``) so views can persist one or more node selectors
- * on the same tab. ``settings`` is a flat string→string map a view uses to
- * round-trip lightweight scalar parameters that are not node selections — for
- * example the Annotation tab persists its Manual/AI mode, AI provider id,
- * model name, and prompt here so they survive reloads and tab switches like
- * the node selectors do. Heavier analysis parameters still live on the
- * referenced ``AnalysisTask.request``.
- *
- * Used by:
- * - `AnalysisTabGroup` and the GET/PUT tab routes because the frontend tab
- * store round-trips this exact shape.
- */
-export type AnalysisTab = {
-    /**
-     * Input Sets
-     */
-    input_sets: {
-        [key: string]: Array<AnalysisTabInput>;
-    };
-    /**
-     * Settings
-     */
-    settings: {
-        [key: string]: string;
-    };
-    /**
-     * Tab Id
-     */
-    tab_id: string;
-    /**
-     * Task Id
-     */
-    task_id?: string | null;
-    /**
-     * Title
-     */
-    title?: string;
-};
-
-/**
- * AnalysisTabGroup
- *
- * Ordered tab group for one analysis type.
- *
- * Tab order is the array order of ``tabs``; ``active_tab_id`` selects the
- * visible tab. Used by `WorkspaceTabsState` to namespace tabs per analysis
- * type (concordance, token_frequencies, ...).
- */
-export type AnalysisTabGroup = {
-    /**
-     * Active Tab Id
-     */
-    active_tab_id?: string | null;
-    /**
-     * Tabs
-     */
-    tabs?: Array<AnalysisTab>;
-};
-
-/**
- * AnalysisTabInput
- *
- * One node selected as input for an analysis tab.
- *
- * Pairs a workspace ``node_id`` with an optional ``column`` pick (the single
- * text/data column the analysis runs on; ``None`` until a column is chosen or
- * for views that need no column). The frontend ``useNodeInputs`` hook adds,
- * removes, and column-assigns these entries under the add-node-as-needed
- * model.
- *
- * Used by:
- * - `AnalysisTab.input_sets` and the GET/PUT tab routes because the frontend
- * tab store round-trips this exact shape.
- */
-export type AnalysisTabInput = {
-    /**
-     * Column
-     */
-    column?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-};
-
-/**
- * AnalysisTaskActionResponse
- *
- * Response schema returned by API routes and consumed by generated clients for analysis task action response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AnalysisTaskActionResponse = {
-    /**
-     * Data
-     */
-    data?: null;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * AnalysisTaskMetadata
- *
- * API schema used by routes and generated clients for analysis task metadata.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AnalysisTaskMetadata = {
-    /**
-     * Task Id
-     */
-    task_id?: string | null;
-    [key: string]: unknown;
-};
-
-/**
- * AnnotationAiAnnotateAllRequest
- *
- * Request to AI-classify every row and persist the whole annotation column.
- *
- * Used by:
- * - Frontend AnnotationAiPreviewPanel's "Annotate All" button because a full run
- * classifies the entire source node in concurrent batches and writes the
- * results back in one go, unlike the transient per-page preview.
- */
-export type AnnotationAiAnnotateAllRequest = {
+export type AnnotationAnalysisRequest = {
     /**
      * Annotation Column
      */
     annotation_column: string;
     /**
-     * Api Key
+     * Classes
      */
-    api_key?: string;
-    /**
-     * Base Url
-     */
-    base_url?: string | null;
-    /**
-     * Batch Size
-     */
-    batch_size?: number | null;
-    /**
-     * Class Column
-     */
-    class_column?: string;
-    /**
-     * Class Node Id
-     */
-    class_node_id: string;
-    /**
-     * Description Column
-     */
-    description_column?: string;
+    classes: Array<AnnotationClassOutput>;
     /**
      * Instruction
      */
     instruction: string;
     /**
+     * Kind
+     */
+    kind?: 'annotation';
+    /**
      * Model
      */
     model: string;
     /**
-     * Provider Id
+     * Node Id
      */
-    provider_id: string;
+    node_id: string;
+    /**
+     * Output Node Name
+     */
+    output_node_name: string;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
     /**
      * Reasoning Effort
      */
-    reasoning_effort?: string;
+    reasoning_effort?: 'low' | 'medium' | 'high';
     /**
      * Reasoning Enabled
      */
     reasoning_enabled?: boolean;
-    /**
-     * Session Id
-     */
-    session_id: string;
     /**
      * Temperature
      */
@@ -377,44 +165,13 @@ export type AnnotationAiAnnotateAllRequest = {
 };
 
 /**
- * AnnotationAiAnnotateAllResponse
- *
- * Refreshed node metadata plus how many of the total rows got a label.
+ * AnnotationClass
  */
-export type AnnotationAiAnnotateAllResponse = {
+export type AnnotationClassOutput = {
     /**
-     * Labeled Rows
+     * Description
      */
-    labeled_rows: number;
-    node: WorkspaceNodeInfo;
-    /**
-     * Total Rows
-     */
-    total_rows: number;
-};
-
-/**
- * AnnotationAiCustomProvider
- *
- * A user-defined OpenAI-compatible AI provider for annotation.
- *
- * Used by:
- * - `AnnotationAiPreferences` (and therefore `UserPreferences`) because the Annotation
- * tab lets users register custom providers (name + base URL) that persist to the
- * TOML preferences file and reappear in the provider dropdown.
- *
- * Flow: validate the provider id/name/base_url, then serialize alongside the rest of
- * the preferences payload for disk persistence and the JSON API contract.
- */
-export type AnnotationAiCustomProvider = {
-    /**
-     * Base Url
-     */
-    base_url: string;
-    /**
-     * Id
-     */
-    id: string;
+    description?: string;
     /**
      * Name
      */
@@ -422,205 +179,95 @@ export type AnnotationAiCustomProvider = {
 };
 
 /**
- * AnnotationAiDetachRequest
- *
- * Request to copy the previewed rows into a new annotated child table.
- *
- * Used by:
- * - Frontend AnnotationAiPreviewPanel's "Detach Previewed Rows" button. The rows
- * the user previewed (across every page they viewed) are read from the
- * server-side preview store, so the node lives in the URL and the panel sends
- * only the target column plus optional operation settings.
- * - The same panel's Detach button *gating*: with ``dry_run`` true the endpoint
- * only probes the server session and returns how many rows would be detached
- * (``node`` is null, nothing is created). The panel calls this on mount so the
- * button reflects the cached preview after a tab switch — the local page map is
- * reset on remount, but the server session is the source of truth — and so the
- * confirmation dialog can show the exact count.
+ * AnnotationCredentialStatus
  */
-export type AnnotationAiDetachRequest = {
+export type AnnotationCredentialStatus = {
+    /**
+     * Anthropic
+     */
+    anthropic: boolean;
+    /**
+     * Google
+     */
+    google: boolean;
+    /**
+     * Openai
+     */
+    openai: boolean;
+    /**
+     * Openrouter
+     */
+    openrouter: boolean;
+};
+
+/**
+ * AnnotationDerivation
+ */
+export type AnnotationDerivation = {
     /**
      * Annotation Column
      */
     annotation_column: string;
     /**
-     * Dry Run
+     * Kind
      */
-    dry_run?: boolean;
+    kind?: 'annotation';
     /**
-     * New Node Name
+     * Model
      */
-    new_node_name?: string | null;
+    model: string;
     /**
-     * Session Id
+     * Provider
      */
-    session_id: string;
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
 };
 
 /**
- * AnnotationAiDetachResponse
+ * AnnotationModelsResource
  *
- * Metadata for the newly created child node plus how many rows it holds.
- *
- * ``node`` is null for a ``dry_run`` probe (nothing is created); ``detached_rows``
- * is then the number of rows that *would* be detached, used only to gate/label the
- * frontend Detach button.
+ * Sorted model identifiers returned by one configured provider.
  */
-export type AnnotationAiDetachResponse = {
-    /**
-     * Detached Rows
-     */
-    detached_rows: number;
-    node?: WorkspaceNodeInfo | null;
-};
-
-/**
- * AnnotationAiModelsRequest
- *
- * Request to list a provider's available models for the AI model picker.
- *
- * Used by:
- * - Frontend ModelNameCombobox because model listing now runs server-side (the
- * browser no longer calls providers directly); it sends only the provider id,
- * an optional custom base URL, and the API key needed to authenticate the
- * listing call.
- */
-export type AnnotationAiModelsRequest = {
-    /**
-     * Api Key
-     */
-    api_key?: string;
-    /**
-     * Base Url
-     */
-    base_url?: string | null;
-    /**
-     * Provider Id
-     */
-    provider_id: string;
-};
-
-/**
- * AnnotationAiModelsResponse
- *
- * Sorted, de-duplicated model-id list returned to the model picker.
- */
-export type AnnotationAiModelsResponse = {
+export type AnnotationModelsResource = {
     /**
      * Models
      */
-    models?: Array<string>;
+    models: Array<string>;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
 };
 
 /**
- * AnnotationAiPreferences
+ * AnnotationPreviewLabel
  *
- * Persisted Annotation-tab AI settings: provider API keys and custom providers.
- *
- * Used by:
- * - `UserPreferences` because the Annotation AI panel persists per-provider API keys
- * (keyed by provider id) and any user-defined custom providers so they survive
- * reloads and sync across the frontend preferences store.
- *
- * Flow: hold the api_keys map and custom_providers list, defaulting both to empty so
- * older preference files (lacking this section) still validate cleanly.
+ * A provider label paired with its stable zero-based source row index.
  */
-export type AnnotationAiPreferences = {
-    /**
-     * Api Keys
-     */
-    api_keys?: {
-        [key: string]: string;
-    };
-    /**
-     * Custom Providers
-     */
-    custom_providers?: Array<AnnotationAiCustomProvider>;
-};
-
-/**
- * AnnotationAiPreviewClearResponse
- *
- * Acknowledgement that the node's preview session was cleared.
- */
-export type AnnotationAiPreviewClearResponse = {
-    /**
-     * Ok
-     */
-    ok?: boolean;
-};
-
-/**
- * AnnotationAiPreviewOverrideRequest
- *
- * One manual cell edit to persist onto an exact preview generation.
- *
- * Used by:
- * - Frontend AnnotationAiPreviewPanel when the user changes a prediction in the
- * dropdown, so the choice survives a tab switch and is honoured by
- * detach/annotate-all. The opaque session id prevents a delayed edit from an
- * old panel generation from attaching to a newer session for the same node.
- * A blank/whitespace ``label`` means the user picked "None" and is stored as an
- * explicit null override (which still wins over the model's label).
- */
-export type AnnotationAiPreviewOverrideRequest = {
+export type AnnotationPreviewLabel = {
     /**
      * Label
      */
-    label?: string | null;
+    label: string | null;
     /**
-     * Session Id
+     * Row Index
      */
-    session_id: string;
+    row_index: number;
 };
 
 /**
- * AnnotationAiPreviewOverrideResponse
+ * AnnotationPreviewRequest
  *
- * Acknowledgement that the edit was applied to the expected generation.
+ * One stateless, one-based page preview using the stored user credential.
  */
-export type AnnotationAiPreviewOverrideResponse = {
-    /**
-     * Ok
-     */
-    ok?: boolean;
-};
-
-/**
- * AnnotationAiPreviewRequest
- *
- * Request to AI-classify one page of a source node's texts (no persistence).
- *
- * Used by:
- * - Frontend AnnotationAiPreviewPanel per visible page because the preview shows
- * the model's predictions without writing them, so the panel sends the same
- * page/page_size slice it displays and gets back one label per row.
- */
-export type AnnotationAiPreviewRequest = {
+export type AnnotationPreviewRequest = {
     /**
      * Annotation Column
      */
     annotation_column: string;
     /**
-     * Api Key
+     * Classes
      */
-    api_key?: string;
-    /**
-     * Base Url
-     */
-    base_url?: string | null;
-    /**
-     * Class Column
-     */
-    class_column?: string;
-    /**
-     * Class Node Id
-     */
-    class_node_id: string;
-    /**
-     * Description Column
-     */
-    description_column?: string;
+    classes: Array<LdacaWordflowModelsAnnotationsAnnotationClass>;
     /**
      * Instruction
      */
@@ -629,10 +276,6 @@ export type AnnotationAiPreviewRequest = {
      * Model
      */
     model: string;
-    /**
-     * Node Id
-     */
-    node_id: string;
     /**
      * Page
      */
@@ -642,13 +285,13 @@ export type AnnotationAiPreviewRequest = {
      */
     page_size?: number;
     /**
-     * Provider Id
+     * Provider
      */
-    provider_id: string;
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
     /**
      * Reasoning Effort
      */
-    reasoning_effort?: string;
+    reasoning_effort?: 'low' | 'medium' | 'high';
     /**
      * Reasoning Enabled
      */
@@ -664,330 +307,234 @@ export type AnnotationAiPreviewRequest = {
 };
 
 /**
- * AnnotationAiPreviewResponse
+ * AnnotationPreviewResource
  *
- * One predicted class (or null) per previewed row, aligned to page order.
+ * Direct stateless preview result for one source-node page.
  */
-export type AnnotationAiPreviewResponse = {
+export type AnnotationPreviewResource = {
     /**
      * Labels
      */
-    labels?: Array<string | null>;
+    labels: Array<AnnotationPreviewLabel>;
     /**
-     * Session Id
+     * Node Id
      */
-    session_id: string;
+    node_id: string;
+    /**
+     * Page
+     */
+    page: number;
+    /**
+     * Page Size
+     */
+    page_size: number;
+    /**
+     * Total Rows
+     */
+    total_rows: number;
 };
 
 /**
- * AnnotationAiPreviewRowState
- *
- * One hydrated row: the model label, the user override, and the effective one.
+ * AnnotationResult
  */
-export type AnnotationAiPreviewRowState = {
-    /**
-     * Ai
-     */
-    ai?: string | null;
-    /**
-     * Effective
-     */
-    effective?: string | null;
-    /**
-     * Has Override
-     */
-    has_override?: boolean;
-    /**
-     * Override
-     */
-    override?: string | null;
-    /**
-     * Row Index
-     */
-    row_index: number;
-};
-
-/**
- * AnnotationAiPreviewStateResponse
- *
- * Matching session identity and rows, or null metadata when none matches.
- */
-export type AnnotationAiPreviewStateResponse = {
+export type AnnotationResult = {
     /**
      * Annotation Column
      */
-    annotation_column: string | null;
+    annotation_column: string;
     /**
-     * Rows
+     * Kind
      */
-    rows?: Array<AnnotationAiPreviewRowState>;
+    kind?: 'annotation';
     /**
-     * Session Id
+     * Output Columns
      */
-    session_id: string | null;
+    output_columns: Array<string>;
+    /**
+     * Output Node Id
+     */
+    output_node_id: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
 };
 
 /**
- * AnnotationClassDescriptionRow
+ * ApiError
  *
- * One editable class-description row returned to the Annotation UI.
- *
- * Used by:
- * - ``get_annotation_class_descriptions`` and
- * ``update_annotation_class_descriptions`` because the frontend editor
- * should always work with semantic ``class``/``description`` keys even when
- * the selected workspace columns have different names.
+ * Safe error body returned by every JSON HTTP error handler.
  */
-export type AnnotationClassDescriptionRow = {
+export type ApiError = {
     /**
-     * Class
+     * Code
      */
-    class?: string;
+    code: string;
     /**
-     * Description
+     * Details
      */
-    description?: string;
+    details?: {
+        [key: string]: JsonDataOutput;
+    } | Array<{
+        [key: string]: JsonDataOutput;
+    }> | null;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Request Id
+     */
+    request_id: string;
 };
 
 /**
- * AnnotationClassDescriptionsPayload
- *
- * Class-description editor payload for one selected workspace node.
- *
- * Used by:
- * - Annotation class-description GET/PUT routes to round-trip the selected
- * class and description columns plus their editable row values.
+ * ArtifactResource
  */
-export type AnnotationClassDescriptionsPayload = {
+export type ArtifactResource = {
     /**
-     * Class Column
+     * Media Type
      */
-    class_column?: string;
+    media_type?: string | null;
     /**
-     * Description Column
+     * Name
      */
-    description_column?: string;
+    name: string;
     /**
-     * Rows
+     * Url
      */
-    rows?: Array<AnnotationClassDescriptionRow>;
+    url: string;
 };
 
 /**
- * AnnotationCreateColumnRequest
+ * AuthProvider
  *
- * Request to add a new empty annotation column to a source node.
- *
- * Used by:
- * - Frontend Annotation view when Start is pressed in "Start new annotation"
- * mode because beginning a fresh pass must materialize the column that the
- * results table then fills in, before the view switches into resume mode.
+ * One configured hosted login provider.
  */
-export type AnnotationCreateColumnRequest = {
-    /**
-     * Column Name
-     */
-    column_name: string;
-};
-
-/**
- * AnnotationSetCellRequest
- *
- * Request to set one annotation cell value on a source node.
- *
- * Used by:
- * - Frontend Annotation results table when a reviewer picks a class in a row's
- * dropdown, because the chosen label must be written into the annotation
- * column cell instead of living only in transient component state.
- */
-export type AnnotationSetCellRequest = {
-    /**
-     * Column Name
-     */
-    column_name: string;
-    /**
-     * Row Index
-     */
-    row_index: number;
-    /**
-     * Value
-     */
-    value?: string | null;
-};
-
-/**
- * AnnotationSetParentRequest
- *
- * Request to set a class-description node's parent to the source node.
- *
- * Used by:
- * - Frontend Annotation view when Start is clicked because the class table
- * should hang off the annotated source block in the workspace graph.
- */
-export type AnnotationSetParentRequest = {
-    /**
-     * Parent Node Id
-     */
-    parent_node_id: string;
-};
-
-/**
- * AuthHealthEndpoints
- *
- * Auth endpoint index included in ``AuthHealthResponse``.
- */
-export type AuthHealthEndpoints = {
-    /**
-     * Auth Info
-     */
-    auth_info: string;
-    /**
-     * Google Auth
-     */
-    google_auth: string;
-    /**
-     * Logout
-     */
-    logout: string;
-    /**
-     * User Details
-     */
-    user_details: string;
-};
-
-/**
- * AuthHealthResponse
- *
- * Response schema for authentication subsystem health metadata.
- *
- * Used by:
- * - ``auth_health`` and generated clients because unauthenticated health
- * checks should still expose a typed response contract.
- */
-export type AuthHealthResponse = {
-    endpoints: AuthHealthEndpoints;
-    /**
-     * Google Configured
-     */
-    google_configured: boolean;
-    /**
-     * Mode
-     */
-    mode: string;
-    /**
-     * Status
-     */
-    status: string;
-};
-
-/**
- * AuthInfoResponse
- *
- * Main auth info response - tells frontend everything it needs to know
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AuthInfoResponse = {
-    /**
-     * Authenticated
-     */
-    authenticated: boolean;
-    /**
-     * Available Auth Methods
-     */
-    available_auth_methods?: Array<AuthMethod>;
-    /**
-     * Data Folder
-     */
-    data_folder?: string | null;
-    /**
-     * Requires Authentication
-     */
-    requires_authentication: boolean;
-    user?: User | null;
-};
-
-/**
- * AuthMethod
- *
- * API schema used by routes and generated clients for auth method.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type AuthMethod = {
+export type AuthProvider = {
     /**
      * Display Name
      */
     display_name: string;
     /**
-     * Enabled
+     * Entrypoint Url
      */
-    enabled: boolean;
-    /**
-     * Name
-     */
-    name: string;
-};
-
-/**
- * AuthStatusResponse
- *
- * Response schema for the lightweight auth status route.
- *
- * Used by:
- * - ``auth_status`` and generated clients because the route previously
- * returned an untyped dict despite having a stable JSON shape.
- */
-export type AuthStatusResponse = {
-    /**
-     * Authenticated
-     */
-    authenticated: boolean;
-    /**
-     * Data Folder
-     */
-    data_folder?: string | null;
-    user: AuthStatusUser;
-};
-
-/**
- * AuthStatusUser
- *
- * Minimal authenticated-user payload for the auth status route.
- *
- * Used by:
- * - ``auth_status`` because lightweight probes need identity confirmation
- * without the full auth bootstrap response.
- */
-export type AuthStatusUser = {
-    /**
-     * Email
-     */
-    email: string;
+    entrypoint_url: string;
     /**
      * Id
      */
-    id: string;
-    /**
-     * Name
-     */
-    name: string;
+    id: 'google' | 'cilogon';
 };
 
 /**
- * Body_google_auth_callback
+ * BackgroundState
  */
-export type BodyGoogleAuthCallback = {
+export type BackgroundState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+/**
+ * BinaryExpression
+ */
+export type BinaryExpressionInput = {
+    /**
+     * Left
+     */
+    left: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput);
+    /**
+     * Op
+     */
+    op: 'add' | 'subtract' | 'multiply' | 'divide' | 'modulo' | 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'and' | 'or' | 'is_in' | 'fill_null';
+    /**
+     * Right
+     */
+    right: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput);
+};
+
+/**
+ * BinaryExpression
+ */
+export type BinaryExpressionOutput = {
+    /**
+     * Left
+     */
+    left: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput);
+    /**
+     * Op
+     */
+    op: 'add' | 'subtract' | 'multiply' | 'divide' | 'modulo' | 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'and' | 'or' | 'is_in' | 'fill_null';
+    /**
+     * Right
+     */
+    right: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput);
+};
+
+/**
+ * Body_google_callback
+ */
+export type BodyGoogleCallback = {
     /**
      * Credential
      */
@@ -995,303 +542,377 @@ export type BodyGoogleAuthCallback = {
     /**
      * G Csrf Token
      */
-    g_csrf_token?: string;
-};
-
-/**
- * Body_upload_file
- */
-export type BodyUploadFile = {
+    g_csrf_token: string;
     /**
-     * File
+     * Return To
      */
-    file: Blob | File;
+    return_to?: string | null;
 };
 
 /**
- * Body_upload_workspace_zip
+ * CastDerivation
  */
-export type BodyUploadWorkspaceZip = {
-    /**
-     * File
-     */
-    file: Blob | File;
-};
-
-/**
- * CastNodeInfo
- *
- * Metadata returned for a completed cast operation.
- *
- * Used by:
- * - cast node response because the UI needs the original/resolved dtypes and
- * effective format/strict options for feedback.
- */
-export type CastNodeInfo = {
+export type CastDerivation = {
     /**
      * Column
      */
     column: string;
     /**
-     * Format Used
+     * Datetime Format
      */
-    format_used?: string | null;
+    datetime_format?: string | null;
     /**
-     * New Type
+     * Kind
      */
-    new_type: string;
-    /**
-     * Original Type
-     */
-    original_type: string;
-    /**
-     * Strict Used
-     */
-    strict_used?: boolean | null;
-    /**
-     * Target Type
-     */
-    target_type: string;
-};
-
-/**
- * CastNodeRequest
- *
- * Request body for casting one node column.
- *
- * Used by:
- * - cast node route because it validates the column, target type, optional
- * datetime format, and strict-mode flag before delegating to casting logic.
- */
-export type CastNodeRequest = {
-    /**
-     * Column
-     */
-    column: string;
-    /**
-     * Format
-     */
-    format?: string | null;
+    kind?: 'cast';
     /**
      * Strict
      */
-    strict?: boolean | null;
+    strict?: boolean;
     /**
      * Target Type
      */
-    target_type: string;
+    target_type: 'string' | 'integer' | 'float' | 'datetime' | 'categorical';
 };
 
 /**
- * CastNodeResponse
- *
- * Response returned after casting one node column.
- *
- * Used by:
- * - cast node route and generated clients because the route returns an action
- * status plus typed cast metadata instead of a full node snapshot.
+ * CastExpression
  */
-export type CastNodeResponse = {
-    cast_info: CastNodeInfo;
+export type CastExpressionInput = {
     /**
-     * Message
+     * Dtype
      */
-    message: string;
+    dtype: 'string' | 'integer' | 'float' | 'boolean' | 'datetime' | 'date';
     /**
-     * Node Id
+     * Op
      */
-    node_id: string;
+    op: 'cast';
     /**
-     * State
+     * Operand
      */
-    state: 'successful';
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput);
+    /**
+     * Strict
+     */
+    strict?: boolean;
 };
 
 /**
- * ColumnDescribeResponse
- *
- * Response model for column describe statistics.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * CastExpression
  */
-export type ColumnDescribeResponse = {
+export type CastExpressionOutput = {
     /**
-     * Column Name
+     * Dtype
      */
-    column_name: string;
+    dtype: 'string' | 'integer' | 'float' | 'boolean' | 'datetime' | 'date';
     /**
-     * Count
+     * Op
      */
-    count?: number | null;
+    op: 'cast';
     /**
-     * Max
+     * Operand
      */
-    max?: string | number | number | boolean | null;
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput);
     /**
-     * Mean
+     * Strict
      */
-    mean?: string | number | number | boolean | null;
-    /**
-     * Median
-     */
-    median?: string | number | number | boolean | null;
-    /**
-     * Min
-     */
-    min?: string | number | number | boolean | null;
-    /**
-     * Null Count
-     */
-    null_count?: number | null;
-    /**
-     * Percentile 25
-     */
-    percentile_25?: string | number | number | boolean | null;
-    /**
-     * Percentile 75
-     */
-    percentile_75?: string | number | number | boolean | null;
-    /**
-     * Std
-     */
-    std?: string | number | number | boolean | null;
+    strict?: boolean;
 };
 
 /**
- * ColumnOperationInfo
+ * CastNodeCreateRequest
  *
- * Metadata schema used by API responses to describe column operation info.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Create a child with one column cast to a supported logical type.
  */
-export type ColumnOperationInfo = {
+export type CastNodeCreateRequest = {
     /**
-     * Label
+     * Column
      */
-    label: string;
+    column: string;
     /**
-     * Method
+     * Datetime Format
      */
-    method: string;
+    datetime_format?: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'cast';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+    /**
+     * Strict
+     */
+    strict?: boolean;
+    /**
+     * Target Type
+     */
+    target_type: 'string' | 'integer' | 'float' | 'datetime' | 'categorical';
 };
 
 /**
- * ColumnOperationsResponse
- *
- * Response schema returned by API routes and consumed by generated clients for column operations response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * CloneDerivation
  */
-export type ColumnOperationsResponse = {
+export type CloneDerivation = {
     /**
-     * Operations
+     * Kind
      */
-    operations: {
-        [key: string]: Array<ColumnOperationInfo>;
+    kind?: 'clone';
+};
+
+/**
+ * CloneNodeCreateRequest
+ *
+ * Create an independent lazy-plan child from one source node.
+ */
+export type CloneNodeCreateRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'clone';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
+ * ColumnExpression
+ */
+export type ColumnExpression = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Op
+     */
+    op: 'column';
+};
+
+/**
+ * CompleteTableResource
+ *
+ * One immutable table fetched as a complete Arrow IPC stream.
+ */
+export type CompleteTableResource = {
+    /**
+     * Delivery
+     */
+    delivery?: 'complete';
+    /**
+     * Table Id
+     */
+    table_id: string;
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
+ * ConcatDerivation
+ */
+export type ConcatDerivation = {
+    /**
+     * Deduplicate
+     */
+    deduplicate?: boolean;
+    /**
+     * Kind
+     */
+    kind?: 'concat';
+};
+
+/**
+ * ConcatNodeCreateRequest
+ *
+ * Create a vertically concatenated child from schema-compatible nodes.
+ */
+export type ConcatNodeCreateRequest = {
+    /**
+     * Deduplicate
+     */
+    deduplicate?: boolean;
+    /**
+     * Kind
+     */
+    kind?: 'concat';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Source Node Ids
+     */
+    source_node_ids: Array<string>;
+};
+
+/**
+ * ConcatStringExpression
+ */
+export type ConcatStringExpressionInput = {
+    /**
+     * Op
+     */
+    op: 'concat_string';
+    /**
+     * Operands
+     */
+    operands: Array<({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput)>;
+    /**
+     * Separator
+     */
+    separator?: string;
+};
+
+/**
+ * ConcatStringExpression
+ */
+export type ConcatStringExpressionOutput = {
+    /**
+     * Op
+     */
+    op: 'concat_string';
+    /**
+     * Operands
+     */
+    operands: Array<({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput)>;
+    /**
+     * Separator
+     */
+    separator?: string;
+};
+
+/**
+ * ConcordanceAnalysisParameters
+ */
+export type ConcordanceAnalysisParameters = {
+    /**
+     * Case Sensitive
+     */
+    case_sensitive?: boolean;
+    /**
+     * Label To Node Map
+     */
+    label_to_node_map?: {
+        [key: string]: string;
     };
-};
-
-/**
- * ColumnUniqueValuesResponse
- *
- * Response schema returned by API routes and consumed by generated clients for column unique values response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type ColumnUniqueValuesResponse = {
     /**
-     * Column Name
+     * Node Columns
      */
-    column_name: string;
-    /**
-     * Has Null
-     */
-    has_null: boolean;
-    /**
-     * Unique Count
-     */
-    unique_count: number;
-    /**
-     * Unique Values
-     */
-    unique_values: Array<string | number | number | boolean>;
-};
-
-/**
- * ConcatPreviewRequest
- *
- * Request schema used by concat preview endpoints.
- *
- * Used by:
- * - concat preview and apply routes because both need the same node id list
- * and deduplication flag before building aligned LazyFrames.
- */
-export type ConcatPreviewRequest = {
-    /**
-     * Deduplicate
-     */
-    deduplicate?: boolean;
+    node_columns: {
+        [key: string]: string;
+    };
     /**
      * Node Ids
      */
     node_ids: Array<string>;
-};
-
-/**
- * ConcatRequest
- *
- * Request schema used when concatenation creates a persisted node.
- *
- * Used by:
- * - concat apply route because it extends the preview contract with an
- * optional output node name.
- */
-export type ConcatRequest = {
     /**
-     * Deduplicate
+     * Num Left Tokens
      */
-    deduplicate?: boolean;
+    num_left_tokens?: number;
     /**
-     * New Node Name
+     * Num Right Tokens
      */
-    new_node_name?: string | null;
+    num_right_tokens?: number;
     /**
-     * Node Ids
+     * Page
      */
-    node_ids: Array<string>;
+    page?: number;
+    /**
+     * Regex
+     */
+    regex?: boolean;
+    /**
+     * Search Mode
+     */
+    search_mode?: 'regex' | 'tokens';
+    /**
+     * Search Word
+     */
+    search_word: string;
+    /**
+     * Whole Word
+     */
+    whole_word?: boolean;
 };
 
 /**
  * ConcordanceAnalysisRequest
- *
- * Request schema used by API routes and generated clients for concordance analysis request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
  */
 export type ConcordanceAnalysisRequest = {
     /**
@@ -1299,9 +920,9 @@ export type ConcordanceAnalysisRequest = {
      */
     case_sensitive?: boolean;
     /**
-     * Descending
+     * Kind
      */
-    descending?: boolean;
+    kind?: 'concordance';
     /**
      * Node Columns
      */
@@ -1333,275 +954,85 @@ export type ConcordanceAnalysisRequest = {
      */
     search_word: string;
     /**
-     * Sort By
-     */
-    sort_by?: string | null;
-    /**
      * Whole Word
      */
     whole_word?: boolean;
 };
 
 /**
- * ConcordanceAnalysisResponse
- *
- * Unified concordance response for single or multi-node requests.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ConcordanceDetachmentAnalysisRequest
  */
-export type ConcordanceAnalysisResponse = {
+export type ConcordanceDetachmentAnalysisRequest = {
     /**
-     * Analysis Params
+     * Kind
      */
-    analysis_params?: {
-        [key: string]: unknown;
-    } | null;
+    kind?: 'concordance_detachment';
     /**
-     * Combinable
+     * Name
      */
-    combinable?: boolean | null;
-    /**
-     * Data
-     */
-    data: {
-        [key: string]: ConcordanceNodeResult;
-    };
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * Preferences
-     */
-    preferences?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * ConcordanceDetachOptionsResponse
- *
- * Response schema returned by API routes and consumed by generated clients for concordance detach options
- * response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type ConcordanceDetachOptionsResponse = {
-    /**
-     * Data
-     */
-    data?: {
-        [key: string]: Array<DetachNodeOption>;
-    } | null;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * ConcordanceDetachRequest
- *
- * Request schema used by API routes and generated clients for concordance detach request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type ConcordanceDetachRequest = {
-    /**
-     * Case Sensitive
-     */
-    case_sensitive?: boolean;
-    /**
-     * Column
-     */
-    column: string;
-    /**
-     * Materialized Path
-     */
-    materialized_path?: string | null;
-    /**
-     * New Node Name
-     */
-    new_node_name?: string | null;
+    name?: string | null;
     /**
      * Node Id
      */
     node_id: string;
-    /**
-     * Num Left Tokens
-     */
-    num_left_tokens?: number;
-    /**
-     * Num Right Tokens
-     */
-    num_right_tokens?: number;
-    /**
-     * Regex
-     */
-    regex?: boolean;
-    /**
-     * Search Word
-     */
-    search_word: string;
     /**
      * Selected Columns
      */
     selected_columns: Array<string>;
-    /**
-     * Whole Word
-     */
-    whole_word?: boolean;
 };
 
 /**
- * ConcordanceDispersionBinRow
- *
- * API schema used by routes and generated clients for concordance dispersion bin row.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ConcordanceDetachmentDerivation
  */
-export type ConcordanceDispersionBinRow = {
+export type ConcordanceDetachmentDerivation = {
     /**
-     * Bin Idx
+     * Kind
      */
-    bin_idx?: number | null;
-    /**
-     * Count
-     */
-    count?: number | null;
-    /**
-     * Matched Text
-     */
-    matched_text?: string | null;
+    kind?: 'concordance_detachment';
 };
 
 /**
- * ConcordanceDispersionBinsResponse
- *
- * Response schema returned by API routes and consumed by generated clients for concordance dispersion bins
- * response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ConcordanceDetachmentResult
  */
-export type ConcordanceDispersionBinsResponse = {
+export type ConcordanceDetachmentResult = {
     /**
-     * Bin Count
+     * Kind
      */
-    bin_count: number;
+    kind?: 'concordance_detachment';
     /**
-     * Document Column
+     * Output Columns
      */
-    document_column?: string | null;
+    output_columns: Array<string>;
     /**
-     * Node Id
+     * Output Node Id
      */
-    node_id: string;
+    output_node_id: string;
     /**
-     * Rows
+     * Record Count
      */
-    rows: Array<ConcordanceDispersionBinRow>;
-    /**
-     * Total Hits
-     */
-    total_hits: number;
+    record_count: number;
 };
 
 /**
- * ConcordanceDispersionDetachRequest
- *
- * Detach a per-document aggregation of concordance hits.
- *
- * Unlike `ConcordanceDetachRequest` (one row per hit), this produces one row
- * per source document with the hits collected into `List<T>` columns and the
- * raw match-window text rendered as a multi-line `CONC_extraction` string.
- *
- * `selected_bins` + `total_bins` optionally restrict the aggregation to hits
- * whose `start_idx / doc_length` falls inside one of the selected bins (the
- * chart's "in-range hits only" semantic).
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ConcordanceDispersionDetachmentAnalysisRequest
  */
-export type ConcordanceDispersionDetachRequest = {
+export type ConcordanceDispersionDetachmentAnalysisRequest = {
     /**
-     * Case Sensitive
+     * Kind
      */
-    case_sensitive?: boolean;
-    /**
-     * Column
-     */
-    column: string;
+    kind?: 'concordance_dispersion_detachment';
     /**
      * Match Case Insensitive
      */
     match_case_insensitive?: boolean;
     /**
-     * Materialized Path
+     * Name
      */
-    materialized_path?: string | null;
-    /**
-     * New Node Name
-     */
-    new_node_name?: string | null;
+    name?: string | null;
     /**
      * Node Id
      */
     node_id: string;
-    /**
-     * Num Left Tokens
-     */
-    num_left_tokens?: number;
-    /**
-     * Num Right Tokens
-     */
-    num_right_tokens?: number;
-    /**
-     * Regex
-     */
-    regex?: boolean;
-    /**
-     * Search Word
-     */
-    search_word: string;
     /**
      * Selected Bins
      */
@@ -1618,103 +1049,44 @@ export type ConcordanceDispersionDetachRequest = {
      * Total Bins
      */
     total_bins?: number | null;
-    /**
-     * Whole Word
-     */
-    whole_word?: boolean;
 };
 
 /**
- * ConcordanceMaterializeRequest
- *
- * Request schema used by API routes and generated clients for concordance materialize request.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ConcordanceDispersionDetachmentDerivation
  */
-export type ConcordanceMaterializeRequest = {
+export type ConcordanceDispersionDetachmentDerivation = {
     /**
-     * Case Sensitive
+     * Kind
      */
-    case_sensitive?: boolean;
-    /**
-     * Column
-     */
-    column: string;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Num Left Tokens
-     */
-    num_left_tokens?: number;
-    /**
-     * Num Right Tokens
-     */
-    num_right_tokens?: number;
-    /**
-     * Regex
-     */
-    regex?: boolean;
-    /**
-     * Search Mode
-     */
-    search_mode?: 'regex' | 'tokens';
-    /**
-     * Search Word
-     */
-    search_word: string;
-    /**
-     * Whole Word
-     */
-    whole_word?: boolean;
+    kind?: 'concordance_dispersion_detachment';
 };
 
 /**
- * ConcordanceMetadata
- *
- * Metadata about concordance columns to help frontend display logic
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ConcordanceDispersionDetachmentResult
  */
-export type ConcordanceMetadata = {
+export type ConcordanceDispersionDetachmentResult = {
     /**
-     * All Columns
+     * Kind
      */
-    all_columns: Array<string>;
+    kind?: 'concordance_dispersion_detachment';
     /**
-     * Concordance Columns
+     * Output Columns
      */
-    concordance_columns: Array<string>;
+    output_columns: Array<string>;
     /**
-     * Metadata Columns
+     * Output Node Id
      */
-    metadata_columns: Array<string>;
+    output_node_id: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
 };
 
 /**
- * ConcordanceNodeResult
- *
- * Per-node concordance payload returned to the frontend.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ConcordancePage
  */
-export type ConcordanceNodeResult = {
+export type ConcordancePage = {
     /**
      * Columns
      */
@@ -1723,43 +1095,47 @@ export type ConcordanceNodeResult = {
      * Data
      */
     data: Array<Array<{
-        [key: string]: unknown;
+        [key: string]: JsonDataOutput;
     }>>;
+    metadata: ResultColumnMetadata;
+    pagination: SourcePagePagination;
+    sorting: ResultSorting;
+};
+
+/**
+ * ConcordanceResult
+ */
+export type ConcordanceResult = {
+    analysis_params: ConcordanceAnalysisParameters;
     /**
-     * Materialized
+     * Combinable
      */
-    materialized?: boolean | null;
-    metadata: ConcordanceMetadata;
-    pagination: SourceRowPagination;
-    sorting: AnalysisSorting;
+    combinable: boolean;
     /**
-     * Total Matches
+     * Data
      */
-    total_matches?: number | null;
+    data: {
+        [key: string]: ConcordancePage;
+    };
+    /**
+     * Kind
+     */
+    kind?: 'concordance';
+    query: ConcordanceResultQuery;
 };
 
 /**
  * ConcordanceResultQuery
- *
- * Query overrides for reading persisted concordance results.
- *
- * Used by:
- * - `concordance_task_result` because they need this unit's "Query overrides for reading persisted concordance results" behavior.
- * - `concordance_task_result_post` because they need this unit's "Query overrides for reading persisted concordance results" behavior.
- *
- * Why:
- * - Allows pagination and sorting updates without recomputing concordance.
- *
- * Flow:
- * - FastAPI/Pydantic parses optional GET query parameters or POST body overrides.
- * - Result endpoints merge provided values into the stored concordance request.
- * - Downstream response builders receive normalized pagination, sorting, and visibility flags.
  */
 export type ConcordanceResultQuery = {
     /**
      * Descending
      */
-    descending?: boolean | null;
+    descending?: boolean;
+    /**
+     * Kind
+     */
+    kind?: 'concordance';
     /**
      * Node Id
      */
@@ -1767,40 +1143,45 @@ export type ConcordanceResultQuery = {
     /**
      * Page
      */
-    page?: number | null;
-    /**
-     * Page Number
-     */
-    page_number?: number | null;
+    page?: number;
     /**
      * Page Size
      */
-    page_size?: number | null;
-    /**
-     * Show Metadata
-     */
-    show_metadata?: boolean | null;
+    page_size?: number;
     /**
      * Sort By
      */
     sort_by?: string | null;
+};
+
+/**
+ * CorruptAnalysis
+ *
+ * Minimal collection item for a root record that cannot be parsed.
+ */
+export type CorruptAnalysis = {
     /**
-     * Update Only
+     * Code
      */
-    update_only?: boolean;
+    code?: 'analysis_corrupt';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Tab Id
+     */
+    tab_id: string;
+    /**
+     * Type
+     */
+    type?: 'corrupt_analysis';
 };
 
 /**
  * CreateFolderRequest
  *
- * Request schema used by API routes and generated clients for create folder request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Create one validated child under a relative parent path.
  */
 export type CreateFolderRequest = {
     /**
@@ -1814,117 +1195,245 @@ export type CreateFolderRequest = {
 };
 
 /**
- * CreateFolderResponse
- *
- * Response schema returned by API routes and consumed by generated clients for create folder response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * DataPortalCredentialStatus
  */
-export type CreateFolderResponse = {
+export type DataPortalCredentialStatus = {
     /**
-     * Message
+     * Deployment Configured
      */
-    message: string;
+    deployment_configured: boolean;
     /**
-     * Path
+     * User Configured
      */
-    path: string;
+    user_configured: boolean;
 };
 
 /**
- * CurrentWorkspaceResponse
+ * DataPortalImportSubmitRequest
  *
- * Response schema returned by API routes and consumed by generated clients for current workspace response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
+ * Portal import request resolved with the configured user credential.
  */
-export type CurrentWorkspaceResponse = {
+export type DataPortalImportSubmitRequest = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
+ * DataPortalRecord
+ *
+ * Normalized portal record independent of Oni JSON-LD shapes.
+ */
+export type DataPortalRecord = {
+    /**
+     * Access
+     */
+    access?: Array<string>;
+    /**
+     * Collections
+     */
+    collections?: Array<string>;
+    /**
+     * Crate Id
+     */
+    crate_id?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * File Formats
+     */
+    file_formats?: Array<string>;
     /**
      * Id
      */
-    id?: string | null;
+    id: string;
+    /**
+     * Importable
+     */
+    importable: boolean;
+    /**
+     * License
+     */
+    license?: string | null;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Types
+     */
+    types?: Array<string>;
 };
 
 /**
- * CurrentWorkspaceUpdateRequest
+ * DataPortalSearchMethod
  *
- * Request body for updating the user's selected workspace pointer.
- *
- * Used by:
- * - ``PUT /users/me/current-workspace`` because current workspace is UI
- * session state owned by the authenticated user, not an implicit target
- * selector for workspace-scoped data APIs.
- *
- * Flow: accept a workspace id to select that workspace, or ``null`` to clear
- * the user's current workspace pointer.
+ * Supported Data Portal search semantics.
  */
-export type CurrentWorkspaceUpdateRequest = {
+export type DataPortalSearchMethod = 'keyword' | 'identifier' | 'collection' | 'file_format' | 'all';
+
+/**
+ * DataPortalSearchRequest
+ *
+ * One one-based portal search using the configured user credential.
+ */
+export type DataPortalSearchRequest = {
+    method?: DataPortalSearchMethod;
     /**
-     * Workspace Id
+     * Page
      */
-    workspace_id?: string | null;
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Query
+     */
+    query?: string;
 };
 
 /**
- * DetachNodeOption
+ * DataPortalSearchResource
  *
- * Shared base for detach-node-option responses across analysis tools.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Direct normalized portal result page.
  */
-export type DetachNodeOption = {
+export type DataPortalSearchResource = {
     /**
-     * Available Columns
+     * Items
      */
-    available_columns: Array<string>;
+    items: Array<DataPortalRecord>;
     /**
-     * Default Selected Columns
+     * Page
      */
-    default_selected_columns?: Array<string> | null;
+    page: number;
     /**
-     * Disabled Columns
+     * Page Size
      */
-    disabled_columns?: Array<string>;
+    page_size: number;
     /**
-     * Node Id
+     * Total
      */
-    node_id: string;
+    total: number;
+};
+
+/**
+ * DataPortalUserFileImportRequest
+ */
+export type DataPortalUserFileImportRequest = {
     /**
-     * Node Name
+     * Identifier
      */
-    node_name: string;
+    identifier: string;
     /**
-     * Text Column
+     * Kind
      */
-    text_column?: string | null;
+    kind?: 'data_portal';
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
+ * DataPortalUserFileImportResult
+ */
+export type DataPortalUserFileImportResult = {
+    /**
+     * Bytes Written
+     */
+    bytes_written: number;
+    /**
+     * Destination Path
+     */
+    destination_path: string;
+    /**
+     * File Count
+     */
+    file_count: number;
+    /**
+     * Kind
+     */
+    kind?: 'data_portal';
+};
+
+/**
+ * DerivationInput
+ *
+ * One ordered, role-bearing derivation input.
+ */
+export type DerivationInput = {
+    /**
+     * Role
+     */
+    role: 'source' | 'left' | 'right' | 'member';
+    /**
+     * Value
+     */
+    value: ({
+        type: 'source';
+    } & SourceProvenance) | ({
+        type: 'node';
+    } & NodeReference) | ({
+        type: 'derivation';
+    } & DerivationProvenance);
+};
+
+/**
+ * DerivationProvenance
+ *
+ * A typed operation applied to ordered live or composed inputs.
+ */
+export type DerivationProvenance = {
+    /**
+     * Inputs
+     */
+    inputs: Array<DerivationInput>;
+    /**
+     * Operation
+     */
+    operation: ({
+        kind: 'clone';
+    } & CloneDerivation) | ({
+        kind: 'slice';
+    } & SliceDerivation) | ({
+        kind: 'filter';
+    } & FilterDerivation) | ({
+        kind: 'replace';
+    } & ReplaceDerivation) | ({
+        kind: 'expression';
+    } & ExpressionDerivation) | ({
+        kind: 'concat';
+    } & ConcatDerivation) | ({
+        kind: 'join';
+    } & JoinDerivation) | ({
+        kind: 'cast';
+    } & CastDerivation) | ({
+        kind: 'annotation';
+    } & AnnotationDerivation) | ({
+        kind: 'concordance_detachment';
+    } & ConcordanceDetachmentDerivation) | ({
+        kind: 'concordance_dispersion_detachment';
+    } & ConcordanceDispersionDetachmentDerivation) | ({
+        kind: 'quotation_detachment';
+    } & QuotationDetachmentDerivation);
+    /**
+     * Type
+     */
+    type?: 'derivation';
 };
 
 /**
  * DtypeNormalizationChange
  *
- * API schema used by routes and generated clients for dtype normalization change.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * One source-file dtype normalization applied during node creation.
  */
 export type DtypeNormalizationChange = {
     /**
@@ -1946,28 +1455,137 @@ export type DtypeNormalizationChange = {
 };
 
 /**
- * ErrorResponse
- *
- * Standard error response format.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: normalize inputs, delegate to the owning backend state or service boundary, and
- * return serialized values or existing domain errors to callers.
+ * ExpressionDerivation
  */
-export type ErrorResponse = {
+export type ExpressionDerivation = {
     /**
-     * Details
+     * Context
      */
-    details?: {
-        [key: string]: unknown;
-    } | null;
+    context: 'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg';
     /**
-     * Error
+     * Expressions
      */
-    error: string;
+    expressions: Array<ExpressionItemOutput>;
+    /**
+     * Group By
+     */
+    group_by?: Array<ExpressionItemOutput>;
+    /**
+     * Kind
+     */
+    kind?: 'expression';
+};
+
+/**
+ * ExpressionItem
+ */
+export type ExpressionItemInput = {
+    /**
+     * Alias
+     */
+    alias?: string | null;
+    /**
+     * Descending
+     */
+    descending?: boolean;
+    /**
+     * Expression
+     */
+    expression: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput);
+};
+
+/**
+ * ExpressionItem
+ */
+export type ExpressionItemOutput = {
+    /**
+     * Alias
+     */
+    alias?: string | null;
+    /**
+     * Descending
+     */
+    descending?: boolean;
+    /**
+     * Expression
+     */
+    expression: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput);
+};
+
+/**
+ * ExpressionNodeCreateRequest
+ *
+ * Create a child from a typed expression tree compiled by the server.
+ */
+export type ExpressionNodeCreateRequest = {
+    /**
+     * Context
+     */
+    context: 'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg';
+    /**
+     * Expressions
+     */
+    expressions: Array<ExpressionItemInput>;
+    /**
+     * Group By
+     */
+    group_by?: Array<ExpressionItemInput>;
+    /**
+     * Kind
+     */
+    kind?: 'expression';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
+ * Failure
+ *
+ * Safe durable terminal failure with no internal diagnostics.
+ */
+export type Failure = {
+    /**
+     * Code
+     */
+    code: string;
     /**
      * Message
      */
@@ -1975,134 +1593,43 @@ export type ErrorResponse = {
 };
 
 /**
- * FileInfoResponse
+ * FileNodeCreateRequest
  *
- * Response schema returned by API routes and consumed by generated clients for file info response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Create one source node from a safe user-file path.
  */
-export type FileInfoResponse = {
+export type FileNodeCreateRequest = {
     /**
-     * Created At
+     * File Path
      */
-    created_at: number;
+    file_path: string;
+    /**
+     * Kind
+     */
+    kind?: 'file';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Sheet Name
+     */
+    sheet_name?: string | null;
+};
+
+/**
+ * FileResource
+ *
+ * One addressable regular file or directory below the user's data root.
+ */
+export type FileResource = {
     /**
      * File Type
      */
-    file_type: string;
-    /**
-     * Filename
-     */
-    filename: string;
+    file_type?: string | null;
     /**
      * Modified At
      */
     modified_at: number;
-    /**
-     * Size Byte
-     */
-    size_Byte: number;
-};
-
-/**
- * FilePreviewRequest
- *
- * Request body for previewing one user file.
- *
- * Used by:
- * - file preview route and preview helpers because they need the selected
- * filename, pagination window, and optional format-specific payload such as
- * an Excel sheet name.
- */
-export type FilePreviewRequest = {
-    /**
-     * Filename
-     */
-    filename: string;
-    /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Page Size
-     */
-    page_size?: number;
-    /**
-     * Payload
-     */
-    payload?: {
-        [key: string]: unknown;
-    } | null;
-};
-
-/**
- * FilePreviewResponse
- *
- * Typed preview payload returned for supported user data files.
- *
- * Used by:
- * - file preview route and generated clients because the Data Loader needs
- * explicit columns, preview rows, total row count, and sheet metadata.
- */
-export type FilePreviewResponse = {
-    /**
-     * Columns
-     */
-    columns: Array<string>;
-    /**
-     * File Type
-     */
-    file_type: string;
-    /**
-     * Filename
-     */
-    filename: string;
-    /**
-     * Preview
-     */
-    preview: Array<{
-        [key: string]: unknown;
-    }>;
-    /**
-     * Selected Sheet
-     */
-    selected_sheet?: string | null;
-    /**
-     * Sheet Names
-     */
-    sheet_names?: Array<string> | null;
-    /**
-     * Supported Types
-     */
-    supported_types: Array<string>;
-    /**
-     * Total Rows
-     */
-    total_rows: number;
-};
-
-/**
- * FileTreeNodeResponse
- *
- * Response schema returned by API routes and consumed by generated clients for file tree node response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type FileTreeNodeResponse = {
-    /**
-     * Children
-     */
-    children?: Array<FileTreeNodeResponse> | null;
     /**
      * Name
      */
@@ -2112,9 +1639,13 @@ export type FileTreeNodeResponse = {
      */
     path: string;
     /**
-     * Size
+     * Preview Available
      */
-    size?: number | null;
+    preview_available?: boolean;
+    /**
+     * Size Bytes
+     */
+    size_bytes?: number | null;
     /**
      * Type
      */
@@ -2122,451 +1653,253 @@ export type FileTreeNodeResponse = {
 };
 
 /**
- * FileUploadResponse
+ * FileWorksheetsResource
  *
- * Response schema returned by API routes and consumed by generated clients for file upload response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Worksheet selection metadata for one Excel user file.
  */
-export type FileUploadResponse = {
+export type FileWorksheetsResource = {
     /**
-     * File Type
+     * Default Sheet
      */
-    file_type: string;
+    default_sheet: string;
     /**
-     * Filename
+     * Sheets
      */
-    filename: string;
-    /**
-     * Preview Available
-     */
-    preview_available: boolean;
-    /**
-     * Size
-     */
-    size: number;
-    /**
-     * Upload Time
-     */
-    upload_time: string;
-};
-
-/**
- * FilesImportTaskStartResponse
- *
- * Response schema returned by API routes and consumed by generated clients for files import task start response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type FilesImportTaskStartResponse = {
-    /**
-     * Message
-     */
-    message: string;
-    metadata: FilesTaskMetadataResponse;
-    /**
-     * State
-     */
-    state: 'running';
-};
-
-/**
- * FilesTaskActionDataResponse
- *
- * Response schema returned by API routes and consumed by generated clients for files task action data response.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type FilesTaskActionDataResponse = {
-    /**
-     * Cancelled
-     */
-    cancelled?: boolean | null;
-    /**
-     * Cancelled Count
-     */
-    cancelled_count?: number | null;
-    /**
-     * Cleared Count
-     */
-    cleared_count?: number | null;
-};
-
-/**
- * FilesTaskActionResponse
- *
- * Response schema returned by API routes and consumed by generated clients for files task action response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type FilesTaskActionResponse = {
-    data: FilesTaskActionDataResponse;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: string;
-};
-
-/**
- * FilesTaskMetadataResponse
- *
- * Response schema returned by API routes and consumed by generated clients for files task metadata response.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type FilesTaskMetadataResponse = {
-    /**
-     * Task Id
-     */
-    task_id: string;
-};
-
-/**
- * FilesTasksListResponse
- *
- * Response schema returned by API routes and consumed by generated clients for files tasks list response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type FilesTasksListResponse = {
-    /**
-     * Data
-     */
-    data: Array<{
-        [key: string]: unknown;
-    }>;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: string;
+    sheets: Array<string>;
 };
 
 /**
  * FilterCondition
  *
- * API schema used by routes and generated clients for filter condition.
- *
- * Used by:
- * - backend request/response models, backend tests because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * One typed predicate used by a filter derivation.
  */
-export type FilterCondition = {
+export type FilterConditionInput = {
     /**
      * Case Sensitive
      */
-    case_sensitive?: boolean | null;
+    case_sensitive?: boolean;
     /**
      * Column
      */
     column: string;
     /**
-     * Datatype
-     */
-    dataType?: string | null;
-    /**
-     * Id
-     */
-    id?: string | null;
-    /**
      * Negate
      */
-    negate?: boolean | null;
+    negate?: boolean;
     /**
      * Operator
      */
-    operator: string;
+    operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains' | 'starts_with' | 'ends_with' | 'is_null' | 'is_not_null' | 'between';
     /**
      * Regex
      */
-    regex?: boolean | null;
+    regex?: boolean;
     /**
      * Value
      */
-    value: string | number | number | boolean | Array<string | number | number | boolean | null> | {
-        [key: string]: unknown;
+    value?: string | number | number | boolean | Array<string | number | number | boolean | null> | {
+        [key: string]: JsonDataInput;
     } | null;
 };
 
 /**
- * FilterPreviewResponse
+ * FilterCondition
  *
- * Response schema returned by API routes and consumed by generated clients for filter preview response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * One typed predicate used by a filter derivation.
  */
-export type FilterPreviewResponse = {
+export type FilterConditionOutput = {
     /**
-     * Columns
+     * Case Sensitive
      */
-    columns: Array<string>;
+    case_sensitive?: boolean;
     /**
-     * Data
+     * Column
      */
-    data: Array<{
-        [key: string]: unknown;
-    }>;
+    column: string;
     /**
-     * Dtypes
+     * Negate
      */
-    dtypes: {
-        [key: string]: string;
-    };
-    pagination: PaginationInfo;
+    negate?: boolean;
+    /**
+     * Operator
+     */
+    operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains' | 'starts_with' | 'ends_with' | 'is_null' | 'is_not_null' | 'between';
+    /**
+     * Regex
+     */
+    regex?: boolean;
+    /**
+     * Value
+     */
+    value?: string | number | number | boolean | Array<string | number | number | boolean | null> | {
+        [key: string]: JsonDataOutput;
+    } | null;
 };
 
 /**
- * FilterRequest
- *
- * Request schema used by API routes and generated clients for filter request.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * FilterDerivation
  */
-export type FilterRequest = {
+export type FilterDerivation = {
     /**
      * Conditions
      */
-    conditions: Array<FilterCondition>;
+    conditions: Array<FilterConditionOutput>;
+    /**
+     * Kind
+     */
+    kind?: 'filter';
     /**
      * Logic
      */
-    logic?: string | null;
-    /**
-     * New Node Name
-     */
-    new_node_name?: string | null;
+    logic?: 'and' | 'or';
 };
 
 /**
- * GoogleIn
+ * FilterNodeCreateRequest
  *
- * API schema used by routes and generated clients for google in.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Create a child node whose rows satisfy typed filter predicates.
  */
-export type GoogleIn = {
+export type FilterNodeCreateRequest = {
     /**
-     * Id Token
+     * Conditions
      */
-    id_token: string;
+    conditions: Array<FilterConditionInput>;
+    /**
+     * Kind
+     */
+    kind?: 'filter';
+    /**
+     * Logic
+     */
+    logic?: 'and' | 'or';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
 };
 
 /**
- * GoogleOut
+ * HealthResponse
  *
- * API schema used by routes and generated clients for google out.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Minimal public readiness payload for probes and uptime monitors.
  */
-export type GoogleOut = {
-    /**
-     * Access Token
-     */
-    access_token: string;
-    /**
-     * Expires In
-     */
-    expires_in: number;
-    /**
-     * Refresh Token
-     */
-    refresh_token: string;
-    /**
-     * Scope
-     */
-    scope: string;
-    /**
-     * Token Type
-     */
-    token_type: string;
-    user: User;
-};
-
-/**
- * HTTPValidationError
- */
-export type HttpValidationError = {
-    /**
-     * Detail
-     */
-    detail?: Array<ValidationError>;
-};
-
-/**
- * ImportSampleDataRequest
- *
- * Request schema used by API routes and generated clients for import sample data request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type ImportSampleDataRequest = {
-    /**
-     * Collection Ids
-     */
-    collection_ids?: Array<string>;
-};
-
-/**
- * ImportSampleDataResponse
- *
- * Response schema returned by API routes and consumed by generated clients for import sample data response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type ImportSampleDataResponse = {
-    /**
-     * Bytes Copied
-     */
-    bytes_copied: number;
-    /**
-     * File Count
-     */
-    file_count: number;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * Remote Download Started
-     */
-    remote_download_started?: boolean;
-    /**
-     * Removed Existing
-     */
-    removed_existing: boolean;
-    /**
-     * Sample Dir
-     */
-    sample_dir?: string | null;
+export type HealthResponse = {
     /**
      * Status
      */
-    status: string;
+    status: 'ready' | 'stopping';
+    /**
+     * Version
+     */
+    version: string;
 };
 
 /**
- * LDaCAImportRequest
- *
- * Request schema used by API routes and generated clients for l da c a import request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * InvalidAnalysisIntegrity
  */
-export type LDaCaImportRequest = {
+export type InvalidAnalysisIntegrity = {
     /**
-     * Filename
+     * Code
      */
-    filename?: string | null;
+    code?: 'analysis_input_missing';
     /**
-     * Url
+     * Missing Input Ids
      */
-    url: string;
+    missing_input_ids: Array<string>;
+    /**
+     * Status
+     */
+    status?: 'invalid';
 };
 
 /**
- * MessageResponse
- *
- * Response schema returned by API routes and consumed by generated clients for message response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * JoinDerivation
  */
-export type MessageResponse = {
+export type JoinDerivation = {
     /**
-     * Message
+     * How
      */
-    message: string;
+    how?: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross';
+    /**
+     * Kind
+     */
+    kind?: 'join';
+    /**
+     * Left On
+     */
+    left_on?: string | null;
+    /**
+     * Right On
+     */
+    right_on?: string | null;
+};
+
+/**
+ * JoinNodeCreateRequest
+ *
+ * Create a relational join child from two source nodes.
+ */
+export type JoinNodeCreateRequest = {
+    /**
+     * How
+     */
+    how?: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross';
+    /**
+     * Kind
+     */
+    kind?: 'join';
+    /**
+     * Left Node Id
+     */
+    left_node_id: string;
+    /**
+     * Left On
+     */
+    left_on?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Right Node Id
+     */
+    right_node_id: string;
+    /**
+     * Right On
+     */
+    right_on?: string | null;
+};
+
+export type JsonDataInput = string | number | number | boolean | Array<JsonDataInput> | {
+    [key: string]: JsonDataInput;
+} | null;
+
+export type JsonDataOutput = string | number | number | boolean | Array<JsonDataOutput> | {
+    [key: string]: JsonDataOutput;
+} | null;
+
+/**
+ * LiteralExpression
+ */
+export type LiteralExpression = {
+    /**
+     * Op
+     */
+    op: 'literal';
+    /**
+     * Value
+     */
+    value: string | number | number | boolean | Array<string | number | number | boolean | null> | null;
 };
 
 /**
  * MoveFileRequest
  *
- * Request schema used by API routes and generated clients for move file request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Move one file into an existing relative directory.
  */
 export type MoveFileRequest = {
     /**
@@ -2576,88 +1909,244 @@ export type MoveFileRequest = {
     /**
      * Target Directory Path
      */
-    target_directory_path: string;
+    target_directory_path?: string;
 };
 
 /**
- * NodeActionResponse
+ * NodeReference
  *
- * Response shared by node actions that do not need a full node payload.
- *
- * Used by:
- * - node delete route because the frontend only needs success state and a
- * message after the workspace graph is invalidated.
+ * One live Data Block dependency inside a derivation expression.
  */
-export type NodeActionResponse = {
+export type NodeReference = {
     /**
-     * Message
+     * Node Id
      */
-    message: string;
+    node_id: string;
     /**
-     * State
+     * Type
      */
-    state: 'successful';
+    type?: 'node';
 };
 
 /**
- * NodeColorUpdateRequest
+ * NodeUpdateRequest
  *
- * Request schema used by API routes and generated clients for node colour updates.
- *
- * Used by:
- * - backend API routes and frontend node selectors because source-node visualisation
- * colours are durable workspace-node metadata.
- *
- * Flow: validate one CSS hex colour string before the node route normalizes and
- * persists it on the selected workspace node.
+ * Partial public metadata update for one existing node.
  */
-export type NodeColorUpdateRequest = {
+export type NodeUpdateRequest = {
     /**
      * Color
      */
-    color: string;
+    color?: string | null;
+    /**
+     * Document
+     */
+    document?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
 };
 
 /**
- * NodeDataFiltering
+ * PagedTableResource
  *
- * API schema used by routes and generated clients for node data filtering.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * One open-ended table fetched as independent Arrow IPC pages.
  */
-export type NodeDataFiltering = {
+export type PagedTableResource = {
+    /**
+     * Delivery
+     */
+    delivery?: 'paged';
+    /**
+     * Rows Url
+     */
+    rows_url: string;
+    /**
+     * Schema Url
+     */
+    schema_url: string;
+    /**
+     * Table Id
+     */
+    table_id: string;
+};
+
+/**
+ * Progress
+ *
+ * Exact live and durable progress value shared by background resources.
+ */
+export type Progress = {
+    /**
+     * Fraction
+     */
+    fraction: number | null;
+    /**
+     * Message
+     */
+    message: string | null;
+};
+
+/**
+ * ProviderCredentialPatch
+ *
+ * Write-only partial update; omitted fields remain unchanged.
+ */
+export type ProviderCredentialPatch = {
+    /**
+     * Anthropic Api Key
+     */
+    anthropic_api_key?: null;
+    /**
+     * Data Portal Api Token
+     */
+    data_portal_api_token?: null;
+    /**
+     * Google Api Key
+     */
+    google_api_key?: null;
+    /**
+     * Openai Api Key
+     */
+    openai_api_key?: null;
+    /**
+     * Openrouter Api Key
+     */
+    openrouter_api_key?: null;
+};
+
+/**
+ * ProviderCredentialSummary
+ *
+ * Safe credential presence information; never contains secret values.
+ */
+export type ProviderCredentialSummary = {
+    annotation: AnnotationCredentialStatus;
+    data_portal: DataPortalCredentialStatus;
+};
+
+/**
+ * QuotaStorageResource
+ *
+ * One point-in-time finite allocation snapshot.
+ */
+export type QuotaStorageResource = {
+    /**
+     * Available Bytes
+     */
+    available_bytes: number;
+    /**
+     * Limit Bytes
+     */
+    limit_bytes: number;
+    /**
+     * Policy
+     */
+    policy?: 'quota';
+    /**
+     * Reserved Bytes
+     */
+    reserved_bytes: number;
+    /**
+     * Used Bytes
+     */
+    used_bytes: number;
+};
+
+/**
+ * QuotationAnalysisRequest
+ */
+export type QuotationAnalysisRequest = {
     /**
      * Column
      */
-    column?: string | null;
+    column: string;
+    engine?: QuotationEngineSelection;
     /**
-     * Op
+     * Kind
      */
-    op: string;
+    kind?: 'quotation';
     /**
-     * Value
+     * Node Id
      */
-    value?: string | null;
+    node_id: string;
 };
 
 /**
- * NodeDataResponse
- *
- * Response schema returned by API routes and consumed by generated clients for node data response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * QuotationDetachmentAnalysisRequest
  */
-export type NodeDataResponse = {
+export type QuotationDetachmentAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_detachment';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Selected Columns
+     */
+    selected_columns: Array<string>;
+};
+
+/**
+ * QuotationDetachmentDerivation
+ */
+export type QuotationDetachmentDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_detachment';
+};
+
+/**
+ * QuotationDetachmentResult
+ */
+export type QuotationDetachmentResult = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_detachment';
+    /**
+     * Output Columns
+     */
+    output_columns: Array<string>;
+    /**
+     * Output Node Id
+     */
+    output_node_id: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
+};
+
+/**
+ * QuotationEngineSelection
+ */
+export type QuotationEngineSelection = {
+    /**
+     * Engine Id
+     */
+    engine_id?: string | null;
+    type?: QuotationEngineType;
+};
+
+/**
+ * QuotationEngineType
+ */
+export type QuotationEngineType = 'local' | 'remote';
+
+/**
+ * QuotationResult
+ */
+export type QuotationResult = {
     /**
      * Columns
      */
@@ -2665,125 +2154,85 @@ export type NodeDataResponse = {
     /**
      * Data
      */
-    data: Array<{
-        [key: string]: unknown;
-    }>;
+    data: Array<Array<{
+        [key: string]: JsonDataOutput;
+    }>>;
     /**
-     * Dtypes
+     * Kind
      */
-    dtypes: {
-        [key: string]: string;
-    };
-    filtering: NodeDataFiltering;
-    pagination: PaginationInfo;
-    /**
-     * Revision
-     */
-    revision: string;
-    sorting: AnalysisSorting;
+    kind?: 'quotation';
+    metadata: ResultColumnMetadata;
+    pagination: SourcePagePagination;
+    query: QuotationResultQuery;
+    sorting: ResultSorting;
 };
 
 /**
- * NodeDocumentColumnUpdateRequest
- *
- * Request schema used by API routes and generated clients for node document column update request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * QuotationResultQuery
  */
-export type NodeDocumentColumnUpdateRequest = {
+export type QuotationResultQuery = {
     /**
-     * Document Column
+     * Context Length
      */
-    document_column?: string | null;
+    context_length?: number;
+    /**
+     * Descending
+     */
+    descending?: boolean;
+    /**
+     * Kind
+     */
+    kind?: 'quotation';
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Sort By
+     */
+    sort_by?: string | null;
 };
 
 /**
- * NodeOperationResponse
- *
- * Response shared by node operations that create one child node.
- *
- * Used by:
- * - filter and slice apply routes because both return the child node id and
- * display name after persisting a derived node.
+ * ReplaceDerivation
  */
-export type NodeOperationResponse = {
+export type ReplaceDerivation = {
     /**
-     * Node Id
+     * Connector
      */
-    node_id: string;
+    connector?: string;
     /**
-     * Node Name
+     * Count
      */
-    node_name: string;
-};
-
-/**
- * NodeQueryPlanResponse
- *
- * Response schema returned by API routes and consumed by generated clients for node query plan response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type NodeQueryPlanResponse = {
+    count?: 'all' | 'first';
     /**
-     * Plan
+     * Kind
      */
-    plan: string;
-};
-
-/**
- * NodeShapeResponse
- *
- * Response schema returned by API routes and consumed by generated clients for node shape response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type NodeShapeResponse = {
+    kind?: 'replace';
     /**
-     * Shape
+     * Match Limit
      */
-    shape: [
-        number | null,
-        number | null
-    ];
-};
-
-/**
- * NodeTokenizationPreferenceRequest
- *
- * Request schema used by API routes and generated clients for node tokenization preference request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve tokenization preferences, hydrate or create token columns, aggregate
- * frequencies, and persist derived artifacts for result queries.
- */
-export type NodeTokenizationPreferenceRequest = {
+    match_limit?: number | null;
     /**
-     * Language
+     * Mode
      */
-    language?: string | null;
+    mode?: 'replace' | 'extract';
     /**
-     * Model
+     * Output Column
      */
-    model?: string | null;
+    output_column?: string | null;
+    /**
+     * Pattern
+     */
+    pattern: string;
+    /**
+     * Replacement
+     */
+    replacement?: string;
     /**
      * Source Column
      */
@@ -2791,147 +2240,83 @@ export type NodeTokenizationPreferenceRequest = {
 };
 
 /**
- * OniSearchRequest
+ * ReplaceNodeCreateRequest
  *
- * Request schema used by API routes and generated clients for oni search request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Create a child with one regex-replaced or extracted text column.
  */
-export type OniSearchRequest = {
+export type ReplaceNodeCreateRequest = {
     /**
-     * Limit
+     * Connector
      */
-    limit?: number;
+    connector?: string;
     /**
-     * Method
+     * Count
      */
-    method?: 'keyword' | 'identifier' | 'id' | 'string' | 'collection' | 'file_format' | 'all';
+    count?: 'all' | 'first';
     /**
-     * Offset
+     * Kind
      */
-    offset?: number;
+    kind?: 'replace';
     /**
-     * Query
+     * Match Limit
      */
-    query?: string;
+    match_limit?: number | null;
+    /**
+     * Mode
+     */
+    mode?: 'replace' | 'extract';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Output Column
+     */
+    output_column?: string | null;
+    /**
+     * Pattern
+     */
+    pattern: string;
+    /**
+     * Replacement
+     */
+    replacement?: string;
+    /**
+     * Source Column
+     */
+    source_column: string;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
 };
 
 /**
- * OniSearchResponse
- *
- * Response schema returned by API routes and consumed by generated clients for oni search response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ResultColumnMetadata
  */
-export type OniSearchResponse = {
+export type ResultColumnMetadata = {
     /**
-     * Data
+     * All Columns
      */
-    data: Array<OniSearchResult>;
+    all_columns: Array<string>;
     /**
-     * Message
+     * Concordance Columns
      */
-    message: string;
+    concordance_columns?: Array<string>;
     /**
-     * State
+     * Metadata Columns
      */
-    state: 'successful';
+    metadata_columns?: Array<string>;
+    /**
+     * Quotation Columns
+     */
+    quotation_columns?: Array<string>;
 };
 
 /**
- * OniSearchResult
- *
- * API schema used by routes and generated clients for oni search result.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ResultPagination
  */
-export type OniSearchResult = {
-    /**
-     * Access
-     */
-    access?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Collections
-     */
-    collections: Array<string>;
-    /**
-     * Crate Id
-     */
-    crate_id?: string | null;
-    /**
-     * Description
-     */
-    description?: string | null;
-    /**
-     * File Formats
-     */
-    file_formats: Array<string>;
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Importable
-     */
-    importable: boolean;
-    /**
-     * License
-     */
-    license?: string | null;
-    /**
-     * Stats
-     */
-    stats: {
-        [key: string]: unknown;
-    };
-    /**
-     * Title
-     */
-    title: string;
-    /**
-     * Types
-     */
-    types: Array<string>;
-};
-
-/**
- * PaginationInfo
- *
- * Metadata schema used by API responses to describe pagination info.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type PaginationInfo = {
-    /**
-     * Has Next
-     */
-    has_next: boolean;
-    /**
-     * Has Prev
-     */
-    has_prev: boolean;
+export type ResultPagination = {
     /**
      * Page
      */
@@ -2951,315 +2336,13 @@ export type PaginationInfo = {
 };
 
 /**
- * PolarsExpressionApplyResponse
- *
- * Response schema returned by API routes and consumed by generated clients for polars expression apply response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * ResultSorting
  */
-export type PolarsExpressionApplyResponse = {
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Node Name
-     */
-    node_name: string;
-};
-
-/**
- * PolarsExpressionContext
- *
- * Enum used by API schema contracts to constrain polars expression context values.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type PolarsExpressionContext = 'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg';
-
-/**
- * PolarsExpressionItem
- *
- * A single polars expression supplied as a Python code string, e.g. ``pl.col('x') > 0``.
- *
- * Used by:
- * - backend request/response models, backend tests because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type PolarsExpressionItem = {
-    /**
-     * Code
-     */
-    code: string;
+export type ResultSorting = {
     /**
      * Descending
      */
-    descending?: boolean | null;
-};
-
-/**
- * PolarsExpressionRequest
- *
- * Request schema used by API routes and generated clients for polars expression request.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type PolarsExpressionRequest = {
-    context: PolarsExpressionContext;
-    /**
-     * Expressions
-     */
-    expressions: Array<PolarsExpressionItem>;
-    /**
-     * Group By Keys
-     */
-    group_by_keys?: Array<PolarsExpressionItem> | null;
-    /**
-     * New Node Name
-     */
-    new_node_name?: string | null;
-};
-
-/**
- * QuotationAnalysisResponse
- *
- * Response schema returned by API routes and consumed by generated clients for quotation analysis response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationAnalysisResponse = {
-    /**
-     * Columns
-     */
-    columns: Array<string>;
-    /**
-     * Data
-     */
-    data: Array<Array<{
-        [key: string]: unknown;
-    }>>;
-    metadata: QuotationMetadata;
-    pagination: SourceRowPagination;
-    /**
-     * Preferences
-     */
-    preferences?: {
-        [key: string]: unknown;
-    } | null;
-    sorting: AnalysisSorting;
-    /**
-     * Task Id
-     */
-    task_id?: string | null;
-};
-
-/**
- * QuotationDetachOptionsResponse
- *
- * Response schema returned by API routes and consumed by generated clients for quotation detach options response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationDetachOptionsResponse = {
-    /**
-     * Data
-     */
-    data?: {
-        [key: string]: Array<DetachNodeOption>;
-    } | null;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * QuotationDetachRequest
- *
- * Request schema used by API routes and generated clients for quotation detach request.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationDetachRequest = {
-    /**
-     * Column
-     */
-    column: string;
-    engine?: QuotationEngineConfig | null;
-    /**
-     * Materialized Path
-     */
-    materialized_path?: string | null;
-    /**
-     * New Node Name
-     */
-    new_node_name?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Selected Columns
-     */
-    selected_columns: Array<string>;
-};
-
-/**
- * QuotationEngineConfig
- *
- * API schema used by routes and generated clients for quotation engine config.
- *
- * Used by:
- * - analysis task helpers, backend API routes, backend request/response models, backend
- * tests, core workspace and worker services because they need a stable JSON contract
- * shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationEngineConfig = {
-    type?: QuotationEngineType;
-    /**
-     * Url
-     */
-    url?: string | null;
-};
-
-/**
- * QuotationEngineType
- *
- * Enum used by API schema contracts to constrain quotation engine type values.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests, core workspace and
- * worker services because they need a stable JSON contract shared by route handlers,
- * generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationEngineType = 'local' | 'remote';
-
-/**
- * QuotationMaterializeRequest
- *
- * Request schema used by API routes and generated clients for quotation materialize request.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationMaterializeRequest = {
-    /**
-     * Column
-     */
-    column: string;
-    engine?: QuotationEngineConfig | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-};
-
-/**
- * QuotationMetadata
- *
- * API schema used by routes and generated clients for quotation metadata.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationMetadata = {
-    /**
-     * All Columns
-     */
-    all_columns: Array<string>;
-    /**
-     * Metadata Columns
-     */
-    metadata_columns: Array<string>;
-    /**
-     * Quotation Columns
-     */
-    quotation_columns: Array<string>;
-};
-
-/**
- * QuotationRequest
- *
- * Request schema used by API routes and generated clients for quotation request.
- *
- * Used by:
- * - analysis task helpers, backend API routes, backend request/response models, backend
- * tests because they need a stable JSON contract shared by route handlers, generated
- * clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type QuotationRequest = {
-    /**
-     * Column
-     */
-    column: string;
-    /**
-     * Descending
-     */
-    descending?: boolean;
-    engine?: QuotationEngineConfig | null;
-    /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Page Size
-     */
-    page_size?: number | null;
+    descending: boolean;
     /**
      * Sort By
      */
@@ -3267,258 +2350,115 @@ export type QuotationRequest = {
 };
 
 /**
- * QuotationResultQuery
- *
- * API schema used by routes and generated clients for quotation result query.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * RoundExpression
  */
-export type QuotationResultQuery = {
+export type RoundExpressionInput = {
     /**
-     * Context Length
+     * Decimals
      */
-    context_length?: number | null;
+    decimals?: number;
     /**
-     * Descending
+     * Op
      */
-    descending?: boolean | null;
+    op: 'round';
     /**
-     * Page
+     * Operand
      */
-    page?: number | null;
-    /**
-     * Page Size
-     */
-    page_size?: number | null;
-    /**
-     * Sort By
-     */
-    sort_by?: string | null;
-    /**
-     * Update Only
-     */
-    update_only?: boolean;
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput);
 };
 
 /**
- * RenameColumnRequest
- *
- * Request schema used by API routes and generated clients for rename column request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * RoundExpression
  */
-export type RenameColumnRequest = {
+export type RoundExpressionOutput = {
     /**
-     * New Name
+     * Decimals
      */
-    new_name: string;
+    decimals?: number;
+    /**
+     * Op
+     */
+    op: 'round';
+    /**
+     * Operand
+     */
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput);
 };
 
 /**
- * ReplaceApplyResponse
+ * SampleCatalogueResource
  *
- * Response returned when a replace operation materializes a node column.
- *
- * Used by:
- * - replace apply route because generated clients need the new node id,
- * output column name, dtype, and user-facing completion message.
+ * Validated sample catalogue plus per-user installation state.
  */
-export type ReplaceApplyResponse = {
-    /**
-     * Column Name
-     */
-    column_name: string;
-    /**
-     * Dtype
-     */
-    dtype?: string | null;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * State
-     */
-    state: 'successful';
-};
-
-/**
- * ReplaceRequest
- *
- * Request schema used by API routes and generated clients for replace request.
- *
- * Used by:
- * - replace node routes because replace/extract operations need one validated
- * request body shared by preview and apply endpoints.
- *
- * Flow: validate the source/pattern/replacement fields and expose defaults
- * used by the replace route helpers before they build Polars expressions.
- */
-export type ReplaceRequest = {
-    /**
-     * Connector
-     */
-    connector?: string;
-    /**
-     * Count
-     */
-    count?: 'all' | 'first';
-    /**
-     * Mode
-     */
-    mode?: 'replace' | 'extract';
-    /**
-     * N
-     */
-    n?: number | null;
-    /**
-     * Output Column Name
-     */
-    output_column_name?: string | null;
-    /**
-     * Pattern
-     */
-    pattern: string;
-    /**
-     * Preview Limit
-     */
-    preview_limit?: number | null;
-    /**
-     * Replacement
-     */
-    replacement?: string;
-    /**
-     * Source Column
-     */
-    source_column: string;
-};
-
-/**
- * RootResponse
- *
- * API root/index response for generated clients and docs.
- *
- * Used by:
- * - ``root`` because the public API entrypoint returns stable service
- * metadata while keeping the nested endpoint catalogue flexible.
- */
-export type RootResponse = {
-    /**
-     * Description
-     */
-    description: string;
-    /**
-     * Endpoints
-     */
-    endpoints: {
-        [key: string]: unknown;
-    };
-    /**
-     * Features
-     */
-    features: {
-        [key: string]: string;
-    };
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * Version
-     */
-    version: string;
-};
-
-/**
- * RuntimeConfigResponse
- *
- * Public response schema for frontend runtime bootstrap.
- *
- * Used by:
- * - `get_runtime_config`, frontend auth bootstrap, and generated API clients
- * because callers need auth-mode and OAuth-provider metadata before login.
- */
-export type RuntimeConfigResponse = {
-    /**
-     * Google Client Id
-     */
-    google_client_id?: string;
-    /**
-     * Multi User Mode
-     */
-    multi_user_mode: boolean;
-};
-
-/**
- * SampleDataCatalogueResponse
- *
- * Response schema returned by API routes and consumed by generated clients for sample data catalogue response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type SampleDataCatalogueResponse = {
+export type SampleCatalogueResource = {
     /**
      * Collections
      */
-    collections: Array<SampleDataCollection>;
+    collections: Array<SampleCollection>;
     /**
      * Schema Version
      */
-    schema_version: number;
+    schema_version: 1;
 };
 
 /**
- * SampleDataCollection
+ * SampleCollection
  *
- * API schema used by routes and generated clients for sample data collection.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * One importable sample collection from the remote catalogue.
  */
-export type SampleDataCollection = {
-    /**
-     * Bundled
-     */
-    bundled: boolean;
+export type SampleCollection = {
     /**
      * Description
      */
-    description: string;
+    description?: string;
     /**
      * Files
      */
-    files: Array<SampleDataFileEntry>;
+    files: Array<SampleFile>;
     /**
      * Id
      */
     id: string;
     /**
+     * Installed
+     */
+    installed?: boolean;
+    /**
      * Language
      */
-    language: string;
+    language?: string;
     /**
      * Name
      */
@@ -3526,11 +2466,7 @@ export type SampleDataCollection = {
     /**
      * Recommended For
      */
-    recommended_for: Array<string>;
-    /**
-     * Status
-     */
-    status: 'bundled' | 'downloaded' | 'partial' | 'not_downloaded';
+    recommended_for?: Array<string>;
     /**
      * Total Size Bytes
      */
@@ -3538,26 +2474,15 @@ export type SampleDataCollection = {
 };
 
 /**
- * SampleDataFileEntry
+ * SampleFile
  *
- * API schema used by routes and generated clients for sample data file entry.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * One fetchable file in a remote sample collection.
  */
-export type SampleDataFileEntry = {
+export type SampleFile = {
     /**
      * Path
      */
     path: string;
-    /**
-     * Sha256
-     */
-    sha256: string;
     /**
      * Size
      */
@@ -3565,142 +2490,47 @@ export type SampleDataFileEntry = {
 };
 
 /**
- * SelectedPeriod
- *
- * API schema used by routes and generated clients for selected period.
- *
- * Used by:
- * - backend API routes because they need this unit's "API schema used by routes and generated clients for selected period" behavior.
+ * SampleUserFileImportRequest
  */
-export type SelectedPeriod = {
+export type SampleUserFileImportRequest = {
     /**
-     * Period End
+     * Collection Id
      */
-    period_end: string | number | number;
+    collection_id: string;
     /**
-     * Period Start
+     * Kind
      */
-    period_start: string | number | number;
+    kind?: 'sample';
 };
 
 /**
- * SequentialAnalysisDetachRequest
- *
- * Request schema used by API routes and generated clients for sequential analysis detach request.
- *
- * Used by:
- * - backend API routes because they need this unit's "Request schema used by API routes and generated clients for sequential analysis detach request" behavior.
+ * SampleUserFileImportResult
  */
-export type SequentialAnalysisDetachRequest = {
+export type SampleUserFileImportResult = {
     /**
-     * New Node Name
+     * Bytes Written
      */
-    new_node_name: string;
+    bytes_written: number;
     /**
-     * Selected Periods
+     * Collection Id
      */
-    selected_periods: Array<SelectedPeriod>;
+    collection_id: string;
     /**
-     * Visible Groups
+     * Destination Path
      */
-    visible_groups?: Array<VisibleGroupSelection> | null;
-};
-
-/**
- * SequentialAnalysisDetachResponse
- *
- * Response schema returned by API routes and consumed by generated clients for sequential analysis detach
- * response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type SequentialAnalysisDetachResponse = {
+    destination_path: string;
     /**
-     * New Node Id
+     * File Count
      */
-    new_node_id: string;
+    file_count: number;
     /**
-     * New Node Name
+     * Kind
      */
-    new_node_name: string;
-};
-
-/**
- * SequentialAnalysisPreferenceUpdateRequest
- *
- * Request schema used by API routes and generated clients for sequential analysis preference update request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type SequentialAnalysisPreferenceUpdateRequest = {
-    /**
-     * Chart Type
-     */
-    chart_type?: string | null;
-};
-
-/**
- * SequentialAnalysisPreviewResponse
- *
- * Response schema returned by API routes and consumed by generated clients for sequential analysis preview
- * response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type SequentialAnalysisPreviewResponse = {
-    /**
-     * Analysis Params
-     */
-    analysis_params?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Columns
-     */
-    columns: Array<string>;
-    /**
-     * Data
-     */
-    data?: Array<{
-        [key: string]: unknown;
-    }> | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-    /**
-     * Total Records
-     */
-    total_records: number;
+    kind?: 'sample';
 };
 
 /**
  * SequentialAnalysisRequest
- *
- * Request schema used by API routes and generated clients for sequential analysis request.
- *
- * Used by:
- * - analysis task helpers, backend API routes, backend request/response models because
- * they need a stable JSON contract shared by route handlers, generated clients, and
- * tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
  */
 export type SequentialAnalysisRequest = {
     /**
@@ -3726,7 +2556,15 @@ export type SequentialAnalysisRequest = {
     /**
      * Group By Columns
      */
-    group_by_columns?: Array<string> | null;
+    group_by_columns?: Array<string>;
+    /**
+     * Kind
+     */
+    kind?: 'sequential';
+    /**
+     * Node Id
+     */
+    node_id: string;
     /**
      * Numeric Interval
      */
@@ -3746,79 +2584,77 @@ export type SequentialAnalysisRequest = {
 };
 
 /**
- * SequentialAnalysisResponse
- *
- * Response schema returned by API routes and consumed by generated clients for sequential analysis response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * SequentialResult
  */
-export type SequentialAnalysisResponse = {
+export type SequentialResult = {
     /**
-     * Chart Type
+     * Kind
      */
-    chart_type?: 'line' | 'bar' | 'area' | null;
-    /**
-     * Columns
-     */
-    columns?: Array<string> | null;
-    /**
-     * Data
-     */
-    data?: Array<{
-        [key: string]: unknown;
-    }> | null;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-    /**
-     * Total Records
-     */
-    total_records?: number | null;
+    kind?: 'sequential';
+    table: CompleteTableResource;
 };
 
 /**
- * SetCurrentWorkspaceResponse
+ * SessionResponse
  *
- * Response schema returned by API routes and consumed by generated clients for set current workspace response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
+ * No-store bootstrap response for both supported deployment profiles.
  */
-export type SetCurrentWorkspaceResponse = {
+export type SessionResponse = {
+    /**
+     * Authenticated
+     */
+    authenticated: boolean;
+    /**
+     * Csrf Token
+     */
+    csrf_token?: string | null;
+    /**
+     * Google Client Id
+     */
+    google_client_id?: string | null;
+    /**
+     * Mode
+     */
+    mode: 'multi_user' | 'single_user';
+    /**
+     * Providers
+     */
+    providers: Array<AuthProvider>;
+    user: SessionUser | null;
+};
+
+/**
+ * SessionUser
+ *
+ * Authenticated identity safe to expose to a bundled client.
+ */
+export type SessionUser = {
+    /**
+     * Email
+     */
+    email: string;
     /**
      * Id
      */
-    id?: string | null;
+    id: string;
     /**
-     * State
+     * Name
      */
-    state: 'successful';
+    name: string;
+    /**
+     * Picture
+     */
+    picture?: string | null;
 };
 
 /**
- * SliceRequest
- *
- * Request schema used by API routes and generated clients for slice request.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests because they need a
- * stable JSON contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * SliceDerivation
  */
-export type SliceRequest = {
+export type SliceDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'slice';
     /**
      * Length
      */
@@ -3827,10 +2663,6 @@ export type SliceRequest = {
      * Mode
      */
     mode?: 'slice' | 'random_sample' | 'shuffle';
-    /**
-     * New Node Name
-     */
-    new_node_name?: string | null;
     /**
      * Offset
      */
@@ -3846,18 +2678,49 @@ export type SliceRequest = {
 };
 
 /**
- * SourceRowPagination
+ * SliceNodeCreateRequest
  *
- * API schema used by routes and generated clients for source row pagination.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Create a slice, random sample, or shuffled child node.
  */
-export type SourceRowPagination = {
+export type SliceNodeCreateRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'slice';
+    /**
+     * Length
+     */
+    length?: number | null;
+    /**
+     * Mode
+     */
+    mode?: 'slice' | 'random_sample' | 'shuffle';
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Offset
+     */
+    offset?: number;
+    /**
+     * Random Seed
+     */
+    random_seed?: number | null;
+    /**
+     * Sample Size
+     */
+    sample_size?: number | null;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
+ * SourcePagePagination
+ */
+export type SourcePagePagination = {
     /**
      * Has Next
      */
@@ -3889,276 +2752,189 @@ export type SourceRowPagination = {
 };
 
 /**
- * TaskCancelActionDataResponse
+ * SourceProvenance
  *
- * Response schema returned by API routes and consumed by generated clients for task cancel action data response.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * A materialized source snapshot with no live graph dependency.
  */
-export type TaskCancelActionDataResponse = {
+export type SourceProvenance = {
     /**
-     * Stopped
+     * Type
      */
-    stopped: boolean;
+    type?: 'source';
 };
 
 /**
- * TaskCancelActionResponse
- *
- * Response schema returned by API routes and consumed by generated clients for task cancel action response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * StringExpression
  */
-export type TaskCancelActionResponse = {
-    data: TaskCancelActionDataResponse;
+export type StringExpressionInput = {
     /**
-     * Message
+     * Literal
      */
-    message: string;
+    literal?: boolean;
     /**
-     * State
+     * Op
      */
-    state: 'successful';
+    op: 'contains' | 'starts_with' | 'ends_with';
+    /**
+     * Operand
+     */
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput);
+    /**
+     * Value
+     */
+    value: string;
 };
 
 /**
- * TaskClearActionDataResponse
- *
- * Response schema returned by API routes and consumed by generated clients for task clear action data response.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * StringExpression
  */
-export type TaskClearActionDataResponse = {
+export type StringExpressionOutput = {
     /**
-     * Cleared Analysis
+     * Literal
      */
-    cleared_analysis: boolean;
+    literal?: boolean;
     /**
-     * Cleared Analysis Ids
+     * Op
      */
-    cleared_analysis_ids: Array<string>;
+    op: 'contains' | 'starts_with' | 'ends_with';
     /**
-     * Cleared Task Ids
+     * Operand
      */
-    cleared_task_ids: Array<string>;
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput);
     /**
-     * Cleared Worker
+     * Value
      */
-    cleared_worker: boolean;
-    /**
-     * Cleared Worker Ids
-     */
-    cleared_worker_ids: Array<string>;
+    value: string;
 };
 
 /**
- * TaskClearActionResponse
+ * Tab
  *
- * Response schema returned by API routes and consumed by generated clients for task clear action response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * Complete strict public and persisted Tab representation.
  */
-export type TaskClearActionResponse = {
-    data: TaskClearActionDataResponse;
+export type Tab = {
     /**
-     * Message
+     * Analysis Id
      */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
-};
-
-/**
- * TaskEntry
- *
- * Dict shape of a serialized task from ``WorkerTaskManager._serialize_task``.
- *
- * Keys match ``core/worker_task_manager.py:_serialize_task``.
- */
-export type TaskEntry = {
+    analysis_id: string | null;
     /**
      * Created At
      */
-    created_at?: string;
+    created_at: string;
     /**
-     * Finished At
+     * Id
      */
-    finished_at?: string | null;
+    id: string;
+    kind: AnalysisKind;
+    /**
+     * Modified At
+     */
+    modified_at: string;
     /**
      * Name
      */
-    name?: string;
+    name: string;
     /**
-     * Parent Task Id
+     * Revision
      */
-    parent_task_id?: string | null;
-    /**
-     * Progress
-     */
-    progress?: number;
-    /**
-     * Progress Message
-     */
-    progress_message?: string | null;
-    /**
-     * Started At
-     */
-    started_at?: string | null;
-    /**
-     * State
-     */
-    state?: string;
-    /**
-     * Task Id
-     */
-    task_id?: string;
-    /**
-     * Task Type
-     */
-    task_type?: string;
-    /**
-     * User Id
-     */
-    user_id?: string;
-    /**
-     * Workspace Id
-     */
-    workspace_id?: string;
+    revision: number;
 };
 
 /**
- * TaskListResponse
- *
- * Response schema returned by API routes and consumed by generated clients for task list response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TabCreate
  */
-export type TaskListResponse = {
+export type TabCreate = {
+    kind: AnalysisKind;
     /**
-     * Data
+     * Name
      */
-    data: Array<TaskEntry>;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
+    name: string;
 };
 
 /**
- * TokenFrequencyData
- *
- * Data payload schema embedded in API responses for token frequency data.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TabRename
  */
-export type TokenFrequencyData = {
+export type TabRename = {
     /**
-     * Frequency
+     * Name
      */
-    frequency: number;
-    /**
-     * Token
-     */
-    token: string;
+    name: string;
 };
 
 /**
- * TokenFrequencyNodeResult
- *
- * API schema used by routes and generated clients for token frequency node result.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TokenAnalysisParameters
  */
-export type TokenFrequencyNodeResult = {
+export type TokenAnalysisParameters = {
     /**
-     * Columns
+     * Node Columns
      */
-    columns?: Array<string>;
+    node_columns: {
+        [key: string]: string;
+    };
     /**
-     * Data
+     * Node Ids
      */
-    data: Array<TokenFrequencyData>;
-    metadata?: AnalysisTaskMetadata | null;
-};
-
-/**
- * TokenFrequencyPreferenceUpdateRequest
- *
- * Request schema used by API routes and generated clients for token frequency preference update request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TokenFrequencyPreferenceUpdateRequest = {
+    node_ids: Array<string>;
+    /**
+     * Node Tokenizer Models
+     */
+    node_tokenizer_models: {
+        [key: string]: string;
+    };
+    /**
+     * Server Limit
+     */
+    server_limit: number;
     /**
      * Stop Words
      */
-    stop_words?: Array<string> | null;
+    stop_words: Array<string>;
     /**
      * Token Limit
      */
-    token_limit?: number | null;
+    token_limit: number;
 };
 
 /**
- * TokenFrequencyRequest
- *
- * Request schema used by API routes and generated clients for token frequency request.
- *
- * Used by:
- * - analysis task helpers, backend API routes, backend request/response models, backend
- * tests because they need a stable JSON contract shared by route handlers, generated
- * clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TokenFrequencyAnalysisRequest
  */
-export type TokenFrequencyRequest = {
+export type TokenFrequencyAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'token_frequency';
     /**
      * Node Columns
      */
@@ -4174,171 +2950,76 @@ export type TokenFrequencyRequest = {
      */
     node_tokenizer_models?: {
         [key: string]: string;
-    } | null;
+    };
     /**
      * Stop Words
      */
-    stop_words?: Array<string> | null;
+    stop_words?: Array<string>;
     /**
      * Token Limit
      */
-    token_limit?: number | null;
-    /**
-     * Tokenizer Model
-     */
-    tokenizer_model?: string | null;
+    token_limit?: number;
 };
 
 /**
- * TokenFrequencyResponse
- *
- * Unified response model for token frequency analysis.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TokenFrequencyResult
  */
-export type TokenFrequencyResponse = {
+export type TokenFrequencyResult = {
+    analysis_params: TokenAnalysisParameters;
     /**
-     * Analysis Params
+     * Kind
      */
-    analysis_params?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Data
-     */
-    data?: {
-        [key: string]: TokenFrequencyNodeResult;
-    } | null;
-    /**
-     * Message
-     */
-    message?: string | null;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state?: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled' | null;
-    /**
-     * Statistics
-     */
-    statistics?: Array<TokenStatisticsData> | null;
+    kind?: 'token_frequency';
+    metadata: TokenResultMetadata;
     /**
      * Stop Words
      */
-    stop_words?: Array<string> | null;
+    stop_words: Array<string>;
+    tables: TokenTableResources;
     /**
      * Token Limit
      */
-    token_limit?: number | null;
+    token_limit: number;
 };
 
 /**
- * TokenStatisticsData
- *
- * Token-level comparative statistics.
- *
- * Numeric statistics use a JSON-safe union to preserve semantic distinctions:
- * - finite number -> float
- * - positive infinity -> "+Inf"
- * - negative infinity -> "-Inf"
- * - missing/undefined -> None
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TokenResultMetadata
  */
-export type TokenStatisticsData = {
+export type TokenResultMetadata = {
     /**
-     * Bayes Factor Bic
+     * Node Display Names
      */
-    bayes_factor_bic: number | string | null;
+    node_display_names: {
+        [key: string]: string;
+    };
     /**
-     * Effect Size Ell
+     * Node Tokenizer Models
      */
-    effect_size_ell: number | string | null;
+    node_tokenizer_models: {
+        [key: string]: string;
+    };
     /**
-     * Expected Reference
+     * Server Limit
      */
-    expected_reference: number | string | null;
+    server_limit: number;
     /**
-     * Expected Study
+     * Stop Words
      */
-    expected_study: number | string | null;
+    stop_words: Array<string>;
     /**
-     * Freq Reference
+     * Token Limit
      */
-    freq_reference: number;
-    /**
-     * Freq Study
-     */
-    freq_study: number;
-    /**
-     * Log Likelihood Llv
-     */
-    log_likelihood_llv: number | string | null;
-    /**
-     * Log Ratio
-     */
-    log_ratio?: number | string | null;
-    /**
-     * Odds Ratio
-     */
-    odds_ratio?: number | string | null;
-    /**
-     * Percent Diff
-     */
-    percent_diff: number | string | null;
-    /**
-     * Percent Reference
-     */
-    percent_reference: number | string | null;
-    /**
-     * Percent Study
-     */
-    percent_study: number | string | null;
-    /**
-     * Reference Total
-     */
-    reference_total: number;
-    /**
-     * Relative Risk
-     */
-    relative_risk?: number | string | null;
-    /**
-     * Significance
-     */
-    significance: string;
-    /**
-     * Study Total
-     */
-    study_total: number;
-    /**
-     * Token
-     */
-    token: string;
+    token_limit: number;
 };
 
 /**
- * TokenizerModelInfo
- *
- * Metadata schema used by API responses to describe tokenizer model info.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TokenizerModelResource
  */
-export type TokenizerModelInfo = {
+export type TokenizerModelResource = {
+    /**
+     * Id
+     */
+    id: string;
     /**
      * Label
      */
@@ -4346,315 +3027,13 @@ export type TokenizerModelInfo = {
     /**
      * Languages
      */
-    languages: Array<string>;
-    /**
-     * Model
-     */
-    model: string;
+    languages?: Array<string>;
 };
 
 /**
- * TokenizerModelsResponse
- *
- * Response schema returned by API routes and consumed by generated clients for tokenizer models response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TopicItem
  */
-export type TokenizerModelsResponse = {
-    /**
-     * Models
-     */
-    models: Array<TokenizerModelInfo>;
-};
-
-/**
- * TopicMeaningOverrideItem
- *
- * One topic's representative-words override for detach.
- *
- * Lets the frontend ship exactly what the user sees — post-fit
- * "Words per topic" slice, post-fit stopword filter — instead of
- * forcing the meanings parquet (written at fit time) into the
- * detached node.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicMeaningOverrideItem = {
-    /**
-     * Topic Id
-     */
-    topic_id: number;
-    /**
-     * Words
-     */
-    words: Array<string>;
-};
-
-/**
- * TopicModelingData
- *
- * Data payload schema embedded in API responses for topic modeling data.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingData = {
-    /**
-     * Corpus Sizes
-     */
-    corpus_sizes: Array<number>;
-    meta?: AnalysisTaskMetadata | null;
-    /**
-     * Per Corpus Topic Counts
-     */
-    per_corpus_topic_counts?: Array<{
-        [key: string]: number;
-    }> | null;
-    /**
-     * Topics
-     */
-    topics: Array<TopicModelingTopic>;
-};
-
-/**
- * TopicModelingDetachData
- *
- * Data payload schema embedded in API responses for topic modeling detach data.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingDetachData = {
-    /**
-     * Detached Nodes
-     */
-    detached_nodes?: Array<TopicModelingDetachedNode>;
-};
-
-/**
- * TopicModelingDetachOptionsResponse
- *
- * Response schema returned by API routes and consumed by generated clients for topic modeling detach options
- * response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingDetachOptionsResponse = {
-    /**
-     * Data
-     */
-    data?: {
-        [key: string]: Array<DetachNodeOption>;
-    } | null;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * TopicModelingDetachRequest
- *
- * Request payload for detaching topic assignments from cached topic-modeling output.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingDetachRequest = {
-    /**
-     * New Node Names
-     */
-    new_node_names?: {
-        [key: string]: string;
-    } | null;
-    /**
-     * Node Ids
-     */
-    node_ids?: Array<string> | null;
-    /**
-     * Selected Columns
-     */
-    selected_columns?: {
-        [key: string]: Array<string>;
-    };
-    /**
-     * Topic Column Name
-     */
-    topic_column_name?: string | null;
-    /**
-     * Topic Ids
-     */
-    topic_ids?: Array<number> | null;
-    /**
-     * Topic Meanings Override
-     */
-    topic_meanings_override?: Array<TopicMeaningOverrideItem> | null;
-};
-
-/**
- * TopicModelingDetachResponse
- *
- * Response schema returned by API routes and consumed by generated clients for topic modeling detach response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingDetachResponse = {
-    data?: TopicModelingDetachData | null;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * TopicModelingDetachedNode
- *
- * API schema used by routes and generated clients for topic modeling detached node.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingDetachedNode = {
-    /**
-     * New Node Id
-     */
-    new_node_id: string;
-    /**
-     * Source Node Id
-     */
-    source_node_id: string;
-    /**
-     * Topic Meanings Node Id
-     */
-    topic_meanings_node_id?: string | null;
-};
-
-/**
- * TopicModelingRequest
- *
- * Request schema used by API routes and generated clients for topic modeling request.
- *
- * Used by:
- * - analysis task helpers, backend API routes, backend request/response models, backend
- * tests because they need a stable JSON contract shared by route handlers, generated
- * clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingRequest = {
-    /**
-     * Min Topic Size
-     */
-    min_topic_size?: number | null;
-    /**
-     * Node Columns
-     */
-    node_columns: {
-        [key: string]: string;
-    };
-    /**
-     * Node Ids
-     */
-    node_ids: Array<string>;
-    /**
-     * Random Seed
-     */
-    random_seed?: number | null;
-    /**
-     * Representative Words Count
-     */
-    representative_words_count?: number | null;
-    /**
-     * Sample Fractions
-     */
-    sample_fractions?: Array<number | null> | null;
-};
-
-/**
- * TopicModelingResponse
- *
- * Response schema returned by API routes and consumed by generated clients for topic modeling response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingResponse = {
-    data?: TopicModelingData | null;
-    /**
-     * Message
-     */
-    message: string;
-    metadata?: AnalysisTaskMetadata | null;
-    /**
-     * State
-     */
-    state: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled';
-};
-
-/**
- * TopicModelingTopic
- *
- * API schema used by routes and generated clients for topic modeling topic.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
- */
-export type TopicModelingTopic = {
+export type TopicItem = {
     /**
      * Id
      */
@@ -4666,7 +3045,7 @@ export type TopicModelingTopic = {
     /**
      * Representative Words
      */
-    representative_words?: Array<string>;
+    representative_words: Array<string>;
     /**
      * Size
      */
@@ -4686,475 +3065,360 @@ export type TopicModelingTopic = {
 };
 
 /**
- * User
- *
- * API schema used by routes and generated clients for user.
- *
- * Used by:
- * - backend API routes, backend package imports, backend request/response models, backend
- * tests because they need a stable JSON contract shared by route handlers, generated
- * clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TopicMetadata
  */
-export type User = {
+export type TopicMetadata = {
     /**
-     * Created At
+     * Corpus Sizes After Sample
      */
-    created_at?: string | null;
+    corpus_sizes_after_sample?: Array<number> | null;
     /**
-     * Email
+     * Corpus Sizes Before Sample
      */
-    email: string;
+    corpus_sizes_before_sample?: Array<number> | null;
     /**
-     * Id
+     * Embedding Backend
      */
-    id: string;
+    embedding_backend?: string | null;
     /**
-     * Is Active
+     * Embedding Model
      */
-    is_active?: boolean | null;
+    embedding_model?: string | null;
     /**
-     * Is Verified
+     * Embeddings From Ctfidf
      */
-    is_verified?: boolean | null;
+    embeddings_from_ctfidf?: boolean | null;
     /**
-     * Last Login
+     * Engine
      */
-    last_login?: string | null;
+    engine?: string | null;
     /**
-     * Name
+     * Min Topic Size
      */
-    name: string;
+    min_topic_size?: number | null;
     /**
-     * Picture
+     * N Chunks
      */
-    picture?: string | null;
+    n_chunks?: number | null;
+    /**
+     * Native
+     */
+    native?: boolean | null;
+    /**
+     * Node Names
+     */
+    node_names?: Array<string>;
+    /**
+     * Random State
+     */
+    random_state?: number | null;
+    /**
+     * Representative Words Count
+     */
+    representative_words_count?: number | null;
+    /**
+     * Stage Timings Ms
+     */
+    stage_timings_ms?: Array<TopicStageTiming> | null;
+    /**
+     * Total Topics Incl Outlier
+     */
+    total_topics_incl_outlier?: number | null;
+    /**
+     * Vectorizer Model
+     */
+    vectorizer_model?: string | null;
 };
 
 /**
- * UserPreferences
- *
- * Preference schema persisted by preference routes for user preferences.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests, core workspace and
- * worker services because they need a stable JSON contract shared by route handlers,
- * generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TopicModelingAnalysisRequest
  */
-export type UserPreferences = {
+export type TopicModelingAnalysisRequest = {
     /**
-     * Analysis Multi Tab Enabled
+     * Kind
      */
-    analysis_multi_tab_enabled?: boolean;
-    annotation_ai?: AnnotationAiPreferences;
+    kind?: 'topic_modeling';
     /**
-     * Default Tokenizer Model
+     * Min Topic Size
      */
-    default_tokenizer_model?: string | null;
+    min_topic_size?: number;
     /**
-     * Favorite Workspaces
+     * Node Columns
      */
-    favorite_workspaces?: Array<string>;
+    node_columns: {
+        [key: string]: string;
+    };
     /**
-     * Hidden Views
+     * Node Ids
      */
-    hidden_views?: Array<string>;
+    node_ids: Array<string>;
     /**
-     * Ldaca Oni Api Token
+     * Random Seed
      */
-    ldaca_oni_api_token?: string | null;
+    random_seed?: number;
+    /**
+     * Representative Words Count
+     */
+    representative_words_count?: number;
+    /**
+     * Sample Fractions
+     */
+    sample_fractions?: Array<number | null> | null;
 };
 
 /**
- * UserPreferencesUpdate
- *
- * Partial update payload — only provided fields are merged.
- *
- * Used by:
- * - backend API routes, backend request/response models, backend tests, core workspace and
- * worker services because they need a stable JSON contract shared by route handlers,
- * generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TopicModelingResult
  */
-export type UserPreferencesUpdate = {
+export type TopicModelingResult = {
+    artifacts: TopicArtifactsResource;
     /**
-     * Analysis Multi Tab Enabled
+     * Corpus Sizes
      */
-    analysis_multi_tab_enabled?: boolean | null;
-    annotation_ai?: AnnotationAiPreferences | null;
+    corpus_sizes: Array<number>;
     /**
-     * Default Tokenizer Model
+     * Kind
      */
-    default_tokenizer_model?: string | null;
+    kind?: 'topic_modeling';
+    meta: TopicMetadata;
+    pagination: ResultPagination;
     /**
-     * Favorite Workspaces
+     * Per Corpus Topic Counts
      */
-    favorite_workspaces?: Array<string> | null;
+    per_corpus_topic_counts?: Array<{
+        [key: string]: number;
+    }> | null;
+    query: TopicModelingResultQuery;
     /**
-     * Hidden Views
+     * Topics
      */
-    hidden_views?: Array<string> | null;
-    /**
-     * Ldaca Oni Api Token
-     */
-    ldaca_oni_api_token?: string | null;
+    topics: Array<TopicItem>;
 };
 
 /**
- * UserResponse
- *
- * Response schema returned by API routes and consumed by generated clients for user response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: validate incoming API fields, apply defaults or validators, and serialize route
- * responses in the shape expected by frontend clients and tests.
+ * TopicModelingResultQuery
  */
-export type UserResponse = {
+export type TopicModelingResultQuery = {
+    /**
+     * Descending
+     */
+    descending?: boolean;
+    /**
+     * Kind
+     */
+    kind?: 'topic_modeling';
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Sort By
+     */
+    sort_by?: string | null;
+    /**
+     * Topic Ids
+     */
+    topic_ids?: Array<number> | null;
+};
+
+/**
+ * TopicStageTiming
+ */
+export type TopicStageTiming = {
+    /**
+     * Elapsed Ms
+     */
+    elapsed_ms: number;
+    /**
+     * Stage
+     */
+    stage: string;
+};
+
+/**
+ * UnaryExpression
+ */
+export type UnaryExpressionInput = {
+    /**
+     * Op
+     */
+    op: 'not' | 'is_null' | 'is_not_null' | 'abs' | 'lowercase' | 'uppercase' | 'year' | 'month' | 'day' | 'sum' | 'mean' | 'min' | 'max' | 'count' | 'n_unique';
+    /**
+     * Operand
+     */
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionInput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionInput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionInput) | ({
+        op: 'cast';
+    } & CastExpressionInput) | ({
+        op: 'round';
+    } & RoundExpressionInput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionInput);
+};
+
+/**
+ * UnaryExpression
+ */
+export type UnaryExpressionOutput = {
+    /**
+     * Op
+     */
+    op: 'not' | 'is_null' | 'is_not_null' | 'abs' | 'lowercase' | 'uppercase' | 'year' | 'month' | 'day' | 'sum' | 'mean' | 'min' | 'max' | 'count' | 'n_unique';
+    /**
+     * Operand
+     */
+    operand: ({
+        op: 'column';
+    } & ColumnExpression) | ({
+        op: 'literal';
+    } & LiteralExpression) | ({
+        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
+    } & BinaryExpressionOutput) | ({
+        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
+    } & UnaryExpressionOutput) | ({
+        op: 'contains' | 'ends_with' | 'starts_with';
+    } & StringExpressionOutput) | ({
+        op: 'cast';
+    } & CastExpressionOutput) | ({
+        op: 'round';
+    } & RoundExpressionOutput) | ({
+        op: 'concat_string';
+    } & ConcatStringExpressionOutput);
+};
+
+/**
+ * UnlimitedStorageResource
+ *
+ * A principal with no durable storage limit.
+ */
+export type UnlimitedStorageResource = {
+    /**
+     * Policy
+     */
+    policy?: 'unlimited';
+};
+
+/**
+ * UserFileImport
+ *
+ * One complete public and persisted import resource.
+ */
+export type UserFileImport = {
+    /**
+     * Cancellation Requested At
+     */
+    cancellation_requested_at: string | null;
     /**
      * Created At
      */
     created_at: string;
+    error: Failure | null;
     /**
-     * Email
+     * Finished At
      */
-    email: string;
+    finished_at: string | null;
     /**
      * Id
      */
     id: string;
+    progress: Progress;
     /**
-     * Is Active
+     * Request
      */
-    is_active: boolean;
+    request: ({
+        kind: 'sample';
+    } & SampleUserFileImportRequest) | ({
+        kind: 'data_portal';
+    } & DataPortalUserFileImportRequest);
     /**
-     * Is Verified
+     * Result
      */
-    is_verified: boolean;
+    result: ({
+        kind: 'sample';
+    } & SampleUserFileImportResult) | ({
+        kind: 'data_portal';
+    } & DataPortalUserFileImportResult) | null;
     /**
-     * Last Login
+     * Revision
      */
-    last_login: string;
+    revision: number;
     /**
-     * Name
+     * Started At
      */
-    name: string;
-    /**
-     * Picture
-     */
-    picture?: string | null;
+    started_at: string | null;
+    state: BackgroundState;
 };
 
 /**
- * ValidationError
+ * UserFileImportPage
  */
-export type ValidationError = {
+export type UserFileImportPage = {
     /**
-     * Context
+     * Items
      */
-    ctx?: {
-        [key: string]: unknown;
-    };
+    items: Array<UserFileImport>;
     /**
-     * Input
+     * Page
      */
-    input?: unknown;
+    page: number;
     /**
-     * Location
+     * Page Size
      */
-    loc: Array<string | number>;
+    page_size: number;
     /**
-     * Message
+     * Total Items
      */
-    msg: string;
+    total_items: number;
     /**
-     * Error Type
+     * Total Pages
      */
-    type: string;
+    total_pages: number;
 };
 
 /**
- * VisibleGroupSelection
- *
- * One exact chart-series identity selected for sequential detachment.
- *
- * Used by:
- * - ``detach_sequential_analysis`` because the chart sends the visible legend
- * groups back to the backend so only those source rows are materialised.
- * ``None`` is a real group value for nullable columns and compiles to
- * ``is_null()`` in ``_build_group_filter_expression``.
+ * ValidAnalysisIntegrity
  */
-export type VisibleGroupSelection = {
+export type ValidAnalysisIntegrity = {
     /**
-     * Values
+     * Status
      */
-    values: {
-        [key: string]: string | number | number | boolean | null;
-    };
-};
-
-/**
- * WorkspaceActionResponse
- *
- * Response schema returned by API routes and consumed by generated clients for workspace action response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
- */
-export type WorkspaceActionResponse = {
-    /**
-     * Id
-     */
-    id?: string | null;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * State
-     */
-    state: 'successful';
+    status?: 'valid';
 };
 
 /**
  * WorkspaceCreateRequest
  *
- * Request schema used by API routes and generated clients for workspace create request.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
+ * Create one workspace resource.
  */
 export type WorkspaceCreateRequest = {
     /**
      * Description
      */
-    description?: string | null;
-    /**
-     * Name
-     */
-    name: string;
-};
-
-/**
- * WorkspaceGraphEdge
- *
- * API schema used by routes and generated clients for workspace graph edge.
- *
- * Used by:
- * - backend request/response models because they need a stable JSON contract shared by
- * route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
- */
-export type WorkspaceGraphEdge = {
-    /**
-     * Label
-     */
-    label?: string | null;
-    /**
-     * Source
-     */
-    source: string;
-    /**
-     * Target
-     */
-    target: string;
-    [key: string]: unknown;
-};
-
-/**
- * WorkspaceGraphNode
- *
- * Lightweight node summary used by workspace graph/topology responses.
- *
- * Used by:
- * - workspace graph routes and generated frontend graph/list clients because
- * graph rendering needs node identity and display/action state, while full
- * schema metadata belongs to ``WorkspaceNodeInfo`` through the collection
- * node-info route.
- *
- * Flow: serialize only graph-facing fields so the graph endpoint does not
- * collect or duplicate per-node schema, columns, shape, tokenizer, or
- * dtype-normalization metadata.
- */
-export type WorkspaceGraphNode = {
-    /**
-     * Can Redo
-     */
-    can_redo?: boolean | null;
-    /**
-     * Can Undo
-     */
-    can_undo?: boolean | null;
-    /**
-     * Child Ids
-     */
-    child_ids?: Array<string>;
-    /**
-     * Color
-     */
-    color?: string | null;
-    /**
-     * Document
-     */
-    document?: string | null;
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Operation
-     */
-    operation?: string | null;
-    /**
-     * Parent Ids
-     */
-    parent_ids?: Array<string>;
-    [key: string]: unknown;
-};
-
-/**
- * WorkspaceGraphResponse
- *
- * Response schema returned by API routes and consumed by generated clients for workspace graph response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
- */
-export type WorkspaceGraphResponse = {
-    /**
-     * Edges
-     */
-    edges: Array<WorkspaceGraphEdge>;
-    /**
-     * Nodes
-     */
-    nodes: Array<WorkspaceGraphNode>;
-    [key: string]: unknown;
-};
-
-/**
- * WorkspaceInfo
- *
- * Metadata schema used by API responses to describe workspace info.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
- */
-export type WorkspaceInfo = {
-    /**
-     * Created At
-     */
-    created_at?: string | null;
-    /**
-     * Description
-     */
     description?: string;
     /**
-     * Id
-     */
-    id: string;
-    /**
-     * Leaf Nodes
-     */
-    leaf_nodes?: number;
-    /**
-     * Modified At
-     */
-    modified_at?: string | null;
-    /**
      * Name
      */
     name: string;
-    /**
-     * Root Nodes
-     */
-    root_nodes?: number;
-    /**
-     * Total Nodes
-     */
-    total_nodes: number;
-};
-
-/**
- * WorkspaceNodeCreateRequest
- *
- * Request body for creating a workspace node from a user data file.
- *
- * Used by:
- * - `add_node_to_workspace` because node creation changes workspace state and
- * should carry creation inputs in a JSON body rather than query parameters.
- */
-export type WorkspaceNodeCreateRequest = {
-    /**
-     * Filename
-     */
-    filename: string;
-    /**
-     * Mode
-     *
-     * How to treat the file: currently only 'LazyFrame' is supported; files are staged as parquet and reloaded lazily.
-     */
-    mode?: string;
-    /**
-     * Sheet Name
-     *
-     * Optional Excel sheet name to load when the source file is a workbook.
-     */
-    sheet_name?: string | null;
 };
 
 /**
  * WorkspaceNodeInfo
  *
- * Metadata schema used by API responses to describe workspace node info.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
+ * Complete addressable node metadata returned by node routes.
  */
 export type WorkspaceNodeInfo = {
-    /**
-     * Can Redo
-     */
-    can_redo?: boolean | null;
-    /**
-     * Can Undo
-     */
-    can_undo?: boolean | null;
     /**
      * Child Ids
      */
@@ -5164,9 +3428,9 @@ export type WorkspaceNodeInfo = {
      */
     color?: string | null;
     /**
-     * Columns
+     * Derivation Description
      */
-    columns?: Array<string>;
+    derivation_description: string;
     /**
      * Document
      */
@@ -5184,19 +3448,17 @@ export type WorkspaceNodeInfo = {
      */
     name: string;
     /**
-     * Operation
-     */
-    operation?: string | null;
-    /**
      * Parent Ids
      */
     parent_ids?: Array<string>;
     /**
-     * Schema
+     * Provenance
      */
-    schema?: {
-        [key: string]: string;
-    };
+    provenance: ({
+        type: 'source';
+    } & SourceProvenance) | ({
+        type: 'derivation';
+    } & DerivationProvenance);
     /**
      * Shape
      */
@@ -5210,58 +3472,12 @@ export type WorkspaceNodeInfo = {
     tokenizer_models?: {
         [key: string]: string;
     };
-    [key: string]: unknown;
-};
-
-/**
- * WorkspaceNodeInfoRequest
- *
- * Request schema for fetching node-info metadata for one or many nodes.
- *
- * Used by:
- * - the workspace node-info collection route and generated frontend clients
- * because graph responses carry only lightweight topology while schema,
- * columns, shape, and tokenizer metadata are fetched on demand.
- *
- * Flow: validate the requested node id list, preserving caller order so the
- * response can line up with the submitted ids.
- */
-export type WorkspaceNodeInfoRequest = {
-    /**
-     * Nodes
-     */
-    nodes?: Array<string>;
-};
-
-/**
- * WorkspaceNodeInfoResponse
- *
- * Response schema for collection-level workspace node-info metadata.
- *
- * Used by:
- * - the workspace node-info collection route and generated frontend clients
- * because single-node and batch metadata reads share one typed contract.
- *
- * Flow: serialize the requested node-info payloads in request order.
- */
-export type WorkspaceNodeInfoResponse = {
-    /**
-     * Nodes
-     */
-    nodes: Array<WorkspaceNodeInfo>;
 };
 
 /**
  * WorkspaceNodeReorderRequest
  *
- * Request body for persisting a new workspace node order.
- *
- * Used by:
- * - backend ``reorder_workspace_nodes`` route and the generated client because the
- * list-view drag-to-reorder gesture commits the full node id sequence.
- *
- * Flow: the route validates the active workspace, applies ``ordered_ids`` via
- * ``Workspace.reorder_nodes``, persists, and returns the rebuilt graph.
+ * Complete desired workspace node order.
  */
 export type WorkspaceNodeReorderRequest = {
     /**
@@ -5271,31 +3487,19 @@ export type WorkspaceNodeReorderRequest = {
 };
 
 /**
- * WorkspaceSummary
+ * WorkspaceResource
  *
- * Summary metadata for a workspace row in list responses.
- *
- * Used by:
- * - backend API routes, backend request/response models, core workspace and worker
- * services because they need a stable JSON contract shared by route handlers, generated
- * clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
+ * Lightweight Workspace metadata plus process-local runtime state.
  */
-export type WorkspaceSummary = {
+export type WorkspaceResource = {
     /**
      * Created At
      */
-    created_at?: string;
+    created_at: string;
     /**
      * Description
      */
-    description?: string;
-    /**
-     * Folder Name
-     */
-    folder_name?: string | null;
+    description: string;
     /**
      * Id
      */
@@ -5303,84 +3507,37 @@ export type WorkspaceSummary = {
     /**
      * Leaf Nodes
      */
-    leaf_nodes?: number;
+    leaf_nodes: number;
     /**
      * Modified At
      */
-    modified_at?: string;
+    modified_at: string;
     /**
      * Name
      */
     name: string;
     /**
+     * Revision
+     */
+    revision: number;
+    /**
      * Root Nodes
      */
-    root_nodes?: number;
+    root_nodes: number;
+    /**
+     * Runtime State
+     */
+    runtime_state: 'closed' | 'open' | 'closing';
     /**
      * Total Nodes
      */
-    total_nodes?: number;
-    /**
-     * Workspace Size Byte
-     */
-    workspace_size_Byte?: number;
-};
-
-/**
- * WorkspaceTabsState
- *
- * Full per-workspace analysis-tab state.
- *
- * API schema round-tripped by the GET/PUT ``/{workspace_id:uuid}/tabs`` routes
- * and the frontend tab store. ``groups`` is keyed by analysis type.
- *
- * Used by:
- * - backend API routes, generated frontend client, and backend tests.
- */
-export type WorkspaceTabsState = {
-    /**
-     * Groups
-     */
-    groups?: {
-        [key: string]: AnalysisTabGroup;
-    };
-};
-
-/**
- * WorkspaceTaskStartResponse
- *
- * Response schema returned by API routes and consumed by generated clients for workspace task start response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
- */
-export type WorkspaceTaskStartResponse = {
-    /**
-     * Message
-     */
-    message: string;
-    metadata: FilesTaskMetadataResponse;
-    /**
-     * State
-     */
-    state: 'running';
+    total_nodes: number;
 };
 
 /**
  * WorkspaceUpdateRequest
  *
- * Request body for updating explicit workspace metadata.
- *
- * Used by:
- * - ``PATCH /workspaces/{workspace_id}`` because callers should name the
- * target workspace in the URL and send mutable metadata in the body.
- *
- * Flow: accept partial name/description updates so route handlers can apply
- * only the fields the caller intentionally supplied.
+ * Partial workspace metadata update.
  */
 export type WorkspaceUpdateRequest = {
     /**
@@ -5394,329 +3551,184 @@ export type WorkspaceUpdateRequest = {
 };
 
 /**
- * WorkspaceUploadResponse
- *
- * Response schema returned by API routes and consumed by generated clients for workspace upload response.
- *
- * Used by:
- * - backend API routes, backend request/response models because they need a stable JSON
- * contract shared by route handlers, generated clients, and tests.
- *
- * Flow: resolve the user workspace directory, refresh cached path indexes, coordinate task
- * cleanup, and return stable workspace metadata to callers.
+ * _TokenNodeTableResource
  */
-export type WorkspaceUploadResponse = {
+export type TokenNodeTableResource = {
     /**
-     * State
+     * Node Id
      */
-    state: 'successful';
-    workspace: WorkspaceSummary;
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+    table: CompleteTableResource;
 };
 
-export type RootData = {
+/**
+ * _TokenTableResources
+ */
+export type TokenTableResources = {
+    /**
+     * Nodes
+     */
+    nodes: Array<TokenNodeTableResource>;
+    statistics?: CompleteTableResource | null;
+    /**
+     * Version
+     */
+    version: 1;
+};
+
+/**
+ * _TopicArtifactsResource
+ */
+export type TopicArtifactsResource = {
+    /**
+     * Nodes
+     */
+    nodes: Array<TopicNodeArtifactResource>;
+    topic_meanings_parquet_path: ArtifactResource;
+    /**
+     * Version
+     */
+    version: 1;
+};
+
+/**
+ * _TopicNodeArtifactResource
+ */
+export type TopicNodeArtifactResource = {
+    assignments: PagedTableResource;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+    /**
+     * Original Columns
+     */
+    original_columns: Array<string>;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
+
+/**
+ * AnnotationClass
+ */
+export type LdacaWordflowDomainWorkspaceAnalysisAnnotationClass = {
+    /**
+     * Description
+     */
+    description?: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * AnnotationClass
+ *
+ * One exact label and optional model-facing description.
+ */
+export type LdacaWordflowModelsAnnotationsAnnotationClass = {
+    /**
+     * Description
+     */
+    description?: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+export type JsonDataInputWritable = string | number | number | boolean | Array<JsonDataInputWritable> | {
+    [key: string]: JsonDataInputWritable;
+} | null;
+
+export type JsonDataOutputWritable = string | number | number | boolean | Array<JsonDataOutputWritable> | {
+    [key: string]: JsonDataOutputWritable;
+} | null;
+
+/**
+ * ProviderCredentialPatch
+ *
+ * Write-only partial update; omitted fields remain unchanged.
+ */
+export type ProviderCredentialPatchWritable = {
+    /**
+     * Anthropic Api Key
+     */
+    anthropic_api_key?: string | null;
+    /**
+     * Data Portal Api Token
+     */
+    data_portal_api_token?: string | null;
+    /**
+     * Google Api Key
+     */
+    google_api_key?: string | null;
+    /**
+     * Openai Api Key
+     */
+    openai_api_key?: string | null;
+    /**
+     * Openrouter Api Key
+     */
+    openrouter_api_key?: string | null;
+};
+
+export type ListAnnotationModelsData = {
     body?: never;
-    path?: never;
-    query?: never;
-    url: '/api';
-};
-
-export type RootErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type RootError = RootErrors[keyof RootErrors];
-
-export type RootResponses = {
-    /**
-     * Successful Response
-     */
-    200: RootResponse;
-};
-
-export type RootResponse2 = RootResponses[keyof RootResponses];
-
-export type AdminCleanupData = {
-    body?: never;
-    headers?: {
+    path: {
         /**
-         * Authorization
+         * Provider
          */
-        authorization?: string | null;
+        provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
     };
-    path?: never;
     query?: never;
-    url: '/api/admin/cleanup';
+    url: '/api/annotation-providers/{provider}/models';
 };
 
-export type AdminCleanupErrors = {
+export type ListAnnotationModelsErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
-     * Resource not found
+     * Request validation failed
      */
-    404: ErrorResponse;
+    422: ApiError;
     /**
-     * Resource conflict
+     * Upstream provider unavailable
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    502: ApiError;
 };
 
-export type AdminCleanupError = AdminCleanupErrors[keyof AdminCleanupErrors];
+export type ListAnnotationModelsError = ListAnnotationModelsErrors[keyof ListAnnotationModelsErrors];
 
-export type AdminCleanupResponses = {
+export type ListAnnotationModelsResponses = {
     /**
      * Successful Response
      */
-    200: AdminCleanupResponse;
+    200: AnnotationModelsResource;
 };
 
-export type AdminCleanupResponse2 = AdminCleanupResponses[keyof AdminCleanupResponses];
-
-export type UpdateAdminConfigData = {
-    body: AdminConfigUpdate;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/admin/config';
-};
-
-export type UpdateAdminConfigErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type UpdateAdminConfigError = UpdateAdminConfigErrors[keyof UpdateAdminConfigErrors];
-
-export type UpdateAdminConfigResponses = {
-    /**
-     * Successful Response
-     */
-    200: AdminConfigResponse;
-};
-
-export type UpdateAdminConfigResponse = UpdateAdminConfigResponses[keyof UpdateAdminConfigResponses];
-
-export type ListUsersData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/admin/users';
-};
-
-export type ListUsersErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ListUsersError = ListUsersErrors[keyof ListUsersErrors];
-
-export type ListUsersResponses = {
-    /**
-     * Successful Response
-     */
-    200: AdminUsersResponse;
-};
-
-export type ListUsersResponse = ListUsersResponses[keyof ListUsersResponses];
-
-export type GetAuthInfoData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/auth/';
-};
-
-export type GetAuthInfoErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetAuthInfoError = GetAuthInfoErrors[keyof GetAuthInfoErrors];
-
-export type GetAuthInfoResponses = {
-    /**
-     * Successful Response
-     */
-    200: AuthInfoResponse;
-};
-
-export type GetAuthInfoResponse = GetAuthInfoResponses[keyof GetAuthInfoResponses];
+export type ListAnnotationModelsResponse = ListAnnotationModelsResponses[keyof ListAnnotationModelsResponses];
 
 export type CilogonCallbackData = {
     body?: never;
@@ -5734,51 +3746,27 @@ export type CilogonCallbackData = {
          * Error
          */
         error?: string | null;
-        /**
-         * Error Description
-         */
-        error_description?: string | null;
     };
     url: '/api/auth/cilogon/callback';
 };
 
 export type CilogonCallbackErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
-     * Authentication required
+     * Origin, CSRF, or access check failed
      */
-    401: ErrorResponse;
+    403: ApiError;
     /**
-     * Access denied
+     * Request validation failed
      */
-    403: ErrorResponse;
+    422: ApiError;
     /**
-     * Resource not found
+     * Upstream provider unavailable
      */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    502: ApiError;
 };
 
 export type CilogonCallbackError = CilogonCallbackErrors[keyof CilogonCallbackErrors];
@@ -5786,402 +3774,679 @@ export type CilogonCallbackError = CilogonCallbackErrors[keyof CilogonCallbackEr
 export type CilogonLoginData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Return To
+         */
+        return_to?: string | null;
+    };
     url: '/api/auth/cilogon/login';
 };
 
 export type CilogonLoginErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
-     * Authentication required
+     * Request validation failed
      */
-    401: ErrorResponse;
+    422: ApiError;
     /**
-     * Access denied
+     * Upstream provider unavailable
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    502: ApiError;
 };
 
 export type CilogonLoginError = CilogonLoginErrors[keyof CilogonLoginErrors];
 
-export type GoogleAuthData = {
-    body: GoogleIn;
-    path?: never;
-    query?: never;
-    url: '/api/auth/google';
-};
-
-export type GoogleAuthErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GoogleAuthError = GoogleAuthErrors[keyof GoogleAuthErrors];
-
-export type GoogleAuthResponses = {
-    /**
-     * Successful Response
-     */
-    200: GoogleOut;
-};
-
-export type GoogleAuthResponse = GoogleAuthResponses[keyof GoogleAuthResponses];
-
-export type GoogleAuthCallbackData = {
-    body: BodyGoogleAuthCallback;
+export type GoogleCallbackData = {
+    body: BodyGoogleCallback;
     path?: never;
     query?: never;
     url: '/api/auth/google/callback';
 };
 
-export type GoogleAuthCallbackErrors = {
+export type GoogleCallbackErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
-     * Authentication required
+     * Origin, CSRF, or access check failed
      */
-    401: ErrorResponse;
+    403: ApiError;
     /**
-     * Access denied
+     * Request validation failed
      */
-    403: ErrorResponse;
+    422: ApiError;
     /**
-     * Resource not found
+     * Upstream provider unavailable
      */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    502: ApiError;
 };
 
-export type GoogleAuthCallbackError = GoogleAuthCallbackErrors[keyof GoogleAuthCallbackErrors];
+export type GoogleCallbackError = GoogleCallbackErrors[keyof GoogleCallbackErrors];
 
-export type AuthHealthData = {
+export type ListFeaturedDataPortalCollectionsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/auth/health';
+    url: '/api/data-portal/featured';
 };
 
-export type AuthHealthErrors = {
+export type ListFeaturedDataPortalCollectionsErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
-     * Resource not found
+     * Request validation failed
      */
-    404: ErrorResponse;
+    422: ApiError;
     /**
-     * Resource conflict
+     * Upstream provider unavailable
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    502: ApiError;
 };
 
-export type AuthHealthError = AuthHealthErrors[keyof AuthHealthErrors];
+export type ListFeaturedDataPortalCollectionsError = ListFeaturedDataPortalCollectionsErrors[keyof ListFeaturedDataPortalCollectionsErrors];
 
-export type AuthHealthResponses = {
+export type ListFeaturedDataPortalCollectionsResponses = {
     /**
      * Successful Response
      */
-    200: AuthHealthResponse;
+    200: DataPortalSearchResource;
 };
 
-export type AuthHealthResponse2 = AuthHealthResponses[keyof AuthHealthResponses];
+export type ListFeaturedDataPortalCollectionsResponse = ListFeaturedDataPortalCollectionsResponses[keyof ListFeaturedDataPortalCollectionsResponses];
 
-export type LogoutData = {
+export type SubmitDataPortalImportData = {
+    body: DataPortalImportSubmitRequest;
+    path?: never;
+    query?: never;
+    url: '/api/data-portal/imports';
+};
+
+export type SubmitDataPortalImportErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type SubmitDataPortalImportError = SubmitDataPortalImportErrors[keyof SubmitDataPortalImportErrors];
+
+export type SubmitDataPortalImportResponses = {
+    /**
+     * Successful Response
+     */
+    202: UserFileImport;
+};
+
+export type SubmitDataPortalImportResponse = SubmitDataPortalImportResponses[keyof SubmitDataPortalImportResponses];
+
+export type SearchDataPortalData = {
+    body: DataPortalSearchRequest;
+    path?: never;
+    query?: never;
+    url: '/api/data-portal/search';
+};
+
+export type SearchDataPortalErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Upstream provider unavailable
+     */
+    502: ApiError;
+};
+
+export type SearchDataPortalError = SearchDataPortalErrors[keyof SearchDataPortalErrors];
+
+export type SearchDataPortalResponses = {
+    /**
+     * Successful Response
+     */
+    200: DataPortalSearchResource;
+};
+
+export type SearchDataPortalResponse = SearchDataPortalResponses[keyof SearchDataPortalResponses];
+
+export type BackendEventsData = {
     body?: never;
-    headers?: {
+    path?: never;
+    query?: never;
+    url: '/api/events';
+};
+
+export type BackendEventsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+};
+
+export type BackendEventsError = BackendEventsErrors[keyof BackendEventsErrors];
+
+export type BackendEventsResponses = {
+    /**
+     * Successful Response
+     */
+    200: string;
+};
+
+export type BackendEventsResponse = BackendEventsResponses[keyof BackendEventsResponses];
+
+export type ClearProviderCredentialsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/provider-credentials';
+};
+
+export type ClearProviderCredentialsErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type ClearProviderCredentialsError = ClearProviderCredentialsErrors[keyof ClearProviderCredentialsErrors];
+
+export type ClearProviderCredentialsResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ClearProviderCredentialsResponse = ClearProviderCredentialsResponses[keyof ClearProviderCredentialsResponses];
+
+export type GetProviderCredentialsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/provider-credentials';
+};
+
+export type GetProviderCredentialsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type GetProviderCredentialsError = GetProviderCredentialsErrors[keyof GetProviderCredentialsErrors];
+
+export type GetProviderCredentialsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProviderCredentialSummary;
+};
+
+export type GetProviderCredentialsResponse = GetProviderCredentialsResponses[keyof GetProviderCredentialsResponses];
+
+export type UpdateProviderCredentialsData = {
+    body: ProviderCredentialPatchWritable;
+    path?: never;
+    query?: never;
+    url: '/api/provider-credentials';
+};
+
+export type UpdateProviderCredentialsErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type UpdateProviderCredentialsError = UpdateProviderCredentialsErrors[keyof UpdateProviderCredentialsErrors];
+
+export type UpdateProviderCredentialsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProviderCredentialSummary;
+};
+
+export type UpdateProviderCredentialsResponse = UpdateProviderCredentialsResponses[keyof UpdateProviderCredentialsResponses];
+
+export type ListSampleCollectionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/sample-collections';
+};
+
+export type ListSampleCollectionsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Upstream provider unavailable
+     */
+    502: ApiError;
+};
+
+export type ListSampleCollectionsError = ListSampleCollectionsErrors[keyof ListSampleCollectionsErrors];
+
+export type ListSampleCollectionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SampleCatalogueResource;
+};
+
+export type ListSampleCollectionsResponse = ListSampleCollectionsResponses[keyof ListSampleCollectionsResponses];
+
+export type SubmitSampleImportData = {
+    body?: never;
+    path: {
         /**
-         * Authorization
+         * Collection Id
          */
-        authorization?: string | null;
+        collection_id: string;
     };
-    path?: never;
     query?: never;
-    url: '/api/auth/logout';
+    url: '/api/sample-collections/{collection_id}/imports';
 };
 
-export type LogoutErrors = {
+export type SubmitSampleImportErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
-     * Resource not found
+     * Resource state conflict
      */
-    404: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Upstream provider unavailable
      */
-    422: HttpValidationError;
+    502: ApiError;
     /**
-     * Internal service error
+     * Storage capacity is exhausted
      */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type LogoutError = LogoutErrors[keyof LogoutErrors];
+export type SubmitSampleImportError = SubmitSampleImportErrors[keyof SubmitSampleImportErrors];
 
-export type LogoutResponses = {
+export type SubmitSampleImportResponses = {
     /**
      * Successful Response
      */
-    200: MessageResponse;
+    202: UserFileImport;
 };
 
-export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+export type SubmitSampleImportResponse = SubmitSampleImportResponses[keyof SubmitSampleImportResponses];
 
-export type GetCurrentUserInfoData = {
+export type DeleteSessionData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query?: never;
-    url: '/api/auth/me';
+    url: '/api/session';
 };
 
-export type GetCurrentUserInfoErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type DeleteSessionErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    403: ApiError;
 };
 
-export type GetCurrentUserInfoError = GetCurrentUserInfoErrors[keyof GetCurrentUserInfoErrors];
+export type DeleteSessionError = DeleteSessionErrors[keyof DeleteSessionErrors];
 
-export type GetCurrentUserInfoResponses = {
+export type DeleteSessionResponses = {
     /**
      * Successful Response
      */
-    200: UserResponse;
+    204: void;
 };
 
-export type GetCurrentUserInfoResponse = GetCurrentUserInfoResponses[keyof GetCurrentUserInfoResponses];
+export type DeleteSessionResponse = DeleteSessionResponses[keyof DeleteSessionResponses];
 
-export type AuthStatusData = {
+export type GetSessionData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query?: never;
-    url: '/api/auth/status';
+    url: '/api/session';
 };
 
-export type AuthStatusErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AuthStatusError = AuthStatusErrors[keyof AuthStatusErrors];
-
-export type AuthStatusResponses = {
+export type GetSessionResponses = {
     /**
      * Successful Response
      */
-    200: AuthStatusResponse;
+    200: SessionResponse;
 };
 
-export type AuthStatusResponse2 = AuthStatusResponses[keyof AuthStatusResponses];
+export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
+
+export type GetStorageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/storage';
+};
+
+export type GetStorageErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+};
+
+export type GetStorageError = GetStorageErrors[keyof GetStorageErrors];
+
+export type GetStorageResponses = {
+    /**
+     * Response Get Storage
+     *
+     * Successful Response
+     */
+    200: ({
+        policy: 'unlimited';
+    } & UnlimitedStorageResource) | ({
+        policy: 'quota';
+    } & QuotaStorageResource);
+};
+
+export type GetStorageResponse = GetStorageResponses[keyof GetStorageResponses];
+
+export type ListTokenizerModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tokenizer-models';
+};
+
+export type ListTokenizerModelsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type ListTokenizerModelsError = ListTokenizerModelsErrors[keyof ListTokenizerModelsErrors];
+
+export type ListTokenizerModelsResponses = {
+    /**
+     * Response List Tokenizer Models
+     *
+     * Successful Response
+     */
+    200: Array<TokenizerModelResource>;
+};
+
+export type ListTokenizerModelsResponse = ListTokenizerModelsResponses[keyof ListTokenizerModelsResponses];
+
+export type ListUserFileImportsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Page
+         */
+        page?: number;
+        /**
+         * Page Size
+         */
+        page_size?: number;
+    };
+    url: '/api/user-file-imports';
+};
+
+export type ListUserFileImportsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type ListUserFileImportsError = ListUserFileImportsErrors[keyof ListUserFileImportsErrors];
+
+export type ListUserFileImportsResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserFileImportPage;
+};
+
+export type ListUserFileImportsResponse = ListUserFileImportsResponses[keyof ListUserFileImportsResponses];
+
+export type DeleteUserFileImportData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/user-file-imports/{import_id}';
+};
+
+export type DeleteUserFileImportErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+};
+
+export type DeleteUserFileImportError = DeleteUserFileImportErrors[keyof DeleteUserFileImportErrors];
+
+export type DeleteUserFileImportResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteUserFileImportResponse = DeleteUserFileImportResponses[keyof DeleteUserFileImportResponses];
+
+export type GetUserFileImportData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/user-file-imports/{import_id}';
+};
+
+export type GetUserFileImportErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+};
+
+export type GetUserFileImportError = GetUserFileImportErrors[keyof GetUserFileImportErrors];
+
+export type GetUserFileImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserFileImport;
+};
+
+export type GetUserFileImportResponse = GetUserFileImportResponses[keyof GetUserFileImportResponses];
+
+export type CancelUserFileImportData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/user-file-imports/{import_id}/cancel';
+};
+
+export type CancelUserFileImportErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+};
+
+export type CancelUserFileImportError = CancelUserFileImportErrors[keyof CancelUserFileImportErrors];
+
+export type CancelUserFileImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserFileImport;
+    /**
+     * Running import cancellation is pending
+     */
+    202: UserFileImport;
+};
+
+export type CancelUserFileImportResponse = CancelUserFileImportResponses[keyof CancelUserFileImportResponses];
 
 export type DeleteFileData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query: {
         /**
@@ -6191,46 +4456,30 @@ export type DeleteFileData = {
          */
         path: string;
     };
-    url: '/api/files/';
+    url: '/api/user-files';
 };
 
 export type DeleteFileErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
 export type DeleteFileError = DeleteFileErrors[keyof DeleteFileErrors];
@@ -6239,84 +4488,97 @@ export type DeleteFileResponses = {
     /**
      * Successful Response
      */
-    200: MessageResponse;
+    204: void;
 };
 
 export type DeleteFileResponse = DeleteFileResponses[keyof DeleteFileResponses];
 
-export type GetUserFilesData = {
+export type ListUserFilesData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query?: never;
-    url: '/api/files/';
+    url: '/api/user-files';
 };
 
-export type GetUserFilesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type ListUserFilesErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
-     * Resource not found
+     * Request or resource exceeds the configured size limit
      */
-    404: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type GetUserFilesError = GetUserFilesErrors[keyof GetUserFilesErrors];
+export type ListUserFilesError = ListUserFilesErrors[keyof ListUserFilesErrors];
 
-export type GetUserFilesResponses = {
+export type ListUserFilesResponses = {
     /**
-     * Response Get User Files
+     * Response List User Files
      *
      * Successful Response
      */
-    200: Array<FileTreeNodeResponse>;
+    200: Array<FileResource>;
 };
 
-export type GetUserFilesResponse = GetUserFilesResponses[keyof GetUserFilesResponses];
+export type ListUserFilesResponse = ListUserFilesResponses[keyof ListUserFilesResponses];
+
+export type MoveFileData = {
+    body: MoveFileRequest;
+    path?: never;
+    query?: never;
+    url: '/api/user-files';
+};
+
+export type MoveFileErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+};
+
+export type MoveFileError = MoveFileErrors[keyof MoveFileErrors];
+
+export type MoveFileResponses = {
+    /**
+     * Successful Response
+     */
+    200: FileResource;
+};
+
+export type MoveFileResponse = MoveFileResponses[keyof MoveFileResponses];
 
 export type DownloadFileData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query: {
         /**
@@ -6326,46 +4588,34 @@ export type DownloadFileData = {
          */
         path: string;
     };
-    url: '/api/files/content';
+    url: '/api/user-files/content';
 };
 
 export type DownloadFileErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    401: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Storage capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
 export type DownloadFileError = DownloadFileErrors[keyof DownloadFileErrors];
@@ -6381,54 +4631,40 @@ export type DownloadFileResponse = DownloadFileResponses[keyof DownloadFileRespo
 
 export type CreateFolderData = {
     body: CreateFolderRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query?: never;
-    url: '/api/files/folders';
+    url: '/api/user-files/folders';
 };
 
 export type CreateFolderErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Storage capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
 export type CreateFolderError = CreateFolderErrors[keyof CreateFolderErrors];
@@ -6437,479 +4673,129 @@ export type CreateFolderResponses = {
     /**
      * Successful Response
      */
-    200: CreateFolderResponse;
+    201: FileResource;
 };
 
-export type CreateFolderResponse2 = CreateFolderResponses[keyof CreateFolderResponses];
+export type CreateFolderResponse = CreateFolderResponses[keyof CreateFolderResponses];
 
-export type ImportLdacaDatasetData = {
-    body: LDaCaImportRequest;
-    headers?: {
-        /**
-         * X-Ldaca-Api-Token
-         */
-        'X-LDACA-API-Token'?: string | null;
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/files/import-ldaca';
-};
-
-export type ImportLdacaDatasetErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ImportLdacaDatasetError = ImportLdacaDatasetErrors[keyof ImportLdacaDatasetErrors];
-
-export type ImportLdacaDatasetResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilesImportTaskStartResponse;
-};
-
-export type ImportLdacaDatasetResponse = ImportLdacaDatasetResponses[keyof ImportLdacaDatasetResponses];
-
-export type ImportSampleDataData = {
-    body?: ImportSampleDataRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/files/import-sample-data';
-};
-
-export type ImportSampleDataErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ImportSampleDataError = ImportSampleDataErrors[keyof ImportSampleDataErrors];
-
-export type ImportSampleDataResponses = {
-    /**
-     * Successful Response
-     */
-    200: ImportSampleDataResponse;
-};
-
-export type ImportSampleDataResponse2 = ImportSampleDataResponses[keyof ImportSampleDataResponses];
-
-export type GetFileInfoData = {
+export type PreviewFileData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query: {
         /**
          * Path
-         *
-         * Path relative to the user's data directory
          */
         path: string;
+        /**
+         * Page
+         */
+        page?: number;
+        /**
+         * Page Size
+         */
+        page_size?: number;
+        /**
+         * Sheet Name
+         */
+        sheet_name?: string | null;
     };
-    url: '/api/files/info';
+    url: '/api/user-files/preview';
 };
 
-export type GetFileInfoErrors = {
+export type PreviewFileErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type GetFileInfoError = GetFileInfoErrors[keyof GetFileInfoErrors];
+export type PreviewFileError = PreviewFileErrors[keyof PreviewFileErrors];
 
-export type GetFileInfoResponses = {
+export type PreviewFileResponses = {
     /**
-     * Successful Response
+     * Arrow IPC stream
      */
-    200: FileInfoResponse;
+    200: Blob | File;
 };
 
-export type GetFileInfoResponse = GetFileInfoResponses[keyof GetFileInfoResponses];
+export type PreviewFileResponse = PreviewFileResponses[keyof PreviewFileResponses];
 
-export type ListLdacaFeaturedCollectionsData = {
+export type PreviewFileSchemaData = {
     body?: never;
-    headers?: {
-        /**
-         * X-Ldaca-Api-Token
-         */
-        'X-LDACA-API-Token'?: string | null;
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
-    query?: never;
-    url: '/api/files/ldaca/featured';
+    query: {
+        /**
+         * Path
+         */
+        path: string;
+        /**
+         * Sheet Name
+         */
+        sheet_name?: string | null;
+    };
+    url: '/api/user-files/preview/schema';
 };
 
-export type ListLdacaFeaturedCollectionsErrors = {
+export type PreviewFileSchemaErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ListLdacaFeaturedCollectionsError = ListLdacaFeaturedCollectionsErrors[keyof ListLdacaFeaturedCollectionsErrors];
-
-export type ListLdacaFeaturedCollectionsResponses = {
-    /**
-     * Successful Response
-     */
-    200: OniSearchResponse;
-};
-
-export type ListLdacaFeaturedCollectionsResponse = ListLdacaFeaturedCollectionsResponses[keyof ListLdacaFeaturedCollectionsResponses];
-
-export type SearchLdacaCollectionsData = {
-    body: OniSearchRequest;
-    headers?: {
-        /**
-         * X-Ldaca-Api-Token
-         */
-        'X-LDACA-API-Token'?: string | null;
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/files/ldaca/search';
-};
-
-export type SearchLdacaCollectionsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type SearchLdacaCollectionsError = SearchLdacaCollectionsErrors[keyof SearchLdacaCollectionsErrors];
+export type PreviewFileSchemaError = PreviewFileSchemaErrors[keyof PreviewFileSchemaErrors];
 
-export type SearchLdacaCollectionsResponses = {
+export type PreviewFileSchemaResponses = {
     /**
-     * Successful Response
+     * Arrow IPC stream
      */
-    200: OniSearchResponse;
+    200: Blob | File;
 };
 
-export type SearchLdacaCollectionsResponse = SearchLdacaCollectionsResponses[keyof SearchLdacaCollectionsResponses];
-
-export type MoveFileData = {
-    body: MoveFileRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/files/move';
-};
-
-export type MoveFileErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type MoveFileError = MoveFileErrors[keyof MoveFileErrors];
-
-export type MoveFileResponses = {
-    /**
-     * Successful Response
-     */
-    200: CreateFolderResponse;
-};
-
-export type MoveFileResponse = MoveFileResponses[keyof MoveFileResponses];
-
-export type UnifiedFilePreviewData = {
-    body: FilePreviewRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/files/preview';
-};
-
-export type UnifiedFilePreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type UnifiedFilePreviewError = UnifiedFilePreviewErrors[keyof UnifiedFilePreviewErrors];
-
-export type UnifiedFilePreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilePreviewResponse;
-};
-
-export type UnifiedFilePreviewResponse = UnifiedFilePreviewResponses[keyof UnifiedFilePreviewResponses];
+export type PreviewFileSchemaResponse = PreviewFileSchemaResponses[keyof PreviewFileSchemaResponses];
 
 export type GetRawFileData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query: {
         /**
@@ -6919,46 +4805,30 @@ export type GetRawFileData = {
          */
         path: string;
     };
-    url: '/api/files/raw';
+    url: '/api/user-files/raw';
 };
 
 export type GetRawFileErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    401: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
 export type GetRawFileError = GetRawFileErrors[keyof GetRawFileErrors];
@@ -6972,324 +4842,97 @@ export type GetRawFileResponses = {
 
 export type GetRawFileResponse = GetRawFileResponses[keyof GetRawFileResponses];
 
-export type GetSampleDataCatalogueData = {
+export type GetUserFileResourceData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/files/sample-data/catalogue';
-};
-
-export type GetSampleDataCatalogueErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetSampleDataCatalogueError = GetSampleDataCatalogueErrors[keyof GetSampleDataCatalogueErrors];
-
-export type GetSampleDataCatalogueResponses = {
-    /**
-     * Successful Response
-     */
-    200: SampleDataCatalogueResponse;
-};
-
-export type GetSampleDataCatalogueResponse = GetSampleDataCatalogueResponses[keyof GetSampleDataCatalogueResponses];
-
-export type GetSampleDataReadmeData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query: {
         /**
          * Path
-         *
-         * Relative path of the README inside the sample data repo
          */
         path: string;
     };
-    url: '/api/files/sample-data/readme';
+    url: '/api/user-files/resource';
 };
 
-export type GetSampleDataReadmeErrors = {
+export type GetUserFileResourceErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetSampleDataReadmeError = GetSampleDataReadmeErrors[keyof GetSampleDataReadmeErrors];
-
-export type GetSampleDataReadmeResponses = {
-    /**
-     * README markdown text from the sample-data catalogue.
-     */
-    200: string;
-};
-
-export type GetSampleDataReadmeResponse = GetSampleDataReadmeResponses[keyof GetSampleDataReadmeResponses];
-
-export type ListFilesTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/files/tasks';
-};
-
-export type ListFilesTasksErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type ListFilesTasksError = ListFilesTasksErrors[keyof ListFilesTasksErrors];
+export type GetUserFileResourceError = GetUserFileResourceErrors[keyof GetUserFileResourceErrors];
 
-export type ListFilesTasksResponses = {
+export type GetUserFileResourceResponses = {
     /**
      * Successful Response
      */
-    200: FilesTasksListResponse;
+    200: FileResource;
 };
 
-export type ListFilesTasksResponse = ListFilesTasksResponses[keyof ListFilesTasksResponses];
-
-export type ClearFilesTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: {
-        /**
-         * Task Type
-         */
-        task_type?: string | null;
-        /**
-         * Task Id
-         */
-        task_id?: string | null;
-    };
-    url: '/api/files/tasks/clear';
-};
-
-export type ClearFilesTasksErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ClearFilesTasksError = ClearFilesTasksErrors[keyof ClearFilesTasksErrors];
-
-export type ClearFilesTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilesTaskActionResponse;
-};
-
-export type ClearFilesTasksResponse = ClearFilesTasksResponses[keyof ClearFilesTasksResponses];
+export type GetUserFileResourceResponse = GetUserFileResourceResponses[keyof GetUserFileResourceResponses];
 
 export type UploadFileData = {
-    body: BodyUploadFile;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+    body: Blob | File;
     path?: never;
-    query?: never;
-    url: '/api/files/upload';
+    query: {
+        /**
+         * Path
+         */
+        path: string;
+    };
+    url: '/api/user-files/uploads';
 };
 
 export type UploadFileErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
-     * Resource not found
+     * Resource state conflict
      */
-    404: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request media type is unsupported
      */
-    410: ErrorResponse;
+    415: ApiError;
     /**
-     * Validation Error
+     * Request validation failed
      */
-    422: HttpValidationError;
+    422: ApiError;
     /**
-     * Internal service error
+     * Storage capacity is exhausted
      */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
 export type UploadFileError = UploadFileErrors[keyof UploadFileErrors];
@@ -7298,633 +4941,73 @@ export type UploadFileResponses = {
     /**
      * Successful Response
      */
-    200: FileUploadResponse;
+    201: FileResource;
 };
 
 export type UploadFileResponse = UploadFileResponses[keyof UploadFileResponses];
 
-export type GetPreferencesData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/preferences/';
-};
-
-export type GetPreferencesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetPreferencesError = GetPreferencesErrors[keyof GetPreferencesErrors];
-
-export type GetPreferencesResponses = {
-    /**
-     * Successful Response
-     */
-    200: UserPreferences;
-};
-
-export type GetPreferencesResponse = GetPreferencesResponses[keyof GetPreferencesResponses];
-
-export type UpdatePreferencesData = {
-    body: UserPreferencesUpdate;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/preferences/';
-};
-
-export type UpdatePreferencesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type UpdatePreferencesError = UpdatePreferencesErrors[keyof UpdatePreferencesErrors];
-
-export type UpdatePreferencesResponses = {
-    /**
-     * Successful Response
-     */
-    200: UserPreferences;
-};
-
-export type UpdatePreferencesResponse = UpdatePreferencesResponses[keyof UpdatePreferencesResponses];
-
-export type GetRuntimeConfigData = {
+export type ListFileWorksheetsData = {
     body?: never;
     path?: never;
-    query?: never;
-    url: '/api/runtime-config';
+    query: {
+        /**
+         * Path
+         */
+        path: string;
+    };
+    url: '/api/user-files/worksheets';
 };
 
-export type GetRuntimeConfigErrors = {
+export type ListFileWorksheetsErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type GetRuntimeConfigError = GetRuntimeConfigErrors[keyof GetRuntimeConfigErrors];
+export type ListFileWorksheetsError = ListFileWorksheetsErrors[keyof ListFileWorksheetsErrors];
 
-export type GetRuntimeConfigResponses = {
+export type ListFileWorksheetsResponses = {
     /**
      * Successful Response
      */
-    200: RuntimeConfigResponse;
+    200: FileWorksheetsResource;
 };
 
-export type GetRuntimeConfigResponse = GetRuntimeConfigResponses[keyof GetRuntimeConfigResponses];
-
-export type ListTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/tasks';
-};
-
-export type ListTasksErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ListTasksError = ListTasksErrors[keyof ListTasksErrors];
-
-export type ListTasksResponses = {
-    /**
-     * Successful Response
-     */
-    200: TaskListResponse;
-};
-
-export type ListTasksResponse = ListTasksResponses[keyof ListTasksResponses];
-
-export type StreamTasksData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: {
-        /**
-         * Token
-         */
-        token?: string | null;
-    };
-    url: '/api/tasks/stream';
-};
-
-export type StreamTasksErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type StreamTasksError = StreamTasksErrors[keyof StreamTasksErrors];
-
-export type StreamTasksResponses = {
-    /**
-     * Server-sent task update event stream.
-     */
-    200: string;
-};
-
-export type StreamTasksResponse = StreamTasksResponses[keyof StreamTasksResponses];
-
-export type ClearTaskData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/tasks/{task_id}';
-};
-
-export type ClearTaskErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ClearTaskError = ClearTaskErrors[keyof ClearTaskErrors];
-
-export type ClearTaskResponses = {
-    /**
-     * Successful Response
-     */
-    200: TaskClearActionResponse;
-};
-
-export type ClearTaskResponse = ClearTaskResponses[keyof ClearTaskResponses];
-
-export type CancelTaskData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/tasks/{task_id}/cancel';
-};
-
-export type CancelTaskErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CancelTaskError = CancelTaskErrors[keyof CancelTaskErrors];
-
-export type CancelTaskResponses = {
-    /**
-     * Successful Response
-     */
-    200: TaskCancelActionResponse;
-};
-
-export type CancelTaskResponse = CancelTaskResponses[keyof CancelTaskResponses];
-
-export type GetMyCurrentWorkspaceData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/users/me/current-workspace';
-};
-
-export type GetMyCurrentWorkspaceErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetMyCurrentWorkspaceError = GetMyCurrentWorkspaceErrors[keyof GetMyCurrentWorkspaceErrors];
-
-export type GetMyCurrentWorkspaceResponses = {
-    /**
-     * Successful Response
-     */
-    200: CurrentWorkspaceResponse;
-};
-
-export type GetMyCurrentWorkspaceResponse = GetMyCurrentWorkspaceResponses[keyof GetMyCurrentWorkspaceResponses];
-
-export type SetMyCurrentWorkspaceData = {
-    body: CurrentWorkspaceUpdateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/users/me/current-workspace';
-};
-
-export type SetMyCurrentWorkspaceErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SetMyCurrentWorkspaceError = SetMyCurrentWorkspaceErrors[keyof SetMyCurrentWorkspaceErrors];
-
-export type SetMyCurrentWorkspaceResponses = {
-    /**
-     * Successful Response
-     */
-    200: SetCurrentWorkspaceResponse;
-};
-
-export type SetMyCurrentWorkspaceResponse = SetMyCurrentWorkspaceResponses[keyof SetMyCurrentWorkspaceResponses];
+export type ListFileWorksheetsResponse = ListFileWorksheetsResponses[keyof ListFileWorksheetsResponses];
 
 export type ListWorkspacesData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query?: never;
-    url: '/api/workspaces/';
+    url: '/api/workspaces';
 };
 
 export type ListWorkspacesErrors = {
     /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    401: ApiError;
 };
 
 export type ListWorkspacesError = ListWorkspacesErrors[keyof ListWorkspacesErrors];
@@ -7935,61 +5018,43 @@ export type ListWorkspacesResponses = {
      *
      * Successful Response
      */
-    200: Array<WorkspaceSummary>;
+    200: Array<WorkspaceResource>;
 };
 
 export type ListWorkspacesResponse = ListWorkspacesResponses[keyof ListWorkspacesResponses];
 
 export type CreateWorkspaceData = {
     body: WorkspaceCreateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path?: never;
     query?: never;
-    url: '/api/workspaces/';
+    url: '/api/workspaces';
 };
 
 export type CreateWorkspaceErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
-     * Resource not found
+     * Resource state conflict
      */
-    404: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
+    422: ApiError;
     /**
-     * Resource no longer available
+     * Storage capacity is exhausted
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
 export type CreateWorkspaceError = CreateWorkspaceErrors[keyof CreateWorkspaceErrors];
@@ -7998,145 +5063,71 @@ export type CreateWorkspaceResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceInfo;
+    201: WorkspaceResource;
 };
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
-export type GetTokenizerModelsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+export type ImportWorkspaceArchiveData = {
+    body: Blob | File;
     path?: never;
-    query?: never;
-    url: '/api/workspaces/tokenizer-models';
+    query: {
+        /**
+         * Filename
+         */
+        filename: string;
+    };
+    url: '/api/workspaces/imports';
 };
 
-export type GetTokenizerModelsErrors = {
+export type ImportWorkspaceArchiveErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
-     * Resource not found
+     * Resource state conflict
      */
-    404: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request media type is unsupported
      */
-    410: ErrorResponse;
+    415: ApiError;
     /**
-     * Validation Error
+     * Request validation failed
      */
-    422: HttpValidationError;
+    422: ApiError;
     /**
-     * Internal service error
+     * Storage capacity is exhausted
      */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type GetTokenizerModelsError = GetTokenizerModelsErrors[keyof GetTokenizerModelsErrors];
+export type ImportWorkspaceArchiveError = ImportWorkspaceArchiveErrors[keyof ImportWorkspaceArchiveErrors];
 
-export type GetTokenizerModelsResponses = {
+export type ImportWorkspaceArchiveResponses = {
     /**
      * Successful Response
      */
-    200: TokenizerModelsResponse;
+    201: WorkspaceResource;
 };
 
-export type GetTokenizerModelsResponse = GetTokenizerModelsResponses[keyof GetTokenizerModelsResponses];
-
-export type UploadWorkspaceZipData = {
-    body: BodyUploadWorkspaceZip;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/workspaces/upload';
-};
-
-export type UploadWorkspaceZipErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type UploadWorkspaceZipError = UploadWorkspaceZipErrors[keyof UploadWorkspaceZipErrors];
-
-export type UploadWorkspaceZipResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceUploadResponse;
-};
-
-export type UploadWorkspaceZipResponse = UploadWorkspaceZipResponses[keyof UploadWorkspaceZipResponses];
+export type ImportWorkspaceArchiveResponse = ImportWorkspaceArchiveResponses[keyof ImportWorkspaceArchiveResponses];
 
 export type DeleteWorkspaceByIdData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -8149,41 +5140,25 @@ export type DeleteWorkspaceByIdData = {
 
 export type DeleteWorkspaceByIdErrors = {
     /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
 export type DeleteWorkspaceByIdError = DeleteWorkspaceByIdErrors[keyof DeleteWorkspaceByIdErrors];
@@ -8192,19 +5167,13 @@ export type DeleteWorkspaceByIdResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceActionResponse;
+    204: void;
 };
 
 export type DeleteWorkspaceByIdResponse = DeleteWorkspaceByIdResponses[keyof DeleteWorkspaceByIdResponses];
 
 export type GetWorkspaceByIdData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -8217,41 +5186,17 @@ export type GetWorkspaceByIdData = {
 
 export type GetWorkspaceByIdErrors = {
     /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    401: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
 export type GetWorkspaceByIdError = GetWorkspaceByIdErrors[keyof GetWorkspaceByIdErrors];
@@ -8260,19 +5205,13 @@ export type GetWorkspaceByIdResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceInfo;
+    200: WorkspaceResource;
 };
 
 export type GetWorkspaceByIdResponse = GetWorkspaceByIdResponses[keyof GetWorkspaceByIdResponses];
 
 export type UpdateWorkspaceByIdData = {
     body: WorkspaceUpdateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -8285,41 +5224,33 @@ export type UpdateWorkspaceByIdData = {
 
 export type UpdateWorkspaceByIdErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Storage capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
 export type UpdateWorkspaceByIdError = UpdateWorkspaceByIdErrors[keyof UpdateWorkspaceByIdErrors];
@@ -8328,577 +5259,599 @@ export type UpdateWorkspaceByIdResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceInfo;
+    200: WorkspaceResource;
 };
 
 export type UpdateWorkspaceByIdResponse = UpdateWorkspaceByIdResponses[keyof UpdateWorkspaceByIdResponses];
 
-export type AnalysisTaskDetachOptionsData = {
+export type ListAnalysesData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
          */
         workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
     };
     query?: {
-        /**
-         * Node Id
-         */
-        node_id?: string | null;
-        /**
-         * Column
-         */
-        column?: string | null;
-    };
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/detach-options';
-};
-
-export type AnalysisTaskDetachOptionsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnalysisTaskDetachOptionsError = AnalysisTaskDetachOptionsErrors[keyof AnalysisTaskDetachOptionsErrors];
-
-export type AnalysisTaskDetachOptionsResponses = {
-    /**
-     * Response Analysis Task Detach Options
-     *
-     * Successful Response
-     */
-    200: TopicModelingDetachOptionsResponse | ConcordanceDetachOptionsResponse | QuotationDetachOptionsResponse;
-};
-
-export type AnalysisTaskDetachOptionsResponse = AnalysisTaskDetachOptionsResponses[keyof AnalysisTaskDetachOptionsResponses];
-
-export type CreateAnalysisTaskDetachmentData = {
-    /**
-     * Request
-     */
-    body: SequentialAnalysisDetachRequest | TopicModelingDetachRequest | ConcordanceDetachRequest | QuotationDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/detachments';
-};
-
-export type CreateAnalysisTaskDetachmentErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CreateAnalysisTaskDetachmentError = CreateAnalysisTaskDetachmentErrors[keyof CreateAnalysisTaskDetachmentErrors];
-
-export type CreateAnalysisTaskDetachmentResponses = {
-    /**
-     * Response Create Analysis Task Detachment
-     *
-     * Successful Response
-     */
-    200: SequentialAnalysisDetachResponse | TopicModelingDetachResponse | AnalysisTaskActionResponse;
-};
-
-export type CreateAnalysisTaskDetachmentResponse = CreateAnalysisTaskDetachmentResponses[keyof CreateAnalysisTaskDetachmentResponses];
-
-export type AnalysisTaskDispersionBinsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query: {
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/dispersion-bins';
-};
-
-export type AnalysisTaskDispersionBinsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnalysisTaskDispersionBinsError = AnalysisTaskDispersionBinsErrors[keyof AnalysisTaskDispersionBinsErrors];
-
-export type AnalysisTaskDispersionBinsResponses = {
-    /**
-     * Successful Response
-     */
-    200: ConcordanceDispersionBinsResponse;
-};
-
-export type AnalysisTaskDispersionBinsResponse = AnalysisTaskDispersionBinsResponses[keyof AnalysisTaskDispersionBinsResponses];
-
-export type CreateAnalysisTaskDispersionDetachmentData = {
-    body: ConcordanceDispersionDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/dispersion-detachments';
-};
-
-export type CreateAnalysisTaskDispersionDetachmentErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CreateAnalysisTaskDispersionDetachmentError = CreateAnalysisTaskDispersionDetachmentErrors[keyof CreateAnalysisTaskDispersionDetachmentErrors];
-
-export type CreateAnalysisTaskDispersionDetachmentResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisTaskActionResponse;
-};
-
-export type CreateAnalysisTaskDispersionDetachmentResponse = CreateAnalysisTaskDispersionDetachmentResponses[keyof CreateAnalysisTaskDispersionDetachmentResponses];
-
-export type CreateAnalysisTaskMaterializationData = {
-    /**
-     * Request
-     */
-    body: ConcordanceMaterializeRequest | QuotationMaterializeRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/materializations';
-};
-
-export type CreateAnalysisTaskMaterializationErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CreateAnalysisTaskMaterializationError = CreateAnalysisTaskMaterializationErrors[keyof CreateAnalysisTaskMaterializationErrors];
-
-export type CreateAnalysisTaskMaterializationResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisTaskActionResponse;
-};
-
-export type CreateAnalysisTaskMaterializationResponse = CreateAnalysisTaskMaterializationResponses[keyof CreateAnalysisTaskMaterializationResponses];
-
-export type AnalysisTaskPreferencesData = {
-    /**
-     * Updates
-     */
-    body?: QuotationResultQuery | SequentialAnalysisPreferenceUpdateRequest | TokenFrequencyPreferenceUpdateRequest | null;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/preferences';
-};
-
-export type AnalysisTaskPreferencesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnalysisTaskPreferencesError = AnalysisTaskPreferencesErrors[keyof AnalysisTaskPreferencesErrors];
-
-export type AnalysisTaskPreferencesResponses = {
-    /**
-     * Response Analysis Task Preferences
-     *
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type AnalysisTaskRequestData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/request';
-};
-
-export type AnalysisTaskRequestErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnalysisTaskRequestError = AnalysisTaskRequestErrors[keyof AnalysisTaskRequestErrors];
-
-export type AnalysisTaskRequestResponses = {
-    /**
-     * Response Analysis Task Request
-     *
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type AnalysisTaskResultData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: {
-        /**
-         * Node Id
-         */
-        node_id?: string | null;
         /**
          * Page
          */
-        page?: number | null;
-        /**
-         * Page Number
-         */
-        page_number?: number | null;
+        page?: number;
         /**
          * Page Size
          */
-        page_size?: number | null;
+        page_size?: number;
+    };
+    url: '/api/workspaces/{workspace_id}/analyses';
+};
+
+export type ListAnalysesErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type ListAnalysesError = ListAnalysesErrors[keyof ListAnalysesErrors];
+
+export type ListAnalysesResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnalysisPage;
+};
+
+export type ListAnalysesResponse = ListAnalysesResponses[keyof ListAnalysesResponses];
+
+export type GetAnalysisData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}';
+};
+
+export type GetAnalysisErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type GetAnalysisError = GetAnalysisErrors[keyof GetAnalysisErrors];
+
+export type GetAnalysisResponses = {
+    /**
+     * Successful Response
+     */
+    200: Analysis;
+};
+
+export type GetAnalysisResponse = GetAnalysisResponses[keyof GetAnalysisResponses];
+
+export type DownloadAnalysisArtifactData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+        /**
+         * Artifact Name
+         */
+        artifact_name: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/artifacts/{artifact_name}';
+};
+
+export type DownloadAnalysisArtifactErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type DownloadAnalysisArtifactError = DownloadAnalysisArtifactErrors[keyof DownloadAnalysisArtifactErrors];
+
+export type DownloadAnalysisArtifactResponses = {
+    /**
+     * Analysis Artifact
+     */
+    200: Blob | File;
+};
+
+export type DownloadAnalysisArtifactResponse = DownloadAnalysisArtifactResponses[keyof DownloadAnalysisArtifactResponses];
+
+export type CancelAnalysisData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/cancel';
+};
+
+export type CancelAnalysisErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type CancelAnalysisError = CancelAnalysisErrors[keyof CancelAnalysisErrors];
+
+export type CancelAnalysisResponses = {
+    /**
+     * Successful Response
+     */
+    200: Analysis;
+    /**
+     * Process termination remains pending
+     */
+    202: Analysis;
+};
+
+export type CancelAnalysisResponse = CancelAnalysisResponses[keyof CancelAnalysisResponses];
+
+export type SubmitChildAnalysisData = {
+    /**
+     * Body
+     */
+    body: ({
+        kind: 'concordance_detachment';
+    } & ConcordanceDetachmentAnalysisRequest) | ({
+        kind: 'concordance_dispersion_detachment';
+    } & ConcordanceDispersionDetachmentAnalysisRequest) | ({
+        kind: 'quotation_detachment';
+    } & QuotationDetachmentAnalysisRequest);
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/children';
+};
+
+export type SubmitChildAnalysisErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type SubmitChildAnalysisError = SubmitChildAnalysisErrors[keyof SubmitChildAnalysisErrors];
+
+export type SubmitChildAnalysisResponses = {
+    /**
+     * Successful Response
+     */
+    201: Analysis;
+};
+
+export type SubmitChildAnalysisResponse = SubmitChildAnalysisResponses[keyof SubmitChildAnalysisResponses];
+
+export type GetAnalysisResultData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result';
+};
+
+export type GetAnalysisResultErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type GetAnalysisResultError = GetAnalysisResultErrors[keyof GetAnalysisResultErrors];
+
+export type GetAnalysisResultResponses = {
+    /**
+     * Response Get Analysis Result
+     *
+     * Successful Response
+     */
+    200: ({
+        kind: 'token_frequency';
+    } & TokenFrequencyResult) | ({
+        kind: 'topic_modeling';
+    } & TopicModelingResult) | ({
+        kind: 'concordance';
+    } & ConcordanceResult) | ({
+        kind: 'quotation';
+    } & QuotationResult) | ({
+        kind: 'sequential';
+    } & SequentialResult) | ({
+        kind: 'annotation';
+    } & AnnotationResult) | ({
+        kind: 'concordance_detachment';
+    } & ConcordanceDetachmentResult) | ({
+        kind: 'concordance_dispersion_detachment';
+    } & ConcordanceDispersionDetachmentResult) | ({
+        kind: 'quotation_detachment';
+    } & QuotationDetachmentResult);
+};
+
+export type GetAnalysisResultResponse = GetAnalysisResultResponses[keyof GetAnalysisResultResponses];
+
+export type QueryAnalysisResultData = {
+    /**
+     * Body
+     */
+    body: ({
+        kind: 'topic_modeling';
+    } & TopicModelingResultQuery) | ({
+        kind: 'concordance';
+    } & ConcordanceResultQuery) | ({
+        kind: 'quotation';
+    } & QuotationResultQuery);
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query';
+};
+
+export type QueryAnalysisResultErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type QueryAnalysisResultError = QueryAnalysisResultErrors[keyof QueryAnalysisResultErrors];
+
+export type QueryAnalysisResultResponses = {
+    /**
+     * Response Query Analysis Result
+     *
+     * Successful Response
+     */
+    200: ({
+        kind: 'token_frequency';
+    } & TokenFrequencyResult) | ({
+        kind: 'topic_modeling';
+    } & TopicModelingResult) | ({
+        kind: 'concordance';
+    } & ConcordanceResult) | ({
+        kind: 'quotation';
+    } & QuotationResult) | ({
+        kind: 'sequential';
+    } & SequentialResult) | ({
+        kind: 'annotation';
+    } & AnnotationResult) | ({
+        kind: 'concordance_detachment';
+    } & ConcordanceDetachmentResult) | ({
+        kind: 'concordance_dispersion_detachment';
+    } & ConcordanceDispersionDetachmentResult) | ({
+        kind: 'quotation_detachment';
+    } & QuotationDetachmentResult);
+};
+
+export type QueryAnalysisResultResponse = QueryAnalysisResultResponses[keyof QueryAnalysisResultResponses];
+
+export type DownloadAnalysisTableData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+        /**
+         * Table Id
+         */
+        table_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}';
+};
+
+export type DownloadAnalysisTableErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type DownloadAnalysisTableError = DownloadAnalysisTableErrors[keyof DownloadAnalysisTableErrors];
+
+export type DownloadAnalysisTableResponses = {
+    /**
+     * Complete Arrow IPC Result table
+     */
+    200: Blob | File;
+};
+
+export type DownloadAnalysisTableResponse = DownloadAnalysisTableResponses[keyof DownloadAnalysisTableResponses];
+
+export type GetAnalysisTableRowsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+        /**
+         * Table Id
+         */
+        table_id: string;
+    };
+    query?: {
+        /**
+         * Page
+         */
+        page?: number;
+        /**
+         * Page Size
+         */
+        page_size?: number;
         /**
          * Sort By
          */
@@ -8906,1424 +5859,125 @@ export type AnalysisTaskResultData = {
         /**
          * Descending
          */
-        descending?: boolean | null;
-        /**
-         * Show Metadata
-         */
-        show_metadata?: boolean | null;
+        descending?: boolean;
     };
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/result';
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows';
 };
 
-export type AnalysisTaskResultErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type GetAnalysisTableRowsErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnalysisTaskResultError = AnalysisTaskResultErrors[keyof AnalysisTaskResultErrors];
-
-export type AnalysisTaskResultResponses = {
-    /**
-     * Response Analysis Task Result
-     *
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type AnalysisTaskResultQueryData = {
-    /**
-     * Query
-     */
-    body: ConcordanceResultQuery | QuotationResultQuery;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analysis-tasks/{task_id}/result-query';
-};
-
-export type AnalysisTaskResultQueryErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Retained artifact is no longer available
      */
-    410: ErrorResponse;
+    410: ApiError;
     /**
-     * Validation Error
+     * Request validation failed
      */
-    422: HttpValidationError;
+    422: ApiError;
     /**
-     * Internal service error
+     * Stored resource is corrupt
      */
-    500: ErrorResponse;
+    500: ApiError;
     /**
-     * Upstream service error
+     * Storage capacity is exhausted
      */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type AnalysisTaskResultQueryError = AnalysisTaskResultQueryErrors[keyof AnalysisTaskResultQueryErrors];
+export type GetAnalysisTableRowsError = GetAnalysisTableRowsErrors[keyof GetAnalysisTableRowsErrors];
 
-export type AnalysisTaskResultQueryResponses = {
+export type GetAnalysisTableRowsResponses = {
     /**
-     * Response Analysis Task Result Query
-     *
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type AnnotateAiPreviewData = {
-    body: AnnotationAiPreviewRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions';
-};
-
-export type AnnotateAiPreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnnotateAiPreviewError = AnnotateAiPreviewErrors[keyof AnnotateAiPreviewErrors];
-
-export type AnnotateAiPreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewResponse;
-};
-
-export type AnnotateAiPreviewResponse = AnnotateAiPreviewResponses[keyof AnnotateAiPreviewResponses];
-
-export type AnnotateAiPreviewClearData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query: {
-        /**
-         * Session Id
-         */
-        session_id: string;
-    };
-    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}';
-};
-
-export type AnnotateAiPreviewClearErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnnotateAiPreviewClearError = AnnotateAiPreviewClearErrors[keyof AnnotateAiPreviewClearErrors];
-
-export type AnnotateAiPreviewClearResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewClearResponse;
-};
-
-export type AnnotateAiPreviewClearResponse = AnnotateAiPreviewClearResponses[keyof AnnotateAiPreviewClearResponses];
-
-export type AnnotateAiPreviewStateData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query: {
-        /**
-         * Text Column
-         */
-        text_column: string;
-        /**
-         * Class Node Id
-         */
-        class_node_id: string;
-        /**
-         * Class Column
-         */
-        class_column?: string;
-        /**
-         * Description Column
-         */
-        description_column?: string;
-        /**
-         * Provider Id
-         */
-        provider_id: string;
-        /**
-         * Base Url
-         */
-        base_url?: string | null;
-        /**
-         * Model
-         */
-        model: string;
-        /**
-         * Instruction
-         */
-        instruction: string;
-        /**
-         * Annotation Column
-         */
-        annotation_column: string;
-        /**
-         * Temperature
-         */
-        temperature?: number;
-        /**
-         * Reasoning Enabled
-         */
-        reasoning_enabled?: boolean;
-        /**
-         * Reasoning Effort
-         */
-        reasoning_effort?: string;
-    };
-    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}';
-};
-
-export type AnnotateAiPreviewStateErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnnotateAiPreviewStateError = AnnotateAiPreviewStateErrors[keyof AnnotateAiPreviewStateErrors];
-
-export type AnnotateAiPreviewStateResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewStateResponse;
-};
-
-export type AnnotateAiPreviewStateResponse = AnnotateAiPreviewStateResponses[keyof AnnotateAiPreviewStateResponses];
-
-export type AnnotateAiAllData = {
-    body: AnnotationAiAnnotateAllRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/annotations';
-};
-
-export type AnnotateAiAllErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnnotateAiAllError = AnnotateAiAllErrors[keyof AnnotateAiAllErrors];
-
-export type AnnotateAiAllResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiAnnotateAllResponse;
-};
-
-export type AnnotateAiAllResponse = AnnotateAiAllResponses[keyof AnnotateAiAllResponses];
-
-export type DetachAiPreviewedRowsData = {
-    body: AnnotationAiDetachRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/detachments';
-};
-
-export type DetachAiPreviewedRowsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type DetachAiPreviewedRowsError = DetachAiPreviewedRowsErrors[keyof DetachAiPreviewedRowsErrors];
-
-export type DetachAiPreviewedRowsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiDetachResponse;
-};
-
-export type DetachAiPreviewedRowsResponse = DetachAiPreviewedRowsResponses[keyof DetachAiPreviewedRowsResponses];
-
-export type AnnotateAiPreviewOverrideData = {
-    body: AnnotationAiPreviewOverrideRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-        /**
-         * Row Index
-         */
-        row_index: number;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation-ai-preview-sessions/{node_id}/rows/{row_index}';
-};
-
-export type AnnotateAiPreviewOverrideErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type AnnotateAiPreviewOverrideError = AnnotateAiPreviewOverrideErrors[keyof AnnotateAiPreviewOverrideErrors];
-
-export type AnnotateAiPreviewOverrideResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiPreviewOverrideResponse;
-};
-
-export type AnnotateAiPreviewOverrideResponse = AnnotateAiPreviewOverrideResponses[keyof AnnotateAiPreviewOverrideResponses];
-
-export type ListAnnotationAiModelsData = {
-    body: AnnotationAiModelsRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation/ai/models';
-};
-
-export type ListAnnotationAiModelsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ListAnnotationAiModelsError = ListAnnotationAiModelsErrors[keyof ListAnnotationAiModelsErrors];
-
-export type ListAnnotationAiModelsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationAiModelsResponse;
-};
-
-export type ListAnnotationAiModelsResponse = ListAnnotationAiModelsResponses[keyof ListAnnotationAiModelsResponses];
-
-export type CreateAnnotationClassDescriptionsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions';
-};
-
-export type CreateAnnotationClassDescriptionsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CreateAnnotationClassDescriptionsError = CreateAnnotationClassDescriptionsErrors[keyof CreateAnnotationClassDescriptionsErrors];
-
-export type CreateAnnotationClassDescriptionsResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type CreateAnnotationClassDescriptionsResponse = CreateAnnotationClassDescriptionsResponses[keyof CreateAnnotationClassDescriptionsResponses];
-
-export type GetAnnotationClassDescriptionsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Class Column
-         */
-        class_column?: string;
-        /**
-         * Description Column
-         */
-        description_column?: string;
-    };
-    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}';
-};
-
-export type GetAnnotationClassDescriptionsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetAnnotationClassDescriptionsError = GetAnnotationClassDescriptionsErrors[keyof GetAnnotationClassDescriptionsErrors];
-
-export type GetAnnotationClassDescriptionsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationClassDescriptionsPayload;
-};
-
-export type GetAnnotationClassDescriptionsResponse = GetAnnotationClassDescriptionsResponses[keyof GetAnnotationClassDescriptionsResponses];
-
-export type UpdateAnnotationClassDescriptionsData = {
-    body: AnnotationClassDescriptionsPayload;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}';
-};
-
-export type UpdateAnnotationClassDescriptionsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type UpdateAnnotationClassDescriptionsError = UpdateAnnotationClassDescriptionsErrors[keyof UpdateAnnotationClassDescriptionsErrors];
-
-export type UpdateAnnotationClassDescriptionsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationClassDescriptionsPayload;
-};
-
-export type UpdateAnnotationClassDescriptionsResponse = UpdateAnnotationClassDescriptionsResponses[keyof UpdateAnnotationClassDescriptionsResponses];
-
-export type SetAnnotationClassParentData = {
-    body: AnnotationSetParentRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation/class-descriptions/{node_id}/parent';
-};
-
-export type SetAnnotationClassParentErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SetAnnotationClassParentError = SetAnnotationClassParentErrors[keyof SetAnnotationClassParentErrors];
-
-export type SetAnnotationClassParentResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type SetAnnotationClassParentResponse = SetAnnotationClassParentResponses[keyof SetAnnotationClassParentResponses];
-
-export type SetAnnotationCellData = {
-    body: AnnotationSetCellRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation/source/{node_id}/annotation-cell';
-};
-
-export type SetAnnotationCellErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SetAnnotationCellError = SetAnnotationCellErrors[keyof SetAnnotationCellErrors];
-
-export type SetAnnotationCellResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type SetAnnotationCellResponse = SetAnnotationCellResponses[keyof SetAnnotationCellResponses];
-
-export type CreateAnnotationColumnData = {
-    body: AnnotationCreateColumnRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/annotation/source/{node_id}/annotation-column';
-};
-
-export type CreateAnnotationColumnErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CreateAnnotationColumnError = CreateAnnotationColumnErrors[keyof CreateAnnotationColumnErrors];
-
-export type CreateAnnotationColumnResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type CreateAnnotationColumnResponse = CreateAnnotationColumnResponses[keyof CreateAnnotationColumnResponses];
-
-export type RunConcordanceData = {
-    body: ConcordanceAnalysisRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/concordance';
-};
-
-export type RunConcordanceErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type RunConcordanceError = RunConcordanceErrors[keyof RunConcordanceErrors];
-
-export type RunConcordanceResponses = {
-    /**
-     * Successful Response
-     */
-    200: ConcordanceAnalysisResponse;
-};
-
-export type RunConcordanceResponse = RunConcordanceResponses[keyof RunConcordanceResponses];
-
-export type StartWorkspaceDownloadData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/download';
-};
-
-export type StartWorkspaceDownloadErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type StartWorkspaceDownloadError = StartWorkspaceDownloadErrors[keyof StartWorkspaceDownloadErrors];
-
-export type StartWorkspaceDownloadResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceTaskStartResponse;
-};
-
-export type StartWorkspaceDownloadResponse = StartWorkspaceDownloadResponses[keyof StartWorkspaceDownloadResponses];
-
-export type DownloadWorkspaceArtifactData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Task Id
-         */
-        task_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/download/tasks/{task_id}/artifact';
-};
-
-export type DownloadWorkspaceArtifactErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type DownloadWorkspaceArtifactError = DownloadWorkspaceArtifactErrors[keyof DownloadWorkspaceArtifactErrors];
-
-export type DownloadWorkspaceArtifactResponses = {
-    /**
-     * Workspace ZIP artifact download.
+     * Arrow IPC stream
      */
     200: Blob | File;
 };
 
-export type DownloadWorkspaceArtifactResponse = DownloadWorkspaceArtifactResponses[keyof DownloadWorkspaceArtifactResponses];
+export type GetAnalysisTableRowsResponse = GetAnalysisTableRowsResponses[keyof GetAnalysisTableRowsResponses];
 
-export type ExportNodesData = {
+export type GetAnalysisTableSchemaData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
          */
         workspace_id: string;
-    };
-    query: {
         /**
-         * Node Ids
+         * Analysis Id
          */
-        node_ids: string;
+        analysis_id: string;
         /**
-         * Format
+         * Table Id
          */
-        format?: string;
+        table_id: string;
     };
-    url: '/api/workspaces/{workspace_id}/export';
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema';
 };
 
-export type ExportNodesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type GetAnalysisTableSchemaErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Retained artifact is no longer available
      */
-    410: ErrorResponse;
+    410: ApiError;
     /**
-     * Validation Error
+     * Request validation failed
      */
-    422: HttpValidationError;
+    422: ApiError;
     /**
-     * Internal service error
+     * Stored resource is corrupt
      */
-    500: ErrorResponse;
+    500: ApiError;
     /**
-     * Upstream service error
+     * Storage capacity is exhausted
      */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type ExportNodesError = ExportNodesErrors[keyof ExportNodesErrors];
+export type GetAnalysisTableSchemaError = GetAnalysisTableSchemaErrors[keyof GetAnalysisTableSchemaErrors];
 
-export type ExportNodesResponses = {
+export type GetAnalysisTableSchemaResponses = {
     /**
-     * Node export download. Single-node exports use the requested format; multi-node exports are returned as a ZIP archive.
+     * Arrow IPC stream
      */
     200: Blob | File;
 };
 
-export type ExportNodesResponse = ExportNodesResponses[keyof ExportNodesResponses];
+export type GetAnalysisTableSchemaResponse = GetAnalysisTableSchemaResponses[keyof GetAnalysisTableSchemaResponses];
 
-export type GetWorkspaceGraphByIdData = {
+export type ExportWorkspaceArchiveData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -10331,67 +5985,45 @@ export type GetWorkspaceGraphByIdData = {
         workspace_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/graph';
+    url: '/api/workspaces/{workspace_id}/archive';
 };
 
-export type GetWorkspaceGraphByIdErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type ExportWorkspaceArchiveErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    401: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request or resource exceeds the configured size limit
      */
-    409: ErrorResponse;
+    413: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Storage capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type GetWorkspaceGraphByIdError = GetWorkspaceGraphByIdErrors[keyof GetWorkspaceGraphByIdErrors];
+export type ExportWorkspaceArchiveError = ExportWorkspaceArchiveErrors[keyof ExportWorkspaceArchiveErrors];
 
-export type GetWorkspaceGraphByIdResponses = {
+export type ExportWorkspaceArchiveResponses = {
     /**
-     * Successful Response
+     * Workspace ZIP archive
      */
-    200: WorkspaceGraphResponse;
+    200: Blob | File;
 };
 
-export type GetWorkspaceGraphByIdResponse = GetWorkspaceGraphByIdResponses[keyof GetWorkspaceGraphByIdResponses];
+export type ExportWorkspaceArchiveResponse = ExportWorkspaceArchiveResponses[keyof ExportWorkspaceArchiveResponses];
 
-export type AddNodeToWorkspaceData = {
-    body: WorkspaceNodeCreateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+export type ListNodesData = {
+    body?: never;
     path: {
         /**
          * Workspace Id
@@ -10402,64 +6034,65 @@ export type AddNodeToWorkspaceData = {
     url: '/api/workspaces/{workspace_id}/nodes';
 };
 
-export type AddNodeToWorkspaceErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type ListNodesErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type AddNodeToWorkspaceError = AddNodeToWorkspaceErrors[keyof AddNodeToWorkspaceErrors];
+export type ListNodesError = ListNodesErrors[keyof ListNodesErrors];
 
-export type AddNodeToWorkspaceResponses = {
+export type ListNodesResponses = {
     /**
+     * Response List Nodes
+     *
      * Successful Response
      */
-    200: WorkspaceNodeInfo;
+    200: Array<WorkspaceNodeInfo>;
 };
 
-export type AddNodeToWorkspaceResponse = AddNodeToWorkspaceResponses[keyof AddNodeToWorkspaceResponses];
+export type ListNodesResponse = ListNodesResponses[keyof ListNodesResponses];
 
-export type ConcatNodesData = {
-    body: ConcatRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+export type CreateNodeData = {
+    /**
+     * Request
+     */
+    body: ({
+        kind: 'file';
+    } & FileNodeCreateRequest) | ({
+        kind: 'clone';
+    } & CloneNodeCreateRequest) | ({
+        kind: 'slice';
+    } & SliceNodeCreateRequest) | ({
+        kind: 'filter';
+    } & FilterNodeCreateRequest) | ({
+        kind: 'replace';
+    } & ReplaceNodeCreateRequest) | ({
+        kind: 'expression';
+    } & ExpressionNodeCreateRequest) | ({
+        kind: 'concat';
+    } & ConcatNodeCreateRequest) | ({
+        kind: 'join';
+    } & JoinNodeCreateRequest) | ({
+        kind: 'cast';
+    } & CastNodeCreateRequest);
     path: {
         /**
          * Workspace Id
@@ -10467,334 +6100,57 @@ export type ConcatNodesData = {
         workspace_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/concat';
+    url: '/api/workspaces/{workspace_id}/nodes';
 };
 
-export type ConcatNodesErrors = {
+export type CreateNodeErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ConcatNodesError = ConcatNodesErrors[keyof ConcatNodesErrors];
-
-export type ConcatNodesResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type ConcatNodesResponse = ConcatNodesResponses[keyof ConcatNodesResponses];
-
-export type ConcatNodesPreviewData = {
-    body: ConcatPreviewRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/concat/preview';
-};
-
-export type ConcatNodesPreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request or resource exceeds the configured size limit
      */
-    410: ErrorResponse;
+    413: ApiError;
     /**
-     * Validation Error
+     * Request validation failed
      */
-    422: HttpValidationError;
+    422: ApiError;
     /**
-     * Internal service error
+     * Storage capacity is exhausted
      */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type ConcatNodesPreviewError = ConcatNodesPreviewErrors[keyof ConcatNodesPreviewErrors];
+export type CreateNodeError = CreateNodeErrors[keyof CreateNodeErrors];
 
-export type ConcatNodesPreviewResponses = {
+export type CreateNodeResponses = {
     /**
      * Successful Response
      */
-    200: FilterPreviewResponse;
+    201: WorkspaceNodeInfo;
 };
 
-export type ConcatNodesPreviewResponse = ConcatNodesPreviewResponses[keyof ConcatNodesPreviewResponses];
-
-export type JoinNodesData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query: {
-        /**
-         * Left Node Id
-         */
-        left_node_id: string;
-        /**
-         * Right Node Id
-         */
-        right_node_id: string;
-        /**
-         * Left On
-         */
-        left_on: string;
-        /**
-         * Right On
-         */
-        right_on: string;
-        /**
-         * How
-         */
-        how?: string;
-        /**
-         * New Node Name
-         */
-        new_node_name?: string | null;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/join';
-};
-
-export type JoinNodesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type JoinNodesError = JoinNodesErrors[keyof JoinNodesErrors];
-
-export type JoinNodesResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type JoinNodesResponse = JoinNodesResponses[keyof JoinNodesResponses];
-
-export type JoinNodesPreviewData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query: {
-        /**
-         * Left Node Id
-         */
-        left_node_id: string;
-        /**
-         * Right Node Id
-         */
-        right_node_id: string;
-        /**
-         * Left On
-         */
-        left_on?: string | null;
-        /**
-         * Right On
-         */
-        right_on?: string | null;
-        /**
-         * How
-         */
-        how?: string;
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/join/preview';
-};
-
-export type JoinNodesPreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type JoinNodesPreviewError = JoinNodesPreviewErrors[keyof JoinNodesPreviewErrors];
-
-export type JoinNodesPreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilterPreviewResponse;
-};
-
-export type JoinNodesPreviewResponse = JoinNodesPreviewResponses[keyof JoinNodesPreviewResponses];
+export type CreateNodeResponse = CreateNodeResponses[keyof CreateNodeResponses];
 
 export type ReorderWorkspaceNodesByIdData = {
     body: WorkspaceNodeReorderRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -10807,41 +6163,33 @@ export type ReorderWorkspaceNodesByIdData = {
 
 export type ReorderWorkspaceNodesByIdErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Storage capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
 export type ReorderWorkspaceNodesByIdError = ReorderWorkspaceNodesByIdErrors[keyof ReorderWorkspaceNodesByIdErrors];
@@ -10850,19 +6198,91 @@ export type ReorderWorkspaceNodesByIdResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceGraphResponse;
+    200: WorkspaceResource;
 };
 
 export type ReorderWorkspaceNodesByIdResponse = ReorderWorkspaceNodesByIdResponses[keyof ReorderWorkspaceNodesByIdResponses];
 
+export type PreviewNodeCreationData = {
+    /**
+     * Request
+     */
+    body: ({
+        kind: 'clone';
+    } & CloneNodeCreateRequest) | ({
+        kind: 'slice';
+    } & SliceNodeCreateRequest) | ({
+        kind: 'filter';
+    } & FilterNodeCreateRequest) | ({
+        kind: 'replace';
+    } & ReplaceNodeCreateRequest) | ({
+        kind: 'expression';
+    } & ExpressionNodeCreateRequest) | ({
+        kind: 'concat';
+    } & ConcatNodeCreateRequest) | ({
+        kind: 'join';
+    } & JoinNodeCreateRequest) | ({
+        kind: 'cast';
+    } & CastNodeCreateRequest);
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: {
+        /**
+         * Page
+         */
+        page?: number;
+        /**
+         * Page Size
+         */
+        page_size?: number;
+    };
+    url: '/api/workspaces/{workspace_id}/nodes/previews';
+};
+
+export type PreviewNodeCreationErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+};
+
+export type PreviewNodeCreationError = PreviewNodeCreationErrors[keyof PreviewNodeCreationErrors];
+
+export type PreviewNodeCreationResponses = {
+    /**
+     * Arrow IPC stream
+     */
+    200: Blob | File;
+};
+
+export type PreviewNodeCreationResponse = PreviewNodeCreationResponses[keyof PreviewNodeCreationResponses];
+
 export type DeleteNodeData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -10879,41 +6299,33 @@ export type DeleteNodeData = {
 
 export type DeleteNodeErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Storage capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
 export type DeleteNodeError = DeleteNodeErrors[keyof DeleteNodeErrors];
@@ -10922,91 +6334,13 @@ export type DeleteNodeResponses = {
     /**
      * Successful Response
      */
-    200: NodeActionResponse;
+    204: void;
 };
 
 export type DeleteNodeResponse = DeleteNodeResponses[keyof DeleteNodeResponses];
 
-export type CastNodeData = {
-    body: CastNodeRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/cast';
-};
-
-export type CastNodeErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CastNodeError = CastNodeErrors[keyof CastNodeErrors];
-
-export type CastNodeResponses = {
-    /**
-     * Successful Response
-     */
-    200: CastNodeResponse;
-};
-
-export type CastNodeResponse2 = CastNodeResponses[keyof CastNodeResponses];
-
-export type CloneNodeData = {
+export type GetNodeData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -11018,67 +6352,37 @@ export type CloneNodeData = {
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/clone';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}';
 };
 
-export type CloneNodeErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type GetNodeErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    401: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type CloneNodeError = CloneNodeErrors[keyof CloneNodeErrors];
+export type GetNodeError = GetNodeErrors[keyof GetNodeErrors];
 
-export type CloneNodeResponses = {
+export type GetNodeResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type CloneNodeResponse = CloneNodeResponses[keyof CloneNodeResponses];
+export type GetNodeResponse = GetNodeResponses[keyof GetNodeResponses];
 
-export type SetNodeColorData = {
-    body: NodeColorUpdateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+export type UpdateNodeData = {
+    body: NodeUpdateRequest;
     path: {
         /**
          * Workspace Id
@@ -11090,67 +6394,53 @@ export type SetNodeColorData = {
         node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/color';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}';
 };
 
-export type SetNodeColorErrors = {
+export type UpdateNodeErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Storage capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type SetNodeColorError = SetNodeColorErrors[keyof SetNodeColorErrors];
+export type UpdateNodeError = UpdateNodeErrors[keyof UpdateNodeErrors];
 
-export type SetNodeColorResponses = {
+export type UpdateNodeResponses = {
     /**
      * Successful Response
      */
     200: WorkspaceNodeInfo;
 };
 
-export type SetNodeColorResponse = SetNodeColorResponses[keyof SetNodeColorResponses];
+export type UpdateNodeResponse = UpdateNodeResponses[keyof UpdateNodeResponses];
 
-export type DeleteNodeColumnData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+export type PreviewAnnotationData = {
+    body: AnnotationPreviewRequest;
     path: {
         /**
          * Workspace Id
@@ -11160,377 +6450,51 @@ export type DeleteNodeColumnData = {
          * Node Id
          */
         node_id: string;
-        /**
-         * Column Name
-         */
-        column_name: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/annotation-previews';
 };
 
-export type DeleteNodeColumnErrors = {
+export type PreviewAnnotationErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type DeleteNodeColumnError = DeleteNodeColumnErrors[keyof DeleteNodeColumnErrors];
-
-export type DeleteNodeColumnResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type DeleteNodeColumnResponse = DeleteNodeColumnResponses[keyof DeleteNodeColumnResponses];
-
-export type RenameNodeColumnData = {
-    body: RenameColumnRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-        /**
-         * Column Name
-         */
-        column_name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}';
-};
-
-export type RenameNodeColumnErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
+    422: ApiError;
     /**
-     * Resource no longer available
+     * Upstream provider unavailable
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    502: ApiError;
 };
 
-export type RenameNodeColumnError = RenameNodeColumnErrors[keyof RenameNodeColumnErrors];
+export type PreviewAnnotationError = PreviewAnnotationErrors[keyof PreviewAnnotationErrors];
 
-export type RenameNodeColumnResponses = {
+export type PreviewAnnotationResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceNodeInfo;
+    200: AnnotationPreviewResource;
 };
 
-export type RenameNodeColumnResponse = RenameNodeColumnResponses[keyof RenameNodeColumnResponses];
+export type PreviewAnnotationResponse = PreviewAnnotationResponses[keyof PreviewAnnotationResponses];
 
-export type DescribeColumnData = {
+export type GetNodeRowsData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-        /**
-         * Column Name
-         */
-        column_name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}/describe';
-};
-
-export type DescribeColumnErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type DescribeColumnError = DescribeColumnErrors[keyof DescribeColumnErrors];
-
-export type DescribeColumnResponses = {
-    /**
-     * Successful Response
-     */
-    200: ColumnDescribeResponse;
-};
-
-export type DescribeColumnResponse = DescribeColumnResponses[keyof DescribeColumnResponses];
-
-export type ColumnOperationsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-        /**
-         * Column Name
-         */
-        column_name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}/operations';
-};
-
-export type ColumnOperationsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ColumnOperationsError = ColumnOperationsErrors[keyof ColumnOperationsErrors];
-
-export type ColumnOperationsResponses = {
-    /**
-     * Successful Response
-     */
-    200: ColumnOperationsResponse;
-};
-
-export type ColumnOperationsResponse2 = ColumnOperationsResponses[keyof ColumnOperationsResponses];
-
-export type GetColumnUniqueValuesData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-        /**
-         * Column Name
-         */
-        column_name: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/columns/{column_name}/unique';
-};
-
-export type GetColumnUniqueValuesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetColumnUniqueValuesError = GetColumnUniqueValuesErrors[keyof GetColumnUniqueValuesErrors];
-
-export type GetColumnUniqueValuesResponses = {
-    /**
-     * Successful Response
-     */
-    200: ColumnUniqueValuesResponse;
-};
-
-export type GetColumnUniqueValuesResponse = GetColumnUniqueValuesResponses[keyof GetColumnUniqueValuesResponses];
-
-export type GetNodeDataByWorkspaceIdData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -11558,458 +6522,42 @@ export type GetNodeDataByWorkspaceIdData = {
          * Descending
          */
         descending?: boolean;
-        /**
-         * Filter Column
-         */
-        filter_column?: string | null;
-        /**
-         * Filter Value
-         */
-        filter_value?: string | null;
-        /**
-         * Filter Op
-         */
-        filter_op?: string;
     };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/data';
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/rows';
 };
 
-export type GetNodeDataByWorkspaceIdErrors = {
+export type GetNodeRowsErrors = {
     /**
-     * Bad request
+     * Invalid request
      */
-    400: ErrorResponse;
+    400: ApiError;
     /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    401: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type GetNodeDataByWorkspaceIdError = GetNodeDataByWorkspaceIdErrors[keyof GetNodeDataByWorkspaceIdErrors];
+export type GetNodeRowsError = GetNodeRowsErrors[keyof GetNodeRowsErrors];
 
-export type GetNodeDataByWorkspaceIdResponses = {
+export type GetNodeRowsResponses = {
     /**
-     * Successful Response
+     * Arrow IPC stream
      */
-    200: NodeDataResponse;
+    200: Blob | File;
 };
 
-export type GetNodeDataByWorkspaceIdResponse = GetNodeDataByWorkspaceIdResponses[keyof GetNodeDataByWorkspaceIdResponses];
+export type GetNodeRowsResponse = GetNodeRowsResponses[keyof GetNodeRowsResponses];
 
-export type SetNodeDocumentColumnData = {
-    body: NodeDocumentColumnUpdateRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/document-column';
-};
-
-export type SetNodeDocumentColumnErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SetNodeDocumentColumnError = SetNodeDocumentColumnErrors[keyof SetNodeDocumentColumnErrors];
-
-export type SetNodeDocumentColumnResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type SetNodeDocumentColumnResponse = SetNodeDocumentColumnResponses[keyof SetNodeDocumentColumnResponses];
-
-export type PolarsExpressionApplyData = {
-    body: PolarsExpressionRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/expression/apply';
-};
-
-export type PolarsExpressionApplyErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type PolarsExpressionApplyError = PolarsExpressionApplyErrors[keyof PolarsExpressionApplyErrors];
-
-export type PolarsExpressionApplyResponses = {
-    /**
-     * Successful Response
-     */
-    200: PolarsExpressionApplyResponse;
-};
-
-export type PolarsExpressionApplyResponse2 = PolarsExpressionApplyResponses[keyof PolarsExpressionApplyResponses];
-
-export type PolarsExpressionPreviewData = {
-    body: PolarsExpressionRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/expression/preview';
-};
-
-export type PolarsExpressionPreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type PolarsExpressionPreviewError = PolarsExpressionPreviewErrors[keyof PolarsExpressionPreviewErrors];
-
-export type PolarsExpressionPreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilterPreviewResponse;
-};
-
-export type PolarsExpressionPreviewResponse = PolarsExpressionPreviewResponses[keyof PolarsExpressionPreviewResponses];
-
-export type FilterNodeData = {
-    body: FilterRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/filter';
-};
-
-export type FilterNodeErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type FilterNodeError = FilterNodeErrors[keyof FilterNodeErrors];
-
-export type FilterNodeResponses = {
-    /**
-     * Successful Response
-     */
-    200: NodeOperationResponse;
-};
-
-export type FilterNodeResponse = FilterNodeResponses[keyof FilterNodeResponses];
-
-export type FilterPreviewData = {
-    body: FilterRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/filter/preview';
-};
-
-export type FilterPreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type FilterPreviewError = FilterPreviewErrors[keyof FilterPreviewErrors];
-
-export type FilterPreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilterPreviewResponse;
-};
-
-export type FilterPreviewResponse2 = FilterPreviewResponses[keyof FilterPreviewResponses];
-
-export type UpdateNodeNameData = {
+export type GetNodeSchemaData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
@@ -12020,1100 +6568,190 @@ export type UpdateNodeNameData = {
          */
         node_id: string;
     };
-    query: {
-        /**
-         * New Name
-         */
-        new_name: string;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/name';
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/schema';
 };
 
-export type UpdateNodeNameErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type GetNodeSchemaErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    401: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Request validation failed
      */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type UpdateNodeNameError = UpdateNodeNameErrors[keyof UpdateNodeNameErrors];
+export type GetNodeSchemaError = GetNodeSchemaErrors[keyof GetNodeSchemaErrors];
 
-export type UpdateNodeNameResponses = {
+export type GetNodeSchemaResponses = {
     /**
-     * Successful Response
+     * Arrow IPC stream
      */
-    200: WorkspaceNodeInfo;
+    200: Blob | File;
 };
 
-export type UpdateNodeNameResponse = UpdateNodeNameResponses[keyof UpdateNodeNameResponses];
+export type GetNodeSchemaResponse = GetNodeSchemaResponses[keyof GetNodeSchemaResponses];
 
-export type GetNodeQueryPlanData = {
+export type CloseWorkspaceByIdData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
          */
         workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/query-plan';
+    url: '/api/workspaces/{workspace_id}/open';
 };
 
-export type GetNodeQueryPlanErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type CloseWorkspaceByIdErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    422: ApiError;
 };
 
-export type GetNodeQueryPlanError = GetNodeQueryPlanErrors[keyof GetNodeQueryPlanErrors];
+export type CloseWorkspaceByIdError = CloseWorkspaceByIdErrors[keyof CloseWorkspaceByIdErrors];
 
-export type GetNodeQueryPlanResponses = {
+export type CloseWorkspaceByIdResponses = {
     /**
      * Successful Response
      */
-    200: NodeQueryPlanResponse;
+    202: WorkspaceResource;
+    /**
+     * Workspace is closed
+     */
+    204: void;
 };
 
-export type GetNodeQueryPlanResponse = GetNodeQueryPlanResponses[keyof GetNodeQueryPlanResponses];
+export type CloseWorkspaceByIdResponse = CloseWorkspaceByIdResponses[keyof CloseWorkspaceByIdResponses];
 
-export type GetQuotationData = {
-    body: QuotationRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+export type OpenWorkspaceByIdData = {
+    body?: never;
     path: {
         /**
          * Workspace Id
          */
         workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/quotation';
+    url: '/api/workspaces/{workspace_id}/open';
 };
 
-export type GetQuotationErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type OpenWorkspaceByIdErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Backend process capacity is exhausted
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    503: ApiError;
 };
 
-export type GetQuotationError = GetQuotationErrors[keyof GetQuotationErrors];
+export type OpenWorkspaceByIdError = OpenWorkspaceByIdErrors[keyof OpenWorkspaceByIdErrors];
 
-export type GetQuotationResponses = {
+export type OpenWorkspaceByIdResponses = {
     /**
-     * Response Get Quotation
+     * Successful Response
+     */
+    200: WorkspaceResource;
+};
+
+export type OpenWorkspaceByIdResponse = OpenWorkspaceByIdResponses[keyof OpenWorkspaceByIdResponses];
+
+export type ListTabsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs';
+};
+
+export type ListTabsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type ListTabsError = ListTabsErrors[keyof ListTabsErrors];
+
+export type ListTabsResponses = {
+    /**
+     * Response List Tabs
      *
      * Successful Response
      */
-    200: QuotationAnalysisResponse | AnalysisTaskActionResponse;
+    200: Array<Tab>;
 };
 
-export type GetQuotationResponse = GetQuotationResponses[keyof GetQuotationResponses];
+export type ListTabsResponse = ListTabsResponses[keyof ListTabsResponses];
 
-export type RedoNodeOperationData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/redo';
-};
-
-export type RedoNodeOperationErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type RedoNodeOperationError = RedoNodeOperationErrors[keyof RedoNodeOperationErrors];
-
-export type RedoNodeOperationResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type RedoNodeOperationResponse = RedoNodeOperationResponses[keyof RedoNodeOperationResponses];
-
-export type ReplaceApplyData = {
-    body: ReplaceRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/replace';
-};
-
-export type ReplaceApplyErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ReplaceApplyError = ReplaceApplyErrors[keyof ReplaceApplyErrors];
-
-export type ReplaceApplyResponses = {
-    /**
-     * Successful Response
-     */
-    200: ReplaceApplyResponse;
-};
-
-export type ReplaceApplyResponse2 = ReplaceApplyResponses[keyof ReplaceApplyResponses];
-
-export type ReplacePreviewData = {
-    body: ReplaceRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/replace/preview';
-};
-
-export type ReplacePreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ReplacePreviewError = ReplacePreviewErrors[keyof ReplacePreviewErrors];
-
-export type ReplacePreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilterPreviewResponse;
-};
-
-export type ReplacePreviewResponse = ReplacePreviewResponses[keyof ReplacePreviewResponses];
-
-export type RunSequentialAnalysisData = {
-    body: SequentialAnalysisRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/sequential-analysis';
-};
-
-export type RunSequentialAnalysisErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type RunSequentialAnalysisError = RunSequentialAnalysisErrors[keyof RunSequentialAnalysisErrors];
-
-export type RunSequentialAnalysisResponses = {
-    /**
-     * Successful Response
-     */
-    200: SequentialAnalysisResponse;
-};
-
-export type RunSequentialAnalysisResponse = RunSequentialAnalysisResponses[keyof RunSequentialAnalysisResponses];
-
-export type PreviewSequentialAnalysisData = {
-    body: SequentialAnalysisRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Include Data
-         *
-         * If true, returns the full aggregated rows in addition to the row count.
-         */
-        include_data?: boolean;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/sequential-analysis/preview';
-};
-
-export type PreviewSequentialAnalysisErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type PreviewSequentialAnalysisError = PreviewSequentialAnalysisErrors[keyof PreviewSequentialAnalysisErrors];
-
-export type PreviewSequentialAnalysisResponses = {
-    /**
-     * Successful Response
-     */
-    200: SequentialAnalysisPreviewResponse;
-};
-
-export type PreviewSequentialAnalysisResponse = PreviewSequentialAnalysisResponses[keyof PreviewSequentialAnalysisResponses];
-
-export type GetNodeShapeData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/shape';
-};
-
-export type GetNodeShapeErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetNodeShapeError = GetNodeShapeErrors[keyof GetNodeShapeErrors];
-
-export type GetNodeShapeResponses = {
-    /**
-     * Successful Response
-     */
-    200: NodeShapeResponse;
-};
-
-export type GetNodeShapeResponse = GetNodeShapeResponses[keyof GetNodeShapeResponses];
-
-export type SliceNodeData = {
-    body: SliceRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/slice';
-};
-
-export type SliceNodeErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SliceNodeError = SliceNodeErrors[keyof SliceNodeErrors];
-
-export type SliceNodeResponses = {
-    /**
-     * Successful Response
-     */
-    200: NodeOperationResponse;
-};
-
-export type SliceNodeResponse = SliceNodeResponses[keyof SliceNodeResponses];
-
-export type SlicePreviewData = {
-    body: SliceRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/slice/preview';
-};
-
-export type SlicePreviewErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SlicePreviewError = SlicePreviewErrors[keyof SlicePreviewErrors];
-
-export type SlicePreviewResponses = {
-    /**
-     * Successful Response
-     */
-    200: FilterPreviewResponse;
-};
-
-export type SlicePreviewResponse = SlicePreviewResponses[keyof SlicePreviewResponses];
-
-export type SetNodeTokenizationPreferenceData = {
-    body: NodeTokenizationPreferenceRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/tokenization-preference';
-};
-
-export type SetNodeTokenizationPreferenceErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SetNodeTokenizationPreferenceError = SetNodeTokenizationPreferenceErrors[keyof SetNodeTokenizationPreferenceErrors];
-
-export type SetNodeTokenizationPreferenceResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type SetNodeTokenizationPreferenceResponse = SetNodeTokenizationPreferenceResponses[keyof SetNodeTokenizationPreferenceResponses];
-
-export type UndoNodeOperationData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/undo';
-};
-
-export type UndoNodeOperationErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type UndoNodeOperationError = UndoNodeOperationErrors[keyof UndoNodeOperationErrors];
-
-export type UndoNodeOperationResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfo;
-};
-
-export type UndoNodeOperationResponse = UndoNodeOperationResponses[keyof UndoNodeOperationResponses];
-
-export type GetWorkspaceNodesInfoByIdData = {
-    body: WorkspaceNodeInfoRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes:batchGet';
-};
-
-export type GetWorkspaceNodesInfoByIdErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetWorkspaceNodesInfoByIdError = GetWorkspaceNodesInfoByIdErrors[keyof GetWorkspaceNodesInfoByIdErrors];
-
-export type GetWorkspaceNodesInfoByIdResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceNodeInfoResponse;
-};
-
-export type GetWorkspaceNodesInfoByIdResponse = GetWorkspaceNodesInfoByIdResponses[keyof GetWorkspaceNodesInfoByIdResponses];
-
-export type SaveWorkspaceByIdData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/save';
-};
-
-export type SaveWorkspaceByIdErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type SaveWorkspaceByIdError = SaveWorkspaceByIdErrors[keyof SaveWorkspaceByIdErrors];
-
-export type SaveWorkspaceByIdResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceActionResponse;
-};
-
-export type SaveWorkspaceByIdResponse = SaveWorkspaceByIdResponses[keyof SaveWorkspaceByIdResponses];
-
-export type GetWorkspaceTabsData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
+export type CreateTabData = {
+    body: TabCreate;
     path: {
         /**
          * Workspace Id
@@ -13124,400 +6762,402 @@ export type GetWorkspaceTabsData = {
     url: '/api/workspaces/{workspace_id}/tabs';
 };
 
-export type GetWorkspaceTabsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type CreateTabErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type GetWorkspaceTabsError = GetWorkspaceTabsErrors[keyof GetWorkspaceTabsErrors];
-
-export type GetWorkspaceTabsResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkspaceTabsState;
-};
-
-export type GetWorkspaceTabsResponse = GetWorkspaceTabsResponses[keyof GetWorkspaceTabsResponses];
-
-export type PutWorkspaceTabsData = {
-    body: WorkspaceTabsState;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/tabs';
-};
-
-export type PutWorkspaceTabsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Stored resource is corrupt
      */
-    422: HttpValidationError;
+    500: ApiError;
     /**
-     * Internal service error
+     * Storage capacity is exhausted
      */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type PutWorkspaceTabsError = PutWorkspaceTabsErrors[keyof PutWorkspaceTabsErrors];
+export type CreateTabError = CreateTabErrors[keyof CreateTabErrors];
 
-export type PutWorkspaceTabsResponses = {
+export type CreateTabResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceTabsState;
+    201: Tab;
 };
 
-export type PutWorkspaceTabsResponse = PutWorkspaceTabsResponses[keyof PutWorkspaceTabsResponses];
+export type CreateTabResponse = CreateTabResponses[keyof CreateTabResponses];
 
-export type CalculateTokenFrequenciesData = {
-    body: TokenFrequencyRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/token-frequencies';
-};
-
-export type CalculateTokenFrequenciesErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type CalculateTokenFrequenciesError = CalculateTokenFrequenciesErrors[keyof CalculateTokenFrequenciesErrors];
-
-export type CalculateTokenFrequenciesResponses = {
-    /**
-     * Successful Response
-     */
-    200: TokenFrequencyResponse;
-};
-
-export type CalculateTokenFrequenciesResponse = CalculateTokenFrequenciesResponses[keyof CalculateTokenFrequenciesResponses];
-
-export type ClearTopicModelingResultsData = {
+export type DeleteTabData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
          */
         workspace_id: string;
+        /**
+         * Tab Id
+         */
+        tab_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/topic-modeling';
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}';
 };
 
-export type ClearTopicModelingResultsErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type DeleteTabErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type ClearTopicModelingResultsError = ClearTopicModelingResultsErrors[keyof ClearTopicModelingResultsErrors];
-
-export type ClearTopicModelingResultsResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnalysisClearResponse;
-};
-
-export type ClearTopicModelingResultsResponse = ClearTopicModelingResultsResponses[keyof ClearTopicModelingResultsResponses];
-
-export type RunTopicModelingData = {
-    body: TopicModelingRequest;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/topic-modeling';
-};
-
-export type RunTopicModelingErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Stored resource is corrupt
      */
-    422: HttpValidationError;
+    500: ApiError;
     /**
-     * Internal service error
+     * Storage capacity is exhausted
      */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    507: ApiError;
 };
 
-export type RunTopicModelingError = RunTopicModelingErrors[keyof RunTopicModelingErrors];
+export type DeleteTabError = DeleteTabErrors[keyof DeleteTabErrors];
 
-export type RunTopicModelingResponses = {
+export type DeleteTabResponses = {
     /**
      * Successful Response
      */
-    200: TopicModelingResponse;
+    204: void;
 };
 
-export type RunTopicModelingResponse = RunTopicModelingResponses[keyof RunTopicModelingResponses];
+export type DeleteTabResponse = DeleteTabResponses[keyof DeleteTabResponses];
 
-export type UnloadWorkspaceData = {
+export type GetTabData = {
     body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-    };
     path: {
         /**
          * Workspace Id
          */
         workspace_id: string;
-    };
-    query?: {
         /**
-         * Save
+         * Tab Id
          */
-        save?: boolean;
+        tab_id: string;
     };
-    url: '/api/workspaces/{workspace_id}/unload';
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}';
 };
 
-export type UnloadWorkspaceErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
+export type GetTabErrors = {
     /**
      * Authentication required
      */
-    401: ErrorResponse;
+    401: ApiError;
     /**
-     * Access denied
+     * Origin, CSRF, or access check failed
      */
-    403: ErrorResponse;
+    403: ApiError;
     /**
      * Resource not found
      */
-    404: ErrorResponse;
+    404: ApiError;
     /**
-     * Resource conflict
+     * Resource state conflict
      */
-    409: ErrorResponse;
+    409: ApiError;
     /**
-     * Resource no longer available
+     * Request validation failed
      */
-    410: ErrorResponse;
+    422: ApiError;
     /**
-     * Validation Error
+     * Stored resource is corrupt
      */
-    422: HttpValidationError;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    500: ApiError;
 };
 
-export type UnloadWorkspaceError = UnloadWorkspaceErrors[keyof UnloadWorkspaceErrors];
+export type GetTabError = GetTabErrors[keyof GetTabErrors];
 
-export type UnloadWorkspaceResponses = {
+export type GetTabResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceActionResponse;
+    200: Tab;
 };
 
-export type UnloadWorkspaceResponse = UnloadWorkspaceResponses[keyof UnloadWorkspaceResponses];
+export type GetTabResponse = GetTabResponses[keyof GetTabResponses];
+
+export type RenameTabData = {
+    body: TabRename;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Tab Id
+         */
+        tab_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}';
+};
+
+export type RenameTabErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type RenameTabError = RenameTabErrors[keyof RenameTabErrors];
+
+export type RenameTabResponses = {
+    /**
+     * Successful Response
+     */
+    200: Tab;
+};
+
+export type RenameTabResponse = RenameTabResponses[keyof RenameTabResponses];
+
+export type ClearTabAnalysisData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Tab Id
+         */
+        tab_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis';
+};
+
+export type ClearTabAnalysisErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type ClearTabAnalysisError = ClearTabAnalysisErrors[keyof ClearTabAnalysisErrors];
+
+export type ClearTabAnalysisResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ClearTabAnalysisResponse = ClearTabAnalysisResponses[keyof ClearTabAnalysisResponses];
+
+export type GetTabAnalysisData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Tab Id
+         */
+        tab_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis';
+};
+
+export type GetTabAnalysisErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type GetTabAnalysisError = GetTabAnalysisErrors[keyof GetTabAnalysisErrors];
+
+export type GetTabAnalysisResponses = {
+    /**
+     * Successful Response
+     */
+    200: Analysis;
+};
+
+export type GetTabAnalysisResponse = GetTabAnalysisResponses[keyof GetTabAnalysisResponses];
+
+export type SubmitTabAnalysisData = {
+    /**
+     * Body
+     */
+    body: ({
+        kind: 'token_frequency';
+    } & TokenFrequencyAnalysisRequest) | ({
+        kind: 'topic_modeling';
+    } & TopicModelingAnalysisRequest) | ({
+        kind: 'concordance';
+    } & ConcordanceAnalysisRequest) | ({
+        kind: 'quotation';
+    } & QuotationAnalysisRequest) | ({
+        kind: 'sequential';
+    } & SequentialAnalysisRequest) | ({
+        kind: 'annotation';
+    } & AnnotationAnalysisRequest);
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Tab Id
+         */
+        tab_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis';
+};
+
+export type SubmitTabAnalysisErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type SubmitTabAnalysisError = SubmitTabAnalysisErrors[keyof SubmitTabAnalysisErrors];
+
+export type SubmitTabAnalysisResponses = {
+    /**
+     * Successful Response
+     */
+    201: Analysis;
+};
+
+export type SubmitTabAnalysisResponse = SubmitTabAnalysisResponses[keyof SubmitTabAnalysisResponses];
 
 export type HealthCheckData = {
     body?: never;
@@ -13528,37 +7168,9 @@ export type HealthCheckData = {
 
 export type HealthCheckErrors = {
     /**
-     * Bad request
+     * Stopping
      */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
+    503: HealthResponse;
 };
 
 export type HealthCheckError = HealthCheckErrors[keyof HealthCheckErrors];
@@ -13567,56 +7179,7 @@ export type HealthCheckResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: HealthResponse;
 };
 
-export type StatusData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/status';
-};
-
-export type StatusErrors = {
-    /**
-     * Bad request
-     */
-    400: ErrorResponse;
-    /**
-     * Authentication required
-     */
-    401: ErrorResponse;
-    /**
-     * Access denied
-     */
-    403: ErrorResponse;
-    /**
-     * Resource not found
-     */
-    404: ErrorResponse;
-    /**
-     * Resource conflict
-     */
-    409: ErrorResponse;
-    /**
-     * Resource no longer available
-     */
-    410: ErrorResponse;
-    /**
-     * Internal service error
-     */
-    500: ErrorResponse;
-    /**
-     * Upstream service error
-     */
-    502: ErrorResponse;
-};
-
-export type StatusError = StatusErrors[keyof StatusErrors];
-
-export type StatusResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
+export type HealthCheckResponse = HealthCheckResponses[keyof HealthCheckResponses];

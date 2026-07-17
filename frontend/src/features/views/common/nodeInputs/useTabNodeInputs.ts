@@ -90,7 +90,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   const currentView = useUIStore((state) => state.currentView);
 
   const value = useMemo(
-    () => getTabInputSet({ input_sets: tabInputSets }, selectorId),
+    () => getTabInputSet(tabInputSets ? { input_sets: tabInputSets } : undefined, selectorId),
     [selectorId, tabInputSets],
   );
   const maxNodes = constraints.maxNodes;

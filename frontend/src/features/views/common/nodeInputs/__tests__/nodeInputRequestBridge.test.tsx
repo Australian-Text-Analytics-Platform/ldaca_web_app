@@ -69,7 +69,7 @@ describe('node input request bridge', () => {
     useRecentSelectionsStore.setState({ byWorkspace: {} });
     mocks.useWorkspaceData.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
-      nodes: [{ id: 'node-a', name: 'Node A', columns: ['text'], schema: { text: 'String' } }],
+      nodes: [{ id: 'node-a', name: 'Node A' }],
     });
     mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({

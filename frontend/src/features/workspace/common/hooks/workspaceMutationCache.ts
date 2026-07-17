@@ -1,19 +1,19 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
+import { invalidateNodeSchemaQuery } from '@/lib/nodeSchema';
 import { queryKeys } from '@/lib/queryKeys';
 
 export interface NodeCacheInvalidationOptions {
   includeNodeInfo?: boolean;
   includeData?: boolean;
-  /** Invalidates node info because the info endpoint is the schema source of truth. */
+  /** Invalidates the authoritative Arrow schema query. */
   includeSchema?: boolean;
 }
 
 /**
  * Identifies cached queries that belong to one workspace detail subtree.
- * Used by: useWorkspaceNodeMutations selection changes because clearing or
- * switching workspaces should touch graph/node detail queries without dropping
- * the workspace list or current-workspace bootstrap query.
+ * Used by workspace selection changes because clearing or switching workspaces
+ * should touch graph and node-detail queries without dropping the workspace list.
  */
 export const isWorkspaceDetailQueryKey = (
   queryKey: QueryKey,
@@ -44,15 +44,9 @@ export const invalidateWorkspaceGraphQuery = (
   });
 };
 
-/**
- * Refreshes workspace list and current-workspace summary caches.
- * Used by: workspace management and graph mutation hooks after operations
- * that can change workspace metadata, selected workspace state, or node
- * counts shown in workspace summaries.
- */
+/** Refreshes workspace summaries after a mutation changes metadata or node counts. */
 export const invalidateWorkspaceSummaries = (queryClient: QueryClient) => {
   void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
 };
 
 /**
@@ -69,8 +63,11 @@ export const invalidateNodeWorkspaceQueries = (
   options: NodeCacheInvalidationOptions = {},
 ) => {
   if (!workspaceId || !nodeId) return;
-  if (options.includeNodeInfo || options.includeSchema) {
+  if (options.includeNodeInfo) {
     invalidateNodeInfoQuery(queryClient, workspaceId, nodeId);
+  }
+  if (options.includeSchema) {
+    invalidateNodeSchemaQuery(queryClient, workspaceId, nodeId);
   }
   invalidateWorkspaceGraphQuery(queryClient, workspaceId);
   if (options.includeData) {

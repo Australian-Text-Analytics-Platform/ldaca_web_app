@@ -1,13 +1,11 @@
-import { useMemo } from 'react';
-
-/** One {topic_id, proportion} entry as delivered by the backend TMDist column. */
+/** One semantic Topic Distribution entry decoded from Arrow. */
 interface DistributionEntry {
   topic_id: number;
   proportion: number;
 }
 
 interface Props {
-  /** Raw cell value from a TMDist column: a list of {topic_id, proportion}. */
+  /** Raw Arrow cell value: a fixed-size list of {topic_id, proportion}. */
   value: unknown;
 }
 
@@ -39,7 +37,7 @@ function parseEntries(value: unknown): DistributionEntry[] {
 }
 
 /**
- * Rendered by: WorkspaceTable for columns whose canonical type is `tmdist`
+ * Rendered by: WorkspaceTable for columns whose semantic kind is `topic-distribution`
  * (the topic-distribution semantic type). Shows the per-document soft topic
  * distribution as a single horizontal bar of end-to-end colored segments whose
  * widths are proportional to each topic's share. Each segment carries a native
@@ -49,11 +47,7 @@ function parseEntries(value: unknown): DistributionEntry[] {
  * widths to sum to 100%, and render proportional segments + a legend.
  */
 export function TopicDistributionBar({ value }: Props) {
-  const entries = useMemo(() => {
-    const parsed = parseEntries(value);
-    parsed.sort((a, b) => b.proportion - a.proportion);
-    return parsed;
-  }, [value]);
+  const entries = parseEntries(value).sort((a, b) => b.proportion - a.proportion);
 
   if (entries.length === 0) {
     return <span className="text-xs text-muted-foreground">—</span>;
