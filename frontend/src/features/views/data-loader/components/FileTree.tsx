@@ -266,6 +266,11 @@ export function FileTree({
             variant="ghost"
             className="h-7 px-2"
             disabled={!hasWorkspaceSelected}
+            title={
+              hasWorkspaceSelected
+                ? 'Add this file as a Data Block'
+                : 'Load a workspace to add this file as a Data Block'
+            }
             data-hint-id="data-loader.file-row.add"
             onClick={() => {
               onAddFile(file.path);
@@ -273,7 +278,7 @@ export function FileTree({
             }}
           >
             <Plus className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Add</span>
+            <span>Add</span>
           </Button>
           <Button
             size="sm"

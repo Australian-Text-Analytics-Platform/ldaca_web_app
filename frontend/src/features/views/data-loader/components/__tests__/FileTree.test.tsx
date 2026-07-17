@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FileTree } from '../FileTree';
 
 describe('FileTree workspace routing', () => {
-  it('disables Add when no workspace is selected instead of routing to an alert', () => {
+  it('keeps Add visibly labelled while disabling it when no workspace is selected', () => {
     const onAddFile = vi.fn();
     render(
       <FileTree
@@ -24,6 +24,11 @@ describe('FileTree workspace routing', () => {
 
     const addButton = screen.getByRole('button', { name: 'Add' });
     expect(addButton).toBeDisabled();
+    expect(addButton).toHaveAttribute(
+      'title',
+      'Load a workspace to add this file as a Data Block',
+    );
+    expect(screen.getByText('Add')).not.toHaveClass('hidden');
     fireEvent.click(addButton);
     expect(onAddFile).not.toHaveBeenCalled();
   });
