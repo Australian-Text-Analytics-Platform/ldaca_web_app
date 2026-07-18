@@ -94,6 +94,33 @@ User File Import execution. Intermediate Progress is ephemeral; only creation
 and terminal transitions persist it.
 _Avoid_: durable progress log, execution phase tree
 
+**Guided Tour**:
+A replayable multi-step orientation that a user deliberately starts.
+_Avoid_: automatic tour, contextual hint
+
+**Contextual Hint**:
+A single versioned guidance message requested after a relevant user action.
+_Avoid_: tour step, coach-mark scheduler
+
+**Inline Guidance**:
+Persistent explanatory copy, empty-state instruction, or disabled-control
+reason presented as part of the interface.
+_Avoid_: contextual hint, tooltip
+
+**Tooltip**:
+A brief hover or focus clarification attached to one interface control.
+_Avoid_: help article, contextual hint
+
+**Hint Acknowledgment History**:
+The device-local record of the highest Contextual Hint version acknowledged by
+each user.
+_Avoid_: dismissal list, account preference
+
+**User Preferences**:
+A user's synchronized, non-secret choices that apply across their Wordflow
+sessions.
+_Avoid_: Workspace state, credential store, device state
+
 ## Relationships
 
 - A Workspace owns an ordered directed acyclic graph of Data Blocks.
@@ -107,3 +134,6 @@ _Avoid_: durable progress log, execution phase tree
 - A User File Import belongs to one user independently of every Workspace.
 - A hosted Session identifies a user; desktop mode identifies its one user by
   the backend process.
+- User Preferences belong to one user independently of every Workspace.
+- Hint Acknowledgment History is device-local and does not belong to User
+  Preferences.

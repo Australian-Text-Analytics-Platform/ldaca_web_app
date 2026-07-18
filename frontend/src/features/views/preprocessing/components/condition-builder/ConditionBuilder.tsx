@@ -40,7 +40,6 @@ export interface ConditionBuilderProps<Condition extends ConditionBuilderItem> {
   renderConditionMetadata?: (condition: Condition, disabled: boolean) => React.ReactNode;
   shouldHideOperatorSelect?: (condition: Condition) => boolean;
   getOperatorOptions: (condition: Condition) => { value: string; label: string }[];
-  getColumnHintId?: (condition: Condition, index: number) => string | undefined;
 }
 
 const defaultMessages = {
@@ -77,7 +76,6 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
     renderConditionMetadata,
     shouldHideOperatorSelect,
     getOperatorOptions,
-    getColumnHintId,
   } = props;
 
   return (
@@ -165,7 +163,6 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                     >
                       <SelectTrigger
                         className="min-w-40 grow"
-                        data-hint-id={getColumnHintId?.(condition, index)}
                         data-filter-column-empty={condition.column ? 'false' : 'true'}
                       >
                         <SelectValue placeholder="Select column" />

@@ -42,8 +42,12 @@ import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
 import { BookOpen, Circle, Cog, MessageSquare, ChevronDown, Pencil } from 'lucide-react';
 import { VIEW_DEFINITIONS, isWorkspaceRequired } from '@/features/views/viewRegistry';
+import type { ViewType } from '@/features/views/viewIds';
 import { useVisibleViews } from '@/features/views/useVisibleViews';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import {
+  useUpdateUserPreferences,
+  useUserPreferences,
+} from '@/features/preferences/useUserPreferences';
 import logo from '@/logo.png';
 
 const SettingsDialog = React.lazy(() =>
@@ -102,7 +106,14 @@ function Sidebar() {
     })),
   );
   const visibleViews = useVisibleViews();
-  const setViewHidden = usePreferencesStore((state) => state.setViewHidden);
+  const { preferences } = useUserPreferences();
+  const updatePreferences = useUpdateUserPreferences();
+  const setViewHidden = (view: ViewType, hidden: boolean) => {
+    const hiddenViews = new Set(preferences.hidden_views ?? []);
+    if (hidden) hiddenViews.add(view);
+    else hiddenViews.delete(view);
+    updatePreferences.mutate({ hidden_views: [...hiddenViews] });
+  };
   const { currentWorkspaceId } = useWorkspaceData();
   const { user, logout, isMultiUserMode } = useAuth();
   const queryClient = useQueryClient();
@@ -188,7 +199,6 @@ function Sidebar() {
           <SidebarMenuItem key={id}>
             <SidebarMenuButton
               isActive={currentView === id}
-              data-hint-id={id === 'data-loader' ? 'sidebar.data-loader' : undefined}
               onClick={() => {
                 if (isDisabled) return;
                 setCurrentView(id);
@@ -457,7 +467,7 @@ function Sidebar() {
               }}
             >
               <BookOpen className="h-4 w-4" />
-              <span>Tutorial</span>
+              <span>Help</span>
             </Button>
             <Button
               variant="ghost"

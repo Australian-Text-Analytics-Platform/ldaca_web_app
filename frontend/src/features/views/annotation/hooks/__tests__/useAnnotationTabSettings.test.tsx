@@ -10,8 +10,8 @@ describe('useAnnotationTabSettings', () => {
         onTabSettingChange: vi.fn(),
         tabSettings: {
           annotationMode: 'ai',
-          aiProvider: 'provider:openai:test',
-          aiProviderModels: JSON.stringify({ 'provider:openai:test': 'gpt-4o' }),
+          aiProvider: 'openai',
+          aiProviderModels: JSON.stringify({ openai: 'gpt-4o' }),
           aiPrompt: 'Classify stance.',
           aiTemperature: '0.7',
           aiReasoningEnabled: 'true',
@@ -23,8 +23,8 @@ describe('useAnnotationTabSettings', () => {
     );
 
     expect(result.current.annotationMode).toBe('ai');
-    expect(result.current.aiProvider).toBe('provider:openai:test');
-    expect(result.current.aiProviderModels).toEqual({ 'provider:openai:test': 'gpt-4o' });
+    expect(result.current.aiProvider).toBe('openai');
+    expect(result.current.aiProviderModels).toEqual({ openai: 'gpt-4o' });
     expect(result.current.aiModel).toBe('gpt-4o');
     expect(result.current.aiPrompt).toBe('Classify stance.');
     expect(result.current.aiTemperature).toBe(0.7);

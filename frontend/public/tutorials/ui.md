@@ -20,7 +20,7 @@ The left sidebar lists the available tool modules. Click a tool name to switch t
 - [**Topic Modelling**](./topic-modeling.md) — discover themes using BERTopic.
 - [**Quotation Extraction**](./quotation.md) — capture quoted speech with speaker and verb annotations.
 
-The edit icon next to the heading lets you customise which tools appear and also allows you to reset the [**hint system**](#help-ui-hint-system).
+The edit icon next to the heading lets you customise which tools appear.
 
 <h2 id="help-ui-data-selection">2. Data Selection</h2>
 
@@ -87,7 +87,7 @@ The centre column is the main working area and shows the interface of whichever 
 - The tool name and a short description appear at the top.
 - Sub-tabs (e.g. Filter, Sample, Join, Stack, Find, Create in Preprocessing) let you switch between related operations within the same tool.
 - Most tools follow a common workflow: configure parameters → review a preview → click an action button (such as **Add to Workspace**) to produce a new data block.
-- Help icons (**?**) are placed next to individual controls and link directly to the relevant section of the tutorial.
+- Help icons (**?**) are placed next to individual controls and link directly to the relevant written Help section.
 
 <h2 id="help-ui-working-directory">7. Working Directory</h2>
 
@@ -100,14 +100,18 @@ The **Working Directory** indicator at the bottom of the left sidebar shows the 
 
 <h2 id="help-ui-help-feedback">8. Help and Feedback</h2>
 
-The **Tutorial** and **Feedback** buttons at the very bottom of the left sidebar provide quick access to assistance.
+The **Help** and **Feedback** buttons at the very bottom of the left sidebar provide quick access to assistance.
 
-- **Tutorial** opens the built-in tutorial in a floating window (the one you are currently reading). Clicking any **?** help icon in the interface scrolls the tutorial to the relevant section.
+- **Help** opens the built-in written guides in a floating window (the one you are currently reading). Clicking any **?** icon scrolls Help to the relevant section.
 - **Feedback** opens a form where you can report bugs, request features, or ask questions. Your feedback goes directly to the developer team. Please do not include any confidential information.
 <span id="help-ui-hint-system"></span>
-- The app includes a **hint system** that displays contextual coach-mark bubbles near relevant UI elements to guide you through key steps (e.g. uploading a file, creating a workspace, selecting a column). Hints appear automatically when their triggering condition is met and are accompanied by a glowing highlight ring around the relevant element. Each hint offers two dismissal options:
-  - **Got it** / **Dismiss** — hides the hint for the current session only; it will reappear after a page reload if the condition is still met.
-  - **Don't show again** — permanently dismisses the hint until you manually reset it.
-- To bring back dismissed hints, click the **edit icon** (pencil) next to the **Views** heading in the left sidebar to open the view settings menu, then choose **Reset all hints** at the bottom of that menu. This restores all permanently and session-dismissed hints so they can appear again.
+- A **Contextual Hint** may appear after a successful action when a feature has
+  a short next-step message. Choose **Got it** to acknowledge that version. It
+  will not appear again on this device unless its guidance is updated.
+- Contextual Hints can be disabled under **Settings → Guidance**. The same page
+  can reset acknowledgment history for the current user. This release includes
+  the guidance framework but does not ship automatic Contextual Hints.
+- A replayable **Guided Tour** is shown in Help only when one is available. A
+  tour is started deliberately and is unaffected by the Contextual Hint switch.
 
 [← Back to tutorial index](./index.md)

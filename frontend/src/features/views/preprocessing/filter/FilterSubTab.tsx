@@ -92,9 +92,6 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
             renderConditionMetadata={conditionBuilder.renderConditionMetadata}
             shouldHideOperatorSelect={conditionBuilder.shouldHideOperatorSelect}
             getOperatorOptions={conditionBuilder.getOperatorOptions}
-            getColumnHintId={(_condition, index) =>
-              index === 0 ? 'preprocessing.filter.condition-column' : undefined
-            }
           />
         </CardContent>
 

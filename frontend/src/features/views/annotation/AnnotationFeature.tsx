@@ -1,9 +1,5 @@
 import { useState } from 'react';
-import {
-  createAnnotationClassDescriptions,
-  createAnnotationColumn,
-  setAnnotationClassParent,
-} from '@/api';
+import { getProviderCredentials } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,23 +25,14 @@ import {
   DEFAULT_ANNOTATION_PROMPT,
 } from './components/AnnotationPromptInput';
 import { AnnotationResultsPanel } from './components/AnnotationResultsPanel';
-import type { AnnotationProviderConfigSave } from './components/AnnotationProviderConfigDialog';
-import type { AnnotationAiProviderId } from './aiProviders';
-import {
-  canAnnotate,
-  parseConfiguredBuiltinProviderId,
-  resolveAnnotationAiProvider,
-} from './aiProviders';
+import { canAnnotate, getBuiltinProvider, type BuiltinAnnotationAiProviderId } from './aiProviders';
 import { useAnnotationTabSettings } from './hooks/useAnnotationTabSettings';
 import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
 import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
-import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
-import { usePreferencesStore } from '@/stores/preferencesStore';
-import { useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAnnotationClassDescriptions } from './hooks/useAnnotationClassDescriptions';
 import { useAnnotationAiPreviewSession } from './hooks/useAnnotationAiPreviewSession';
@@ -154,7 +141,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   } = host;
   const [descriptionColumns, setDescriptionColumns] = useState<Record<string, string>>({});
   const [newColumnNames, setNewColumnNames] = useState<Record<string, string>>({});
-  const [isCreatingClassNode, setIsCreatingClassNode] = useState(false);
   const [hasRun, setHasRun] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   // Tab-persisted AI settings live in their own hook so this feature body can
@@ -164,7 +150,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     annotationMode,
     setAnnotationMode,
     aiProviderModels,
-    persistAiProviderModels,
     aiProvider,
     aiModel,
     selectAiProvider,
@@ -182,52 +167,16 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     annotationTargets,
     setAnnotationTarget,
   } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
-  const annotationAiApiKeys = usePreferencesStore((s) => s.annotationAiApiKeys);
-  const annotationAiCustomProviders = usePreferencesStore((s) => s.annotationAiCustomProviders);
-  const setAnnotationAiApiKey = usePreferencesStore((s) => s.setAnnotationAiApiKey);
-  const addAnnotationAiCustomProvider = usePreferencesStore((s) => s.addAnnotationAiCustomProvider);
-  const removeAnnotationAiCustomProvider = usePreferencesStore(
-    (s) => s.removeAnnotationAiCustomProvider,
-  );
+  const providerCredentialsQuery = useQuery({
+    queryKey: ['provider-credentials'],
+    queryFn: async () => (await getProviderCredentials({ throwOnError: true })).data,
+  });
   // Annotation-column choice per example node (plain columns only — no "Start
   // new annotation" option, since examples reference existing labels).
   const [exampleAnnotationColumns, setExampleAnnotationColumns] = useState<Record<string, string>>(
     {},
   );
   const { currentWorkspaceId } = useWorkspaceData();
-  const queryClient = useQueryClient();
-
-  const handleSaveAiProvider = (config: AnnotationProviderConfigSave) => {
-    if (config.customProvider) addAnnotationAiCustomProvider(config.customProvider);
-    setAnnotationAiApiKey(config.id, config.apiKey);
-    const nextModels = { ...aiProviderModels, [config.id]: config.model };
-    persistAiProviderModels(nextModels);
-    selectAiProvider(config.id, config.model);
-    const label =
-      config.customProvider?.name ?? resolveAnnotationAiProvider(config.id, [])?.label ?? config.id;
-    toast.success(`Saved provider "${label}"`);
-  };
-
-  const handleDeleteAiProvider = (providerId: AnnotationAiProviderId) => {
-    const customProvider = annotationAiCustomProviders.find(
-      (candidate) => candidate.id === providerId,
-    );
-    if (customProvider) {
-      removeAnnotationAiCustomProvider(providerId);
-    } else if (parseConfiguredBuiltinProviderId(providerId)) {
-      setAnnotationAiApiKey(providerId, null);
-    } else {
-      console.warn(`[annotation] Ignoring delete for unknown AI provider card: ${providerId}`);
-      return;
-    }
-    const nextModels: Record<string, string> = {};
-    for (const [id, savedModel] of Object.entries(aiProviderModels)) {
-      if (id !== providerId) nextModels[id] = savedModel;
-    }
-    persistAiProviderModels(nextModels);
-    if (aiProvider === providerId) selectAiProvider('', '');
-    toast.success(`Removed provider "${customProvider?.name ?? providerId}"`);
-  };
 
   // Once annotation has started, the run/results are pinned and every selector
   // and column picker locks until Reset; `isStarting` also locks during the
@@ -346,31 +295,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     );
   };
 
-  const handleCreateClassDescriptionNode = async () => {
-    if (!currentWorkspaceId || isCreatingClassNode) return;
-    setIsCreatingClassNode(true);
-    try {
-      const { data } = await createAnnotationClassDescriptions({
-        path: { workspace_id: currentWorkspaceId },
-        throwOnError: true,
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.workspaceGraph(currentWorkspaceId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.workspaceNodes(currentWorkspaceId),
-        }),
-      ]);
-      onTabInputSetChange(CLASS_DESCRIPTION_SELECTOR_ID, [{ node_id: data.id, column: 'class' }]);
-    } catch (error) {
-      console.warn('[annotation] Failed to create class-description node:', error);
-      toast.error('Could not create class descriptions');
-    } finally {
-      setIsCreatingClassNode(false);
-    }
-  };
-
   const classDescriptionNode = classNodeInputs.resolvedNodes[0] ?? null;
   const classDescriptionClassColumn =
     classDescriptionNode?.column ?? classNodeInputs.inputs[0]?.column ?? null;
@@ -393,9 +317,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   // Count only non-empty class names: an empty class node (or one whose rows are all
   // blank) offers nothing to classify into, so Preview must stay disabled until at
   // least one real class exists.
-  const aiClassCount = classDescriptions.rows.filter(
-    (row) => (row.class ?? '').trim().length > 0,
-  ).length;
+  const aiClassCount = classDescriptions.rows.filter((row) => row.class.trim().length > 0).length;
   // Source node drives the run action: "Start new annotation" begins a fresh
   // pass, while picking an existing column resumes annotating that column.
   const sourceNode = sourceNodeInputs.resolvedNodes[0] ?? null;
@@ -416,27 +338,28 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   // node with both columns chosen AND at least one class row — the backend needs a
   // non-empty class list to classify into, so previewing an empty class node would
   // only ever return blanks.
-  const resolvedAiProvider = resolveAnnotationAiProvider(aiProvider, annotationAiCustomProviders);
-  const aiApiKey = aiProvider ? (annotationAiApiKeys[aiProvider] ?? '') : '';
+  const resolvedAiProvider = getBuiltinProvider(aiProvider);
+  const configuredProviders = (providerCredentialsQuery.data?.annotation ?? {}) as Partial<
+    Record<BuiltinAnnotationAiProviderId, boolean>
+  >;
+  const providerConfigured = configuredProviders[resolvedAiProvider.id] === true;
   const resolvedSystemPrompt = aiPrompt.trim() || DEFAULT_ANNOTATION_PROMPT;
   const hasClassNodeForAi = Boolean(
     classDescriptionNode && classDescriptionClassColumn && classDescriptionDescriptionColumn,
   );
   const canPreviewAi =
-    resolvedAiProvider != null &&
     Boolean(sourceNode) &&
     hasClassNodeForAi &&
     aiClassCount > 0 &&
-    canAnnotate(resolvedAiProvider, aiApiKey, aiModel);
+    canAnnotate(resolvedAiProvider, providerConfigured, aiModel);
 
   // Start/Resume: lock the setup and reveal the text + annotation results.
-  // Start (new-annotation): create the annotation column on the source node,
-  // reparent the class node under it, then switch the column picker from
-  // "Start new annotation" into resume mode on the freshly created column.
+  // Column creation is owned by the canonical analysis submission. The setup
+  // therefore only records the selected output name in the tab draft.
   // Returns whether the run was started (locked) so callers that chain further
   // UI on success — the AI Preview button opens its panel only once the column
   // exists — can await the outcome and skip opening on a failed column create.
-  const handleRunAnnotation = async (): Promise<boolean> => {
+  const handleRunAnnotation = (): boolean => {
     if (!sourceNode || !currentWorkspaceId) return false;
     if (!isStartNewAnnotation) {
       // Resuming an existing column needs no backend mutation; just lock + reveal.
@@ -446,26 +369,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     const columnName = resolvedAnnotationColumn;
     setIsStarting(true);
     try {
-      await createAnnotationColumn({
-        path: { workspace_id: currentWorkspaceId, node_id: sourceNode.id },
-        body: { column_name: columnName },
-        throwOnError: true,
-      });
-      if (classDescriptionNode) {
-        await setAnnotationClassParent({
-          path: { workspace_id: currentWorkspaceId, node_id: classDescriptionNode.id },
-          body: { parent_node_id: sourceNode.id },
-          throwOnError: true,
-        });
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceNodes(currentWorkspaceId) }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.nodeData(currentWorkspaceId, sourceNode.id),
-        }),
-      ]);
-      // Switch from "Start new annotation" to resuming the new column, then lock.
       setAnnotationTarget(sourceNode.id, columnName);
       setHasRun(true);
       return true;
@@ -506,9 +409,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     classNodeId: classDescriptionNode?.id ?? null,
     classColumn: classDescriptionClassColumn,
     descriptionColumn: classDescriptionDescriptionColumn,
-    providerId: resolvedAiProvider?.requestProviderId ?? '',
-    baseUrl: resolvedAiProvider?.baseUrl ?? null,
-    apiKey: aiApiKey,
+    providerId: resolvedAiProvider.requestProviderId,
     model: aiModel,
     systemPrompt: resolvedSystemPrompt,
     temperature: aiTemperature,
@@ -517,7 +418,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     isOpen: isPreviewing,
     targetValid: !hasInvalidPersistedPreviewTarget,
     onOpenChange: setIsPreviewing,
-    prepareOpen: async () => hasRun || handleRunAnnotation(),
+    prepareOpen: () => Promise.resolve(hasRun || handleRunAnnotation()),
     onExplicitClose: handleReset,
   });
 
@@ -525,10 +426,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   /** Passed to: the AI-mode footer button. */
   const handleToggleAiPreview = async () => {
     if (isPreviewing) {
-      await aiPreviewSession.commands.close();
-    } else {
-      await aiPreviewSession.commands.open();
+      aiPreviewSession.commands.close();
+      return;
     }
+    await aiPreviewSession.commands.open();
   };
 
   return (
@@ -609,21 +510,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                   onColumnChange={classNodeInputs.setColumn}
                   columnLabel="Class Column"
                   disabled={isLocked}
-                  headerAddon={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      disabled={!currentWorkspaceId || isCreatingClassNode || isLocked}
-                      onClick={() => {
-                        void handleCreateClassDescriptionNode();
-                      }}
-                    >
-                      <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                      Add new
-                    </Button>
-                  }
                   renderColumnAddon={renderDescriptionColumnPicker}
                 />
               </div>
@@ -679,11 +565,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     workspaceId={currentWorkspaceId ?? null}
                     provider={aiProvider}
                     onProviderChange={selectAiProvider}
-                    apiKeys={annotationAiApiKeys}
+                    configuredProviders={configuredProviders}
                     providerModels={aiProviderModels}
-                    customProviders={annotationAiCustomProviders}
-                    onSaveProvider={handleSaveAiProvider}
-                    onDeleteProvider={handleDeleteAiProvider}
                     model={aiModel}
                     disabled={isLocked}
                   >
@@ -763,7 +646,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           The annotation column saved for this preview is missing. Close the preview and choose an
           existing annotation column before opening it again.
         </section>
-      ) : annotationMode === 'ai' && isPreviewing && sourceNode && resolvedAiProvider ? (
+      ) : annotationMode === 'ai' && isPreviewing && sourceNode ? (
         <AnnotationAiPreviewPanel session={aiPreviewSession} />
       ) : null}
     </section>

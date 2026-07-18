@@ -10,11 +10,11 @@ the repository-level [`docs/`](../../docs/index.md) system.
 
 **Answer:** Start with `user-guide/running-ui.md`.
 
-## UI tour
+## UI overview
 
 **Question:** *Is there a user‑level walkthrough of the app?*
 
-**Answer:** Yes — `user-guide/app-tour.md`.
+**Answer:** Yes — the written `user-guide/app-tour.md`.
 
 ## Engineering reference
 

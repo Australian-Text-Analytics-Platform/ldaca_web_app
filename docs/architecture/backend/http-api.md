@@ -17,6 +17,8 @@ flowchart LR
     API["/api"] --> SESSION["session and authentication"]
     API --> STORAGE["current-principal storage"]
     API --> EVENTS["unified events"]
+    API --> PREFERENCES["user preferences"]
+    API --> CREDENTIALS["write-only provider credentials"]
     API --> FILES["user-files"]
     API --> SAMPLES["sample collections"]
     API --> PORTAL["data portal"]
@@ -55,6 +57,11 @@ CORS and trusted Host rules are explicit settings. No Wordflow API route accepts
 bearer authentication or query-string credentials; provider adapters may use
 their own server-side credentials. Cross-user Workspace, Analysis, and User
 File Import lookups are concealed as not found.
+
+Account preferences and provider credentials are independent current-principal
+resources. Preference responses contain only synchronized non-secret choices.
+Credential reads return presence metadata only; secret values enter through
+write-only request fields and are resolved internally for provider calls.
 
 ## Control And Table Data Planes
 

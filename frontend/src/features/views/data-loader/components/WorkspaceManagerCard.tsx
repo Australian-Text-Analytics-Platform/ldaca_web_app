@@ -18,8 +18,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import HelpIcon from '@/components/help/HelpIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { useShallow } from 'zustand/react/shallow';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import {
+  useUpdateUserPreferences,
+  useUserPreferences,
+} from '@/features/preferences/useUserPreferences';
 import type { WorkspaceSummary } from '@/api';
 import { formatBytes, formatTimestamp } from '../utils/format';
 import type { WorkspaceDownloadsHandle } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
@@ -62,15 +64,17 @@ export function WorkspaceManagerCard({
   onDeleteWorkspace,
 }: WorkspaceManagerCardProps) {
   const zipInputRef = useRef<HTMLInputElement | null>(null);
-  // Selecting only the two action functions; reading the full state would
-  // re-render this card every time the `syncing` flag flips during the
-  // 800ms preferences-sync debounce.
-  const { toggleFavorite, isFavorite } = usePreferencesStore(
-    useShallow((state) => ({
-      toggleFavorite: state.toggleFavorite,
-      isFavorite: state.isFavorite,
-    })),
-  );
+  const { preferences } = useUserPreferences();
+  const updatePreferences = useUpdateUserPreferences();
+  const favoriteWorkspaces = preferences.favorite_workspaces ?? [];
+  const isFavorite = (workspaceId: string) => favoriteWorkspaces.includes(workspaceId);
+  const toggleFavorite = (workspaceId: string) => {
+    updatePreferences.mutate({
+      favorite_workspaces: isFavorite(workspaceId)
+        ? favoriteWorkspaces.filter((id) => id !== workspaceId)
+        : [...favoriteWorkspaces, workspaceId],
+    });
+  };
 
   /**
    * Forwards the selected ZIP file to the parent upload action and clears the

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { PaginationState } from '@tanstack/react-table';
 
-import { getNodeDataByWorkspaceId } from '@/api';
+import { getNodeRowsTable } from '@/api';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 
 export type AnnotationNodePageRow = Record<string, unknown>;
@@ -50,23 +50,25 @@ export function useAnnotationNodePage({
     enabled: Boolean(workspaceId) && enabled,
     queryFn: async ({ signal }) => {
       if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await getNodeDataByWorkspaceId({
+      const data = await getNodeRowsTable({
         path: { workspace_id: workspaceId, node_id: nodeId },
         query: request,
         signal,
-        throwOnError: true,
       });
       return data;
     },
   });
 
-  const rows = (query.data?.data ?? []) as AnnotationNodePageRow[];
+  const rows = (query.data?.rows ?? []) as AnnotationNodePageRow[];
   return {
     pagination,
     setPagination,
     query,
     rows,
-    revision: query.data?.revision ?? '',
-    rowCount: query.data?.pagination.total_rows ?? rows.length,
+    revision: '',
+    rowCount:
+      pagination.pageIndex * pagination.pageSize +
+      rows.length +
+      (query.data?.hasNext ? pagination.pageSize : 0),
   };
 }

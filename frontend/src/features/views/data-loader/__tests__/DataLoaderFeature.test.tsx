@@ -4,8 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
-import { listLdacaFeaturedCollections } from '@/api';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import { listFeaturedDataPortalCollections } from '@/api';
 import { WorkspaceDownloadsProvider } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsProvider';
 
 const {
@@ -16,7 +15,7 @@ const {
   mockRawFile,
   mockCreateFolder,
   mockMoveFile,
-  mockListLdacaFeaturedCollections,
+  mockListFeaturedDataPortalCollections,
 } = vi.hoisted(() => ({
   mockSetCurrentWorkspace: vi.fn(),
   mockUpdateWorkspaceDescription: vi.fn(),
@@ -25,7 +24,7 @@ const {
   mockRawFile: vi.fn(),
   mockCreateFolder: vi.fn(),
   mockMoveFile: vi.fn(),
-  mockListLdacaFeaturedCollections: vi.fn(),
+  mockListFeaturedDataPortalCollections: vi.fn(),
 }));
 
 interface MockWorkspaceState {
@@ -92,11 +91,8 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
-  // Provides deterministic data-folder context for file-browser controls.
-  useAuth: () => ({
-    dataFolder: '/tmp/user_data',
-    getAuthHeaders: () => ({}),
-  }),
+  // Provides the auth surface needed by file-browser controls.
+  useAuth: () => ({}),
 }));
 
 const mockFileTree = [
@@ -147,12 +143,7 @@ vi.mock('@/api', async (importOriginal) => ({
   createFolder: mockCreateFolder,
   moveFile: mockMoveFile,
   importSampleData: vi.fn(),
-  listLdacaFeaturedCollections: mockListLdacaFeaturedCollections,
-  searchLdacaCollections: vi.fn(() => ({
-    data: { state: 'successful', data: [], message: 'Searched' },
-  })),
-  importLdacaDataset: vi.fn(),
-  uploadWorkspaceZip: vi.fn(),
+  listFeaturedDataPortalCollections: mockListFeaturedDataPortalCollections,
 }));
 
 vi.mock('@/features/views/data-loader/hooks/useFiles', () => ({
@@ -236,11 +227,10 @@ describe('DataLoaderFeature citation UI', () => {
       data: { message: 'File moved', path: 'sample_data/Other/docs.csv' },
       error: undefined,
     });
-    mockListLdacaFeaturedCollections.mockResolvedValue({
-      data: { state: 'successful', data: [], message: 'Loaded' },
+    mockListFeaturedDataPortalCollections.mockResolvedValue({
+      data: { items: [], page: 1, page_size: 20, total: 0 },
       error: undefined,
     });
-    usePreferencesStore.getState().setLdacaOniApiToken(null);
     mockWorkspaceState = {
       workspaces: [
         {
@@ -442,35 +432,11 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
   });
 
-  it('saves and deletes the LDaCA token through an in-app dialog', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<DataLoaderFeature />);
-
-    await user.click(screen.getByRole('button', { name: /^import from ldaca$/i }));
-    expect(await screen.findByRole('heading', { name: 'Import from LDaCA' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /add your own token/i }));
-    expect(screen.getByRole('heading', { name: 'Add LDaCA Token' })).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText(/token key/i), ' portal-token ');
-    await user.click(screen.getByRole('button', { name: /save token/i }));
-
-    await waitFor(() => {
-      expect(usePreferencesStore.getState().ldacaOniApiToken).toBe('portal-token');
-    });
-    expect(screen.getByRole('button', { name: /delete token/i })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /delete token/i }));
-    expect(usePreferencesStore.getState().ldacaOniApiToken).toBeNull();
-    expect(screen.getByRole('button', { name: /add your own token/i })).toBeInTheDocument();
-  });
-
   it('links LDaCA collection card titles to their portal pages', async () => {
     const user = userEvent.setup();
-    vi.mocked(listLdacaFeaturedCollections).mockResolvedValueOnce({
+    vi.mocked(listFeaturedDataPortalCollections).mockResolvedValueOnce({
       data: {
-        state: 'successful',
-        data: [
+        items: [
           {
             id: 'arcp://name,hdl10.26180~23961609',
             crate_id: 'arcp://name,hdl10.26180~23961609',
@@ -484,7 +450,9 @@ describe('DataLoaderFeature citation UI', () => {
             stats: {},
           },
         ],
-        message: 'Loaded',
+        page: 1,
+        page_size: 20,
+        total: 1,
       },
       error: undefined,
     });

@@ -62,8 +62,13 @@ export function useAnnotationTabSettings({
       '[annotation] Ignoring malformed AI provider model setting:',
     ),
   );
-  const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(
-    () => tabSettings.aiProvider ?? '',
+  const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(() =>
+    tabSettings.aiProvider === 'openrouter' ||
+    tabSettings.aiProvider === 'openai' ||
+    tabSettings.aiProvider === 'anthropic' ||
+    tabSettings.aiProvider === 'google'
+      ? tabSettings.aiProvider
+      : 'openrouter',
   );
   const [aiModel, setAiModel] = useState(() => {
     const providerModels = parseStringMapSetting(

@@ -4,7 +4,6 @@ import { uploadWorkspaceZip } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import { queryKeys } from '@/lib/queryKeys';
-import { useHintsStore } from '@/stores/hintsStore';
 import type { WorkspaceSummary } from '@/api';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
@@ -194,17 +193,12 @@ export function useDataLoaderWorkspaceActions({
   };
 
   /**
-   * Adds a file-browser path to the active workspace and clears upload-followup
-   * hints when the selected file matches the last uploaded path.
+   * Adds a file-browser path to the active workspace.
    * Passed to `FileTree` as its add-file action.
    */
   const handleAddFileToWorkspace = async (filename: string, selectedSheet?: string | null) => {
     await workspaceActions.createNodeFromFile(filename, selectedSheet ?? undefined);
     notify('success', `${filename} added to workspace.`);
-    const lastUploaded = useHintsStore.getState().lastUploadedFilePath;
-    if (lastUploaded && (lastUploaded === filename || filename.endsWith(`/${lastUploaded}`))) {
-      useHintsStore.getState().setLastUploadedFilePath(null);
-    }
   };
 
   return {

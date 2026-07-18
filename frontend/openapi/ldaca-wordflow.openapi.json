@@ -4979,8 +4979,14 @@
         "type": "object"
       },
       "SampleCollection": {
-        "description": "One importable sample collection from the remote catalogue.",
+        "additionalProperties": false,
+        "description": "One importable sample collection from the configured catalogue.",
         "properties": {
+          "bundled": {
+            "default": false,
+            "title": "Bundled",
+            "type": "boolean"
+          },
           "description": {
             "default": "",
             "title": "Description",
@@ -4995,8 +5001,7 @@
             "type": "array"
           },
           "id": {
-            "maxLength": 1024,
-            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
             "title": "Id",
             "type": "string"
           },
@@ -5037,10 +5042,16 @@
         "type": "object"
       },
       "SampleFile": {
-        "description": "One fetchable file in a remote sample collection.",
+        "additionalProperties": false,
+        "description": "One integrity-pinned file in a remote sample collection.",
         "properties": {
           "path": {
             "title": "Path",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "title": "Sha256",
             "type": "string"
           },
           "size": {
@@ -5051,7 +5062,8 @@
         },
         "required": [
           "path",
-          "size"
+          "size",
+          "sha256"
         ],
         "title": "SampleFile",
         "type": "object"
@@ -5060,8 +5072,7 @@
         "additionalProperties": false,
         "properties": {
           "collection_id": {
-            "maxLength": 1024,
-            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
             "title": "Collection Id",
             "type": "string"
           },
@@ -5087,8 +5098,7 @@
             "type": "integer"
           },
           "collection_id": {
-            "maxLength": 1024,
-            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
             "title": "Collection Id",
             "type": "string"
           },
@@ -6090,37 +6100,6 @@
         "title": "TokenResultMetadata",
         "type": "object"
       },
-      "TokenizerModelResource": {
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Id",
-            "type": "string"
-          },
-          "label": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Label",
-            "type": "string"
-          },
-          "languages": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 32,
-            "title": "Languages",
-            "type": "array"
-          }
-        },
-        "required": [
-          "id",
-          "label"
-        ],
-        "title": "TokenizerModelResource",
-        "type": "object"
-      },
       "TopicItem": {
         "additionalProperties": false,
         "properties": {
@@ -6962,6 +6941,92 @@
           "total_pages"
         ],
         "title": "UserFileImportPage",
+        "type": "object"
+      },
+      "UserPreferences": {
+        "additionalProperties": false,
+        "description": "Non-secret preferences synchronized for one authenticated user.",
+        "properties": {
+          "analysis_multi_tab_enabled": {
+            "default": false,
+            "title": "Analysis Multi Tab Enabled",
+            "type": "boolean"
+          },
+          "contextual_hints_enabled": {
+            "default": true,
+            "title": "Contextual Hints Enabled",
+            "type": "boolean"
+          },
+          "default_tokenizer_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Tokenizer Model"
+          },
+          "favorite_workspaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Favorite Workspaces",
+            "type": "array"
+          },
+          "hidden_views": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hidden Views",
+            "type": "array"
+          }
+        },
+        "title": "UserPreferences",
+        "type": "object"
+      },
+      "UserPreferencesPatch": {
+        "additionalProperties": false,
+        "description": "Partial update; only explicitly provided fields are changed.",
+        "properties": {
+          "analysis_multi_tab_enabled": {
+            "default": false,
+            "title": "Analysis Multi Tab Enabled",
+            "type": "boolean"
+          },
+          "contextual_hints_enabled": {
+            "default": true,
+            "title": "Contextual Hints Enabled",
+            "type": "boolean"
+          },
+          "default_tokenizer_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Tokenizer Model"
+          },
+          "favorite_workspaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Favorite Workspaces",
+            "type": "array"
+          },
+          "hidden_views": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hidden Views",
+            "type": "array"
+          }
+        },
+        "title": "UserPreferencesPatch",
         "type": "object"
       },
       "ValidAnalysisIntegrity": {
@@ -8045,8 +8110,23 @@
           "200": {
             "content": {
               "text/event-stream": {
-                "schema": {
-                  "type": "string"
+                "itemSchema": {
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
                 }
               }
             },
@@ -8071,6 +8151,116 @@
         "summary": "Backend Events",
         "tags": [
           "events"
+        ]
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "operationId": "get_preferences",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPreferences"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Get Preferences",
+        "tags": [
+          "preferences"
+        ]
+      },
+      "patch": {
+        "operationId": "update_preferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPreferencesPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPreferences"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Update Preferences",
+        "tags": [
+          "preferences"
         ]
       }
     },
@@ -8531,56 +8721,6 @@
         "summary": "Get Storage",
         "tags": [
           "storage"
-        ]
-      }
-    },
-    "/api/tokenizer-models": {
-      "get": {
-        "operationId": "list_tokenizer_models",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TokenizerModelResource"
-                  },
-                  "title": "Response List Tokenizer Models",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Authentication required"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Stored resource is corrupt"
-          }
-        },
-        "security": [
-          {
-            "WordflowSession": []
-          }
-        ],
-        "summary": "List Tokenizer Models",
-        "tags": [
-          "tokenizers"
         ]
       }
     },

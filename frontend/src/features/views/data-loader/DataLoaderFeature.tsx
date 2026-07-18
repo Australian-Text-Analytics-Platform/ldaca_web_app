@@ -2,9 +2,8 @@ import { useState, type ReactNode } from 'react';
 import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useFiles } from '@/features/views/data-loader/hooks/useFiles';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useUserPreferences } from '@/features/preferences/useUserPreferences';
 import { useAnalysisStore, isRunningTaskState, isPendingTaskState } from '@/stores/analysisStore';
 import { AddFilePanel, FilePreviewPanel } from '@/features/views/data-loader/components';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,9 +96,6 @@ function FileListShell({
 function DataLoaderFeature() {
   const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
-  const { dataFolder } = useAuth();
-  const ldacaOniApiToken = usePreferencesStore((state) => state.ldacaOniApiToken);
-  const setLdacaOniApiToken = usePreferencesStore((state) => state.setLdacaOniApiToken);
 
   const {
     fileTree,
@@ -198,10 +194,9 @@ function DataLoaderFeature() {
     importingId,
     ldacaImporting,
     errorMessage: ldacaErrorMessage,
-    reloadFeaturedRecords,
     handleLdacaSearch,
     handleLdacaImport,
-  } = useLdacaImport({ ldacaApiToken: ldacaOniApiToken, notify });
+  } = useLdacaImport({ notify });
   const {
     fileInputRef,
     uploadingFiles,
@@ -226,7 +221,8 @@ function DataLoaderFeature() {
     handleCreateFolder,
   } = useFolderCreation({ notify });
 
-  const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
+  const { preferences } = useUserPreferences();
+  const favoriteWorkspaces = preferences.favorite_workspaces ?? [];
 
   const sortedWorkspaces = workspaces.toSorted((a, b) => {
     const aId = a.id;
@@ -235,9 +231,9 @@ function DataLoaderFeature() {
     const bFav = favoriteWorkspaces.includes(bId) ? 1 : 0;
     if (aFav !== bFav) return bFav - aFav;
     // modified_at/created_at may be '' and must fall through to the next timestamp source
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+
     const aTime = Date.parse(a.modified_at || a.created_at || '');
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+
     const bTime = Date.parse(b.modified_at || b.created_at || '');
     return (bTime || 0) - (aTime || 0);
   });
@@ -271,9 +267,6 @@ function DataLoaderFeature() {
     }
   };
 
-  // an empty data folder should fall through to the default 'data/' location
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const workspaceFolder = dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
   // Block workspace switching/unloading while a task on the active workspace
   // is still running — switching while a materialisation is in flight has
@@ -418,9 +411,6 @@ function DataLoaderFeature() {
                     void handleFileInputChange(e);
                   }}
                 />
-                <div className="text-muted-foreground text-xs">
-                  Stored under <span className="font-mono">{workspaceFolder}</span>
-                </div>
               </div>
 
               <div className="text-muted-foreground text-xs">
@@ -550,35 +540,12 @@ function DataLoaderFeature() {
           onFileFormatFilterChange: setFileFormatFilter,
           featuredRecords,
           featuredLoading,
-          hasToken: Boolean(ldacaOniApiToken),
           searchResults,
           hasSearched,
           searching,
           importingId,
           importing: ldacaImporting,
           errorMessage: ldacaErrorMessage,
-          // These handlers adapt dialog-level token/search/import controls to
-          // the feature hooks and preference store that own their side effects.
-          // Invoked by DataLoaderDialogs when an Oni token is saved.
-          onTokenSave: (token) => {
-            const trimmed = token.trim();
-            if (!trimmed) {
-              notify('error', 'Enter a token before saving.');
-              return;
-            }
-            setLdacaOniApiToken(trimmed);
-            void reloadFeaturedRecords(trimmed);
-            notify('success', 'LDaCA token saved.');
-          },
-          /**
-           * Deletes the stored Oni token and refreshes featured collections anonymously.
-           * Invoked by `DataLoaderDialogs` when the saved Oni token is deleted.
-           */
-          onTokenDelete: () => {
-            setLdacaOniApiToken(null);
-            void reloadFeaturedRecords(null);
-            notify('success', 'LDaCA token deleted.');
-          },
           /**
            * Routes dialog search submission through the feature's guarded search handler.
            * Invoked by `DataLoaderDialogs` when its Oni search form submits.

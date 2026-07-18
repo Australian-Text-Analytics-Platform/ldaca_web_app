@@ -17,12 +17,20 @@ proof, except provider callbacks with their own one-use validation.
 | `GET /api/auth/cilogon/login` | `cilogon_login` | 302 | Public CILogon authorization redirect |
 | `GET /api/auth/cilogon/callback` | `cilogon_callback` | 303 | Public CILogon OIDC callback |
 | `GET /api/annotation-providers/{provider}/models` | `list_annotation_models` | 200 | Resolve configured provider model IDs |
+| `GET /api/preferences` | `get_preferences` | 200 | Read synchronized non-secret current-principal preferences |
+| `PATCH /api/preferences` | `update_preferences` | 200 | Partially update synchronized current-principal preferences |
 | `GET /api/provider-credentials` | `get_provider_credentials` | 200 | Read configured-provider status without returning secrets |
 | `PATCH /api/provider-credentials` | `update_provider_credentials` | 200 | Update current-principal provider credentials |
 | `DELETE /api/provider-credentials` | `clear_provider_credentials` | 204 | Clear all current-principal provider credentials |
 | `GET /api/tokenizer-models` | `list_tokenizer_models` | 200 | List backend-supported tokenizer models |
 | `GET /api/storage` | `get_storage` | 200 | Fresh current-principal allocated-byte quota status |
 | `GET /api/events` | `backend_events` | 200 SSE | Unified bounded resource-refresh stream |
+
+`UserPreferences` has exactly `hidden_views`, `favorite_workspaces`,
+`default_tokenizer_model`, `analysis_multi_tab_enabled`, and
+`contextual_hints_enabled`. `PATCH` changes only fields present in the request;
+an explicit `null` clears `default_tokenizer_model`. Unknown fields and invalid
+nulls are rejected. Provider credential responses never include secret values.
 
 ## User Files And External Data
 

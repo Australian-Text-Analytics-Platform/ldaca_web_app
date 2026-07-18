@@ -22,7 +22,7 @@
 import { useEffect, useRef, type ComponentType } from 'react';
 import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useUserPreferences } from '@/features/preferences/useUserPreferences';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
 import type { AnalysisTabInputSets } from './tabStateOps';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
@@ -60,7 +60,8 @@ export interface AnalysisTabsHostProps {
  */
 export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
   const { currentWorkspaceId } = useWorkspaceData();
-  const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
+  const { preferences } = useUserPreferences();
+  const analysisMultiTabEnabled = preferences.analysis_multi_tab_enabled ?? false;
   const autoCreateKeyRef = useRef<string | null>(null);
 
   const {

@@ -17,9 +17,14 @@ import { DataFolderSettingsPanel } from '@/components/dialogs/DataFolderSettings
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
 import { useVisibleViews } from '@/features/views/useVisibleViews';
-import { useHintsStore } from '@/stores/hintsStore';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import {
+  useUpdateUserPreferences,
+  useUserPreferences,
+} from '@/features/preferences/useUserPreferences';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
 import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
+import { DataPortalCredentialPanel } from '@/features/settings/DataPortalCredentialPanel';
 import { toast } from 'sonner';
 import { Bot, Eye, FolderOpen, Hash, KeyRound, RotateCcw, Sparkles } from 'lucide-react';
 import { isTauri } from '@/lib/isTauri';
@@ -35,7 +40,7 @@ const SETTINGS_TABS = [
   { value: 'ai', label: 'AI', icon: Bot },
   { value: 'workspace', label: 'Workspace', icon: FolderOpen },
   { value: 'views', label: 'Views', icon: Eye },
-  { value: 'hints', label: 'Hints', icon: Hash },
+  { value: 'guidance', label: 'Guidance', icon: Hash },
 ] as const;
 
 /**
@@ -43,32 +48,25 @@ const SETTINGS_TABS = [
  * backend-synced preferences and browser-local settings in one vertical-tab
  * surface while preserving workflow-local quick entry points elsewhere.
  * Used by: Sidebar because the app shell owns the persistent header action for user preferences.
- * Flow: hydrate draft inputs from stores when opened, route tab controls to the existing preference/UI/hints stores, and reuse the working-directory backend config panel in single-user mode.
+ * Flow: route account controls through the preference API, keep guidance
+ * acknowledgments device-local, and reuse the working-directory backend config
+ * panel in single-user mode.
  */
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { workspaces } = useWorkspaceData();
+  const userId = useAuth().user?.id ?? null;
   const desktopRuntime = isTauri();
   const visibleViews = useVisibleViews();
-  const sessionDismissedHints = useHintsStore((state) => state.sessionDismissedHints);
-  const hintsEnabled = useHintsStore((state) => state.hintsEnabled);
-  const dismissedHints = useHintsStore((state) => state.dismissedHints);
-  const resetHints = useHintsStore((state) => state.resetHints);
-  const setHintsEnabled = useHintsStore((state) => state.setHintsEnabled);
-  const favoriteWorkspaces = usePreferencesStore((state) => state.favoriteWorkspaces);
-  const setViewHidden = usePreferencesStore((state) => state.setViewHidden);
-  const toggleFavorite = usePreferencesStore((state) => state.toggleFavorite);
-  const defaultTokenizerModel = usePreferencesStore((state) => state.defaultTokenizerModel);
-  const setDefaultTokenizerModel = usePreferencesStore((state) => state.setDefaultTokenizerModel);
-  const ldacaOniApiToken = usePreferencesStore((state) => state.ldacaOniApiToken);
-  const setLdacaOniApiToken = usePreferencesStore((state) => state.setLdacaOniApiToken);
-  const analysisMultiTabEnabled = usePreferencesStore((state) => state.analysisMultiTabEnabled);
-  const setAnalysisMultiTabEnabled = usePreferencesStore(
-    (state) => state.setAnalysisMultiTabEnabled,
+  const acknowledgments = useGuidanceAcknowledgmentsStore((state) =>
+    userId ? state.byUser[userId] : undefined,
   );
-  const hydrated = usePreferencesStore((state) => state.hydrated);
-  const syncing = usePreferencesStore((state) => state.syncing);
-  const lastSyncError = usePreferencesStore((state) => state.lastSyncError);
-  const tokenInputRef = useRef<HTMLInputElement>(null);
+  const resetAcknowledgments = useGuidanceAcknowledgmentsStore((state) => state.reset);
+  const { preferences } = useUserPreferences();
+  const updatePreferences = useUpdateUserPreferences();
+  const favoriteWorkspaces = preferences.favorite_workspaces ?? [];
+  const defaultTokenizerModel = preferences.default_tokenizer_model ?? null;
+  const analysisMultiTabEnabled = preferences.analysis_multi_tab_enabled ?? false;
+  const contextualHintsEnabled = preferences.contextual_hints_enabled ?? false;
   const tokenizerInputRef = useRef<HTMLInputElement>(null);
   /**
    * Called by: the shadcn Switch for the analysis multi-tab preference.
@@ -76,26 +74,21 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
    * immediately without reading or changing persisted analysis tabs.
    */
   const handleAnalysisMultiTabChange = (enabled: boolean) => {
-    setAnalysisMultiTabEnabled(enabled);
+    updatePreferences.mutate({ analysis_multi_tab_enabled: enabled });
   };
 
-  /** Called by: Settings hint reset button because browser-local permanent and session hint dismissals need one reset action. */
+  /** Clears versioned Contextual Hint acknowledgments for the current user only. */
   const handleResetHints = () => {
-    resetHints();
-    toast('All hints have been reset. Dismissed hints can appear again.');
-  };
-
-  /** Called by: Settings portal token save button because token edits should use the same persisted preference setter as the import flow. */
-  const handleSaveToken = () => {
-    const nextToken = tokenInputRef.current?.value ?? '';
-    setLdacaOniApiToken(nextToken);
-    toast.success(nextToken.trim() ? 'LDaCA token saved' : 'LDaCA token cleared');
+    if (userId) resetAcknowledgments(userId);
+    toast('Contextual Hint history reset. Eligible hints can appear again.');
   };
 
   /** Called by: Settings general tokenizer save button because tokenization-aware tools read their default from the preference store. */
   const handleSaveTokenizer = () => {
     const nextModel = tokenizerInputRef.current?.value ?? '';
-    setDefaultTokenizerModel(nextModel);
+    updatePreferences.mutate({
+      default_tokenizer_model: nextModel.trim() || null,
+    });
     toast.success(
       nextModel.trim() ? 'Default tokenizer model saved' : 'Default tokenizer model cleared',
     );
@@ -107,13 +100,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     return workspace?.name ?? workspaceId;
   };
 
-  const syncBadge = lastSyncError
-    ? { label: 'Sync error', variant: 'destructive' as const }
-    : syncing
-      ? { label: 'Syncing', variant: 'secondary' as const }
-      : hydrated
-        ? { label: 'Synced', variant: 'outline' as const }
-        : { label: 'Loading', variant: 'secondary' as const };
+  const syncBadge = { label: 'Account', variant: 'outline' as const };
 
   return (
     <>
@@ -129,7 +116,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </div>
               <Badge variant={syncBadge.variant}>{syncBadge.label}</Badge>
             </div>
-            {lastSyncError ? <p className="text-xs text-destructive">{lastSyncError}</p> : null}
           </DialogHeader>
           <Tabs
             defaultValue="general"
@@ -154,7 +140,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <div>
                     <h3 className="text-sm font-semibold">Preference Sync</h3>
                     <p className="text-sm text-muted-foreground">
-                      Backend preferences are loaded once and saved after local changes settle.
+                      These preferences follow your account. Credentials remain in dedicated
+                      write-only server panels.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-sm">
@@ -197,40 +184,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </TabsContent>
 
               <TabsContent value="portal" className="mt-0 space-y-5">
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold">LDaCA Oni API Token</h3>
-                    <Badge variant={ldacaOniApiToken ? 'outline' : 'secondary'}>
-                      {ldacaOniApiToken ? 'Configured' : 'Not configured'}
-                    </Badge>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="settings-ldaca-token">Token key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="settings-ldaca-token"
-                        type="password"
-                        ref={tokenInputRef}
-                        defaultValue={ldacaOniApiToken ?? ''}
-                        placeholder="Paste token"
-                      />
-                      <Button type="button" onClick={handleSaveToken}>
-                        Save
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          if (tokenInputRef.current) tokenInputRef.current.value = '';
-                          setLdacaOniApiToken(null);
-                          toast.success('LDaCA token cleared');
-                        }}
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  </div>
-                </section>
+                <DataPortalCredentialPanel />
               </TabsContent>
 
               <TabsContent value="ai" className="mt-0">
@@ -273,7 +227,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              toggleFavorite(workspaceId);
+                              updatePreferences.mutate({
+                                favorite_workspaces: favoriteWorkspaces.filter(
+                                  (id) => id !== workspaceId,
+                                ),
+                              });
                             }}
                           >
                             Remove
@@ -309,7 +267,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           checked={checked}
                           disabled={disabled}
                           onCheckedChange={(nextChecked) => {
-                            setViewHidden(view, nextChecked !== true);
+                            const hiddenViews = new Set(preferences.hidden_views ?? []);
+                            if (nextChecked === true) hiddenViews.delete(view);
+                            else hiddenViews.add(view);
+                            updatePreferences.mutate({
+                              hidden_views: [...hiddenViews],
+                            });
                           }}
                         />
                         <span>{label}</span>
@@ -319,7 +282,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="hints" className="mt-0 space-y-4">
+              <TabsContent value="guidance" className="mt-0 space-y-4">
                 <section className="space-y-3">
                   <Label
                     htmlFor="settings-hints-enabled"
@@ -327,22 +290,23 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   >
                     <Checkbox
                       id="settings-hints-enabled"
-                      checked={hintsEnabled}
+                      checked={contextualHintsEnabled}
                       onCheckedChange={(checked) => {
-                        setHintsEnabled(checked === true);
+                        updatePreferences.mutate({
+                          contextual_hints_enabled: checked === true,
+                        });
                       }}
                     />
                     <span>Show contextual hints</span>
                   </Label>
                   <div className="flex flex-wrap gap-2 text-sm">
-                    <Badge variant="outline">{dismissedHints.length} dismissed</Badge>
                     <Badge variant="outline">
-                      {sessionDismissedHints.length} dismissed this session
+                      {Object.keys(acknowledgments ?? {}).length} acknowledged
                     </Badge>
                   </div>
                   <Button type="button" variant="outline" onClick={handleResetHints}>
                     <RotateCcw className="h-4 w-4" />
-                    Reset all hints
+                    Reset Contextual Hint history
                   </Button>
                 </section>
               </TabsContent>

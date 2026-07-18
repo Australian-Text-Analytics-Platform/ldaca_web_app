@@ -73,7 +73,7 @@ Supported file types can be previewed before being added to the workspace as a d
 
 <h2 id="help-data-loader-import-sample-button">Import sample data</h2>
 
-Use this option to load curated sample datasets bundled with the application. These are intended for first-time users to explore the app's capabilities. All sample data is publicly available and may be freely tested or removed. If sample data is used in a research output, please cite <img alt="citemark" src="references/assets/mark_ref.png" style="display: inline; height: 1em; vertical-align: middle;"> the dataset appropriately.
+Use this option to download curated sample datasets from the Wordflow sample-data repository. These are intended for first-time users to explore the app's capabilities. All sample data is publicly available and may be freely tested or removed. If sample data is used in a research output, please cite <img alt="citemark" src="references/assets/mark_ref.png" style="display: inline; height: 1em; vertical-align: middle;"> the dataset appropriately.
 
 <h2 id="help-data-loader-import-ldaca-button">Import from LDaCA</h2>
 

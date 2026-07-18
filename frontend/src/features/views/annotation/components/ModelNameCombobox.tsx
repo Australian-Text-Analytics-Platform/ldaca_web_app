@@ -22,25 +22,21 @@
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
-import { listAnnotationAiModels } from '@/api';
+import { listAnnotationModels } from '@/api';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { type AnnotationAiProvider, canListModels } from '../aiProviders';
 
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
-
 interface ModelDropdownOption {
   id: string;
-  name?: string;
-  priceLabel?: string;
 }
 
 interface ModelNameComboboxProps {
   workspaceId: string | null;
   provider: AnnotationAiProvider;
-  apiKey: string;
+  credentialConfigured: boolean;
   value: string;
   onChange: (value: string) => void;
   /**
@@ -52,68 +48,6 @@ interface ModelNameComboboxProps {
   onCommit?: (value: string) => void;
   disabled?: boolean;
   id?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function readString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === 'string' ? value : undefined;
-}
-
-function formatUsdPerMillionTokens(rawPrice: string | undefined): string | undefined {
-  if (rawPrice === undefined) return undefined;
-  const perToken = Number(rawPrice);
-  if (!Number.isFinite(perToken)) return undefined;
-  const perMillion = perToken * 1_000_000;
-  if (perMillion === 0) return '$0';
-  const maximumFractionDigits = perMillion < 0.01 ? 4 : perMillion < 1 ? 3 : 2;
-  return `$${perMillion.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits,
-  })}`;
-}
-
-function formatOpenRouterPrice(pricing: Record<string, unknown> | undefined): string | undefined {
-  if (!pricing) return undefined;
-  const prompt = formatUsdPerMillionTokens(readString(pricing, 'prompt'));
-  const completion = formatUsdPerMillionTokens(readString(pricing, 'completion'));
-  if (!prompt && !completion) return undefined;
-  if ((prompt ?? '$0') === '$0' && (completion ?? '$0') === '$0') return 'Free';
-  return `In ${prompt ?? 'n/a'} / Out ${completion ?? 'n/a'} per 1M`;
-}
-
-function parseOpenRouterModelsPayload(payload: unknown): ModelDropdownOption[] {
-  if (!isRecord(payload) || !Array.isArray(payload.data)) return [];
-  return payload.data.flatMap((entry) => {
-    if (!isRecord(entry)) return [];
-    const modelId = readString(entry, 'id');
-    if (!modelId) return [];
-    const modelName = readString(entry, 'name');
-    const pricing = entry.pricing;
-    const priceLabel = isRecord(pricing) ? formatOpenRouterPrice(pricing) : undefined;
-    return [
-      {
-        id: modelId,
-        ...(modelName && modelName !== modelId ? { name: modelName } : {}),
-        ...(priceLabel ? { priceLabel } : {}),
-      },
-    ];
-  });
-}
-
-async function fetchOpenRouterModels(): Promise<ModelDropdownOption[]> {
-  const response = await fetch(OPENROUTER_MODELS_URL, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) {
-    const statusText = response.statusText ? ` ${response.statusText}` : '';
-    throw new Error(`Failed to load OpenRouter models: ${String(response.status)}${statusText}`);
-  }
-  return parseOpenRouterModelsPayload(await response.json());
 }
 
 function normalizeSearchText(value: string): string {
@@ -131,7 +65,7 @@ function escapeRegExp(value: string): string {
 function modelMatchesQuery(option: ModelDropdownOption, query: string): boolean {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return true;
-  const haystack = normalizeSearchText([option.id, option.name, option.priceLabel].join(' '));
+  const haystack = normalizeSearchText(option.id);
   if (normalizedQuery.includes('*')) {
     const parts = normalizedQuery
       .split('*')
@@ -146,7 +80,7 @@ function modelMatchesQuery(option: ModelDropdownOption, query: string): boolean 
 export function ModelNameCombobox({
   workspaceId,
   provider,
-  apiKey,
+  credentialConfigured,
   value,
   onChange,
   onCommit,
@@ -156,59 +90,26 @@ export function ModelNameCombobox({
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
 
-  const listingEnabled = canListModels(provider, apiKey);
-  const listsOpenRouterDirectly = provider.requestProviderId === 'openrouter';
-  const listingCredentialKey = listsOpenRouterDirectly ? '' : apiKey;
+  const listingEnabled = canListModels(provider, credentialConfigured);
 
   // Lazy, cached model listing: OpenRouter is intentionally fetched directly so
   // the UI can use its public pricing payload, while other providers still route
   // through the backend proxy that owns native SDK calls and provider secrets.
   const modelsQuery = useQuery<ModelDropdownOption[]>({
-    queryKey: [
-      'annotation-ai-models',
-      workspaceId ?? '',
-      provider.id,
-      provider.requestProviderId,
-      provider.baseUrl ?? '',
-      listingCredentialKey,
-    ],
+    queryKey: ['annotation-ai-models', workspaceId ?? '', provider.id, provider.requestProviderId],
     queryFn: async () => {
-      if (listsOpenRouterDirectly) return fetchOpenRouterModels();
       if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await listAnnotationAiModels({
-        path: { workspace_id: workspaceId },
-        body: {
-          provider_id: provider.requestProviderId,
-          base_url: provider.baseUrl ?? null,
-          api_key: apiKey.trim(),
-        },
+      const { data } = await listAnnotationModels({
+        path: { provider: provider.requestProviderId },
         throwOnError: true,
       });
-      return (data.models ?? []).map((modelId) => ({ id: modelId }));
+      return data.models.map((modelId) => ({ id: modelId }));
     },
-    enabled: open && listingEnabled && (listsOpenRouterDirectly || Boolean(workspaceId)),
+    enabled: open && listingEnabled && Boolean(workspaceId),
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
 
-  // Custom (no backend listing support): plain text input, no dropdown.
-  if (!provider.supportsModelListing) {
-    return (
-      <Input
-        id={id}
-        value={value}
-        disabled={disabled}
-        placeholder="Model name"
-        autoComplete="off"
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-        onBlur={(event) => {
-          onCommit?.(event.target.value);
-        }}
-      />
-    );
-  }
   const models = modelsQuery.data ?? [];
   // When the field already holds an exact catalogue entry, show the whole list
   // again on focus instead of filtering down to just that one row.
@@ -304,14 +205,6 @@ export function ModelNameCombobox({
                 >
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="truncate">{model.id}</span>
-                    {model.name ? (
-                      <span className="truncate text-xs text-muted-foreground">{model.name}</span>
-                    ) : null}
-                    {model.priceLabel ? (
-                      <span className="truncate text-xs leading-tight text-muted-foreground tabular-nums">
-                        {model.priceLabel}
-                      </span>
-                    ) : null}
                   </span>
                   {model.id === value ? (
                     <Check className="absolute right-2 top-2 size-4 shrink-0" aria-hidden="true" />

@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { usePreferencesInit } from '@/hooks/usePreferences';
+import { useDevicePreferencesInit } from '@/features/preferences/useUserPreferences';
 import { useSidebarResize } from '@/hooks/useSidebarResize';
 import { useRightPanelResize } from '@/hooks/useRightPanelResize';
 import { QueryProvider } from '@/providers/QueryProvider';
@@ -15,14 +15,20 @@ import { DocumentModalHost } from '@/components/dialogs/DocumentModalHost';
 import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
 import { isTabbedMainView } from '@/features/views/viewRegistry';
+import { GuidanceProvider } from '@/features/guidance/GuidanceProvider';
 
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
-const HintsController = lazy(() =>
-  import('@/features/hints/HintsController').then((m) => ({ default: m.HintsController })),
-);
 
 export function WorkspaceShell() {
-  usePreferencesInit();
+  return (
+    <QueryProvider>
+      <WorkspaceShellContent />
+    </QueryProvider>
+  );
+}
+
+function WorkspaceShellContent() {
+  useDevicePreferencesInit();
   const currentView = useUIStore((s) => s.currentView);
   const isTabbedMain = isTabbedMainView(currentView);
 
@@ -45,8 +51,8 @@ export function WorkspaceShell() {
   } = useRightPanelResize();
 
   return (
-    <QueryProvider>
-      <WorkspaceProvider>
+    <WorkspaceProvider>
+      <GuidanceProvider>
         <ViewRouteSync />
         <ErrorBoundary>
           <SidebarProvider
@@ -55,9 +61,6 @@ export function WorkspaceShell() {
           >
             <DocumentModalHost />
             <RefreshStatusBanner />
-            <Suspense fallback={null}>
-              <HintsController />
-            </Suspense>
             <div className="flex h-dvh w-full overflow-hidden" ref={sidebarHostRef}>
               <ErrorBoundary>
                 <Sidebar />
@@ -163,7 +166,7 @@ export function WorkspaceShell() {
             </div>
           </SidebarProvider>
         </ErrorBoundary>
-      </WorkspaceProvider>
-    </QueryProvider>
+      </GuidanceProvider>
+    </WorkspaceProvider>
   );
 }

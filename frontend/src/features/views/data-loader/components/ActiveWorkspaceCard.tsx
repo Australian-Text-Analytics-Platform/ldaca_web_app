@@ -71,7 +71,6 @@ export function ActiveWorkspaceCard({
   return (
     <Card
       data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
-      data-hint-id="workspace.create-or-load"
       className="flex h-full flex-col overflow-hidden"
     >
       <CardHeader>

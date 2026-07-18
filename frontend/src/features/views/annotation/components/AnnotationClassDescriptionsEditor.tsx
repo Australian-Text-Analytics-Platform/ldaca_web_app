@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { AnnotationClassDescriptionRow } from '@/api';
-import { updateAnnotationClassDescriptions } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,8 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { queryKeys } from '@/lib/queryKeys';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -73,49 +71,19 @@ export function AnnotationClassDescriptionsEditor({
   // with a "+N more" badge. Chips without a description render as plain badges.
   const classChips = editorRows
     .map((row) => ({
-      name: (row.class ?? '').trim(),
-      description: (row.description ?? '').trim(),
+      name: row.class.trim(),
+      description: row.description.trim(),
     }))
     .filter((chip) => chip.name.length > 0);
   const visibleClassChips = classChips.slice(0, CLASS_NAME_PREVIEW_LIMIT);
   const hiddenClassCount = classChips.length - visibleClassChips.length;
 
-  const updateClassDescriptionsMutation = useMutation({
-    mutationFn: async (rows: AnnotationClassDescriptionRow[]) => {
-      if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
-        throw new Error('Missing class-description selection');
-      }
-      const body = {
-        class_column: classColumn,
-        description_column: descriptionColumn,
-        rows,
-      };
-      const { data } = await updateAnnotationClassDescriptions({
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        body,
-        throwOnError: true,
-      });
-      return data;
-    },
-    onSuccess: (payload) => {
-      const rows = normalizeClassDescriptionRows(payload.rows);
-      setDraftRows(rows);
-      if (workspaceId && nodeId) {
-        queryClient.setQueryData(classDescriptions.queryKey, { ...payload, rows });
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.nodeData(workspaceId, nodeId),
-        });
-      }
-    },
-    onError: (error) => {
-      console.warn('[annotation] Failed to update class descriptions:', error);
-      toast.error('Could not update class descriptions');
-    },
-  });
-
   const persistRows = (rows: AnnotationClassDescriptionRow[]) => {
     if (!classDescriptions.canLoad) return;
-    updateClassDescriptionsMutation.mutate(normalizeClassDescriptionRows(rows));
+    const normalized = normalizeClassDescriptionRows(rows);
+    setDraftRows(normalized);
+    queryClient.setQueryData(classDescriptions.queryKey, { rows: normalized });
+    toast.info('Class changes apply to this annotation draft only.');
   };
 
   const updateDraftCell = (rowIndex: number, field: 'class' | 'description', value: string) => {
@@ -205,10 +173,10 @@ export function AnnotationClassDescriptionsEditor({
                   <div key={index} className="flex items-start gap-2">
                     <Input
                       aria-label={`Class ${String(index + 1)}`}
-                      value={row.class ?? ''}
+                      value={row.class}
                       placeholder="Class"
                       className="w-1/3"
-                      disabled={updateClassDescriptionsMutation.isPending}
+                      disabled={false}
                       onChange={(event) => {
                         updateDraftCell(index, 'class', event.target.value);
                       }}
@@ -218,10 +186,10 @@ export function AnnotationClassDescriptionsEditor({
                     />
                     <Textarea
                       aria-label={`Description ${String(index + 1)}`}
-                      value={row.description ?? ''}
+                      value={row.description}
                       rows={2}
                       placeholder="Description"
-                      disabled={updateClassDescriptionsMutation.isPending}
+                      disabled={false}
                       className="min-h-9 flex-1 resize-y"
                       onChange={(event) => {
                         updateDraftCell(index, 'description', event.target.value);

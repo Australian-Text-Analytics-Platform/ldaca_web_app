@@ -1,16 +1,5 @@
-import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
-import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -19,12 +8,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import type { AnnotationAiPreviewSession } from '../hooks/useAnnotationAiPreviewSession';
 import type { AnnotationNodePageRow } from '../hooks/useAnnotationNodePage';
-
-const NO_CLASS_VALUE = '__no_class__';
 
 /** Coerce an unknown cell value to display text without object stringification. */
 const cellText = (value: unknown): string => {
@@ -48,8 +36,7 @@ interface AnnotationAiPreviewPanelProps {
  * adapter and the detach-confirmation presentation.
  */
 export function AnnotationAiPreviewPanel({ session }: AnnotationAiPreviewPanelProps) {
-  const [detachDialogOpen, setDetachDialogOpen] = useState(false);
-  const { page, predictions, classes, detach, annotateAll, columns } = session;
+  const { page, predictions, columns } = session;
   const tableColumns: ColumnDef<AnnotationNodePageRow>[] = [
     { id: columns.text, accessorFn: (row) => row[columns.text] },
     { id: 'ai_prediction', accessorFn: (row) => row[columns.text] },
@@ -120,33 +107,9 @@ export function AnnotationAiPreviewPanel({ session }: AnnotationAiPreviewPanelPr
                               {existing}
                             </span>
                           ) : null}
-                          <Select
-                            value={value}
-                            disabled={!predictions.canEdit || classes.options.length === 0}
-                            onValueChange={(next) => {
-                              predictions.setSelection(
-                                rowPosition,
-                                next === NO_CLASS_VALUE ? '' : next,
-                              );
-                            }}
-                          >
-                            <SelectTrigger
-                              aria-label={`AI class for row ${String(rowPosition + 1)}`}
-                              className="w-full text-sm"
-                            >
-                              <SelectValue placeholder="—" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={NO_CLASS_VALUE} className="text-muted-foreground">
-                                None
-                              </SelectItem>
-                              {classes.options.map((name) => (
-                                <SelectItem key={name} value={name}>
-                                  {name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <span aria-label={`AI prediction for row ${String(rowPosition + 1)}`}>
+                            {value || '—'}
+                          </span>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -179,56 +142,8 @@ export function AnnotationAiPreviewPanel({ session }: AnnotationAiPreviewPanelPr
             pageIndex={page.pagination.pageIndex}
             pageSize={page.pagination.pageSize}
             rowCount={page.rowCount}
-            loading={page.query.isFetching || session.isMaterializing}
+            loading={page.query.isFetching}
           />
-          <div className="flex items-center justify-end gap-3 border-t border-border px-4 py-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={detach.isPending || !detach.canRun}
-              onClick={() => {
-                setDetachDialogOpen(true);
-              }}
-            >
-              {detach.isPending ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                  Detaching…
-                </>
-              ) : (
-                'Detach Previewed Rows'
-              )}
-            </Button>
-            <ConfirmDialog
-              open={detachDialogOpen}
-              onOpenChange={setDetachDialogOpen}
-              title="Detach previewed rows"
-              description={`Copy the ${String(detach.count)} previewed row${
-                detach.count === 1 ? '' : 's'
-              } into a new child table with their AI labels? The source table is left unchanged.`}
-              confirmText="Detach"
-              onConfirm={detach.run}
-            />
-            {annotateAll.isPending ? (
-              <span className="text-xs text-muted-foreground">Annotating every row…</span>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              disabled={annotateAll.isPending || !annotateAll.canRun}
-              onClick={annotateAll.run}
-            >
-              {annotateAll.isPending ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                  Annotating…
-                </>
-              ) : (
-                'Annotate All'
-              )}
-            </Button>
-          </div>
         </div>
       )}
     </section>

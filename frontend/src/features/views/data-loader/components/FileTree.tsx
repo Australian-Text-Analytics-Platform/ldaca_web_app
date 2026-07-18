@@ -273,7 +273,6 @@ export function FileTree({
                 ? 'Add this file as a Data Block'
                 : 'Load a workspace to add this file as a Data Block'
             }
-            data-hint-id="data-loader.file-row.add"
             onClick={() => {
               onAddFile(file.path);
               onSelectFile(file.path);

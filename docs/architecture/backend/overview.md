@@ -60,6 +60,9 @@ this direction and the absence of removed facades.
 - `EventHub` is the single live refresh transport for Workspaces, Tabs,
   Analyses, and User File Imports; it is not durable state.
 - `SessionService` and `OAuthService` own identity state and provider exchange.
+- `UserPreferenceStore` owns per-user non-secret preferences, provider
+  credential files, and their idempotent legacy split; `ProviderCredentialStore`
+  exposes only credential status, updates, and internal secret resolution.
 - `UserFileStore` and `WorkspaceArchiveService` own their respective storage
   boundaries.
 

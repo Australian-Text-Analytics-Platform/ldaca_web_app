@@ -127,9 +127,7 @@ function DataPreprocessingFeature() {
    * subtab card so preprocessing matches the other functional tab layouts.
    */
   const renderNodeInputsPanel = () => (
-    <div
-      data-hint-id={activeSubtab === 'filter' ? 'preprocessing.filter.node-selection' : undefined}
-    >
+    <div>
       <NodeInputsPanel
         resolvedNodes={nodeInputs.resolvedNodes}
         availableNodes={nodeInputs.availableNodes}

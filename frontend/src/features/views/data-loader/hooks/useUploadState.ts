@@ -1,5 +1,4 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
-import { useHintsStore } from '@/stores/hintsStore';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -44,7 +43,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
 
   /**
    * Uploads one or more selected files sequentially, tracks partial failures,
-   * and records the last successful upload for contextual hints.
+   * and reports aggregate success or failure.
    * Shared by the picker-change and drop handlers below.
    * Steps: copy the selected list, skip empty batches, upload files sequentially so
    * notifications match actual outcomes, then reset busy/drop state.
@@ -58,26 +57,18 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
     setUploadingFiles(true);
     let uploadedCount = 0;
     const failedFiles: string[] = [];
-    const setLastUploadedFilePath = useHintsStore.getState().setLastUploadedFilePath;
-    let lastSuccess: string | null = null;
-
     try {
       for (const file of selectedFiles) {
         try {
           const success = await uploadFile(file);
           if (success) {
             uploadedCount += 1;
-            lastSuccess = file.name;
           } else {
             failedFiles.push(file.name);
           }
         } catch {
           failedFiles.push(file.name);
         }
-      }
-
-      if (lastSuccess) {
-        setLastUploadedFilePath(lastSuccess);
       }
 
       if (failedFiles.length === 0) {

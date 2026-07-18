@@ -44,6 +44,13 @@ policy in `deployment.sqlite3`, not an environment setting. `NULL` means
 unlimited; new hosted users receive the database default of 30 GiB. There are
 no file-count, directory-count, Analysis-count, or queue-count quotas.
 
+Each `users/<user-id>/` root contains `files/`, `imports/`,
+schema-versioned non-secret `preferences.toml`, and write-only
+`provider-credentials.toml` when needed. The backend rejects unversioned,
+linked, malformed, or schema-invalid files rather than interpreting earlier
+storage layouts. Provider secrets are accepted only through the dedicated
+write-only credential resource.
+
 Both execution capacities default to two and accept any positive integer with
 no schema ceiling or unlimited sentinel. `SHUTDOWN_GRACE_SECONDS` defaults to
 10 seconds and must be positive and finite. All three are immutable for one
@@ -60,7 +67,6 @@ runtime and change only after restart.
 | `QUOTATION_SERVICE_TIMEOUT` | Remote quotation timeout |
 | `QUOTATION_SERVICE_MAX_BATCH_SIZE` | Remote quotation batch ceiling |
 | `QUOTATION_REMOTE_ENGINES` | Operator-owned quotation engine allowlist |
-| `SAMPLE_DATA_REMOTE_URL` | Verified remote sample catalogue root |
 
 Single-user mode requires a loopback server host. Wildcard CORS and Host values
 are invalid. Port zero is accepted only by the desktop launcher before it

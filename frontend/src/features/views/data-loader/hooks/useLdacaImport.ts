@@ -1,33 +1,20 @@
 import { useReducer } from 'react';
-import { importLdacaDataset, listLdacaFeaturedCollections, searchLdacaCollections } from '@/api';
-import type { OniSearchRequest } from '@/api';
+import { searchDataPortal, listFeaturedDataPortalCollections, submitDataPortalImport } from '@/api';
+import type { DataPortalSearchRequest } from '@/api';
 import {
   initialLdacaImportState,
   ldacaImportReducer,
   type LdacaSearchMethod,
 } from './ldacaImportState';
 
-const LDACA_API_TOKEN_HEADER = 'X-LDACA-API-Token';
-
-type LdacaSearchRequest = Omit<OniSearchRequest, 'method' | 'query'> & {
+type LdacaSearchRequest = Omit<DataPortalSearchRequest, 'method' | 'query'> & {
   method: LdacaSearchMethod;
   query: string;
 };
 
-/**
- * Adds an optional Oni API token to generated-client headers. LDaCA search,
- * featured records, and import calls all share this adapter.
- * Called by featured, search, and import request paths in `useLdacaImport`.
- */
-function withLdacaApiToken(token?: string | null): Record<string, string> {
-  const trimmed = token?.trim();
-  return trimmed ? { [LDACA_API_TOKEN_HEADER]: trimmed } : {};
-}
-
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
 interface UseLdacaImportParams {
-  ldacaApiToken?: string | null;
   notify: Notify;
 }
 
@@ -39,7 +26,7 @@ interface UseLdacaImportParams {
  * Flow: load featured records, run ONI search from dialog filters, import selected records
  * through backend APIs, and keep loading/error state isolated for DataLoaderDialogs.
  */
-export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) {
+export function useLdacaImport({ notify }: UseLdacaImportParams) {
   const [state, dispatch] = useReducer(ldacaImportReducer, initialLdacaImportState);
 
   /**
@@ -49,16 +36,15 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
    * Steps: skip cached loads, apply token-aware headers, request featured records, update cached
    * results, and surface load errors through the dialog state.
    */
-  const loadFeaturedRecords = async (tokenOverride = ldacaApiToken, force = false) => {
+  const loadFeaturedRecords = async (force = false) => {
     if (state.featuredLoading || (!force && state.featuredLoaded)) return;
 
     dispatch({ type: 'featuredStarted' });
     try {
-      const { data: response } = await listLdacaFeaturedCollections({
-        headers: withLdacaApiToken(tokenOverride),
+      const { data: response } = await listFeaturedDataPortalCollections({
         throwOnError: true,
       });
-      dispatch({ type: 'featuredSucceeded', records: response.data });
+      dispatch({ type: 'featuredSucceeded', records: response.items });
     } catch (error) {
       const message = (error as Error).message || 'Failed to load LDaCA staff picks.';
       dispatch({ type: 'featuredFailed', message });
@@ -70,9 +56,9 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
    * Forces staff picks to reload after token changes so the dialog reflects the
    * current authentication context.
    */
-  const reloadFeaturedRecords = async (tokenOverride = ldacaApiToken) => {
+  const reloadFeaturedRecords = async () => {
     dispatch({ type: 'featuredInvalidated' });
-    await loadFeaturedRecords(tokenOverride, true);
+    await loadFeaturedRecords(true);
   };
 
   /**
@@ -118,15 +104,14 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
       const request: LdacaSearchRequest = {
         method: state.searchMethod,
         query: trimmedQuery,
-        limit: 25,
-        offset: 0,
+        page: 1,
+        page_size: 25,
       };
-      const { data: response } = await searchLdacaCollections({
+      const { data: response } = await searchDataPortal({
         body: request,
-        headers: withLdacaApiToken(ldacaApiToken),
         throwOnError: true,
       });
-      dispatch({ type: 'searchSucceeded', records: response.data });
+      dispatch({ type: 'searchSucceeded', records: response.items });
     } catch (error) {
       const message = (error as Error).message || 'Failed to search LDaCA.';
       dispatch({ type: 'searchFailed', message });
@@ -149,13 +134,11 @@ export function useLdacaImport({ ldacaApiToken, notify }: UseLdacaImportParams) 
 
     dispatch({ type: 'importStarted', importingId: target });
     try {
-      const { data: response } = await importLdacaDataset({
-        body: { url: target },
-        headers: withLdacaApiToken(ldacaApiToken),
+      const { data: response } = await submitDataPortalImport({
+        body: { identifier: target },
         throwOnError: true,
       });
-
-      notify('success', response.message || 'LDaCA import started in background.');
+      notify('success', `LDaCA import ${response.state}.`);
       dispatch({ type: 'importSucceeded' });
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to start LDaCA import.');

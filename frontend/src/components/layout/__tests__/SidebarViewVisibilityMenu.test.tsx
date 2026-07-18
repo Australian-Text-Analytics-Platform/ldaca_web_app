@@ -5,11 +5,14 @@ import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
 import { useUIStore } from '@/stores/uiStore';
-import { useHintsStore } from '@/stores/hintsStore';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
 
 /** Toast spy used to verify sidebar menu actions surface user feedback. */
 const toastMock = vi.fn();
+const preferenceFixture = vi.hoisted(() => ({
+  hiddenViews: [] as string[],
+  mutate: vi.fn(),
+}));
 
 vi.mock('sonner', () => ({
   /** Used by: sidebar menu tests to assert toast feedback. */
@@ -20,10 +23,8 @@ vi.mock('sonner', () => ({
  * Mutable auth fixture consumed by the mocked `useAuth` hook across sidebar visibility tests.
  */
 const authState = {
-  getAuthHeaders: () => ({}),
-  user: { name: 'Test User' },
+  user: { id: 'user-1', name: 'Test User' },
   logout: vi.fn(),
-  dataFolder: '/tmp/workdir',
   isMultiUserMode: false,
 };
 
@@ -67,6 +68,19 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
   useAuth: () => authState,
 }));
 
+vi.mock('@/features/preferences/useUserPreferences', () => ({
+  useUserPreferences: () => ({
+    preferences: {
+      hidden_views: preferenceFixture.hiddenViews,
+      favorite_workspaces: [],
+      default_tokenizer_model: null,
+      analysis_multi_tab_enabled: false,
+      contextual_hints_enabled: true,
+    },
+  }),
+  useUpdateUserPreferences: () => ({ mutate: preferenceFixture.mutate }),
+}));
+
 vi.mock('@/stores/analysisStore', () => ({
   /** Used by: Sidebar tests to expose an empty analysis-task store fixture. */
   useAnalysisStore: (
@@ -91,7 +105,6 @@ const renderSidebar = () => {
 describe('Sidebar view visibility menu', () => {
   beforeEach(() => {
     authState.isMultiUserMode = false;
-    authState.dataFolder = '/tmp/workdir';
     authState.logout = vi.fn();
 
     Object.defineProperty(window, 'matchMedia', {
@@ -116,20 +129,16 @@ describe('Sidebar view visibility menu', () => {
       feedbackOpen: false,
       documentTarget: null,
     }));
-    usePreferencesStore.setState({ hiddenViews: [] });
-    useHintsStore.setState({
-      dismissedHints: [],
-      sessionDismissedHints: [],
-      lastUploadedFilePath: null,
-      hintsEnabled: true,
-    });
+    preferenceFixture.hiddenViews = [];
+    preferenceFixture.mutate.mockReset();
+    useGuidanceAcknowledgmentsStore.setState({ byUser: {} });
     toastMock.mockReset();
   });
 
   it('allows hiding and showing optional views from the views editor', async () => {
     const user = userEvent.setup();
 
-    renderSidebar();
+    const view = renderSidebar();
 
     expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Data Loader' })).toBeInTheDocument();
@@ -140,17 +149,17 @@ describe('Sidebar view visibility menu', () => {
     expect(exportToggle).toBeChecked();
 
     await user.click(exportToggle);
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Export' })).not.toBeChecked();
+    expect(preferenceFixture.mutate).toHaveBeenCalledWith({
+      hidden_views: ['export'],
+    });
 
-    await user.keyboard('{Escape}');
-
-    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
-
+    view.unmount();
+    preferenceFixture.hiddenViews = ['export'];
+    preferenceFixture.mutate.mockClear();
+    renderSidebar();
     await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Export' }));
-    await user.keyboard('{Escape}');
-
-    expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument();
+    expect(preferenceFixture.mutate).toHaveBeenCalledWith({ hidden_views: [] });
   });
 
   it('keeps Data Loader out of the views editor so it always remains visible', async () => {
@@ -166,28 +175,27 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.getAllByRole('button', { name: 'Data Loader' }).length).toBeGreaterThan(0);
   });
 
-  it('opens Settings from the header cog and resets dismissed hints there', async () => {
+  it('opens Settings from the header cog and resets Contextual Hint history there', async () => {
     const user = userEvent.setup();
 
-    useHintsStore.setState({
-      dismissedHints: ['preprocessing.filter.select-node'],
-      sessionDismissedHints: ['preprocessing.filter.select-column'],
-      hintsEnabled: true,
+    useGuidanceAcknowledgmentsStore.setState({
+      byUser: { 'user-1': { 'preprocessing.filter.select-node': 1 } },
     });
 
     renderSidebar();
 
     await user.click(screen.getByRole('button', { name: /open settings/i }));
-    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('dialog', { name: 'Settings' }, { timeout: 5_000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /quotation/i })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: /hints/i }));
-    await user.click(screen.getByRole('button', { name: /reset all hints/i }));
+    await user.click(screen.getByRole('tab', { name: /guidance/i }));
+    await user.click(screen.getByRole('button', { name: /reset contextual hint history/i }));
 
-    expect(useHintsStore.getState().dismissedHints).toEqual([]);
-    expect(useHintsStore.getState().sessionDismissedHints).toEqual([]);
+    expect(useGuidanceAcknowledgmentsStore.getState().byUser['user-1']).toBeUndefined();
     expect(toastMock).toHaveBeenCalledWith(
-      'All hints have been reset. Dismissed hints can appear again.',
+      'Contextual Hint history reset. Eligible hints can appear again.',
     );
   });
 
@@ -197,7 +205,9 @@ describe('Sidebar view visibility menu', () => {
     renderSidebar();
 
     await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
-    expect(screen.queryByRole('menuitem', { name: 'Reset all hints' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: /reset contextual hint history/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('does not show the old working directory card in multi-user mode', () => {

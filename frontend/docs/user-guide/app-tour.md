@@ -1,6 +1,7 @@
-# LDaCA Web App Tour (UI Overview)
+# LDaCA Web App Written Overview
 
-**Scope statement:** This tour introduces the main UI areas without going into backend or library internals.
+**Scope statement:** This written guide introduces the main UI areas without
+starting a Guided Tour or covering backend internals.
 
 ## Step 1 — Understand the layout
 
@@ -40,4 +41,5 @@
 
 **Question:** *What should I read after the tour?*
 
-**Answer:** If you are developing the frontend, read the architecture page and configuration reference next.
+**Answer:** Open **Help** in the sidebar for feature guides. Guided Tour
+launchers appear there only when a tour is available.

@@ -2436,9 +2436,13 @@ export type SampleCatalogueResource = {
 /**
  * SampleCollection
  *
- * One importable sample collection from the remote catalogue.
+ * One importable sample collection from the configured catalogue.
  */
 export type SampleCollection = {
+    /**
+     * Bundled
+     */
+    bundled?: boolean;
     /**
      * Description
      */
@@ -2476,13 +2480,17 @@ export type SampleCollection = {
 /**
  * SampleFile
  *
- * One fetchable file in a remote sample collection.
+ * One integrity-pinned file in a remote sample collection.
  */
 export type SampleFile = {
     /**
      * Path
      */
     path: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
     /**
      * Size
      */
@@ -3013,24 +3021,6 @@ export type TokenResultMetadata = {
 };
 
 /**
- * TokenizerModelResource
- */
-export type TokenizerModelResource = {
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Label
-     */
-    label: string;
-    /**
-     * Languages
-     */
-    languages?: Array<string>;
-};
-
-/**
  * TopicItem
  */
 export type TopicItem = {
@@ -3385,6 +3375,62 @@ export type UserFileImportPage = {
      * Total Pages
      */
     total_pages: number;
+};
+
+/**
+ * UserPreferences
+ *
+ * Non-secret preferences synchronized for one authenticated user.
+ */
+export type UserPreferences = {
+    /**
+     * Analysis Multi Tab Enabled
+     */
+    analysis_multi_tab_enabled?: boolean;
+    /**
+     * Contextual Hints Enabled
+     */
+    contextual_hints_enabled?: boolean;
+    /**
+     * Default Tokenizer Model
+     */
+    default_tokenizer_model?: string | null;
+    /**
+     * Favorite Workspaces
+     */
+    favorite_workspaces?: Array<string>;
+    /**
+     * Hidden Views
+     */
+    hidden_views?: Array<string>;
+};
+
+/**
+ * UserPreferencesPatch
+ *
+ * Partial update; only explicitly provided fields are changed.
+ */
+export type UserPreferencesPatch = {
+    /**
+     * Analysis Multi Tab Enabled
+     */
+    analysis_multi_tab_enabled?: boolean;
+    /**
+     * Contextual Hints Enabled
+     */
+    contextual_hints_enabled?: boolean;
+    /**
+     * Default Tokenizer Model
+     */
+    default_tokenizer_model?: string | null;
+    /**
+     * Favorite Workspaces
+     */
+    favorite_workspaces?: Array<string>;
+    /**
+     * Hidden Views
+     */
+    hidden_views?: Array<string>;
 };
 
 /**
@@ -3975,10 +4021,70 @@ export type BackendEventsResponses = {
     /**
      * Successful Response
      */
-    200: string;
+    200: unknown;
 };
 
-export type BackendEventsResponse = BackendEventsResponses[keyof BackendEventsResponses];
+export type GetPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/preferences';
+};
+
+export type GetPreferencesErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type GetPreferencesError = GetPreferencesErrors[keyof GetPreferencesErrors];
+
+export type GetPreferencesResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserPreferences;
+};
+
+export type GetPreferencesResponse = GetPreferencesResponses[keyof GetPreferencesResponses];
+
+export type UpdatePreferencesData = {
+    body: UserPreferencesPatch;
+    path?: never;
+    query?: never;
+    url: '/api/preferences';
+};
+
+export type UpdatePreferencesErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type UpdatePreferencesError = UpdatePreferencesErrors[keyof UpdatePreferencesErrors];
+
+export type UpdatePreferencesResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserPreferences;
+};
+
+export type UpdatePreferencesResponse = UpdatePreferencesResponses[keyof UpdatePreferencesResponses];
 
 export type ClearProviderCredentialsData = {
     body?: never;
@@ -4245,37 +4351,6 @@ export type GetStorageResponses = {
 };
 
 export type GetStorageResponse = GetStorageResponses[keyof GetStorageResponses];
-
-export type ListTokenizerModelsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/tokenizer-models';
-};
-
-export type ListTokenizerModelsErrors = {
-    /**
-     * Authentication required
-     */
-    401: ApiError;
-    /**
-     * Stored resource is corrupt
-     */
-    500: ApiError;
-};
-
-export type ListTokenizerModelsError = ListTokenizerModelsErrors[keyof ListTokenizerModelsErrors];
-
-export type ListTokenizerModelsResponses = {
-    /**
-     * Response List Tokenizer Models
-     *
-     * Successful Response
-     */
-    200: Array<TokenizerModelResource>;
-};
-
-export type ListTokenizerModelsResponse = ListTokenizerModelsResponses[keyof ListTokenizerModelsResponses];
 
 export type ListUserFileImportsData = {
     body?: never;

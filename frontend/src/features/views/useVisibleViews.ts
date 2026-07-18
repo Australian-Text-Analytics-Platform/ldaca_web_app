@@ -1,5 +1,5 @@
 import { ALL_VIEWS, type ViewType } from './viewIds';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useUserPreferences } from '@/features/preferences/useUserPreferences';
 
 /** Derives navigation order from the canonical registry ids and hidden preference. */
 export const visibleViewsFromHidden = (hiddenViews: readonly string[]): ViewType[] =>
@@ -11,6 +11,6 @@ export const visibleViewsFromHidden = (hiddenViews: readonly string[]): ViewType
  * the sole owner that repairs a hidden or workspace-gated active view.
  */
 export const useVisibleViews = (): ViewType[] => {
-  const hiddenViews = usePreferencesStore((state) => state.hiddenViews);
-  return visibleViewsFromHidden(hiddenViews);
+  const { preferences } = useUserPreferences();
+  return visibleViewsFromHidden(preferences.hidden_views ?? []);
 };

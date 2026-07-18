@@ -2,13 +2,13 @@ import { act, render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useUIStore } from '@/stores/uiStore';
-import { usePreferencesStore } from '@/stores/preferencesStore';
 import { ViewRouteSync } from '../ViewRouteSync';
 
 const routeFixture = vi.hoisted(() => ({
   routeView: undefined as string | undefined,
   workspaceId: null as string | null,
   navigate: vi.fn(),
+  hiddenViews: [] as string[],
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -26,6 +26,12 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   }),
 }));
 
+vi.mock('@/features/preferences/useUserPreferences', () => ({
+  useUserPreferences: () => ({
+    preferences: { hidden_views: routeFixture.hiddenViews },
+  }),
+}));
+
 /**
  * Resets the shared UI store and route fixtures before route-sync assertions.
  * Used by: ViewRouteSync tests because the global store persists across tests.
@@ -38,7 +44,7 @@ const resetFixtures = () => {
     ...state,
     currentView: 'data-loader',
   }));
-  usePreferencesStore.setState({ hiddenViews: [] });
+  routeFixture.hiddenViews = [];
 };
 
 describe('ViewRouteSync', () => {
@@ -164,7 +170,7 @@ describe('ViewRouteSync', () => {
 
   it('repairs an active view hidden by restored preferences', async () => {
     useUIStore.setState({ currentView: 'quotation' });
-    usePreferencesStore.setState({ hiddenViews: ['quotation'] });
+    routeFixture.hiddenViews = ['quotation'];
 
     render(<ViewRouteSync />);
 
@@ -175,7 +181,7 @@ describe('ViewRouteSync', () => {
 
   it('repairs a hidden URL view without adopting it into the store', async () => {
     routeFixture.routeView = 'quotation';
-    usePreferencesStore.setState({ hiddenViews: ['quotation'] });
+    routeFixture.hiddenViews = ['quotation'];
 
     render(<ViewRouteSync />);
 

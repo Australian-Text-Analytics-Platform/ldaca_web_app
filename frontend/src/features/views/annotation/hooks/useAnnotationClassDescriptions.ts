@@ -1,5 +1,5 @@
 import type { AnnotationClassDescriptionRow } from '@/api';
-import { getAnnotationClassDescriptions } from '@/api';
+import { getNodeRowsTable } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { useQuery } from '@tanstack/react-query';
 
@@ -21,9 +21,15 @@ export const normalizeClassDescriptionRows = (
   rows: AnnotationClassDescriptionRow[] | undefined,
 ): AnnotationClassDescriptionRow[] =>
   (rows ?? []).map((row) => ({
-    class: row.class ?? '',
-    description: row.description ?? '',
+    class: row.class,
+    description: row.description,
   }));
+
+const jsonValueToText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+};
 
 /**
  * Shared class-description query for Annotation setup, editing, and AI gating.
@@ -53,13 +59,17 @@ export function useAnnotationClassDescriptions({
       if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
         throw new Error('Missing class-description selection');
       }
-      const { data } = await getAnnotationClassDescriptions({
+      const data = await getNodeRowsTable({
         path: { workspace_id: workspaceId, node_id: nodeId },
-        query: { class_column: classColumn, description_column: descriptionColumn },
+        query: { page: 1, page_size: 1000 },
         signal,
-        throwOnError: true,
       });
-      return data;
+      return {
+        rows: data.rows.map((row) => ({
+          class: jsonValueToText(row[classColumn]),
+          description: jsonValueToText(row[descriptionColumn]),
+        })),
+      };
     },
   });
 

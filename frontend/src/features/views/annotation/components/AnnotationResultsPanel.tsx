@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { setAnnotationCell } from '@/api';
 import {
   Select,
   SelectContent,
@@ -18,8 +17,6 @@ import {
 } from '@/components/ui/table';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
-import { queryKeys } from '@/lib/queryKeys';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
 import { useAnnotationNodePage, type AnnotationNodePageRow } from '../hooks/useAnnotationNodePage';
@@ -81,7 +78,6 @@ export function AnnotationResultsPanel({
 }: AnnotationResultsPanelProps) {
   // Per-row class overrides keyed by source row position; falls back to the source value.
   const [selections, setSelections] = useState<Record<number, string>>({});
-  const queryClient = useQueryClient();
   const nodePage = useAnnotationNodePage({
     workspaceId,
     nodeId,
@@ -93,37 +89,6 @@ export function AnnotationResultsPanel({
     nodeId: classNodeId,
     classColumn,
     descriptionColumn,
-  });
-
-  // Persist a single annotation cell to the backend column. row_index is the
-  // ABSOLUTE 0-based position across the node (page offset + row), matching the
-  // backend's int_range rewrite. On failure the dropdown rolls back to the value
-  // it showed before the change so optimistic UI never diverges from storage.
-  const setCellMutation = useMutation({
-    mutationFn: async (vars: { rowPosition: number; value: string; previous: string }) => {
-      if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await setAnnotationCell({
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        body: {
-          column_name: annotationColumn,
-          row_index: vars.rowPosition,
-          value: vars.value === '' ? null : vars.value,
-        },
-        throwOnError: true,
-      });
-      return data;
-    },
-    onError: (_error, vars) => {
-      setSelections((current) => ({ ...current, [vars.rowPosition]: vars.previous }));
-      toast.error('Could not save annotation.');
-    },
-    onSuccess: () => {
-      // Refetch so other views of this node reflect the saved cell; the local
-      // override already matches, so the visible dropdown does not flicker.
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.nodeData(workspaceId ?? '', nodeId),
-      });
-    },
   });
 
   const tableColumns: ColumnDef<AnnotationResultRow>[] = [
@@ -189,7 +154,6 @@ export function AnnotationResultsPanel({
                           onValueChange={(next) => {
                             // The sentinel clears the cell back to an unset value.
                             const resolved = next === NO_CLASS_VALUE ? '' : next;
-                            const previous = value;
                             setSelections((current) => ({
                               ...current,
                               [rowPosition]: resolved,
@@ -199,7 +163,7 @@ export function AnnotationResultsPanel({
                             // existing column; skip the request in the unlikely
                             // new-mode render to avoid a guaranteed 400.
                             if (!isNew) {
-                              setCellMutation.mutate({ rowPosition, value: resolved, previous });
+                              toast.info('Annotation changes apply to this view only.');
                             }
                           }}
                         >

@@ -1,5 +1,4 @@
-import { useState, type SyntheticEvent } from 'react';
-import { Download, KeyRound, Loader2, Search, Trash2 } from 'lucide-react';
+import { Download, Loader2, Search } from 'lucide-react';
 
 import type { OniSearchRequest, OniSearchResult as LdacaSearchResult } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +8,6 @@ import {
   DialogContent,
   DialogDescription,
   DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -51,33 +49,14 @@ export interface LdacaImportDialogProps {
   onFileFormatFilterChange: (value: string) => void;
   featuredRecords: LdacaSearchResult[];
   featuredLoading: boolean;
-  hasToken: boolean;
   searchResults: LdacaSearchResult[];
   hasSearched: boolean;
   searching: boolean;
   importingId?: string;
   importing: boolean;
   errorMessage?: string;
-  onTokenSave: (token: string) => void;
-  onTokenDelete: () => void;
   onSearch: () => void;
   onImport: (recordId: string) => void;
-}
-
-/**
- * Normalizes varied Oni record statistic values for the small metadata cards
- * shown inside each LDaCA search result.
- * Used by: LdacaRecordCard because Oni stats can be arrays, primitives, or
- * nested values and the card needs one compact display rule.
- */
-function formatLdacaStat(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ');
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value);
 }
 
 /**
@@ -92,7 +71,7 @@ function ldacaFilterOptions(records: LdacaSearchResult[], field: 'collections' |
   const values: string[] = [];
   for (const record of records) {
     // record is an Oni API response; the array field may be absent at runtime despite the type
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
     for (const value of record[field] ?? []) {
       if (!seen.has(value)) {
         seen.add(value);
@@ -133,8 +112,8 @@ function ldacaRecordUrl(record: LdacaSearchResult) {
   if (/^https?:\/\//i.test(identifier)) return identifier;
 
   const encodedIdentifier = encodeURIComponent(identifier);
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const encodedCrateId = encodeURIComponent(record.crate_id || identifier);
+
+  const encodedCrateId = encodeURIComponent(record.crate_id ?? identifier);
   return `${LDACA_PORTAL_COLLECTION_URL}?id=${encodedIdentifier}&_crateId=${encodedCrateId}`;
 }
 
@@ -153,9 +132,6 @@ function LdacaRecordCard({
   importingId?: string;
   onImport: (recordId: string) => void;
 }) {
-  // stats is an Oni API field; guard against malformed records that omit it
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const stats = Object.entries(record.stats || {}).slice(0, 3);
   const isImporting = importingId === record.id;
 
   return (
@@ -183,13 +159,13 @@ function LdacaRecordCard({
             <p className="text-muted-foreground line-clamp-3 text-sm">{record.description}</p>
           ) : null}
           <div className="flex flex-wrap gap-1.5">
-            {record.types.slice(0, 4).map((typeName) => (
+            {(record.types ?? []).slice(0, 4).map((typeName) => (
               <Badge key={typeName} variant="secondary" className="text-xs">
                 {typeName}
               </Badge>
             ))}
             {/* file_formats is an Oni API field that may be absent at runtime despite the type */}
-            {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
+            {}
             {(record.file_formats ?? []).slice(0, 3).map((fileFormat) => (
               <Badge key={fileFormat} variant="outline" className="text-xs">
                 {fileFormat}
@@ -201,18 +177,6 @@ function LdacaRecordCard({
               </Badge>
             ) : null}
           </div>
-          {stats.length > 0 ? (
-            <dl className="text-muted-foreground grid gap-2 text-xs sm:grid-cols-3">
-              {stats.map(([label, value]) => (
-                <div key={label} className="bg-background rounded border px-2 py-1">
-                  <dt className="text-foreground font-medium capitalize">
-                    {label.replace(/_/g, ' ')}
-                  </dt>
-                  <dd className="truncate">{formatLdacaStat(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
         </div>
         <Button
           type="button"
@@ -243,10 +207,6 @@ function LdacaRecordCard({
  * result filtering.
  */
 export function LdacaImportDialog(props: LdacaImportDialogProps) {
-  const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
-  const [tokenDraft, setTokenDraft] = useState('');
-  const [tokenError, setTokenError] = useState<string | undefined>();
-
   const canSearch = props.query.trim().length > 0;
   const showingSearchResults = props.hasSearched || props.searching;
   const collectionOptions = ldacaFilterOptions(props.searchResults, 'collections');
@@ -261,52 +221,6 @@ export function LdacaImportDialog(props: LdacaImportDialogProps) {
   const listRecords = showingSearchResults ? filteredSearchResults : props.featuredRecords;
   const listLoading = showingSearchResults ? props.searching : props.featuredLoading;
 
-  /**
-   * Toggles between deleting an existing Oni token and opening the save-token
-   * dialog. The token button is the only control that owns that branch.
-   * Called by: LdacaImportDialog token button.
-   */
-  const handleLdacaTokenClick = () => {
-    if (props.hasToken) {
-      props.onTokenDelete();
-      return;
-    }
-
-    setTokenDraft('');
-    setTokenError(undefined);
-    setTokenDialogOpen(true);
-  };
-
-  /**
-   * Resets token draft state when the Radix dialog closes so later opens start
-   * from a clean form.
-   * Called by: the token Dialog open-state callback.
-   */
-  const handleTokenDialogOpenChange = (open: boolean) => {
-    setTokenDialogOpen(open);
-    if (!open) {
-      setTokenDraft('');
-      setTokenError(undefined);
-    }
-  };
-
-  /**
-   * Validates and forwards the Oni token form submission to the parent-owned
-   * preference action used by `DataLoaderFeature`.
-   * Called by: the token form submit handler.
-   */
-  const handleTokenSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedToken = tokenDraft.trim();
-    if (!trimmedToken) {
-      setTokenError('Enter a token before saving.');
-      return;
-    }
-
-    props.onTokenSave(trimmedToken);
-    handleTokenDialogOpenChange(false);
-  };
-
   return (
     <>
       <Dialog
@@ -318,23 +232,7 @@ export function LdacaImportDialog(props: LdacaImportDialogProps) {
       >
         <DialogContent className="flex max-h-[88vh] max-w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-3xl">
           <div className="flex flex-col gap-1.5 pr-8">
-            <div className="flex items-start justify-between gap-2">
-              <DialogTitle>Import from LDaCA</DialogTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={handleLdacaTokenClick}
-              >
-                {props.hasToken ? (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                ) : (
-                  <KeyRound className="mr-2 h-4 w-4" />
-                )}
-                {props.hasToken ? 'Delete Token' : 'Add Your Own Token'}
-              </Button>
-            </div>
+            <DialogTitle>Import from LDaCA</DialogTitle>
             <DialogDescription>
               Search the{' '}
               <a
@@ -496,52 +394,6 @@ export function LdacaImportDialog(props: LdacaImportDialogProps) {
               Close
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={tokenDialogOpen} onOpenChange={handleTokenDialogOpenChange}>
-        <DialogContent>
-          <form onSubmit={handleTokenSubmit} className="space-y-4">
-            <DialogHeader>
-              <DialogTitle>Add LDaCA Token</DialogTitle>
-              <DialogDescription>
-                Save a LDaCA Data Portal token for staff picks, search, and imports.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="ldaca-token">Token key</Label>
-              <Input
-                id="ldaca-token"
-                type="password"
-                autoComplete="off"
-                value={tokenDraft}
-                onChange={(event) => {
-                  setTokenDraft(event.target.value);
-                  if (tokenError) setTokenError(undefined);
-                }}
-                aria-invalid={Boolean(tokenError)}
-                aria-describedby={tokenError ? 'ldaca-token-error' : undefined}
-                placeholder="Paste token key"
-              />
-              {tokenError ? (
-                <p id="ldaca-token-error" className="text-destructive text-sm" role="alert">
-                  {tokenError}
-                </p>
-              ) : null}
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  handleTokenDialogOpenChange(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Save Token</Button>
-            </DialogFooter>
-          </form>
         </DialogContent>
       </Dialog>
     </>

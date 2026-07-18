@@ -1,17 +1,17 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { importLdacaDataset, listLdacaFeaturedCollections, searchLdacaCollections } from '@/api';
-import type { OniSearchResult as LdacaSearchResult } from '@/api';
+import { listFeaturedDataPortalCollections, searchDataPortal, submitDataPortalImport } from '@/api';
+import type { DataPortalRecord } from '@/api';
 import { useLdacaImport } from '../useLdacaImport';
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  listLdacaFeaturedCollections: vi.fn(),
-  searchLdacaCollections: vi.fn(),
-  importLdacaDataset: vi.fn(),
+  listFeaturedDataPortalCollections: vi.fn(),
+  searchDataPortal: vi.fn(),
+  submitDataPortalImport: vi.fn(),
 }));
 
-const cooeeRecord: LdacaSearchResult = {
+const record: DataPortalRecord = {
   id: 'arcp://name,hdl10.26180~23961609',
   crate_id: 'arcp://name,hdl10.26180~23961609',
   title: 'A COrpus of Oz Early English (COOEE)',
@@ -21,102 +21,68 @@ const cooeeRecord: LdacaSearchResult = {
   importable: true,
   collections: ['arcp://name,hdl10.26180~23961609'],
   file_formats: ['text/plain'],
-  stats: { documents: 600 },
+};
+
+const importResource = {
+  id: 'import-1',
+  state: 'queued' as const,
+  request: { kind: 'data_portal' as const, identifier: record.id },
+  progress: { fraction: 0, message: 'Queued' },
+  error: null,
+  cancellation_requested_at: null,
+  created_at: '2026-01-01T00:00:00Z',
+  started_at: null,
+  finished_at: null,
+  revision: 1,
+  result: null,
 };
 
 describe('useLdacaImport', () => {
-  const ldacaApiToken = 'ldaca-secret-token';
   const notify = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(listLdacaFeaturedCollections).mockResolvedValue({
-      data: {
-        state: 'successful',
-        data: [cooeeRecord],
-        message: 'loaded',
-      },
+    vi.mocked(listFeaturedDataPortalCollections).mockResolvedValue({
+      data: { items: [record], page: 1, page_size: 20, total: 1 },
       error: undefined,
     });
-    vi.mocked(searchLdacaCollections).mockResolvedValue({
-      data: {
-        state: 'successful',
-        data: [cooeeRecord],
-        message: 'searched',
-      },
+    vi.mocked(searchDataPortal).mockResolvedValue({
+      data: { items: [record], page: 1, page_size: 25, total: 1 },
       error: undefined,
     });
-    vi.mocked(importLdacaDataset).mockResolvedValue({
-      data: {
-        state: 'running',
-        message: 'LDaCA import started',
-        metadata: { task_id: 'task-1' },
-      },
-      error: undefined,
-    });
+    vi.mocked(submitDataPortalImport).mockResolvedValue({ data: importResource, error: undefined });
   });
 
-  it('loads staff picks when the dialog opens', async () => {
-    const { result } = renderHook(() => useLdacaImport({ ldacaApiToken, notify }));
-
-    act(() => {
-      result.current.setLdacaImportOpen(true);
-    });
-
-    await waitFor(() => {
-      expect(result.current.featuredRecords).toEqual([cooeeRecord]);
-    });
-    expect(listLdacaFeaturedCollections).toHaveBeenCalledWith({
-      headers: { 'X-LDACA-API-Token': ldacaApiToken },
-      throwOnError: true,
-    });
+  it('loads featured records through the canonical endpoint', async () => {
+    const { result } = renderHook(() => useLdacaImport({ notify }));
+    act(() => result.current.setLdacaImportOpen(true));
+    await waitFor(() => expect(result.current.featuredRecords).toEqual([record]));
+    expect(listFeaturedDataPortalCollections).toHaveBeenCalledWith({ throwOnError: true });
   });
 
-  it('searches with the selected method and query', async () => {
-    const { result } = renderHook(() => useLdacaImport({ ldacaApiToken, notify }));
-
+  it('searches with one-based pagination and the selected method', async () => {
+    const { result } = renderHook(() => useLdacaImport({ notify }));
     act(() => {
       result.current.setSearchMethod('identifier');
-      result.current.setSearchQuery(
-        'https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609',
-      );
+      result.current.setSearchQuery(record.id);
     });
-    await act(async () => {
-      await result.current.handleLdacaSearch();
-    });
-
-    expect(searchLdacaCollections).toHaveBeenCalledWith({
-      body: {
-        method: 'identifier',
-        query: 'https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609',
-        limit: 25,
-        offset: 0,
-      },
-      headers: { 'X-LDACA-API-Token': ldacaApiToken },
+    await act(async () => result.current.handleLdacaSearch());
+    expect(searchDataPortal).toHaveBeenCalledWith({
+      body: { method: 'identifier', query: record.id, page: 1, page_size: 25 },
       throwOnError: true,
     });
-    expect(result.current.searchResults).toEqual([cooeeRecord]);
-    expect(result.current.hasSearched).toBe(true);
+    expect(result.current.searchResults).toEqual([record]);
   });
 
-  it('imports the chosen record id and closes the dialog', async () => {
-    const { result } = renderHook(() => useLdacaImport({ ldacaApiToken, notify }));
-
-    act(() => {
-      result.current.setLdacaImportOpen(true);
-    });
-    await act(async () => {
-      await result.current.handleLdacaImport(cooeeRecord.id);
-    });
-
-    expect(importLdacaDataset).toHaveBeenCalledWith({
-      body: { url: cooeeRecord.id },
-      headers: { 'X-LDACA-API-Token': ldacaApiToken },
+  it('submits the selected identifier and closes the dialog', async () => {
+    const { result } = renderHook(() => useLdacaImport({ notify }));
+    act(() => result.current.setLdacaImportOpen(true));
+    await act(async () => result.current.handleLdacaImport(record.id));
+    expect(submitDataPortalImport).toHaveBeenCalledWith({
+      body: { identifier: record.id },
       throwOnError: true,
     });
-    expect(notify).toHaveBeenCalledWith('success', 'LDaCA import started');
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith('success', 'LDaCA import queued.');
     expect(result.current.ldacaImportOpen).toBe(false);
-    expect(result.current.hasSearched).toBe(false);
   });
 });

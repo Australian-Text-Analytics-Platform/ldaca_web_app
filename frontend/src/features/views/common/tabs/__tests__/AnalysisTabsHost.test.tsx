@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AnalysisTab } from '@/api';
-import { usePreferencesStore } from '@/stores/preferencesStore';
 import { AnalysisTabsHost, type AnalysisTabFeatureProps } from '../AnalysisTabsHost';
 import type { UseWorkspaceTabsResult } from '../useWorkspaceTabs';
 
@@ -10,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
   useAuth: vi.fn(),
   useWorkspaceTabs: vi.fn(),
+  multiTabEnabled: false,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
@@ -22,6 +22,12 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
 
 vi.mock('../useWorkspaceTabs', () => ({
   useWorkspaceTabs: mocks.useWorkspaceTabs,
+}));
+
+vi.mock('@/features/preferences/useUserPreferences', () => ({
+  useUserPreferences: () => ({
+    preferences: { analysis_multi_tab_enabled: mocks.multiTabEnabled },
+  }),
 }));
 
 const tab: AnalysisTab = {
@@ -98,21 +104,15 @@ function FeatureCommands({ host }: AnalysisTabFeatureProps) {
   );
 }
 
-type PreferenceTestState = Partial<ReturnType<typeof usePreferencesStore.getState>> & {
-  analysisMultiTabEnabled: boolean;
-};
-
 function setMultiTabPreference(enabled: boolean) {
-  usePreferencesStore.setState({
-    analysisMultiTabEnabled: enabled,
-  } as PreferenceTestState);
+  mocks.multiTabEnabled = enabled;
 }
 
 describe('AnalysisTabsHost', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1' });
-    mocks.useAuth.mockReturnValue({ getAuthHeaders: () => ({}) });
+    mocks.useAuth.mockReturnValue({});
     setMultiTabPreference(false);
   });
 
