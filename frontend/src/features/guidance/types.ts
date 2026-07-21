@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import type { StepTarget } from 'react-joyride';
+import type { Step, StepTarget } from 'react-joyride';
 
 export interface ContextualHintDefinition {
   id: string;
   version: number;
   target: StepTarget;
+  placement?: Step['placement'];
   title?: ReactNode;
   content: ReactNode;
 }
