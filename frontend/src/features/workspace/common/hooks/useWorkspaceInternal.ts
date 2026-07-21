@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceCore } from './useWorkspaceCore';
 import { useWorkspaceQueries } from './useWorkspaceQueries';
 import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
+import { useDevicePreferencesStore } from '@/stores/preferencesStore';
 
 /**
  * Orchestrates core state, queries, and mutations into the single internal
@@ -14,6 +15,8 @@ import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
 export const useWorkspaceInternal = () => {
   const core = useWorkspaceCore();
   const queryClient = useQueryClient();
+  const lastWorkspaceId = useDevicePreferencesStore((state) => state.lastWorkspaceId);
+  const setLastWorkspaceId = useDevicePreferencesStore((state) => state.setLastWorkspaceId);
 
   const {
     isAuthenticated,
@@ -40,8 +43,6 @@ export const useWorkspaceInternal = () => {
     selectedNode,
     selectedNodes,
     queryLoadingState,
-    currentWorkspaceIdFromQuery,
-    currentWorkspaceQueryError,
   } = useWorkspaceQueries({
     isAuthenticated,
     currentWorkspaceId,
@@ -49,37 +50,25 @@ export const useWorkspaceInternal = () => {
     selectedNodeIds,
   });
 
-  // The `current.get` server query is treated as a one-shot bootstrap that
-  // hydrates the selectionStore. After the first hydration
-  // (or first error after authentication), `setCurrentWorkspace` mutations
-  // are the only writer — without this guard, every refetch of the
-  // currentWorkspace query would otherwise revert local state back to the
-  // server's stale value during the brief window before the post-mutation
-  // invalidate lands.
-  const hasBootstrappedRef = useRef(false);
   useEffect(() => {
     if (!isAuthenticated) {
-      hasBootstrappedRef.current = false;
       if (currentWorkspaceId !== null) setCurrentWorkspaceId(null);
       return;
     }
-    if (hasBootstrappedRef.current) return;
-
-    if (currentWorkspaceIdFromQuery !== undefined) {
-      hasBootstrappedRef.current = true;
-      if (currentWorkspaceId !== currentWorkspaceIdFromQuery) {
-        setCurrentWorkspaceId(currentWorkspaceIdFromQuery);
+    if (currentWorkspaceId === null && lastWorkspaceId) {
+      if (workspaces.some((workspace) => workspace.id === lastWorkspaceId)) {
+        setCurrentWorkspaceId(lastWorkspaceId);
+      } else {
+        setLastWorkspaceId(null);
       }
-    } else if (currentWorkspaceQueryError) {
-      hasBootstrappedRef.current = true;
-      if (currentWorkspaceId !== null) setCurrentWorkspaceId(null);
     }
   }, [
     currentWorkspaceId,
-    currentWorkspaceIdFromQuery,
-    currentWorkspaceQueryError,
     isAuthenticated,
+    lastWorkspaceId,
     setCurrentWorkspaceId,
+    setLastWorkspaceId,
+    workspaces,
   ]);
 
   const { actions: nodeActions } = useWorkspaceNodeMutations({

@@ -27,6 +27,7 @@ describe('useColumnMutations', () => {
       useColumnMutations({
         workspaceId: 'workspace-1',
         nodeId: 'node-1',
+        columns: ['published_at'],
         columnKinds: { published_at: 'string' },
         onCast,
         onRefreshSchema,
@@ -63,6 +64,7 @@ describe('useColumnMutations', () => {
       useColumnMutations({
         workspaceId: 'workspace-1',
         nodeId: 'node-1',
+        columns: ['published_at'],
         columnKinds: { published_at: 'string' },
         onCast,
       }),
@@ -78,5 +80,40 @@ describe('useColumnMutations', () => {
       );
       expect(result.current.loadingCast).toEqual({});
     });
+  });
+
+  it('renames and deletes columns through the edit callbacks', async () => {
+    const onRenameColumn = vi.fn().mockResolvedValue(undefined);
+    const onDeleteColumn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useColumnMutations({
+        workspaceId: 'workspace-1',
+        nodeId: 'node-1',
+        columns: ['title', 'count'],
+        columnKinds: { title: 'string', count: 'integer' },
+        onRenameColumn,
+        onDeleteColumn,
+      }),
+    );
+
+    act(() => {
+      result.current.startRename('title');
+    });
+    await act(async () => {
+      await result.current.submitRename('title', 'heading');
+    });
+    expect(onRenameColumn).toHaveBeenCalledWith('title', 'heading');
+    expect(result.current.renamingColumn).toBeNull();
+
+    act(() => {
+      result.current.requestDeleteColumn('count');
+    });
+    expect(result.current.deleteColumnDialogOpen).toBe(true);
+    await act(async () => {
+      await result.current.confirmDeleteColumn();
+    });
+    expect(onDeleteColumn).toHaveBeenCalledWith('count');
+    expect(result.current.deleteColumnDialogOpen).toBe(false);
+    expect(result.current.columnTypes).not.toHaveProperty('count');
   });
 });

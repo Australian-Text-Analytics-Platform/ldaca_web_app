@@ -17,7 +17,7 @@ describe('deriveSliceFormModel', () => {
       offsetInput: '5',
       lengthInput: '10',
       sampleSizeInput: '',
-      randomSeedInput: '42',
+      randomSeedInput: '0',
       noRandomSeed: false,
     });
 
@@ -35,7 +35,7 @@ describe('deriveSliceFormModel', () => {
       offsetInput: '5',
       lengthInput: '',
       sampleSizeInput: '',
-      randomSeedInput: '42',
+      randomSeedInput: '0',
       noRandomSeed: false,
     });
 
@@ -70,7 +70,7 @@ describe('deriveSliceFormModel', () => {
       offsetInput: '0',
       lengthInput: '',
       sampleSizeInput: '25.5',
-      randomSeedInput: '42',
+      randomSeedInput: '0',
       noRandomSeed: false,
     });
 

@@ -74,7 +74,7 @@ const nodeData = (
 });
 
 describe('CustomNode', () => {
-  it('removes the save action from the node menu', async () => {
+  it('shows Undo and Redo from backend history flags without restoring Save', async () => {
     mockZoom = 1;
     const user = userEvent.setup();
     const props = {
@@ -104,8 +104,10 @@ describe('CustomNode', () => {
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clone' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Redo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(props.data.onUndo).toHaveBeenCalledWith('node-1');
   });
 
   it('paints a left color accent on the card when the node has a color', () => {

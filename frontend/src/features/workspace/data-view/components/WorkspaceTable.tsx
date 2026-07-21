@@ -15,6 +15,16 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -49,6 +59,8 @@ export interface WorkspaceTableProps {
   nodeId?: string;
   documentColumn?: string;
   onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
+  onRenameColumn?: (column: string, nextName: string) => Promise<void>;
+  onDeleteColumn?: (column: string) => Promise<void>;
   onRefreshSchema?: () => Promise<unknown>;
 
   /** Server-side pagination info (1-indexed page from backend). */
@@ -80,6 +92,8 @@ export function WorkspaceTable({
   nodeId,
   documentColumn,
   onCast,
+  onRenameColumn,
+  onDeleteColumn,
   onRefreshSchema,
   pagination,
   rowCount,
@@ -107,18 +121,31 @@ export function WorkspaceTable({
   const mutations = useColumnMutations({
     workspaceId,
     nodeId,
+    columns: backendColumns,
     columnKinds,
     onCast,
+    onRenameColumn,
+    onDeleteColumn,
     onRefreshSchema,
   });
 
   const {
     columnTypes,
     loadingCast,
+    columnActionLoading,
+    renamingColumn,
     datetimeModal,
     closeDatetimeModal,
     handleDatetimeFormatConfirm,
+    deleteColumnDialogOpen,
+    setDeleteColumnDialogOpen,
+    columnToDelete,
+    requestDeleteColumn,
+    confirmDeleteColumn,
     handleTypeChange,
+    startRename,
+    cancelRename,
+    submitRename,
   } = mutations;
 
   const columns = useMemo(() => {
@@ -173,7 +200,8 @@ export function WorkspaceTable({
   const columnDefs: ColumnDef<DataRow>[] = columns.map((column) => {
     const currentType = columnTypes[column] ?? 'unknown';
     const isColumnLoading = Boolean(loadingCast[column]);
-    const isColumnBusy = isColumnLoading;
+    const isColumnMutating = Boolean(columnActionLoading[column]);
+    const isColumnBusy = isColumnLoading || isColumnMutating;
     const displayLabel = getTypeDisplayName(currentType);
     const availableTypes = [
       { value: currentType, label: displayLabel },
@@ -219,7 +247,10 @@ export function WorkspaceTable({
           displayLabel={displayLabel}
           availableTypes={availableTypes}
           isColumnBusy={isColumnBusy}
+          isRenaming={renamingColumn === column}
           canCast={Boolean(onCast)}
+          canRename={Boolean(onRenameColumn)}
+          canDelete={Boolean(onDeleteColumn)}
           isWideColumn={isWideColumn}
           isCollapsedColumn={isCollapsedColumn}
           onToggleExpand={onToggleExpand}
@@ -227,8 +258,16 @@ export function WorkspaceTable({
           onSort={() => {
             handleSort(column);
           }}
+          onStartRename={() => {
+            startRename(column);
+          }}
+          onSubmitRename={submitRename}
+          onCancelRename={cancelRename}
           onTypeChange={(newType) => {
             handleTypeChange(column, newType);
+          }}
+          onRequestDelete={() => {
+            requestDeleteColumn(column);
           }}
         />
       ),
@@ -368,7 +407,7 @@ export function WorkspaceTable({
   return (
     <>
       <div className="flex h-full w-full flex-col min-h-0">
-        <ScrollArea type="always" scrollbars="both" className="flex-1 bg-white">
+        <ScrollArea scrollbars="both" className="flex-1 bg-white">
           <Table disableContainer className="w-max table-auto">
             <TableHeader className="sticky top-0 z-20 bg-muted">
               {tableInstance.getHeaderGroups().map((hg) => (
@@ -500,6 +539,29 @@ export function WorkspaceTable({
           })
           .filter(Boolean)}
       />
+
+      <AlertDialog open={deleteColumnDialogOpen} onOpenChange={setDeleteColumnDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete column</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete column &quot;{columnToDelete}&quot; from this Data Block? You can undo this
+              while the Workspace remains open.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                void confirmDeleteColumn();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <RowDetailPanel open={detailOpen} onOpenChange={setDetailOpen} payload={detailPayload} />
     </>

@@ -48,7 +48,7 @@ const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string 
  * visual-builder modes, and keep table/apply controls tied to hook state.
  */
 function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
-  const { isLoading } = props;
+  const { applyMode, isLoading } = props;
   const { renderNodeInputsPanel } = props;
   const { activeNode, expression, basicBuilder, preview, apply, dropZoneRef } =
     useAggregateSubTab(props);
@@ -340,10 +340,12 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
               {apply.loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding…
+                  {applyMode === 'create' ? 'Creating Data Block…' : 'Updating Data Block…'}
                 </>
+              ) : applyMode === 'create' ? (
+                'Create Data Block'
               ) : (
-                'Add to Data Block'
+                'Update Data Block'
               )}
             </Button>
           </DisabledReasonTooltip>

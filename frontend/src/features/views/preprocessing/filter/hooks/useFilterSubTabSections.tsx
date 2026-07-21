@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { getNodeRowsTable } from '@/api';
+import { queryWorkspaceSqlTable, sqlIdentifier, sqlTable } from '@/api';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { getOperatorsForType } from '../../utils/typeUtils';
@@ -22,13 +22,19 @@ import type {
   PreviewPagination,
   PreviewRow,
 } from '../../types';
+import type { PreprocessingApplyMode } from '../../preprocessingApplyMode';
 
 export interface FilterSubTabProps {
   selectedNodeId: string | null;
   selectedNode: WorkspaceNodeMetadata | null;
   columnOptions: ConditionColumnOption[];
   currentWorkspaceId: string | null;
-  filterNode: (nodeId: string, request: FilterRequest) => Promise<void>;
+  applyMode: PreprocessingApplyMode;
+  filterNode: (
+    nodeId: string,
+    request: FilterRequest,
+    mode: PreprocessingApplyMode,
+  ) => Promise<unknown>;
   filterPreview: OperationPreviewFetcher<FilterRequest>;
   isLoading: {
     operations: boolean;
@@ -90,25 +96,22 @@ export interface UseFilterSubTabSectionsResult {
 }
 
 async function sampleColumnBounds(workspaceId: string, nodeId: string, column: string) {
-  const data = await getNodeRowsTable({
-    path: { workspace_id: workspaceId, node_id: nodeId },
-    query: { page: 1, page_size: 1000 },
+  const identifier = sqlIdentifier(column);
+  const data = await queryWorkspaceSqlTable({
+    path: { workspace_id: workspaceId },
+    body: {
+      mode: 'query',
+      node_ids: [nodeId],
+      sql: `SELECT MIN(${identifier}) AS minimum, MAX(${identifier}) AS maximum, MEDIAN(${identifier}) AS median FROM ${sqlTable(nodeId)}`,
+      page: 1,
+      page_size: 1,
+    },
   });
-  const values = data.rows
-    .map((row) => row[column])
-    .filter(
-      (value): value is string | number => typeof value === 'string' || typeof value === 'number',
-    );
-  if (values.length === 0) return { min: undefined, max: undefined, median: undefined };
-  const sorted = [...values].sort((left, right) =>
-    typeof left === 'number' && typeof right === 'number'
-      ? left - right
-      : String(left).localeCompare(String(right)),
-  );
+  const row = data.rows[0];
   return {
-    min: sorted[0],
-    max: sorted.at(-1),
-    median: sorted[Math.floor(sorted.length / 2)],
+    min: row?.minimum as string | number | undefined,
+    max: row?.maximum as string | number | undefined,
+    median: row?.median as string | number | undefined,
   };
 }
 
@@ -129,6 +132,7 @@ export const useFilterSubTabSections = (
     selectedNode,
     columnOptions,
     currentWorkspaceId,
+    applyMode,
     filterNode,
     filterPreview,
     isLoading,
@@ -156,6 +160,7 @@ export const useFilterSubTabSections = (
     optionSearchQueries,
     getCategoricalKey,
     ensureCategoricalOptions,
+    loadMoreCategoricalOptions,
     setOptionSearchQuery,
     resetOptionSearchQuery,
     removeOptionSearchQuery,
@@ -163,6 +168,7 @@ export const useFilterSubTabSections = (
     currentWorkspaceId,
     selectedNodeId,
     conditions,
+    columnOptions,
   });
 
   const availableColumns = columnOptions
@@ -476,6 +482,7 @@ export const useFilterSubTabSections = (
       optionSearchQueries={optionSearchQueries}
       getCategoricalKey={getCategoricalKey}
       ensureCategoricalOptions={ensureCategoricalOptions}
+      loadMoreCategoricalOptions={loadMoreCategoricalOptions}
       onOptionSearchQueryChange={setOptionSearchQuery}
       onConditionChange={handleConditionChange}
     />
@@ -506,7 +513,7 @@ export const useFilterSubTabSections = (
 
     try {
       setIsFiltering(true);
-      await filterNode(selectedNodeId, request);
+      await filterNode(selectedNodeId, request, applyMode);
     } catch (error) {
       onAlert(`Error applying filter: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {

@@ -44,4 +44,26 @@ describe('columnMutationReducer', () => {
       targetType: '',
     });
   });
+
+  it('tracks rename and delete workflows independently from casts', () => {
+    const renaming = columnMutationReducer(createColumnMutationState(), {
+      type: 'renameStarted',
+      column: 'title',
+    });
+    expect(renaming.renamingColumn).toBe('title');
+
+    const deleting = columnMutationReducer(renaming, {
+      type: 'deleteRequested',
+      column: 'count',
+    });
+    expect(deleting.columnToDelete).toBe('count');
+
+    const busy = columnMutationReducer(deleting, {
+      type: 'columnActionLoadingChanged',
+      column: 'count',
+      active: true,
+    });
+    expect(busy.columnActionLoading).toEqual({ count: true });
+    expect(busy.loadingCast).toEqual({});
+  });
 });

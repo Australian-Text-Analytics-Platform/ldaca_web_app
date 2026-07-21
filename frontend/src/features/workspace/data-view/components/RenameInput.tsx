@@ -10,23 +10,15 @@ interface RenameInputProps {
 }
 
 /**
- * Inline text input shown when the user picks "Rename" on a workspace-table
- * column. Auto-focuses + selects on mount, commits on blur or Enter, and
- * cancels on Escape.
- * Rendered by: WorkspaceColumnHeader component.
- * Why: because column headers need inline rename editing without embedding form state in the full table component.
- * Flow: initialize the draft from the column, autofocus the input, then commit or cancel on blur and keys.
+ * Provides the inline editor opened from a column's settings menu.
  */
 export function RenameInput({ column, disabled, onSubmit, onCancel }: RenameInputProps) {
   const [draft, setDraft] = useState(column);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const el = inputRef.current;
-    if (el) {
-      el.focus();
-      el.select();
-    }
+    inputRef.current?.focus();
+    inputRef.current?.select();
   }, []);
 
   return (
@@ -34,17 +26,17 @@ export function RenameInput({ column, disabled, onSubmit, onCancel }: RenameInpu
       ref={inputRef}
       value={draft}
       disabled={disabled}
-      onChange={(e) => {
-        setDraft(e.target.value);
+      onChange={(event) => {
+        setDraft(event.target.value);
       }}
       onBlur={() => {
         if (!disabled) onSubmit(column, draft);
       }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
           if (!disabled) onSubmit(column, draft);
-        } else if (e.key === 'Escape') {
+        } else if (event.key === 'Escape') {
           onCancel();
         }
       }}

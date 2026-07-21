@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Redo2, Undo2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +8,8 @@ import type { WorkspaceDataTableHeaderInfo } from '../hooks/useWorkspaceDataTabl
 interface WorkspaceDataHeaderProps {
   info: WorkspaceDataTableHeaderInfo;
   onRename?: (newName: string) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 /**
@@ -75,7 +77,12 @@ function HeaderNodeLabel({ label }: { label: string }) {
  * with a leading fade, run inline rename, and expose icon-only actions beside
  * the table.
  */
-export const WorkspaceDataHeader = ({ info, onRename }: WorkspaceDataHeaderProps) => {
+export const WorkspaceDataHeader = ({
+  info,
+  onRename,
+  onUndo,
+  onRedo,
+}: WorkspaceDataHeaderProps) => {
   const [renameDraft, setRenameDraft] = useState<{ baseLabel: string; value: string }>();
   const inputRef = useRef<HTMLInputElement>(null);
   const isRenaming = renameDraft?.baseLabel === info.nodeLabel;
@@ -154,7 +161,30 @@ export const WorkspaceDataHeader = ({ info, onRename }: WorkspaceDataHeaderProps
           )}
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5" />
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs text-gray-600 enabled:hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={onUndo}
+            disabled={!info.canUndo}
+            aria-label="Undo Data Block edit"
+            title="Undo the last edit from this Workspace session"
+          >
+            <Undo2 className="h-3 w-3" />
+            Undo
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs text-gray-600 enabled:hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={onRedo}
+            disabled={!info.canRedo}
+            aria-label="Redo Data Block edit"
+            title="Redo the last undone edit from this Workspace session"
+          >
+            <Redo2 className="h-3 w-3" />
+            Redo
+          </button>
+        </div>
       </div>
     </div>
   );

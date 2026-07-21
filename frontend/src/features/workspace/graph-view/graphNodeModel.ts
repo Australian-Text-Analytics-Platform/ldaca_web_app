@@ -18,6 +18,6 @@ export const projectWorkspaceGraphNodeCard = (
   name: node.name,
   color: node.color ?? null,
   shape: [null, null],
-  canUndo: Boolean(node.can_undo),
-  canRedo: Boolean(node.can_redo),
+  canUndo: node.can_undo,
+  canRedo: node.can_redo,
 });

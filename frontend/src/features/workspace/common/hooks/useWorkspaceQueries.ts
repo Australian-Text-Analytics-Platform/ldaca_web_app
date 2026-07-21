@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getMyCurrentWorkspace, getWorkspaceGraphById, listWorkspaces } from '@/api';
+import { listNodes, listWorkspaces } from '@/api';
+import type { WorkspaceGraphResponse } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
-import type { WorkspaceGraphNode as GraphNode } from '@/api';
+import type { WorkspaceNodeInfo as GraphNode } from '@/api';
 
 interface WorkspaceQueriesParams {
   isAuthenticated: boolean;
@@ -41,21 +42,7 @@ export const useWorkspaceQueries = ({
     staleTime: 5 * 60 * 1000,
   });
 
-  const currentWorkspaceQuery = useQuery({
-    queryKey: queryKeys.currentWorkspace,
-    /**
-     * Restores the backend-selected workspace during authenticated startup.
-     * Why: startup needs one authenticated, cached source for the backend-selected workspace id.
-     */
-    queryFn: async () => {
-      const { data } = await getMyCurrentWorkspace({ throwOnError: true });
-      return data.id ?? null;
-    },
-    enabled: isAuthenticated,
-    staleTime: 60 * 1000,
-  });
-
-  const graphQuery = useQuery({
+  const nodesQuery = useQuery({
     queryKey: currentWorkspaceId
       ? queryKeys.workspaceGraph(currentWorkspaceId)
       : ['workspaces', 'graph'],
@@ -65,11 +52,18 @@ export const useWorkspaceQueries = ({
      */
     queryFn: async () => {
       if (!currentWorkspaceId) throw new Error('Missing workspace ID');
-      const { data } = await getWorkspaceGraphById({
+      const { data } = await listNodes({
         path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
-      return data;
+      const edges = data.flatMap((node) =>
+        (node.child_ids ?? []).map((childId) => ({
+          id: `${node.id}:${childId}`,
+          source: node.id,
+          target: childId,
+        })),
+      );
+      return { nodes: data, edges } satisfies WorkspaceGraphResponse;
     },
     enabled: isAuthenticated && !!currentWorkspaceId,
     refetchOnWindowFocus: false,
@@ -79,7 +73,7 @@ export const useWorkspaceQueries = ({
   const workspaces = workspacesQuery.data ?? [];
   const currentWorkspace =
     workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null;
-  const workspaceGraph = graphQuery.data ?? null;
+  const workspaceGraph = nodesQuery.data ?? null;
 
   const nodes = workspaceGraph?.nodes ?? [];
   const selectedNode = nodes.find((node) => node.id === activeNodeId) ?? null;
@@ -91,11 +85,11 @@ export const useWorkspaceQueries = ({
   const queryLoadingState = useMemo(
     () => ({
       workspaces: workspacesQuery.isLoading,
-      currentWorkspace: currentWorkspaceQuery.isLoading,
-      nodes: graphQuery.isLoading,
-      graph: graphQuery.isLoading,
+      currentWorkspace: workspacesQuery.isLoading,
+      nodes: nodesQuery.isLoading,
+      graph: nodesQuery.isLoading,
     }),
-    [workspacesQuery.isLoading, currentWorkspaceQuery.isLoading, graphQuery.isLoading],
+    [workspacesQuery.isLoading, nodesQuery.isLoading],
   );
 
   return {
@@ -106,7 +100,7 @@ export const useWorkspaceQueries = ({
     selectedNode,
     selectedNodes,
     queryLoadingState,
-    currentWorkspaceIdFromQuery: currentWorkspaceQuery.data,
-    currentWorkspaceQueryError: currentWorkspaceQuery.isError,
+    currentWorkspaceIdFromQuery: currentWorkspaceId,
+    currentWorkspaceQueryError: false,
   } as const;
 };

@@ -37,7 +37,9 @@ export interface ServerPaginationFooterProps<TData> {
   /** Current page size (real changing value from the consumer). */
   pageSize: number;
   /** Total row count used to derive the page count (documents, for analysis tables). */
-  rowCount: number;
+  rowCount?: number;
+  /** Lookahead result for transports that deliberately do not calculate totals. */
+  hasNext?: boolean;
   /** Options shown in the page-size dropdown. */
   pageSizeOptions?: number[];
   /**
@@ -90,6 +92,7 @@ export function ServerPaginationFooter<TData>({
   pageIndex,
   pageSize,
   rowCount,
+  hasNext,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   showPageSize = true,
   pageSizeLabel = 'Rows per page',
@@ -101,7 +104,12 @@ export function ServerPaginationFooter<TData>({
 }: ServerPaginationFooterProps<TData>) {
   // Derived from real props (not `table.getState()`) so the component re-renders
   // when the consumer's controlled pagination advances.
-  const pageCount = pageSize > 0 ? Math.ceil(rowCount / pageSize) : 0;
+  const pageCount =
+    hasNext === undefined
+      ? pageSize > 0
+        ? Math.ceil((rowCount ?? 0) / pageSize)
+        : 0
+      : pageIndex + 1 + (hasNext ? 1 : 0);
 
   if (compact && pageCount <= 0) return null;
 

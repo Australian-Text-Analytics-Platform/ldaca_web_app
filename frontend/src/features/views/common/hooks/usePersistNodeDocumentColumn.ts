@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { setNodeDocumentColumn, setNodeTokenizationPreference } from '@/api';
+import { updateNode } from '@/api';
 import type { WorkspaceGraphNode, WorkspaceGraphResponse, WorkspaceNodeInfo } from '@/api';
 import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { queryKeys } from '@/lib/queryKeys';
@@ -13,17 +13,16 @@ import { queryKeys } from '@/lib/queryKeys';
  * repopulated with schema, shape, tokenizer, or dtype metadata after a
  * preference write.
  */
-function toGraphNodeSummary(nodeInfo: WorkspaceNodeInfo): WorkspaceGraphNode {
+function toGraphNodeSummary(
+  nodeInfo: WorkspaceNodeInfo,
+): Pick<WorkspaceGraphNode, 'id' | 'name' | 'parent_ids' | 'child_ids' | 'document' | 'color'> {
   return {
     id: nodeInfo.id,
     name: nodeInfo.name,
-    operation: nodeInfo.operation,
     parent_ids: nodeInfo.parent_ids,
     child_ids: nodeInfo.child_ids,
     document: nodeInfo.document,
     color: nodeInfo.color,
-    can_undo: nodeInfo.can_undo,
-    can_redo: nodeInfo.can_redo,
   };
 }
 
@@ -51,7 +50,7 @@ function updateWorkspaceNodeInfoCache(
       return {
         ...previous,
         nodes: previous.nodes.map((node) =>
-          node.id === nodeInfo.id ? toGraphNodeSummary(nodeInfo) : node,
+          node.id === nodeInfo.id ? { ...node, ...toGraphNodeSummary(nodeInfo) } : node,
         ),
       };
     },
@@ -77,54 +76,15 @@ export function usePersistNodeDocumentColumn({
     async (nodeId: string, column: string) => {
       if (!workspaceId) return null;
       try {
-        const { data } = await setNodeDocumentColumn({
+        const { data } = await updateNode({
           path: { workspace_id: workspaceId, node_id: nodeId },
-          body: { document_column: column.trim() || null },
+          body: { document: column.trim() || null },
           throwOnError: true,
         });
         updateWorkspaceNodeInfoCache(queryClient, workspaceId, data);
         return data;
       } catch {
         toast.error('Could not save the document column for this data block.');
-        return null;
-      }
-    },
-    [queryClient, workspaceId],
-  );
-}
-
-/**
- * Returns the mutation used by tokenizer selectors to persist per-column model
- * preferences that later analyses use when choosing tokenized columns.
- * Used by: token model selectors in analysis parameter panels.
- * Flow: normalize the selected model/language, persist the preference, project
- * the returned metadata into node-info/graph caches, and toast on failure.
- */
-export function usePersistNodeTokenizationPreference({
-  workspaceId,
-}: {
-  workspaceId: string | null | undefined;
-}) {
-  const queryClient = useQueryClient();
-
-  return useCallback(
-    async (nodeId: string, column: string, model: string, language: string | null) => {
-      if (!workspaceId) return null;
-      try {
-        const trimmedModel = model.trim();
-        const { data } = await setNodeTokenizationPreference({
-          path: { workspace_id: workspaceId, node_id: nodeId },
-          body: {
-            source_column: column,
-            model: trimmedModel || null,
-            language: trimmedModel ? language : null,
-          },
-          throwOnError: true,
-        });
-        updateWorkspaceNodeInfoCache(queryClient, workspaceId, data);
-        return data;
-      } catch {
-        toast.error('Could not save the tokenizer model for this column.');
         return null;
       }
     },

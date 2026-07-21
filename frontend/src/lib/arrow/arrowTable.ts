@@ -27,7 +27,8 @@ export type ColumnKind =
   | 'float'
   | 'categorical'
   | 'structured'
-  | 'unknown';
+  | 'unknown'
+  | `extension:${string}`;
 
 export interface ArrowColumn {
   name: string;
@@ -44,6 +45,7 @@ export interface ArrowTableData {
 
 export interface ArrowTablePage extends ArrowTableData {
   hasNext: boolean;
+  etag: string | null;
 }
 
 const isStringType = (type: ArrowDataType): boolean =>
@@ -58,8 +60,11 @@ const listChild = (type: ArrowDataType): ArrowField | undefined => {
 
 /** Classify one decoded Arrow field for UI behavior without parsing dtype spellings. */
 export const columnKind = (field: ArrowField): ColumnKind => {
-  if (field.metadata.get(ARROW_EXTENSION_NAME) === TOPIC_DISTRIBUTION_EXTENSION) {
-    return 'topic-distribution';
+  const extensionName = field.metadata.get(ARROW_EXTENSION_NAME);
+  if (extensionName) {
+    return extensionName === TOPIC_DISTRIBUTION_EXTENSION
+      ? 'topic-distribution'
+      : `extension:${extensionName}`;
   }
 
   const type = field.type;
@@ -86,10 +91,13 @@ export const columnKind = (field: ArrowField): ColumnKind => {
   return 'unknown';
 };
 
-const normalizeArrowValue = (value: unknown): unknown => {
+const normalizeArrowValue = (value: unknown, type?: ArrowDataType): unknown => {
+  if (type && DataType.isTimestamp(type) && typeof value === 'number') {
+    return new Date(value).toISOString();
+  }
   if (typeof value === 'bigint') return value.toString();
   if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map(normalizeArrowValue);
+  if (Array.isArray(value)) return value.map((child) => normalizeArrowValue(child));
   if (value && typeof value === 'object' && 'toJSON' in value) {
     const toJSON = (value as { toJSON?: unknown }).toJSON;
     if (typeof toJSON === 'function') {
@@ -116,9 +124,14 @@ export const decodeArrowTable = async (source: Blob | ArrayBuffer): Promise<Arro
     const columns = schema.map((column) => column.name);
     const rows = table.toArray().map((row) => {
       const normalized = normalizeArrowValue(row);
-      return normalized && typeof normalized === 'object' && !Array.isArray(normalized)
-        ? (normalized as Record<string, unknown>)
-        : {};
+      if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) return {};
+      const record = normalized as Record<string, unknown>;
+      return Object.fromEntries(
+        schema.map((column) => [
+          column.name,
+          normalizeArrowValue(record[column.name], column.field.type),
+        ]),
+      );
     });
     return { table, columns, schema, rows };
   } catch (error) {
@@ -133,6 +146,7 @@ export const decodeArrowPage = async (
 ): Promise<ArrowTablePage> => ({
   ...(await decodeArrowTable(source)),
   hasNext: response.headers.get('X-Wordflow-Has-Next') === 'true',
+  etag: response.headers.get('ETag'),
 });
 
 export const fetchArrowTable = async (url: string): Promise<ArrowTableData> => {

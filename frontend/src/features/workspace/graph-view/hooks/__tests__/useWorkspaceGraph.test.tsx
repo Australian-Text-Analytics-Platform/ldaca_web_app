@@ -8,6 +8,8 @@ const useWorkspaceSelectionMock = vi.hoisted(() => vi.fn());
 const useWorkspaceStatusMock = vi.hoisted(() => vi.fn());
 const useWorkspaceActionsMock = vi.hoisted(() => vi.fn());
 const requestNodeInputAddMock = vi.hoisted(() => vi.fn());
+const undoNode = vi.fn();
+const redoNode = vi.fn();
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: useWorkspaceDataMock,
@@ -28,7 +30,9 @@ vi.mock('@/stores/nodeInputRequestsStore', () => ({
 }));
 vi.mock('../../services/graphLayout', () => ({
   computeDagreLayout: (nodes: { id: string }[]) =>
-    new Map(nodes.map((node, index) => [node.id, { x: index * 100, y: 50 }])),
+    new Map(
+      nodes.map((node, index) => [node.id, { x: 0, y: (nodes.length - index - 1) * 100 + 50 }]),
+    ),
 }));
 
 import { useWorkspaceGraph } from '../useWorkspaceGraph';
@@ -47,8 +51,22 @@ const makeGraph = (color: string, edgeLabel: string) => ({
   edges: [{ source: 'node-1', target: 'node-1', label: edgeLabel }],
 });
 
+const makeIndependentGraph = (nodeIds: string[]) => ({
+  nodes: nodeIds.map((id) => ({
+    id,
+    name: id,
+    color: null,
+    document: 'text',
+    can_undo: false,
+    can_redo: false,
+  })),
+  edges: [],
+});
+
 interface TestNodeData {
-  node: { color: string | null };
+  node: { color: string | null; canUndo: boolean; canRedo: boolean };
+  onUndo: (nodeId: string) => void;
+  onRedo: (nodeId: string) => void;
   onAddToSelection: (nodeId: string) => void;
 }
 
@@ -60,6 +78,8 @@ describe('useWorkspaceGraph', () => {
     });
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     requestNodeInputAddMock.mockReset();
+    undoNode.mockReset();
+    redoNode.mockReset();
     useFreshNodesStore.getState().reset();
     useSelectionStore.setState({ currentWorkspaceId: 'workspace-a' });
     useWorkspaceDataMock.mockReturnValue({
@@ -72,8 +92,8 @@ describe('useWorkspaceGraph', () => {
       deleteNode: vi.fn(),
       copyNode: vi.fn(),
       renameNode: vi.fn(),
-      undoNode: vi.fn(),
-      redoNode: vi.fn(),
+      undoNode,
+      redoNode,
       toggleNode: vi.fn(),
       toggleNodeSelection: vi.fn(),
       clearSelection: vi.fn(),
@@ -94,6 +114,20 @@ describe('useWorkspaceGraph', () => {
 
     expect((result.current.nodes[0]?.data as unknown as TestNodeData).node.color).toBe('#0000ff');
     expect(result.current.edges[0]?.label).toBe('second label');
+  });
+
+  it('projects history flags and routes graph history commands', () => {
+    const { result } = renderHook(() => useWorkspaceGraph());
+    const data = result.current.nodes[0]?.data as unknown as TestNodeData;
+
+    expect(data.node.canUndo).toBe(false);
+    expect(data.node.canRedo).toBe(true);
+    act(() => {
+      data.onUndo('node-1');
+      data.onRedo('node-1');
+    });
+    expect(undoNode).toHaveBeenCalledWith('node-1');
+    expect(redoNode).toHaveBeenCalledWith('node-1');
   });
 
   it('preserves a dragged position while refreshing node and edge presentation', () => {
@@ -122,6 +156,58 @@ describe('useWorkspaceGraph', () => {
     expect(result.current.nodes[0]?.dragging).toBe(true);
     expect((result.current.nodes[0]?.data as unknown as TestNodeData).node.color).toBe('#0000ff');
     expect(result.current.edges[0]?.label).toBe('second label');
+  });
+
+  it('re-applies the complete layout when a Data Block is added', () => {
+    useWorkspaceDataMock.mockReturnValue({
+      currentWorkspaceId: 'workspace-a',
+      workspaceGraph: makeIndependentGraph(['node-1']),
+    });
+    const { result, rerender } = renderHook(() => useWorkspaceGraph());
+
+    expect(result.current.nodes[0]?.position).toEqual({ x: 0, y: 50 });
+
+    useWorkspaceDataMock.mockReturnValue({
+      currentWorkspaceId: 'workspace-a',
+      workspaceGraph: makeIndependentGraph(['node-1', 'node-2']),
+    });
+    rerender();
+
+    expect(result.current.nodes.map((node) => node.position)).toEqual([
+      { x: 0, y: 150 },
+      { x: 0, y: 50 },
+    ]);
+  });
+
+  it('re-applies the complete layout when Data Block lineage changes', () => {
+    useWorkspaceDataMock.mockReturnValue({
+      currentWorkspaceId: 'workspace-a',
+      workspaceGraph: makeIndependentGraph(['node-1', 'node-2']),
+    });
+    const { result, rerender } = renderHook(() => useWorkspaceGraph());
+
+    act(() => {
+      result.current.handleNodesChange([
+        {
+          id: 'node-1',
+          type: 'position',
+          position: { x: 420, y: 315 },
+          dragging: true,
+        },
+      ]);
+    });
+
+    useWorkspaceDataMock.mockReturnValue({
+      currentWorkspaceId: 'workspace-a',
+      workspaceGraph: {
+        ...makeIndependentGraph(['node-1', 'node-2']),
+        edges: [{ source: 'node-1', target: 'node-2', label: 'derived' }],
+      },
+    });
+    rerender();
+
+    expect(result.current.nodes[0]?.position).toEqual({ x: 0, y: 150 });
+    expect(result.current.nodes[0]?.dragging).toBeUndefined();
   });
 
   it('resets React Flow-owned state when a new workspace reuses the same node id', () => {

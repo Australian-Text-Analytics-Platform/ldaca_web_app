@@ -123,7 +123,7 @@ function ExpressionListEditor({
  * expressions for preview, and apply column/sort/group operations through hook actions.
  */
 export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentProps) {
-  const { isLoading } = props;
+  const { applyMode, isLoading } = props;
   const { renderNodeInputsPanel } = props;
   const {
     effectiveNode,
@@ -391,24 +391,26 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
         </CardContent>
 
         <CardFooter className="flex items-center gap-3 border-t pt-4">
-          <div className="flex flex-1 items-center gap-2">
-            <Label htmlFor="polars-new-node-name" className="shrink-0">
-              New data block name
-            </Label>
-            <Input
-              id="polars-new-node-name"
-              className="min-w-0 flex-1"
-              placeholder={newNodeNamePlaceholder}
-              value={newNodeName}
-              onChange={(e) => {
-                setNewNodeName(e.target.value);
-              }}
-              onKeyDown={(event) => {
-                acceptPlaceholderOnTab({ event, value: newNodeName, setValue: setNewNodeName });
-              }}
-              disabled={!canApply}
-            />
-          </div>
+          {applyMode === 'create' && (
+            <div className="flex flex-1 items-center gap-2">
+              <Label htmlFor="polars-new-node-name" className="shrink-0">
+                New data block name
+              </Label>
+              <Input
+                id="polars-new-node-name"
+                className="min-w-0 flex-1"
+                placeholder={newNodeNamePlaceholder}
+                value={newNodeName}
+                onChange={(e) => {
+                  setNewNodeName(e.target.value);
+                }}
+                onKeyDown={(event) => {
+                  acceptPlaceholderOnTab({ event, value: newNodeName, setValue: setNewNodeName });
+                }}
+                disabled={!canApply}
+              />
+            </div>
+          )}
           <DisabledReasonTooltip reason={applyDisabledReason}>
             <Button
               size="sm"
@@ -421,12 +423,12 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               {isApplying ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding to Workspace…
+                  {applyMode === 'create' ? 'Creating Data Block…' : 'Updating Data Block…'}
                 </>
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace
+                  {applyMode === 'create' ? 'Create Data Block' : 'Update Data Block'}
                 </>
               )}
             </Button>

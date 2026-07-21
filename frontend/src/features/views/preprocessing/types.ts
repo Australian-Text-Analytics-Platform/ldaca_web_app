@@ -3,6 +3,7 @@
  */
 
 import type { FilterConditionInput, JsonDataInput } from '@/api';
+import type { ArrowField } from '@/lib/arrow/arrowTable';
 import type { Field } from 'apache-arrow';
 
 type FilterOperator =
@@ -59,6 +60,7 @@ export interface ConditionColumnOption {
   name: string;
   dataType: string;
   label?: string;
+  field?: ArrowField;
 }
 
 /**

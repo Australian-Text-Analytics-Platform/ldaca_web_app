@@ -27,8 +27,14 @@ import { ConcatSubTab } from './concat/ConcatSubTab';
 import { SliceSubTab } from './slice/SliceSubTab';
 import { AggregateSubTab } from './aggregate/AggregateSubTab';
 import { ReplaceSubTab } from './replace/ReplaceSubTab';
+import { PreprocessingApplyModeControl } from './components/PreprocessingApplyModeControl';
 import InfoIcon from '@/components/help/InfoIcon';
 import { MAX_CONCAT_NODES, MAX_JOIN_NODES } from './types';
+import {
+  CREATE_DATA_BLOCK_MODE,
+  EDITABLE_PREPROCESSING_TABS,
+  type PreprocessingApplyMode,
+} from './preprocessingApplyMode';
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
 
@@ -103,6 +109,31 @@ function DataPreprocessingFeature() {
   const selectedNodeColumns = Object.fromEntries(
     nodeInputs.resolvedNodes.map((node) => [node.id, node.column]),
   );
+  const applyModeScope = `${activeSubtab}:${selectedNodeId ?? ''}`;
+  const [applyModeState, setApplyModeState] = useState<{
+    scope: string;
+    value: PreprocessingApplyMode;
+  }>({
+    scope: applyModeScope,
+    value: CREATE_DATA_BLOCK_MODE,
+  });
+  const applyMode =
+    applyModeState.scope === applyModeScope ? applyModeState.value : CREATE_DATA_BLOCK_MODE;
+  const supportsUpdateMode = EDITABLE_PREPROCESSING_TABS.some((subtab) => subtab === activeSubtab);
+  const setApplyMode = (value: PreprocessingApplyMode) => {
+    setApplyModeState({ scope: applyModeScope, value });
+  };
+  const setSelectedJoinColumns = (columns: Record<string, string>) => {
+    if (!currentWorkspaceId) return;
+    setPersistedInputs(
+      currentWorkspaceId,
+      'join',
+      persistedInputs.map((input) => {
+        const column = columns[input.node_id];
+        return column === undefined ? input : { ...input, column };
+      }),
+    );
+  };
   const showInputColumnPicker = activeSubtab === 'find' || activeSubtab === 'join';
   const preprocessingColumnLabel = ({ nodeId }: NodeSelectionRenderArgs) => {
     if (activeSubtab === 'join') {
@@ -205,6 +236,10 @@ function DataPreprocessingFeature() {
           </TabsTrigger>
         </TabsList>
 
+        {supportsUpdateMode && (
+          <PreprocessingApplyModeControl value={applyMode} onChange={setApplyMode} />
+        )}
+
         <TabsContent value="filter" className="space-y-4">
           <FilterSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
@@ -216,6 +251,7 @@ function DataPreprocessingFeature() {
             filterPreview={filterPreview}
             isLoading={isLoading}
             onAlert={handleAlert}
+            applyMode={applyMode}
           />
         </TabsContent>
 
@@ -237,6 +273,7 @@ function DataPreprocessingFeature() {
             renderNodeInputsPanel={renderNodeInputsPanel}
             selectedNodeIds={selectedNodeIds}
             selectedNodeColumns={selectedNodeColumns}
+            setSelectedNodeColumns={setSelectedJoinColumns}
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
             getColumnInfos={nodeInputs.getColumnInfos}
@@ -272,6 +309,7 @@ function DataPreprocessingFeature() {
             replaceTextPreview={replaceTextPreview}
             replaceText={replaceText}
             refreshNodeSchema={refreshNodeSchema}
+            applyMode={applyMode}
           />
         </TabsContent>
 
@@ -286,6 +324,7 @@ function DataPreprocessingFeature() {
             polarsExpressionPreview={polarsExpressionPreview}
             polarsExpressionApply={polarsExpressionApply}
             refreshNodeSchema={refreshNodeSchema}
+            applyMode={applyMode}
           />
         </TabsContent>
 
@@ -300,6 +339,7 @@ function DataPreprocessingFeature() {
               polarsExpressionPreview={polarsExpressionPreview}
               polarsExpressionApply={polarsExpressionApply}
               refreshNodeSchema={refreshNodeSchema}
+              applyMode={applyMode}
             />
           </Suspense>
         </TabsContent>

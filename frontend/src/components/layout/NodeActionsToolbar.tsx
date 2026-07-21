@@ -24,8 +24,6 @@ import { Input } from '@/components/ui/input';
 interface NodeActionsToolbarNode {
   id: string;
   name: string;
-  canUndo?: boolean;
-  canRedo?: boolean;
 }
 
 export interface NodeActionsToolbarProps {
@@ -35,8 +33,6 @@ export interface NodeActionsToolbarProps {
   onAddToSelection: (nodeId: string) => void;
   onRename: (nodeId: string, newName: string) => void;
   onClone: (nodeId: string) => void;
-  onUndo: (nodeId: string) => void;
-  onRedo: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
 }
 
@@ -104,8 +100,6 @@ export function NodeActionsToolbar({
   onAddToSelection,
   onRename,
   onClone,
-  onUndo,
-  onRedo,
   onDelete,
 }: NodeActionsToolbarProps) {
   const [renameOpen, setRenameOpen] = useState(false);
@@ -148,22 +142,6 @@ export function NodeActionsToolbar({
             }}
           >
             Clone
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={!node.canUndo}
-            onSelect={() => {
-              if (node.canUndo) onUndo(node.id);
-            }}
-          >
-            Undo
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={!node.canRedo}
-            onSelect={() => {
-              if (node.canRedo) onRedo(node.id);
-            }}
-          >
-            Redo
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-red-600 focus:text-red-700"

@@ -8,6 +8,7 @@ import {
   Loader2,
   Minimize,
   Pin,
+  Settings2,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -15,12 +16,14 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 import type { DataRow } from '../types';
+import { RenameInput } from './RenameInput';
 
 interface DataTypeOption {
   value: string;
@@ -42,9 +45,12 @@ export interface WorkspaceColumnHeaderProps {
   displayLabel: string;
   availableTypes: DataTypeOption[];
   isColumnBusy: boolean;
+  isRenaming: boolean;
 
   // Capability flags
   canCast: boolean;
+  canRename: boolean;
+  canDelete: boolean;
 
   // Wide column expand/collapse
   isWideColumn: boolean;
@@ -55,13 +61,16 @@ export interface WorkspaceColumnHeaderProps {
   sortState: SortState | undefined;
   onSort: () => void;
 
+  onStartRename: () => void;
+  onSubmitRename: (column: string, value: string) => Promise<void>;
+  onCancelRename: () => void;
   onTypeChange: (newType: string) => void;
+  onRequestDelete: () => void;
 }
 
 /**
- * Renders one server-backed table column header. Node names are editable at
- * the graph level; column names are fixed by the node representation, so this
- * component only exposes sorting, pinning, sizing, and dtype casts.
+ * Renders one server-backed table column header with identity-preserving cast,
+ * rename, and delete controls.
  */
 export function WorkspaceColumnHeader({
   column,
@@ -70,13 +79,20 @@ export function WorkspaceColumnHeader({
   displayLabel,
   availableTypes,
   isColumnBusy,
+  isRenaming,
   canCast,
+  canRename,
+  canDelete,
   isWideColumn,
   isCollapsedColumn,
   onToggleExpand,
   sortState,
   onSort,
+  onStartRename,
+  onSubmitRename,
+  onCancelRename,
   onTypeChange,
+  onRequestDelete,
 }: WorkspaceColumnHeaderProps) {
   const isPinnedLeft = colInst.getIsPinned() === 'left';
 
@@ -98,14 +114,25 @@ export function WorkspaceColumnHeader({
         <Pin className="h-3.5 w-3.5" fill={isPinnedLeft ? 'currentColor' : 'none'} />
       </button>
 
-      <div className="min-w-0">
-        <span
-          className="block max-w-[160px] truncate text-xs font-medium text-foreground"
-          title={column}
-        >
-          {column}
-        </span>
-      </div>
+      {isRenaming ? (
+        <RenameInput
+          column={column}
+          disabled={isColumnBusy}
+          onSubmit={(currentColumn, value) => {
+            void onSubmitRename(currentColumn, value);
+          }}
+          onCancel={onCancelRename}
+        />
+      ) : (
+        <div className="min-w-0">
+          <span
+            className="block max-w-[160px] truncate text-xs font-medium text-foreground"
+            title={column}
+          >
+            {column}
+          </span>
+        </div>
+      )}
 
       {/* Sort indicator + click-to-sort */}
       <button
@@ -179,6 +206,50 @@ export function WorkspaceColumnHeader({
             <Minimize className="h-3.5 w-3.5" />
           )}
         </Button>
+      )}
+
+      {(canRename || canDelete) && !isRenaming && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={isColumnBusy}
+              className={cn(
+                'h-7 w-7 shrink-0 text-muted-foreground hover:text-primary',
+                isColumnBusy && 'cursor-progress opacity-80',
+              )}
+              aria-label={`Column settings for ${column}`}
+            >
+              {isColumnBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Settings2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 p-1">
+            {canRename && (
+              <DropdownMenuItem
+                disabled={isColumnBusy}
+                onSelect={onStartRename}
+                className="text-xs"
+              >
+                Rename
+              </DropdownMenuItem>
+            )}
+            {canDelete && (
+              <DropdownMenuItem
+                disabled={isColumnBusy}
+                onSelect={onRequestDelete}
+                className="text-xs text-destructive focus:text-destructive"
+              >
+                Delete
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </div>
   );

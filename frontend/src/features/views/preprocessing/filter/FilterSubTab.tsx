@@ -23,7 +23,7 @@ type FilterSubTabComponentProps = FilterSubTabProps & {
  * condition edits/apply requests through hook actions.
  */
 export function FilterSubTab(props: FilterSubTabComponentProps) {
-  const { renderNodeInputsPanel } = props;
+  const { applyMode, renderNodeInputsPanel } = props;
   const {
     schemaState,
     conditionBuilder,
@@ -49,7 +49,7 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
                 <HelpIcon
                   targetKey="preprocessing.filter.tab"
                   label="Filter sub-tab overview"
-                  tooltip="Apply column-based filters to create a new data block from the selected data block."
+                  tooltip="Apply column-based filters to a new or selected data block."
                 />
               </CardTitle>
             </div>
@@ -76,7 +76,7 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
                 />
               </span>
             }
-            description="Apply column-based filters to create a new data block from the selected data block."
+            description="Apply column-based filters to a new or selected data block."
             conditions={conditionBuilder.conditions}
             availableColumns={conditionBuilder.availableColumns}
             logic={conditionBuilder.logic}
@@ -96,33 +96,35 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
         </CardContent>
 
         <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
-          <div className="flex flex-1 items-center gap-2">
-            <label
-              className="shrink-0 text-sm font-medium text-muted-foreground"
-              htmlFor="filter-new-node-name"
-            >
-              New data block name
-            </label>
-            <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
-            <input
-              id="filter-new-node-name"
-              type="text"
-              value={newNodeInput.value}
-              onChange={(event) => {
-                newNodeInput.setValue(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                acceptPlaceholderOnTab({
-                  event,
-                  value: newNodeInput.value,
-                  setValue: newNodeInput.setValue,
-                });
-              }}
-              placeholder={newNodeInput.placeholder}
-              disabled={newNodeInput.disabled}
-              className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </div>
+          {applyMode === 'create' && (
+            <div className="flex flex-1 items-center gap-2">
+              <label
+                className="shrink-0 text-sm font-medium text-muted-foreground"
+                htmlFor="filter-new-node-name"
+              >
+                New data block name
+              </label>
+              <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
+              <input
+                id="filter-new-node-name"
+                type="text"
+                value={newNodeInput.value}
+                onChange={(event) => {
+                  newNodeInput.setValue(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  acceptPlaceholderOnTab({
+                    event,
+                    value: newNodeInput.value,
+                    setValue: newNodeInput.setValue,
+                  });
+                }}
+                placeholder={newNodeInput.placeholder}
+                disabled={newNodeInput.disabled}
+                className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          )}
           <DisabledReasonTooltip reason={applyButtonDisabledReason}>
             <Button
               size="sm"
@@ -135,12 +137,12 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
               {isFiltering ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding to workspace…
+                  {applyMode === 'create' ? 'Creating Data Block…' : 'Updating Data Block…'}
                 </>
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace
+                  {applyMode === 'create' ? 'Create Data Block' : 'Update Data Block'}
                 </>
               )}
             </Button>

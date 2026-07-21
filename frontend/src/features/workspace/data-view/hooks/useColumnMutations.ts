@@ -15,8 +15,12 @@ interface UseColumnMutationsArgs {
   workspaceId: string | undefined;
   /** Current node id; enables schema bootstrap when paired with a workspace id. */
   nodeId: string | undefined;
+  /** Current visible column names, used for duplicate-name validation. */
+  columns: string[];
   columnKinds: Record<string, ColumnKind>;
   onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
+  onRenameColumn?: (column: string, nextName: string) => Promise<void>;
+  onDeleteColumn?: (column: string) => Promise<void>;
   /** Returns the latest node schema; called once on mount and after every mutation. */
   onRefreshSchema?: () => Promise<unknown>;
 }
@@ -25,13 +29,25 @@ export interface ColumnMutationsApi {
   // Read state
   columnTypes: Record<string, string>;
   loadingCast: Record<string, boolean>;
+  columnActionLoading: Record<string, boolean>;
+  renamingColumn: string | null;
 
   // Datetime confirmation modal (string→datetime needs a format)
   datetimeModal: DatetimeModalState;
   closeDatetimeModal: () => void;
   handleDatetimeFormatConfirm: (format?: string) => void;
 
+  // Delete-column confirmation dialog
+  deleteColumnDialogOpen: boolean;
+  setDeleteColumnDialogOpen: (open: boolean) => void;
+  columnToDelete: string | null;
+  requestDeleteColumn: (column: string) => void;
+  confirmDeleteColumn: () => Promise<void>;
+
   handleTypeChange: (column: string, newType: string) => void;
+  startRename: (column: string) => void;
+  cancelRename: () => void;
+  submitRename: (column: string, value: string) => Promise<void>;
 }
 
 /**
@@ -45,12 +61,23 @@ export interface ColumnMutationsApi {
 export const useColumnMutations = ({
   workspaceId,
   nodeId,
+  columns,
   columnKinds,
   onCast,
+  onRenameColumn,
+  onDeleteColumn,
   onRefreshSchema,
 }: UseColumnMutationsArgs): ColumnMutationsApi => {
   const [state, dispatch] = useReducer(columnMutationReducer, undefined, createColumnMutationState);
-  const { columnTypes, loadingCast, datetimeModal } = state;
+  const {
+    columnTypes,
+    loadingCast,
+    columnActionLoading,
+    renamingColumn,
+    datetimeModal,
+    columnToDelete,
+  } = state;
+  const deleteColumnDialogOpen = columnToDelete !== null;
   const sourceSchemaSignature = JSON.stringify(Object.entries(columnKinds).toSorted());
   const appliedSourceSchemaRef = useRef<string | null>(null);
 
@@ -120,12 +147,106 @@ export const useColumnMutations = ({
     dispatch({ type: 'datetimeClosed' });
   }, []);
 
+  /** Tracks the spinner for rename and delete operations on one column. */
+  const setColumnBusy = useCallback((column: string, active: boolean) => {
+    dispatch({ type: 'columnActionLoadingChanged', column, active });
+  }, []);
+
+  /** Opens inline rename mode for one column. */
+  const startRename = useCallback((column: string) => {
+    dispatch({ type: 'renameStarted', column });
+  }, []);
+
+  /** Leaves inline rename mode without changing data. */
+  const cancelRename = useCallback(() => {
+    dispatch({ type: 'renameClosed' });
+  }, []);
+
+  /** Validates and applies a column rename through the selected Data Block edit. */
+  const submitRename = useCallback(
+    async (column: string, value: string) => {
+      const nextName = value.trim();
+      if (!onRenameColumn) {
+        dispatch({ type: 'renameClosed' });
+        return;
+      }
+      if (!nextName) {
+        toast.error('Column name cannot be empty.');
+        return;
+      }
+      if (nextName === column) {
+        dispatch({ type: 'renameClosed' });
+        return;
+      }
+      if (columns.some((candidate) => candidate !== column && candidate === nextName)) {
+        toast.error(`A column named "${nextName}" already exists.`);
+        return;
+      }
+
+      setColumnBusy(column, true);
+      try {
+        await onRenameColumn(column, nextName);
+        if (onRefreshSchema) {
+          applySchema(await onRefreshSchema());
+        }
+        dispatch({ type: 'renameClosed' });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error(`Failed to rename column "${column}": ${message}`);
+      } finally {
+        setColumnBusy(column, false);
+      }
+    },
+    [applySchema, columns, onRefreshSchema, onRenameColumn, setColumnBusy],
+  );
+
+  /** Opens the destructive confirmation for one column. */
+  const requestDeleteColumn = useCallback((column: string) => {
+    dispatch({ type: 'deleteRequested', column });
+  }, []);
+
+  /** Mirrors the shared dialog open state into the reducer. */
+  const setDeleteColumnDialogOpen = useCallback((open: boolean) => {
+    dispatch({ type: 'deleteDialogChanged', open });
+  }, []);
+
+  /** Deletes the confirmed column through an identity-preserving edit. */
+  const confirmDeleteColumn = useCallback(async () => {
+    if (!columnToDelete || !onDeleteColumn) return;
+    const column = columnToDelete;
+    dispatch({ type: 'deleteDialogChanged', open: false });
+    setColumnBusy(column, true);
+    try {
+      await onDeleteColumn(column);
+      if (onRefreshSchema) {
+        applySchema(await onRefreshSchema());
+      } else {
+        dispatch({ type: 'columnTypeRemoved', column });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete column "${column}": ${message}`);
+    } finally {
+      setColumnBusy(column, false);
+    }
+  }, [applySchema, columnToDelete, onDeleteColumn, onRefreshSchema, setColumnBusy]);
+
   return {
     columnTypes,
     loadingCast,
+    columnActionLoading,
+    renamingColumn,
     datetimeModal,
     closeDatetimeModal,
     handleDatetimeFormatConfirm,
+    deleteColumnDialogOpen,
+    setDeleteColumnDialogOpen,
+    columnToDelete,
+    requestDeleteColumn,
+    confirmDeleteColumn,
     handleTypeChange,
+    startRename,
+    cancelRename,
+    submitRename,
   };
 };

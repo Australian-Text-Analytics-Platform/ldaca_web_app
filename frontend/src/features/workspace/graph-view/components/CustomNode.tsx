@@ -297,26 +297,18 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     onCopy(node.id);
   };
 
-  /**
-   * Runs node undo when the backend reports it is available.
-   */
-  const handleUndoNode = (e: React.MouseEvent) => {
+  /** Undoes the Data Block's latest session edit from the settings menu. */
+  const handleUndo = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (node.canUndo) {
-      onUndo(node.id);
-    }
+    onUndo(node.id);
   };
 
-  /**
-   * Runs node redo when the backend reports it is available.
-   */
-  const handleRedoNode = (e: React.MouseEvent) => {
+  /** Redoes the Data Block's latest undone session edit from the settings menu. */
+  const handleRedo = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatchUi({ type: 'set-menu', showMenu: false });
-    if (node.canRedo) {
-      onRedo(node.id);
-    }
+    onRedo(node.id);
   };
 
   /**
@@ -405,8 +397,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         showMenu={showMenu}
         menuOpensUp={menuOpensUp}
         menuOpensRight={menuOpensRight}
-        canUndo={node.canUndo}
-        canRedo={node.canRedo}
         onMenuChange={(willOpen, placement) => {
           dispatchUi({
             type: 'set-menu',
@@ -418,8 +408,10 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         }}
         onRenameClick={handleRenameClick}
         onCopyNode={handleCopyNode}
-        onUndoNode={handleUndoNode}
-        onRedoNode={handleRedoNode}
+        canUndo={node.canUndo}
+        canRedo={node.canRedo}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
         onDeleteClick={handleDeleteClick}
         stopGraphControlEvent={stopGraphControlEvent}
       />

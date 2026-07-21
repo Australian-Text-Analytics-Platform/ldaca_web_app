@@ -1,4 +1,12 @@
-import { getNodeRows, getNodeSchema, previewFile, previewNodeCreation } from './generated';
+import {
+  executeWorkspaceSql,
+  getNodeSchema,
+  previewFile,
+  previewNodeCreation,
+  type WorkspaceNodeInfo,
+  type WorkspaceSqlCreateRequest,
+  type WorkspaceSqlQueryRequest,
+} from './generated';
 import {
   decodeArrowPage,
   decodeArrowTable,
@@ -6,11 +14,47 @@ import {
   type ArrowTablePage,
 } from '@/lib/arrow/arrowTable';
 
-export async function getNodeRowsTable(
-  options: Parameters<typeof getNodeRows>[0],
-): Promise<ArrowTablePage> {
-  const { data, response } = await getNodeRows({ ...options, throwOnError: true });
+const ARROW_STREAM_MEDIA_TYPE = 'application/vnd.apache.arrow.stream';
+const JSON_MEDIA_TYPE = 'application/json';
+
+const responseMediaType = (response: Response): string | undefined =>
+  response.headers.get('Content-Type')?.split(';', 1)[0];
+
+export async function queryWorkspaceSqlTable(options: {
+  baseUrl?: string;
+  path: { workspace_id: string };
+  body: WorkspaceSqlQueryRequest & { mode: 'query' };
+  signal?: AbortSignal;
+}): Promise<ArrowTablePage> {
+  const { data, response } = await executeWorkspaceSql({ ...options, throwOnError: true });
+  const contentType = responseMediaType(response);
+  if (contentType !== ARROW_STREAM_MEDIA_TYPE) {
+    throw new Error(
+      `Expected ${ARROW_STREAM_MEDIA_TYPE}, received ${contentType ?? 'no content type'}`,
+    );
+  }
+  if (!(data instanceof Blob) && !(data instanceof ArrayBuffer)) {
+    throw new Error('Workspace SQL query did not return Arrow IPC');
+  }
   return decodeArrowPage(data, response);
+}
+
+export async function createWorkspaceSqlDataBlock(options: {
+  baseUrl?: string;
+  path: { workspace_id: string };
+  body: WorkspaceSqlCreateRequest & { mode: 'create' };
+  signal?: AbortSignal;
+}): Promise<WorkspaceNodeInfo> {
+  const { data, response } = await executeWorkspaceSql({ ...options, throwOnError: true });
+  const contentType = responseMediaType(response);
+  if (contentType !== JSON_MEDIA_TYPE) {
+    throw new Error(`Expected ${JSON_MEDIA_TYPE}, received ${contentType ?? 'no content type'}`);
+  }
+  const resource: unknown = data;
+  if (!resource || typeof resource !== 'object' || !('id' in resource)) {
+    throw new Error('Workspace SQL creation did not return a Data Block resource');
+  }
+  return resource as WorkspaceNodeInfo;
 }
 
 export async function getNodeSchemaTable(

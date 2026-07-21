@@ -7,6 +7,7 @@ import {
   Schema,
   Struct,
   Table,
+  TimestampMicrosecond,
   Utf8,
   Utf8View,
   tableFromArrays,
@@ -50,16 +51,24 @@ describe('Arrow table transport', () => {
     ]);
   });
 
+  it('decodes timestamp values into UTC ISO strings', async () => {
+    const source = new Table({
+      created_at: vectorFromArray(
+        [new Date('2020-10-16T15:20:22.000Z')],
+        new TimestampMicrosecond('UTC'),
+      ),
+    });
+
+    const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
+
+    expect(decoded.schema[0]?.kind).toBe('datetime');
+    expect(decoded.rows).toEqual([{ created_at: '2020-10-16T15:20:22.000Z' }]);
+  });
+
   it('classifies Utf8View and LargeList<Utf8View> from native Arrow types', async () => {
     const strings = vectorFromArray(['one', 'two'], new Utf8View());
     const stringListType = new LargeList(new Field('item', new Utf8View(), true));
-    const stringLists = vectorFromArray(
-      [
-        ['one', 'two'],
-        ['three'],
-      ],
-      stringListType,
-    );
+    const stringLists = vectorFromArray([['one', 'two'], ['three']], stringListType);
     const source = new Table({ strings, stringLists });
 
     const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
@@ -87,6 +96,21 @@ describe('Arrow table transport', () => {
     );
 
     expect(columnKind(distribution)).toBe('topic-distribution');
+  });
+
+  it('preserves the exact identity of an unknown foreign extension', () => {
+    const foreign = new Field(
+      'measurement',
+      new Struct([new Field('value', new Int64())]),
+      true,
+      new Map([
+        ['ARROW:extension:name', 'org.example.foreign_measure.v2'],
+        ['ARROW:extension:metadata', '{"unit":"widgets"}'],
+      ]),
+    );
+
+    expect(columnKind(foreign)).toBe('extension:org.example.foreign_measure.v2');
+    expect(foreign.metadata.get('ARROW:extension:metadata')).toBe('{"unit":"widgets"}');
   });
 
   it('decodes fixed-size Topic Distribution values through official Apache Arrow', async () => {
@@ -127,12 +151,15 @@ describe('Arrow table transport', () => {
 
   it('reads page continuation only from the transport header', async () => {
     const source = tableFromArrays({ value: ['only'] });
-    const response = new Response(null, { headers: { 'X-Wordflow-Has-Next': 'true' } });
+    const response = new Response(null, {
+      headers: { 'X-Wordflow-Has-Next': 'true', ETag: '"revision-1"' },
+    });
 
     const decoded = await decodeArrowPage(stream(source).buffer as ArrayBuffer, response);
 
     expect(decoded.rows).toEqual([{ value: 'only' }]);
     expect(decoded.hasNext).toBe(true);
+    expect(decoded.etag).toBe('"revision-1"');
   });
 
   it('resolves semantic table URLs against the runtime backend origin', async () => {

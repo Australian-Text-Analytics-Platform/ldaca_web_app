@@ -43,6 +43,7 @@ describe('useJoinSubTab preview adapter', () => {
         useJoinSubTab({
           selectedNodeIds: ['left', 'right'],
           selectedNodeColumns: {},
+          setSelectedNodeColumns: vi.fn(),
           currentWorkspaceId: workspaceId,
           workspaceNodes,
           getColumnInfos: () => [
@@ -97,6 +98,46 @@ describe('useJoinSubTab preview adapter', () => {
         hasNext: false,
       });
       await firstResponse;
+    });
+  });
+
+  it('selects the first shared column when both nodes still use their defaults', () => {
+    const setSelectedNodeColumns = vi.fn();
+    const workspaceNodes = [
+      projectWorkspaceNodeMetadata({ id: 'left', name: 'Tweets' }),
+      projectWorkspaceNodeMetadata({ id: 'right', name: 'Candidates' }),
+    ];
+
+    renderHook(() =>
+      useJoinSubTab({
+        selectedNodeIds: ['left', 'right'],
+        selectedNodeColumns: {
+          left: 'tweet_id',
+          right: 'party',
+        },
+        setSelectedNodeColumns,
+        currentWorkspaceId: null,
+        workspaceNodes,
+        getColumnInfos: (node) =>
+          node.id === 'left'
+            ? [
+                { name: 'tweet_id', dataType: 'string', field: new Field('tweet_id', new Utf8()) },
+                { name: 'username', dataType: 'string', field: new Field('username', new Utf8()) },
+              ]
+            : [
+                { name: 'party', dataType: 'string', field: new Field('party', new Utf8()) },
+                { name: 'username', dataType: 'string', field: new Field('username', new Utf8()) },
+              ],
+        joinNodes: vi.fn(),
+        isLoading: { operations: false },
+        onAlert: vi.fn(),
+      }),
+    );
+
+    expect(setSelectedNodeColumns).toHaveBeenCalledOnce();
+    expect(setSelectedNodeColumns).toHaveBeenCalledWith({
+      left: 'username',
+      right: 'username',
     });
   });
 });

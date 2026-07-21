@@ -107,7 +107,7 @@ export interface UseSliceSubTabResult {
 }
 
 const PREVIEW_DEBOUNCE_MS = 400;
-const DEFAULT_RANDOM_SEED = '42';
+const DEFAULT_RANDOM_SEED = '0';
 const DEFAULT_SLICE_FORM_VALUES: SliceFormValues = {
   mode: 'slice',
   offsetInput: '0',

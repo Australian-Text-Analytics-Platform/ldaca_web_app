@@ -14,6 +14,8 @@ describe('WorkspaceDataHeader', () => {
             tabPosition: 1,
             totalTabs: 1,
             isEmptyTable: false,
+            canUndo: false,
+            canRedo: false,
           }}
         />
       </TooltipProvider>,
@@ -23,7 +25,7 @@ describe('WorkspaceDataHeader', () => {
   });
 
   it('keeps the selected node name in a leading-fade single-line wrapper', () => {
-    const longName = 'reddit/reddit_comments_topic_sampled_fr_0_1_rs_42_topic_meanings';
+    const longName = 'reddit/reddit_comments_topic_sampled_fr_0_1_rs_0_topic_meanings';
 
     render(
       <TooltipProvider>
@@ -33,6 +35,8 @@ describe('WorkspaceDataHeader', () => {
             tabPosition: 1,
             totalTabs: 1,
             isEmptyTable: false,
+            canUndo: false,
+            canRedo: false,
           }}
           onRename={vi.fn()}
         />
@@ -44,5 +48,34 @@ describe('WorkspaceDataHeader', () => {
     expect(screen.getByTestId('workspace-data-node-label')).toHaveClass('overflow-hidden');
     expect(screen.getByTestId('workspace-data-node-label-fade')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Rename node' })).toBeInTheDocument();
+  });
+
+  it('drives Undo and Redo disabled state solely from backend flags', () => {
+    const onUndo = vi.fn();
+    const onRedo = vi.fn();
+    render(
+      <TooltipProvider>
+        <WorkspaceDataHeader
+          info={{
+            nodeLabel: 'Corpus',
+            tabPosition: 1,
+            totalTabs: 1,
+            isEmptyTable: false,
+            canUndo: true,
+            canRedo: false,
+          }}
+          onUndo={onUndo}
+          onRedo={onRedo}
+        />
+      </TooltipProvider>,
+    );
+
+    const undo = screen.getByRole('button', { name: 'Undo Data Block edit' });
+    const redo = screen.getByRole('button', { name: 'Redo Data Block edit' });
+    expect(undo).toBeEnabled();
+    expect(redo).toBeDisabled();
+    undo.click();
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(onRedo).not.toHaveBeenCalled();
   });
 });

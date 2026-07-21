@@ -23,10 +23,10 @@ vi.mock('../usePreprocessingPreview', () => ({
   usePreprocessingPreview: usePreprocessingPreviewMock,
 }));
 
-const getNodeRowsTableMock = vi.hoisted(() => vi.fn());
+const queryWorkspaceSqlTableMock = vi.hoisted(() => vi.fn());
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  getNodeRowsTable: getNodeRowsTableMock,
+  queryWorkspaceSqlTable: queryWorkspaceSqlTableMock,
 }));
 
 import { useNodePreviewWithRawFallback } from '../useNodePreviewWithRawFallback';
@@ -43,7 +43,7 @@ const lastCapturedOptions = (): CapturedOptions => {
 describe('useNodePreviewWithRawFallback', () => {
   beforeEach(() => {
     usePreprocessingPreviewMock.mockReset();
-    getNodeRowsTableMock.mockReset();
+    queryWorkspaceSqlTableMock.mockReset();
     usePreprocessingPreviewMock.mockReturnValue({});
   });
 
@@ -150,7 +150,7 @@ describe('useNodePreviewWithRawFallback', () => {
         pageSize: 25,
         signal,
       });
-      expect(getNodeRowsTableMock).not.toHaveBeenCalled();
+      expect(queryWorkspaceSqlTableMock).not.toHaveBeenCalled();
       expect(result).toEqual({
         data: [{ a: 1 }],
         columns: ['a'],
@@ -160,7 +160,7 @@ describe('useNodePreviewWithRawFallback', () => {
 
     it('falls back to explicit node data when the payload is null', async () => {
       const operationFetch = vi.fn();
-      getNodeRowsTableMock.mockResolvedValue({
+      queryWorkspaceSqlTableMock.mockResolvedValue({
         rows: [{ raw: 1 }],
         columns: ['raw'],
         hasNext: false,
@@ -186,9 +186,15 @@ describe('useNodePreviewWithRawFallback', () => {
       });
 
       expect(operationFetch).not.toHaveBeenCalled();
-      expect(getNodeRowsTableMock).toHaveBeenCalledWith({
-        path: { workspace_id: 'workspace-1', node_id: 'node-1' },
-        query: { page: 1, page_size: 10 },
+      expect(queryWorkspaceSqlTableMock).toHaveBeenCalledWith({
+        path: { workspace_id: 'workspace-1' },
+        body: {
+          mode: 'query',
+          node_ids: ['node-1'],
+          sql: 'SELECT * FROM "node-1"',
+          page: 1,
+          page_size: 10,
+        },
         signal,
       });
       expect(result).toEqual({

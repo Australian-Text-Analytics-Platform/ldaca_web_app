@@ -3,12 +3,10 @@ import { type QueryClient, useMutation } from '@tanstack/react-query';
 import {
   createWorkspace,
   deleteWorkspaceById,
-  listWorkspaces,
-  saveWorkspaceById,
-  setMyCurrentWorkspace,
+  closeWorkspaceById,
+  openWorkspaceById,
   updateWorkspaceById,
 } from '@/api';
-import { ApiError } from '@/lib/apiError';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateWorkspaceSummaries, isWorkspaceDetailQueryKey } from './workspaceMutationCache';
 import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
@@ -51,28 +49,22 @@ export const useWorkspaceManagementMutations = ({
   });
 
   const setCurrentWorkspaceOnServer = async (workspaceId: string | null) => {
-    const setCurrent = () =>
-      setMyCurrentWorkspace({
-        body: { workspace_id: workspaceId },
+    if (workspaceId === null) {
+      if (!currentWorkspaceId) return null;
+      return closeWorkspaceById({
+        path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
-
-    try {
-      const { data } = await setCurrent();
-      return data;
-    } catch (error) {
-      if (!(workspaceId !== null && error instanceof ApiError && error.status === 404)) {
-        throw error;
-      }
-
-      await listWorkspaces({ throwOnError: true });
-      const { data } = await setCurrent();
-      return data;
     }
+    const { data } = await openWorkspaceById({
+      path: { workspace_id: workspaceId },
+      throwOnError: true,
+    });
+    return data;
   };
 
   const setCurrentWorkspaceMutation = useMutation<
-    Record<string, unknown>,
+    unknown,
     Error,
     string | null,
     { previousId: string | null }
@@ -108,7 +100,10 @@ export const useWorkspaceManagementMutations = ({
           });
         }
 
-        void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+        if (nextId) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceNodes(nextId) });
+        }
       },
     ),
     onError: operationLifecycle.onError('setCurrentWorkspace'),
@@ -121,14 +116,8 @@ export const useWorkspaceManagementMutations = ({
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: operationLifecycle.onMutate('createWorkspace'),
-    onSuccess: operationLifecycle.onSuccess('createWorkspace', (data) => {
-      const newWorkspaceId = (data.id as string | undefined) ?? null;
+    onSuccess: operationLifecycle.onSuccess('createWorkspace', () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
-      if (newWorkspaceId) {
-        setCurrentWorkspaceId(newWorkspaceId);
-        clearSelection();
-        void queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
-      }
     }),
     onError: operationLifecycle.onError('createWorkspace'),
   });
@@ -141,34 +130,17 @@ export const useWorkspaceManagementMutations = ({
       return deleteWorkspaceById({
         path: { workspace_id: workspaceId },
         throwOnError: true,
-      }).then(({ data }) => data);
+      }).then(() => undefined);
     },
     onMutate: operationLifecycle.onMutate('deleteWorkspace'),
-    onSuccess: operationLifecycle.onSuccess(
-      'deleteWorkspace',
-      (data: Record<string, unknown>, workspaceId) => {
-        const deletedWorkspaceId = (data.id as string | undefined) ?? workspaceId;
-        if (currentWorkspaceId && deletedWorkspaceId === currentWorkspaceId) {
-          setCurrentWorkspaceId(null);
-          clearSelection();
-        }
-        invalidateWorkspaceSummaries(queryClient);
-      },
-    ),
+    onSuccess: operationLifecycle.onSuccess('deleteWorkspace', (_data, workspaceId) => {
+      if (currentWorkspaceId === workspaceId) {
+        setCurrentWorkspaceId(null);
+        clearSelection();
+      }
+      invalidateWorkspaceSummaries(queryClient);
+    }),
     onError: operationLifecycle.onError('deleteWorkspace'),
-  });
-
-  const saveWorkspaceMutation = useMutation({
-    mutationFn: () => {
-      const workspaceId = ensureWorkspaceSelected();
-      return saveWorkspaceById({
-        path: { workspace_id: workspaceId },
-        throwOnError: true,
-      }).then(({ data }) => data);
-    },
-    onMutate: operationLifecycle.onMutate('saveWorkspace'),
-    onSuccess: operationLifecycle.onSuccess('saveWorkspace'),
-    onError: operationLifecycle.onError('saveWorkspace'),
   });
 
   const updateWorkspaceNameMutation = useMutation({
@@ -210,7 +182,9 @@ export const useWorkspaceManagementMutations = ({
       createWorkspace: (name: string, description?: string) =>
         createWorkspaceMutation.mutateAsync({ name, description }),
       deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
-      saveWorkspace: () => saveWorkspaceMutation.mutateAsync(undefined),
+      saveWorkspace: async () => {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      },
       renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
       updateWorkspaceDescription: (description: string) =>
         updateWorkspaceDescriptionMutation.mutateAsync(description),

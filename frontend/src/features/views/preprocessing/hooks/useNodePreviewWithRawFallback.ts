@@ -1,4 +1,4 @@
-import { getNodeRowsTable } from '@/api';
+import { queryWorkspaceSqlTable, sqlTable } from '@/api';
 import type { PreviewPagination, PreviewRow } from '../types';
 import {
   usePreprocessingPreview,
@@ -108,9 +108,15 @@ export const useNodePreviewWithRawFallback = <P>(
           signal,
         });
       }
-      const data = await getNodeRowsTable({
-        path: { workspace_id: req.workspaceId, node_id: req.nodeId },
-        query: { page, page_size: pageSize },
+      const data = await queryWorkspaceSqlTable({
+        path: { workspace_id: req.workspaceId },
+        body: {
+          mode: 'query',
+          node_ids: [req.nodeId],
+          sql: `SELECT * FROM ${sqlTable(req.nodeId)}`,
+          page,
+          page_size: pageSize,
+        },
         signal,
       });
       return {

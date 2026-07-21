@@ -3,7 +3,6 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { matchChecklistOption } from '@/features/views/common/checklistSearch';
 
 type FilterChecklistValue = string | number | boolean | null;
 
@@ -26,6 +25,8 @@ interface FilterValueChecklistProps {
   onToggleOption: (option: FilterChecklistOption, checked: boolean) => void;
   onSelectAll: (visibleOptions: FilterChecklistOption[]) => void;
   onClearAll: () => void;
+  hasNext: boolean;
+  onLoadMore?: () => void;
   onRetry?: () => void;
 }
 
@@ -49,14 +50,11 @@ export function FilterValueChecklist({
   onToggleOption,
   onSelectAll,
   onClearAll,
+  hasNext,
+  onLoadMore,
   onRetry,
 }: FilterValueChecklistProps) {
-  const filteredOptions = options.filter((option) =>
-    matchChecklistOption(option.label, searchQuery),
-  );
-
-  const hasActiveSearch = searchQuery.trim().length > 0;
-  const selectLabel = hasActiveSearch ? 'Select All Filtered' : 'Select all';
+  const filteredOptions = options;
 
   return (
     <div className="flex flex-col gap-2">
@@ -82,7 +80,7 @@ export function FilterValueChecklist({
             onSelectAll(filteredOptions);
           }}
         >
-          {selectLabel}
+          Select loaded
         </Button>
         <Button
           type="button"
@@ -100,7 +98,7 @@ export function FilterValueChecklist({
         )}
       </div>
 
-      {loading ? (
+      {loading && options.length === 0 ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading categories…</span>
@@ -110,7 +108,19 @@ export function FilterValueChecklist({
           Failed to load categories: {error}
         </div>
       ) : (
-        <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2">
+        <div
+          className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2"
+          onScroll={(event) => {
+            const target = event.currentTarget;
+            if (
+              hasNext &&
+              !loading &&
+              target.scrollHeight - target.scrollTop - target.clientHeight < 24
+            ) {
+              onLoadMore?.();
+            }
+          }}
+        >
           {filteredOptions.length === 0 ? (
             <div className="text-xs text-muted-foreground">
               {options.length === 0 ? 'No categories available.' : 'No matching categories found.'}
@@ -143,6 +153,12 @@ export function FilterValueChecklist({
               );
             })
           )}
+          {loading && options.length > 0 ? (
+            <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Loading more…</span>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

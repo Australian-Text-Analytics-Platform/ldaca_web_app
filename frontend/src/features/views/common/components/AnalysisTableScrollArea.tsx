@@ -1,7 +1,6 @@
 import React from 'react';
-
-import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface AnalysisTableScrollAreaProps {
   maxHeightClass: string;
@@ -22,7 +21,6 @@ const AnalysisTableScrollArea = ({
   className,
 }: AnalysisTableScrollAreaProps) => (
   <ScrollArea
-    type="hover"
     scrollbars="both"
     data-testid="analysis-table-scroll-area"
     className={cn(maxHeightClass, className)}

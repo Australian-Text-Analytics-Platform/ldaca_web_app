@@ -49,6 +49,7 @@ describe('direct preprocessing preview adapters', () => {
       useJoinSubTab({
         selectedNodeIds: ['left', 'right'],
         selectedNodeColumns: {},
+        setSelectedNodeColumns: vi.fn(),
         currentWorkspaceId: 'closure-workspace',
         workspaceNodes,
         getColumnInfos: () => [{ name: 'id', dataType: 'string' }],

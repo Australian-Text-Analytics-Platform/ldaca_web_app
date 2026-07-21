@@ -15,6 +15,7 @@ import {
   type ExpressionContextTab,
   type ExpressionListTarget,
 } from './polarsExpressionDraftState';
+import type { PreprocessingApplyMode } from '../../preprocessingApplyMode';
 
 export {
   buildPolarsExpressionRequest,
@@ -25,6 +26,7 @@ export {
 
 export interface PolarsExpressionSubTabProps {
   currentWorkspaceId: string | null;
+  applyMode: PreprocessingApplyMode;
   selectedNodes: WorkspaceNodeMetadata[];
   isLoading: { operations: boolean };
   onAlert: (message: string) => void;
@@ -32,6 +34,7 @@ export interface PolarsExpressionSubTabProps {
   polarsExpressionApply: (
     nodeId: string,
     req: PolarsExpressionRequest,
+    mode: PreprocessingApplyMode,
   ) => Promise<PolarsExpressionApplyResponse>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
@@ -49,6 +52,7 @@ const DEFAULT_PALETTE = ['#2563eb'];
 export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const {
     currentWorkspaceId,
+    applyMode,
     selectedNodes,
     onAlert,
     polarsExpressionPreview,
@@ -201,12 +205,17 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     if (!nodeId || !serializedRequest) return;
     setIsApplying(true);
     try {
-      const req: PolarsExpressionRequest = {
-        ...serializedRequest,
-        name: newNodeName.trim() || newNodeNamePlaceholder,
-      };
-      await polarsExpressionApply(nodeId, req);
-      await refreshNodeSchema(nodeId);
+      const req: PolarsExpressionRequest =
+        applyMode === 'create'
+          ? {
+              ...serializedRequest,
+              name: newNodeName.trim() || newNodeNamePlaceholder,
+            }
+          : serializedRequest;
+      await polarsExpressionApply(nodeId, req, applyMode);
+      if (applyMode === 'update') {
+        await refreshNodeSchema(nodeId);
+      }
     } catch (err) {
       onAlert(err instanceof Error ? err.message : 'Failed to apply expression');
     } finally {

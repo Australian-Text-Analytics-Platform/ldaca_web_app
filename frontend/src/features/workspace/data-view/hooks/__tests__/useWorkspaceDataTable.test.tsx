@@ -3,14 +3,17 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const getNodeRowsTableMock = vi.hoisted(() => vi.fn());
+const queryWorkspaceSqlTableMock = vi.hoisted(() => vi.fn());
 const useWorkspaceDataMock = vi.hoisted(() => vi.fn());
 const useWorkspaceSelectionMock = vi.hoisted(() => vi.fn());
 const useWorkspaceStatusMock = vi.hoisted(() => vi.fn());
 const useWorkspaceActionsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api', () => ({
-  getNodeRowsTable: getNodeRowsTableMock,
+  queryWorkspaceSqlTable: queryWorkspaceSqlTableMock,
+  sqlOrder: (column: string, descending: boolean) =>
+    `"${column}" ${descending ? 'DESC' : 'ASC'} NULLS FIRST`,
+  sqlTable: (value: string) => `"${value}"`,
 }));
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: useWorkspaceDataMock,
@@ -50,8 +53,8 @@ describe('useWorkspaceDataTable', () => {
     activateNode.mockReset();
     reorderSelectedNodes.mockReset();
     removeNode.mockReset();
-    getNodeRowsTableMock.mockReset();
-    getNodeRowsTableMock.mockResolvedValue(makeNodeDataResponse());
+    queryWorkspaceSqlTableMock.mockReset();
+    queryWorkspaceSqlTableMock.mockResolvedValue(makeNodeDataResponse());
     useWorkspaceDataMock.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
       nodeData: makeNodeDataResponse(),
@@ -113,13 +116,20 @@ describe('useWorkspaceDataTable', () => {
     });
 
     await waitFor(() => {
-      expect(getNodeRowsTableMock).toHaveBeenCalledTimes(1);
+      expect(queryWorkspaceSqlTableMock).toHaveBeenCalledTimes(1);
     });
 
     const request = { page: 1, page_size: 20, sort_by: null, descending: false };
-    expect(getNodeRowsTableMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ query: request }),
-    );
+    expect(queryWorkspaceSqlTableMock).toHaveBeenLastCalledWith({
+      path: { workspace_id: 'workspace-1' },
+      body: {
+        mode: 'query',
+        node_ids: ['node-b'],
+        sql: 'SELECT * FROM "node-b"',
+        page: 1,
+        page_size: 20,
+      },
+    });
     expect(
       queryClient
         .getQueryCache()

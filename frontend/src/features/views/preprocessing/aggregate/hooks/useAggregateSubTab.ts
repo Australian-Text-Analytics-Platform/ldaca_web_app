@@ -22,9 +22,11 @@ import {
   type OperationPreviewFetcher,
 } from '../../hooks/useNodePreviewWithRawFallback';
 import type { PreviewPagination, PreviewRow } from '../../types';
+import type { PreprocessingApplyMode } from '../../preprocessingApplyMode';
 
 export interface AggregateSubTabProps {
   currentWorkspaceId: string | null;
+  applyMode: PreprocessingApplyMode;
   selectedNodes: WorkspaceNodeMetadata[];
   getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[];
   isLoading: {
@@ -35,6 +37,7 @@ export interface AggregateSubTabProps {
   polarsExpressionApply: (
     nodeId: string,
     request: PolarsExpressionRequest,
+    mode: PreprocessingApplyMode,
   ) => Promise<PolarsExpressionApplyResponse>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
@@ -144,6 +147,7 @@ const createTokenId = (): string => {
 export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSubTabResult => {
   const {
     currentWorkspaceId,
+    applyMode,
     selectedNodes,
     isLoading,
     onAlert,
@@ -497,10 +501,12 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     setApplyLoading(true);
     try {
       const payload = buildRequest();
-      const response = await polarsExpressionApply(activeNodeId, payload);
+      const response = await polarsExpressionApply(activeNodeId, payload, applyMode);
       setLastAppliedExpression(currentExpression);
-      onAlert(`Applied expression to ${response.name}`);
-      void refreshNodeSchema(activeNodeId);
+      onAlert(applyMode === 'create' ? `Created ${response.name}` : `Updated ${response.name}`);
+      if (applyMode === 'update') {
+        void refreshNodeSchema(activeNodeId);
+      }
       commitExpression();
       refreshPreview();
     } catch {

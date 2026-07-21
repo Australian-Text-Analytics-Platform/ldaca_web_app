@@ -9,7 +9,7 @@ const options: FilterChecklistOption[] = [
 ];
 
 describe('FilterValueChecklist', () => {
-  it('shows Select All Filtered when query is active and sends only visible options', () => {
+  it('selects all values loaded by the server-side query', () => {
     const onSelectAll = vi.fn();
 
     render(
@@ -25,17 +25,18 @@ describe('FilterValueChecklist', () => {
         onToggleOption={vi.fn()}
         onSelectAll={onSelectAll}
         onClearAll={vi.fn()}
+        hasNext={false}
       />,
     );
 
-    const button = screen.getByRole('button', { name: 'Select All Filtered' });
+    const button = screen.getByRole('button', { name: 'Select loaded' });
     fireEvent.click(button);
 
     expect(onSelectAll).toHaveBeenCalledTimes(1);
-    expect(onSelectAll.mock.calls[0]?.[0]).toEqual([{ key: 'a', value: 'alpha', label: 'alpha' }]);
+    expect(onSelectAll.mock.calls[0]?.[0]).toEqual(options);
   });
 
-  it('filters visible options using wildcard matching', () => {
+  it('renders the values returned by server-side search', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
 
@@ -52,14 +53,15 @@ describe('FilterValueChecklist', () => {
         onToggleOption={vi.fn()}
         onSelectAll={vi.fn()}
         onClearAll={vi.fn()}
+        hasNext={false}
       />,
       { container },
     );
 
     const scoped = within(container);
 
-    expect(scoped.queryByText('alpha')).not.toBeInTheDocument();
-    expect(scoped.queryByText('beta')).not.toBeInTheDocument();
+    expect(scoped.getByText('alpha')).toBeInTheDocument();
+    expect(scoped.getByText('beta')).toBeInTheDocument();
     expect(scoped.getByText('gamma')).toBeInTheDocument();
   });
 });

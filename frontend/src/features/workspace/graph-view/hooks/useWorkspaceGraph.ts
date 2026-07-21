@@ -106,10 +106,9 @@ const edgePresentationFor = (edge: Edge) => ({
 
 /**
  * Merges incoming backend presentation into React Flow-owned node state.
- * Used by: the presentation reconciliation effect after a node signature
- * change. Existing ids retain their dragged position, selection, measurement,
- * and drag state; new ids use the incoming dagre layout and removed ids drop
- * out because the incoming list defines membership and order.
+ * Used by: the presentation reconciliation effect when graph topology is
+ * unchanged. Existing IDs retain their temporary dragged position, selection,
+ * measurement, and drag state while rendered metadata refreshes.
  */
 const reconcileProjectedNodes = (existingNodes: Node[], incomingNodes: Node[]): Node[] => {
   const existingById = new Map(existingNodes.map((node) => [node.id, node]));
@@ -173,19 +172,15 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     void graphCommandsRef.current.copyNode(nodeId);
   }, []);
 
-  /** Applies an undo operation to a graph node. */
+  /** Undoes the last session edit for a graph Data Block. */
   const handleUndo = useCallback((nodeId: string) => {
-    if (!nodeId) {
-      return;
-    }
+    if (!nodeId) return;
     void graphCommandsRef.current.undoNode(nodeId);
   }, []);
 
-  /** Applies a redo operation to a graph node. */
+  /** Redoes the last undone session edit for a graph Data Block. */
   const handleRedo = useCallback((nodeId: string) => {
-    if (!nodeId) {
-      return;
-    }
+    if (!nodeId) return;
     void graphCommandsRef.current.redoNode(nodeId);
   }, []);
 
@@ -322,14 +317,28 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const newNodesSignature = JSON.stringify(initialNodes.map(nodePresentationFor));
   const currentEdgesSignature = JSON.stringify(edges.map(edgePresentationFor));
   const newEdgesSignature = JSON.stringify(initialEdges.map(edgePresentationFor));
+  const currentTopologySignature = JSON.stringify({
+    nodeIds: nodes.map((node) => node.id),
+    edges: edges.map((edge) => [edge.source, edge.target]),
+  });
+  const newTopologySignature = JSON.stringify({
+    nodeIds: initialNodes.map((node) => node.id),
+    edges: initialEdges.map((edge) => [edge.source, edge.target]),
+  });
   const nodesPresentationChanged = newNodesSignature !== currentNodesSignature;
   const edgesPresentationChanged = newEdgesSignature !== currentEdgesSignature;
+  const topologyChanged = newTopologySignature !== currentTopologySignature;
   const renderedWorkspaceIdRef = useRef(currentWorkspaceId);
 
   const updateRafRef = useRef<number | null>(null);
   useEffect(() => {
     const workspaceChanged = renderedWorkspaceIdRef.current !== currentWorkspaceId;
-    if (!workspaceChanged && !nodesPresentationChanged && !edgesPresentationChanged) {
+    if (
+      !workspaceChanged &&
+      !topologyChanged &&
+      !nodesPresentationChanged &&
+      !edgesPresentationChanged
+    ) {
       return;
     }
 
@@ -338,17 +347,17 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     }
 
     updateRafRef.current = requestAnimationFrame(() => {
-      if (workspaceChanged) {
-        // A workspace is a separate React Flow identity domain. Even when ids
-        // and presentation signatures overlap, use only the incoming graph so
-        // position, selection, measurement, and dragging cannot cross over.
+      if (workspaceChanged || topologyChanged) {
+        // Workspace identity and graph topology define the canonical Dagre
+        // layout. Temporary React Flow drag positions never cross either
+        // boundary.
         setNodes(initialNodes);
         setEdges(initialEdges);
         renderedWorkspaceIdRef.current = currentWorkspaceId;
       } else if (nodesPresentationChanged) {
         setNodes((existingNodes) => reconcileProjectedNodes(existingNodes, initialNodes));
       }
-      if (!workspaceChanged && edgesPresentationChanged) {
+      if (!workspaceChanged && !topologyChanged && edgesPresentationChanged) {
         setEdges(initialEdges);
       }
     });
@@ -370,6 +379,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     nodesPresentationChanged,
     setEdges,
     setNodes,
+    topologyChanged,
   ]);
 
   useEffect(() => {

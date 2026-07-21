@@ -31,6 +31,7 @@ interface FilterConditionValueInputProps {
   optionSearchQueries: Record<string, string>;
   getCategoricalKey: (column: string) => string;
   ensureCategoricalOptions: (column: string, dataType: string) => Promise<void> | void;
+  loadMoreCategoricalOptions: (column: string, dataType: string) => Promise<void> | void;
   onOptionSearchQueryChange: (conditionId: string, query: string) => void;
   onConditionChange: OnConditionChange;
 }
@@ -53,6 +54,7 @@ export function FilterConditionValueInput({
   optionSearchQueries,
   getCategoricalKey,
   ensureCategoricalOptions,
+  loadMoreCategoricalOptions,
   onOptionSearchQueryChange,
   onConditionChange,
 }: FilterConditionValueInputProps) {
@@ -240,6 +242,14 @@ export function FilterConditionValueInput({
         onToggleOption={toggleValue}
         onSelectAll={onSelectAllForMode}
         onClearAll={handleClearAll}
+        hasNext={optionState?.hasNext ?? false}
+        onLoadMore={
+          column
+            ? () => {
+                void loadMoreCategoricalOptions(column, dataType);
+              }
+            : undefined
+        }
         onRetry={
           column
             ? () => {

@@ -245,7 +245,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace
+                  Create Data Block
                 </>
               )}
             </Button>

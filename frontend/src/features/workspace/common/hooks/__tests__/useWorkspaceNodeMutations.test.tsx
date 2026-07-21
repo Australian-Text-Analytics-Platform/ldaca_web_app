@@ -9,13 +9,16 @@ const workspaceSdkMock = vi.hoisted(() => ({
   createWorkspace: vi.fn(),
   deleteNode: vi.fn(),
   deleteWorkspaceById: vi.fn(),
+  editNode: vi.fn(),
   openWorkspaceById: vi.fn(),
   previewNodeCreationTable: vi.fn(),
   reorderWorkspaceNodesById: vi.fn(),
+  redoNode: vi.fn(),
   submitChildAnalysis: vi.fn(),
   submitTabAnalysis: vi.fn(),
   updateNode: vi.fn(),
   updateWorkspaceById: vi.fn(),
+  undoNode: vi.fn(),
 }));
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -222,28 +225,117 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
-  it('casts a column by creating a typed cast node', async () => {
+  it('casts, renames, and deletes columns through identity-preserving edits', async () => {
     const queryClient = createTestClient();
-    workspaceSdkMock.createNode.mockResolvedValue({ data: { id: 'cast-node' } });
+    workspaceSdkMock.editNode.mockResolvedValue({ data: { id: 'node-1' } });
     const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
       wrapper: wrapWithClient(queryClient),
     });
 
     await act(async () => {
       await result.current.actions.castColumn('node-1', 'published_at', 'datetime', '%Y-%m-%d');
+      await result.current.actions.renameColumn('node-1', 'published_at', 'date');
+      await result.current.actions.deleteColumn('node-1', 'date');
     });
 
-    expect(workspaceSdkMock.createNode).toHaveBeenCalledWith({
+    expect(workspaceSdkMock.editNode).toHaveBeenNthCalledWith(1, {
       body: {
         kind: 'cast',
-        source_node_id: 'node-1',
         column: 'published_at',
         target_type: 'datetime',
         datetime_format: '%Y-%m-%d',
       },
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+    expect(workspaceSdkMock.editNode).toHaveBeenNthCalledWith(2, {
+      body: {
+        kind: 'rename_column',
+        column: 'published_at',
+        new_name: 'date',
+      },
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+    expect(workspaceSdkMock.editNode).toHaveBeenNthCalledWith(3, {
+      body: { kind: 'delete_column', column: 'date' },
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+  });
+
+  it('routes preprocessing create and update modes to distinct commands', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.createNode.mockResolvedValue({ data: { id: 'derived-node' } });
+    workspaceSdkMock.editNode.mockResolvedValue({ data: { id: 'node-1' } });
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
+    });
+    const request = {
+      conditions: [{ column: 'count', operator: 'gte' as const, value: 2 }],
+      logic: 'and' as const,
+      name: 'Filtered',
+    };
+
+    await act(async () => {
+      await result.current.actions.filterNode('node-1', request, 'create');
+      await result.current.actions.filterNode('node-1', request, 'update');
+    });
+
+    expect(workspaceSdkMock.createNode).toHaveBeenCalledWith({
+      body: {
+        kind: 'filter',
+        source_node_id: 'node-1',
+        conditions: request.conditions,
+        logic: 'and',
+        name: 'Filtered',
+      },
       path: { workspace_id: 'ws-1' },
       throwOnError: true,
     });
+    expect(workspaceSdkMock.editNode).toHaveBeenCalledWith({
+      body: {
+        kind: 'filter',
+        conditions: request.conditions,
+        logic: 'and',
+      },
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+  });
+
+  it('runs Undo and Redo commands through the node history endpoints', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.undoNode.mockResolvedValue({ data: { id: 'node-1' } });
+    workspaceSdkMock.redoNode.mockResolvedValue({ data: { id: 'node-1' } });
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.actions.undoNode('node-1');
+      await result.current.actions.redoNode('node-1');
+    });
+
+    expect(workspaceSdkMock.undoNode).toHaveBeenCalledWith({
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+    expect(workspaceSdkMock.redoNode).toHaveBeenCalledWith({
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['workspaces', 'ws-1', 'graph'],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'data'],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'schema'],
+    });
+    expect(invalidateQueries.mock.calls.some(([options]) => 'predicate' in options)).toBe(true);
   });
 
   it('submits child analysis resources under their parent analysis', async () => {
@@ -265,6 +357,37 @@ describe('useWorkspaceNodeMutations', () => {
         kind: 'concordance_detachment',
         node_id: 'node-1',
         selected_columns: ['text'],
+      },
+      path: { workspace_id: 'ws-1', analysis_id: 'analysis-1' },
+      throwOnError: true,
+    });
+  });
+
+  it('submits Topic Modeling detachment as one typed multi-source child', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.submitChildAnalysis.mockResolvedValue({ data: { id: 'child-topics' } });
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.actions.detachTopicModeling('analysis-1', {
+        node_ids: ['node-1', 'node-2'],
+        selected_columns: { 'node-1': ['text'], 'node-2': ['text'] },
+        new_node_names: { 'node-1': 'First topics', 'node-2': 'Second topics' },
+        topic_ids: [1, 3],
+        topic_meanings_override: [{ topic_id: 1, words: ['word'] }],
+      });
+    });
+
+    expect(workspaceSdkMock.submitChildAnalysis).toHaveBeenCalledWith({
+      body: {
+        kind: 'topic_modeling_detachment',
+        node_ids: ['node-1', 'node-2'],
+        selected_columns: { 'node-1': ['text'], 'node-2': ['text'] },
+        new_node_names: { 'node-1': 'First topics', 'node-2': 'Second topics' },
+        topic_ids: [1, 3],
+        topic_meanings_override: [{ topic_id: 1, words: ['word'] }],
       },
       path: { workspace_id: 'ws-1', analysis_id: 'analysis-1' },
       throwOnError: true,

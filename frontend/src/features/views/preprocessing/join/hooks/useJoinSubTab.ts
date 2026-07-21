@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { previewNodeCreationTable } from '@/api';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
@@ -11,7 +11,6 @@ import type {
   PreviewPagination,
   PreviewRow,
 } from '../../types';
-import { JOIN_TYPE_OPTIONS } from '../../types';
 import { dedupeNodeIds } from '@/features/workspace/common/utils/selectionUtils';
 import { MAX_JOIN_NODES } from '../../types';
 
@@ -20,6 +19,7 @@ const DEFAULT_JOIN_PALETTE = ['#2563eb', '#dc2626'];
 export interface JoinSubTabProps {
   selectedNodeIds: string[];
   selectedNodeColumns: Record<string, string>;
+  setSelectedNodeColumns: (columns: Record<string, string>) => void;
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeMetadata[];
   getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[];
@@ -80,11 +80,9 @@ interface JoinApplyState {
 
 export interface UseJoinSubTabResult {
   selectionPanel: JoinSelectionPanelConfig;
-  sharedColumnsNotice: string | null;
   needsColumns: boolean;
   joinType: JoinType;
   setJoinType: (value: JoinType) => void;
-  currentJoinTypeInfo?: (typeof JOIN_TYPE_OPTIONS)[number];
   joinNewNodeName: string;
   setJoinNewNodeName: (value: string) => void;
   joinNamePlaceholder: string;
@@ -95,18 +93,6 @@ export interface UseJoinSubTabResult {
   apply: JoinApplyState;
   showActivityTag: boolean;
 }
-
-/**
- * Formats the shared-column notice shown below the selection panel. Join uses
- * it to nudge users toward matching columns without dumping long schema lists.
- * Called by `useJoinSubTab` when building its shared-column status message.
- */
-const describeSharedColumns = (count: number, columns: string[]): string => {
-  const preview = columns.slice(0, 4).join(', ');
-  const suffix = columns.length > 4 ? ', …' : '';
-  const list = preview ? ` (${preview}${suffix})` : '';
-  return `Found ${String(count)} shared column${count === 1 ? '' : 's'}${list}.`;
-};
 
 /**
  * Creates a stable key for the current column set used by draft preservation.
@@ -145,6 +131,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const {
     selectedNodeIds,
     selectedNodeColumns,
+    setSelectedNodeColumns,
     currentWorkspaceId,
     workspaceNodes,
     getColumnInfos,
@@ -209,6 +196,54 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   })();
 
   const preferredJoinColumn = sharedColumns[0];
+  const joinPairSignature =
+    joinLeftNodeId && joinRightNodeId && leftColumns.length > 0 && rightColumns.length > 0
+      ? [
+          joinLeftNodeId,
+          joinRightNodeId,
+          columnsKey(leftColumns),
+          columnsKey(rightColumns),
+        ].join('\0')
+      : '';
+  const initializedJoinPairRef = useRef<string | null>(null);
+  const selectedLeftColumn = selectedNodeColumns[joinLeftNodeId] ?? '';
+  const selectedRightColumn = selectedNodeColumns[joinRightNodeId] ?? '';
+  const defaultLeftColumn = leftColumns[0] ?? '';
+  const defaultRightColumn = rightColumns[0] ?? '';
+
+  useEffect(() => {
+    if (!joinPairSignature) {
+      initializedJoinPairRef.current = null;
+      return;
+    }
+    if (initializedJoinPairRef.current === joinPairSignature) return;
+    initializedJoinPairRef.current = joinPairSignature;
+    if (!preferredJoinColumn) return;
+
+    const alreadyUsesFirstShared =
+      selectedLeftColumn === preferredJoinColumn &&
+      selectedRightColumn === preferredJoinColumn;
+    const stillUsesInitialDefaults =
+      (!selectedLeftColumn || selectedLeftColumn === defaultLeftColumn) &&
+      (!selectedRightColumn || selectedRightColumn === defaultRightColumn);
+    if (alreadyUsesFirstShared || !stillUsesInitialDefaults) return;
+
+    setSelectedNodeColumns({
+      [joinLeftNodeId]: preferredJoinColumn,
+      [joinRightNodeId]: preferredJoinColumn,
+    });
+  }, [
+    defaultLeftColumn,
+    defaultRightColumn,
+    joinLeftNodeId,
+    joinPairSignature,
+    joinRightNodeId,
+    preferredJoinColumn,
+    selectedLeftColumn,
+    selectedRightColumn,
+    setSelectedNodeColumns,
+  ]);
+
   const preferredLeftColumn = leftColumns.includes(selectedNodeColumns[joinLeftNodeId] ?? '')
     ? selectedNodeColumns[joinLeftNodeId]
     : preferredJoinColumn;
@@ -267,8 +302,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     }
     return joinConfigIssues || 'Configure the join to preview results.';
   })();
-
-  const currentJoinTypeInfo = JOIN_TYPE_OPTIONS.find((option) => option.value === joinType);
 
   const autoJoinName = (() => {
     if (!joinLeftNodeId || !joinRightNodeId || joinLeftNodeId === joinRightNodeId) return '';
@@ -444,14 +477,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     },
   };
 
-  const sharedColumnsNotice = (() => {
-    if (!needsColumns) return null;
-    if (!joinLeftNodeId || !joinRightNodeId || joinLeftNodeId === joinRightNodeId) return null;
-    return sharedColumns.length > 0
-      ? describeSharedColumns(sharedColumns.length, sharedColumns)
-      : 'No matching column names detected. Select compatible columns manually.';
-  })();
-
   const previewIsEmpty =
     joinConfigReady &&
     joinPreviewReady &&
@@ -487,11 +512,9 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   return {
     selectionPanel,
-    sharedColumnsNotice,
     needsColumns,
     joinType,
     setJoinType: handleSetJoinType,
-    currentJoinTypeInfo,
     joinNewNodeName,
     setJoinNewNodeName,
     joinNamePlaceholder: autoJoinName || 'Joined dataset',

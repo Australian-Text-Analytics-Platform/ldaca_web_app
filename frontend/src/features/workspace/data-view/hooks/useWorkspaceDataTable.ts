@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
-import { getNodeRowsTable } from '@/api';
+import { queryWorkspaceSqlTable, sqlOrder, sqlTable } from '@/api';
 import type { NodeDataResponse } from '@/api/frontendModels';
 import { createNodeDataRequest, queryKeys, type NodeDataRequest } from '@/lib/queryKeys';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
@@ -14,11 +14,15 @@ export interface WorkspaceDataTableHeaderInfo {
   tabPosition: number;
   totalTabs: number;
   isEmptyTable: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 interface WorkspaceDataTableNodeActions {
   onDelete?: () => void;
   onRename?: (newName: string) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 interface WorkspaceSelectionTab {
@@ -111,6 +115,10 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const { activeNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
   const {
     castColumn,
+    renameColumn,
+    deleteColumn,
+    undoNode,
+    redoNode,
     refreshNodeSchema,
     deleteNode,
     renameNode,
@@ -208,9 +216,20 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       if (!currentWorkspaceId || !activeNodeId) {
         throw new Error('Missing workspace or node ID');
       }
-      const data = await getNodeRowsTable({
-        path: { workspace_id: currentWorkspaceId, node_id: activeNodeId },
-        query: nodeTableRequest,
+      const sql = `SELECT * FROM ${sqlTable(activeNodeId)}${
+        nodeTableRequest.sort_by
+          ? ` ORDER BY ${sqlOrder(nodeTableRequest.sort_by, nodeTableRequest.descending)}`
+          : ''
+      }`;
+      const data = await queryWorkspaceSqlTable({
+        path: { workspace_id: currentWorkspaceId },
+        body: {
+          mode: 'query',
+          node_ids: [activeNodeId],
+          sql,
+          page: nodeTableRequest.page,
+          page_size: nodeTableRequest.page_size,
+        },
       });
       return {
         page: nodeTableRequest.page,
@@ -230,6 +249,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     tabPosition,
     totalTabs: selectedNodeIds.length,
     isEmptyTable: nodeData.rows.length === 0,
+    canUndo: selectedNode?.can_undo ?? false,
+    canRedo: selectedNode?.can_redo ?? false,
   };
 
   const nodeActions: WorkspaceDataTableNodeActions = {
@@ -237,6 +258,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onRename: selectedNode?.id
       ? (newName: string) => void renameNode(selectedNode.id, newName)
       : undefined,
+    onUndo: selectedNode?.id ? () => void undoNode(selectedNode.id) : undefined,
+    onRedo: selectedNode?.id ? () => void redoNode(selectedNode.id) : undefined,
   };
 
   const tabs: WorkspaceSelectionTabsState = {
@@ -287,6 +310,24 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     [selectedNodeIdForCallbacks, castColumn],
   );
 
+  /** Renames a column on the active Data Block. */
+  const handleRenameColumn = useCallback(
+    async (column: string, nextName: string) => {
+      if (!selectedNodeIdForCallbacks) return;
+      await renameColumn(selectedNodeIdForCallbacks, column, nextName);
+    },
+    [renameColumn, selectedNodeIdForCallbacks],
+  );
+
+  /** Deletes a column from the active Data Block. */
+  const handleDeleteColumn = useCallback(
+    async (column: string) => {
+      if (!selectedNodeIdForCallbacks) return;
+      await deleteColumn(selectedNodeIdForCallbacks, column);
+    },
+    [deleteColumn, selectedNodeIdForCallbacks],
+  );
+
   /** Refreshes schema for the active node after column mutations. */
   const handleRefreshSchema = useCallback(async () => {
     if (!selectedNodeIdForCallbacks) return undefined;
@@ -302,6 +343,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     nodeId: selectedNode?.id,
     documentColumn: selectedNode?.document ?? undefined,
     onCast: selectedNodeIdForCallbacks ? handleCast : undefined,
+    onRenameColumn: selectedNodeIdForCallbacks ? handleRenameColumn : undefined,
+    onDeleteColumn: selectedNodeIdForCallbacks ? handleDeleteColumn : undefined,
     onRefreshSchema: selectedNodeIdForCallbacks ? handleRefreshSchema : undefined,
     pagination: { page: nodeData.page, page_size: nodeData.page_size },
     hasNext: nodeData.has_next,

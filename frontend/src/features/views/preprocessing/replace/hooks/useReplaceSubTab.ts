@@ -15,9 +15,11 @@ import {
   type ReplaceRequestDraft,
 } from './replaceRequestModel';
 import type { ReplaceRequest } from './replaceRequestModel';
+import type { PreprocessingApplyMode } from '../../preprocessingApplyMode';
 
 export interface ReplaceSubTabProps {
   currentWorkspaceId: string | null;
+  applyMode: PreprocessingApplyMode;
   selectedColumn?: string;
   selectedNodes: WorkspaceNodeMetadata[];
   getColumnInfos: (node: WorkspaceNodeMetadata) => ColumnInfo[];
@@ -26,7 +28,11 @@ export interface ReplaceSubTabProps {
   };
   onAlert: (message: string) => void;
   replaceTextPreview: OperationPreviewFetcher<ReplaceRequest>;
-  replaceText: (nodeId: string, request: ReplaceRequest) => Promise<WorkspaceNodeInfo>;
+  replaceText: (
+    nodeId: string,
+    request: ReplaceRequest,
+    mode: PreprocessingApplyMode,
+  ) => Promise<WorkspaceNodeInfo>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
 
@@ -40,6 +46,7 @@ export interface ReplaceSubTabProps {
 export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const {
     currentWorkspaceId,
+    applyMode,
     selectedColumn: inputSelectedColumn = '',
     selectedNodes,
     isLoading,
@@ -134,9 +141,11 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     if (!activeNodeId || !request) return;
     setApplyLoading(true);
     try {
-      const response = await replaceText(activeNodeId, request);
-      onAlert(`Created ${response.name}`);
-      await refreshNodeSchema(activeNodeId);
+      const response = await replaceText(activeNodeId, request, applyMode);
+      onAlert(applyMode === 'create' ? `Created ${response.name}` : `Updated ${response.name}`);
+      if (applyMode === 'update') {
+        await refreshNodeSchema(activeNodeId);
+      }
     } catch {
       // Error is shown via preview refresh
     } finally {

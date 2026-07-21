@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getNodeDataByWorkspaceId } from '@/api';
+import { queryWorkspaceSqlTable, sqlIdentifier, sqlTable } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import { collectDocumentColumnText } from '../components/tokenizerModelSelectorUtils';
@@ -54,17 +54,24 @@ export function useDetectedColumnLanguage({
     staleTime: 60_000,
     /** Called by: TanStack Query to fetch sample rows for language detection. */
     queryFn: async () => {
-      const { data } = await getNodeDataByWorkspaceId({
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- queryFn only runs when canFetchSample guarantees workspaceId/nodeId are set
-        path: { workspace_id: workspaceId!, node_id: nodeId! },
-        query: LANGUAGE_SAMPLE_REQUEST,
-        throwOnError: true,
+      if (!workspaceId || !nodeId || !column) {
+        throw new Error('Missing language-detection selection');
+      }
+      const data = await queryWorkspaceSqlTable({
+        path: { workspace_id: workspaceId },
+        body: {
+          mode: 'query',
+          node_ids: [nodeId],
+          sql: `SELECT ${sqlIdentifier(column)} FROM ${sqlTable(nodeId)}`,
+          page: LANGUAGE_SAMPLE_REQUEST.page,
+          page_size: LANGUAGE_SAMPLE_REQUEST.page_size,
+        },
       });
       return data;
     },
   });
 
-  const sampleText = collectDocumentColumnText(sampleQuery.data?.data, column ?? '');
+  const sampleText = collectDocumentColumnText(sampleQuery.data?.rows, column ?? '');
 
   const detectionQuery = useQuery({
     queryKey: [

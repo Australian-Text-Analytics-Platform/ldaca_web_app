@@ -23,5 +23,6 @@ export const extractColumnTypes = (
  */
 export const getTypeDisplayName = (type: string): string => {
   const dataType = DATA_TYPES.find((entry) => entry.value === type);
-  return dataType ? dataType.label : type;
+  if (dataType) return dataType.label;
+  return type.startsWith('extension:') ? type.slice('extension:'.length) : type;
 };

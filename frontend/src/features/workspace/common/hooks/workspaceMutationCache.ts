@@ -74,5 +74,22 @@ export const invalidateNodeWorkspaceQueries = (
     void queryClient.invalidateQueries({
       queryKey: queryKeys.nodeData(workspaceId, nodeId),
     });
+    void queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey;
+        if (
+          key[0] !== 'workspaces' ||
+          key[1] !== workspaceId ||
+          key[2] !== 'sql' ||
+          typeof key[3] !== 'object' ||
+          key[3] === null ||
+          !('nodeIds' in key[3])
+        ) {
+          return false;
+        }
+        const nodeIds = (key[3] as { nodeIds?: unknown }).nodeIds;
+        return Array.isArray(nodeIds) && nodeIds.includes(nodeId);
+      },
+    });
   }
 };

@@ -7,14 +7,23 @@ export interface DatetimeModalState {
 export interface ColumnMutationState {
   columnTypes: Record<string, string>;
   loadingCast: Record<string, boolean>;
+  columnActionLoading: Record<string, boolean>;
+  renamingColumn: string | null;
   datetimeModal: DatetimeModalState;
+  columnToDelete: string | null;
 }
 
 export type ColumnMutationAction =
   | { type: 'schemaApplied'; columnTypes: Record<string, string> }
   | { type: 'castLoadingChanged'; column: string; active: boolean }
+  | { type: 'columnActionLoadingChanged'; column: string; active: boolean }
   | { type: 'datetimeRequested'; column: string; targetType: string }
-  | { type: 'datetimeClosed' };
+  | { type: 'datetimeClosed' }
+  | { type: 'renameStarted'; column: string }
+  | { type: 'renameClosed' }
+  | { type: 'deleteRequested'; column: string }
+  | { type: 'deleteDialogChanged'; open: boolean }
+  | { type: 'columnTypeRemoved'; column: string };
 
 const closedDatetimeModal: DatetimeModalState = {
   isOpen: false,
@@ -25,7 +34,10 @@ const closedDatetimeModal: DatetimeModalState = {
 export const createColumnMutationState = (): ColumnMutationState => ({
   columnTypes: {},
   loadingCast: {},
+  columnActionLoading: {},
+  renamingColumn: null,
   datetimeModal: closedDatetimeModal,
+  columnToDelete: null,
 });
 
 const setColumnFlag = (
@@ -56,6 +68,16 @@ export const columnMutationReducer = (
       const loadingCast = setColumnFlag(state.loadingCast, action.column, action.active);
       return loadingCast === state.loadingCast ? state : { ...state, loadingCast };
     }
+    case 'columnActionLoadingChanged': {
+      const columnActionLoading = setColumnFlag(
+        state.columnActionLoading,
+        action.column,
+        action.active,
+      );
+      return columnActionLoading === state.columnActionLoading
+        ? state
+        : { ...state, columnActionLoading };
+    }
     case 'datetimeRequested':
       return {
         ...state,
@@ -63,6 +85,29 @@ export const columnMutationReducer = (
       };
     case 'datetimeClosed':
       return state.datetimeModal.isOpen ? { ...state, datetimeModal: closedDatetimeModal } : state;
+    case 'renameStarted':
+      return state.renamingColumn === action.column
+        ? state
+        : { ...state, renamingColumn: action.column };
+    case 'renameClosed':
+      return state.renamingColumn === null ? state : { ...state, renamingColumn: null };
+    case 'deleteRequested':
+      return state.columnToDelete === action.column
+        ? state
+        : { ...state, columnToDelete: action.column };
+    case 'deleteDialogChanged':
+      return action.open || state.columnToDelete === null
+        ? state
+        : { ...state, columnToDelete: null };
+    case 'columnTypeRemoved': {
+      if (!(action.column in state.columnTypes)) return state;
+      const { [action.column]: _, ...columnTypes } = state.columnTypes;
+      return {
+        ...state,
+        columnTypes,
+        renamingColumn: state.renamingColumn === action.column ? null : state.renamingColumn,
+      };
+    }
     default:
       return state;
   }

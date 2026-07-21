@@ -10,13 +10,13 @@ interface CustomNodeActionMenuProps {
   showMenu: boolean;
   menuOpensUp: boolean;
   menuOpensRight: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
   onMenuChange: (showMenu: boolean, placement: NodeMenuPlacement | null) => void;
   onRenameClick: (event: React.MouseEvent) => void;
   onCopyNode: (event: React.MouseEvent) => void;
-  onUndoNode: (event: React.MouseEvent) => void;
-  onRedoNode: (event: React.MouseEvent) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: (event: React.MouseEvent) => void;
+  onRedo: (event: React.MouseEvent) => void;
   onDeleteClick: (event: React.MouseEvent) => void;
   stopGraphControlEvent: (event: React.SyntheticEvent) => void;
 }
@@ -31,13 +31,13 @@ export function CustomNodeActionMenu({
   showMenu,
   menuOpensUp,
   menuOpensRight,
-  canUndo,
-  canRedo,
   onMenuChange,
   onRenameClick,
   onCopyNode,
-  onUndoNode,
-  onRedoNode,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onDeleteClick,
   stopGraphControlEvent,
 }: CustomNodeActionMenuProps) {
@@ -69,6 +69,7 @@ export function CustomNodeActionMenu({
           )}
         >
           <button
+            type="button"
             onClick={onRenameClick}
             className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-muted/60"
           >
@@ -76,6 +77,7 @@ export function CustomNodeActionMenu({
           </button>
 
           <button
+            type="button"
             onClick={onCopyNode}
             className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
           >
@@ -83,22 +85,25 @@ export function CustomNodeActionMenu({
           </button>
 
           <button
-            onClick={onUndoNode}
+            type="button"
+            onClick={onUndo}
             disabled={!canUndo}
-            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
+            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs enabled:hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Undo
           </button>
 
           <button
-            onClick={onRedoNode}
+            type="button"
+            onClick={onRedo}
             disabled={!canRedo}
-            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
+            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs enabled:hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Redo
           </button>
 
           <button
+            type="button"
             onClick={onDeleteClick}
             className="w-full border-t border-border/60 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
           >

@@ -31,7 +31,7 @@ type ReplaceSubTabComponentProps = ReplaceSubTabProps & {
  * apply/preview actions to the replace hook.
  */
 export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
-  const { renderNodeInputsPanel } = props;
+  const { applyMode, renderNodeInputsPanel } = props;
   const {
     hasSelection,
     effectiveNodes,
@@ -199,7 +199,13 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
               disabled={!canApply}
               className="shrink-0"
             >
-              {applyLoading ? 'Applying…' : 'Add to Data Block'}
+              {applyLoading
+                ? applyMode === 'create'
+                  ? 'Creating Data Block…'
+                  : 'Updating Data Block…'
+                : applyMode === 'create'
+                  ? 'Create Data Block'
+                  : 'Update Data Block'}
             </Button>
           </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
@@ -213,7 +219,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
             <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
           </span>
         }
-        description="Review the updated rows before applying to the selected data block."
+        description="Review the transformed rows before creating or updating a data block."
         columns={preview.columns}
         data={preview.data}
         pagination={preview.pagination}

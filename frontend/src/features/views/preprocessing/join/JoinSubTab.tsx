@@ -34,11 +34,8 @@ type JoinSubTabComponentProps = JoinSubTabProps & {
 export function JoinSubTab(props: JoinSubTabComponentProps) {
   const { renderNodeInputsPanel } = props;
   const {
-    sharedColumnsNotice,
-    needsColumns,
     joinType,
     setJoinType,
-    currentJoinTypeInfo,
     joinNewNodeName,
     setJoinNewNodeName,
     joinNamePlaceholder,
@@ -69,10 +66,6 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
         <CardContent className="space-y-4 pt-0">
           {renderNodeInputsPanel?.()}
 
-          {needsColumns && sharedColumnsNotice && (
-            <div className="text-xs text-muted-foreground">{sharedColumnsNotice}</div>
-          )}
-
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -96,9 +89,6 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
                   ))}
                 </SelectContent>
               </Select>
-              {currentJoinTypeInfo && (
-                <p className="text-xs text-muted-foreground">{currentJoinTypeInfo.description}</p>
-              )}
             </div>
           </div>
         </CardContent>
@@ -144,7 +134,7 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add to Workspace
+                  Create Data Block
                 </>
               )}
             </Button>

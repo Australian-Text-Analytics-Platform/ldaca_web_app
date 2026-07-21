@@ -14,6 +14,10 @@ interface CategoricalOptionState {
   hasNull: boolean;
   loading: boolean;
   error: string | null;
+  page: number;
+  hasNext: boolean;
+  etag: string | null;
+  searchQuery: string;
 }
 
 export type CategoricalOptionsByKey = Record<string, CategoricalOptionState>;

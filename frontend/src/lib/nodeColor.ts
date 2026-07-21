@@ -1,5 +1,5 @@
 /** Matches the ``#rrggbb`` colours persisted on ``Node.color`` by the backend
- * ``POST /api/workspaces/{workspace_id}/nodes/{node_id}/color`` endpoint. */
+ * node update resource. */
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 /**
