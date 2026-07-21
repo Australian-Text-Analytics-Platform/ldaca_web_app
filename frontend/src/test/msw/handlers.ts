@@ -69,14 +69,13 @@ export const handlers = [
   http.delete(apiPath('/session'), () => new HttpResponse(null, { status: 204 })),
   http.get(apiPath('/storage'), () => HttpResponse.json({ policy: 'unlimited' })),
   http.get(apiPath('/provider-credentials'), () => HttpResponse.json(providerCredentialResponse())),
-  http.put(apiPath('/provider-credentials'), () => HttpResponse.json(providerCredentialResponse())),
   http.patch(apiPath('/provider-credentials'), () =>
     HttpResponse.json(providerCredentialResponse()),
   ),
   http.delete(apiPath('/provider-credentials'), () => new HttpResponse(null, { status: 204 })),
   http.get(apiPath('/tokenizer-models'), () => HttpResponse.json(tokenizerModelsResponse())),
   http.get(apiPath('/sample-collections'), () => HttpResponse.json(sampleCatalogueResponse())),
-  http.get(apiPath('/data-portal/featured'), () => HttpResponse.json(dataPortalResponse())),
+  http.post(apiPath('/data-portal/featured'), () => HttpResponse.json(dataPortalResponse())),
   http.post(apiPath('/data-portal/search'), () => HttpResponse.json(dataPortalResponse())),
   http.post(apiPath('/data-portal/imports'), () => HttpResponse.json(acceptedAnalysis())),
   http.get(apiPath('/user-files'), () => HttpResponse.json([])),
@@ -128,6 +127,19 @@ export const handlers = [
     () => new HttpResponse(null, { status: 204 }),
   ),
   http.delete(apiPath('/workspaces/:workspace_id'), () => new HttpResponse(null, { status: 204 })),
+  http.post(apiPath('/workspaces/:workspace_id/sql'), async ({ request }) => {
+    const body = (await request.json()) as { mode?: string };
+    if (body.mode === 'create') {
+      return HttpResponse.json(nodeResponse(), { status: 201 });
+    }
+    return new HttpResponse(nodeRowsArrowStream(), {
+      headers: {
+        'Content-Type': 'application/vnd.apache.arrow.stream',
+        'X-Wordflow-Has-Next': 'false',
+        ETag: '"workspace-1"',
+      },
+    });
+  }),
   http.get(apiPath('/workspaces/:workspace_id/nodes'), () => HttpResponse.json([nodeResponse()])),
   http.get(apiPath('/workspaces/:workspace_id/nodes/:node_id'), () =>
     HttpResponse.json(nodeResponse()),
@@ -143,7 +155,6 @@ export const handlers = [
     apiPath('/workspaces/:workspace_id/nodes/:node_id'),
     () => new HttpResponse(null, { status: 204 }),
   ),
-  http.get(apiPath('/workspaces/:workspace_id/nodes/:node_id/rows'), arrowPageResponse),
   http.get(apiPath('/workspaces/:workspace_id/nodes/:node_id/schema'), arrowSchemaResponse),
   http.post(apiPath('/workspaces/:workspace_id/nodes/:node_id/annotation-previews'), () =>
     HttpResponse.json({ labels: [] }),

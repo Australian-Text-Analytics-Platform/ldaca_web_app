@@ -72,7 +72,7 @@ describe('SidebarTasksSection', () => {
     ]);
   });
 
-  it('expands task details only when clicked', async () => {
+  it('shows the failure without stale progress after a task becomes terminal', async () => {
     const user = userEvent.setup();
 
     renderTasks([
@@ -81,17 +81,35 @@ describe('SidebarTasksSection', () => {
         task_type: 'topic_modeling',
         state: 'failed',
         message: 'Save failed',
-        progress_message: 'Could not save analysis result',
+        progress_message: 'Queued',
         created_at: 100,
         finished_at: 200,
       },
     ]);
 
-    expect(screen.queryByText(/could not save analysis result/i)).not.toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: /task: topic modeling/i }));
 
-    expect(screen.getByText(/could not save analysis result/i)).toBeInTheDocument();
+    expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^queued$/i)).not.toBeInTheDocument();
+  });
+
+  it('shows live progress details while a task is active', async () => {
+    const user = userEvent.setup();
+
+    renderTasks([
+      {
+        task_id: 'task-running',
+        task_type: 'token_frequencies',
+        state: 'running',
+        message: 'Running',
+        progress_message: 'Tokenizing documents',
+        created_at: 100,
+      },
+    ]);
+
+    await user.click(screen.getByRole('button', { name: /task: token frequencies/i }));
+
+    expect(screen.getByText(/tokenizing documents/i)).toBeInTheDocument();
   });
 
   it('does not render task lifecycle action buttons in expanded details', async () => {

@@ -260,13 +260,14 @@ export function FileTree({
             }}
           >
             <Eye className="h-3.5 w-3.5" />
-            <span className="hidden @min-[40rem]/file-row:inline">Preview</span>
+            <span className="hidden @min-[640px]/file-row:inline">Preview</span>
           </Button>
           <Button
             size="sm"
             variant="ghost"
             className="h-7 px-2"
             aria-label="Add"
+            data-guidance="add-data-block"
             disabled={!hasWorkspaceSelected}
             title={
               hasWorkspaceSelected
@@ -279,23 +280,27 @@ export function FileTree({
             }}
           >
             <Plus className="h-3.5 w-3.5" />
-            <span className="hidden @min-[40rem]/file-row:inline">Add</span>
+            <span className="hidden @min-[640px]/file-row:inline">Add</span>
           </Button>
           <Button
             size="sm"
             variant="ghost"
             className="h-7 px-2"
+            aria-label={`Download ${file.name}`}
+            title={`Download ${file.name}`}
             onClick={() => {
               onDownloadFile(file.path);
             }}
           >
             <DownloadIcon className="h-3.5 w-3.5" />
-            <span className="hidden xl:inline">Download</span>
+            <span className="hidden @min-[640px]/file-row:inline">Download</span>
           </Button>
           <Button
             size="sm"
             variant="ghost"
             className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            aria-label={`Delete ${file.name}`}
+            title={`Delete ${file.name}`}
             onClick={() => {
               onDeleteFile(file.path);
             }}

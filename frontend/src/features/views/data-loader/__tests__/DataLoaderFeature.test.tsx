@@ -16,6 +16,7 @@ const {
   mockCreateFolder,
   mockMoveFile,
   mockListFeaturedDataPortalCollections,
+  mockRequestContextualHint,
 } = vi.hoisted(() => ({
   mockSetCurrentWorkspace: vi.fn(),
   mockUpdateWorkspaceDescription: vi.fn(),
@@ -25,6 +26,7 @@ const {
   mockCreateFolder: vi.fn(),
   mockMoveFile: vi.fn(),
   mockListFeaturedDataPortalCollections: vi.fn(),
+  mockRequestContextualHint: vi.fn(),
 }));
 
 interface MockWorkspaceState {
@@ -93,6 +95,13 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
 vi.mock('@/features/auth/hooks/useAuth', () => ({
   // Provides the auth surface needed by file-browser controls.
   useAuth: () => ({}),
+}));
+
+vi.mock('@/features/guidance/GuidanceContext', () => ({
+  useGuidance: () => ({
+    requestContextualHint: mockRequestContextualHint,
+    startGuidedTour: vi.fn(),
+  }),
 }));
 
 const mockFileTree = [
@@ -245,6 +254,18 @@ describe('DataLoaderFeature citation UI', () => {
       currentWorkspaceId: 'ws-1',
       workspaceGraph: { nodes: [] },
     };
+  });
+
+  it('keeps a stable file-list toolbar fallback for contextual guidance', () => {
+    renderWithProviders(<DataLoaderFeature />);
+
+    expect(screen.getByRole('toolbar', { name: 'File list' })).toHaveAttribute(
+      'data-guidance',
+      'file-library-toolbar',
+    );
+    expect(screen.getByRole('region', { name: 'Files upload area' })).not.toHaveAttribute(
+      'data-guidance',
+    );
   });
 
   it('shows folder citation icons only for directories with readme and opens citation dialog', async () => {

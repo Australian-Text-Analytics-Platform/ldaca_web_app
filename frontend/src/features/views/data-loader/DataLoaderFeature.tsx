@@ -1,29 +1,30 @@
-import { useState, type ReactNode } from 'react';
-import { Loader2, FolderPlus, Upload, Download as DownloadIcon, RefreshCcw } from 'lucide-react';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { useFiles } from '@/features/views/data-loader/hooks/useFiles';
-import { useUserPreferences } from '@/features/preferences/useUserPreferences';
-import { useAnalysisStore, isRunningTaskState, isPendingTaskState } from '@/stores/analysisStore';
-import { AddFilePanel, FilePreviewPanel } from '@/features/views/data-loader/components';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Download as DownloadIcon, FolderPlus, Loader2, RefreshCcw, Upload } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
-import { useResizableSplit } from '@/hooks/useResizableSplit';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useUserPreferences } from '@/features/preferences/useUserPreferences';
+import { AddFilePanel, FilePreviewPanel } from '@/features/views/data-loader/components';
+import { useFiles } from '@/features/views/data-loader/hooks/useFiles';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceDownloads } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
+import { useResizableSplit } from '@/hooks/useResizableSplit';
+import { isPendingTaskState, isRunningTaskState, useAnalysisStore } from '@/stores/analysisStore';
+import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
+import { DataLoaderDialogs } from './components/DataLoaderDialogs';
+import { FileTree } from './components/FileTree';
+import { SampleDataPanel } from './components/SampleDataPanel';
+import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';
+import { useDataLoaderGuidance } from './hooks/useDataLoaderGuidance';
 import { useDataLoaderWorkspaceActions } from './hooks/useDataLoaderWorkspaceActions';
 import { useFileBrowserActions } from './hooks/useFileBrowserActions';
 import { useFolderCreation } from './hooks/useFolderCreation';
 import { useLdacaImport } from './hooks/useLdacaImport';
 import { useUploadState } from './hooks/useUploadState';
-import { FileTree } from './components/FileTree';
-import { WorkspaceManagerCard } from './components/WorkspaceManagerCard';
-import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
-import { DataLoaderDialogs } from './components/DataLoaderDialogs';
-import { SampleDataPanel } from './components/SampleDataPanel';
 import { countFilesInNode } from './utils/fileTreeHelpers';
 
 interface FileListShellProps {
@@ -60,7 +61,12 @@ function FileListShell({
     <div
       className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border ${stateClasses}`}
     >
-      <div className="border-border/60 flex items-center justify-start border-b px-2 py-1.5">
+      <div
+        role="toolbar"
+        aria-label="File list"
+        data-guidance="file-library-toolbar"
+        className="border-border/60 flex items-center justify-start border-b px-2 py-1.5"
+      >
         <Button
           size="icon"
           variant="ghost"
@@ -280,8 +286,17 @@ function DataLoaderFeature() {
       )
     : false;
 
+  useDataLoaderGuidance({
+    currentWorkspaceId,
+    loadingFiles,
+    nodeCount,
+    totalFileCount,
+    workspaceBusy,
+    workspaceCount: workspaces.length,
+  });
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="@container/data-loader flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-foreground leading-none font-semibold tracking-tight">Data Loader</h1>
@@ -300,10 +315,10 @@ function DataLoaderFeature() {
 
       <div ref={splitContainerRef} className="flex min-h-0 flex-1 flex-col">
         <div
-          className="min-h-0 overflow-hidden"
+          className="min-h-0 overflow-y-auto @min-[576px]/data-loader:overflow-hidden"
           style={{ flexBasis: `${String(topRatio * 100)}%` }}
         >
-          <div className="grid h-full min-h-0 gap-4 lg:grid-cols-2">
+          <div className="grid min-h-full gap-4 @min-[576px]/data-loader:h-full @min-[576px]/data-loader:min-h-0 @min-[576px]/data-loader:grid-cols-2">
             <ActiveWorkspaceCard
               currentWorkspace={currentWorkspace}
               nodeCount={nodeCount}
@@ -371,7 +386,7 @@ function DataLoaderFeature() {
               </div>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden pb-4">
-              <div className="flex flex-wrap items-center gap-2">
+              <div data-guidance="file-sources" className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1">
                   <Button onClick={openFilePicker} disabled={uploading || uploadingFiles}>
                     <Upload className="mr-2 h-4 w-4" />{' '}

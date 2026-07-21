@@ -23,33 +23,37 @@ describe('SampleDataPanel cache policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     server.use(
-      http.get('*/api/files/sample-data/catalogue', () =>
+      http.get('*/api/sample-collections', () =>
         HttpResponse.json({
           schema_version: 1,
           collections: [
             {
-              id: 'bundled-sample',
-              name: 'Bundled sample',
-              description: 'A bundled corpus',
+              id: 'ADO/twitter',
+              name: 'ADO Twitter',
+              description: 'A remote corpus',
               language: 'en',
-              bundled: true,
-              files: [],
+              installed: false,
+              files: [{ path: 'ADO/twitter/README.md', size: 10 }],
               recommended_for: ['data-loader'],
-              status: 'bundled',
-              total_size_bytes: 100,
+              total_size_bytes: 10,
             },
           ],
         }),
       ),
-      http.post('*/api/files/import-sample-data', () => {
+      http.post('*/api/sample-collections/:collection_id/imports', () => {
         mocks.importRequest();
         return HttpResponse.json({
-          bytes_copied: 100,
-          file_count: 1,
-          message: 'imported',
-          remote_download_started: false,
-          removed_existing: false,
-          status: 'successful',
+          id: 'import-1',
+          state: 'queued',
+          request: { kind: 'sample', collection_id: 'ADO/twitter' },
+          progress: { fraction: 0, message: 'Queued' },
+          error: null,
+          cancellation_requested_at: null,
+          created_at: '2026-01-01T00:00:00Z',
+          started_at: null,
+          finished_at: null,
+          revision: 1,
+          result: null,
         });
       }),
     );
@@ -68,12 +72,40 @@ describe('SampleDataPanel cache policy', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Import sample data' }));
-    expect(await screen.findByText('Bundled sample')).toBeInTheDocument();
+    expect(await screen.findByText('ADO Twitter')).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'ADO Twitter' }));
     await user.click(screen.getByRole('button', { name: 'Import selected' }));
 
     await waitFor(() => {
       expect(mocks.importRequest).toHaveBeenCalledTimes(1);
     });
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not submit when the remote catalogue fails', async () => {
+    server.use(
+      http.get('*/api/sample-collections', () =>
+        HttpResponse.json(
+          { code: 'bad_gateway', message: 'Sample catalogue is unavailable' },
+          { status: 502 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SampleDataPanel />
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Import sample data' }));
+    expect(
+      await screen.findByText('Could not load the sample catalogue.', {}, { timeout: 3_000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import selected' })).toBeDisabled();
+    expect(mocks.importRequest).not.toHaveBeenCalled();
   });
 });

@@ -7,7 +7,7 @@ import { useFiles } from '../useFiles';
 const mocks = vi.hoisted(() => ({
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
-  getUserFiles: vi.fn(),
+  listUserFiles: vi.fn(),
   uploadFile: vi.fn(),
 }));
 
@@ -15,7 +15,7 @@ vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
   deleteFile: mocks.deleteFile,
   downloadFile: mocks.downloadFile,
-  getUserFiles: mocks.getUserFiles,
+  listUserFiles: mocks.listUserFiles,
   uploadFile: mocks.uploadFile,
 }));
 
@@ -29,7 +29,7 @@ function makeWrapper(queryClient: QueryClient) {
 describe('useFiles cache policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getUserFiles.mockResolvedValue({ data: [] });
+    mocks.listUserFiles.mockResolvedValue({ data: [] });
     mocks.uploadFile.mockResolvedValue({ data: { message: 'uploaded' } });
     mocks.deleteFile.mockResolvedValue({ data: { message: 'deleted' } });
   });
@@ -43,7 +43,7 @@ describe('useFiles cache policy', () => {
       wrapper: makeWrapper(queryClient),
     });
     await waitFor(() => {
-      expect(mocks.getUserFiles).toHaveBeenCalledTimes(1);
+      expect(mocks.listUserFiles).toHaveBeenCalledTimes(1);
     });
 
     await act(async () => {
@@ -64,12 +64,12 @@ describe('useFiles cache policy', () => {
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
 
     invalidateQueries.mockClear();
-    const readsBeforeRefresh = mocks.getUserFiles.mock.calls.length;
+    const readsBeforeRefresh = mocks.listUserFiles.mock.calls.length;
     await act(async () => {
       await result.current.refreshFiles();
     });
 
     expect(invalidateQueries).not.toHaveBeenCalled();
-    expect(mocks.getUserFiles).toHaveBeenCalledTimes(readsBeforeRefresh + 1);
+    expect(mocks.listUserFiles).toHaveBeenCalledTimes(readsBeforeRefresh + 1);
   });
 });

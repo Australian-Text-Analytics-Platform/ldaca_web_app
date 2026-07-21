@@ -1,4 +1,3 @@
-import React, { useRef } from 'react';
 import {
   Download as DownloadIcon,
   Loader2,
@@ -8,23 +7,24 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useRef } from 'react';
+import type { WorkspaceSummary } from '@/api';
+import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import HelpIcon from '@/components/help/HelpIcon';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import {
   useUpdateUserPreferences,
   useUserPreferences,
 } from '@/features/preferences/useUserPreferences';
-import type { WorkspaceSummary } from '@/api';
-import { formatBytes, formatTimestamp } from '../utils/format';
 import type { WorkspaceDownloadsHandle } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
+import { formatTimestamp } from '../utils/format';
 
 export type WorkspaceListItem = WorkspaceSummary;
 
@@ -92,9 +92,12 @@ export function WorkspaceManagerCard({
   };
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    <Card
+      data-guidance="workspace-manager"
+      className="@container/workspace-manager flex h-full flex-col overflow-hidden"
+    >
       <CardHeader>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col items-stretch gap-2 @min-[288px]/workspace-manager:flex-row @min-[288px]/workspace-manager:items-center @min-[288px]/workspace-manager:justify-between">
           <CardTitle className="flex items-center gap-2">
             Workspace manager
             <HelpIcon
@@ -103,7 +106,7 @@ export function WorkspaceManagerCard({
               tooltip="Switch between saved workspaces or remove ones you no longer need."
             />
           </CardTitle>
-          <div className="flex items-center gap-1">
+          <div className="flex w-full flex-wrap items-center gap-1 @min-[288px]/workspace-manager:w-auto @min-[288px]/workspace-manager:justify-end">
             <Button
               size="sm"
               variant="outline"
@@ -149,12 +152,12 @@ export function WorkspaceManagerCard({
             {workspaces.map((workspace) => {
               const workspaceId = workspace.id;
               const isActive = workspaceId === currentWorkspaceId;
-              const blockCount = workspace.total_nodes ?? 0;
+              const blockCount = workspace.total_nodes;
               return (
                 <div
                   key={workspaceId}
                   data-testid={`workspace-manager-item-${workspaceId}`}
-                  className={`flex flex-col gap-2 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                  className={`flex flex-col gap-2 rounded-md border px-4 py-3 @min-[480px]/workspace-manager:flex-row @min-[480px]/workspace-manager:items-center @min-[480px]/workspace-manager:justify-between ${
                     isActive
                       ? 'border-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm'
                       : 'border-border/70 bg-background'
@@ -198,16 +201,15 @@ export function WorkspaceManagerCard({
                           <DropdownMenuLabel>Description</DropdownMenuLabel>
                           <div className="px-2 py-1.5 text-sm text-popover-foreground whitespace-pre-wrap">
                             {/* an empty/whitespace description should fall through to the placeholder */}
-                            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
-                            {workspace.description?.trim() || 'No description added yet.'}
+                            {}
+                            {workspace.description.trim() || 'No description added yet.'}
                           </div>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Updated {formatTimestamp(workspace.modified_at)} | {blockCount} data block
-                      {blockCount === 1 ? '' : 's'} | Size{' '}
-                      {formatBytes(workspace.workspace_size_Byte ?? 0)}
+                      {blockCount === 1 ? '' : 's'}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">

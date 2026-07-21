@@ -1,7 +1,7 @@
-import type { CilogonLoginData, GoogleAuthCallbackData } from '@/api';
+import type { CilogonLoginData, GoogleCallbackData } from '@/api';
 import { getGeneratedApiBase } from '@/lib/backend/generatedClientConfig';
 
-const GOOGLE_AUTH_CALLBACK_PATH: GoogleAuthCallbackData['url'] = '/api/auth/google/callback';
+const GOOGLE_AUTH_CALLBACK_PATH: GoogleCallbackData['url'] = '/api/auth/google/callback';
 const CILOGON_LOGIN_PATH: CilogonLoginData['url'] = '/api/auth/cilogon/login';
 
 /**
@@ -9,7 +9,7 @@ const CILOGON_LOGIN_PATH: CilogonLoginData['url'] = '/api/auth/cilogon/login';
  * Used by: GoogleLogin and CILogonLogin because OAuth redirects need native
  * browser navigation while their endpoint paths should stay tied to OpenAPI.
  */
-const buildAuthRedirectUrl = (path: GoogleAuthCallbackData['url'] | CilogonLoginData['url']) =>
+const buildAuthRedirectUrl = (path: GoogleCallbackData['url'] | CilogonLoginData['url']) =>
   `${getGeneratedApiBase()}${path}`;
 
 export const buildGoogleLoginUri = () => buildAuthRedirectUrl(GOOGLE_AUTH_CALLBACK_PATH);

@@ -221,9 +221,13 @@ function SidebarTasksSection({
                     {task.message && (
                       <p className="text-[11px] text-muted-foreground">{task.message}</p>
                     )}
-                    {task.progress_message && task.progress_message !== task.message && (
-                      <p className="text-[11px] text-muted-foreground">{task.progress_message}</p>
-                    )}
+                    {(task.state === 'queued' || task.state === 'running') &&
+                      task.progress_message &&
+                      task.progress_message !== task.message && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {task.progress_message}
+                        </p>
+                      )}
                     <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
                       <dt>Created</dt>
                       <dd className="truncate">{formatTimestamp(task.created_at)}</dd>

@@ -4,9 +4,8 @@ import { toast } from 'sonner';
 import { FolderPlus, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { importSampleData } from '@/api';
+import { getRawFile, listSampleCollections, submitSampleImport } from '@/api';
 import type { SampleDataCollection } from '@/api';
-import { getSampleDataCatalogueOptions, getSampleDataReadmeOptions } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 import { invalidateFilesQuery } from '../hooks/fileCache';
 
 const TOOL_LABELS: Record<string, string> = {
@@ -32,9 +30,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 /**
- * Formats sample-data collection sizes in the import dialog. Kept local because
- * sample catalogue entries always include concrete byte counts.
- * Used by `SampleDataPanel` when rendering each collection's download size.
+ * Formats sample-data collection sizes in the import dialog.
  */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`;
@@ -43,22 +39,20 @@ function formatBytes(bytes: number): string {
 }
 
 /**
- * Renders local availability for a sample-data collection so users understand
- * which rows are bundled, downloaded, partial, or pending download.
- * Rendered by `SampleDataPanel` beside each collection's availability label.
- * Flow: map backend availability states to compact labels and color classes for the collection row.
+ * Shows whether a remote sample collection has already been imported.
  */
-function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
-  const map: Record<SampleDataCollection['status'], { label: string; className: string }> = {
-    bundled: { label: '● Available', className: 'text-green-600 dark:text-green-400' },
-    downloaded: { label: '✓ Downloaded', className: 'text-green-600 dark:text-green-400' },
-    partial: { label: '⚠ Partial', className: 'text-yellow-600 dark:text-yellow-400' },
-    not_downloaded: { label: '○ Not downloaded', className: 'text-muted-foreground' },
-  };
-  // backend status may fall outside the typed union; fall back to the not-downloaded chip
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const { label, className } = map[status] ?? map.not_downloaded;
-  return <span className={cn('text-xs font-medium whitespace-nowrap', className)}>{label}</span>;
+function StatusChip({ installed }: { installed: boolean }) {
+  return (
+    <span
+      className={
+        installed
+          ? 'text-xs font-medium whitespace-nowrap text-green-600 dark:text-green-400'
+          : 'text-xs font-medium whitespace-nowrap text-muted-foreground'
+      }
+    >
+      {installed ? '✓ Imported' : '○ Remote'}
+    </span>
+  );
 }
 
 /**
@@ -67,7 +61,9 @@ function StatusChip({ status }: { status: SampleDataCollection['status'] }) {
  * Used by `SampleDataPanel` to enable the README action for each collection.
  */
 function readmePath(col: SampleDataCollection): string | null {
-  return col.files.find((f) => f.path.endsWith('README.md'))?.path ?? null;
+  if (!col.installed) return null;
+  const path = col.files.find((file) => file.path.endsWith('README.md'))?.path;
+  return path ? `sample_data/${path}` : null;
 }
 
 // ── README viewer ─────────────────────────────────────────────────────────────
@@ -86,10 +82,15 @@ interface ReadmeViewerProps {
  */
 function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
   const { data, isLoading, isError } = useQuery({
-    ...getSampleDataReadmeOptions({
-      parseAs: 'text',
-      query: { path: path ?? '' },
-    }),
+    queryKey: ['sample-readme', path],
+    queryFn: async () => {
+      const { data } = await getRawFile({
+        parseAs: 'text',
+        query: { path: path ?? '' },
+        throwOnError: true,
+      });
+      return data;
+    },
     enabled: path !== null,
     staleTime: 5 * 60_000,
     retry: 1,
@@ -154,7 +155,11 @@ export function SampleDataPanel() {
   const [viewingReadme, setViewingReadme] = useState<{ path: string; name: string } | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    ...getSampleDataCatalogueOptions(),
+    queryKey: ['sample-collections'],
+    queryFn: async () => {
+      const { data } = await listSampleCollections({ throwOnError: true });
+      return data;
+    },
     staleTime: 30_000,
     retry: 1,
     enabled: open,
@@ -162,18 +167,16 @@ export function SampleDataPanel() {
   const catalogue = data;
 
   /**
-   * Treats bundled collections as always selected. Checkbox rendering and
-   * import payload creation both use this helper to stay consistent.
+   * Keeps imported collections out of a new import selection.
    * Called by collection checkbox rendering and `handleImport`.
    */
   const getChecked = (col: SampleDataCollection) => {
-    if (col.bundled) return true;
+    if (col.installed) return false;
     return checked[col.id] ?? false;
   };
 
   /**
-   * Toggles optional remote collections in the dataset import dialog.
-   * Attached to each optional collection checkbox.
+   * Toggles one remote collection in the dataset import dialog.
    */
   const toggle = (id: string) => {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -183,31 +186,26 @@ export function SampleDataPanel() {
    * Imports selected sample datasets and invalidates the shared file browser
    * once the backend reports the import has started or completed.
    * Attached to the sample-data dialog's Import button.
-   * Steps: collect selected IDs, show import progress, call the backend, report remote-download
-   * state, invalidate files, then reset dialog state.
+   * Steps: collect selected IDs, show import progress, call the backend,
+   * invalidate files, then reset dialog state.
    */
   const handleImport = async () => {
     const selectedIds = catalogue
       ? catalogue.collections.filter((col) => getChecked(col)).map((col) => col.id)
       : [];
+    if (selectedIds.length === 0) return;
 
     setImporting(true);
     const loadingToastId = toast.loading('Importing sample data…');
     try {
-      const { data: result } = await importSampleData({
-        body: { collection_ids: selectedIds },
-        throwOnError: true,
-      });
-      toast.dismiss(loadingToastId);
-      if (result.remote_download_started) {
-        toast.success('Bundled datasets ready.');
-        toast.info(
-          'Larger datasets are downloading in the background and will appear in the file browser shortly.',
-          { duration: 8000 },
-        );
-      } else {
-        toast.success('Sample data imported.');
+      for (const collectionId of selectedIds) {
+        await submitSampleImport({
+          path: { collection_id: collectionId },
+          throwOnError: true,
+        });
       }
+      toast.dismiss(loadingToastId);
+      toast.success('Sample data import started.');
       await invalidateFilesQuery(queryClient);
       setOpen(false);
     } catch (err) {
@@ -236,7 +234,9 @@ export function SampleDataPanel() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Import sample content</DialogTitle>
-            <DialogDescription>Import bundled or downloadable sample corpora.</DialogDescription>
+            <DialogDescription>
+              Download sample corpora from the Wordflow sample-data repository.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2">
@@ -258,7 +258,7 @@ export function SampleDataPanel() {
                         <Checkbox
                           id={`sdc-${col.id}`}
                           checked={getChecked(col)}
-                          disabled={col.bundled}
+                          disabled={col.installed}
                           onCheckedChange={() => {
                             toggle(col.id);
                           }}
@@ -286,11 +286,11 @@ export function SampleDataPanel() {
                         <span className="text-xs text-muted-foreground">
                           {formatBytes(col.total_size_bytes)}
                         </span>
-                        <StatusChip status={col.status} />
+                        <StatusChip installed={col.installed ?? false} />
                       </div>
-                      {col.recommended_for.length > 0 && (
+                      {(col.recommended_for?.length ?? 0) > 0 && (
                         <div className="flex flex-wrap gap-1 pl-6">
-                          {col.recommended_for.map((tool) => (
+                          {(col.recommended_for ?? []).map((tool) => (
                             <Badge key={tool} variant="secondary" className="text-xs">
                               {TOOL_LABELS[tool] ?? tool}
                             </Badge>
@@ -304,9 +304,7 @@ export function SampleDataPanel() {
             )}
 
             {!isLoading && isError && (
-              <p className="text-sm text-muted-foreground">
-                Could not load catalogue. All bundled datasets will be imported.
-              </p>
+              <p className="text-sm text-destructive">Could not load the sample catalogue.</p>
             )}
 
             <div className="flex justify-end">
@@ -314,7 +312,7 @@ export function SampleDataPanel() {
                 onClick={() => {
                   void handleImport();
                 }}
-                disabled={importing || (!isError && !anyChecked)}
+                disabled={importing || isLoading || isError || !anyChecked}
               >
                 <FolderPlus className="mr-2 h-4 w-4" />
                 {importing ? 'Importing…' : 'Import selected'}

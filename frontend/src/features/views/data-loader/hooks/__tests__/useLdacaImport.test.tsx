@@ -1,14 +1,17 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { listFeaturedDataPortalCollections, searchDataPortal, submitDataPortalImport } from '@/api';
 import type { DataPortalRecord } from '@/api';
+import {
+  listFeaturedDataPortalCollectionsWithProviderCredential,
+  searchDataPortalWithProviderCredential,
+  submitDataPortalImportWithProviderCredential,
+} from '@/features/provider-credentials/providerCredentialRequests';
 import { useLdacaImport } from '../useLdacaImport';
 
-vi.mock('@/api', async (importOriginal) => ({
-  ...(await importOriginal()),
-  listFeaturedDataPortalCollections: vi.fn(),
-  searchDataPortal: vi.fn(),
-  submitDataPortalImport: vi.fn(),
+vi.mock('@/features/provider-credentials/providerCredentialRequests', () => ({
+  listFeaturedDataPortalCollectionsWithProviderCredential: vi.fn(),
+  searchDataPortalWithProviderCredential: vi.fn(),
+  submitDataPortalImportWithProviderCredential: vi.fn(),
 }));
 
 const record: DataPortalRecord = {
@@ -42,22 +45,25 @@ describe('useLdacaImport', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(listFeaturedDataPortalCollections).mockResolvedValue({
+    vi.mocked(listFeaturedDataPortalCollectionsWithProviderCredential).mockResolvedValue({
       data: { items: [record], page: 1, page_size: 20, total: 1 },
       error: undefined,
     });
-    vi.mocked(searchDataPortal).mockResolvedValue({
+    vi.mocked(searchDataPortalWithProviderCredential).mockResolvedValue({
       data: { items: [record], page: 1, page_size: 25, total: 1 },
       error: undefined,
     });
-    vi.mocked(submitDataPortalImport).mockResolvedValue({ data: importResource, error: undefined });
+    vi.mocked(submitDataPortalImportWithProviderCredential).mockResolvedValue({
+      data: importResource,
+      error: undefined,
+    });
   });
 
   it('loads featured records through the canonical endpoint', async () => {
     const { result } = renderHook(() => useLdacaImport({ notify }));
     act(() => result.current.setLdacaImportOpen(true));
     await waitFor(() => expect(result.current.featuredRecords).toEqual([record]));
-    expect(listFeaturedDataPortalCollections).toHaveBeenCalledWith({ throwOnError: true });
+    expect(listFeaturedDataPortalCollectionsWithProviderCredential).toHaveBeenCalledWith();
   });
 
   it('searches with one-based pagination and the selected method', async () => {
@@ -67,9 +73,11 @@ describe('useLdacaImport', () => {
       result.current.setSearchQuery(record.id);
     });
     await act(async () => result.current.handleLdacaSearch());
-    expect(searchDataPortal).toHaveBeenCalledWith({
-      body: { method: 'identifier', query: record.id, page: 1, page_size: 25 },
-      throwOnError: true,
+    expect(searchDataPortalWithProviderCredential).toHaveBeenCalledWith({
+      method: 'identifier',
+      query: record.id,
+      page: 1,
+      page_size: 25,
     });
     expect(result.current.searchResults).toEqual([record]);
   });
@@ -78,9 +86,8 @@ describe('useLdacaImport', () => {
     const { result } = renderHook(() => useLdacaImport({ notify }));
     act(() => result.current.setLdacaImportOpen(true));
     await act(async () => result.current.handleLdacaImport(record.id));
-    expect(submitDataPortalImport).toHaveBeenCalledWith({
-      body: { identifier: record.id },
-      throwOnError: true,
+    expect(submitDataPortalImportWithProviderCredential).toHaveBeenCalledWith({
+      identifier: record.id,
     });
     expect(notify).toHaveBeenCalledWith('success', 'LDaCA import queued.');
     expect(result.current.ldacaImportOpen).toBe(false);

@@ -125,6 +125,7 @@ export const sampleCatalogueResponse = (
 export const providerCredentialResponse = (
   overrides: Partial<ProviderCredentialSummary> = {},
 ): ProviderCredentialSummary => ({
+  storage: 'backend',
   annotation: { anthropic: false, google: false, openai: false, openrouter: false },
   data_portal: { deployment_configured: false, user_configured: false },
   ...overrides,

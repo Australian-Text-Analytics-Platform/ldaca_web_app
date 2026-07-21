@@ -1,7 +1,7 @@
 import { GoogleLogin as OAuthGoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProviderCard } from '@/features/auth/components/AuthProviderCard';
 import { buildGoogleLoginUri } from '@/features/auth/authRedirectUrls';
-import { getRuntimeGoogleClientId } from '@/lib/backend/env';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 interface GoogleLoginProps {
   isLoading?: boolean;
@@ -10,8 +10,8 @@ interface GoogleLoginProps {
 
 export default function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
   const loginUri = buildGoogleLoginUri();
-  const injectedClientId =
-    typeof window !== 'undefined' ? getRuntimeGoogleClientId()?.trim() : undefined;
+  const { authInfo } = useAuth();
+  const injectedClientId = authInfo?.google_client_id?.trim();
   /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty runtime/build values intentionally fall through */
   const clientId =
     injectedClientId ||

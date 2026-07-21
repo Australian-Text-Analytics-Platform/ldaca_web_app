@@ -5,22 +5,11 @@ import type { ConcordanceAnalysisResponse } from '@/api';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
 /** Canonical task lifecycle states. */
-type TaskState =
-  | 'pending'
-  | 'queued'
-  | 'submitted'
-  | 'running'
-  | 'successful'
-  | 'failed'
-  | 'cancelled';
+type TaskState = 'queued' | 'running' | 'successful' | 'failed' | 'cancelled';
 
 /** States representing work the backend has accepted but not started. */
-const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>([
-  'pending',
-  'queued',
-  'submitted',
-]);
-/** States representing in-flight execution. */
+const PENDING_TASK_STATES: ReadonlySet<string> = new Set<string>(['queued']);
+/** State representing in-flight execution. */
 const RUNNING_TASK_STATES: ReadonlySet<string> = new Set<string>(['running']);
 /** States the task can never leave (i.e. polling can stop). */
 const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>([
@@ -29,7 +18,7 @@ const TERMINAL_TASK_STATES: ReadonlySet<string> = new Set<string>([
   'cancelled',
 ]);
 
-/** Lets hooks treat queued/submitted variants as one pending bucket. */
+/** Lets hooks treat accepted work as one queued bucket. */
 /** Used by DataLoaderFeature and useAnalysisTaskStatus to classify accepted work consistently. */
 export const isPendingTaskState = (state: string | null | undefined): boolean =>
   Boolean(state && PENDING_TASK_STATES.has(state));
@@ -60,6 +49,7 @@ export interface TaskItem {
 }
 
 export interface PendingConcordance {
+  targetTabId: string;
   result?: ConcordanceAnalysisResponse;
   source?: string;
   searchWord?: string;
@@ -69,46 +59,18 @@ export interface PendingConcordance {
   timestamp?: number;
 }
 
-/**
- * Mirror of the backend's `analysis_materialized` SSE event. Pushed onto the
- * store the moment the worker emits it, so feature components can react
- * synchronously without having to refetch the parent task's request (which
- * races with the persistence write on the backend).
- */
-export interface AnalysisMaterializedEvent {
-  taskType: string;
-  taskId: string;
-  parentTaskId: string;
-  parentNodeId: string;
-  materializedPath: string;
-  timestamp: number;
-  /** Monotonically increasing sequence to disambiguate equal timestamps. */
-  sequence: number;
-}
-
 interface AnalysisState {
   tasks: TaskItem[];
   pendingConcordance: PendingConcordance | null;
-  /**
-   * Latest `analysis_materialized` notifications, newest first. Bounded length
-   * (`MATERIALIZED_EVENT_HISTORY_LIMIT`) — consumers should look up by
-   * `parentTaskId` + `parentNodeId` rather than scan the array.
-   */
-  materializedEvents: AnalysisMaterializedEvent[];
   setTasks: (tasks: TaskItem[] | ((prev: TaskItem[]) => TaskItem[])) => void;
   setPendingConcordance: (payload: PendingConcordance) => void;
   clearPendingConcordance: () => void;
-  pushMaterializedEvent: (event: Omit<AnalysisMaterializedEvent, 'sequence'>) => void;
 }
-
-const MATERIALIZED_EVENT_HISTORY_LIMIT = 64;
-let materializedEventSequence = 0;
 
 export const useAnalysisStore = create<AnalysisState>()(
   immer((set) => ({
     tasks: [],
     pendingConcordance: null,
-    materializedEvents: [],
     /** Used by the task inbox and analysis features to merge or prune shared task summaries. */
     setTasks: (tasks) => {
       set((state) => {
@@ -125,19 +87,6 @@ export const useAnalysisStore = create<AnalysisState>()(
     clearPendingConcordance: () => {
       set((state) => {
         state.pendingConcordance = null;
-      });
-    },
-    /** Called by the task inbox when SSE reports a materialized analysis result. */
-    pushMaterializedEvent: (event) => {
-      set((state) => {
-        materializedEventSequence += 1;
-        state.materializedEvents.unshift({
-          ...event,
-          sequence: materializedEventSequence,
-        });
-        if (state.materializedEvents.length > MATERIALIZED_EVENT_HISTORY_LIMIT) {
-          state.materializedEvents.length = MATERIALIZED_EVENT_HISTORY_LIMIT;
-        }
       });
     },
   })),

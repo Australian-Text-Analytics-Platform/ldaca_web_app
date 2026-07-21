@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteFile, downloadFile, getUserFiles, uploadFile } from '@/api';
+import { deleteFile, downloadFile, listUserFiles, uploadFile } from '@/api';
 import { saveBlob } from '@/lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateFilesQuery } from './fileCache';
+import { toFileTree } from '@/api/frontendModels';
 
 interface UseFilesProps {
   /** Defer the initial fetch until auth has been resolved. */
   enabled?: boolean;
 }
+
+const uploadPath = (file: File): string => file.name;
 
 /** Coordinates user file tree loading plus upload/delete/download actions for data-loader panels. */
 /**
@@ -26,8 +29,8 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
      * Called by: TanStack Query while the Data Loader's files query is enabled.
      */
     queryFn: async () => {
-      const { data } = await getUserFiles({ throwOnError: true });
-      return data as FileTreeNode[];
+      const { data } = await listUserFiles({ throwOnError: true });
+      return toFileTree(data) as FileTreeNode[];
     },
     enabled,
     staleTime: 2 * 60 * 1000,
@@ -39,7 +42,12 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   const uploadMutation = useMutation({
     /** Uploads a browser File object through the generated SDK for file panel actions. */
     /** Called by: the upload mutation when `handleUploadFile` invokes `mutateAsync`. */
-    mutationFn: (file: File) => uploadFile({ body: { file }, throwOnError: true }),
+    mutationFn: (file: File) =>
+      uploadFile({
+        body: file,
+        query: { path: uploadPath(file) },
+        throwOnError: true,
+      }),
     onSuccess: () => invalidateFilesQuery(queryClient),
   });
 

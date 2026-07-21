@@ -101,7 +101,19 @@ export default tseslint.config([
 
   // ── Test files ──────────────────────────────────────────────────
   {
-    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
+    files: [
+      '**/*.test.{ts,tsx}',
+      '**/*.spec.{ts,tsx}',
+      '**/__tests__/**/*.{ts,tsx}',
+      'src/test/**/*.{ts,tsx}',
+    ],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      parserOptions: {
+        // Test files are intentionally excluded from the production tsconfig.
+        projectService: false,
+      },
+    },
     plugins: {
       'testing-library': testingLibrary,
     },

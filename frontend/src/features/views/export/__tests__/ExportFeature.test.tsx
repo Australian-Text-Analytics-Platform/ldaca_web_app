@@ -1,171 +1,47 @@
-import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ExportFeature from '../ExportFeature';
 
-vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-  },
+const mocks = vi.hoisted(() => ({
+  exportWorkspaceArchive: vi.fn(),
+  saveBlob: vi.fn(),
+  useWorkspaceData: vi.fn(),
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
 
-vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
-  // Supplies a selected node so export actions have a concrete target.
-  useWorkspaceSelection: () => ({
-    selectedNodes: [
-      {
-        id: 'node-1',
-        name: 'Node One',
-      },
-    ],
-  }),
-}));
-
+vi.mock('@/api', () => ({ exportWorkspaceArchive: mocks.exportWorkspaceArchive }));
+vi.mock('@/lib/download', () => ({ saveBlob: mocks.saveBlob }));
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  // Provides workspace identity used to compose export URLs and archive names.
-  useWorkspaceData: () => ({
-    currentWorkspaceId: 'ws-1',
-    currentWorkspace: { name: 'Workspace One' },
-  }),
+  useWorkspaceData: mocks.useWorkspaceData,
 }));
-
-vi.mock('@/features/auth/hooks/useAuth', () => ({
-  // Supplies stable auth headers for expected fetch arguments.
-  useAuth: () => ({
-    // Mirrors the real hook contract without needing an authenticated session.
-    getAuthHeaders: () => ({ Authorization: 'Bearer token' }),
-  }),
-}));
-
-vi.mock('@/lib/backend/env', () => ({
-  // Fixes the backend origin so URL assertions stay deterministic.
-  getApiBase: () => 'http://api.test',
-}));
-
-vi.mock('@/components/help/HelpIcon', () => ({
-  // Removes help chrome from tests focused on export behavior.
-  default: () => null,
-}));
-
-vi.mock('@/components/help/InfoIcon', () => ({
-  // Removes info chrome from tests focused on export behavior.
-  default: () => null,
-}));
-
-vi.mock('@/components/ui/select', async () => {
-  const ReactModule = await import('react');
-  const SelectContext = ReactModule.createContext<{
-    value: string;
-    onValueChange: (value: string) => void;
-  } | null>(null);
-
-  return {
-    // Keeps the select stateful enough for format-change tests without Radix internals.
-    Select: ({
-      value,
-      onValueChange,
-      children,
-    }: {
-      value: string;
-      onValueChange: (value: string) => void;
-      children: React.ReactNode;
-    }) => (
-      <SelectContext.Provider value={{ value, onValueChange }}>
-        <div>{children}</div>
-      </SelectContext.Provider>
-    ),
-    // Renders trigger content plainly because interaction happens through the native select.
-    SelectTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    // Avoids placeholder rendering that is irrelevant to export assertions.
-    SelectValue: () => null,
-    // Replaces the Radix popup with a native select for accessible test interaction.
-    SelectContent: ({ children }: { children: React.ReactNode }) => {
-      const context = ReactModule.useContext(SelectContext);
-      if (!context) {
-        throw new Error('SelectContent must be rendered inside Select');
-      }
-      return (
-        <select
-          aria-label="Format"
-          value={context.value}
-          onChange={(event) => {
-            context.onValueChange(event.target.value);
-          }}
-        >
-          {children}
-        </select>
-      );
-    },
-    // Maps each mocked item to a native option consumed by SelectContent.
-    SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => (
-      <option value={value}>{children}</option>
-    ),
-  };
-});
+vi.mock('sonner', () => ({ toast: mocks.toast }));
+vi.mock('@/components/help/HelpIcon', () => ({ default: () => null }));
+vi.mock('@/components/help/InfoIcon', () => ({ default: () => null }));
 
 describe('ExportFeature', () => {
-  let createObjectURLMock: ReturnType<typeof vi.fn>;
-  let revokeObjectURLMock: ReturnType<typeof vi.fn>;
-  let clickMock: ReturnType<typeof vi.fn>;
-  let fetchMock: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
-    createObjectURLMock = vi.fn(() => 'blob:export');
-    revokeObjectURLMock = vi.fn();
-    clickMock = vi.fn();
-    fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      // Provides export bytes to the component's download branch.
-      blob: () => new Blob(['parquet-bytes']),
+    vi.clearAllMocks();
+    mocks.useWorkspaceData.mockReturnValue({
+      currentWorkspaceId: 'workspace-1',
+      currentWorkspace: { name: 'Main Workspace' },
     });
-
-    Object.defineProperty(URL, 'createObjectURL', {
-      configurable: true,
-      writable: true,
-      value: createObjectURLMock,
-    });
-
-    Object.defineProperty(URL, 'revokeObjectURL', {
-      configurable: true,
-      writable: true,
-      value: revokeObjectURLMock,
-    });
-
-    Object.defineProperty(HTMLAnchorElement.prototype, 'click', {
-      configurable: true,
-      writable: true,
-      value: clickMock,
-    });
-
-    vi.stubGlobal('fetch', fetchMock);
+    mocks.exportWorkspaceArchive.mockResolvedValue({ data: new Blob(['zip']) });
+    mocks.saveBlob.mockResolvedValue(undefined);
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-    document.body.innerHTML = '';
-  });
-
-  it('passes the selected bulk export format through to the backend request', async () => {
+  it('exports the complete workspace through the canonical archive endpoint', async () => {
     render(<ExportFeature />);
+    fireEvent.click(screen.getByRole('button', { name: 'Export workspace archive' }));
 
-    expect(screen.getByText('Selected Data Blocks')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByRole('combobox', { name: 'Format' }), {
-      target: { value: 'parquet' },
+    await waitFor(() => expect(mocks.exportWorkspaceArchive).toHaveBeenCalledTimes(1));
+    expect(mocks.exportWorkspaceArchive).toHaveBeenCalledWith({
+      parseAs: 'blob',
+      path: { workspace_id: 'workspace-1' },
+      throwOnError: true,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Export All (ZIP bundle)' }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'http://api.test/api/workspaces/ws-1/export?node_ids=node-1&format=parquet',
+    await waitFor(() =>
+      expect(mocks.saveBlob).toHaveBeenCalledWith(expect.any(Blob), 'Main_Workspace.zip'),
     );
-
-    const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('download', 'Node One.parquet');
-    expect(clickMock).toHaveBeenCalledTimes(1);
   });
 });

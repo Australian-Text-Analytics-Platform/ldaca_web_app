@@ -1,5 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll } from 'vitest';
+// Vitest is configured without globals, so Testing Library cannot register its
+// automatic cleanup hook. Keep the explicit teardown to prevent DOM leakage
+// between tests.
+// eslint-disable-next-line testing-library/no-manual-cleanup
 import { cleanup } from '@testing-library/react';
 import { enableMapSet } from 'immer';
 
@@ -11,9 +15,6 @@ beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
 });
 
-// vitest is not configured with globals:true, so @testing-library/react's
-// automatic DOM cleanup is not wired up. Register it explicitly so state from
-// one test doesn't leak into the next.
 afterEach(() => {
   cleanup();
   server.resetHandlers();

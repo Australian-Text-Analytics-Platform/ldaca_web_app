@@ -1,6 +1,10 @@
 import { useReducer } from 'react';
-import { searchDataPortal, listFeaturedDataPortalCollections, submitDataPortalImport } from '@/api';
 import type { DataPortalSearchRequest } from '@/api';
+import {
+  listFeaturedDataPortalCollectionsWithProviderCredential,
+  searchDataPortalWithProviderCredential,
+  submitDataPortalImportWithProviderCredential,
+} from '@/features/provider-credentials/providerCredentialRequests';
 import {
   initialLdacaImportState,
   ldacaImportReducer,
@@ -41,9 +45,7 @@ export function useLdacaImport({ notify }: UseLdacaImportParams) {
 
     dispatch({ type: 'featuredStarted' });
     try {
-      const { data: response } = await listFeaturedDataPortalCollections({
-        throwOnError: true,
-      });
+      const { data: response } = await listFeaturedDataPortalCollectionsWithProviderCredential();
       dispatch({ type: 'featuredSucceeded', records: response.items });
     } catch (error) {
       const message = (error as Error).message || 'Failed to load LDaCA staff picks.';
@@ -107,10 +109,7 @@ export function useLdacaImport({ notify }: UseLdacaImportParams) {
         page: 1,
         page_size: 25,
       };
-      const { data: response } = await searchDataPortal({
-        body: request,
-        throwOnError: true,
-      });
+      const { data: response } = await searchDataPortalWithProviderCredential(request);
       dispatch({ type: 'searchSucceeded', records: response.items });
     } catch (error) {
       const message = (error as Error).message || 'Failed to search LDaCA.';
@@ -134,9 +133,8 @@ export function useLdacaImport({ notify }: UseLdacaImportParams) {
 
     dispatch({ type: 'importStarted', importingId: target });
     try {
-      const { data: response } = await submitDataPortalImport({
-        body: { identifier: target },
-        throwOnError: true,
+      const { data: response } = await submitDataPortalImportWithProviderCredential({
+        identifier: target,
       });
       notify('success', `LDaCA import ${response.state}.`);
       dispatch({ type: 'importSucceeded' });

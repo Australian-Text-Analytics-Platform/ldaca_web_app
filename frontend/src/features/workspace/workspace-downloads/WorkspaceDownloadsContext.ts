@@ -1,7 +1,6 @@
 import { createContext, useContext } from 'react';
 
 export interface PendingWorkspaceDownload {
-  taskId: string;
   workspaceId: string;
   artifactName: string;
   status: 'pending';

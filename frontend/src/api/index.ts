@@ -5,3 +5,4 @@ export type { CreateClientConfig } from './generated/client.gen';
 export * from './generated/@tanstack/react-query.gen';
 export * from './frontendModels';
 export * from './tableApi';
+export * from './workspaceSql';

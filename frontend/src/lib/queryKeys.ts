@@ -1,12 +1,12 @@
-import type { GetNodeRowsData } from '@/api';
-
-type GeneratedNodeDataQuery = NonNullable<GetNodeRowsData['query']>;
-
-export type NodeDataRequest = Required<GeneratedNodeDataQuery>;
+export interface NodeDataRequest {
+  page: number;
+  page_size: number;
+  sort_by: string | null;
+  descending: boolean;
+}
 
 /**
- * Builds the complete generated node-data query shape used by both the SDK
- * request and TanStack cache identity.
+ * Builds the complete node-data query shape used by SQL and cache identity.
  * Used by: Data View plus node-page consumers such as annotation and language
  * detection, which must not let omitted defaults create cache aliases.
  * Flow: apply backend defaults, preserve explicit nullable sort/filter fields,
@@ -47,6 +47,15 @@ export const queryKeys = {
     const base = ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const;
     return request ? ([...base, request] as const) : base;
   },
+
+  /** Workspace SQL pages include every declared Data Block dependency. */
+  workspaceSql: (
+    workspaceId: string,
+    nodeIds: string[],
+    sql: string,
+    page: number,
+    pageSize: number,
+  ) => ['workspaces', workspaceId, 'sql', { nodeIds: [...nodeIds], sql, page, pageSize }] as const,
 
   /** Authoritative Arrow schema for one data block. */
   nodeSchema: (workspaceId: string, nodeId: string) =>

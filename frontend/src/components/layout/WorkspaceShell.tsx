@@ -78,7 +78,7 @@ function WorkspaceShellContent() {
                 />
               </div>
 
-              <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
+              <SidebarInset className="@container/workspace-shell flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <header className="border-border/40 border-b bg-white px-4 py-3 md:hidden">
                   <div className="flex items-center justify-between">
                     <SidebarTrigger />
@@ -86,15 +86,15 @@ function WorkspaceShellContent() {
                 </header>
 
                 <div className="flex flex-1 flex-col overflow-hidden">
-                  {/* Below md, stack panes so desktop resize widths cannot force horizontal overflow. */}
+                  {/* Stack whenever the post-sidebar shell becomes too narrow for both panes. */}
                   <div
-                    className="relative flex flex-1 overflow-hidden max-md:flex-col max-md:overflow-y-auto"
+                    className="relative flex flex-1 overflow-hidden max-md:flex-col max-md:overflow-y-auto @max-[639px]/workspace-shell:flex-col @max-[639px]/workspace-shell:overflow-y-auto"
                     ref={layoutRef}
                   >
                     <InsetCard
                       ref={mainRef}
                       role="main"
-                      className={`relative h-full p-2 pl-1 pr-1 max-md:h-auto max-md:min-h-[calc(100dvh-3.5rem)] max-md:!w-full max-md:!min-w-0 ${
+                      className={`relative h-full p-2 pl-1 pr-1 max-md:h-auto max-md:min-h-[calc(100dvh-3.5rem)] max-md:w-full! max-md:min-w-0! @max-[639px]/workspace-shell:h-auto @max-[639px]/workspace-shell:min-h-[calc(100dvh-3.5rem)] @max-[639px]/workspace-shell:w-full! @max-[639px]/workspace-shell:min-w-0! ${
                         isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'
                       }`}
                       style={{
@@ -120,7 +120,7 @@ function WorkspaceShellContent() {
 
                     {!isRightCollapsed && (
                       <div
-                        className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex"
+                        className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex @max-[639px]/workspace-shell:hidden"
                         aria-label="Resize right panel"
                         {...rightPanelSplitterProps}
                       >
@@ -137,7 +137,7 @@ function WorkspaceShellContent() {
                       className={`relative flex h-full flex-col bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                         isRightCollapsed
                           ? 'min-w-0 w-0 overflow-visible flex-none'
-                          : 'min-w-[320px] overflow-hidden max-md:h-[70dvh] max-md:!w-full max-md:!min-w-0 max-md:flex-none'
+                          : 'min-w-[320px] overflow-hidden max-md:h-[70dvh] max-md:w-full! max-md:min-w-0! max-md:flex-none @max-[639px]/workspace-shell:h-[70dvh] @max-[639px]/workspace-shell:w-full! @max-[639px]/workspace-shell:min-w-0! @max-[639px]/workspace-shell:flex-none'
                       }`}
                       style={
                         isRightCollapsed

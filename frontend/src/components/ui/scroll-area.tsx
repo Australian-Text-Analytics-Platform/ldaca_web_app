@@ -1,5 +1,5 @@
-import * as React from 'react';
 import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
+import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -16,7 +16,13 @@ type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
  * Why: overflow panels need Radix scrollbars with app styling while preserving the caller's viewport content.
  * Flow: render Root and Viewport, conditionally mount vertical/horizontal ScrollBar primitives, then add the Radix corner when both axes show.
  */
-function ScrollArea({ className, children, scrollbars = 'vertical', ...props }: ScrollAreaProps) {
+function ScrollArea({
+  className,
+  children,
+  scrollbars = 'vertical',
+  type = 'scroll',
+  ...props
+}: ScrollAreaProps) {
   const showVertical = scrollbars === 'vertical' || scrollbars === 'both';
   const showHorizontal = scrollbars === 'horizontal' || scrollbars === 'both';
 
@@ -24,15 +30,16 @@ function ScrollArea({ className, children, scrollbars = 'vertical', ...props }: 
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
       className={cn('group relative overflow-hidden', className)}
+      type={type}
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full max-h-[inherit] rounded-[inherit] transition-[color,box-shadow] outline-hidden focus-visible:ring-[3px] focus-visible:outline-1"
+        className="focus-visible:ring-ring/50 size-full max-h-[inherit] rounded-[inherit] transition-[color,box-shadow] outline-hidden focus-visible:ring-[3px] focus-visible:outline-1 [&>div]:block! [&>div]:w-full! [&>div]:min-w-0!"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      {showVertical ? <ScrollBar forceMount /> : null}
+      {showVertical ? <ScrollBar /> : null}
       {showHorizontal ? <ScrollBar forceMount orientation="horizontal" /> : null}
       {showVertical && showHorizontal ? <ScrollAreaPrimitive.Corner /> : null}
     </ScrollAreaPrimitive.Root>
@@ -56,9 +63,9 @@ function ScrollBar({
       orientation={orientation}
       forceMount={forceMount}
       className={cn(
-        'z-10 flex select-none touch-none p-px opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100',
+        'z-10 flex select-none touch-none p-px',
         orientation === 'vertical' && 'h-full w-2.5 border-l border-l-transparent',
-        orientation === 'horizontal' && 'h-2.5 flex-col border-t border-t-transparent opacity-100',
+        orientation === 'horizontal' && 'h-2.5 flex-col border-t border-t-transparent',
         className,
       )}
       {...props}

@@ -1,6 +1,6 @@
 import { getApiBase } from '@/lib/backend/env';
 import { ApiError, formatErrorDetail } from '@/lib/apiError';
-import { getAuthHeaders } from '@/lib/backend/authToken';
+import { getCsrfToken } from '@/lib/backend/csrfToken';
 
 import type { CreateClientConfig } from '@/api';
 
@@ -98,10 +98,12 @@ const resolveTimeoutOverride = (
   return { timeoutMs, init: { ...init, headers } };
 };
 
-/** Injects auth headers into a Request while leaving explicit caller headers untouched. */
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/** Injects the session-bound CSRF header into unsafe requests. */
 /**
  * Called by: `createGeneratedApiFetch` after timeout resolution.
- * Flow: start from caller or Request headers, fill missing auth headers lazily, then create a Request with the chained timeout signal.
+ * Flow: start from caller or Request headers, add the current session's CSRF header for unsafe requests, then create a Request with the chained timeout signal.
  */
 const createRequest = (
   input: RequestInfo | URL,
@@ -109,10 +111,10 @@ const createRequest = (
   signal: AbortSignal,
 ): Request => {
   const headers = new Headers(init?.headers ?? (isRequest(input) ? input.headers : undefined));
-  for (const [name, value] of Object.entries(getAuthHeaders())) {
-    if (!headers.has(name)) {
-      headers.set(name, value);
-    }
+  const method = (init?.method ?? (isRequest(input) ? input.method : 'GET')).toUpperCase();
+  const token = getCsrfToken();
+  if (UNSAFE_METHODS.has(method) && token && !headers.has('X-CSRF-Token')) {
+    headers.set('X-CSRF-Token', token);
   }
   return new Request(input, { ...init, headers, signal });
 };
@@ -136,7 +138,7 @@ const parseErrorResponse = async (response: Response): Promise<ApiError> => {
   }
 
   const parsed = detail && typeof detail === 'object' ? (detail as Record<string, unknown>) : null;
-  const message =
+  const backendMessage =
     /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- fall through empty-string messages to the next candidate, not only null/undefined */
     (typeof parsed?.message === 'string' && parsed.message) ||
     formatErrorDetail(parsed?.detail) ||
@@ -144,7 +146,14 @@ const parseErrorResponse = async (response: Response): Promise<ApiError> => {
     `HTTP ${String(response.status)}`;
   /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
-  const code = typeof parsed?.error === 'string' ? parsed.error : undefined;
+  const code = typeof parsed?.code === 'string' ? parsed.code : undefined;
+  const requestId =
+    (typeof parsed?.request_id === 'string' && parsed.request_id) ||
+    response.headers.get('X-Request-ID');
+  const message =
+    response.status >= 500 && requestId
+      ? `${backendMessage} (Request ID: ${requestId})`
+      : backendMessage;
   return new ApiError(message, { status: response.status, code, detail });
 };
 

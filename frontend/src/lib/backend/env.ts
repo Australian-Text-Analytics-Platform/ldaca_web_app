@@ -19,7 +19,6 @@ declare global {
     __BACKEND_URL__?: string;
     __WORDFLOW_CONFIG__?: {
       basePath?: string;
-      googleClientId?: string;
     };
   }
 }
@@ -45,10 +44,6 @@ function getRuntimeConfig() {
 
 export function getRuntimeBasePath(): string | undefined {
   return getRuntimeConfig()?.basePath;
-}
-
-export function getRuntimeGoogleClientId(): string | undefined {
-  return getRuntimeConfig()?.googleClientId;
 }
 
 /**

@@ -31,6 +31,5 @@ interface Window {
   __BACKEND_URL__?: string;
   __WORDFLOW_CONFIG__?: {
     basePath?: string;
-    googleClientId?: string;
   };
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { uploadWorkspaceZip } from '@/api';
+import { importWorkspaceArchive } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import { queryKeys } from '@/lib/queryKeys';
@@ -182,7 +182,11 @@ export function useDataLoaderWorkspaceActions({
   const handleUploadWorkspaceZip = async (file: File) => {
     setUploadingWorkspaceZip(true);
     try {
-      await uploadWorkspaceZip({ body: { file }, throwOnError: true });
+      await importWorkspaceArchive({
+        body: file,
+        query: { filename: file.name },
+        throwOnError: true,
+      });
       await queryClient.refetchQueries({ queryKey: queryKeys.workspaces, exact: true });
       notify('success', `Workspace ZIP "${file.name}" uploaded.`);
     } catch (error) {

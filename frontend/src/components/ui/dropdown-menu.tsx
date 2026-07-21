@@ -3,7 +3,7 @@
 import * as React from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Check, ChevronRight } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 /** Dropdown root primitive used by menus in sidebar and feature actions. */
 const DropdownMenu = DropdownMenuPrimitive.Root;
@@ -11,49 +11,8 @@ const DropdownMenu = DropdownMenuPrimitive.Root;
 /** Dropdown trigger primitive for menu buttons and icon affordances. */
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
-/** Dropdown sub-menu primitive used by nested menu compositions. */
-const DropdownMenuSub = DropdownMenuPrimitive.Sub;
-
 /** Radio-group primitive for menus with mutually exclusive choices. */
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
-
-/** Sub-menu trigger row used by nested dropdown items with a trailing chevron. */
-const DropdownMenuSubTrigger = React.forwardRef<
-  React.ComponentRef<typeof DropdownMenuPrimitive.SubTrigger>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
-    inset?: boolean;
-  }
->(({ className, inset, children, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubTrigger
-    ref={ref}
-    className={cn(
-      'flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent data-[state=open]:bg-accent [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
-      inset && 'pl-8',
-      className,
-    )}
-    {...props}
-  >
-    {children}
-    <ChevronRight className="ml-auto size-4" />
-  </DropdownMenuPrimitive.SubTrigger>
-));
-DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
-
-/** Floating content panel for nested dropdown menus. */
-const DropdownMenuSubContent = React.forwardRef<
-  React.ComponentRef<typeof DropdownMenuPrimitive.SubContent>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubContent
-    ref={ref}
-    className={cn(
-      'z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-32 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]',
-      className,
-    )}
-    {...props}
-  />
-));
-DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
 
 /** Main dropdown content panel used by sidebar and toolbar menus. */
 const DropdownMenuContent = React.forwardRef<
@@ -178,8 +137,5 @@ export {
   DropdownMenuRadioItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
 };

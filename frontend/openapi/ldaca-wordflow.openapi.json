@@ -67,6 +67,14 @@
             ],
             "title": "Integrity"
           },
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Output Node Ids",
+            "type": "array"
+          },
           "parent_analysis_id": {
             "anyOf": [
               {
@@ -122,7 +130,8 @@
                   "mapping": {
                     "concordance_detachment": "#/components/schemas/ConcordanceDetachmentAnalysisRequest",
                     "concordance_dispersion_detachment": "#/components/schemas/ConcordanceDispersionDetachmentAnalysisRequest",
-                    "quotation_detachment": "#/components/schemas/QuotationDetachmentAnalysisRequest"
+                    "quotation_detachment": "#/components/schemas/QuotationDetachmentAnalysisRequest",
+                    "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
                   },
                   "propertyName": "kind"
                 },
@@ -135,6 +144,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/QuotationDetachmentAnalysisRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
                   }
                 ]
               }
@@ -174,6 +186,7 @@
           "started_at",
           "finished_at",
           "revision",
+          "output_node_ids",
           "integrity"
         ],
         "title": "Analysis",
@@ -341,6 +354,122 @@
         "title": "AnnotationAnalysisRequest",
         "type": "object"
       },
+      "AnnotationAnalysisSubmission": {
+        "additionalProperties": false,
+        "description": "Annotation creation command with an optional request-only credential.",
+        "properties": {
+          "annotation_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Annotation Column",
+            "type": "string"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key",
+            "writeOnly": true
+          },
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/ldaca_wordflow__domain__workspace__analysis__AnnotationClass"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Classes",
+            "type": "array"
+          },
+          "instruction": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Instruction",
+            "type": "string"
+          },
+          "kind": {
+            "const": "annotation",
+            "default": "annotation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "node_id": {
+            "format": "uuid",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "output_node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Output Node Name",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "openrouter",
+              "anthropic",
+              "google"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "reasoning_effort": {
+            "default": "medium",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Reasoning Effort",
+            "type": "string"
+          },
+          "reasoning_enabled": {
+            "default": false,
+            "title": "Reasoning Enabled",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.0,
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "text_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "text_column",
+          "annotation_column",
+          "classes",
+          "provider",
+          "model",
+          "instruction",
+          "output_node_name"
+        ],
+        "title": "AnnotationAnalysisSubmission",
+        "type": "object"
+      },
       "AnnotationClass-Output": {
         "additionalProperties": false,
         "properties": {
@@ -432,6 +561,30 @@
         "title": "AnnotationDerivation",
         "type": "object"
       },
+      "AnnotationModelsRequest": {
+        "additionalProperties": false,
+        "description": "Optional request-only credential for provider model discovery.",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key",
+            "writeOnly": true
+          }
+        },
+        "title": "AnnotationModelsRequest",
+        "type": "object"
+      },
       "AnnotationModelsResource": {
         "additionalProperties": false,
         "description": "Sorted model identifiers returned by one configured provider.",
@@ -491,13 +644,29 @@
       },
       "AnnotationPreviewRequest": {
         "additionalProperties": false,
-        "description": "One stateless, one-based page preview using the stored user credential.",
+        "description": "One stateless, one-based page preview with a request-only credential.",
         "properties": {
           "annotation_column": {
             "maxLength": 500,
             "minLength": 1,
             "title": "Annotation Column",
             "type": "string"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key",
+            "writeOnly": true
           },
           "classes": {
             "items": {
@@ -646,10 +815,14 @@
             "title": "Output Columns",
             "type": "array"
           },
-          "output_node_id": {
-            "format": "uuid",
-            "title": "Output Node Id",
-            "type": "string"
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
           },
           "record_count": {
             "minimum": 0.0,
@@ -658,7 +831,7 @@
           }
         },
         "required": [
-          "output_node_id",
+          "output_node_ids",
           "output_columns",
           "record_count",
           "annotation_column"
@@ -1432,9 +1605,9 @@
         "title": "CastExpression",
         "type": "object"
       },
-      "CastNodeCreateRequest": {
+      "CastNodeEditRequest": {
         "additionalProperties": false,
-        "description": "Create a child with one column cast to a supported logical type.",
+        "description": "Cast one column on the target Data Block.",
         "properties": {
           "column": {
             "minLength": 1,
@@ -1458,24 +1631,6 @@
             "title": "Kind",
             "type": "string"
           },
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "source_node_id": {
-            "format": "uuid",
-            "title": "Source Node Id",
-            "type": "string"
-          },
           "strict": {
             "default": false,
             "title": "Strict",
@@ -1495,10 +1650,9 @@
         },
         "required": [
           "column",
-          "target_type",
-          "source_node_id"
+          "target_type"
         ],
-        "title": "CastNodeCreateRequest",
+        "title": "CastNodeEditRequest",
         "type": "object"
       },
       "CloneDerivation": {
@@ -2102,10 +2256,14 @@
             "title": "Output Columns",
             "type": "array"
           },
-          "output_node_id": {
-            "format": "uuid",
-            "title": "Output Node Id",
-            "type": "string"
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
           },
           "record_count": {
             "minimum": 0.0,
@@ -2114,7 +2272,7 @@
           }
         },
         "required": [
-          "output_node_id",
+          "output_node_ids",
           "output_columns",
           "record_count"
         ],
@@ -2239,10 +2397,14 @@
             "title": "Output Columns",
             "type": "array"
           },
-          "output_node_id": {
-            "format": "uuid",
-            "title": "Output Node Id",
-            "type": "string"
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
           },
           "record_count": {
             "minimum": 0.0,
@@ -2251,7 +2413,7 @@
           }
         },
         "required": [
-          "output_node_id",
+          "output_node_ids",
           "output_columns",
           "record_count"
         ],
@@ -2458,8 +2620,15 @@
             "type": "boolean"
           },
           "user_configured": {
-            "title": "User Configured",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Configured"
           }
         },
         "required": [
@@ -2469,10 +2638,50 @@
         "title": "DataPortalCredentialStatus",
         "type": "object"
       },
+      "DataPortalFeaturedRequest": {
+        "additionalProperties": false,
+        "description": "Optional request-only token for configured featured collections.",
+        "properties": {
+          "api_token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Token",
+            "writeOnly": true
+          }
+        },
+        "title": "DataPortalFeaturedRequest",
+        "type": "object"
+      },
       "DataPortalImportSubmitRequest": {
         "additionalProperties": false,
-        "description": "Portal import request resolved with the configured user credential.",
+        "description": "Portal import request with a token excluded from retained import state.",
         "properties": {
+          "api_token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Token",
+            "writeOnly": true
+          },
           "identifier": {
             "maxLength": 4000,
             "minLength": 1,
@@ -2599,8 +2808,24 @@
       },
       "DataPortalSearchRequest": {
         "additionalProperties": false,
-        "description": "One one-based portal search using the configured user credential.",
+        "description": "One one-based portal search with an optional request-only token.",
         "properties": {
+          "api_token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Token",
+            "writeOnly": true
+          },
           "method": {
             "$ref": "#/components/schemas/DataPortalSearchMethod",
             "default": "keyword"
@@ -2733,6 +2958,29 @@
         "title": "DataPortalUserFileImportResult",
         "type": "object"
       },
+      "DeleteColumnNodeEditRequest": {
+        "additionalProperties": false,
+        "description": "Delete one column from the target Data Block.",
+        "properties": {
+          "column": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Column",
+            "type": "string"
+          },
+          "kind": {
+            "const": "delete_column",
+            "default": "delete_column",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column"
+        ],
+        "title": "DeleteColumnNodeEditRequest",
+        "type": "object"
+      },
       "DerivationInput": {
         "additionalProperties": false,
         "description": "One ordered, role-bearing derivation input.",
@@ -2742,7 +2990,8 @@
               "source",
               "left",
               "right",
-              "member"
+              "member",
+              "input"
             ],
             "title": "Role",
             "type": "string"
@@ -2802,7 +3051,9 @@
                 "join": "#/components/schemas/JoinDerivation",
                 "quotation_detachment": "#/components/schemas/QuotationDetachmentDerivation",
                 "replace": "#/components/schemas/ReplaceDerivation",
-                "slice": "#/components/schemas/SliceDerivation"
+                "slice": "#/components/schemas/SliceDerivation",
+                "sql": "#/components/schemas/SqlDerivation",
+                "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentDerivation"
               },
               "propertyName": "kind"
             },
@@ -2832,6 +3083,9 @@
                 "$ref": "#/components/schemas/CastDerivation"
               },
               {
+                "$ref": "#/components/schemas/SqlDerivation"
+              },
+              {
                 "$ref": "#/components/schemas/AnnotationDerivation"
               },
               {
@@ -2842,6 +3096,9 @@
               },
               {
                 "$ref": "#/components/schemas/QuotationDetachmentDerivation"
+              },
+              {
+                "$ref": "#/components/schemas/TopicModelingDetachmentDerivation"
               }
             ],
             "title": "Operation"
@@ -3194,6 +3451,50 @@
           "source_node_id"
         ],
         "title": "ExpressionNodeCreateRequest",
+        "type": "object"
+      },
+      "ExpressionNodeEditRequest": {
+        "additionalProperties": false,
+        "description": "Apply a typed Polars expression to the target Data Block.",
+        "properties": {
+          "context": {
+            "enum": [
+              "filter",
+              "with_columns",
+              "select",
+              "sort",
+              "group_by_agg"
+            ],
+            "title": "Context",
+            "type": "string"
+          },
+          "expressions": {
+            "items": {
+              "$ref": "#/components/schemas/ExpressionItem-Input"
+            },
+            "minItems": 1,
+            "title": "Expressions",
+            "type": "array"
+          },
+          "group_by": {
+            "items": {
+              "$ref": "#/components/schemas/ExpressionItem-Input"
+            },
+            "title": "Group By",
+            "type": "array"
+          },
+          "kind": {
+            "const": "expression",
+            "default": "expression",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context",
+          "expressions"
+        ],
+        "title": "ExpressionNodeEditRequest",
         "type": "object"
       },
       "Failure": {
@@ -3635,6 +3936,40 @@
           "source_node_id"
         ],
         "title": "FilterNodeCreateRequest",
+        "type": "object"
+      },
+      "FilterNodeEditRequest": {
+        "additionalProperties": false,
+        "description": "Replace the target plan with a filtered plan.",
+        "properties": {
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/FilterCondition-Input"
+            },
+            "minItems": 1,
+            "title": "Conditions",
+            "type": "array"
+          },
+          "kind": {
+            "const": "filter",
+            "default": "filter",
+            "title": "Kind",
+            "type": "string"
+          },
+          "logic": {
+            "default": "and",
+            "enum": [
+              "and",
+              "or"
+            ],
+            "title": "Logic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conditions"
+        ],
+        "title": "FilterNodeEditRequest",
         "type": "object"
       },
       "HealthResponse": {
@@ -4103,6 +4438,7 @@
           "anthropic_api_key": {
             "anyOf": [
               {
+                "format": "password",
                 "maxLength": 4000,
                 "minLength": 1,
                 "type": "string",
@@ -4117,6 +4453,7 @@
           "data_portal_api_token": {
             "anyOf": [
               {
+                "format": "password",
                 "maxLength": 4000,
                 "minLength": 1,
                 "type": "string",
@@ -4131,6 +4468,7 @@
           "google_api_key": {
             "anyOf": [
               {
+                "format": "password",
                 "maxLength": 4000,
                 "minLength": 1,
                 "type": "string",
@@ -4145,6 +4483,7 @@
           "openai_api_key": {
             "anyOf": [
               {
+                "format": "password",
                 "maxLength": 4000,
                 "minLength": 1,
                 "type": "string",
@@ -4159,6 +4498,7 @@
           "openrouter_api_key": {
             "anyOf": [
               {
+                "format": "password",
                 "maxLength": 4000,
                 "minLength": 1,
                 "type": "string",
@@ -4179,13 +4519,29 @@
         "description": "Safe credential presence information; never contains secret values.",
         "properties": {
           "annotation": {
-            "$ref": "#/components/schemas/AnnotationCredentialStatus"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationCredentialStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "data_portal": {
             "$ref": "#/components/schemas/DataPortalCredentialStatus"
+          },
+          "storage": {
+            "enum": [
+              "backend",
+              "browser"
+            ],
+            "title": "Storage",
+            "type": "string"
           }
         },
         "required": [
+          "storage",
           "annotation",
           "data_portal"
         ],
@@ -4335,10 +4691,14 @@
             "title": "Output Columns",
             "type": "array"
           },
-          "output_node_id": {
-            "format": "uuid",
-            "title": "Output Node Id",
-            "type": "string"
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
           },
           "record_count": {
             "minimum": 0.0,
@@ -4347,7 +4707,7 @@
           }
         },
         "required": [
-          "output_node_id",
+          "output_node_ids",
           "output_columns",
           "record_count"
         ],
@@ -4485,6 +4845,36 @@
           }
         },
         "title": "QuotationResultQuery",
+        "type": "object"
+      },
+      "RenameColumnNodeEditRequest": {
+        "additionalProperties": false,
+        "description": "Rename one column on the target Data Block.",
+        "properties": {
+          "column": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Column",
+            "type": "string"
+          },
+          "kind": {
+            "const": "rename_column",
+            "default": "rename_column",
+            "title": "Kind",
+            "type": "string"
+          },
+          "new_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "New Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column",
+          "new_name"
+        ],
+        "title": "RenameColumnNodeEditRequest",
         "type": "object"
       },
       "ReplaceDerivation": {
@@ -4665,6 +5055,87 @@
           "source_node_id"
         ],
         "title": "ReplaceNodeCreateRequest",
+        "type": "object"
+      },
+      "ReplaceNodeEditRequest": {
+        "additionalProperties": false,
+        "description": "Replace or extract text on the target Data Block.",
+        "properties": {
+          "connector": {
+            "default": " ",
+            "title": "Connector",
+            "type": "string"
+          },
+          "count": {
+            "default": "all",
+            "enum": [
+              "all",
+              "first"
+            ],
+            "title": "Count",
+            "type": "string"
+          },
+          "kind": {
+            "const": "replace",
+            "default": "replace",
+            "title": "Kind",
+            "type": "string"
+          },
+          "match_limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Limit"
+          },
+          "mode": {
+            "default": "replace",
+            "enum": [
+              "replace",
+              "extract"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "output_column": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Column"
+          },
+          "pattern": {
+            "minLength": 1,
+            "title": "Pattern",
+            "type": "string"
+          },
+          "replacement": {
+            "default": "",
+            "title": "Replacement",
+            "type": "string"
+          },
+          "source_column": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_column",
+          "pattern"
+        ],
+        "title": "ReplaceNodeEditRequest",
         "type": "object"
       },
       "ResultColumnMetadata": {
@@ -4979,14 +5450,8 @@
         "type": "object"
       },
       "SampleCollection": {
-        "additionalProperties": false,
-        "description": "One importable sample collection from the configured catalogue.",
+        "description": "One importable sample collection from the remote catalogue.",
         "properties": {
-          "bundled": {
-            "default": false,
-            "title": "Bundled",
-            "type": "boolean"
-          },
           "description": {
             "default": "",
             "title": "Description",
@@ -5001,7 +5466,8 @@
             "type": "array"
           },
           "id": {
-            "pattern": "^[A-Za-z0-9._-]+$",
+            "maxLength": 1024,
+            "minLength": 1,
             "title": "Id",
             "type": "string"
           },
@@ -5042,16 +5508,10 @@
         "type": "object"
       },
       "SampleFile": {
-        "additionalProperties": false,
-        "description": "One integrity-pinned file in a remote sample collection.",
+        "description": "One fetchable file in a remote sample collection.",
         "properties": {
           "path": {
             "title": "Path",
-            "type": "string"
-          },
-          "sha256": {
-            "pattern": "^[0-9a-fA-F]{64}$",
-            "title": "Sha256",
             "type": "string"
           },
           "size": {
@@ -5062,8 +5522,7 @@
         },
         "required": [
           "path",
-          "size",
-          "sha256"
+          "size"
         ],
         "title": "SampleFile",
         "type": "object"
@@ -5072,7 +5531,8 @@
         "additionalProperties": false,
         "properties": {
           "collection_id": {
-            "pattern": "^[A-Za-z0-9._-]+$",
+            "maxLength": 1024,
+            "minLength": 1,
             "title": "Collection Id",
             "type": "string"
           },
@@ -5098,7 +5558,8 @@
             "type": "integer"
           },
           "collection_id": {
-            "pattern": "^[A-Za-z0-9._-]+$",
+            "maxLength": 1024,
+            "minLength": 1,
             "title": "Collection Id",
             "type": "string"
           },
@@ -5585,6 +6046,28 @@
           }
         },
         "title": "SourceProvenance",
+        "type": "object"
+      },
+      "SqlDerivation": {
+        "additionalProperties": false,
+        "description": "Exact SQL submitted when a Derived Data Block was created.",
+        "properties": {
+          "kind": {
+            "const": "sql",
+            "default": "sql",
+            "title": "Kind",
+            "type": "string"
+          },
+          "sql": {
+            "minLength": 1,
+            "title": "Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "title": "SqlDerivation",
         "type": "object"
       },
       "StringExpression-Input": {
@@ -6100,6 +6583,37 @@
         "title": "TokenResultMetadata",
         "type": "object"
       },
+      "TokenizerModelResource": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Languages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "TokenizerModelResource",
+        "type": "object"
+      },
       "TopicItem": {
         "additionalProperties": false,
         "properties": {
@@ -6149,6 +6663,29 @@
           "y"
         ],
         "title": "TopicItem",
+        "type": "object"
+      },
+      "TopicMeaningOverride": {
+        "additionalProperties": false,
+        "properties": {
+          "topic_id": {
+            "title": "Topic Id",
+            "type": "integer"
+          },
+          "words": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "topic_id",
+          "words"
+        ],
+        "title": "TopicMeaningOverride",
         "type": "object"
       },
       "TopicMetadata": {
@@ -6369,7 +6906,7 @@
             "type": "array"
           },
           "random_seed": {
-            "default": 42,
+            "default": 0,
             "title": "Random Seed",
             "type": "integer"
           },
@@ -6407,6 +6944,185 @@
           "node_columns"
         ],
         "title": "TopicModelingAnalysisRequest",
+        "type": "object"
+      },
+      "TopicModelingDetachedOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          },
+          "topic_data_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Topic Data Columns",
+            "type": "array"
+          },
+          "topic_data_node_id": {
+            "format": "uuid",
+            "title": "Topic Data Node Id",
+            "type": "string"
+          },
+          "topic_data_record_count": {
+            "minimum": 0.0,
+            "title": "Topic Data Record Count",
+            "type": "integer"
+          },
+          "topic_meanings_node_id": {
+            "format": "uuid",
+            "title": "Topic Meanings Node Id",
+            "type": "string"
+          },
+          "topic_meanings_record_count": {
+            "minimum": 0.0,
+            "title": "Topic Meanings Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "topic_data_node_id",
+          "topic_meanings_node_id",
+          "topic_data_columns",
+          "topic_data_record_count",
+          "topic_meanings_record_count"
+        ],
+        "title": "TopicModelingDetachedOutput",
+        "type": "object"
+      },
+      "TopicModelingDetachmentAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "topic_modeling_detachment",
+            "default": "topic_modeling_detachment",
+            "title": "Kind",
+            "type": "string"
+          },
+          "new_node_names": {
+            "additionalProperties": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "New Node Names",
+            "type": "object"
+          },
+          "node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Node Ids",
+            "type": "array"
+          },
+          "selected_columns": {
+            "additionalProperties": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Selected Columns",
+            "type": "object"
+          },
+          "topic_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Ids"
+          },
+          "topic_meanings_override": {
+            "items": {
+              "$ref": "#/components/schemas/TopicMeaningOverride"
+            },
+            "title": "Topic Meanings Override",
+            "type": "array"
+          }
+        },
+        "required": [
+          "node_ids",
+          "selected_columns",
+          "new_node_names"
+        ],
+        "title": "TopicModelingDetachmentAnalysisRequest",
+        "type": "object"
+      },
+      "TopicModelingDetachmentDerivation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "topic_modeling_detachment",
+            "default": "topic_modeling_detachment",
+            "title": "Kind",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "topic_data",
+              "topic_meanings"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "TopicModelingDetachmentDerivation",
+        "type": "object"
+      },
+      "TopicModelingDetachmentResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "topic_modeling_detachment",
+            "default": "topic_modeling_detachment",
+            "title": "Kind",
+            "type": "string"
+          },
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 2,
+            "title": "Output Node Ids",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/TopicModelingDetachedOutput"
+            },
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "output_node_ids",
+          "outputs"
+        ],
+        "title": "TopicModelingDetachmentResult",
         "type": "object"
       },
       "TopicModelingResult": {
@@ -7069,6 +7785,14 @@
         "additionalProperties": false,
         "description": "Complete addressable node metadata returned by node routes.",
         "properties": {
+          "can_redo": {
+            "title": "Can Redo",
+            "type": "boolean"
+          },
+          "can_undo": {
+            "title": "Can Undo",
+            "type": "boolean"
+          },
           "child_ids": {
             "items": {
               "format": "uuid",
@@ -7198,7 +7922,9 @@
           "id",
           "name",
           "provenance",
-          "derivation_description"
+          "derivation_description",
+          "can_undo",
+          "can_redo"
         ],
         "title": "WorkspaceNodeInfo",
         "type": "object"
@@ -7292,6 +8018,88 @@
           "runtime_state"
         ],
         "title": "WorkspaceResource",
+        "type": "object"
+      },
+      "WorkspaceSqlCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "const": "create",
+            "default": "create",
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Node Ids",
+            "type": "array"
+          },
+          "sql": {
+            "minLength": 1,
+            "title": "Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_ids",
+          "sql",
+          "name"
+        ],
+        "title": "WorkspaceSqlCreateRequest",
+        "type": "object"
+      },
+      "WorkspaceSqlQueryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "const": "query",
+            "default": "query",
+            "title": "Mode",
+            "type": "string"
+          },
+          "node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Node Ids",
+            "type": "array"
+          },
+          "page": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 50,
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "sql": {
+            "minLength": 1,
+            "title": "Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_ids",
+          "sql"
+        ],
+        "title": "WorkspaceSqlQueryRequest",
         "type": "object"
       },
       "WorkspaceUpdateRequest": {
@@ -7515,8 +8323,8 @@
   "openapi": "3.1.0",
   "paths": {
     "/api/annotation-providers/{provider}/models": {
-      "get": {
-        "description": "Discover models using the authenticated user's stored credential.",
+      "post": {
+        "description": "Discover models using the mode-appropriate request boundary.",
         "operationId": "list_annotation_models",
         "parameters": [
           {
@@ -7535,6 +8343,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationModelsRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -7575,6 +8393,16 @@
               }
             },
             "description": "Origin, CSRF, or access check failed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
           },
           "422": {
             "content": {
@@ -7842,9 +8670,19 @@
       }
     },
     "/api/data-portal/featured": {
-      "get": {
+      "post": {
         "description": "Return configured featured collections through the same typed resource.",
         "operationId": "list_featured_data_portal_collections",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataPortalFeaturedRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -8291,6 +9129,16 @@
             },
             "description": "Authentication required"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
           "500": {
             "content": {
               "application/json": {
@@ -8398,6 +9246,16 @@
               }
             },
             "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
           },
           "409": {
             "content": {
@@ -8721,6 +9579,56 @@
         "summary": "Get Storage",
         "tags": [
           "storage"
+        ]
+      }
+    },
+    "/api/tokenizer-models": {
+      "get": {
+        "operationId": "list_tokenizer_models",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TokenizerModelResource"
+                  },
+                  "title": "Response List Tokenizer Models",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "List Tokenizer Models",
+        "tags": [
+          "tokenizers"
         ]
       }
     },
@@ -11220,7 +12128,8 @@
                   "mapping": {
                     "concordance_detachment": "#/components/schemas/ConcordanceDetachmentAnalysisRequest",
                     "concordance_dispersion_detachment": "#/components/schemas/ConcordanceDispersionDetachmentAnalysisRequest",
-                    "quotation_detachment": "#/components/schemas/QuotationDetachmentAnalysisRequest"
+                    "quotation_detachment": "#/components/schemas/QuotationDetachmentAnalysisRequest",
+                    "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
                   },
                   "propertyName": "kind"
                 },
@@ -11233,6 +12142,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/QuotationDetachmentAnalysisRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
                   }
                 ],
                 "title": "Body"
@@ -11375,7 +12287,8 @@
                       "quotation_detachment": "#/components/schemas/QuotationDetachmentResult",
                       "sequential": "#/components/schemas/SequentialResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
-                      "topic_modeling": "#/components/schemas/TopicModelingResult"
+                      "topic_modeling": "#/components/schemas/TopicModelingResult",
+                      "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentResult"
                     },
                     "propertyName": "kind"
                   },
@@ -11406,6 +12319,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QuotationDetachmentResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TopicModelingDetachmentResult"
                     }
                   ],
                   "title": "Response Get Analysis Result"
@@ -11586,7 +12502,8 @@
                       "quotation_detachment": "#/components/schemas/QuotationDetachmentResult",
                       "sequential": "#/components/schemas/SequentialResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
-                      "topic_modeling": "#/components/schemas/TopicModelingResult"
+                      "topic_modeling": "#/components/schemas/TopicModelingResult",
+                      "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentResult"
                     },
                     "propertyName": "kind"
                   },
@@ -11617,6 +12534,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QuotationDetachmentResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TopicModelingDetachmentResult"
                     }
                   ],
                   "title": "Response Query Analysis Result"
@@ -12416,7 +13336,6 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
-                    "cast": "#/components/schemas/CastNodeCreateRequest",
                     "clone": "#/components/schemas/CloneNodeCreateRequest",
                     "concat": "#/components/schemas/ConcatNodeCreateRequest",
                     "expression": "#/components/schemas/ExpressionNodeCreateRequest",
@@ -12452,9 +13371,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/JoinNodeCreateRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/CastNodeCreateRequest"
                   }
                 ],
                 "title": "Request"
@@ -12730,7 +13646,6 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
-                    "cast": "#/components/schemas/CastNodeCreateRequest",
                     "clone": "#/components/schemas/CloneNodeCreateRequest",
                     "concat": "#/components/schemas/ConcatNodeCreateRequest",
                     "expression": "#/components/schemas/ExpressionNodeCreateRequest",
@@ -12762,9 +13677,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/JoinNodeCreateRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/CastNodeCreateRequest"
                   }
                 ],
                 "title": "Request"
@@ -13259,6 +14171,16 @@
             },
             "description": "Resource not found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13291,10 +14213,10 @@
         ]
       }
     },
-    "/api/workspaces/{workspace_id}/nodes/{node_id}/rows": {
-      "get": {
-        "description": "Materialize one bounded, one-based page from a lazy node plan.",
-        "operationId": "get_node_rows",
+    "/api/workspaces/{workspace_id}/nodes/{node_id}/edits": {
+      "post": {
+        "description": "Apply one identity-preserving Data Block Edit.",
+        "operationId": "edit_node",
         "parameters": [
           {
             "in": "path",
@@ -13315,68 +14237,59 @@
               "title": "Node Id",
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "minimum": 1,
-              "title": "Page",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page_size",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Page Size",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "sort_by",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Sort By"
-            }
-          },
-          {
-            "in": "query",
-            "name": "descending",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "Descending",
-              "type": "boolean"
-            }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "cast": "#/components/schemas/CastNodeEditRequest",
+                    "delete_column": "#/components/schemas/DeleteColumnNodeEditRequest",
+                    "expression": "#/components/schemas/ExpressionNodeEditRequest",
+                    "filter": "#/components/schemas/FilterNodeEditRequest",
+                    "rename_column": "#/components/schemas/RenameColumnNodeEditRequest",
+                    "replace": "#/components/schemas/ReplaceNodeEditRequest"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CastNodeEditRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RenameColumnNodeEditRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DeleteColumnNodeEditRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FilterNodeEditRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReplaceNodeEditRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExpressionNodeEditRequest"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
-              "application/vnd.apache.arrow.stream": {
+              "application/json": {
                 "schema": {
-                  "format": "binary",
-                  "type": "string"
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
                 }
               }
             },
-            "description": "Arrow IPC stream"
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -13398,6 +14311,16 @@
             },
             "description": "Authentication required"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -13408,6 +14331,16 @@
             },
             "description": "Resource not found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13417,6 +14350,16 @@
               }
             },
             "description": "Request validation failed"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
           }
         },
         "security": [
@@ -13424,7 +14367,116 @@
             "WordflowSession": []
           }
         ],
-        "summary": "Get Node Rows",
+        "summary": "Edit Node",
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/nodes/{node_id}/redo": {
+      "post": {
+        "description": "Restore the Data Block's next session plan.",
+        "operationId": "redo_node",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Redo Node",
         "tags": [
           "nodes"
         ]
@@ -13505,6 +14557,115 @@
           }
         ],
         "summary": "Get Node Schema",
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/nodes/{node_id}/undo": {
+      "post": {
+        "description": "Restore the Data Block's previous session plan.",
+        "operationId": "undo_node",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Undo Node",
         "tags": [
           "nodes"
         ]
@@ -13694,6 +14855,161 @@
           }
         ],
         "summary": "Open Workspace By Id",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/sql": {
+      "post": {
+        "description": "Query declared Data Blocks or create one SQL-derived Data Block.",
+        "operationId": "execute_workspace_sql",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "create": "#/components/schemas/WorkspaceSqlCreateRequest",
+                    "query": "#/components/schemas/WorkspaceSqlQueryRequest"
+                  },
+                  "propertyName": "mode"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/WorkspaceSqlQueryRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WorkspaceSqlCreateRequest"
+                  }
+                ],
+                "title": "Command"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.apache.arrow.stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Arrow IPC stream"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                }
+              }
+            },
+            "description": "SQL-derived Data Block"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request or resource exceeds the configured size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Execute Workspace Sql",
         "tags": [
           "workspaces"
         ]
@@ -14514,7 +15830,7 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
-                    "annotation": "#/components/schemas/AnnotationAnalysisRequest",
+                    "annotation": "#/components/schemas/AnnotationAnalysisSubmission",
                     "concordance": "#/components/schemas/ConcordanceAnalysisRequest",
                     "quotation": "#/components/schemas/QuotationAnalysisRequest",
                     "sequential": "#/components/schemas/SequentialAnalysisRequest",
@@ -14540,7 +15856,7 @@
                     "$ref": "#/components/schemas/SequentialAnalysisRequest"
                   },
                   {
-                    "$ref": "#/components/schemas/AnnotationAnalysisRequest"
+                    "$ref": "#/components/schemas/AnnotationAnalysisSubmission"
                   }
                 ],
                 "title": "Body"

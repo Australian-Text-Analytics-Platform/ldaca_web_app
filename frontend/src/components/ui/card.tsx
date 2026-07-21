@@ -53,7 +53,7 @@ CardContent.displayName = 'CardContent';
 /** Card footer region used for action rows and pagination controls. */
 const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center p-4 pt-0', className)} {...props} />
+    <div ref={ref} className={cn('flex flex-wrap items-center p-4 pt-0', className)} {...props} />
   ),
 );
 CardFooter.displayName = 'CardFooter';

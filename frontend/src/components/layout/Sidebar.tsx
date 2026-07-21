@@ -134,8 +134,7 @@ function Sidebar() {
 
   const { workspaceGraph } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
-  const { toggleNode, deleteNode, copyNode, renameNode, undoNode, redoNode } =
-    useWorkspaceActions();
+  const { toggleNode, deleteNode, copyNode, renameNode } = useWorkspaceActions();
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
   const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
   const togglePinnedNode = usePinnedNodesStore((state) => state.togglePinnedNode);
@@ -151,8 +150,6 @@ function Sidebar() {
   const getToolbarNode = (node: WorkspaceGraphNode) => ({
     id: node.id,
     name: node.name,
-    canUndo: node.can_undo ?? undefined,
-    canRedo: node.can_redo ?? undefined,
   });
 
   /**
@@ -216,7 +213,7 @@ function Sidebar() {
     </SidebarMenu>
   );
   return (
-    <SidebarRoot className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden">
+    <SidebarRoot className="@container/sidebar md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden">
       <SidebarHeader className="px-3 py-2">
         <div className="flex min-w-0 flex-col gap-2 w-full">
           <div className="flex items-center gap-2 w-full">
@@ -284,6 +281,7 @@ function Sidebar() {
             return (
               <div
                 key={key}
+                data-guidance={key === 'nodes' ? 'data-blocks' : undefined}
                 className="flex min-h-0 flex-col rounded-md border border-border/40 bg-background/40"
                 style={getSectionFlexStyle(key)}
               >
@@ -424,12 +422,6 @@ function Sidebar() {
                                 onClone={(id) => {
                                   void copyNode(id);
                                 }}
-                                onUndo={(id) => {
-                                  void undoNode(id);
-                                }}
-                                onRedo={(id) => {
-                                  void redoNode(id);
-                                }}
                                 onDelete={(id) => {
                                   void deleteNode(id);
                                 }}
@@ -458,7 +450,7 @@ function Sidebar() {
 
       <SidebarFooter className="space-y-2 px-3 py-2">
         <div className="flex items-center gap-2">
-          <div className="flex flex-1 gap-2">
+          <div className="flex flex-1 flex-col gap-2 @min-[208px]/sidebar:flex-row">
             <Button
               variant="ghost"
               className="flex-1 justify-center"

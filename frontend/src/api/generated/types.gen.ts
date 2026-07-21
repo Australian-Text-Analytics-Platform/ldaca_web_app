@@ -36,6 +36,10 @@ export type Analysis = {
         status: 'invalid';
     } & InvalidAnalysisIntegrity);
     /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
      * Parent Analysis Id
      */
     parent_analysis_id: string | null;
@@ -61,7 +65,9 @@ export type Analysis = {
         kind: 'concordance_dispersion_detachment';
     } & ConcordanceDispersionDetachmentAnalysisRequest) | ({
         kind: 'quotation_detachment';
-    } & QuotationDetachmentAnalysisRequest);
+    } & QuotationDetachmentAnalysisRequest) | ({
+        kind: 'topic_modeling_detachment';
+    } & TopicModelingDetachmentAnalysisRequest);
     /**
      * Revision
      */
@@ -165,6 +171,62 @@ export type AnnotationAnalysisRequest = {
 };
 
 /**
+ * AnnotationAnalysisSubmission
+ *
+ * Annotation creation command with an optional request-only credential.
+ */
+export type AnnotationAnalysisSubmission = {
+    /**
+     * Annotation Column
+     */
+    annotation_column: string;
+    /**
+     * Classes
+     */
+    classes: Array<LdacaWordflowDomainWorkspaceAnalysisAnnotationClass>;
+    /**
+     * Instruction
+     */
+    instruction: string;
+    /**
+     * Kind
+     */
+    kind?: 'annotation';
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Output Node Name
+     */
+    output_node_name: string;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    /**
+     * Reasoning Effort
+     */
+    reasoning_effort?: 'low' | 'medium' | 'high';
+    /**
+     * Reasoning Enabled
+     */
+    reasoning_enabled?: boolean;
+    /**
+     * Temperature
+     */
+    temperature?: number;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
+
+/**
  * AnnotationClass
  */
 export type AnnotationClassOutput = {
@@ -223,6 +285,18 @@ export type AnnotationDerivation = {
 };
 
 /**
+ * AnnotationModelsRequest
+ *
+ * Optional request-only credential for provider model discovery.
+ */
+export type AnnotationModelsRequest = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+};
+
+/**
  * AnnotationModelsResource
  *
  * Sorted model identifiers returned by one configured provider.
@@ -257,7 +331,7 @@ export type AnnotationPreviewLabel = {
 /**
  * AnnotationPreviewRequest
  *
- * One stateless, one-based page preview using the stored user credential.
+ * One stateless, one-based page preview with a request-only credential.
  */
 export type AnnotationPreviewRequest = {
     /**
@@ -351,9 +425,9 @@ export type AnnotationResult = {
      */
     output_columns: Array<string>;
     /**
-     * Output Node Id
+     * Output Node Ids
      */
-    output_node_id: string;
+    output_node_ids: Array<string>;
     /**
      * Record Count
      */
@@ -652,11 +726,11 @@ export type CastExpressionOutput = {
 };
 
 /**
- * CastNodeCreateRequest
+ * CastNodeEditRequest
  *
- * Create a child with one column cast to a supported logical type.
+ * Cast one column on the target Data Block.
  */
-export type CastNodeCreateRequest = {
+export type CastNodeEditRequest = {
     /**
      * Column
      */
@@ -669,14 +743,6 @@ export type CastNodeCreateRequest = {
      * Kind
      */
     kind?: 'cast';
-    /**
-     * Name
-     */
-    name?: string | null;
-    /**
-     * Source Node Id
-     */
-    source_node_id: string;
     /**
      * Strict
      */
@@ -1004,9 +1070,9 @@ export type ConcordanceDetachmentResult = {
      */
     output_columns: Array<string>;
     /**
-     * Output Node Id
+     * Output Node Ids
      */
-    output_node_id: string;
+    output_node_ids: Array<string>;
     /**
      * Record Count
      */
@@ -1074,9 +1140,9 @@ export type ConcordanceDispersionDetachmentResult = {
      */
     output_columns: Array<string>;
     /**
-     * Output Node Id
+     * Output Node Ids
      */
-    output_node_id: string;
+    output_node_ids: Array<string>;
     /**
      * Record Count
      */
@@ -1205,13 +1271,25 @@ export type DataPortalCredentialStatus = {
     /**
      * User Configured
      */
-    user_configured: boolean;
+    user_configured: boolean | null;
+};
+
+/**
+ * DataPortalFeaturedRequest
+ *
+ * Optional request-only token for configured featured collections.
+ */
+export type DataPortalFeaturedRequest = {
+    /**
+     * Api Token
+     */
+    api_token?: string | null;
 };
 
 /**
  * DataPortalImportSubmitRequest
  *
- * Portal import request resolved with the configured user credential.
+ * Portal import request with a token excluded from retained import state.
  */
 export type DataPortalImportSubmitRequest = {
     /**
@@ -1282,7 +1360,7 @@ export type DataPortalSearchMethod = 'keyword' | 'identifier' | 'collection' | '
 /**
  * DataPortalSearchRequest
  *
- * One one-based portal search using the configured user credential.
+ * One one-based portal search with an optional request-only token.
  */
 export type DataPortalSearchRequest = {
     method?: DataPortalSearchMethod;
@@ -1365,6 +1443,22 @@ export type DataPortalUserFileImportResult = {
 };
 
 /**
+ * DeleteColumnNodeEditRequest
+ *
+ * Delete one column from the target Data Block.
+ */
+export type DeleteColumnNodeEditRequest = {
+    /**
+     * Column
+     */
+    column: string;
+    /**
+     * Kind
+     */
+    kind?: 'delete_column';
+};
+
+/**
  * DerivationInput
  *
  * One ordered, role-bearing derivation input.
@@ -1373,7 +1467,7 @@ export type DerivationInput = {
     /**
      * Role
      */
-    role: 'source' | 'left' | 'right' | 'member';
+    role: 'source' | 'left' | 'right' | 'member' | 'input';
     /**
      * Value
      */
@@ -1416,6 +1510,8 @@ export type DerivationProvenance = {
     } & JoinDerivation) | ({
         kind: 'cast';
     } & CastDerivation) | ({
+        kind: 'sql';
+    } & SqlDerivation) | ({
         kind: 'annotation';
     } & AnnotationDerivation) | ({
         kind: 'concordance_detachment';
@@ -1423,7 +1519,9 @@ export type DerivationProvenance = {
         kind: 'concordance_dispersion_detachment';
     } & ConcordanceDispersionDetachmentDerivation) | ({
         kind: 'quotation_detachment';
-    } & QuotationDetachmentDerivation);
+    } & QuotationDetachmentDerivation) | ({
+        kind: 'topic_modeling_detachment';
+    } & TopicModelingDetachmentDerivation);
     /**
      * Type
      */
@@ -1574,6 +1672,30 @@ export type ExpressionNodeCreateRequest = {
      * Source Node Id
      */
     source_node_id: string;
+};
+
+/**
+ * ExpressionNodeEditRequest
+ *
+ * Apply a typed Polars expression to the target Data Block.
+ */
+export type ExpressionNodeEditRequest = {
+    /**
+     * Context
+     */
+    context: 'filter' | 'with_columns' | 'select' | 'sort' | 'group_by_agg';
+    /**
+     * Expressions
+     */
+    expressions: Array<ExpressionItemInput>;
+    /**
+     * Group By
+     */
+    group_by?: Array<ExpressionItemInput>;
+    /**
+     * Kind
+     */
+    kind?: 'expression';
 };
 
 /**
@@ -1780,6 +1902,26 @@ export type FilterNodeCreateRequest = {
      * Source Node Id
      */
     source_node_id: string;
+};
+
+/**
+ * FilterNodeEditRequest
+ *
+ * Replace the target plan with a filtered plan.
+ */
+export type FilterNodeEditRequest = {
+    /**
+     * Conditions
+     */
+    conditions: Array<FilterConditionInput>;
+    /**
+     * Kind
+     */
+    kind?: 'filter';
+    /**
+     * Logic
+     */
+    logic?: 'and' | 'or';
 };
 
 /**
@@ -2022,8 +2164,12 @@ export type ProviderCredentialPatch = {
  * Safe credential presence information; never contains secret values.
  */
 export type ProviderCredentialSummary = {
-    annotation: AnnotationCredentialStatus;
+    annotation: AnnotationCredentialStatus | null;
     data_portal: DataPortalCredentialStatus;
+    /**
+     * Storage
+     */
+    storage: 'backend' | 'browser';
 };
 
 /**
@@ -2118,9 +2264,9 @@ export type QuotationDetachmentResult = {
      */
     output_columns: Array<string>;
     /**
-     * Output Node Id
+     * Output Node Ids
      */
-    output_node_id: string;
+    output_node_ids: Array<string>;
     /**
      * Record Count
      */
@@ -2195,6 +2341,26 @@ export type QuotationResultQuery = {
      * Sort By
      */
     sort_by?: string | null;
+};
+
+/**
+ * RenameColumnNodeEditRequest
+ *
+ * Rename one column on the target Data Block.
+ */
+export type RenameColumnNodeEditRequest = {
+    /**
+     * Column
+     */
+    column: string;
+    /**
+     * Kind
+     */
+    kind?: 'rename_column';
+    /**
+     * New Name
+     */
+    new_name: string;
 };
 
 /**
@@ -2289,6 +2455,50 @@ export type ReplaceNodeCreateRequest = {
      * Source Node Id
      */
     source_node_id: string;
+};
+
+/**
+ * ReplaceNodeEditRequest
+ *
+ * Replace or extract text on the target Data Block.
+ */
+export type ReplaceNodeEditRequest = {
+    /**
+     * Connector
+     */
+    connector?: string;
+    /**
+     * Count
+     */
+    count?: 'all' | 'first';
+    /**
+     * Kind
+     */
+    kind?: 'replace';
+    /**
+     * Match Limit
+     */
+    match_limit?: number | null;
+    /**
+     * Mode
+     */
+    mode?: 'replace' | 'extract';
+    /**
+     * Output Column
+     */
+    output_column?: string | null;
+    /**
+     * Pattern
+     */
+    pattern: string;
+    /**
+     * Replacement
+     */
+    replacement?: string;
+    /**
+     * Source Column
+     */
+    source_column: string;
 };
 
 /**
@@ -2436,13 +2646,9 @@ export type SampleCatalogueResource = {
 /**
  * SampleCollection
  *
- * One importable sample collection from the configured catalogue.
+ * One importable sample collection from the remote catalogue.
  */
 export type SampleCollection = {
-    /**
-     * Bundled
-     */
-    bundled?: boolean;
     /**
      * Description
      */
@@ -2480,17 +2686,13 @@ export type SampleCollection = {
 /**
  * SampleFile
  *
- * One integrity-pinned file in a remote sample collection.
+ * One fetchable file in a remote sample collection.
  */
 export type SampleFile = {
     /**
      * Path
      */
     path: string;
-    /**
-     * Sha256
-     */
-    sha256: string;
     /**
      * Size
      */
@@ -2772,6 +2974,22 @@ export type SourceProvenance = {
 };
 
 /**
+ * SqlDerivation
+ *
+ * Exact SQL submitted when a Derived Data Block was created.
+ */
+export type SqlDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'sql';
+    /**
+     * Sql
+     */
+    sql: string;
+};
+
+/**
  * StringExpression
  */
 export type StringExpressionInput = {
@@ -3021,6 +3239,24 @@ export type TokenResultMetadata = {
 };
 
 /**
+ * TokenizerModelResource
+ */
+export type TokenizerModelResource = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Languages
+     */
+    languages?: Array<string>;
+};
+
+/**
  * TopicItem
  */
 export type TopicItem = {
@@ -3052,6 +3288,20 @@ export type TopicItem = {
      * Y
      */
     y: number;
+};
+
+/**
+ * TopicMeaningOverride
+ */
+export type TopicMeaningOverride = {
+    /**
+     * Topic Id
+     */
+    topic_id: number;
+    /**
+     * Words
+     */
+    words: Array<string>;
 };
 
 /**
@@ -3154,6 +3404,102 @@ export type TopicModelingAnalysisRequest = {
      * Sample Fractions
      */
     sample_fractions?: Array<number | null> | null;
+};
+
+/**
+ * TopicModelingDetachedOutput
+ */
+export type TopicModelingDetachedOutput = {
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+    /**
+     * Topic Data Columns
+     */
+    topic_data_columns: Array<string>;
+    /**
+     * Topic Data Node Id
+     */
+    topic_data_node_id: string;
+    /**
+     * Topic Data Record Count
+     */
+    topic_data_record_count: number;
+    /**
+     * Topic Meanings Node Id
+     */
+    topic_meanings_node_id: string;
+    /**
+     * Topic Meanings Record Count
+     */
+    topic_meanings_record_count: number;
+};
+
+/**
+ * TopicModelingDetachmentAnalysisRequest
+ */
+export type TopicModelingDetachmentAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'topic_modeling_detachment';
+    /**
+     * New Node Names
+     */
+    new_node_names: {
+        [key: string]: string;
+    };
+    /**
+     * Node Ids
+     */
+    node_ids: Array<string>;
+    /**
+     * Selected Columns
+     */
+    selected_columns: {
+        [key: string]: Array<string>;
+    };
+    /**
+     * Topic Ids
+     */
+    topic_ids?: Array<number> | null;
+    /**
+     * Topic Meanings Override
+     */
+    topic_meanings_override?: Array<TopicMeaningOverride>;
+};
+
+/**
+ * TopicModelingDetachmentDerivation
+ */
+export type TopicModelingDetachmentDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'topic_modeling_detachment';
+    /**
+     * Role
+     */
+    role: 'topic_data' | 'topic_meanings';
+};
+
+/**
+ * TopicModelingDetachmentResult
+ */
+export type TopicModelingDetachmentResult = {
+    /**
+     * Kind
+     */
+    kind?: 'topic_modeling_detachment';
+    /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
+     * Outputs
+     */
+    outputs: Array<TopicModelingDetachedOutput>;
 };
 
 /**
@@ -3466,6 +3812,14 @@ export type WorkspaceCreateRequest = {
  */
 export type WorkspaceNodeInfo = {
     /**
+     * Can Redo
+     */
+    can_redo: boolean;
+    /**
+     * Can Undo
+     */
+    can_undo: boolean;
+    /**
      * Child Ids
      */
     child_ids?: Array<string>;
@@ -3578,6 +3932,54 @@ export type WorkspaceResource = {
      * Total Nodes
      */
     total_nodes: number;
+};
+
+/**
+ * WorkspaceSqlCreateRequest
+ */
+export type WorkspaceSqlCreateRequest = {
+    /**
+     * Mode
+     */
+    mode?: 'create';
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Node Ids
+     */
+    node_ids: Array<string>;
+    /**
+     * Sql
+     */
+    sql: string;
+};
+
+/**
+ * WorkspaceSqlQueryRequest
+ */
+export type WorkspaceSqlQueryRequest = {
+    /**
+     * Mode
+     */
+    mode?: 'query';
+    /**
+     * Node Ids
+     */
+    node_ids: Array<string>;
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Sql
+     */
+    sql: string;
 };
 
 /**
@@ -3694,6 +4096,167 @@ export type LdacaWordflowModelsAnnotationsAnnotationClass = {
     name: string;
 };
 
+/**
+ * AnnotationAnalysisSubmission
+ *
+ * Annotation creation command with an optional request-only credential.
+ */
+export type AnnotationAnalysisSubmissionWritable = {
+    /**
+     * Annotation Column
+     */
+    annotation_column: string;
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Classes
+     */
+    classes: Array<LdacaWordflowDomainWorkspaceAnalysisAnnotationClass>;
+    /**
+     * Instruction
+     */
+    instruction: string;
+    /**
+     * Kind
+     */
+    kind?: 'annotation';
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Output Node Name
+     */
+    output_node_name: string;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    /**
+     * Reasoning Effort
+     */
+    reasoning_effort?: 'low' | 'medium' | 'high';
+    /**
+     * Reasoning Enabled
+     */
+    reasoning_enabled?: boolean;
+    /**
+     * Temperature
+     */
+    temperature?: number;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
+
+/**
+ * AnnotationPreviewRequest
+ *
+ * One stateless, one-based page preview with a request-only credential.
+ */
+export type AnnotationPreviewRequestWritable = {
+    /**
+     * Annotation Column
+     */
+    annotation_column: string;
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Classes
+     */
+    classes: Array<LdacaWordflowModelsAnnotationsAnnotationClass>;
+    /**
+     * Instruction
+     */
+    instruction: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    /**
+     * Reasoning Effort
+     */
+    reasoning_effort?: 'low' | 'medium' | 'high';
+    /**
+     * Reasoning Enabled
+     */
+    reasoning_enabled?: boolean;
+    /**
+     * Temperature
+     */
+    temperature?: number;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
+
+/**
+ * DataPortalImportSubmitRequest
+ *
+ * Portal import request with a token excluded from retained import state.
+ */
+export type DataPortalImportSubmitRequestWritable = {
+    /**
+     * Api Token
+     */
+    api_token?: string | null;
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
+ * DataPortalSearchRequest
+ *
+ * One one-based portal search with an optional request-only token.
+ */
+export type DataPortalSearchRequestWritable = {
+    /**
+     * Api Token
+     */
+    api_token?: string | null;
+    method?: DataPortalSearchMethod;
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Query
+     */
+    query?: string;
+};
+
 export type JsonDataInputWritable = string | number | number | boolean | Array<JsonDataInputWritable> | {
     [key: string]: JsonDataInputWritable;
 } | null;
@@ -3731,7 +4294,7 @@ export type ProviderCredentialPatchWritable = {
 };
 
 export type ListAnnotationModelsData = {
-    body?: never;
+    body: AnnotationModelsRequest;
     path: {
         /**
          * Provider
@@ -3755,6 +4318,10 @@ export type ListAnnotationModelsErrors = {
      * Origin, CSRF, or access check failed
      */
     403: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
     /**
      * Request validation failed
      */
@@ -3875,7 +4442,7 @@ export type GoogleCallbackErrors = {
 export type GoogleCallbackError = GoogleCallbackErrors[keyof GoogleCallbackErrors];
 
 export type ListFeaturedDataPortalCollectionsData = {
-    body?: never;
+    body: DataPortalFeaturedRequest;
     path?: never;
     query?: never;
     url: '/api/data-portal/featured';
@@ -3916,7 +4483,7 @@ export type ListFeaturedDataPortalCollectionsResponses = {
 export type ListFeaturedDataPortalCollectionsResponse = ListFeaturedDataPortalCollectionsResponses[keyof ListFeaturedDataPortalCollectionsResponses];
 
 export type SubmitDataPortalImportData = {
-    body: DataPortalImportSubmitRequest;
+    body: DataPortalImportSubmitRequestWritable;
     path?: never;
     query?: never;
     url: '/api/data-portal/imports';
@@ -3961,7 +4528,7 @@ export type SubmitDataPortalImportResponses = {
 export type SubmitDataPortalImportResponse = SubmitDataPortalImportResponses[keyof SubmitDataPortalImportResponses];
 
 export type SearchDataPortalData = {
-    body: DataPortalSearchRequest;
+    body: DataPortalSearchRequestWritable;
     path?: never;
     query?: never;
     url: '/api/data-portal/search';
@@ -4103,6 +4670,10 @@ export type ClearProviderCredentialsErrors = {
      */
     401: ApiError;
     /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
      * Stored resource is corrupt
      */
     500: ApiError;
@@ -4164,6 +4735,10 @@ export type UpdateProviderCredentialsErrors = {
      * Authentication required
      */
     401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
     /**
      * Resource state conflict
      */
@@ -4351,6 +4926,37 @@ export type GetStorageResponses = {
 };
 
 export type GetStorageResponse = GetStorageResponses[keyof GetStorageResponses];
+
+export type ListTokenizerModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tokenizer-models';
+};
+
+export type ListTokenizerModelsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type ListTokenizerModelsError = ListTokenizerModelsErrors[keyof ListTokenizerModelsErrors];
+
+export type ListTokenizerModelsResponses = {
+    /**
+     * Response List Tokenizer Models
+     *
+     * Successful Response
+     */
+    200: Array<TokenizerModelResource>;
+};
+
+export type ListTokenizerModelsResponse = ListTokenizerModelsResponses[keyof ListTokenizerModelsResponses];
 
 export type ListUserFileImportsData = {
     body?: never;
@@ -5590,7 +6196,9 @@ export type SubmitChildAnalysisData = {
         kind: 'concordance_dispersion_detachment';
     } & ConcordanceDispersionDetachmentAnalysisRequest) | ({
         kind: 'quotation_detachment';
-    } & QuotationDetachmentAnalysisRequest);
+    } & QuotationDetachmentAnalysisRequest) | ({
+        kind: 'topic_modeling_detachment';
+    } & TopicModelingDetachmentAnalysisRequest);
     path: {
         /**
          * Workspace Id
@@ -5728,7 +6336,9 @@ export type GetAnalysisResultResponses = {
         kind: 'concordance_dispersion_detachment';
     } & ConcordanceDispersionDetachmentResult) | ({
         kind: 'quotation_detachment';
-    } & QuotationDetachmentResult);
+    } & QuotationDetachmentResult) | ({
+        kind: 'topic_modeling_detachment';
+    } & TopicModelingDetachmentResult);
 };
 
 export type GetAnalysisResultResponse = GetAnalysisResultResponses[keyof GetAnalysisResultResponses];
@@ -5827,7 +6437,9 @@ export type QueryAnalysisResultResponses = {
         kind: 'concordance_dispersion_detachment';
     } & ConcordanceDispersionDetachmentResult) | ({
         kind: 'quotation_detachment';
-    } & QuotationDetachmentResult);
+    } & QuotationDetachmentResult) | ({
+        kind: 'topic_modeling_detachment';
+    } & TopicModelingDetachmentResult);
 };
 
 export type QueryAnalysisResultResponse = QueryAnalysisResultResponses[keyof QueryAnalysisResultResponses];
@@ -6165,9 +6777,7 @@ export type CreateNodeData = {
         kind: 'concat';
     } & ConcatNodeCreateRequest) | ({
         kind: 'join';
-    } & JoinNodeCreateRequest) | ({
-        kind: 'cast';
-    } & CastNodeCreateRequest);
+    } & JoinNodeCreateRequest);
     path: {
         /**
          * Workspace Id
@@ -6296,9 +6906,7 @@ export type PreviewNodeCreationData = {
         kind: 'concat';
     } & ConcatNodeCreateRequest) | ({
         kind: 'join';
-    } & JoinNodeCreateRequest) | ({
-        kind: 'cast';
-    } & CastNodeCreateRequest);
+    } & JoinNodeCreateRequest);
     path: {
         /**
          * Workspace Id
@@ -6515,7 +7123,7 @@ export type UpdateNodeResponses = {
 export type UpdateNodeResponse = UpdateNodeResponses[keyof UpdateNodeResponses];
 
 export type PreviewAnnotationData = {
-    body: AnnotationPreviewRequest;
+    body: AnnotationPreviewRequestWritable;
     path: {
         /**
          * Workspace Id
@@ -6548,6 +7156,10 @@ export type PreviewAnnotationErrors = {
      */
     404: ApiError;
     /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
      * Request validation failed
      */
     422: ApiError;
@@ -6568,7 +7180,80 @@ export type PreviewAnnotationResponses = {
 
 export type PreviewAnnotationResponse = PreviewAnnotationResponses[keyof PreviewAnnotationResponses];
 
-export type GetNodeRowsData = {
+export type EditNodeData = {
+    /**
+     * Request
+     */
+    body: ({
+        kind: 'cast';
+    } & CastNodeEditRequest) | ({
+        kind: 'rename_column';
+    } & RenameColumnNodeEditRequest) | ({
+        kind: 'delete_column';
+    } & DeleteColumnNodeEditRequest) | ({
+        kind: 'filter';
+    } & FilterNodeEditRequest) | ({
+        kind: 'replace';
+    } & ReplaceNodeEditRequest) | ({
+        kind: 'expression';
+    } & ExpressionNodeEditRequest);
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/edits';
+};
+
+export type EditNodeErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type EditNodeError = EditNodeErrors[keyof EditNodeErrors];
+
+export type EditNodeResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type EditNodeResponse = EditNodeResponses[keyof EditNodeResponses];
+
+export type RedoNodeData = {
     body?: never;
     path: {
         /**
@@ -6580,56 +7265,47 @@ export type GetNodeRowsData = {
          */
         node_id: string;
     };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-        /**
-         * Sort By
-         */
-        sort_by?: string | null;
-        /**
-         * Descending
-         */
-        descending?: boolean;
-    };
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/rows';
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/redo';
 };
 
-export type GetNodeRowsErrors = {
-    /**
-     * Invalid request
-     */
-    400: ApiError;
+export type RedoNodeErrors = {
     /**
      * Authentication required
      */
     401: ApiError;
     /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
      * Resource not found
      */
     404: ApiError;
     /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
      * Request validation failed
      */
     422: ApiError;
-};
-
-export type GetNodeRowsError = GetNodeRowsErrors[keyof GetNodeRowsErrors];
-
-export type GetNodeRowsResponses = {
     /**
-     * Arrow IPC stream
+     * Storage capacity is exhausted
      */
-    200: Blob | File;
+    507: ApiError;
 };
 
-export type GetNodeRowsResponse = GetNodeRowsResponses[keyof GetNodeRowsResponses];
+export type RedoNodeError = RedoNodeErrors[keyof RedoNodeErrors];
+
+export type RedoNodeResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type RedoNodeResponse = RedoNodeResponses[keyof RedoNodeResponses];
 
 export type GetNodeSchemaData = {
     body?: never;
@@ -6672,6 +7348,60 @@ export type GetNodeSchemaResponses = {
 };
 
 export type GetNodeSchemaResponse = GetNodeSchemaResponses[keyof GetNodeSchemaResponses];
+
+export type UndoNodeData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Node Id
+         */
+        node_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/undo';
+};
+
+export type UndoNodeErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type UndoNodeError = UndoNodeErrors[keyof UndoNodeErrors];
+
+export type UndoNodeResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkspaceNodeInfo;
+};
+
+export type UndoNodeResponse = UndoNodeResponses[keyof UndoNodeResponses];
 
 export type CloseWorkspaceByIdData = {
     body?: never;
@@ -6772,6 +7502,75 @@ export type OpenWorkspaceByIdResponses = {
 };
 
 export type OpenWorkspaceByIdResponse = OpenWorkspaceByIdResponses[keyof OpenWorkspaceByIdResponses];
+
+export type ExecuteWorkspaceSqlData = {
+    /**
+     * Command
+     */
+    body: ({
+        mode: 'query';
+    } & WorkspaceSqlQueryRequest) | ({
+        mode: 'create';
+    } & WorkspaceSqlCreateRequest);
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/sql';
+};
+
+export type ExecuteWorkspaceSqlErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type ExecuteWorkspaceSqlError = ExecuteWorkspaceSqlErrors[keyof ExecuteWorkspaceSqlErrors];
+
+export type ExecuteWorkspaceSqlResponses = {
+    /**
+     * Arrow IPC stream
+     */
+    200: Blob | File;
+    /**
+     * SQL-derived Data Block
+     */
+    201: WorkspaceNodeInfo;
+};
+
+export type ExecuteWorkspaceSqlResponse = ExecuteWorkspaceSqlResponses[keyof ExecuteWorkspaceSqlResponses];
 
 export type ListTabsData = {
     body?: never;
@@ -7177,7 +7976,7 @@ export type SubmitTabAnalysisData = {
         kind: 'sequential';
     } & SequentialAnalysisRequest) | ({
         kind: 'annotation';
-    } & AnnotationAnalysisRequest);
+    } & AnnotationAnalysisSubmissionWritable);
     path: {
         /**
          * Workspace Id

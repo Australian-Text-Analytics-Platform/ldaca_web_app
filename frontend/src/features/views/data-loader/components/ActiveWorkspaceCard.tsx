@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import HelpIcon from '@/components/help/HelpIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { formatBytes, formatTimestamp } from '../utils/format';
+import { formatTimestamp } from '../utils/format';
 import type { WorkspaceListItem } from './WorkspaceManagerCard';
 
 export interface ActiveWorkspaceCardProps {
@@ -45,7 +45,7 @@ interface CreateWorkspaceFormProps {
  * active controls own only their local draft inputs.
  */
 function getActiveWorkspaceDraftKey(workspace: WorkspaceListItem) {
-  return [workspace.id, workspace.name, workspace.description ?? ''].join('\n');
+  return [workspace.id, workspace.name, workspace.description].join('\n');
 }
 
 /**
@@ -71,6 +71,7 @@ export function ActiveWorkspaceCard({
   return (
     <Card
       data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
+      data-guidance="workspace-setup"
       className="flex h-full flex-col overflow-hidden"
     >
       <CardHeader>
@@ -133,8 +134,8 @@ function ActiveWorkspaceControls({
   onUnload,
 }: ActiveWorkspaceControlsProps) {
   const [renameValue, setRenameValue] = useState(currentWorkspace.name);
-  const [descriptionValue, setDescriptionValue] = useState(currentWorkspace.description ?? '');
-  const normalizedCurrentDescription = (currentWorkspace.description ?? '').trim();
+  const [descriptionValue, setDescriptionValue] = useState(currentWorkspace.description);
+  const normalizedCurrentDescription = currentWorkspace.description.trim();
   const normalizedDescriptionValue = descriptionValue.trim();
 
   return (
@@ -147,8 +148,7 @@ function ActiveWorkspaceControls({
           </Badge>
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
-          Updated {formatTimestamp(currentWorkspace.modified_at)} | Size{' '}
-          {formatBytes(currentWorkspace.workspace_size_Byte ?? 0)} | Created{' '}
+          Updated {formatTimestamp(currentWorkspace.modified_at)} | Created{' '}
           {formatTimestamp(currentWorkspace.created_at)}
         </div>
       </div>

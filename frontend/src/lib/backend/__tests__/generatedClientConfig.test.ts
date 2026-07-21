@@ -1,115 +1,123 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApiError } from '@/lib/apiError';
 import { createClientConfig, getGeneratedApiBase } from '@/lib/backend/generatedClientConfig';
-import { setRequiresAuthentication } from '@/lib/backend/authToken';
+import { clearCsrfToken, setCsrfToken } from '@/lib/backend/csrfToken';
 
 const originalFetch = global.fetch;
 
-/** Narrows optional generated fetch config before exercising the wrapped SDK request path. */
-/** Used by: tests in this file. */
 const requireFetch = (fetchImpl: typeof fetch | undefined): typeof fetch => {
   if (!fetchImpl) throw new Error('Expected generated client config to provide fetch');
   return fetchImpl;
 };
 
 describe('generatedClientConfig', () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-    setRequiresAuthentication(null);
-  });
-
+  beforeEach(() => clearCsrfToken());
   afterEach(() => {
     global.fetch = originalFetch;
+    clearCsrfToken();
   });
 
-  it('adds credentials and the current auth header to generated client requests', async () => {
-    window.localStorage.setItem('auth_token', 'test-token');
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+  it('uses credentialed cookie requests and injects the current CSRF token only for unsafe methods', async () => {
+    setCsrfToken('csrf-1');
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
     const config = createClientConfig({ baseUrl: 'http://api.test/api', fetch: fetchMock });
 
     await requireFetch(config.fetch)(
-      new Request(`${String(config.baseUrl)}/runtime-config`, { credentials: config.credentials }),
+      new Request(`${String(config.baseUrl)}/session`, {
+        method: 'GET',
+        credentials: config.credentials,
+      }),
+    );
+    await requireFetch(config.fetch)(
+      new Request(`${String(config.baseUrl)}/session`, {
+        method: 'DELETE',
+        credentials: config.credentials,
+      }),
     );
 
-    const [request] = fetchMock.mock.calls[0] as [Request];
-    expect(request.credentials).toBe('include');
-    expect(request.headers.get('Authorization')).toBe('Bearer test-token');
+    const [getRequest, deleteRequest] = fetchMock.mock.calls.map(([request]) => request as Request);
+    expect(getRequest.credentials).toBe('include');
+    expect(getRequest.headers.has('X-CSRF-Token')).toBe(false);
+    expect(deleteRequest.credentials).toBe('include');
+    expect(deleteRequest.headers.get('X-CSRF-Token')).toBe('csrf-1');
   });
 
-  it('suppresses a stale stored token after single-user auth mode resolves', async () => {
-    window.localStorage.setItem('auth_token', 'stale-token');
-    setRequiresAuthentication(false);
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    const config = createClientConfig({ baseUrl: 'http://api.test/api', fetch: fetchMock });
-
-    await requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/runtime-config`));
-
-    const [request] = fetchMock.mock.calls[0] as [Request];
-    expect(request.headers.has('Authorization')).toBe(false);
-  });
-
-  it('uses a base URL compatible with generated paths that already include /api', () => {
+  it('normalizes generated paths that already include /api', () => {
     expect(getGeneratedApiBase('http://api.test/api')).toBe('http://api.test');
     expect(getGeneratedApiBase('/api')).toBe('');
   });
 
-  it('strips the x-client-timeout-ms override header before the request leaves the browser', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+  it('strips the client-only timeout override before the request leaves the browser', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
     const config = createClientConfig({ baseUrl: 'http://api.test/api', fetch: fetchMock });
-
     await requireFetch(config.fetch)(
-      new Request(`${String(config.baseUrl)}/runtime-config`, {
+      new Request(`${String(config.baseUrl)}/session`, {
         headers: { 'x-client-timeout-ms': '600000' },
       }),
     );
-
-    // The opt-in override is a client-only hint; it must never reach the server.
     const [request] = fetchMock.mock.calls[0] as [Request];
     expect(request.headers.has('x-client-timeout-ms')).toBe(false);
   });
 
-  it('normalizes fetch network failures to ApiError', async () => {
+  it('normalizes network failures to ApiError', async () => {
     const config = createClientConfig({
       baseUrl: 'http://api.test/api',
       fetch: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
     });
-
     await expect(
-      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/runtime-config`)),
+      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/session`)),
+    ).rejects.toMatchObject({ code: 'NETWORK', name: 'ApiError' } satisfies Partial<ApiError>);
+  });
+
+  it('preserves the backend stable error code on failed generated requests', async () => {
+    const config = createClientConfig({
+      baseUrl: 'http://api.test/api',
+      fetch: vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ code: 'workspace_conflict', message: 'Workspace changed' }),
+            { status: 409, headers: { 'Content-Type': 'application/json' } },
+          ),
+        ),
+    });
+    await expect(
+      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/session`)),
     ).rejects.toMatchObject({
-      code: 'NETWORK',
-      name: 'ApiError',
+      status: 409,
+      code: 'workspace_conflict',
+      message: 'Workspace changed',
     } satisfies Partial<ApiError>);
   });
 
-  it('preserves the backend semantic error code on failed generated requests', async () => {
+  it('includes the backend request id in server-error messages', async () => {
     const config = createClientConfig({
       baseUrl: 'http://api.test/api',
       fetch: vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            error: 'annotation_preview_session_busy',
-            message: 'Annotation preview session is being materialised',
-            details: null,
+            code: 'internal_server_error',
+            message: 'Internal server error',
+            request_id: 'request-500',
           }),
-          { status: 409, headers: { 'Content-Type': 'application/json' } },
+          {
+            status: 500,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Request-ID': 'request-500',
+            },
+          },
         ),
       ),
     });
 
     await expect(
-      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/preview`)),
+      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/session`)),
     ).rejects.toMatchObject({
-      status: 409,
-      code: 'annotation_preview_session_busy',
-      message: 'Annotation preview session is being materialised',
+      status: 500,
+      code: 'internal_server_error',
+      message: 'Internal server error (Request ID: request-500)',
     } satisfies Partial<ApiError>);
   });
 });
