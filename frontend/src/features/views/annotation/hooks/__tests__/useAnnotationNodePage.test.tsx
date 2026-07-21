@@ -5,8 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAnnotationNodePage } from '../useAnnotationNodePage';
 
-const getNodeRowsTable = vi.hoisted(() => vi.fn());
-vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal()), getNodeRowsTable }));
+const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  queryWorkspaceSqlTable,
+}));
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -17,7 +20,11 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 describe('useAnnotationNodePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getNodeRowsTable.mockResolvedValue({ rows: [{ text: 'one' }], hasNext: true });
+    queryWorkspaceSqlTable.mockResolvedValue({
+      rows: [{ text: 'one' }],
+      hasNext: true,
+      etag: '"revision-1"',
+    });
   });
 
   it('uses one-based node row pagination and forwards the query abort signal', async () => {
@@ -26,9 +33,15 @@ describe('useAnnotationNodePage', () => {
       { wrapper },
     );
     await waitFor(() => expect(result.current.rows).toEqual([{ text: 'one' }]));
-    expect(getNodeRowsTable).toHaveBeenCalledWith({
-      path: { workspace_id: 'workspace-1', node_id: 'node-1' },
-      query: { page: 1, page_size: 50, sort_by: null, descending: false },
+    expect(queryWorkspaceSqlTable).toHaveBeenCalledWith({
+      path: { workspace_id: 'workspace-1' },
+      body: {
+        mode: 'query',
+        node_ids: ['node-1'],
+        sql: 'SELECT * FROM "node-1"',
+        page: 1,
+        page_size: 50,
+      },
       signal: expect.any(AbortSignal),
     });
     expect(result.current.rowCount).toBe(51);

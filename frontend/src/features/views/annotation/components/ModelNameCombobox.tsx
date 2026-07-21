@@ -3,26 +3,21 @@
  *
  * Rendered by: AnnotationAiSettings, once per active provider. It serves two
  * shapes from one control:
- *   1. Listable providers get a text input whose popover shows a live model list:
- *      OpenRouter is fetched directly from its public client-side `GET /models`
- *      endpoint so pricing can be displayed, while OpenAI/Anthropic/Google/custom
- *      providers continue through our `/annotation/ai/models` backend proxy. The
- *      input always stays free-text, so a custom endpoint that lacks `/models`
- *      just shows a dropdown error while the user types an id by hand.
+ *   1. Listable providers get a text input whose popover shows a live model list
+ *      obtained through the backend provider adapter. The input always stays
+ *      free-text, so users can still enter a model id by hand.
  *   2. Any provider without listing support falls back to a plain text input so
  *      users can still type any model id.
  *
  * Flow: the input value doubles as both the chosen model and a wildcard search
- * query. The model list is fetched lazily through React Query (keyed by provider
- * card + provider + base URL + relevant key) only while the popover is open and
- * the provider's key requirement is met, so no network call happens until the
- * user opens the dropdown. Backend-listed providers use generated client auth;
- * OpenRouter intentionally bypasses the backend per the client-side pricing UI.
+ * query. The model list is fetched lazily through React Query, keyed only by
+ * safe provider metadata and a credential revision, so no secret enters query
+ * state and no network call happens until the user opens the dropdown.
  */
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
-import { listAnnotationModels } from '@/api';
+import { listAnnotationModelsWithProviderCredential } from '@/features/provider-credentials/providerCredentialRequests';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,6 +32,7 @@ interface ModelNameComboboxProps {
   workspaceId: string | null;
   provider: AnnotationAiProvider;
   credentialConfigured: boolean;
+  credentialRevision: number;
   value: string;
   onChange: (value: string) => void;
   /**
@@ -81,6 +77,7 @@ export function ModelNameCombobox({
   workspaceId,
   provider,
   credentialConfigured,
+  credentialRevision,
   value,
   onChange,
   onCommit,
@@ -92,17 +89,22 @@ export function ModelNameCombobox({
 
   const listingEnabled = canListModels(provider, credentialConfigured);
 
-  // Lazy, cached model listing: OpenRouter is intentionally fetched directly so
-  // the UI can use its public pricing payload, while other providers still route
-  // through the backend proxy that owns native SDK calls and provider secrets.
+  // The request facade injects browser-owned multi-user credentials only at the
+  // network boundary. Single-user credentials remain backend-owned.
   const modelsQuery = useQuery<ModelDropdownOption[]>({
-    queryKey: ['annotation-ai-models', workspaceId ?? '', provider.id, provider.requestProviderId],
-    queryFn: async () => {
+    queryKey: [
+      'annotation-ai-models',
+      workspaceId ?? '',
+      provider.id,
+      provider.requestProviderId,
+      credentialRevision,
+    ],
+    queryFn: async ({ signal }) => {
       if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await listAnnotationModels({
-        path: { provider: provider.requestProviderId },
-        throwOnError: true,
-      });
+      const { data } = await listAnnotationModelsWithProviderCredential(
+        provider.requestProviderId,
+        signal,
+      );
       return data.models.map((modelId) => ({ id: modelId }));
     },
     enabled: open && listingEnabled && Boolean(workspaceId),

@@ -21,7 +21,11 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'user-1' } }),
+  useAuth: () => ({
+    isAuthenticated: true,
+    isMultiUserMode: false,
+    user: { id: 'root' },
+  }),
 }));
 
 vi.mock('@/features/preferences/useUserPreferences', () => ({

@@ -15,6 +15,7 @@ interface AnnotationAiSettingsProps {
   provider: AnnotationAiProviderId;
   onProviderChange: (provider: AnnotationAiProviderId, model: string) => void;
   configuredProviders: Partial<Record<BuiltinAnnotationAiProviderId, boolean>>;
+  credentialRevision: number;
   providerModels: Record<string, string>;
   model: string;
   disabled?: boolean;
@@ -27,6 +28,7 @@ export function AnnotationAiSettings({
   provider,
   onProviderChange,
   configuredProviders,
+  credentialRevision,
   providerModels,
   model,
   disabled,
@@ -99,6 +101,7 @@ export function AnnotationAiSettings({
             id="annotation-ai-model"
             provider={getBuiltinProvider(selected.id)}
             credentialConfigured={selectedConfigured}
+            credentialRevision={credentialRevision}
             value={selectedModel}
             onChange={(next) => {
               onProviderChange(selected.id, next);

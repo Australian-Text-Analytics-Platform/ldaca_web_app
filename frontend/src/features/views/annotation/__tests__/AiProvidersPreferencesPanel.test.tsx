@@ -4,16 +4,23 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getProviderCredentials: vi.fn(),
-  updateProviderCredentials: vi.fn(),
-  clearProviderCredentials: vi.fn(),
+  saveAnnotationCredential: vi.fn(),
+  clearAnnotationCredential: vi.fn(),
+  clearAnnotationCredentials: vi.fn(),
 }));
 
-vi.mock('@/api', async (importOriginal) => ({
-  ...(await importOriginal()),
-  getProviderCredentials: mocks.getProviderCredentials,
-  updateProviderCredentials: mocks.updateProviderCredentials,
-  clearProviderCredentials: mocks.clearProviderCredentials,
+vi.mock('@/features/provider-credentials/useProviderCredentials', () => ({
+  useProviderCredentials: () => ({
+    storage: 'browser',
+    annotation: { openai: false, openrouter: true, anthropic: false, google: false },
+    dataPortal: { userConfigured: false, deploymentConfigured: false },
+    revision: 1,
+    isLoading: false,
+    error: null,
+    saveAnnotationCredential: mocks.saveAnnotationCredential,
+    clearAnnotationCredential: mocks.clearAnnotationCredential,
+    clearAnnotationCredentials: mocks.clearAnnotationCredentials,
+  }),
 }));
 
 import { AiProvidersPreferencesPanel } from '../components/AiProvidersPreferencesPanel';
@@ -30,33 +37,33 @@ const renderPanel = () => {
 describe('AiProvidersPreferencesPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getProviderCredentials.mockResolvedValue({
-      data: {
-        annotation: { openai: false, openrouter: true, anthropic: false, google: false },
-        data_portal: { deployment_configured: false, user_configured: false },
-      },
-    });
-    mocks.updateProviderCredentials.mockResolvedValue({ data: undefined });
-    mocks.clearProviderCredentials.mockResolvedValue({ data: undefined });
+    mocks.saveAnnotationCredential.mockResolvedValue(undefined);
+    mocks.clearAnnotationCredential.mockResolvedValue(undefined);
+    mocks.clearAnnotationCredentials.mockResolvedValue(undefined);
   });
 
-  it('shows write-only provider presence state from the backend', async () => {
+  it('shows only credential presence and keeps every input blank', () => {
     renderPanel();
-    expect(await screen.findByText('AI provider credentials')).toBeInTheDocument();
+    expect(screen.getByText('AI provider credentials')).toBeInTheDocument();
     expect(screen.getByText('OpenRouter')).toBeInTheDocument();
-    expect(await screen.findByText('Configured')).toBeInTheDocument();
+    expect(screen.getByText('Configured')).toBeInTheDocument();
     expect(screen.getAllByText('Not configured')).toHaveLength(3);
+    const inputs = screen.getAllByLabelText(/API key$/);
+    expect(inputs).toHaveLength(4);
+    for (const input of inputs) expect(input).toHaveValue('');
   });
 
-  it('sends a new credential to the canonical provider endpoint without storing it locally', async () => {
+  it('passes replacements and explicit clears through the credential facade', async () => {
     const user = userEvent.setup();
     renderPanel();
-    const input = await screen.findByLabelText('OpenAI API key');
+
+    const input = screen.getByLabelText('OpenAI API key');
     await user.type(input, 'sk-test');
     await user.click(screen.getAllByRole('button', { name: 'Save' })[1]!);
-    expect(mocks.updateProviderCredentials).toHaveBeenCalledWith({
-      body: { openai_api_key: 'sk-test' },
-      throwOnError: true,
-    });
+    expect(mocks.saveAnnotationCredential).toHaveBeenCalledWith('openai', 'sk-test');
+    expect(input).toHaveValue('');
+
+    await user.click(screen.getAllByRole('button', { name: 'Clear' })[0]!);
+    expect(mocks.clearAnnotationCredential).toHaveBeenCalledWith('openrouter');
   });
 });

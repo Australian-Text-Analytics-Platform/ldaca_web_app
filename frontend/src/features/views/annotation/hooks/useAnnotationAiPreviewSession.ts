@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { previewAnnotation } from '@/api';
 import type { AnnotationPreviewLabel } from '@/api';
+import { previewAnnotationWithProviderCredential } from '@/features/provider-credentials/providerCredentialRequests';
 import type { AnnotationClassOption, AnnotationAiProviderId } from '../aiProviders';
 import { useAnnotationClassDescriptions } from './useAnnotationClassDescriptions';
 import { useAnnotationNodePage } from './useAnnotationNodePage';
@@ -23,6 +23,7 @@ interface AnnotationAiPreviewSessionConfig {
   temperature: number;
   reasoningEnabled: boolean;
   reasoningEffort: string;
+  credentialRevision: number;
 }
 
 interface UseAnnotationAiPreviewSessionArgs extends AnnotationAiPreviewSessionConfig {
@@ -44,9 +45,8 @@ function normalizePromptClasses(classes: AnnotationClassOption[]): AnnotationCla
 }
 
 /**
- * Owns one stateless annotation preview. The backend does not create preview
- * sessions or accept credentials from the browser, so a preview is simply a
- * query for the current node page and a typed classification request.
+ * Owns one stateless annotation preview. The request boundary adds the current
+ * mode-specific credential without placing it in this query's state or key.
  */
 export function useAnnotationAiPreviewSession({
   workspaceId,
@@ -62,6 +62,7 @@ export function useAnnotationAiPreviewSession({
   temperature,
   reasoningEnabled,
   reasoningEffort,
+  credentialRevision,
   isOpen,
   targetValid,
   onOpenChange,
@@ -97,6 +98,7 @@ export function useAnnotationAiPreviewSession({
     temperature,
     reasoningEnabled,
     reasoningEffort,
+    credentialRevision,
     classes,
     nodePage.pagination,
   ]);
@@ -111,10 +113,10 @@ export function useAnnotationAiPreviewSession({
     retry: false,
     queryFn: async ({ signal }) => {
       if (!workspaceId || !nodeId) throw new Error('Missing annotation preview identity');
-      const { data } = await previewAnnotation({
-        headers: { 'x-client-timeout-ms': '120000' },
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        body: {
+      const { data } = await previewAnnotationWithProviderCredential({
+        workspaceId,
+        nodeId,
+        request: {
           text_column: textColumn,
           annotation_column: annotationColumn,
           classes,
@@ -128,7 +130,6 @@ export function useAnnotationAiPreviewSession({
           page_size: nodePage.pagination.pageSize,
         },
         signal,
-        throwOnError: true,
       });
       return data;
     },

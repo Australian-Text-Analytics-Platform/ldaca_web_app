@@ -6,13 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAnnotationAiPreviewSession } from '../useAnnotationAiPreviewSession';
 
 const mocks = vi.hoisted(() => ({
-  getNodeRowsTable: vi.fn(),
-  previewAnnotation: vi.fn(),
+  queryWorkspaceSqlTable: vi.fn(),
+  previewAnnotationWithProviderCredential: vi.fn(),
 }));
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  getNodeRowsTable: mocks.getNodeRowsTable,
-  previewAnnotation: mocks.previewAnnotation,
+  queryWorkspaceSqlTable: mocks.queryWorkspaceSqlTable,
+}));
+vi.mock('@/features/provider-credentials/providerCredentialRequests', () => ({
+  previewAnnotationWithProviderCredential: mocks.previewAnnotationWithProviderCredential,
 }));
 
 const wrapper = ({ children }: { children: ReactNode }) => (
@@ -24,17 +26,23 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 describe('useAnnotationAiPreviewSession', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getNodeRowsTable.mockResolvedValue({
-      rows: [{ text: 'hello' }],
-      columns: ['text'],
-      hasNext: false,
+    mocks.queryWorkspaceSqlTable.mockImplementation(async (options) => {
+      const isClassData = options.body.node_ids[0] === 'classes-1';
+      return {
+        rows: isClassData
+          ? [{ class: 'greeting', description: 'A greeting' }]
+          : [{ text: 'hello' }],
+        columns: isClassData ? ['class', 'description'] : ['text'],
+        hasNext: false,
+        etag: '"revision-1"',
+      };
     });
-    mocks.previewAnnotation.mockResolvedValue({
+    mocks.previewAnnotationWithProviderCredential.mockResolvedValue({
       data: { labels: [{ row_index: 0, label: 'greeting' }] },
     });
   });
 
-  it('uses the canonical node rows and stateless annotation preview endpoints', async () => {
+  it('uses Workspace SQL and the stateless annotation preview endpoint', async () => {
     const { result } = renderHook(
       () =>
         useAnnotationAiPreviewSession({
@@ -51,6 +59,7 @@ describe('useAnnotationAiPreviewSession', () => {
           temperature: 0,
           reasoningEnabled: false,
           reasoningEffort: 'medium',
+          credentialRevision: 0,
           isOpen: true,
           targetValid: true,
           onOpenChange: vi.fn(),
@@ -60,7 +69,21 @@ describe('useAnnotationAiPreviewSession', () => {
       { wrapper },
     );
 
-    await waitFor(() => expect(mocks.getNodeRowsTable).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.queryWorkspaceSqlTable).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.previewAnnotationWithProviderCredential).toHaveBeenCalled());
+    expect(mocks.previewAnnotationWithProviderCredential.mock.calls[0]?.[0].request).toEqual({
+      text_column: 'text',
+      annotation_column: 'label',
+      classes: [{ name: 'greeting', description: 'A greeting' }],
+      provider: 'openrouter',
+      model: 'model-1',
+      instruction: 'classify',
+      temperature: 0,
+      reasoning_enabled: false,
+      reasoning_effort: 'medium',
+      page: 1,
+      page_size: 20,
+    });
     expect(result.current.columns).toEqual({ text: 'text', annotation: 'label' });
     expect(result.current.isBusy).toBe(false);
   });

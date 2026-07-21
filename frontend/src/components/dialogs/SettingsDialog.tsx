@@ -140,8 +140,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <div>
                     <h3 className="text-sm font-semibold">Preference Sync</h3>
                     <p className="text-sm text-muted-foreground">
-                      These preferences follow your account. Credentials remain in dedicated
-                      write-only server panels.
+                      These preferences follow your account. Provider credentials use dedicated
+                      mode-specific storage and are not User Preferences.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-sm">

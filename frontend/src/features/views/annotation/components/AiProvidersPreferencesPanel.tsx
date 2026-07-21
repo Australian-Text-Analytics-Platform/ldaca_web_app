@@ -1,67 +1,60 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { clearProviderCredentials, getProviderCredentials, updateProviderCredentials } from '@/api';
-import type { AnnotationCredentialStatus, ProviderCredentialPatchWritable } from '@/api';
+import { useProviderCredentials } from '@/features/provider-credentials/useProviderCredentials';
 import { ANNOTATION_AI_PROVIDERS, type BuiltinAnnotationAiProviderId } from '../aiProviders';
 
-const CREDENTIALS_QUERY_KEY = ['provider-credentials'] as const;
-
-type CredentialField = keyof AnnotationCredentialStatus;
-
-const FIELD_BY_PROVIDER: Record<CredentialField, keyof ProviderCredentialPatchWritable> = {
-  openai: 'openai_api_key',
-  openrouter: 'openrouter_api_key',
-  anthropic: 'anthropic_api_key',
-  google: 'google_api_key',
-};
+type CredentialField = BuiltinAnnotationAiProviderId;
 
 /**
- * Hosted credentials are write-only. The form therefore keeps the entered
- * value only in the input element and renders the server's presence booleans.
- * No secret is copied into Zustand, localStorage, tab settings, or query data.
+ * Provider inputs remain blank/write-only. The credential facade routes a save
+ * to the local backend in single-user mode or this browser in multi-user mode.
  */
 export function AiProvidersPreferencesPanel() {
-  const queryClient = useQueryClient();
-  const credentialsQuery = useQuery({
-    queryKey: CREDENTIALS_QUERY_KEY,
-    queryFn: async () => (await getProviderCredentials({ throwOnError: true })).data,
-  });
-  const updateMutation = useMutation({
-    mutationFn: (body: ProviderCredentialPatchWritable) =>
-      updateProviderCredentials({ body, throwOnError: true }).then(({ data }) => data),
-    onSuccess: (data) => {
-      queryClient.setQueryData(CREDENTIALS_QUERY_KEY, data);
-      toast.success('Provider credential updated');
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Could not update credential');
-    },
-  });
-  const clearMutation = useMutation({
-    mutationFn: () => clearProviderCredentials({ throwOnError: true }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: CREDENTIALS_QUERY_KEY });
-      toast.success('Provider credentials cleared');
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Could not clear credentials');
-    },
-  });
-
-  const statuses = credentialsQuery.data?.annotation;
+  const credentials = useProviderCredentials();
+  const [pending, setPending] = useState<CredentialField | 'all' | null>(null);
   const [drafts, setDrafts] = useState<Partial<Record<CredentialField, string>>>({});
 
-  const save = (provider: BuiltinAnnotationAiProviderId) => {
-    const field = FIELD_BY_PROVIDER[provider];
+  const save = async (provider: BuiltinAnnotationAiProviderId) => {
     const value = drafts[provider]?.trim() ?? '';
     if (!value) return;
-    void updateMutation.mutateAsync({ [field]: value });
-    setDrafts((current) => ({ ...current, [provider]: '' }));
+    setPending(provider);
+    try {
+      await credentials.saveAnnotationCredential(provider, value);
+      setDrafts((current) => ({ ...current, [provider]: '' }));
+      toast.success('Provider credential updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update credential');
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const clear = async (provider: BuiltinAnnotationAiProviderId) => {
+    setPending(provider);
+    try {
+      await credentials.clearAnnotationCredential(provider);
+      toast.success('Provider credential cleared');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not clear credential');
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const clearAll = async () => {
+    setPending('all');
+    try {
+      await credentials.clearAnnotationCredentials();
+      toast.success('Provider credentials cleared');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not clear credentials');
+    } finally {
+      setPending(null);
+    }
   };
 
   return (
@@ -70,14 +63,16 @@ export function AiProvidersPreferencesPanel() {
         <div>
           <h3 className="text-sm font-semibold">AI provider credentials</h3>
           <p className="text-sm text-muted-foreground">
-            Credentials are stored by the backend and are never returned to the browser. Enter a new
-            value to replace an existing credential.
+            {credentials.storage === 'browser'
+              ? 'Credentials stay in this browser for the current account and are sent only with provider requests.'
+              : 'Credentials are stored by the local backend and are never returned to the browser.'}{' '}
+            Enter a new value to replace an existing credential.
           </p>
         </div>
         <div className="space-y-2">
           {ANNOTATION_AI_PROVIDERS.map((provider) => {
             const field = provider.id;
-            const configured = statuses?.[field] ?? false;
+            const configured = credentials.annotation[field];
             return (
               <div
                 key={provider.id}
@@ -103,11 +98,21 @@ export function AiProvidersPreferencesPanel() {
                   <Button
                     type="button"
                     onClick={() => {
-                      save(provider.id);
+                      void save(provider.id);
                     }}
-                    disabled={!drafts[field]?.trim() || updateMutation.isPending}
+                    disabled={!drafts[field]?.trim() || pending !== null}
                   >
                     Save
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      void clear(provider.id);
+                    }}
+                    disabled={!configured || pending !== null}
+                  >
+                    Clear
                   </Button>
                 </div>
               </div>
@@ -119,11 +124,11 @@ export function AiProvidersPreferencesPanel() {
         type="button"
         variant="outline"
         onClick={() => {
-          clearMutation.mutate();
+          void clearAll();
         }}
-        disabled={clearMutation.isPending || !credentialsQuery.data}
+        disabled={pending !== null || !Object.values(credentials.annotation).some(Boolean)}
       >
-        Clear all provider credentials
+        Clear all AI provider credentials
       </Button>
     </div>
   );

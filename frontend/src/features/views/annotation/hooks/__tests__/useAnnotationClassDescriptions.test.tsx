@@ -5,8 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAnnotationClassDescriptions } from '../useAnnotationClassDescriptions';
 
-const getNodeRowsTable = vi.hoisted(() => vi.fn());
-vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal()), getNodeRowsTable }));
+const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  queryWorkspaceSqlTable,
+}));
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -17,13 +20,14 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 describe('useAnnotationClassDescriptions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getNodeRowsTable.mockResolvedValue({
+    queryWorkspaceSqlTable.mockResolvedValue({
       rows: [{ class: 'support', description: 'positive' }, { class: 'reject' }],
       hasNext: false,
+      etag: '"revision-1"',
     });
   });
 
-  it('loads and normalizes the selected class-description columns through node rows', async () => {
+  it('loads and normalizes the selected class-description columns through Workspace SQL', async () => {
     const { result } = renderHook(
       () =>
         useAnnotationClassDescriptions({
@@ -35,9 +39,15 @@ describe('useAnnotationClassDescriptions', () => {
       { wrapper },
     );
     await waitFor(() => expect(result.current.query.isSuccess).toBe(true));
-    expect(getNodeRowsTable).toHaveBeenCalledWith({
-      path: { workspace_id: 'workspace-1', node_id: 'classes-node' },
-      query: { page: 1, page_size: 1000 },
+    expect(queryWorkspaceSqlTable).toHaveBeenCalledWith({
+      path: { workspace_id: 'workspace-1' },
+      body: {
+        mode: 'query',
+        node_ids: ['classes-node'],
+        sql: 'SELECT "class", "description" FROM "classes-node"',
+        page: 1,
+        page_size: 500,
+      },
       signal: expect.any(AbortSignal),
     });
     expect(result.current.rows).toEqual([
@@ -59,6 +69,6 @@ describe('useAnnotationClassDescriptions', () => {
     );
     expect(result.current.canLoad).toBe(false);
     expect(result.current.rows).toEqual([]);
-    expect(getNodeRowsTable).not.toHaveBeenCalled();
+    expect(queryWorkspaceSqlTable).not.toHaveBeenCalled();
   });
 });

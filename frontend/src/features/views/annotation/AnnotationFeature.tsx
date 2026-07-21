@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { getProviderCredentials } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,10 +31,10 @@ import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAnnotationClassDescriptions } from './hooks/useAnnotationClassDescriptions';
 import { useAnnotationAiPreviewSession } from './hooks/useAnnotationAiPreviewSession';
+import { useProviderCredentials } from '@/features/provider-credentials/useProviderCredentials';
 
 const SOURCE_NODE_CONSTRAINTS: NodeInputConstraints = {
   allowedDataTypes: ['string'],
@@ -144,8 +143,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   const [hasRun, setHasRun] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   // Tab-persisted AI settings live in their own hook so this feature body can
-  // focus on selector, run, and results orchestration. API keys stay in
-  // preferences, never in tab settings.
+  // focus on selector, run, and results orchestration. API keys stay behind the
+  // credential facade, never in tab settings.
   const {
     annotationMode,
     setAnnotationMode,
@@ -167,10 +166,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     annotationTargets,
     setAnnotationTarget,
   } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
-  const providerCredentialsQuery = useQuery({
-    queryKey: ['provider-credentials'],
-    queryFn: async () => (await getProviderCredentials({ throwOnError: true })).data,
-  });
+  const providerCredentials = useProviderCredentials();
   // Annotation-column choice per example node (plain columns only — no "Start
   // new annotation" option, since examples reference existing labels).
   const [exampleAnnotationColumns, setExampleAnnotationColumns] = useState<Record<string, string>>(
@@ -339,7 +335,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   // non-empty class list to classify into, so previewing an empty class node would
   // only ever return blanks.
   const resolvedAiProvider = getBuiltinProvider(aiProvider);
-  const configuredProviders = (providerCredentialsQuery.data?.annotation ?? {}) as Partial<
+  const configuredProviders = providerCredentials.annotation as Partial<
     Record<BuiltinAnnotationAiProviderId, boolean>
   >;
   const providerConfigured = configuredProviders[resolvedAiProvider.id] === true;
@@ -415,6 +411,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     temperature: aiTemperature,
     reasoningEnabled: aiReasoningEnabled,
     reasoningEffort: aiReasoningEffort,
+    credentialRevision: providerCredentials.revision,
     isOpen: isPreviewing,
     targetValid: !hasInvalidPersistedPreviewTarget,
     onOpenChange: setIsPreviewing,
@@ -566,6 +563,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     provider={aiProvider}
                     onProviderChange={selectAiProvider}
                     configuredProviders={configuredProviders}
+                    credentialRevision={providerCredentials.revision}
                     providerModels={aiProviderModels}
                     model={aiModel}
                     disabled={isLocked}

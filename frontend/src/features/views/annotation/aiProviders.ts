@@ -1,10 +1,9 @@
 /**
  * Built-in annotation provider metadata.
  *
- * Provider credentials are owned by the backend credential service. The
- * frontend stores only the selected provider and model in the tab's local
- * presentation state; there are no custom endpoint records or client-side
- * provider secrets.
+ * The frontend stores only the selected provider and model in the tab's local
+ * presentation state. Credential presence and request-time resolution come
+ * through the mode-specific provider-credential facade.
  */
 
 export type BuiltinAnnotationAiProviderId = 'openrouter' | 'openai' | 'anthropic' | 'google';

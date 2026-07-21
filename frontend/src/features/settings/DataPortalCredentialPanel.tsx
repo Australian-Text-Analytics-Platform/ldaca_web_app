@@ -1,45 +1,43 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { clearProviderCredentials, getProviderCredentials, updateProviderCredentials } from '@/api';
-import type { ProviderCredentialPatchWritable } from '@/api';
-
-const CREDENTIALS_QUERY_KEY = ['provider-credentials'] as const;
+import { useProviderCredentials } from '@/features/provider-credentials/useProviderCredentials';
 
 export function DataPortalCredentialPanel() {
-  const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: CREDENTIALS_QUERY_KEY,
-    queryFn: async () => (await getProviderCredentials({ throwOnError: true })).data,
-  });
-  const update = useMutation({
-    mutationFn: (body: ProviderCredentialPatchWritable) =>
-      updateProviderCredentials({ body, throwOnError: true }).then(({ data }) => data),
-    onSuccess: (data) => {
-      queryClient.setQueryData(CREDENTIALS_QUERY_KEY, data);
-      toast.success('Data Portal credential updated');
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Could not update credential');
-    },
-  });
-  const clear = useMutation({
-    mutationFn: () => clearProviderCredentials({ throwOnError: true }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: CREDENTIALS_QUERY_KEY });
-      toast.success('Data Portal credential cleared');
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Could not clear credential');
-    },
-  });
+  const credentials = useProviderCredentials();
   const [draft, setDraft] = useState('');
-  const configured = query.data?.data_portal.user_configured ?? false;
-  const deploymentConfigured = query.data?.data_portal.deployment_configured ?? false;
+  const [pending, setPending] = useState(false);
+  const configured = credentials.dataPortal.userConfigured;
+  const deploymentConfigured = credentials.dataPortal.deploymentConfigured;
+
+  const save = async () => {
+    if (!draft.trim()) return;
+    setPending(true);
+    try {
+      await credentials.saveDataPortalCredential(draft);
+      setDraft('');
+      toast.success('Data Portal credential updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update credential');
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const clear = async () => {
+    setPending(true);
+    try {
+      await credentials.clearDataPortalCredential();
+      toast.success('Data Portal credential cleared');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not clear credential');
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <section className="space-y-3">
@@ -47,15 +45,19 @@ export function DataPortalCredentialPanel() {
         <h3 className="text-sm font-semibold">LDaCA Data Portal credential</h3>
         <Badge variant={configured || deploymentConfigured ? 'outline' : 'secondary'}>
           {configured
-            ? 'Configured for this user'
+            ? credentials.storage === 'browser'
+              ? 'Configured in this browser'
+              : 'Configured for this user'
             : deploymentConfigured
               ? 'Deployment default'
               : 'Not configured'}
         </Badge>
       </div>
       <p className="text-sm text-muted-foreground">
-        The backend resolves this credential for portal search and imports. Existing values are
-        never returned; enter a replacement to update it.
+        {credentials.storage === 'browser'
+          ? 'This token stays in this browser for the current account and is sent only with Data Portal requests.'
+          : 'The local backend stores this write-only token for Data Portal search and imports.'}{' '}
+        Enter a new value to replace it.
       </p>
       <div className="flex gap-2">
         <Input
@@ -70,10 +72,9 @@ export function DataPortalCredentialPanel() {
         />
         <Button
           type="button"
-          disabled={!draft.trim() || update.isPending}
+          disabled={!draft.trim() || pending}
           onClick={() => {
-            void update.mutateAsync({ data_portal_api_token: draft.trim() });
-            setDraft('');
+            void save();
           }}
         >
           Save
@@ -81,9 +82,9 @@ export function DataPortalCredentialPanel() {
         <Button
           type="button"
           variant="outline"
-          disabled={!configured || clear.isPending}
+          disabled={!configured || pending}
           onClick={() => {
-            clear.mutate();
+            void clear();
           }}
         >
           Clear

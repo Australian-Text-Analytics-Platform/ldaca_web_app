@@ -1,5 +1,5 @@
 import type { AnnotationClassDescriptionRow } from '@/api';
-import { getNodeRowsTable } from '@/api';
+import { queryWorkspaceSqlTable, sqlIdentifier, sqlTable } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { useQuery } from '@tanstack/react-query';
 
@@ -59,13 +59,35 @@ export function useAnnotationClassDescriptions({
       if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
         throw new Error('Missing class-description selection');
       }
-      const data = await getNodeRowsTable({
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        query: { page: 1, page_size: 1000 },
-        signal,
-      });
+      const sql = `SELECT ${sqlIdentifier(classColumn)}, ${sqlIdentifier(
+        descriptionColumn,
+      )} FROM ${sqlTable(nodeId)}`;
+      const rows: Record<string, unknown>[] = [];
+      let page = 1;
+      let initialEtag: string | null | undefined;
+      let hasNext: boolean;
+      do {
+        const data = await queryWorkspaceSqlTable({
+          path: { workspace_id: workspaceId },
+          body: {
+            mode: 'query',
+            node_ids: [nodeId],
+            sql,
+            page,
+            page_size: 500,
+          },
+          signal,
+        });
+        initialEtag ??= data.etag;
+        if (initialEtag !== data.etag) {
+          throw new Error('Workspace changed while loading class descriptions');
+        }
+        rows.push(...data.rows);
+        hasNext = data.hasNext;
+        page += 1;
+      } while (hasNext);
       return {
-        rows: data.rows.map((row) => ({
+        rows: rows.map((row) => ({
           class: jsonValueToText(row[classColumn]),
           description: jsonValueToText(row[descriptionColumn]),
         })),

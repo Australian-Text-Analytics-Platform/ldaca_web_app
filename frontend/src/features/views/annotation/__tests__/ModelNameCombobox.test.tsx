@@ -5,10 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModelNameCombobox } from '../components/ModelNameCombobox';
 import { ANNOTATION_AI_PROVIDERS } from '../aiProviders';
 
-const listAnnotationModels = vi.hoisted(() => vi.fn());
-vi.mock('@/api', async (importOriginal) => ({
-  ...(await importOriginal()),
-  listAnnotationModels,
+const listAnnotationModelsWithProviderCredential = vi.hoisted(() => vi.fn());
+vi.mock('@/features/provider-credentials/providerCredentialRequests', () => ({
+  listAnnotationModelsWithProviderCredential,
 }));
 
 const provider = ANNOTATION_AI_PROVIDERS[0];
@@ -22,6 +21,7 @@ const renderCombobox = (value = '') => {
         workspaceId="workspace-1"
         provider={provider}
         credentialConfigured
+        credentialRevision={0}
         value={value}
         onChange={onChange}
         onCommit={onCommit}
@@ -34,7 +34,7 @@ const renderCombobox = (value = '') => {
 describe('ModelNameCombobox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listAnnotationModels.mockResolvedValue({
+    listAnnotationModelsWithProviderCredential.mockResolvedValue({
       data: { models: ['openrouter/alpha', 'openrouter/beta'] },
     });
   });
@@ -43,12 +43,8 @@ describe('ModelNameCombobox', () => {
     renderCombobox();
     const input = screen.getByPlaceholderText('Search or type a model name');
     fireEvent.focus(input);
-    await waitFor(() =>
-      expect(listAnnotationModels).toHaveBeenCalledWith({
-        path: { provider: 'openrouter' },
-        throwOnError: true,
-      }),
-    );
+    await waitFor(() => expect(listAnnotationModelsWithProviderCredential).toHaveBeenCalled());
+    expect(listAnnotationModelsWithProviderCredential.mock.calls[0]?.[0]).toBe('openrouter');
     expect(await screen.findByRole('button', { name: 'openrouter/alpha' })).toBeInTheDocument();
   });
 
