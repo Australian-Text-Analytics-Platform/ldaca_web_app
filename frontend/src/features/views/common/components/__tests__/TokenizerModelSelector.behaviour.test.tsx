@@ -2,14 +2,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { getNodeDataByWorkspaceId, getTokenizerModels } from '@/api';
+import { listTokenizerModels, queryWorkspaceSqlTable } from '@/api';
 import { detectLanguageIso6391 } from '@/lib/languageDetection';
 import TokenizerModelSelector from '../TokenizerModelSelector';
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  getNodeDataByWorkspaceId: vi.fn(),
-  getTokenizerModels: vi.fn(),
+  queryWorkspaceSqlTable: vi.fn(),
+  listTokenizerModels: vi.fn(),
 }));
 
 vi.mock('@/lib/languageDetection', () => ({
@@ -48,36 +48,34 @@ const renderSelector = ({
 
 describe('TokenizerModelSelector', () => {
   beforeEach(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom may not implement hasPointerCapture despite lib.dom types
     if (!HTMLElement.prototype.hasPointerCapture) {
       Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
         configurable: true,
         value: vi.fn(() => false),
       });
     }
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- jsdom may not implement scrollIntoView despite lib.dom types
+
     if (!HTMLElement.prototype.scrollIntoView) {
       Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
         configurable: true,
         value: vi.fn(),
       });
     }
-    vi.mocked(getNodeDataByWorkspaceId).mockResolvedValue({
-      data: {
-        data: [
-          { text: 'This is a short English document.' },
-          { text: 'Another English paragraph for detection.' },
-        ],
-      },
+    vi.mocked(queryWorkspaceSqlTable).mockResolvedValue({
+      columns: ['text'],
+      rows: [
+        { text: 'This is a short English document.' },
+        { text: 'Another English paragraph for detection.' },
+      ],
+      hasNext: false,
+      etag: '"workspace-1"',
     } as never);
-    vi.mocked(getTokenizerModels).mockResolvedValue({
-      data: {
-        models: [
-          { model: 'native:plain_words_en', label: 'Plain words (English)', languages: ['en'] },
-          { model: 'huggingface:bert-base-uncased', label: 'BERT base uncased', languages: ['en'] },
-          { model: 'lindera:ja-ipadic', label: 'IPADIC', languages: ['ja'] },
-        ],
-      },
+    vi.mocked(listTokenizerModels).mockResolvedValue({
+      data: [
+        { id: 'native:plain_words_en', label: 'Plain words (English)', languages: ['en'] },
+        { id: 'huggingface:bert-base-uncased', label: 'BERT base uncased', languages: ['en'] },
+        { id: 'lindera:ja-ipadic', label: 'IPADIC', languages: ['ja'] },
+      ],
     } as never);
     vi.mocked(detectLanguageIso6391).mockResolvedValue('en');
   });
@@ -86,12 +84,12 @@ describe('TokenizerModelSelector', () => {
     const user = userEvent.setup();
     renderSelector();
 
-    expect(getTokenizerModels).not.toHaveBeenCalled();
+    expect(listTokenizerModels).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('combobox', { name: /tokenizer model/i }));
 
     await waitFor(() => {
-      expect(getTokenizerModels).toHaveBeenCalledTimes(1);
+      expect(listTokenizerModels).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText('Recommended')).toBeInTheDocument();
     expect(screen.getByTestId('tokenizer-model-recommendations')).toHaveClass('rounded-lg');
@@ -100,12 +98,12 @@ describe('TokenizerModelSelector', () => {
     expect(screen.getByText('IPADIC')).toBeInTheDocument();
   });
 
-  it('offers Select Model as a clearing option', async () => {
+  it('offers None as a clearing option', async () => {
     const user = userEvent.setup();
     const { onChange } = renderSelector({ value: 'native:plain_words_en' });
 
     await user.click(screen.getByRole('combobox', { name: /tokenizer model/i }));
-    await user.click(await screen.findByText('Select Model'));
+    await user.click(await screen.findByText('None'));
 
     expect(onChange).toHaveBeenCalledWith('', 'en');
   });

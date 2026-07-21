@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,8 +42,12 @@ let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
 let mockPendingConcordance: Record<string, unknown> | null = null;
 let mockHydrationState = { status: 'idle' as const, lastHydratedAt: 1 };
 let mockInitialResult: Record<string, unknown> | null = null;
+let mockAnalysisState: 'successful' | null = null;
 let mockSetSafeResult: React.Dispatch<React.SetStateAction<Record<string, unknown> | null>> | null =
   null;
+let latestAnalysisFeatureConfig: {
+  onHydratedRequest?: (request: unknown) => void | Promise<void>;
+} | null = null;
 
 vi.mock('sonner', () => ({
   toast: {
@@ -222,10 +226,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
   /** Provides auth shape expected by generated API calls without real credentials. */
-  useAuth: () => ({
-    /** Supplies empty headers because every network boundary is mocked. */
-    getAuthHeaders: () => ({}),
-  }),
+  useAuth: () => ({}),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
@@ -341,16 +342,23 @@ vi.mock('../../common/hooks/useLastRunRequest', () => ({
 
 vi.mock('../../common/hooks/useAnalysisFeature', () => ({
   /** Supplies analysis lifecycle state and mockable clear behavior for feature tests. */
-  useAnalysisFeature: () => ({
-    resolveTaskId: vi.fn(() => 'task-1'),
-    setLocalTaskId: vi.fn(),
-    isRunning: false,
-    setIsRunning: vi.fn(),
-    taskStatus: { tasks: [] },
-    banner: null,
-    hydrationState: mockHydrationState,
-    clearResults: clearResultsMock,
-  }),
+  useAnalysisFeature: (config: {
+    onHydratedRequest?: (request: unknown) => void | Promise<void>;
+  }) => {
+    latestAnalysisFeatureConfig = config;
+    return {
+      resolveTaskId: vi.fn(() => 'task-1'),
+      setLocalTaskId: vi.fn(),
+      isRunning: false,
+      setIsRunning: vi.fn(),
+      taskStatus: {
+        tasks: mockAnalysisState ? [{ state: mockAnalysisState }] : [],
+      },
+      banner: null,
+      hydrationState: mockHydrationState,
+      clearResults: clearResultsMock,
+    };
+  },
 }));
 
 vi.mock('../../common/useSafeResult', async () => {
@@ -358,9 +366,14 @@ vi.mock('../../common/useSafeResult', async () => {
   return {
     /** Emulates the shared safe-result hook while exposing the setter to tests. */
     useSafeResult: () => {
-      const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(
-        mockInitialResult,
-      );
+      const initial = mockInitialResult
+        ? {
+            query: { page: 1, page_size: 20 },
+            analysis_params: {},
+            ...mockInitialResult,
+          }
+        : null;
+      const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(initial);
       const ref = ReactModule.useRef<Record<string, unknown> | null>(result);
       ReactModule.useEffect(() => {
         ref.current = result;
@@ -385,16 +398,17 @@ vi.mock('../../common/hooks/useNodeColorControls', () => ({
 vi.mock('../../common/rerunAnalysis', () => ({
   executeAnalysisRerun: vi.fn(
     async ({
-      hasUnrunChanges,
+      hasAttachedAnalysis,
       clearResults,
       runFreshAnalysis,
     }: {
-      hasUnrunChanges: boolean;
-      clearResults: () => Promise<void>;
+      hasAttachedAnalysis: boolean;
+      clearResults: () => Promise<boolean>;
       runFreshAnalysis: () => Promise<void>;
     }) => {
-      if (hasUnrunChanges) {
-        await clearResults();
+      if (hasAttachedAnalysis) {
+        const cleared = await clearResults();
+        if (!cleared) return;
       }
       await runFreshAnalysis();
     },
@@ -403,19 +417,25 @@ vi.mock('../../common/rerunAnalysis', () => ({
 
 import ConcordanceFeature from '../ConcordanceFeature';
 
-const renderConcordanceFeature = () =>
-  renderWithClient(
+const renderConcordanceFeature = (taskId: string | null = null) => {
+  const setInputSet = vi.fn();
+  return {
+    ...renderWithClient(
     <ConcordanceFeature
       host={{
-        taskId: null,
+        tabId: 'tab-1',
+        taskId,
         inputSets: {},
         settings: {},
         setTaskId: vi.fn(),
-        setInputSet: vi.fn(),
+        setInputSet,
         setSetting: vi.fn(),
       }}
     />,
-  );
+    ),
+    setInputSet,
+  };
+};
 
 describe('ConcordanceFeature', () => {
   beforeEach(() => {
@@ -425,12 +445,32 @@ describe('ConcordanceFeature', () => {
     mockPendingConcordance = null;
     mockHydrationState = { status: 'idle', lastHydratedAt: 1 };
     mockInitialResult = null;
+    mockAnalysisState = null;
     mockSetSafeResult = null;
+    latestAnalysisFeatureConfig = null;
     detachDialogMocks.render.mockClear();
-    // eslint-disable-next-line @typescript-eslint/require-await -- mock must match async interface
+
     clearResultsMock.mockImplementation(async () => {
       mockSetSafeResult?.(null);
+      return true;
     });
+  });
+
+  it('restores the persisted Analysis Data Blocks into the owning Tab input set', async () => {
+    const { setInputSet } = renderConcordanceFeature('analysis-1');
+
+    await act(async () => {
+      await latestAnalysisFeatureConfig?.onHydratedRequest?.({
+        node_ids: ['node-2', 'node-1'],
+        node_columns: { 'node-1': 'text', 'node-2': 'body' },
+        search_word: 'queensland',
+      });
+    });
+
+    expect(setInputSet).toHaveBeenCalledWith('source', [
+      { node_id: 'node-2', column: 'body' },
+      { node_id: 'node-1', column: 'text' },
+    ]);
   });
 
   it('owns table and dispersion detach copy and forwards each dialog handler set', () => {
@@ -461,7 +501,8 @@ describe('ConcordanceFeature', () => {
   });
 
   it('clears previous results before rerunning when clicking Re-run', () => {
-    const { unmount } = renderConcordanceFeature();
+    mockAnalysisState = 'successful';
+    const { unmount } = renderConcordanceFeature('analysis-1');
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -476,7 +517,8 @@ describe('ConcordanceFeature', () => {
   });
 
   it('runs a fresh search when clicking Re-run after changing parameters', () => {
-    const { unmount } = renderConcordanceFeature();
+    mockAnalysisState = 'successful';
+    const { unmount } = renderConcordanceFeature('analysis-1');
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
@@ -511,6 +553,7 @@ describe('ConcordanceFeature', () => {
 
   it('fills the concordance search box from a pending token handoff when no results exist', async () => {
     mockPendingConcordance = {
+      targetTabId: 'tab-1',
       searchWord: 'keyword',
       selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
       nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
@@ -531,6 +574,7 @@ describe('ConcordanceFeature', () => {
 
   it('submits an auto-run token handoff once with the handed-off inputs', async () => {
     mockPendingConcordance = {
+      targetTabId: 'tab-1',
       searchWord: 'keyword',
       selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
       nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
@@ -554,6 +598,7 @@ describe('ConcordanceFeature', () => {
 
   it('fills the concordance search box directly from a token handoff even when results already exist', async () => {
     mockPendingConcordance = {
+      targetTabId: 'tab-1',
       searchWord: 'replacement',
       selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
       nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],

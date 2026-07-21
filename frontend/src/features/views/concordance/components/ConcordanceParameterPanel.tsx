@@ -52,7 +52,7 @@ export interface ConcordanceParameterPanelProps {
   handleRunOrUpdate: () => Promise<void>;
   handleStopTask?: () => Promise<void>;
   isStopping?: boolean;
-  handleClearResults: () => Promise<void>;
+  handleClearResults: () => Promise<boolean>;
   renderTokenizerModelSelector?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
 }
 

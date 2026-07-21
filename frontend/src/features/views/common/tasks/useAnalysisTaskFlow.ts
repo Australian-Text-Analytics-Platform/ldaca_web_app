@@ -13,9 +13,9 @@ import type {
 } from './types';
 
 /**
- * Adapts global task-store status into the banner and terminal refresh contract
+ * Adapts shared task-inbox status into the banner and terminal refresh contract
  * used by every analysis tab.
- * Used by: useAnalysisFeature to bridge global task status into feature UI state.
+ * Used by: useAnalysisFeature to bridge task-inbox status into feature UI state.
  * Flow: scope task status to the owning workspace/tab, derive the fallback
  * banner, refresh one matching terminal task, and expose only status and banner.
  */

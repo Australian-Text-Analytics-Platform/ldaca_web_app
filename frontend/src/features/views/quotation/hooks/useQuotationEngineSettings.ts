@@ -1,27 +1,22 @@
 import { useState } from 'react';
 import type { QuotationEngineConfig } from '@/api';
-import { normalizeRemoteUrl } from '../quotationRemoteUrl';
 
-export type QuotationEngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
+export type QuotationEngineRequestPayload =
+  | { type: 'local'; engine_id?: string }
+  | { type: 'remote'; engine_id: string };
 
 type QuotationResolvedEnginePayload =
   | { type: 'local' }
-  | {
-      type: 'remote';
-      rawUrl: string;
-      normalizedUrl: string;
-      isValid: boolean;
-      failureReason: string | null;
-    };
+  | { type: 'remote'; engineId: string; isValid: boolean };
 
 export interface UseQuotationEngineSettingsResult {
   engineConfig: QuotationEngineConfig;
-  lastRemoteUrl: string;
+  lastRemoteEngineId: string;
   engineError: string | null;
   resolvedEnginePayload: QuotationResolvedEnginePayload;
   engineReady: boolean;
   setTaskEngineConfig: (config: QuotationEngineConfig) => void;
-  updateRemoteUrl: (url: string) => void;
+  updateRemoteEngineId: (engineId: string) => void;
   hydrateEngineConfig: (config: QuotationEngineConfig | null | undefined) => void;
   buildEngineRequest: () => QuotationEngineRequestPayload | null;
 }
@@ -40,25 +35,24 @@ export interface UseQuotationEngineSettingsResult {
  */
 export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
   const [engineConfig, setEngineConfig] = useState<QuotationEngineConfig>({ type: 'local' });
-  const [lastRemoteUrl, setLastRemoteUrl] = useState('');
+  const [lastRemoteEngineId, setLastRemoteEngineId] = useState('');
   const [engineError, setEngineError] = useState<string | null>(null);
 
   /** Applies a task engine config from direct UI selection or hydration. */
   // Called by: QuotationEngineSettingsFields and task hydration because engine settings belong to a single quotation tab/run.
   const setTaskEngineConfig = (config: QuotationEngineConfig) => {
     setEngineConfig(config);
-    if (config.type === 'remote' && config.url) {
-      setLastRemoteUrl(config.url);
+    if (config.type === 'remote' && config.engine_id) {
+      setLastRemoteEngineId(config.engine_id);
     }
     setEngineError(null);
   };
 
-  /** Updates the remembered remote endpoint and, when remote is active, the submitted config. */
-  // Called by: QuotationEngineSettingsFields endpoint input because inactive remote URLs should still be remembered when users switch away and back.
-  const updateRemoteUrl = (url: string) => {
-    setLastRemoteUrl(url);
+  /** Updates the remembered remote engine id and active request configuration. */
+  const updateRemoteEngineId = (engineId: string) => {
+    setLastRemoteEngineId(engineId);
     setEngineConfig((current: QuotationEngineConfig) =>
-      current.type === 'remote' ? { type: 'remote', url } : current,
+      current.type === 'remote' ? { type: 'remote', engine_id: engineId } : current,
     );
     setEngineError(null);
   };
@@ -67,11 +61,9 @@ export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
   // Called by: QuotationFeature task hydration because reloaded tabs should reopen with the backend-stored engine choice.
   const hydrateEngineConfig = (config: QuotationEngineConfig | null | undefined) => {
     if (config?.type === 'remote') {
-      const trimmed = (config.url ?? '').trim();
-      if (!trimmed.length) return;
-      const { normalized, valid } = normalizeRemoteUrl(trimmed);
-      const appliedUrl = valid ? normalized : trimmed;
-      setTaskEngineConfig({ type: 'remote', url: appliedUrl });
+      const engineId = (config.engine_id ?? '').trim();
+      if (!engineId.length) return;
+      setTaskEngineConfig({ type: 'remote', engine_id: engineId });
       return;
     }
     if (config?.type === 'local') {
@@ -81,17 +73,11 @@ export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
 
   const resolvedEnginePayload: QuotationResolvedEnginePayload =
     engineConfig.type === 'remote'
-      ? (() => {
-          const rawUrl = (engineConfig.url ?? '').trim();
-          const { normalized, valid, reason } = normalizeRemoteUrl(rawUrl);
-          return {
-            type: 'remote' as const,
-            rawUrl,
-            normalizedUrl: normalized,
-            isValid: valid,
-            failureReason: reason,
-          };
-        })()
+      ? {
+          type: 'remote',
+          engineId: (engineConfig.engine_id ?? '').trim(),
+          isValid: Boolean((engineConfig.engine_id ?? '').trim()),
+        }
       : { type: 'local' };
 
   const engineReady = resolvedEnginePayload.type === 'local' ? true : resolvedEnginePayload.isValid;
@@ -104,37 +90,33 @@ export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
       return { type: 'local' };
     }
 
-    if (!resolvedEnginePayload.rawUrl.length) {
-      setEngineError('Provide a quotation service URL.');
+    if (!resolvedEnginePayload.engineId.length) {
+      setEngineError('Provide a remote quotation engine id.');
       return null;
     }
 
     if (!resolvedEnginePayload.isValid) {
-      if (resolvedEnginePayload.failureReason === 'protocol') {
-        setEngineError('Remote engines must use http:// or https:// URLs.');
-      } else {
-        setEngineError('Enter a valid URL including http:// or https://');
-      }
+      setEngineError('Enter a remote quotation engine id.');
       return null;
     }
 
-    const normalizedUrl = resolvedEnginePayload.normalizedUrl;
-    if ((engineConfig.url ?? '').trim() !== normalizedUrl) {
-      updateRemoteUrl(normalizedUrl);
+    const normalizedEngineId = resolvedEnginePayload.engineId;
+    if ((engineConfig.engine_id ?? '').trim() !== normalizedEngineId) {
+      updateRemoteEngineId(normalizedEngineId);
     } else if (engineError !== null) {
       setEngineError(null);
     }
-    return { type: 'remote', url: normalizedUrl };
+    return { type: 'remote', engine_id: normalizedEngineId };
   };
 
   return {
     engineConfig,
-    lastRemoteUrl,
+    lastRemoteEngineId,
     engineError,
     resolvedEnginePayload,
     engineReady,
     setTaskEngineConfig,
-    updateRemoteUrl,
+    updateRemoteEngineId,
     hydrateEngineConfig,
     buildEngineRequest,
   };

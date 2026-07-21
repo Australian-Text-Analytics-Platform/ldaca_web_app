@@ -1,4 +1,3 @@
-import type { ConcordanceDispersionBinRow } from '@/api';
 import { CONCORDANCE_COLUMN_KEYS, CONCORDANCE_CORE_COLUMNS } from '../common/generatedColumns';
 import { toCellText } from './concordanceTableDomain';
 
@@ -191,13 +190,6 @@ export function buildDispersionBins(
  * Server-side bin row tagged with the source node it came from. The frontend
  * combines per-node responses for combined-view display.
  */
-export type TaggedBinRow = ConcordanceDispersionBinRow & {
-  __source_node?: string;
-};
-
-/** The fixed source-bin resolution returned by the `/bins` endpoint. */
-const DISPERSION_SERVER_BIN_COUNT = 100;
-
 /** Display bin counts the user can pick. Each value divides 100 evenly so we
  *  can re-aggregate the 100 server bins without remainders.
  */
@@ -206,13 +198,6 @@ export type DispersionDisplayBinCount = (typeof DISPERSION_DISPLAY_BIN_COUNTS)[n
 export const DISPERSION_DEFAULT_BIN_COUNT: DispersionDisplayBinCount = 20;
 export const CONCORDANCE_DISPERSION_CHART_MODES = ['density', 'cumulative'] as const;
 export type ConcordanceDispersionChartMode = (typeof CONCORDANCE_DISPERSION_CHART_MODES)[number];
-
-/** Guards user or persisted preferences before re-binning server dispersion data. */
-/**
- * Used by concordance view-model builders in this module.
- */
-const isValidDisplayBinCount = (n: number): n is DispersionDisplayBinCount =>
-  (DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(n);
 
 /**
  * Re-aggregate server-binned hit counts (100 buckets) into N display bins.
@@ -224,48 +209,6 @@ const isValidDisplayBinCount = (n: number): n is DispersionDisplayBinCount =>
  * Flow: validate the requested display-bin count, fold each of the 100 server
  * bins into its display bucket, accumulate series totals, then fill gaps.
  */
-export function buildDispersionBinsFromBinned(
-  rows: TaggedBinRow[],
-  displayBinCount: number,
-  options: BuildDispersionBinsOptions = {},
-): BuildDispersionBinsResult {
-  const { lowercaseMatches = false, splitBySource = false, aggregateAll = false } = options;
-  const targetCount = isValidDisplayBinCount(displayBinCount)
-    ? displayBinCount
-    : DISPERSION_DEFAULT_BIN_COUNT;
-  const step = DISPERSION_SERVER_BIN_COUNT / targetCount;
-  const bins: DispersionBinDatum[] = Array.from({ length: targetCount }, (_, i) => ({
-    binCenter: ((i + 0.5) / targetCount) * 100,
-  }));
-  const totalsByKey: Record<string, number> = {};
-  const sourceSet = new Set<string>();
-  if (aggregateAll) totalsByKey[DISPERSION_AGGREGATE_KEY] = 0;
-
-  for (const row of rows) {
-    const sourceBinIdx = getNumericIndex(row.bin_idx);
-    if (sourceBinIdx === null) continue;
-    if (sourceBinIdx < 0 || sourceBinIdx >= DISPERSION_SERVER_BIN_COUNT) continue;
-    const count = typeof row.count === 'number' && Number.isFinite(row.count) ? row.count : 0;
-    if (count <= 0) continue;
-    const rawText = row.matched_text ?? '';
-    if (!rawText) continue;
-    const text = lowercaseMatches ? rawText.toLowerCase() : rawText;
-    const source = row.__source_node ?? '';
-    if (source) sourceSet.add(source);
-    const displayIdx = Math.min(targetCount - 1, Math.floor(sourceBinIdx / step));
-    const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
-    const seriesKey =
-      splitBySource && source ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}` : baseKey;
-    const bin = bins[displayIdx];
-    if (bin === undefined) continue;
-    bin[seriesKey] = (bin[seriesKey] ?? 0) + count;
-    totalsByKey[seriesKey] = (totalsByKey[seriesKey] ?? 0) + count;
-  }
-
-  fillEmptyBins(bins, totalsByKey);
-  return { bins, totalsByKey, sources: [...sourceSet].sort() };
-}
-
 /**
  * Format a sparse set of selected bin indices as a comma-separated list of
  * percentage ranges, suitable for appending to a node name on dispersion

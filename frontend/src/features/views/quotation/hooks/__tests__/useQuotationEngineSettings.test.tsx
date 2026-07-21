@@ -13,31 +13,34 @@ describe('useQuotationEngineSettings', () => {
     expect(result.current.engineError).toBeNull();
   });
 
-  it('remembers the previous remote endpoint when switching engines', () => {
+  it('remembers the previous remote engine id when switching engines', () => {
     const { result } = renderHook(() => useQuotationEngineSettings());
 
     act(() => {
-      result.current.setTaskEngineConfig({ type: 'remote', url: 'https://quotation.test/api' });
+      result.current.setTaskEngineConfig({ type: 'remote', engine_id: 'quotation-v1' });
     });
     act(() => {
       result.current.setTaskEngineConfig({ type: 'local' });
     });
     act(() => {
-      result.current.setTaskEngineConfig({ type: 'remote', url: result.current.lastRemoteUrl });
+      result.current.setTaskEngineConfig({
+        type: 'remote',
+        engine_id: result.current.lastRemoteEngineId,
+      });
     });
 
     expect(result.current.engineConfig).toEqual({
       type: 'remote',
-      url: 'https://quotation.test/api',
+      engine_id: 'quotation-v1',
     });
-    expect(result.current.lastRemoteUrl).toBe('https://quotation.test/api');
+    expect(result.current.lastRemoteEngineId).toBe('quotation-v1');
   });
 
-  it('normalizes schemeless remote endpoints before building request payloads', () => {
+  it('requires a remote engine id before building request payloads', () => {
     const { result } = renderHook(() => useQuotationEngineSettings());
 
     act(() => {
-      result.current.setTaskEngineConfig({ type: 'remote', url: 'localhost:9000/quote' });
+      result.current.setTaskEngineConfig({ type: 'remote', engine_id: 'quotation-v1' });
     });
 
     let payload: ReturnType<typeof result.current.buildEngineRequest> = null;
@@ -45,19 +48,19 @@ describe('useQuotationEngineSettings', () => {
       payload = result.current.buildEngineRequest();
     });
 
-    expect(payload).toEqual({ type: 'remote', url: 'http://localhost:9000/quote' });
+    expect(payload).toEqual({ type: 'remote', engine_id: 'quotation-v1' });
     expect(result.current.engineConfig).toEqual({
       type: 'remote',
-      url: 'http://localhost:9000/quote',
+      engine_id: 'quotation-v1',
     });
     expect(result.current.engineError).toBeNull();
   });
 
-  it('rejects unsupported remote URL protocols with a specific error', () => {
+  it('rejects an empty remote engine id with a stable error', () => {
     const { result } = renderHook(() => useQuotationEngineSettings());
 
     act(() => {
-      result.current.setTaskEngineConfig({ type: 'remote', url: 'ftp://quotation.test/api' });
+      result.current.setTaskEngineConfig({ type: 'remote', engine_id: '' });
     });
 
     let payload: ReturnType<typeof result.current.buildEngineRequest> = { type: 'local' };
@@ -66,6 +69,6 @@ describe('useQuotationEngineSettings', () => {
     });
 
     expect(payload).toBeNull();
-    expect(result.current.engineError).toBe('Remote engines must use http:// or https:// URLs.');
+    expect(result.current.engineError).toBe('Provide a remote quotation engine id.');
   });
 });

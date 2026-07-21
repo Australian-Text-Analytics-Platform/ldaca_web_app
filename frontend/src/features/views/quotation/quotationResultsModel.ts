@@ -37,17 +37,6 @@ export interface QuotationResultRow {
   cellText: (column: string) => string;
 }
 
-export interface QuotationMaterializeSummary {
-  recordCount: number;
-  uniqueDocuments: number;
-  totalDocuments: number;
-}
-
-export interface QuotationMaterialization {
-  path: string | null;
-  summary: QuotationMaterializeSummary | null;
-}
-
 const isQuotationHighlightType = (value: unknown): value is QuotationHighlightType =>
   typeof value === 'string' && QUOTATION_HIGHLIGHT_TYPES.some((candidate) => candidate === value);
 
@@ -203,30 +192,10 @@ export const buildQuotationSegments = (
   return segments;
 };
 
-const normalizeMaterializationCount = (value: unknown): number => {
-  const count = Number(value);
-  return Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
-};
-
-/** Parses the saved/materialized request fields at their one UI boundary. */
-export const normalizeQuotationMaterialization = (
-  path: unknown,
-  summary: Record<string, unknown> | undefined,
-): QuotationMaterialization => ({
-  path: typeof path === 'string' && path.length > 0 ? path : null,
-  summary: summary
-    ? {
-        recordCount: normalizeMaterializationCount(summary.record_count),
-        uniqueDocuments: normalizeMaterializationCount(summary.unique_documents_with_hits),
-        totalDocuments: normalizeMaterializationCount(summary.total_source_documents),
-      }
-    : null,
-});
-
 interface QuotationResultMetadataSource {
   metadata: {
-    metadata_columns: string[];
-    quotation_columns: string[];
+    metadata_columns?: string[];
+    quotation_columns?: string[];
   };
 }
 
@@ -258,11 +227,11 @@ export const buildQuotationMetadataColumns = (
 ): string[] => {
   if (!resultState) return [];
 
-  const baseColumns = resultState.metadata.metadata_columns.filter(
+  const baseColumns = (resultState.metadata.metadata_columns ?? []).filter(
     (column) => !column.startsWith('__'),
   );
   const generatedMetadataColumns = QUOTATION_GENERATED_METADATA_COLUMNS.filter((column) =>
-    resultState.metadata.quotation_columns.includes(column),
+    (resultState.metadata.quotation_columns ?? []).includes(column),
   );
 
   return Array.from(new Set([...baseColumns, ...generatedMetadataColumns]));

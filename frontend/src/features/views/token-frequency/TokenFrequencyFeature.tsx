@@ -1,44 +1,43 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { TokenFrequencyResponse } from '@/api';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
+import { usePersistNodeDocumentColumn } from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useAnalysisStore } from '@/stores/analysisStore';
+import { useUIStore } from '@/stores/uiStore';
+import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
+import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
+import { useTabNodeInputs } from '../common/nodeInputs';
+import { hasParameterDiff } from '../common/parameterComparison';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { executeAnalysisRerun } from '../common/rerunAnalysis';
+import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
+import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
 import { useSafeResult } from '../common/useSafeResult';
 import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest } from '../common/utils';
-import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
-import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
-import { useTabNodeInputs } from '../common/nodeInputs';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
-import { hasParameterDiff } from '../common/parameterComparison';
-import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
-import {
-  buildNodeIdDisplayNameMap,
-  buildSelectionNameById,
-  derivePanelNodeIds,
-  deriveBackendStopWordsKey,
-  deriveBackendTokenLimit,
-  deriveStudyNodeOrder,
-  type NodeNameEntry,
-} from './tokenFrequencyUtils';
-import { TokenFrequencyDownloadDialog } from './components/TokenFrequencyDownloadDialog';
 import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog';
+import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
+import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
+import { TokenFrequencyDownloadDialog } from './components/TokenFrequencyDownloadDialog';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyResultModel } from './hooks/useTokenFrequencyResultModel';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
-import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
-import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
-import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
-import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
-import { useAnalysisStore } from '@/stores/analysisStore';
-import { useUIStore } from '@/stores/uiStore';
 import {
-  usePersistNodeDocumentColumn,
-  usePersistNodeTokenizationPreference,
-} from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
-import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
+  buildNodeIdDisplayNameMap,
+  buildSelectionNameById,
+  deriveBackendStopWordsKey,
+  deriveBackendTokenLimit,
+  derivePanelNodeIds,
+  deriveStudyNodeOrder,
+  type NodeNameEntry,
+  reconcileHydratedTokenFrequencyInputs,
+} from './tokenFrequencyUtils';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
@@ -94,6 +93,44 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const lastCompareNodeIds = liveLastCompareNodeIds;
   const studyNodeId = liveStudyNodeId;
 
+  const restoreAnalysisNodeContext = (requestData: Record<string, unknown>) => {
+    const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
+    if (nodeIds.length === 0) return;
+
+    setLastCompareNodeIds(nodeIds);
+    setStudyNodeId(nodeIds[1] ?? null);
+
+    const hydratedInputs = selections.map(({ nodeId, column }) => ({
+      node_id: nodeId,
+      column,
+    }));
+    const currentInputs = tabInputSets[DEFAULT_TAB_INPUT_SET_ID] ?? [];
+    const restoredInputs = reconcileHydratedTokenFrequencyInputs(currentInputs, hydratedInputs);
+    const inputsMatch =
+      currentInputs.length === restoredInputs.length &&
+      currentInputs.every((input, index) => {
+        const restoredInput = restoredInputs[index];
+        return (
+          input.node_id === restoredInput?.node_id && (input.column ?? '') === restoredInput.column
+        );
+      });
+    if (!inputsMatch) {
+      onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, restoredInputs);
+    }
+
+    const requestedModels = requestData.node_tokenizer_models;
+    if (requestedModels && typeof requestedModels === 'object') {
+      setLiveTokenizerModelsByNode(
+        Object.fromEntries(
+          nodeIds.flatMap((nodeId) => {
+            const model = (requestedModels as Record<string, unknown>)[nodeId];
+            return typeof model === 'string' && model.trim() ? [[nodeId, model]] : [];
+          }),
+        ),
+      );
+    }
+  };
+
   const panelNodeIds = derivePanelNodeIds(panelSelectedNodes);
   const { effectiveStudyNodeId, orderedPanelNodeIds } = deriveStudyNodeOrder(
     panelNodeIds,
@@ -117,7 +154,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   });
 
   const {
-    resolveTaskId,
     isRunning,
     isStopping,
     setIsRunning,
@@ -131,6 +167,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
     taskType: ANALYSIS_TASK_TYPES.tokenFrequencies,
     workspaceId: currentWorkspaceId,
+    tabId: host.tabId,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
@@ -139,16 +176,12 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskResult<TokenFrequencyResponse>(currentWorkspaceId, taskId);
+      return getAnalysisResultResource<TokenFrequencyResponse>(currentWorkspaceId, taskId);
     },
     /** Fetches the saved task request so a reopened task can restore panel state. */
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskRequest(
-        ANALYSIS_TAB_GROUPS.tokenFrequencies,
-        currentWorkspaceId,
-        taskId,
-      );
+      return getAnalysisRequest(currentWorkspaceId, taskId);
     },
     /** Pushes fetched task results into guarded component state. */
     onResultFetched: (result) => {
@@ -162,12 +195,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       // ids from result.analysis_params keeps that gate satisfied regardless
       // of which path applies the result. During a live run these ids match
       // what the submit handler already set, so this is a no-op overwrite.
-      const requestData = result.analysis_params ?? {};
-      const { nodeIds } = parseAnalysisNodeRequest(requestData, 2);
-      if (nodeIds.length > 0) {
-        setLastCompareNodeIds(nodeIds);
-        setStudyNodeId(nodeIds[1] ?? null);
-      }
+      restoreAnalysisNodeContext(result.analysis_params);
       setResultSafely(result);
     },
     /**
@@ -177,10 +205,8 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
      */
     onHydratedResult: (result) => {
       if (!result) return;
-      const requestData = result.analysis_params ?? {};
-      const { nodeIds } = parseAnalysisNodeRequest(requestData, 2);
-      setLastCompareNodeIds(nodeIds);
-      setStudyNodeId(nodeIds[1] ?? null);
+      const requestData = result.analysis_params;
+      restoreAnalysisNodeContext(requestData);
       applyTokenLimitState(
         typeof requestData.token_limit === 'number' ? requestData.token_limit : null,
       );
@@ -194,19 +220,15 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       }
     },
     /**
-     * Rehydrates node selections from a persisted request payload after task
-     * recovery. Flow: unwrap the saved request, cap its node ids to the
-     * two-input contract, and restore the study-node role.
+     * Rehydrates the complete node-input context from a persisted request.
+     * Flow: unwrap the saved request, then restore columns, tokenizer models,
+     * and study/reference roles while retaining an existing parameter-card order.
      */
     onHydratedRequest: (requestPayload) => {
       const raw = requestPayload as Record<string, unknown> | null;
       const req = raw?.data ?? raw;
       if (!req || typeof req !== 'object') return;
-      const reqObj = req as Record<string, unknown>;
-      const nodeIds: string[] = Array.isArray(reqObj.node_ids)
-        ? (reqObj.node_ids as string[]).slice(0, 2)
-        : [];
-      setStudyNodeId(nodeIds[1] ?? null);
+      restoreAnalysisNodeContext(req as Record<string, unknown>);
     },
     /** Clears local result and selection state when the feature reset action runs. */
     onCleared: (_, options) => {
@@ -222,7 +244,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       resetPreferenceUiState();
     },
     /** Removes token-frequency tasks from the shared analysis store after local cleanup. */
-    pruneGlobalTasks: (taskIds) => {
+    pruneTaskInbox: (taskIds) => {
       setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
     },
   });
@@ -281,10 +303,8 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     handleAddDefaultStopWords,
     resetPreferenceUiState,
   } = useTokenFrequencyPreferences({
-    currentWorkspaceId,
     results,
     setResults: setResultSafely,
-    resolveTokenFrequencyTaskId: resolveTaskId,
     backendTokenLimit,
     backendStopWordsKey,
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
@@ -307,6 +327,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     state: {
       currentWorkspaceId,
+      tabId: host.tabId,
       panelNodeIds: orderedPanelNodeIds,
       panelSelectedNodes,
       effectiveNodeColumnSelections,
@@ -342,7 +363,11 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
 
   const handleAnalyzeWithNodeColors = async () => {
     await ensureNodeColors();
-    await handleAnalyze();
+    await executeAnalysisRerun({
+      hasAttachedAnalysis: Boolean(tabTaskId),
+      clearResults,
+      runFreshAnalysis: handleAnalyze,
+    });
   };
 
   const {
@@ -388,7 +413,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const lastRunRequest = serverRequest ?? null;
   const currentTokenFrequencyParams = {};
   const serverTokenFrequencyParams = (_request: Record<string, unknown>) => ({});
-  const hasLastRun = Boolean(lastRunRequest);
   const hasChanges = !lastRunRequest
     ? true
     : hasParameterDiff(currentTokenFrequencyParams, serverTokenFrequencyParams(lastRunRequest)) ||
@@ -400,10 +424,10 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const baseActionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: panelSelectedNodes.length > 0 && !hasIncompleteSelections,
-    hasLastRun,
+    hasAttachedAnalysis: Boolean(tabTaskId),
+    analysisState: taskStatus.tasks[0]?.state ?? null,
     hasChanges,
     isBusy: isRunning,
-    hasResults: Boolean(results),
   });
   const hasTokenizerModel = missingTokenizerModelNodeIds.length === 0;
   const actionState = {
@@ -415,9 +439,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   };
 
   const persistDocumentColumn = usePersistNodeDocumentColumn({
-    workspaceId: currentWorkspaceId,
-  });
-  const persistTokenizerPreference = usePersistNodeTokenizationPreference({
     workspaceId: currentWorkspaceId,
   });
 
@@ -433,16 +454,15 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
    */
   const handleTokenizerModelChange = (
     nodeId: string,
-    column: string,
+    _column: string,
     model: string,
-    language: string | null,
+    _language: string | null,
   ) => {
     setLiveTokenizerModelsByNode((prev) => {
       if (model) return { ...prev, [nodeId]: model };
       const { [nodeId]: _removed, ...rest } = prev;
       return rest;
     });
-    void persistTokenizerPreference(nodeId, column, model, language);
   };
 
   return (

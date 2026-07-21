@@ -9,7 +9,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { getTokenizerModels } from '@/api';
+import { listTokenizerModels } from '@/api';
+import type { TokenizerModelInfo } from '@/api/frontendModels';
 import { queryKeys } from '@/lib/queryKeys';
 import { partitionTokenizerModelsForLanguage } from '@/lib/languages';
 import { cn } from '@/lib/utils';
@@ -59,11 +60,15 @@ function TokenizerModelSelector({
     enabled: false,
     staleTime: 10 * 60_000,
     /** Called by: TanStack Query when the selector opens and requests model inventory. */
-    queryFn: async () => {
-      const { data } = await getTokenizerModels({
+    queryFn: async (): Promise<TokenizerModelInfo[]> => {
+      const { data } = await listTokenizerModels({
         throwOnError: true,
       });
-      return data.models;
+      return data.map((model) => ({
+        model: model.id,
+        label: model.label,
+        languages: model.languages ?? [],
+      }));
     },
   });
   const { recommended, other } = partitionTokenizerModelsForLanguage(
@@ -92,13 +97,13 @@ function TokenizerModelSelector({
           disabled={isDisabled}
         >
           <SelectTrigger className="w-full text-sm" aria-label="Tokenizer model">
-            <SelectValue placeholder="Select model">
+            <SelectValue placeholder="None">
               {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty value should display the placeholder, not '' */}
-              {selectedModel?.label ?? (value ? value : 'Select Model')}
+              {selectedModel?.label ?? (value ? value : 'None')}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={TOKENIZER_MODEL_CLEAR_VALUE}>Select Model</SelectItem>
+            <SelectItem value={TOKENIZER_MODEL_CLEAR_VALUE}>None</SelectItem>
             {modelQuery.isFetching && !modelQuery.data ? (
               <SelectItem value={TOKENIZER_MODELS_LOADING_VALUE} disabled>
                 Loading models...

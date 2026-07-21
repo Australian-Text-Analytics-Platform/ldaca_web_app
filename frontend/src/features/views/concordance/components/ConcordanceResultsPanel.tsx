@@ -10,7 +10,6 @@ import { MetadataColumnSelector } from '../../common/components/MetadataColumnSe
 import type {
   ConcordanceDispersionChartMode,
   DispersionDisplayBinCount,
-  TaggedBinRow,
 } from '../concordanceDispersionDomain';
 import { resolveConcordanceResultBlock } from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
@@ -62,8 +61,6 @@ interface ConcordanceResultsDisplay {
   setBinCount: (value: DispersionDisplayBinCount) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
-  getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
-  isBlockMaterialised: (nodeKey: string) => boolean;
 }
 
 interface ConcordanceResultsMetadata {
@@ -95,12 +92,6 @@ interface ConcordanceResultsSession {
   setCombinedPage: Dispatch<SetStateAction<number>>;
   nodeLoading: Record<string, boolean>;
   nodeDetaching: Record<string, boolean>;
-  nodeMaterializing: Record<string, boolean>;
-  materializedPaths: Record<string, string>;
-  materializeSummaries: Record<
-    string,
-    { recordCount: number; uniqueDocuments: number; totalDocuments: number }
-  >;
 }
 
 interface ConcordanceResultsCommands {
@@ -112,7 +103,6 @@ interface ConcordanceResultsCommands {
     column: string,
     groupedHits?: ConcordanceGroupedRow,
   ) => void;
-  handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
   /**
    * Open the per-document detach dialog. Parent gathers the source-node
@@ -175,8 +165,6 @@ export function ConcordanceResultsPanel({
     setBinCount,
     allMatchedTexts,
     matchedTextColorMap,
-    getMaterializedBinsForKey,
-    isBlockMaterialised,
   },
   metadata: {
     showMetadata,
@@ -204,18 +192,8 @@ export function ConcordanceResultsPanel({
     setCombinedPage,
     nodeLoading,
     nodeDetaching,
-    nodeMaterializing,
-    materializedPaths,
-    materializeSummaries,
   },
-  commands: {
-    handleSort,
-    handlePageChange,
-    handleRowClick,
-    handleMaterialize,
-    openDetachDialog,
-    onDispersionDetach,
-  },
+  commands: { handleSort, handlePageChange, handleRowClick, openDetachDialog, onDispersionDetach },
 }: ConcordanceResultsPanelProps) {
   const showDispersion = concordanceView === 'dispersion';
 
@@ -419,12 +397,8 @@ export function ConcordanceResultsPanel({
                     combinedLoading,
                     nodeLoading,
                     nodeDetaching,
-                    nodeMaterializing,
-                    materializedPaths,
-                    materializeSummaries,
                     handlePageChange,
                     handleRowClick,
-                    handleMaterialize,
                     setCombinedPage,
                     openDetachDialog,
                   };
@@ -449,8 +423,6 @@ export function ConcordanceResultsPanel({
                       onClearBinSelection={onClearBinSelection}
                       allMatchedTexts={allMatchedTexts}
                       matchedTextColorMap={matchedTextColorMap}
-                      getMaterializedBinsForKey={getMaterializedBinsForKey}
-                      isBlockMaterialised={isBlockMaterialised}
                       onDispersionDetach={onDispersionDetach}
                     />
                   ) : (

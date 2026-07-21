@@ -1,9 +1,9 @@
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
-import type { SequentialAnalysisRequest } from '@/api';
+import type { Analysis, SequentialAnalysisRequest } from '@/api';
 import type { ColumnKind } from '@/lib/arrow/arrowTable';
-import { extractAndSetTaskId } from '../../common/extractTaskId';
-import { isChartTypeOption, type ChartTypeOption } from './sequentialChartModel';
+import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
+import type { ChartTypeOption } from './sequentialChartModel';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
@@ -16,7 +16,6 @@ interface SequentialAnalysisState {
   timeColumn: string;
   groupByColumns: string[];
   frequency: SequentialFrequency;
-  chartType: ChartTypeOption;
   derivedColumnType: 'datetime' | 'numeric';
   numericOriginValue: number | null;
   numericIntervalValue: number | null;
@@ -37,10 +36,12 @@ interface SequentialAnalysisActions {
   ) => void;
   setChartType: (value: ChartTypeOption) => void;
   setLocalTaskId: (value: string | null) => void;
+  runningRef: { current: boolean };
+  lastFetchedRef: { current: { taskId: string | null; state: string | null } };
   setNodeColumnSelections: (selections: { nodeId: string; column: string }[]) => void;
   setTimeColumn: (value: string) => void;
   lockCurrentSchema: (schema?: Record<string, ColumnKind>) => void;
-  clearResults: () => Promise<void>;
+  clearResults: () => Promise<boolean>;
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
   onTaskIdAssigned: (taskId: string | null) => void;
@@ -68,7 +69,6 @@ export function useSequentialAnalysisTaskFlow({
     timeColumn,
     groupByColumns,
     frequency,
-    chartType,
     derivedColumnType,
     numericOriginValue,
     numericIntervalValue,
@@ -83,6 +83,8 @@ export function useSequentialAnalysisTaskFlow({
     setResults,
     setChartType,
     setLocalTaskId,
+    runningRef,
+    lastFetchedRef,
     setNodeColumnSelections,
     setTimeColumn,
     lockCurrentSchema,
@@ -163,57 +165,40 @@ export function useSequentialAnalysisTaskFlow({
       case_sensitive: caseSensitive,
     };
 
-    try {
-      setIsAnalyzing(true);
-      const { data: result } = await submitTabAnalysis({
-        body: { kind: 'sequential', ...request },
-        path: { workspace_id: currentWorkspaceId, tab_id: tabId },
-        throwOnError: true,
-      });
-      const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
-      onTaskIdAssigned(assignedTaskId);
-      const enrichedResult = {
-        ...result,
-        analysis_params: {
-          ...((result as Record<string, unknown>).analysis_params as Record<string, unknown>),
-          group_by_columns: validGroupByColumns,
-          time_column: picked,
-          frequency,
-          column_type: derivedColumnType,
-          numeric_origin: numericOriginValue,
-          numeric_interval: numericIntervalValue,
-          custom_interval_value: isCustomDatetime ? customIntervalValue : null,
-          custom_interval_unit: isCustomDatetime ? customIntervalUnit : null,
-          case_sensitive: caseSensitive,
-        },
-      };
-      const resolvedChartType = isChartTypeOption(
-        (enrichedResult as Record<string, unknown>).chart_type,
-      )
-        ? ((enrichedResult as Record<string, unknown>).chart_type as ChartTypeOption)
-        : chartType;
-      const normalizedResult = { ...enrichedResult, chart_type: resolvedChartType };
-      setResults(normalizedResult);
-      setChartType(resolvedChartType);
-
-      lockCurrentSchema();
-    } catch (error) {
-      console.error('Sequential analysis error:', error);
-      toast.error(
-        `Error performing sequential analysis: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
-    } finally {
-      setIsAnalyzing(false);
-    }
+    await runAnalysisTaskEnvelope<Analysis>({
+      lastFetchedRef,
+      runningRef,
+      setIsRunning: setIsAnalyzing,
+      setLocalTaskId,
+      onTaskIdAssigned,
+      resetBeforeRun: () => {
+        setResults(null);
+      },
+      submit: async () => {
+        const { data } = await submitTabAnalysis({
+          body: { kind: 'sequential', ...request },
+          path: { workspace_id: currentWorkspaceId, tab_id: tabId },
+          throwOnError: true,
+        });
+        return data;
+      },
+      onSuccess: () => {
+        lockCurrentSchema();
+      },
+      onError: (error) => {
+        console.error('Sequential analysis error:', error);
+        toast.error(
+          `Error performing sequential analysis: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      },
+    });
   };
 
   // Clears the active sequential-analysis result through the shared lifecycle.
   /**
    * Returned to `SequentialAnalysisFeature` by `useSequentialAnalysisTaskFlow`.
    */
-  const handleClearResults = async () => {
-    await clearResults();
-  };
+  const handleClearResults = () => clearResults();
 
   // Persists chart-type changes onto both local result state and the stored task result.
   /**

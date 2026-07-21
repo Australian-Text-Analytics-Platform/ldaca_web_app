@@ -56,6 +56,7 @@ describe('useTopicModelingParameters', () => {
     expect(result.current.effectiveDocCounts).toEqual([8000, 80]);
     expect(result.current.sampleFractionsForRequest).toEqual([null, null]);
     expect(result.current.hasAnySampling).toBe(false);
+    expect(result.current.randomSeed).toBe(0);
   });
 
   it('tracks user-set parameters and preserves tuned sampling across clear', async () => {

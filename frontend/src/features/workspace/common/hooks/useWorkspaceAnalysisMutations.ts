@@ -1,19 +1,12 @@
 import { useMemo } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
-import {
-  createAnalysisTaskDetachment,
-  createAnalysisTaskDispersionDetachment,
-  createAnalysisTaskMaterialization,
-  getQuotation,
-} from '@/api';
+import { submitTabAnalysis, submitChildAnalysis } from '@/api';
 import type {
-  AnalysisTaskActionResponse,
-  ConcordanceDetachRequest,
-  ConcordanceDispersionDetachRequest,
-  ConcordanceMaterializeRequest,
-  QuotationDetachRequest,
-  QuotationMaterializeRequest,
-  QuotationRequest,
+  ConcordanceDetachmentAnalysisRequest,
+  ConcordanceDispersionDetachmentAnalysisRequest,
+  QuotationAnalysisRequest,
+  QuotationDetachmentAnalysisRequest,
+  TopicModelingDetachmentAnalysisRequest,
 } from '@/api';
 import { invalidateWorkspaceGraphQuery } from './workspaceMutationCache';
 import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
@@ -54,18 +47,18 @@ export const useWorkspaceAnalysisMutations = ({
   const detachConcordanceMutation = useMutation({
     mutationFn: ({
       workspaceId,
-      taskId,
+      analysisId,
       request,
     }: {
       workspaceId: string;
-      taskId: string;
-      request: ConcordanceDetachRequest;
+      analysisId: string;
+      request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'>;
     }) =>
-      createAnalysisTaskDetachment({
-        body: request,
-        path: { workspace_id: workspaceId, task_id: taskId },
+      submitChildAnalysis({
+        body: { kind: 'concordance_detachment', ...request },
+        path: { workspace_id: workspaceId, analysis_id: analysisId },
         throwOnError: true,
-      }).then(({ data }) => data as AnalysisTaskActionResponse),
+      }).then(({ data }) => data),
     onMutate: operationLifecycle.onMutate('detachConcordance'),
     onSuccess: operationLifecycle.onSuccess('detachConcordance', (_data, variables) => {
       invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
@@ -76,18 +69,18 @@ export const useWorkspaceAnalysisMutations = ({
   const detachConcordanceDispersionMutation = useMutation({
     mutationFn: ({
       workspaceId,
-      taskId,
+      analysisId,
       request,
     }: {
       workspaceId: string;
-      taskId: string;
-      request: ConcordanceDispersionDetachRequest;
+      analysisId: string;
+      request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'>;
     }) =>
-      createAnalysisTaskDispersionDetachment({
-        body: request,
-        path: { workspace_id: workspaceId, task_id: taskId },
+      submitChildAnalysis({
+        body: { kind: 'concordance_dispersion_detachment', ...request },
+        path: { workspace_id: workspaceId, analysis_id: analysisId },
         throwOnError: true,
-      }).then(({ data }) => ({ task_id: data.metadata?.task_id ?? undefined })),
+      }).then(({ data }) => data),
     onMutate: operationLifecycle.onMutate('detachConcordanceDispersion'),
     onSuccess: operationLifecycle.onSuccess('detachConcordanceDispersion', (_data, variables) => {
       invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
@@ -95,31 +88,11 @@ export const useWorkspaceAnalysisMutations = ({
     onError: operationLifecycle.onError('detachConcordanceDispersion'),
   });
 
-  const materializeConcordanceMutation = useMutation({
-    mutationFn: ({
-      workspaceId,
-      taskId,
-      request,
-    }: {
-      workspaceId: string;
-      taskId: string;
-      request: ConcordanceMaterializeRequest;
-    }) =>
-      createAnalysisTaskMaterialization({
-        body: request,
-        path: { workspace_id: workspaceId, task_id: taskId },
-        throwOnError: true,
-      }).then(({ data }) => data),
-    onMutate: operationLifecycle.onMutate('materializeConcordance'),
-    onSuccess: operationLifecycle.onSuccess('materializeConcordance'),
-    onError: operationLifecycle.onError('materializeConcordance'),
-  });
-
   const quotationMutation = useMutation({
-    mutationFn: ({ nodeId, request }: { nodeId: string; request: QuotationRequest }) =>
-      getQuotation({
-        body: request,
-        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+    mutationFn: ({ tabId, request }: { tabId: string; request: QuotationAnalysisRequest }) =>
+      submitTabAnalysis({
+        body: { kind: 'quotation', ...request },
+        path: { workspace_id: ensureWorkspaceSelected(), tab_id: tabId },
         throwOnError: true,
       }).then(({ data }) => data),
     onMutate: operationLifecycle.onMutate('quotation'),
@@ -127,21 +100,43 @@ export const useWorkspaceAnalysisMutations = ({
     onError: operationLifecycle.onError('quotation'),
   });
 
-  const detachQuotationMutation = useMutation({
+  const detachTopicModelingMutation = useMutation({
     mutationFn: ({
       workspaceId,
-      taskId,
+      analysisId,
       request,
     }: {
       workspaceId: string;
-      taskId: string;
-      request: QuotationDetachRequest;
+      analysisId: string;
+      request: Omit<TopicModelingDetachmentAnalysisRequest, 'kind'>;
     }) =>
-      createAnalysisTaskDetachment({
-        body: request,
-        path: { workspace_id: workspaceId, task_id: taskId },
+      submitChildAnalysis({
+        body: { kind: 'topic_modeling_detachment', ...request },
+        path: { workspace_id: workspaceId, analysis_id: analysisId },
         throwOnError: true,
-      }).then(({ data }) => data as AnalysisTaskActionResponse),
+      }).then(({ data }) => data),
+    onMutate: operationLifecycle.onMutate('detachTopicModeling'),
+    onSuccess: operationLifecycle.onSuccess('detachTopicModeling', (_data, variables) => {
+      invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
+    }),
+    onError: operationLifecycle.onError('detachTopicModeling'),
+  });
+
+  const detachQuotationMutation = useMutation({
+    mutationFn: ({
+      workspaceId,
+      analysisId,
+      request,
+    }: {
+      workspaceId: string;
+      analysisId: string;
+      request: Omit<QuotationDetachmentAnalysisRequest, 'kind'>;
+    }) =>
+      submitChildAnalysis({
+        body: { kind: 'quotation_detachment', ...request },
+        path: { workspace_id: workspaceId, analysis_id: analysisId },
+        throwOnError: true,
+      }).then(({ data }) => data),
     onMutate: operationLifecycle.onMutate('detachQuotation'),
     onSuccess: operationLifecycle.onSuccess('detachQuotation', (_data, variables) => {
       invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
@@ -149,61 +144,47 @@ export const useWorkspaceAnalysisMutations = ({
     onError: operationLifecycle.onError('detachQuotation'),
   });
 
-  const materializeQuotationMutation = useMutation({
-    mutationFn: ({
-      workspaceId,
-      taskId,
-      request,
-    }: {
-      workspaceId: string;
-      taskId: string;
-      request: QuotationMaterializeRequest;
-    }) =>
-      createAnalysisTaskMaterialization({
-        body: request,
-        path: { workspace_id: workspaceId, task_id: taskId },
-        throwOnError: true,
-      }).then(({ data }) => data),
-    onMutate: operationLifecycle.onMutate('materializeQuotation'),
-    onSuccess: operationLifecycle.onSuccess('materializeQuotation'),
-    onError: operationLifecycle.onError('materializeQuotation'),
-  });
-
   const actions = useMemo(
     () => ({
-      detachConcordance: (taskId: string, request: ConcordanceDetachRequest) =>
+      detachConcordance: (
+        analysisId: string,
+        request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'>,
+      ) =>
         detachConcordanceMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          taskId,
+          analysisId,
           request,
         }),
-      detachConcordanceDispersion: (taskId: string, request: ConcordanceDispersionDetachRequest) =>
+      detachConcordanceDispersion: (
+        analysisId: string,
+        request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'>,
+      ) =>
         detachConcordanceDispersionMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          taskId,
+          analysisId,
           request,
         }),
-      materializeConcordance: (taskId: string, request: ConcordanceMaterializeRequest) =>
-        materializeConcordanceMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          taskId,
-          request,
-        }),
-      quotationSearch: (nodeId: string, request: QuotationRequest) =>
+      quotationSearch: (tabId: string, request: QuotationAnalysisRequest) =>
         quotationMutation.mutateAsync({
-          nodeId,
+          tabId,
           request,
         }),
-      detachQuotation: (taskId: string, request: QuotationDetachRequest) =>
+      detachQuotation: (
+        analysisId: string,
+        request: Omit<QuotationDetachmentAnalysisRequest, 'kind'>,
+      ) =>
         detachQuotationMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          taskId,
+          analysisId,
           request,
         }),
-      materializeQuotation: (taskId: string, request: QuotationMaterializeRequest) =>
-        materializeQuotationMutation.mutateAsync({
+      detachTopicModeling: (
+        analysisId: string,
+        request: Omit<TopicModelingDetachmentAnalysisRequest, 'kind'>,
+      ) =>
+        detachTopicModelingMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          taskId,
+          analysisId,
           request,
         }),
     }),

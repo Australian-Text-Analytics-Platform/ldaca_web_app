@@ -7,6 +7,7 @@ import type { ConcordanceHandoffSearchRequest } from './useConcordanceTaskFlow';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 
 interface Params {
+  tabId: string;
   pendingConcordance: PendingConcordance | null;
   clearPendingConcordance: () => void;
   hydrationState: HydrationState;
@@ -24,14 +25,8 @@ export interface UseConcordancePendingHandoffResult {
 }
 
 /**
- * Owns the queue + apply effects for `pendingConcordance` handoffs from
- * TokenFrequencyTab. Two effects:
- *
- *   1. Queue: copy `pendingConcordance` from the analysis store into local
- *      state (deferred via rAF) so hydration has a chance to finish first.
- *   2. Apply: once hydration settles, fill the search box / sync the selection /
- *      sync column selections, and optionally publish one runnable request
- *      snapshot for automatic submission.
+ * Applies a `pendingConcordance` handoff from Token Frequency once the targeted
+ * destination tab has mounted and hydration has settled.
  *
  * Token clicks always open a brand-new concordance tab (see
  * useTokenFrequencyTaskFlow.handleTokenClick), so the consuming feature instance
@@ -45,6 +40,7 @@ export interface UseConcordancePendingHandoffResult {
  * Used by: ConcordanceFeature.tsx.
  */
 export function useConcordancePendingHandoff({
+  tabId,
   pendingConcordance,
   clearPendingConcordance,
   hydrationState,
@@ -53,29 +49,15 @@ export function useConcordancePendingHandoff({
   setNodeColumnSelections,
   replaceSelectedNodes,
 }: Params): UseConcordancePendingHandoffResult {
-  const [queuedPendingConcordance, setQueuedPendingConcordance] =
-    useState<PendingConcordance | null>(pendingConcordance);
   const [autoSearchRequest, setAutoSearchRequest] =
     useState<ConcordanceHandoffSearchRequest | null>(null);
-  const lastPendingConcordanceRef = useRef<number | null>(null);
+  const consumedPendingConcordanceRef = useRef<PendingConcordance | null>(null);
 
   useEffect(() => {
-    if (!pendingConcordance) return;
-    if (lastPendingConcordanceRef.current === pendingConcordance.timestamp) {
-      return;
-    }
-    lastPendingConcordanceRef.current = pendingConcordance.timestamp ?? null;
-    const id = requestAnimationFrame(() => {
-      setQueuedPendingConcordance(pendingConcordance);
-      clearPendingConcordance();
-    });
-    return () => {
-      cancelAnimationFrame(id);
-    };
-  }, [pendingConcordance, clearPendingConcordance]);
-
-  useEffect(() => {
-    if (!queuedPendingConcordance) {
+    if (
+      pendingConcordance?.targetTabId !== tabId ||
+      consumedPendingConcordanceRef.current === pendingConcordance
+    ) {
       return;
     }
 
@@ -86,21 +68,21 @@ export function useConcordancePendingHandoff({
       return;
     }
 
-    const rafIds: number[] = [];
-    const word = queuedPendingConcordance.searchWord;
+    // Mark and clear the handoff before any downstream state writes. Parent
+    // rerenders can now safely revisit this effect without applying it again.
+    consumedPendingConcordanceRef.current = pendingConcordance;
+    clearPendingConcordance();
+
+    const word = pendingConcordance.searchWord;
     if (word) {
-      rafIds.push(
-        requestAnimationFrame(() => {
-          setSearchWord(word);
-        }),
-      );
+      setSearchWord(word);
     }
 
     if (
-      Array.isArray(queuedPendingConcordance.selectedNodes) &&
-      queuedPendingConcordance.selectedNodes.length > 0
+      Array.isArray(pendingConcordance.selectedNodes) &&
+      pendingConcordance.selectedNodes.length > 0
     ) {
-      const targetIds = queuedPendingConcordance.selectedNodes
+      const targetIds = pendingConcordance.selectedNodes
         .map((node) => (typeof node.id === 'string' ? node.id : ''))
         .filter((id): id is string => id.trim().length > 0);
       const effectiveTargetIds = takeMostRecent(targetIds, 2);
@@ -119,17 +101,17 @@ export function useConcordancePendingHandoff({
       }
     }
 
-    if (queuedPendingConcordance.nodeColumnSelections?.length) {
-      setNodeColumnSelections(queuedPendingConcordance.nodeColumnSelections, { replace: true });
+    if (pendingConcordance.nodeColumnSelections?.length) {
+      setNodeColumnSelections(pendingConcordance.nodeColumnSelections, { replace: true });
     }
 
     const selectedNodeIds = takeMostRecent(
-      (queuedPendingConcordance.selectedNodes ?? [])
+      (pendingConcordance.selectedNodes ?? [])
         .map((node) => (typeof node.id === 'string' ? node.id : ''))
         .filter((id): id is string => id.trim().length > 0),
       2,
     );
-    const handoffSelections = (queuedPendingConcordance.nodeColumnSelections ?? []).filter(
+    const handoffSelections = (pendingConcordance.nodeColumnSelections ?? []).filter(
       (selection) => Boolean(selection.column),
     );
     const runnableNodeIds =
@@ -145,34 +127,26 @@ export function useConcordancePendingHandoff({
         handoffSelections.some((selection) => selection.nodeId === nodeId),
       );
     if (
-      queuedPendingConcordance.autoRun === true &&
-      queuedPendingConcordance.searchWord &&
+      pendingConcordance.autoRun === true &&
+      pendingConcordance.searchWord &&
       hasNodeTargets
     ) {
-      rafIds.push(
-        requestAnimationFrame(() => {
-          setAutoSearchRequest({
-            searchWord: queuedPendingConcordance.searchWord ?? '',
-            nodeIds: runnableNodeIds,
-            nodeColumnSelections: handoffSelections.map((selection) => ({ ...selection })),
-          });
-        }),
-      );
+      const searchWord = pendingConcordance.searchWord;
+      queueMicrotask(() => {
+        setAutoSearchRequest({
+          searchWord,
+          nodeIds: runnableNodeIds,
+          nodeColumnSelections: handoffSelections.map((selection) => ({ ...selection })),
+        });
+      });
     }
-
-    const resetId = requestAnimationFrame(() => {
-      setQueuedPendingConcordance(null);
-    });
-
-    return () => {
-      rafIds.forEach(cancelAnimationFrame);
-      cancelAnimationFrame(resetId);
-    };
   }, [
-    queuedPendingConcordance,
+    tabId,
+    pendingConcordance,
     hydrationState.status,
     hydrationState.lastHydratedAt,
     selectedNodes,
+    clearPendingConcordance,
     setNodeColumnSelections,
     replaceSelectedNodes,
     setSearchWord,

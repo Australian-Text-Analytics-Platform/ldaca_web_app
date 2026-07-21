@@ -68,6 +68,52 @@ export interface AnalysisNodeRequestShape {
   node_columns?: Record<string, string | undefined>;
 }
 
+interface AnalysisInputRequestShape extends AnalysisNodeRequestShape {
+  node_id?: unknown;
+  column?: unknown;
+  time_column?: unknown;
+}
+
+export interface AnalysisRequestInput {
+  node_id: string;
+  column: string;
+}
+
+/**
+ * Rebuilds the Data Block input cards owned by an Analysis Tab from its saved
+ * backend request.
+ * Used by: Analysis feature hydration after the canonical Tab refactor because
+ * the Tab stores only the Analysis identity while the Analysis request owns the
+ * submitted Data Block IDs and columns.
+ */
+export const analysisInputsFromRequest = (
+  requestData: AnalysisInputRequestShape | null | undefined,
+  maxNodes = 2,
+): AnalysisRequestInput[] => {
+  const limit = Math.max(0, Math.floor(maxNodes));
+  if (Array.isArray(requestData?.node_ids)) {
+    const nodeColumns =
+      requestData.node_columns && typeof requestData.node_columns === 'object'
+        ? requestData.node_columns
+        : {};
+    return requestData.node_ids
+      .filter(isNonEmptyString)
+      .slice(0, limit)
+      .map((nodeId) => ({
+        node_id: nodeId,
+        column: isNonEmptyString(nodeColumns[nodeId]) ? nodeColumns[nodeId] : '',
+      }));
+  }
+
+  if (!isNonEmptyString(requestData?.node_id) || limit === 0) return [];
+  const column = isNonEmptyString(requestData.column)
+    ? requestData.column
+    : isNonEmptyString(requestData.time_column)
+      ? requestData.time_column
+      : '';
+  return [{ node_id: requestData.node_id, column }];
+};
+
 /**
  * Extracts the node/column selection shape shared by multi-node analysis task
  * requests so hydration and cross-feature handoffs can reuse one parser.

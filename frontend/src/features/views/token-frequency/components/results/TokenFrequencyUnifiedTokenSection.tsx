@@ -1,17 +1,18 @@
+import { Text } from '@visx/text';
+import { Wordcloud } from '@visx/wordcloud';
+import { Download } from 'lucide-react';
 import { memo } from 'react';
+import HelpIcon from '@/components/help/HelpIcon';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useElementWidth } from '@/lib/useElementWidth';
 import type {
   NodeResultView,
   NormalizedNodeResult,
   TokenFrequencyStatisticsEntry,
 } from '../../tokenFrequencyAdapters';
-import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import HelpIcon from '@/components/help/HelpIcon';
-import { Wordcloud } from '@visx/wordcloud';
-import { Text } from '@visx/text';
 import { TokenFrequencyStatisticsTable } from './TokenFrequencyStatisticsTable';
-import { useElementWidth } from '@/lib/useElementWidth';
 
 // Aspect ratio for the cloud SVG when sized from the container width. Keeps
 // the cloud "landscape-ish" without dominating tall corpora layouts.
@@ -58,6 +59,7 @@ interface TokenFrequencyUnifiedTokenSectionProps {
    * statistics table when in list view. Cloud rendering is unaffected.
    */
   tokenFilter?: string;
+  onTokenFilterChange?: (value: string) => void;
 }
 
 /** Used by: TokenFrequencyUnifiedTokenSectionInner to parse backend statistic values for unified-cloud scoring. */
@@ -91,6 +93,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   onDownloadFrequencyCsv,
   view,
   tokenFilter = '',
+  onTokenFilterChange,
 }: TokenFrequencyUnifiedTokenSectionProps) => {
   // Hook must come before any early return so React sees a stable call order
   // across renders, regardless of whether the comparative panel is showing.
@@ -120,8 +123,8 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     .filter((s) => !appliedStopSet.has(s.token.toLowerCase()))
     .map((s) => ({
       token: s.token,
-      o1: s.freq_reference || 0,
-      o2: s.freq_study || 0,
+      o1: Number(s.freq_reference ?? 0),
+      o2: Number(s.freq_study ?? 0),
       p1: parseStatisticsNumericValue(s.percent_reference),
       p2: parseStatisticsNumericValue(s.percent_study),
       logratio: parseStatisticsNumericValue(s.log_ratio),
@@ -271,32 +274,54 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
           >
             {isComparative && selectedCloudStats.length > 0 ? (
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1">
-                    <span
-                      className="inline-block h-3.5 w-3.5 rounded"
-                      style={{ backgroundColor: nodeAColor }}
-                    />
-                    {nodeAName}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span
-                      className="inline-block h-3.5 w-3.5 rounded"
-                      style={{ backgroundColor: nodeBColor }}
-                    />
-                    {nodeBName}
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <span>Gradient</span>
+                <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+                  <div
+                    className="flex items-center gap-1.5 text-sm"
+                    aria-label="Reference to Study color scale"
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          tabIndex={0}
+                          aria-label={`Reference: ${nodeAName}`}
+                          className="inline-flex cursor-help items-center gap-1"
+                        >
+                          <span>Reference</span>
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-4 w-4 rounded-sm"
+                            style={{ backgroundColor: nodeAColor }}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{nodeAName}</TooltipContent>
+                    </Tooltip>
                     <div
                       className="h-2.5 w-28 rounded"
+                      aria-hidden="true"
                       style={{
                         background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})`,
                       }}
                     />
-                    <span>A → B</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          tabIndex={0}
+                          aria-label={`Study: ${nodeBName}`}
+                          className="inline-flex cursor-help items-center gap-1"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-4 w-4 rounded-sm"
+                            style={{ backgroundColor: nodeBColor }}
+                          />
+                          <span>Study</span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{nodeBName}</TooltipContent>
+                    </Tooltip>
                   </div>
-                </div>
+                </TooltipProvider>
 
                 <div className="flex w-full justify-center overflow-visible">
                   <svg
@@ -380,6 +405,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
                 onDownloadFrequencyCsv={onDownloadFrequencyCsv}
                 onTokenClick={onTokenClick}
                 tokenFilter={tokenFilter}
+                onTokenFilterChange={onTokenFilterChange}
                 referenceNodeName={referenceId ? computeDisplayName(referenceId) : null}
                 referenceColor={referenceId ? getColorForNode(referenceId, 0) : null}
                 studyNodeName={studyId ? computeDisplayName(studyId) : null}

@@ -1,20 +1,21 @@
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   createColumnHelper,
+  type FilterFn,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
-  type FilterFn,
   type SortingState,
+  useReactTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search } from 'lucide-react';
+import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import HelpIcon from '@/components/help/HelpIcon';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
 import { wildcardToRegExp } from '../../tokenFrequencyAdapters';
 
@@ -46,15 +47,12 @@ interface Props {
    */
   onTokenClick?: (token: string) => void;
   /**
-   * Optional controlled wildcard filter. When provided, the table is
-   * filtered by this value and the internal search box is not rendered
-   * (the filter UI lives in the parent panel for the list view).
+   * Optional controlled wildcard filter shared with the two frequency lists.
    */
   tokenFilter?: string;
+  onTokenFilterChange?: (value: string) => void;
   /**
-   * Display name + colour for the reference (Corpus 1) and study (Corpus 2)
-   * data blocks. Drives the "Reference corpus: ... ; Study corpus: ..."
-   * caption rendered under the section heading.
+   * Display name + colour for the reference and study Data Blocks.
    */
   referenceNodeName?: string | null;
   referenceColor?: string | null;
@@ -105,12 +103,42 @@ const tokenWildcardFilter: FilterFn<EnhancedStatisticsRow> = (row, _columnId, fi
 
 const columnHelper = createColumnHelper<EnhancedStatisticsRow>();
 
+const STATISTICS_COLUMN_TOOLTIPS: Record<string, string> = {
+  token: 'The token being compared across the Reference and Study Data Blocks.',
+  freq_reference: 'Observed frequency: the token count in the Reference Data Block.',
+  percent_reference: 'The token count as a percentage of all tokens in the Reference Data Block.',
+  freq_study: 'Observed frequency: the token count in the Study Data Block.',
+  percent_study: 'The token count as a percentage of all tokens in the Study Data Block.',
+  log_likelihood_llv:
+    'Log-likelihood score measuring the strength of the frequency difference between the two Data Blocks.',
+  overuse: 'Which Data Block has the higher observed token frequency: Reference or Study.',
+  signed_ll:
+    'The log-likelihood score, positive when Study has the higher frequency and negative when Reference does.',
+  percent_diff:
+    'Reference relative frequency minus Study relative frequency, shown as a percentage.',
+  bayes_factor_bic:
+    'A BIC-adjusted evidence score for the frequency difference; larger values indicate stronger evidence.',
+  effect_size_ell:
+    'ELL effect-size estimate for the frequency difference, adjusted for corpus size and expected frequency.',
+  relative_risk:
+    'Reference relative frequency divided by Study relative frequency; 1 means equal relative frequency.',
+  log_ratio:
+    'Natural logarithm of the Reference-to-Study relative-frequency ratio; 0 means equal relative frequency.',
+  odds_ratio: 'Reference token odds divided by Study token odds; 1 means equal odds.',
+  significance:
+    'Significance level derived from log likelihood: more stars indicate stronger evidence of a difference.',
+};
+
 /**
  * Called by: TokenFrequencyStatisticsTable because it needs TanStack Table column definitions for the keyness grid. Flow: build accessors, attach renderers and filters, then return the column list consumed by the table instance.
  * ``onTokenClick`` (when provided) makes the token cell a button that hands the
  * token to a fresh concordance tab across both compared corpora.
  */
-const buildColumns = (onTokenClick?: (token: string) => void) => [
+const buildColumns = (
+  onTokenClick?: (token: string) => void,
+  referenceColor?: string | null,
+  studyColor?: string | null,
+) => [
   columnHelper.accessor('sort_token', {
     id: 'token',
     header: 'Token',
@@ -167,13 +195,19 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
   }),
   columnHelper.accessor('overuse', {
     header: 'Overuse',
-    /** Used by: TanStack Table Overuse column to render direction as a compact colored badge. */
+    /** Used by: TanStack Table Overuse column to identify the Data Block with the higher observed frequency. */
     cell: (info) => {
       const isOveruse = info.getValue();
-      const cls = isOveruse ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+      const directionColor = isOveruse ? studyColor : referenceColor;
+      const fallbackClass = isOveruse
+        ? 'bg-emerald-100 text-emerald-800'
+        : 'bg-rose-100 text-rose-800';
       return (
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>
-          {isOveruse ? 'Over' : 'Under'}
+        <span
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${directionColor ? 'text-white' : fallbackClass}`}
+          style={{ backgroundColor: directionColor ?? undefined }}
+        >
+          {isOveruse ? 'Study' : 'Reference'}
         </span>
       );
     },
@@ -240,7 +274,7 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
         <span
           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}
         >
-          {significance || 'n.s.'}
+          {significance ?? 'n.s.'}
         </span>
       );
     },
@@ -253,8 +287,8 @@ const buildColumns = (onTokenClick?: (token: string) => void) => [
  */
 const enhanceRows = (statistics: TokenFrequencyStatisticsEntry[]): EnhancedStatisticsRow[] =>
   statistics.map((stat) => {
-    const or = stat.freq_reference || 0;
-    const os = stat.freq_study || 0;
+    const or = parseStatisticsNumericValue(stat.freq_reference);
+    const os = parseStatisticsNumericValue(stat.freq_study);
     const overuse = os > or;
     const ll = parseStatisticsNumericValue(stat.log_likelihood_llv);
     const llAbs = Number.isFinite(ll) ? Math.abs(ll) : NaN;
@@ -287,13 +321,17 @@ export const TokenFrequencyStatisticsTable = ({
   onDownloadFrequencyCsv,
   onTokenClick,
   tokenFilter: tokenFilterProp,
+  onTokenFilterChange,
   referenceNodeName,
   referenceColor,
   studyNodeName,
   studyColor,
 }: Props) => {
   const data = useMemo(() => enhanceRows(statistics), [statistics]);
-  const columns = useMemo(() => buildColumns(onTokenClick), [onTokenClick]);
+  const columns = useMemo(
+    () => buildColumns(onTokenClick, referenceColor, studyColor),
+    [onTokenClick, referenceColor, studyColor],
+  );
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'log_likelihood_llv', desc: true }]);
   const tokenFilter = tokenFilterProp ?? '';
@@ -347,177 +385,250 @@ export const TokenFrequencyStatisticsTable = ({
   const filteredCount = table.getFilteredRowModel().rows.length;
   const totalCount = data.length;
 
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty reference name must still let the study name show the caption, so falsy '' must fall through
-  const hasCorpusCaption = Boolean(referenceNodeName || studyNodeName);
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty reference name must still let the study name show the legend, so falsy '' must fall through
+  const hasCorpusLegend = Boolean(referenceNodeName || studyNodeName);
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h4 className="font-semibold">Keyword Analysis</h4>
-            <HelpIcon
-              targetKey="analysis.token-frequency.statistical-measures"
-              label="Keyword Analysis"
-              tooltip="Comparative token-level keyness statistics for the two selected data blocks."
-            />
-          </div>
-          {hasCorpusCaption ? (
-            <p className="text-xs text-muted-foreground">
-              <span>Reference corpus: </span>
-              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty color string must map to undefined (no inline color), so falsy '' must fall through */}
-              <span className="font-medium" style={{ color: referenceColor || undefined }}>
-                {referenceNodeName ?? '—'}
-              </span>
-              <span>; Study corpus: </span>
-              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty color string must map to undefined (no inline color), so falsy '' must fall through */}
-              <span className="font-medium" style={{ color: studyColor || undefined }}>
-                {studyNodeName ?? '—'}
-              </span>
-              <span>
-                ; The Overuse column indicates how frequently a token appears in the study corpus
-                compared to the reference corpus.
-              </span>
-            </p>
-          ) : null}
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label="Download frequencies"
-          title="Download frequencies"
-          onClick={handleDownload}
-        >
-          <Download className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {tokenFilter ? (
-        <p className="text-xs text-muted-foreground">
-          {filteredCount} match{filteredCount !== 1 ? 'es' : ''} of {totalCount}
-        </p>
-      ) : null}
-
-      {totalCount > 0 ? (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-300 border-collapse text-sm">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="border-b text-left">
-                    {headerGroup.headers.map((header) => {
-                      const sortDir = header.column.getIsSorted();
-                      return (
-                        <th key={header.id} className="px-2 py-2 whitespace-nowrap">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto px-0"
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                            {sortDir === 'asc' ? (
-                              <ArrowUp className="ml-1 h-3.5 w-3.5" />
-                            ) : sortDir === 'desc' ? (
-                              <ArrowDown className="ml-1 h-3.5 w-3.5" />
-                            ) : (
-                              <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-40" />
-                            )}
-                          </Button>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="border-b last:border-b-0">
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-2 py-1 whitespace-nowrap tabular-nums">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredCount === 0 ? (
-            <p className="text-sm text-muted-foreground">No tokens match the current filter.</p>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Label htmlFor="stats-rows-per-page" className="text-xs text-muted-foreground">
-                  Rows per page
-                </Label>
-                <Input
-                  id="stats-rows-per-page"
-                  type="number"
-                  min={5}
-                  max={200}
-                  value={pageSize}
-                  onChange={(event) => {
-                    const next = Number(event.target.value);
-                    if (Number.isFinite(next) && next >= 5 && next <= 200) {
-                      table.setPageSize(next);
-                    }
-                  }}
-                  className="h-8 w-20"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!table.getCanPreviousPage()}
-                  onClick={() => {
-                    table.setPageIndex(0);
-                  }}
-                >
-                  First
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!table.getCanPreviousPage()}
-                  onClick={() => {
-                    table.previousPage();
-                  }}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  Page {pageIndex + 1} / {pageCount}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!table.getCanNextPage()}
-                  onClick={() => {
-                    table.nextPage();
-                  }}
-                >
-                  Next
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!table.getCanNextPage()}
-                  onClick={() => {
-                    table.setPageIndex(pageCount - 1);
-                  }}
-                >
-                  Last
-                </Button>
-              </div>
+    <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+      <div
+        role="region"
+        aria-label="Keyword Analysis statistics"
+        className="space-y-3 rounded-lg border p-4"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold">Keyword Analysis</h4>
+              <HelpIcon
+                targetKey="analysis.token-frequency.statistical-measures"
+                label="Keyword Analysis"
+                tooltip="Comparative token-level keyness statistics for the two selected data blocks."
+              />
             </div>
-          )}
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground">No statistics available.</p>
-      )}
-    </div>
+            {hasCorpusLegend ? (
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      tabIndex={0}
+                      aria-label={`Reference: ${referenceNodeName ?? '—'}`}
+                      className="inline-flex cursor-help items-center gap-1.5"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 rounded-sm"
+                        style={{ backgroundColor: referenceColor ?? undefined }}
+                      />
+                      <span>Reference</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{referenceNodeName ?? '—'}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      tabIndex={0}
+                      aria-label={`Study: ${studyNodeName ?? '—'}`}
+                      className="inline-flex cursor-help items-center gap-1.5"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 rounded-sm"
+                        style={{ backgroundColor: studyColor ?? undefined }}
+                      />
+                      <span>Study</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{studyNodeName ?? '—'}</TooltipContent>
+                </Tooltip>
+              </div>
+            ) : null}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label="Download frequencies"
+            title="Download frequencies"
+            onClick={handleDownload}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {onTokenFilterChange ? (
+          <div className="flex flex-col gap-2 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="stats-token-filter" className="font-semibold">
+                Filter tokens
+              </Label>
+              <HelpIcon
+                targetKey="analysis.token-frequency.token-filter"
+                label="Token filter"
+                tooltip="Filter the list views and statistics table by token. Use * as a wildcard (e.g. pre* or *ing). Does not affect the word cloud view."
+              />
+            </div>
+            <div className="flex flex-1 items-center gap-2 sm:max-w-md">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                id="stats-token-filter"
+                placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
+                value={tokenFilter}
+                onChange={(event) => {
+                  onTokenFilterChange(event.target.value);
+                }}
+                className="h-8"
+              />
+              {tokenFilter ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onTokenFilterChange('');
+                  }}
+                >
+                  Clear
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {tokenFilter ? (
+          <p className="text-xs text-muted-foreground">
+            {filteredCount} match{filteredCount !== 1 ? 'es' : ''} of {totalCount}
+          </p>
+        ) : null}
+
+        {totalCount > 0 ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-300 border-collapse text-sm">
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id} className="border-b text-left">
+                      {headerGroup.headers.map((header) => {
+                        const sortDir = header.column.getIsSorted();
+                        const tooltip =
+                          STATISTICS_COLUMN_TOOLTIPS[header.id] ??
+                          'Click to sort the statistics table by this column.';
+                        return (
+                          <th key={header.id} className="px-2 py-2 whitespace-nowrap">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-auto px-0"
+                                  onClick={header.column.getToggleSortingHandler()}
+                                >
+                                  {flexRender(header.column.columnDef.header, header.getContext())}
+                                  {sortDir === 'asc' ? (
+                                    <ArrowUp className="ml-1 h-3.5 w-3.5" />
+                                  ) : sortDir === 'desc' ? (
+                                    <ArrowDown className="ml-1 h-3.5 w-3.5" />
+                                  ) : (
+                                    <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-40" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+                            </Tooltip>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr key={row.id} className="border-b last:border-b-0">
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="px-2 py-1 whitespace-nowrap tabular-nums">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredCount === 0 ? (
+              <p className="text-sm text-muted-foreground">No tokens match the current filter.</p>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Label htmlFor="stats-rows-per-page" className="text-xs text-muted-foreground">
+                    Rows per page
+                  </Label>
+                  <Input
+                    id="stats-rows-per-page"
+                    type="number"
+                    min={5}
+                    max={200}
+                    value={pageSize}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isFinite(next) && next >= 5 && next <= 200) {
+                        table.setPageSize(next);
+                      }
+                    }}
+                    className="h-8 w-20"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!table.getCanPreviousPage()}
+                    onClick={() => {
+                      table.setPageIndex(0);
+                    }}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!table.getCanPreviousPage()}
+                    onClick={() => {
+                      table.previousPage();
+                    }}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Page {pageIndex + 1} / {pageCount}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!table.getCanNextPage()}
+                    onClick={() => {
+                      table.nextPage();
+                    }}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!table.getCanNextPage()}
+                    onClick={() => {
+                      table.setPageIndex(pageCount - 1);
+                    }}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">No statistics available.</p>
+        )}
+      </div>
+    </TooltipProvider>
   );
 };

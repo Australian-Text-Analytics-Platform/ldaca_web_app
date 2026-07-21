@@ -15,8 +15,9 @@
  * panel content.
  */
 import { type ReactNode } from 'react';
-import { ChromeTabs, type ChromeTabItem } from '@/components/tabs';
 import type { AnalysisTab } from '@/api';
+import { type ChromeTabItem, ChromeTabs } from '@/components/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 export interface AnalysisTabbedPanelProps {
@@ -55,7 +56,7 @@ export function AnalysisTabbedPanel({
 }: AnalysisTabbedPanelProps) {
   const items: ChromeTabItem[] = tabs.map((tab) => ({
     id: tab.tab_id,
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty title should fall back to 'Untitled'
+
     title: tab.title || 'Untitled',
   }));
 
@@ -76,14 +77,15 @@ export function AnalysisTabbedPanel({
         />
       ) : null}
 
-      <div
+      <ScrollArea
+        scrollbars="both"
         className={cn(
-          'min-h-0 flex-1 overflow-auto rounded-xl border border-border/60 bg-white p-4 shadow-sm',
+          'min-h-0 flex-1 rounded-xl border border-border/60 bg-white shadow-sm',
           multiTabEnabled ? '-mt-px border-t-0' : null,
         )}
       >
-        {children}
-      </div>
+        <div className="min-h-full p-4">{children}</div>
+      </ScrollArea>
     </div>
   );
 }

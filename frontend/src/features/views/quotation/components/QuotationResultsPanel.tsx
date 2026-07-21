@@ -17,7 +17,7 @@ import {
   resolveQuotationMetadataColumns,
   type QuotationResultRow,
 } from '../quotationResultsModel';
-import type { MaterializeSummary, QuotationResultState } from '../hooks/useQuotationResultControls';
+import type { QuotationResultState } from '../hooks/useQuotationResultControls';
 import { type QuotationHoverState } from './QuotationHighlightedCell';
 import { QuotationNodeBlock } from './QuotationNodeBlock';
 
@@ -36,15 +36,11 @@ interface QuotationResultsPanelProps {
   onContextLengthKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   hoverState: QuotationHoverState | null;
   onHoverChange: (state: QuotationHoverState | null) => void;
-  materializedPaths: Record<string, string>;
-  materializeSummary: MaterializeSummary | null;
-  nodeMaterializing: Record<string, boolean>;
   nodeDetaching: Record<string, boolean>;
   onSort: (nodeId: string, columnName: string) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onRowClick: (row: QuotationResultRow) => void;
-  onMaterialize: (nodeId: string) => void;
   onOpenDetachDialog: (nodeId: string) => void;
 }
 
@@ -55,7 +51,7 @@ interface QuotationResultsPanelProps {
  * the feature shell can stay focused on lifecycle and request wiring.
  * Flow: derive available metadata columns from the active result, render shared
  * result controls, then render each selected node through QuotationNodeBlock
- * with pagination, sorting, materialization, and detach actions wired back to
+ * with pagination, sorting, and detach actions wired back to
  * the feature hooks.
  */
 export function QuotationResultsPanel({
@@ -73,15 +69,11 @@ export function QuotationResultsPanel({
   onContextLengthKeyDown,
   hoverState,
   onHoverChange,
-  materializedPaths,
-  materializeSummary,
-  nodeMaterializing,
   nodeDetaching,
   onSort,
   onPageChange,
   onPageSizeChange,
   onRowClick,
-  onMaterialize,
   onOpenDetachDialog,
 }: QuotationResultsPanelProps) {
   const metadataNodeId = displayedNodes[0]?.id ?? '';
@@ -170,8 +162,6 @@ export function QuotationResultsPanel({
           const rowsWithQuotes = filterQuotationRowsWithQuotes(resultState?.rows);
           const visibleMetadataColumns = showMetadata ? resolvedMetadataColumns : [];
           const cols = buildQuotationDisplayColumns(visibleMetadataColumns);
-          const materialized = Boolean(materializedPaths[nodeId]);
-
           return (
             <QuotationNodeBlock
               key={nodeId}
@@ -192,61 +182,12 @@ export function QuotationResultsPanel({
               }}
               pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
               pageSizeSummary={
-                materialized ? (
-                  materializeSummary ? (
-                    <GroupedResultsPageSizeSummary
-                      groups={[]}
-                      totalInstances={materializeSummary.recordCount}
-                      totalDocuments={materializeSummary.uniqueDocuments}
-                      totalProcessed={materializeSummary.totalDocuments}
-                    />
-                  ) : (
-                    // Materialise summary not yet hydrated (for example, the
-                    // task-request fetch is mid-flight after Process All). Fall
-                    // back to the pagination total until the document
-                    // breakdown lands.
-                    <>
-                      (Found {(resultState?.pagination.total_source_rows ?? 0).toLocaleString()}{' '}
-                      {(resultState?.pagination.total_source_rows ?? 0) === 1
-                        ? 'quotation'
-                        : 'quotations'}{' '}
-                      across the materialised corpus.)
-                    </>
-                  )
-                ) : (
-                  <GroupedResultsPageSizeSummary
-                    groups={resultState?.groupedRows ?? []}
-                    totalProcessed={resultState?.pagination.page_size}
-                  />
-                )
+                <GroupedResultsPageSizeSummary
+                  groups={resultState?.groupedRows ?? []}
+                  totalProcessed={resultState?.pagination.page_size}
+                />
               }
             >
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  onMaterialize(nodeId);
-                }}
-                disabled={
-                  Boolean(nodeMaterializing[nodeId]) ||
-                  materialized ||
-                  Boolean(nodeDetaching[nodeId])
-                }
-                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
-              >
-                {nodeMaterializing[nodeId] ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing…
-                  </>
-                ) : materialized ? (
-                  <>Processed</>
-                ) : (
-                  <>Process All</>
-                )}
-              </Button>
               <Button
                 type="button"
                 size="sm"

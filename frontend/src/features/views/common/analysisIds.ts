@@ -1,15 +1,14 @@
 /**
- * Canonical ids shared by analysis tab sidecars, task hydration, and task-status
- * subscriptions.
+ * Canonical analysis kinds shared by server-owned tabs and feature routing.
  * Used by: the view registry, analysis feature configs, and task-stream
  * helpers so one logical analysis id is not repeated as unrelated literals.
  */
 export const ANALYSIS_TAB_GROUPS = {
   annotation: 'annotation',
-  concordance: 'concordance_analysis',
-  quotation: 'quotation_analysis',
-  sequential: 'sequential_analysis',
-  tokenFrequencies: 'token_frequencies',
+  concordance: 'concordance',
+  quotation: 'quotation',
+  sequential: 'sequential',
+  tokenFrequencies: 'token_frequency',
   topicModeling: 'topic_modeling',
 } as const;
 
@@ -19,8 +18,8 @@ export type LastRunAnalysisType = Exclude<AnalysisTabGroup, typeof ANALYSIS_TAB_
 export const ANALYSIS_TASK_TYPES = {
   concordance: 'concordance',
   quotation: 'quotation',
-  sequential: 'sequential_analysis',
-  tokenFrequencies: 'token_frequencies',
+  sequential: 'sequential',
+  tokenFrequencies: 'token_frequency',
   topicModeling: 'topic_modeling',
 } as const;
 

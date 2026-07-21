@@ -46,14 +46,12 @@ import {
 import {
   CONCORDANCE_DISPERSION_CHART_MODES,
   buildDispersionBins,
-  buildDispersionBinsFromBinned,
   DISPERSION_AGGREGATE_KEY,
   DISPERSION_DISPLAY_BIN_COUNTS,
   DISPERSION_SOURCE_DELIMITER,
   type ConcordanceDispersionChartMode,
   type ConcordanceDispersionRow,
   type DispersionDisplayBinCount,
-  type TaggedBinRow,
 } from '../concordanceDispersionDomain';
 
 interface Props {
@@ -68,18 +66,6 @@ interface Props {
   /** Human-readable label for the data block (used in title and download filename). */
   dataBlockLabel: string;
   searchWord: string;
-  /**
-   * When provided (i.e. node is materialised and the server-side 100-bin
-   * histogram has been fetched), the plot is re-aggregated from these counts
-   * instead of from the current page rows.
-   */
-  materialisedBins?: TaggedBinRow[];
-  /**
-   * True once this block (or every underlying block, in combined view) has
-   * been processed. Drives whether the scope dropdown can select
-   * "whole data block" after the server-side histogram rows are available.
-   */
-  materialised?: boolean;
   /**
    * When true (i.e. "Colour matches" is off), all hits are plotted as a single
    * aggregate line in a default colour, with no per-matched-text breakdown.
@@ -247,8 +233,6 @@ export function ConcordanceDispersionSummary({
   hiddenMatchedTexts,
   dataBlockLabel,
   searchWord,
-  materialisedBins,
-  materialised = false,
   aggregateAll = false,
   chartMode = 'density',
   onChartModeChange,
@@ -264,51 +248,13 @@ export function ConcordanceDispersionSummary({
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [dragSelection, setDragSelection] = useState<DragSelection | null>(null);
 
-  const materialisedBinsReady = !!materialisedBins;
-  const [showAllProcessed, setShowAllProcessed] = useState<boolean>(materialisedBinsReady);
-  // Auto-enable the scope dropdown the *first* time the corpus bins finish
-  // loading (so a fresh materialisation immediately switches the plot to
-  // whole-data-block mode once the data is actually ready). After that,
-  // respect the user's manual choice — otherwise a transient false→true
-  // flip in `materialisedBins` (e.g. workspace navigation) would re-select
-  // an option the user had just deselected. React-blessed render-time
-  // set-state pattern, gated by a sticky flag.
-  const [hasAutoEnabledShowAll, setHasAutoEnabledShowAll] =
-    useState<boolean>(materialisedBinsReady);
-  if (materialisedBinsReady && !hasAutoEnabledShowAll) {
-    setHasAutoEnabledShowAll(true);
-    setShowAllProcessed(true);
-  }
-
-  // The plot only switches data sources once the server-side bin histogram
-  // has been fetched. Until then, even with the scope set to whole-corpus,
-  // we keep showing the current page.
-  const useMaterialised = materialised && showAllProcessed && materialisedBinsReady;
-  const materialisedScopeReady = materialised && materialisedBinsReady;
-
   const { bins, sources, totalsByKey } = useMemo(() => {
-    if (useMaterialised) {
-      return buildDispersionBinsFromBinned(materialisedBins, binCount, {
-        lowercaseMatches,
-        splitBySource,
-        aggregateAll,
-      });
-    }
     return buildDispersionBins(rows, textColumn, binCount, {
       lowercaseMatches,
       splitBySource,
       aggregateAll,
     });
-  }, [
-    useMaterialised,
-    materialisedBins,
-    rows,
-    textColumn,
-    binCount,
-    lowercaseMatches,
-    splitBySource,
-    aggregateAll,
-  ]);
+  }, [rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll]);
 
   /**
    * Per-matched-text totals across every bin in the displayed graph.
@@ -370,8 +316,7 @@ export function ConcordanceDispersionSummary({
     });
   }, [onLegendCountsChange, totalsByText, selectedTotalsByText]);
 
-  const aggregationLabel = useMaterialised ? 'whole data block' : 'page above';
-  const titleText = `${dataBlockLabel}: aggregated matches at relative locations of documents from ${aggregationLabel}`;
+  const titleText = `${dataBlockLabel}: aggregated matches at relative locations of documents from page above`;
   const chartTitle = `${CHART_MODE_LABELS[chartMode]} dispersion`;
 
   const visibleTexts = useMemo(
@@ -773,27 +718,9 @@ export function ConcordanceDispersionSummary({
       </CardContent>
       <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center gap-2 text-foreground">
-          <span>{dataBlockLabel}: aggregated matches at relative locations of documents from</span>
-          <Select
-            value={materialisedScopeReady && showAllProcessed ? 'whole' : 'page'}
-            disabled={!materialisedScopeReady}
-            onValueChange={(value) => {
-              setShowAllProcessed(value === 'whole');
-            }}
-          >
-            <SelectTrigger
-              aria-label="Aggregation scope"
-              className="h-8 w-48 px-2 py-1 font-medium"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="page">page above</SelectItem>
-                {materialisedScopeReady && <SelectItem value="whole">whole data block</SelectItem>}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <span>
+            {dataBlockLabel}: aggregated matches at relative locations of documents from page above
+          </span>
         </div>
         {splitBySource && sources.length > 0 && (
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">

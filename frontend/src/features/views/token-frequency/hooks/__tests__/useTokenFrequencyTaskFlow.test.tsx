@@ -1,18 +1,18 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useTokenFrequencyTaskFlow } from '../useTokenFrequencyTaskFlow';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/features/views/viewIds';
 
-const { calculateTokenFrequenciesMock, createConcordanceTabMock } = vi.hoisted(() => ({
-  calculateTokenFrequenciesMock: vi.fn(),
+const { submitTabAnalysisMock, createConcordanceTabMock } = vi.hoisted(() => ({
+  submitTabAnalysisMock: vi.fn(),
   createConcordanceTabMock: vi.fn(),
 }));
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  calculateTokenFrequencies: calculateTokenFrequenciesMock,
+  submitTabAnalysis: submitTabAnalysisMock,
 }));
 
 vi.mock('@/features/views/common/tabs/useWorkspaceTabs', () => ({
@@ -21,10 +21,16 @@ vi.mock('@/features/views/common/tabs/useWorkspaceTabs', () => ({
 
 describe('useTokenFrequencyTaskFlow', () => {
   beforeEach(() => {
-    calculateTokenFrequenciesMock.mockReset();
+    submitTabAnalysisMock.mockReset();
     createConcordanceTabMock.mockReset();
-    calculateTokenFrequenciesMock.mockResolvedValue({
-      data: { state: 'running', metadata: { task_id: 'task-1' } },
+    createConcordanceTabMock.mockResolvedValue({ id: 'concordance-tab' });
+    submitTabAnalysisMock.mockResolvedValue({
+      data: {
+        id: 'analysis-1',
+        kind: 'token_frequency',
+        state: 'queued',
+        request: {},
+      },
     });
   });
 
@@ -41,6 +47,7 @@ describe('useTokenFrequencyTaskFlow', () => {
       useTokenFrequencyTaskFlow({
         state: {
           currentWorkspaceId: 'workspace-1',
+          tabId: 'tab-1',
           panelNodeIds: ['node-1'],
           panelSelectedNodes: [{ id: 'node-1', name: 'Corpus' }],
           effectiveNodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
@@ -75,18 +82,21 @@ describe('useTokenFrequencyTaskFlow', () => {
       await result.current.handleAnalyze();
     });
 
-    expect(calculateTokenFrequenciesMock).toHaveBeenCalledWith(
+    expect(submitTabAnalysisMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
         body: expect.objectContaining({
+          kind: 'token_frequency',
           node_ids: ['node-1'],
           node_columns: { 'node-1': 'text' },
+          node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
           stop_words: ['and', 'the'],
         }),
       }),
     );
-    expect(calculateTokenFrequenciesMock.mock.calls[0]?.[0]?.body).not.toHaveProperty('tab_id');
-    expect(setLocalTaskId).toHaveBeenCalledWith('task-1');
-    expect(onTaskIdAssigned).toHaveBeenCalledWith('task-1');
+    expect(submitTabAnalysisMock.mock.calls[0]?.[0]?.body).not.toHaveProperty('tab_id');
+    expect(setLocalTaskId).toHaveBeenCalledWith('analysis-1');
+    expect(onTaskIdAssigned).toHaveBeenCalledWith('analysis-1');
   });
 
   // Two-node comparison fixture shared by the token-click handoff tests below.
@@ -138,7 +148,7 @@ describe('useTokenFrequencyTaskFlow', () => {
       }),
     );
 
-  it('scopes the concordance handoff to the clicked node when a source id is given', () => {
+  it('scopes the concordance handoff to the clicked node when a source id is given', async () => {
     const replaceSelectedNodes = vi.fn<(nodeIds: string[], activeNodeId?: string | null) => void>();
     const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
     const setCurrentView = vi.fn<(view: ViewType) => void>();
@@ -153,20 +163,23 @@ describe('useTokenFrequencyTaskFlow', () => {
       result.current.handleTokenClick('hello', 'node-2');
     });
 
-    expect(replaceSelectedNodes).toHaveBeenCalledWith(['node-2'], 'node-2');
-    expect(setPendingConcordance).toHaveBeenCalledWith(
-      expect.objectContaining({
-        searchWord: 'hello',
-        selectedNodes: [{ id: 'node-2', name: 'Corpus B' }],
-        nodeColumnSelections: [{ nodeId: 'node-2', column: 'text' }],
-        autoRun: true,
-      }),
-    );
-    expect(setCurrentView).toHaveBeenCalledWith('concordance');
     expect(createConcordanceTabMock).toHaveBeenCalledWith('hello');
+    await waitFor(() => {
+      expect(replaceSelectedNodes).toHaveBeenCalledWith(['node-2'], 'node-2');
+      expect(setPendingConcordance).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetTabId: 'concordance-tab',
+          searchWord: 'hello',
+          selectedNodes: [{ id: 'node-2', name: 'Corpus B' }],
+          nodeColumnSelections: [{ nodeId: 'node-2', column: 'text' }],
+          autoRun: true,
+        }),
+      );
+      expect(setCurrentView).toHaveBeenCalledWith('concordance');
+    });
   });
 
-  it('keeps both compared nodes when no source id is given', () => {
+  it('keeps both compared nodes when no source id is given', async () => {
     const replaceSelectedNodes = vi.fn<(nodeIds: string[], activeNodeId?: string | null) => void>();
     const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
     const setCurrentView = vi.fn<(view: ViewType) => void>();
@@ -181,20 +194,56 @@ describe('useTokenFrequencyTaskFlow', () => {
       result.current.handleTokenClick('hello');
     });
 
-    expect(replaceSelectedNodes).toHaveBeenCalledWith(['node-1', 'node-2'], 'node-2');
-    expect(setPendingConcordance).toHaveBeenCalledWith(
-      expect.objectContaining({
-        searchWord: 'hello',
-        selectedNodes: [
-          { id: 'node-1', name: 'Corpus A' },
-          { id: 'node-2', name: 'Corpus B' },
-        ],
-        nodeColumnSelections: [
-          { nodeId: 'node-1', column: 'text' },
-          { nodeId: 'node-2', column: 'text' },
-        ],
-        autoRun: true,
-      }),
+    await waitFor(() => {
+      expect(replaceSelectedNodes).toHaveBeenCalledWith(['node-1', 'node-2'], 'node-2');
+      expect(setPendingConcordance).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetTabId: 'concordance-tab',
+          searchWord: 'hello',
+          selectedNodes: [
+            { id: 'node-1', name: 'Corpus A' },
+            { id: 'node-2', name: 'Corpus B' },
+          ],
+          nodeColumnSelections: [
+            { nodeId: 'node-1', column: 'text' },
+            { nodeId: 'node-2', column: 'text' },
+          ],
+          autoRun: true,
+        }),
+      );
+    });
+  });
+
+  it('does not navigate until the destination tab has been created', async () => {
+    let resolveCreatedTab: ((value: { id: string }) => void) | undefined;
+    createConcordanceTabMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCreatedTab = resolve;
+        }),
     );
+    const setPendingConcordance = vi.fn<(payload: PendingConcordance) => void>();
+    const setCurrentView = vi.fn<(view: ViewType) => void>();
+    const { result } = renderTwoNodeFlow({
+      replaceSelectedNodes: vi.fn(),
+      setPendingConcordance,
+      setCurrentView,
+    });
+
+    act(() => {
+      result.current.handleTokenClick('hello');
+    });
+
+    expect(setPendingConcordance).not.toHaveBeenCalled();
+    expect(setCurrentView).not.toHaveBeenCalled();
+
+    resolveCreatedTab?.({ id: 'delayed-tab' });
+
+    await waitFor(() => {
+      expect(setPendingConcordance).toHaveBeenCalledWith(
+        expect.objectContaining({ targetTabId: 'delayed-tab' }),
+      );
+      expect(setCurrentView).toHaveBeenCalledWith('concordance');
+    });
   });
 });

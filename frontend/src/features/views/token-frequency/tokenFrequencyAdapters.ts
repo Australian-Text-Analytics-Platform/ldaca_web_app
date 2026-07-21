@@ -85,10 +85,7 @@ export const buildResponseDisplayNameHints = (
   results?: TokenFrequencyResponse | null,
 ): Record<string, string> => {
   const mapping: Record<string, string> = {};
-  const metadataNodeNames = (results?.metadata?.node_display_names ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const metadataNodeNames = (results?.metadata.node_display_names ?? {}) as Record<string, unknown>;
   if (typeof metadataNodeNames === 'object') {
     Object.entries(metadataNodeNames).forEach(([id, name]) => {
       if (isNonEmptyString(name)) {

@@ -1,28 +1,27 @@
 import type { ClearAnalysisUiOptions } from './hooks/useAnalysisFeature';
 
 interface ExecuteAnalysisRerunArgs {
-  /** True when current parameters or inputs differ from the last completed run. */
-  hasUnrunChanges: boolean;
-  clearResults: (options?: ClearAnalysisUiOptions) => Promise<void>;
+  /** True when the owning Tab currently references a root Analysis. */
+  hasAttachedAnalysis: boolean;
+  clearResults: (options?: ClearAnalysisUiOptions) => Promise<boolean>;
   runFreshAnalysis: () => Promise<void>;
-  clearOptionsOnRerun?: ClearAnalysisUiOptions;
 }
 
 /**
  * Shared branch for the Run/Re-run button.
  *
- * Before a re-run, clear the previous task/result so the new request owns the
- * tab state; otherwise run directly. Keeps this clear-then-run behavior
- * consistent across analysis features without leaking old selection-model details.
+ * Before a re-run, clear the Tab's attached Analysis so the replacement request
+ * can become its single root Analysis; otherwise run directly. A failed clear
+ * aborts submission and leaves the existing local state intact.
  */
 export const executeAnalysisRerun = async ({
-  hasUnrunChanges,
+  hasAttachedAnalysis,
   clearResults,
   runFreshAnalysis,
-  clearOptionsOnRerun,
 }: ExecuteAnalysisRerunArgs): Promise<void> => {
-  if (hasUnrunChanges) {
-    await clearResults(clearOptionsOnRerun);
+  if (hasAttachedAnalysis) {
+    const cleared = await clearResults({ preserveLocalState: true });
+    if (!cleared) return;
   }
 
   await runFreshAnalysis();

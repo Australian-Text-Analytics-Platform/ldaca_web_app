@@ -16,16 +16,21 @@
  * - AnalysisTabbedPanel (create/close/rename/reorder, body-connected look).
  * - WorkspaceSelectionTabs (activate/close/reorder for multi-selected nodes).
  */
+
+import { Plus, X } from 'lucide-react';
 import {
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   useEffect,
   useReducer,
   useRef,
   useState,
-  type KeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  chromeTabsInteractionReducer,
+  createChromeTabsInteractionState,
+} from './chromeTabsInteractionState';
 import {
   closestIndex,
   computeContentTabWidths,
@@ -34,10 +39,6 @@ import {
   moveInOrder,
   TAB_MAX_WIDTH,
 } from './chromeTabsLayout';
-import {
-  chromeTabsInteractionReducer,
-  createChromeTabsInteractionState,
-} from './chromeTabsInteractionState';
 
 export interface ChromeTabItem {
   id: string;
@@ -297,7 +298,7 @@ export function ChromeTabs({
   return (
     <div
       ref={scrollRef}
-      className={cn('relative overflow-x-auto', className)}
+      className={cn('relative overflow-x-auto overflow-y-hidden', className)}
       role="tablist"
       aria-label={ariaLabel}
     >

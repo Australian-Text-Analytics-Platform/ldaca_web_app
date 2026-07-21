@@ -3,29 +3,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useConcordanceTaskFlow } from '../useConcordanceTaskFlow';
 
-const { runConcordanceMock } = vi.hoisted(() => ({
-  runConcordanceMock: vi.fn(),
-}));
-
-vi.mock('@/api', async (importOriginal) => ({
-  ...(await importOriginal()),
-  runConcordance: runConcordanceMock,
-}));
+const submitTabAnalysis = vi.hoisted(() => vi.fn());
+vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal()), submitTabAnalysis }));
 
 describe('useConcordanceTaskFlow', () => {
   beforeEach(() => {
-    runConcordanceMock.mockReset();
-    runConcordanceMock.mockResolvedValue({
-      data: { state: 'running', metadata: { task_id: 'concordance-task-1' } },
-    });
+    vi.clearAllMocks();
+    submitTabAnalysis.mockResolvedValue({ data: { id: 'analysis-1', state: 'queued' } });
   });
 
-  it('submits a token handoff from its snapshot instead of stale rendered form state', async () => {
+  it('submits a token handoff as a canonical tab-owned analysis', async () => {
     const onTaskIdAssigned = vi.fn();
+    const setIsSearching = vi.fn();
     const { result } = renderHook(() =>
       useConcordanceTaskFlow({
         state: {
           currentWorkspaceId: 'workspace-1',
+          tabId: 'tab-1',
           searchWord: '',
           activeNodeIds: [],
           effectiveNodeColumnSelections: [],
@@ -42,21 +36,19 @@ describe('useConcordanceTaskFlow', () => {
         },
         actions: {
           setNodePagination: vi.fn(),
-          setViewMode: vi.fn(),
-          setIsSearching: vi.fn(),
+          setIsSearching,
           setResults: vi.fn(),
           setLocalTaskId: vi.fn(),
+          runningRef: { current: false },
+          lastFetchedRef: { current: { taskId: null, state: null } },
           setNodeLoading: vi.fn(),
           setNodeDetaching: vi.fn(),
-          setNodeMaterializing: vi.fn(),
-          setMaterializeTaskIds: vi.fn(),
           onTaskIdAssigned,
         },
         lock: {
-          resolveTaskId: vi.fn(() => Promise.resolve(null)),
+          resolveTaskId: vi.fn(async () => null),
           detachConcordance: vi.fn(),
           detachConcordanceDispersion: vi.fn(),
-          materializeConcordance: vi.fn(),
         },
       }),
     );
@@ -69,15 +61,18 @@ describe('useConcordanceTaskFlow', () => {
       });
     });
 
-    expect(runConcordanceMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        body: expect.objectContaining({
-          node_ids: ['node-1'],
-          node_columns: { 'node-1': 'text' },
-          search_word: 'keyword',
-        }),
+    expect(submitTabAnalysis).toHaveBeenCalledWith({
+      body: expect.objectContaining({
+        kind: 'concordance',
+        node_ids: ['node-1'],
+        node_columns: { 'node-1': 'text' },
+        search_word: 'keyword',
       }),
-    );
-    expect(onTaskIdAssigned).toHaveBeenCalledWith('concordance-task-1');
+      path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
+      throwOnError: true,
+    });
+    expect(onTaskIdAssigned).toHaveBeenCalledWith('analysis-1');
+    expect(setIsSearching).toHaveBeenCalledTimes(1);
+    expect(setIsSearching).toHaveBeenCalledWith(true);
   });
 });

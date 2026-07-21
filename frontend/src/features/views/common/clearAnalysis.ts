@@ -1,4 +1,4 @@
-import { clearTask } from '@/api';
+import { clearTabAnalysis } from '@/api';
 import { collectTaskIds } from '@/features/views/common/analysisTaskUtils';
 import { lastRunRequestQueryKey, type LastRunAnalysisType } from './hooks/useLastRunRequest';
 
@@ -7,12 +7,13 @@ interface QueryClientLike {
 }
 
 /**
- * Describes the clear workflow shared by analysis features that mirror task
- * state in both the backend task cache and local UI state.
+ * Describes the clear workflow shared by Analysis features that mirror backend
+ * lifecycle state in the local UI.
  */
 export interface ClearAnalysisOptions {
   analysisType: LastRunAnalysisType;
   workspaceId: string;
+  tabId: string;
   queryClient: QueryClientLike;
   taskIdSources: (string | null | undefined)[];
   resolveTaskId?: () => Promise<string | null>;
@@ -20,15 +21,14 @@ export interface ClearAnalysisOptions {
 }
 
 /**
- * Clears backend task records, local task state, and the last-run request cache so
- * analysis feature hooks can reset without leaving stale running-task metadata.
- * Used by: useAnalysisFeature clear/cleanup flows because every task-backed tab must delete known task ids, invalidate task caches, and release local state together.
- * Flow: collect known/resolved task ids, clear them concurrently, report
- * individual failures, then invalidate the last-run query and invoke cleanup.
+ * Clears the Tab's attached backend Analysis, then cleans local state and
+ * invalidates the last-run request cache. Backend clear is the commit boundary:
+ * if it fails, the error propagates and local state remains unchanged.
  */
 export async function clearAnalysis({
   analysisType,
   workspaceId,
+  tabId,
   queryClient,
   taskIdSources,
   resolveTaskId,
@@ -37,30 +37,16 @@ export async function clearAnalysis({
   const initialIds = collectTaskIds(taskIdSources);
   let allTaskIds = initialIds;
 
-  try {
-    if (resolveTaskId) {
-      const resolvedId = await resolveTaskId();
-      allTaskIds = collectTaskIds([...initialIds, resolvedId]);
-    }
-
-    const settled = await Promise.allSettled(
-      allTaskIds.map((taskId) => clearTask({ path: { task_id: taskId }, throwOnError: true })),
-    );
-
-    settled.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.warn(
-          `[${analysisType}] Failed to clear task ${String(allTaskIds[index])}`,
-          result.reason,
-        );
-      }
-    });
-  } catch (error) {
-    console.warn(`[${analysisType}] Failed to clear tasks:`, error);
-  } finally {
-    onCleanup(allTaskIds);
-    void queryClient.invalidateQueries({
-      queryKey: lastRunRequestQueryKey(analysisType, workspaceId),
-    });
+  if (resolveTaskId) {
+    const resolvedId = await resolveTaskId();
+    allTaskIds = collectTaskIds([...initialIds, resolvedId]);
   }
+  await clearTabAnalysis({
+    path: { workspace_id: workspaceId, tab_id: tabId },
+    throwOnError: true,
+  });
+  onCleanup(allTaskIds);
+  void queryClient.invalidateQueries({
+    queryKey: lastRunRequestQueryKey(analysisType, workspaceId),
+  });
 }

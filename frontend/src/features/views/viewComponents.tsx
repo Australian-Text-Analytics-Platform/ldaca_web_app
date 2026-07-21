@@ -2,6 +2,7 @@ import { lazy, type ComponentProps, type ComponentType, type LazyExoticComponent
 import { ANALYSIS_TAB_GROUPS } from '@/features/views/common/analysisIds';
 import { AnalysisTabsHost } from '@/features/views/common/tabs/AnalysisTabsHost';
 import type { ViewType } from '@/features/views/viewIds';
+import { useAnalysisStore } from '@/stores/analysisStore';
 
 type AnalysisFeatureComponent = ComponentProps<typeof AnalysisTabsHost>['Feature'];
 
@@ -20,7 +21,18 @@ const createTabbedFeatureLoader = <TModule,>({
     const module = await load();
     const Feature = pickFeature(module);
     function TabbedFeature() {
-      return <AnalysisTabsHost tabGroup={tabGroup} Feature={Feature} />;
+      const preferredTabId = useAnalysisStore((state) =>
+        tabGroup === ANALYSIS_TAB_GROUPS.concordance
+          ? (state.pendingConcordance?.targetTabId ?? null)
+          : null,
+      );
+      return (
+        <AnalysisTabsHost
+          tabGroup={tabGroup}
+          Feature={Feature}
+          preferredTabId={preferredTabId}
+        />
+      );
     }
     TabbedFeature.displayName = displayName;
     return { default: TabbedFeature };

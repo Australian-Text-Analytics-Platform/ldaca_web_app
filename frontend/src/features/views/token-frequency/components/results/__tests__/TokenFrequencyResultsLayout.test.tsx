@@ -1,12 +1,13 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { TokenFrequencySingleTokenSection } from '../TokenFrequencySingleTokenSection';
-import { TokenFrequencyUnifiedTokenSection } from '../TokenFrequencyUnifiedTokenSection';
 import type {
   NodeResultView,
   TokenFrequencyStatisticsEntry,
 } from '@/features/views/token-frequency/tokenFrequencyAdapters';
+import { TokenFrequencySingleTokenSection } from '../TokenFrequencySingleTokenSection';
+import { TokenFrequencyUnifiedTokenSection } from '../TokenFrequencyUnifiedTokenSection';
 
 vi.mock('@/components/help/HelpIcon', () => ({
   default: () => <span data-testid="help-icon" />,
@@ -108,6 +109,8 @@ const baseUnifiedSectionProps = {
   registerWordCloudRef: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
   view: 'cloud' as const,
+  tokenFilter: '',
+  onTokenFilterChange: vi.fn(),
 };
 
 describe('Token frequency result layouts', () => {
@@ -134,13 +137,14 @@ describe('Token frequency result layouts', () => {
     expect(screen.getAllByText('token-50').length).toBeGreaterThan(0);
   });
 
-  it('shows the unified card only when two node results are available', () => {
+  it('shows the unified card only when two node results are available', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(<TokenFrequencyUnifiedTokenSection {...baseUnifiedSectionProps} />);
 
     expect(screen.queryByText('Juxtorpus')).not.toBeInTheDocument();
 
-    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Node A' });
-    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Node B' });
+    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
+    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
     const statistics = [buildStatistic()];
 
     rerender(
@@ -150,9 +154,188 @@ describe('Token frequency result layouts', () => {
         nodeDisplayResults={[nodeA, nodeB]}
         lastCompareNodeIds={['node-a', 'node-b']}
         statistics={statistics}
+        computeDisplayName={(nodeId) =>
+          nodeId === 'node-a' ? 'Reference Data Block' : 'Study Data Block'
+        }
+        getColorForNode={(_nodeId, index) => (index === 0 ? '#2563eb' : '#dc2626')}
       />,
     );
 
     expect(screen.getByText('Juxtorpus')).toBeInTheDocument();
+    expect(screen.queryByText('Reference Data Block')).not.toBeInTheDocument();
+    expect(screen.queryByText('Study Data Block')).not.toBeInTheDocument();
+    const colorScale = within(screen.getByLabelText('Reference to Study color scale'));
+    expect(colorScale.getByText('Reference')).toBeInTheDocument();
+    expect(colorScale.getByText('Study')).toBeInTheDocument();
+
+    const referenceTrigger = colorScale.getByLabelText('Reference: Reference Data Block');
+    const studyTrigger = colorScale.getByLabelText('Study: Study Data Block');
+
+    expect(referenceTrigger).toHaveTextContent('Reference');
+    expect(studyTrigger).toHaveTextContent('Study');
+
+    await user.hover(referenceTrigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Reference Data Block');
+  });
+
+  it('shows the Study Data Block name from the combined Study legend trigger', async () => {
+    const user = userEvent.setup();
+    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
+    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
+
+    render(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={[buildStatistic()]}
+      />,
+    );
+
+    const colorScale = within(screen.getByLabelText('Reference to Study color scale'));
+    const studyTrigger = colorScale.getByLabelText('Study: Study Data Block');
+
+    expect(studyTrigger).toHaveTextContent('Study');
+    await user.hover(studyTrigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Study Data Block');
+  });
+
+  it('keeps the token filter and compact corpus legend inside the statistics card', async () => {
+    const user = userEvent.setup();
+    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
+    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
+
+    render(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={[buildStatistic()]}
+        computeDisplayName={(nodeId) =>
+          nodeId === 'node-a' ? 'Reference Data Block' : 'Study Data Block'
+        }
+        view="list"
+      />,
+    );
+
+    const statisticsCard = screen.getByRole('region', {
+      name: 'Keyword Analysis statistics',
+    });
+
+    expect(within(statisticsCard).getByRole('textbox')).toHaveAttribute(
+      'placeholder',
+      'Filter tokens (use * as wildcard, e.g. pre* or *ing)',
+    );
+    expect(
+      within(statisticsCard).getByLabelText('Reference: Reference Data Block'),
+    ).toBeInTheDocument();
+    expect(within(statisticsCard).getByLabelText('Study: Study Data Block')).toBeInTheDocument();
+    expect(within(statisticsCard).queryByText(/Reference corpus:/)).toBeNull();
+
+    await user.hover(within(statisticsCard).getByLabelText('Reference: Reference Data Block'));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Reference Data Block');
+
+    expect(within(statisticsCard).getByLabelText('Study: Study Data Block')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['Token', 'The token being compared across the Reference and Study Data Blocks.'],
+    ['OR', 'Observed frequency: the token count in the Reference Data Block.'],
+    ['%R', 'The token count as a percentage of all tokens in the Reference Data Block.'],
+    ['OS', 'Observed frequency: the token count in the Study Data Block.'],
+    ['%S', 'The token count as a percentage of all tokens in the Study Data Block.'],
+    [
+      'LL',
+      'Log-likelihood score measuring the strength of the frequency difference between the two Data Blocks.',
+    ],
+    ['Overuse', 'Which Data Block has the higher observed token frequency: Reference or Study.'],
+    [
+      'Signed LL',
+      'The log-likelihood score, positive when Study has the higher frequency and negative when Reference does.',
+    ],
+    [
+      '%DIFF',
+      'Reference relative frequency minus Study relative frequency, shown as a percentage.',
+    ],
+    [
+      'Bayes',
+      'A BIC-adjusted evidence score for the frequency difference; larger values indicate stronger evidence.',
+    ],
+    [
+      'ELL',
+      'ELL effect-size estimate for the frequency difference, adjusted for corpus size and expected frequency.',
+    ],
+    [
+      'RRisk',
+      'Reference relative frequency divided by Study relative frequency; 1 means equal relative frequency.',
+    ],
+    [
+      'LogRatio',
+      'Natural logarithm of the Reference-to-Study relative-frequency ratio; 0 means equal relative frequency.',
+    ],
+    ['OddsRatio', 'Reference token odds divided by Study token odds; 1 means equal odds.'],
+    [
+      'Significance',
+      'Significance level derived from log likelihood: more stars indicate stronger evidence of a difference.',
+    ],
+  ])('immediately explains the %s statistics header', async (header, explanation) => {
+    const user = userEvent.setup();
+    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
+    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
+
+    render(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={[buildStatistic()]}
+        view="list"
+      />,
+    );
+
+    const statisticsCard = screen.getByRole('region', {
+      name: 'Keyword Analysis statistics',
+    });
+    await user.hover(within(statisticsCard).getByRole('button', { name: header }));
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent(explanation);
+  });
+
+  it('labels numeric-string frequency direction as Reference or Study', () => {
+    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
+    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
+
+    render(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={[
+          buildStatistic({ token: 'reference-token', freq_reference: '59', freq_study: '8' }),
+          buildStatistic({ token: 'study-token', freq_reference: '8', freq_study: '59' }),
+        ]}
+        getColorForNode={(_nodeId, index) => (index === 0 ? '#2563eb' : '#dc2626')}
+        view="list"
+      />,
+    );
+
+    const statisticsCard = within(
+      screen.getByRole('region', {
+        name: 'Keyword Analysis statistics',
+      }),
+    );
+    const referenceBadge = within(
+      statisticsCard.getByRole('row', { name: /reference-token/ }),
+    ).getByText('Reference');
+    const studyBadge = within(statisticsCard.getByRole('row', { name: /study-token/ })).getByText(
+      'Study',
+    );
+
+    expect(referenceBadge).toHaveStyle({ backgroundColor: '#2563eb' });
+    expect(studyBadge).toHaveStyle({ backgroundColor: '#dc2626' });
   });
 });

@@ -20,11 +20,10 @@
  * ownership or persisted state.
  */
 import { useEffect, useRef, type ComponentType } from 'react';
-import type { AnalysisTabInput } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useUserPreferences } from '@/features/preferences/useUserPreferences';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
-import type { AnalysisTabInputSets } from './tabStateOps';
+import type { AnalysisTabInput, AnalysisTabInputSets } from './tabStateOps';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
 
 /**
@@ -32,7 +31,8 @@ import { useWorkspaceTabs } from './useWorkspaceTabs';
  * this boundary and persistence commands already capture the active tab id, so
  * feature code never branches on whether it happens to be tab-mounted.
  */
-export interface AnalysisFeatureHost {
+interface AnalysisFeatureHost {
+  tabId: string;
   taskId: string | null;
   inputSets: AnalysisTabInputSets;
   settings: Record<string, string>;
@@ -50,6 +50,8 @@ export interface AnalysisTabsHostProps {
   tabGroup: string;
   /** The single-analysis panel mounted for the active tab. */
   Feature: ComponentType<AnalysisTabFeatureProps>;
+  /** A cross-view handoff may target a newly created tab before this host mounts. */
+  preferredTabId?: string | null;
 }
 
 /**
@@ -58,7 +60,11 @@ export interface AnalysisTabsHostProps {
  * keyed feature panel both need the same live tab list, active id, and mutators.
  * Flow: read tab group → ensure a tab exists → render optional bar + keyed panel.
  */
-export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
+export function AnalysisTabsHost({
+  tabGroup,
+  Feature,
+  preferredTabId = null,
+}: AnalysisTabsHostProps) {
   const { currentWorkspaceId } = useWorkspaceData();
   const { preferences } = useUserPreferences();
   const analysisMultiTabEnabled = preferences.analysis_multi_tab_enabled ?? false;
@@ -91,23 +97,39 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
     if (autoCreateKeyRef.current === autoCreateKey) return;
     autoCreateKeyRef.current = autoCreateKey;
     if (tabs.length === 0) {
-      createTab('Analysis 1');
+      void createTab('Analysis 1');
     }
   }, [currentWorkspaceId, tabGroup, isLoading, tabs.length, createTab]);
+
+  useEffect(() => {
+    if (
+      preferredTabId &&
+      preferredTabId !== activeTabId &&
+      tabs.some((tab) => tab.tab_id === preferredTabId)
+    ) {
+      setActiveTab(preferredTabId);
+    }
+  }, [activeTabId, preferredTabId, setActiveTab, tabs]);
 
   // Disabled mode hides chrome only for the ordinary one-tab case. Programmatic
   // flows may still create additional tabs, which must immediately reveal the
   // complete tab UI so every persisted tab stays reachable.
   const showTabChrome = analysisMultiTabEnabled || tabs.length > 1;
-  const activeTab = tabs.find((t) => t.tab_id === activeTabId) ?? null;
+  const preferredTab = preferredTabId
+    ? (tabs.find((tab) => tab.tab_id === preferredTabId) ?? null)
+    : null;
+  const effectiveActiveTabId = preferredTab?.tab_id ?? activeTabId;
+  const activeTab = preferredTab ?? tabs.find((tab) => tab.tab_id === activeTabId) ?? null;
 
   return (
     <AnalysisTabbedPanel
       tabs={tabs}
-      activeTabId={activeTabId}
+      activeTabId={effectiveActiveTabId}
       onSelect={setActiveTab}
       onClose={closeTab}
-      onCreate={() => createTab()}
+      onCreate={() => {
+        void createTab();
+      }}
       onRename={renameTab}
       onReorder={reorderTabs}
       multiTabEnabled={showTabChrome}
@@ -118,6 +140,7 @@ export function AnalysisTabsHost({ tabGroup, Feature }: AnalysisTabsHostProps) {
         <Feature
           key={activeTab.tab_id}
           host={{
+            tabId: activeTab.tab_id,
             taskId: activeTab.task_id ?? null,
             inputSets: activeTab.input_sets,
             settings: activeTab.settings,

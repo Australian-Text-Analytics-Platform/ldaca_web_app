@@ -11,6 +11,15 @@ const detachDialogMocks = vi.hoisted(() => ({
   handleDetachConfirm: vi.fn(),
 }));
 
+const quotationHydrationMocks = vi.hoisted(() => ({
+  latestConfig: null as {
+    onResultFetched?: (result: unknown, taskId: string) => void | Promise<void>;
+    onHydratedRequest?: (request: unknown) => void | Promise<void>;
+    onHydratedResult?: (result: unknown) => void | Promise<void>;
+  } | null,
+  updateResultState: vi.fn(),
+}));
+
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1' }),
 }));
@@ -45,23 +54,23 @@ vi.mock('../../common/nodeInputs', () => ({
   }),
 }));
 
-vi.mock('../../common/parameterComparison', () => ({
-  getServerEngineConfig: () => ({ type: 'local', url: null }),
-}));
-
 vi.mock('../../common/hooks/useLastRunRequest', () => ({
   useLastRunRequest: () => ({ serverRequest: null }),
 }));
 
 vi.mock('../../common/hooks/useAnalysisFeature', () => ({
-  useAnalysisFeature: () => ({
+  useAnalysisFeature: (config: NonNullable<typeof quotationHydrationMocks.latestConfig>) => {
+    quotationHydrationMocks.latestConfig = config;
+    return {
     resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
     setLocalTaskId: vi.fn(),
     banner: null,
-    clearResults: vi.fn(() => Promise.resolve()),
+    taskStatus: { tasks: [] },
+    clearResults: vi.fn(() => Promise.resolve(true)),
     stopTask: vi.fn(() => Promise.resolve()),
     isStopping: false,
-  }),
+    };
+  },
 }));
 
 vi.mock('../../common/rerunAnalysis', () => ({
@@ -117,7 +126,7 @@ vi.mock('../hooks/useQuotationResultControls', () => ({
     materializedPaths: {},
     materializeSummary: {},
     resultsByNode: {},
-    updateResultState: vi.fn(),
+    updateResultState: quotationHydrationMocks.updateResultState,
     applyMaterializedRequest: vi.fn(),
     resetAfterClear: vi.fn(),
   }),
@@ -229,6 +238,53 @@ describe('QuotationFeature detach dialog', () => {
         deselectAllDetachColumns: detachDialogMocks.deselectAllDetachColumns,
         handleDetachConfirm: detachDialogMocks.handleDetachConfirm,
       }),
+    );
+  });
+
+  it('restores the persisted result after hydrating its saved request', async () => {
+    const host = {
+      taskId: 'task-1',
+      inputSets: {},
+      settings: {},
+      setTaskId: vi.fn(),
+      setInputSet: vi.fn(),
+      setSetting: vi.fn(),
+    };
+    render(<QuotationFeature host={host} />);
+
+    const persistedResult = {
+      kind: 'quotation',
+      state: 'successful',
+      data: [],
+      columns: ['QUOTE_extraction'],
+      metadata: { all_columns: ['QUOTE_extraction'] },
+      pagination: {
+        page: 1,
+        page_size: 50,
+        total_source_rows: 1,
+        total_source_pages: 1,
+        result_count: 0,
+        has_next: false,
+        has_prev: false,
+      },
+      query: { kind: 'quotation', page: 1, page_size: 50 },
+      sorting: { sort_by: null, descending: false },
+    };
+
+    await quotationHydrationMocks.latestConfig?.onHydratedRequest?.({
+      kind: 'quotation',
+      node_id: 'node-1',
+      column: 'text',
+      engine: { type: 'local' },
+    });
+    expect(quotationHydrationMocks.updateResultState).not.toHaveBeenCalled();
+
+    await quotationHydrationMocks.latestConfig?.onResultFetched?.(persistedResult, 'task-1');
+
+    expect(quotationHydrationMocks.updateResultState).toHaveBeenCalledWith(
+      'node-1',
+      'text',
+      expect.objectContaining({ kind: 'quotation', state: 'successful' }),
     );
   });
 });

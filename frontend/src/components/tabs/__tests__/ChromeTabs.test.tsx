@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { ChromeTabs, type ChromeTabItem } from '../ChromeTabs';
+import { type ChromeTabItem, ChromeTabs } from '../ChromeTabs';
 
 const tabs: ChromeTabItem[] = [
   { id: 'tab-1', title: 'Analysis 1' },
@@ -37,6 +37,12 @@ function renderTabs(overrides: Partial<React.ComponentProps<typeof ChromeTabs>> 
 }
 
 describe('ChromeTabs', () => {
+  it('allows horizontal overflow without showing a vertical scrollbar', () => {
+    renderTabs();
+
+    expect(screen.getByRole('tablist')).toHaveClass('overflow-x-auto', 'overflow-y-hidden');
+  });
+
   it('activates an inactive tab on a click without drag travel', () => {
     const { onActivate } = renderTabs();
     const second = screen.getAllByRole('tab')[1]!;

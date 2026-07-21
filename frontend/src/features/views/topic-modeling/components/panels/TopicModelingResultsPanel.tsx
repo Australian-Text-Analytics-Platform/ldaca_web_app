@@ -1,12 +1,11 @@
 import React from 'react';
-import type { DetachNodeOption, TopicModelingResponse, TopicModelingTopic } from '@/api';
-import { Button } from '@/components/ui/button';
-import { Loader2, Plus } from 'lucide-react';
+import type { TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
-import { DetachColumnsDialog } from '@/features/views/common/components/DetachColumnsDialog';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 
 interface Props {
   topicWaitingBanner: {
@@ -25,9 +24,6 @@ interface Props {
   error?: string | null;
   topics: TopicModelingTopic[];
   containerRef: React.RefObject<HTMLDivElement | null>;
-  isDetachLoading: boolean;
-  isDetaching: boolean;
-  openDetachDialog: () => Promise<void> | void;
   chartRef: React.RefObject<HTMLDivElement | null>;
   handleResetZoom: () => void;
   isAtGlobalZoom: boolean;
@@ -45,21 +41,15 @@ interface Props {
   nodeNames?: string[];
   topicSizeValue?: number;
   randomSeed?: number;
-  detachDialogOpen: boolean;
-  setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  detachNodeOptions: DetachNodeOption[];
-  selectedDetachColumns: Record<string, string[]>;
-  toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
-  selectAllDetachColumns: () => void;
-  deselectAllDetachColumns: () => void;
-  handleDetachConfirm: () => Promise<void> | void;
+  onAddToWorkspace: () => void;
+  isAddingToWorkspace: boolean;
 }
 
 /**
  * Maps topic-modeling task state to running, error, or successful result content.
  * Rendered by: TopicModelingFeature whenever a banner, result, or local error exists.
  * Flow: derive the task-state card, render TopicModelingBubbleChartSection for
- * successful results, and host the Add to Workspace controls and detach dialog.
+ * successful results.
  */
 export function TopicModelingResultsPanel({
   topicWaitingBanner,
@@ -68,9 +58,6 @@ export function TopicModelingResultsPanel({
   result,
   topics,
   containerRef,
-  isDetachLoading,
-  isDetaching,
-  openDetachDialog,
   chartRef,
   handleResetZoom,
   isAtGlobalZoom,
@@ -88,14 +75,8 @@ export function TopicModelingResultsPanel({
   nodeNames,
   topicSizeValue,
   randomSeed,
-  detachDialogOpen,
-  setDetachDialogOpen,
-  detachNodeOptions,
-  selectedDetachColumns,
-  toggleDetachColumn,
-  selectAllDetachColumns,
-  deselectAllDetachColumns,
-  handleDetachConfirm,
+  onAddToWorkspace,
+  isAddingToWorkspace,
 }: Props) {
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
   const runningMessage =
@@ -135,7 +116,7 @@ export function TopicModelingResultsPanel({
 
         {isFailedState ? (
           <p className="text-sm text-muted-foreground">
-            {result.message || 'Topic modeling failed'}
+            {result.message ?? 'Topic modeling failed'}
           </p>
         ) : null}
 
@@ -163,34 +144,11 @@ export function TopicModelingResultsPanel({
               topicSizeValue={topicSizeValue}
               randomSeed={randomSeed}
               controlRowSlot={
-                <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6">
-                  <div className="flex shrink-0 items-center gap-3">
-                    <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
-                  </div>
-                  <div className="hidden lg:block" />
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="w-full shrink-0 lg:w-auto"
-                    onClick={() => void openDetachDialog()}
-                    disabled={isDetachLoading || isDetaching}
-                  >
-                    {isDetachLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Preparing Add to Workspace…
-                      </>
-                    ) : selectedTopicIds.size > 0 ? (
-                      <>
-                        <Plus className="mr-2 h-4 w-4" />
-                        {`Add to Workspace (${String(selectedTopicIds.size)} topics)`}
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add to Workspace (all)
-                      </>
-                    )}
+                <div className="flex w-full items-center justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
+                  <Button size="sm" onClick={onAddToWorkspace} disabled={isAddingToWorkspace}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add to Workspace
                   </Button>
                 </div>
               }
@@ -198,20 +156,6 @@ export function TopicModelingResultsPanel({
           </div>
         ) : null}
       </AnalysisCardLayout>
-
-      <DetachColumnsDialog
-        open={detachDialogOpen}
-        onOpenChange={setDetachDialogOpen}
-        isDetaching={isDetaching}
-        title="Detach Topic Results"
-        description="Select the columns to include with the detached topic results. The topic columns are selected by default; untick any you don't need."
-        detachNodeOptions={detachNodeOptions}
-        selectedDetachColumns={selectedDetachColumns}
-        toggleDetachColumn={toggleDetachColumn}
-        selectAllDetachColumns={selectAllDetachColumns}
-        deselectAllDetachColumns={deselectAllDetachColumns}
-        handleDetachConfirm={handleDetachConfirm}
-      />
     </>
   );
 }

@@ -133,11 +133,12 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown>(
         const applyRequestPromise = applyRequest
           ? requestPromise.then((payload) => applyRequest(payload ?? null))
           : Promise.resolve();
+        await Promise.allSettled([applyRequestPromise]);
+
         const applyResultPromise = applyResult
           ? resultPromise.then((payload) => applyResult(payload ?? null))
           : Promise.resolve();
-
-        await Promise.allSettled([applyRequestPromise, applyResultPromise]);
+        await Promise.allSettled([applyResultPromise]);
 
         setHydrationState({
           status: 'idle',

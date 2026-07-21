@@ -82,7 +82,7 @@ export function TopicSelectionPanel({
         </div>
         {selectedTopics.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">
-            Click topics in the chart or list to select them for detach.
+            Click topics in the chart or list to prioritize them in the chart export.
           </p>
         ) : (
           <div className="max-h-80 space-y-1 overflow-y-auto">

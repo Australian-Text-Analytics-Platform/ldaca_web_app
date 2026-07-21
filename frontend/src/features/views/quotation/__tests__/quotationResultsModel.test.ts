@@ -7,7 +7,6 @@ import {
   buildQuotationMetadataColumns,
   filterQuotationRowsWithQuotes,
   getQuotationHighlightColor,
-  normalizeQuotationMaterialization,
   normalizeQuotationRow,
   resolveQuotationMetadataColumns,
 } from '../quotationResultsModel';
@@ -122,22 +121,11 @@ describe('quotationResultsModel', () => {
     expect(row.spans).toEqual([]);
   });
 
-  it('owns stable palette and materialization parsing', () => {
+  it('owns a stable highlight palette', () => {
     expect((['speaker', 'quote', 'verb'] as const).map(getQuotationHighlightColor)).toEqual([
       '#2563eb',
       '#059669',
       '#7c3aed',
     ]);
-    expect(
-      normalizeQuotationMaterialization('/tmp/quotes.parquet', {
-        record_count: '8',
-        unique_documents_with_hits: 3,
-        total_source_documents: '12',
-      }),
-    ).toEqual({
-      path: '/tmp/quotes.parquet',
-      summary: { recordCount: 8, uniqueDocuments: 3, totalDocuments: 12 },
-    });
-    expect(normalizeQuotationMaterialization('', undefined)).toEqual({ path: null, summary: null });
   });
 });

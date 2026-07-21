@@ -3,12 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAnalysisFeature } from '../hooks/useAnalysisFeature';
 
-const { cancelTaskMock, clearAnalysisMock, hydrateFromServerMock, taskFlowOptionsMock } =
+const {
+  cancelAnalysisMock,
+  clearAnalysisMock,
+  hydrateFromServerMock,
+  taskFlowOptionsMock,
+  toastErrorMock,
+} =
   vi.hoisted(() => ({
-    cancelTaskMock: vi.fn(),
+    cancelAnalysisMock: vi.fn(),
     clearAnalysisMock: vi.fn(),
     hydrateFromServerMock: vi.fn(() => Promise.resolve()),
     taskFlowOptionsMock: vi.fn(),
+    toastErrorMock: vi.fn(),
   }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -21,9 +28,13 @@ vi.mock('../clearAnalysis', () => ({
   clearAnalysis: clearAnalysisMock,
 }));
 
+vi.mock('sonner', () => ({
+  toast: { error: toastErrorMock },
+}));
+
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  cancelTask: cancelTaskMock,
+  cancelAnalysis: cancelAnalysisMock,
 }));
 
 vi.mock('../useAnalysisHydration', () => ({
@@ -54,14 +65,15 @@ vi.mock('../tasks/useAnalysisTaskFlow', () => ({
 
 describe('useAnalysisFeature', () => {
   beforeEach(() => {
-    cancelTaskMock.mockReset();
-    cancelTaskMock.mockResolvedValue({ data: { state: 'successful' }, error: undefined });
+    cancelAnalysisMock.mockReset();
+    cancelAnalysisMock.mockResolvedValue({ data: { state: 'cancelled' }, error: undefined });
     clearAnalysisMock.mockReset();
     clearAnalysisMock.mockImplementation(({ onCleanup }) => {
       onCleanup(['task-1']);
     });
     hydrateFromServerMock.mockClear();
     taskFlowOptionsMock.mockClear();
+    toastErrorMock.mockClear();
   });
 
   it('passes clear options through to onCleared cleanup handlers', async () => {
@@ -72,6 +84,7 @@ describe('useAnalysisFeature', () => {
         analysisType: 'sequential_analysis',
         taskType: 'sequential_analysis',
         workspaceId: 'workspace-1',
+        tabId: 'tab-1',
         isTabActive: true,
         resultRef: { current: null },
         fetchResult: vi.fn(() => Promise.resolve(null)),
@@ -80,14 +93,45 @@ describe('useAnalysisFeature', () => {
       }),
     );
 
+    let cleared = false;
     await act(async () => {
-      await result.current.clearResults({ preserveLocalState: true });
+      cleared = await result.current.clearResults({ preserveLocalState: true });
     });
 
+    expect(cleared).toBe(true);
     expect(clearAnalysisMock).toHaveBeenCalledTimes(1);
     expect(onCleared).toHaveBeenCalledWith(['task-1'], {
       preserveLocalState: true,
     });
+  });
+
+  it('keeps local Analysis state and reports the backend message when clear fails', async () => {
+    const onCleared = vi.fn();
+    clearAnalysisMock.mockRejectedValueOnce(new Error('Workspace is closing'));
+
+    const { result } = renderHook(() =>
+      useAnalysisFeature({
+        analysisType: 'token_frequencies',
+        taskType: 'token_frequencies',
+        workspaceId: 'workspace-1',
+        tabId: 'tab-1',
+        isTabActive: true,
+        hydrationTaskId: 'analysis-1',
+        resultRef: { current: null },
+        fetchResult: vi.fn(() => Promise.resolve(null)),
+        onResultFetched: vi.fn(),
+        onCleared,
+      }),
+    );
+
+    let cleared = true;
+    await act(async () => {
+      cleared = await result.current.clearResults();
+    });
+
+    expect(cleared).toBe(false);
+    expect(onCleared).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith('Workspace is closing');
   });
 
   it('cancels the resolved analysis task from the owning analysis tab', async () => {
@@ -96,6 +140,7 @@ describe('useAnalysisFeature', () => {
         analysisType: 'sequential_analysis',
         taskType: 'sequential_analysis',
         workspaceId: 'workspace-1',
+        tabId: 'tab-1',
         isTabActive: true,
         resultRef: { current: { metadata: { task_id: 'task-1' } } },
         fetchResult: vi.fn(() => Promise.resolve(null)),
@@ -108,8 +153,8 @@ describe('useAnalysisFeature', () => {
       await result.current.stopTask();
     });
 
-    expect(cancelTaskMock).toHaveBeenCalledWith({
-      path: { task_id: 'task-1' },
+    expect(cancelAnalysisMock).toHaveBeenCalledWith({
+      path: { workspace_id: 'workspace-1', analysis_id: 'task-1' },
       throwOnError: true,
     });
   });
@@ -119,6 +164,7 @@ describe('useAnalysisFeature', () => {
       analysisType: 'token_frequencies' as const,
       taskType: 'token_frequencies',
       workspaceId: 'workspace-1',
+      tabId: 'tab-1',
       isTabActive: true,
       resultRef: { current: null },
       fetchResult: vi.fn(() => Promise.resolve(null)),
@@ -152,6 +198,7 @@ describe('useAnalysisFeature', () => {
         analysisType: 'token_frequencies',
         taskType: 'token_frequencies',
         workspaceId: 'workspace-1',
+        tabId: 'tab-1',
         isTabActive: true,
         hydrationTaskId: 'owned-task',
         resultRef: { current: null },
@@ -183,11 +230,62 @@ describe('useAnalysisFeature', () => {
     expect(onResultFetched).toHaveBeenCalledWith(terminalResult, 'owned-task');
   });
 
+  it('finishes a failed Analysis without requesting a successful Result resource', async () => {
+    const fetchResult = vi.fn(() => Promise.resolve(null));
+    const onResultFetched = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAnalysisFeature({
+        analysisType: 'token_frequencies',
+        taskType: 'token_frequencies',
+        workspaceId: 'workspace-1',
+        tabId: 'tab-1',
+        isTabActive: true,
+        hydrationTaskId: 'owned-task',
+        resultRef: { current: null },
+        fetchResult,
+        onResultFetched,
+        onCleared: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.setIsRunning(true);
+    });
+
+    const taskFlowOptions = taskFlowOptionsMock.mock.lastCall?.[0] as {
+      refreshResults?: (context: {
+        reason: 'terminal';
+        task: null;
+        taskId: string;
+        taskState: 'failed';
+      }) => Promise<void>;
+    };
+
+    await act(async () => {
+      await taskFlowOptions.refreshResults?.({
+        reason: 'terminal',
+        task: null,
+        taskId: 'owned-task',
+        taskState: 'failed',
+      });
+    });
+
+    expect(fetchResult).not.toHaveBeenCalled();
+    expect(onResultFetched).not.toHaveBeenCalled();
+    expect(result.current.isRunning).toBe(false);
+    expect(result.current.lastFetchedRef.current).toEqual({
+      taskId: 'owned-task',
+      state: 'failed',
+    });
+  });
+
   it('hydrates again when the owning tab task id changes after a run', async () => {
     const baseConfig = {
       analysisType: 'token_frequencies' as const,
       taskType: 'token_frequencies',
       workspaceId: 'workspace-1',
+      tabId: 'tab-1',
       isTabActive: true,
       resultRef: { current: null },
       fetchResult: vi.fn(() => Promise.resolve(null)),

@@ -15,6 +15,7 @@ import { useSafeResult } from '../common/useSafeResult';
 import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
+import { analysisInputsFromRequest } from '../common/utils';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
@@ -142,7 +143,10 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     isRunning: isAnalyzing,
     isStopping,
     setIsRunning: setIsAnalyzing,
+    runningRef,
+    lastFetchedRef,
     banner: sequentialWaitingBanner,
+    taskStatus,
     clearResults,
     stopTask,
   } = useAnalysisFeature<Record<string, unknown>>({
@@ -225,6 +229,10 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
       try {
         const hydrated = sequentialParameters.applyHydratedRequest(req);
         const nodeIdStr = hydrated.nodeId;
+        onTabInputSetChange(
+          DEFAULT_TAB_INPUT_SET_ID,
+          analysisInputsFromRequest(req, 1),
+        );
         hydratedParamsRef.current = hydrated.hydratedParams;
         if (nodeIdStr && currentWorkspaceId) {
           const schema = await fetchNodeSchema({
@@ -313,7 +321,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const serverNodeId =
     lastRunRequest && typeof lastRunRequest.node_id === 'string' ? lastRunRequest.node_id : '';
   const serverColumn = lastRunRequest ? ((lastRunRequest.time_column ?? '') as string) : '';
-  const hasLastRun = Boolean(lastRunRequest);
   const hasParamsChanged = !lastRunRequest
     ? true
     : hasParameterDiff(currentSequentialParams, readSequentialServerParams(lastRunRequest)) ||
@@ -326,10 +333,10 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: Boolean(activeNodeId),
-    hasLastRun,
+    hasAttachedAnalysis: Boolean(tabTaskId),
+    analysisState: taskStatus.tasks[0]?.state ?? null,
     hasChanges: hasParamsChanged,
     isBusy: isAnalyzing,
-    hasResults: Boolean(results),
   });
 
   useEffect(() => {
@@ -366,7 +373,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         timeColumn,
         groupByColumns,
         frequency,
-        chartType,
         derivedColumnType,
         numericOriginValue,
         numericIntervalValue,
@@ -381,6 +387,8 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         setResults,
         setChartType,
         setLocalTaskId,
+        runningRef,
+        lastFetchedRef,
         setNodeColumnSelections: (selections) => {
           applyInputsFromSelections(selections);
         },
@@ -401,10 +409,9 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
    */
   const handleRunOrUpdate = async () => {
     await executeAnalysisRerun({
-      hasUnrunChanges: hasParamsChanged,
+      hasAttachedAnalysis: Boolean(tabTaskId),
       clearResults,
       runFreshAnalysis: handleAnalyze,
-      clearOptionsOnRerun: { preserveLocalState: true },
     });
   };
 

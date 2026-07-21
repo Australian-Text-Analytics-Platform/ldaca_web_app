@@ -1,212 +1,59 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  closeTabInState,
-  createTabInState,
   getActiveTabId,
   getTabInputSet,
   getTabSetting,
   getTabs,
-  renameTabInState,
-  reorderTabsInState,
-  setActiveTabInState,
-  setTabInputSetInState,
-  setTabSettingInState,
-  setTabTaskInState,
+  reorderTabs,
+  tabFromResource,
 } from '../tabStateOps';
 
-const TYPE = 'concordance_analysis';
-const OTHER = 'token_frequency_analysis';
+const tab = {
+  id: 'tab-1',
+  name: 'Analysis',
+  kind: 'concordance' as const,
+  analysis_id: 'analysis-1',
+  created_at: '2026-01-01T00:00:00Z',
+  modified_at: '2026-01-01T00:00:00Z',
+  revision: 2,
+};
 
 describe('tabStateOps', () => {
-  it('creates a tab, focuses it, and returns its id', () => {
-    const { state, tabId } = createTabInState(null, TYPE, 'Analysis 1', 'a');
-    expect(tabId).toBe('a');
-    expect(getTabs(state, TYPE)).toHaveLength(1);
-    expect(getTabs(state, TYPE)[0]).toMatchObject({
-      tab_id: 'a',
-      task_id: null,
-      title: 'Analysis 1',
-    });
-    expect(getActiveTabId(state, TYPE)).toBe('a');
-  });
-
-  it('keeps other analysis-type groups intact when mutating one group', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = createTabInState(state, OTHER, 'B', 'b').state;
-    state = createTabInState(state, TYPE, 'A2', 'a2').state;
-    expect(getTabs(state, TYPE).map((t) => t.tab_id)).toEqual(['a', 'a2']);
-    expect(getTabs(state, OTHER).map((t) => t.tab_id)).toEqual(['b']);
-  });
-
-  it('reselects the previous tab when the active tab is closed', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = createTabInState(state, TYPE, 'B', 'b').state;
-    state = createTabInState(state, TYPE, 'C', 'c').state; // active = c
-    state = closeTabInState(state, TYPE, 'c');
-    expect(getActiveTabId(state, TYPE)).toBe('b');
-    expect(getTabs(state, TYPE).map((t) => t.tab_id)).toEqual(['a', 'b']);
-  });
-
-  it('clears the active id when the last tab is closed', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = closeTabInState(state, TYPE, 'a');
-    expect(getTabs(state, TYPE)).toHaveLength(0);
-    expect(getActiveTabId(state, TYPE)).toBeNull();
-  });
-
-  it('does not change the active id when closing a non-active tab', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = createTabInState(state, TYPE, 'B', 'b').state; // active = b
-    state = closeTabInState(state, TYPE, 'a');
-    expect(getActiveTabId(state, TYPE)).toBe('b');
-  });
-
-  it('renames a tab title', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = renameTabInState(state, TYPE, 'a', 'Renamed');
-    expect(getTabs(state, TYPE)[0]!.title).toBe('Renamed');
-  });
-
-  it('sets the active tab and ignores unknown ids', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = createTabInState(state, TYPE, 'B', 'b').state;
-    state = setActiveTabInState(state, TYPE, 'a');
-    expect(getActiveTabId(state, TYPE)).toBe('a');
-    state = setActiveTabInState(state, TYPE, 'missing');
-    expect(getActiveTabId(state, TYPE)).toBe('a');
-  });
-
-  it('sets and clears a tab task id', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = setTabTaskInState(state, TYPE, 'a', 'task-123');
-    expect(getTabs(state, TYPE)[0]!.task_id).toBe('task-123');
-    state = setTabTaskInState(state, TYPE, 'a', null);
-    expect(getTabs(state, TYPE)[0]!.task_id).toBeNull();
-  });
-
-  it('creates new tabs without copying an existing tab task or input sets', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = setTabTaskInState(state, TYPE, 'a', 'task-123');
-    state = setTabInputSetInState(state, TYPE, 'a', 'source', [
-      { node_id: 'node-1', column: 'text' },
-    ]);
-
-    state = createTabInState(state, TYPE, 'B', 'b').state;
-
-    expect(getTabs(state, TYPE)[0]).toMatchObject({
-      tab_id: 'a',
-      task_id: 'task-123',
+  it('projects server identity while preserving frontend-only draft state', () => {
+    const projected = tabFromResource(tab, {
+      title: 'Local title',
       input_sets: { source: [{ node_id: 'node-1', column: 'text' }] },
+      settings: { mode: 'manual' },
     });
-    expect(getTabs(state, TYPE)[1]).toMatchObject({
-      tab_id: 'b',
-      task_id: null,
-      input_sets: { source: [] },
-    });
-    expect(getActiveTabId(state, TYPE)).toBe('b');
-  });
-
-  it('stores multiple named input sets without mirroring source inputs', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    const sourceInputs = [{ node_id: 'source-node', column: 'text' }];
-    const classInputs = [{ node_id: 'class-node', column: 'class' }];
-
-    state = setTabInputSetInState(state, TYPE, 'a', 'source', sourceInputs);
-    state = setTabInputSetInState(state, TYPE, 'a', 'classDescriptions', classInputs);
-
-    expect(getTabs(state, TYPE)[0]).toMatchObject({
-      input_sets: {
-        source: sourceInputs,
-        classDescriptions: classInputs,
-      },
-    });
-    expect('inputs' in (getTabs(state, TYPE)[0] ?? {})).toBe(false);
-  });
-
-  it('initializes a new tab with an empty settings map', () => {
-    const { state } = createTabInState(null, TYPE, 'A', 'a');
-    expect(getTabs(state, TYPE)[0]).toMatchObject({ settings: {} });
-  });
-
-  it('sets and merges free-form tab settings without dropping other keys', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-
-    state = setTabSettingInState(state, TYPE, 'a', 'annotationMode', 'ai');
-    state = setTabSettingInState(state, TYPE, 'a', 'aiProvider', 'openai');
-    // Overwriting one key preserves the others.
-    state = setTabSettingInState(state, TYPE, 'a', 'annotationMode', 'manual');
-
-    expect(getTabs(state, TYPE)[0]?.settings).toEqual({
-      annotationMode: 'manual',
-      aiProvider: 'openai',
+    expect(projected).toMatchObject({
+      tab_id: 'tab-1',
+      task_id: 'analysis-1',
+      title: 'Local title',
+      kind: 'concordance',
+      settings: { mode: 'manual' },
     });
   });
 
-  it('reads one tab setting by key (undefined when absent)', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = setTabSettingInState(state, TYPE, 'a', 'aiModel', 'gpt-4o-mini');
-    const tab = getTabs(state, TYPE)[0];
-
-    expect(getTabSetting(tab, 'aiModel')).toBe('gpt-4o-mini');
-    expect(getTabSetting(tab, 'aiPrompt')).toBeUndefined();
-    expect(getTabSetting(undefined, 'aiModel')).toBeUndefined();
+  it('resolves groups, active ids, named inputs, and settings without server persistence', () => {
+    const projected = tabFromResource(tab, {
+      input_sets: { source: [{ node_id: 'node-1', column: 'text' }] },
+      settings: { mode: 'manual' },
+    });
+    const state = { groups: { concordance: { tabs: [projected], active_tab_id: 'tab-1' } } };
+    expect(getTabs(state, 'concordance')).toEqual([projected]);
+    expect(getActiveTabId(state, 'concordance')).toBe('tab-1');
+    expect(getTabInputSet(projected, 'source')).toEqual([{ node_id: 'node-1', column: 'text' }]);
+    expect(getTabSetting(projected, 'mode')).toBe('manual');
+    expect(getTabSetting(projected, 'missing')).toBeUndefined();
   });
 
-  it('leaves state untouched when setting a key on an unknown tab', () => {
-    const state = createTabInState(null, TYPE, 'A', 'a').state;
-    const next = setTabSettingInState(state, TYPE, 'missing', 'aiModel', 'x');
-    expect(getTabs(next, TYPE)[0]?.settings).toEqual({});
-  });
-
-  it('resolves only named input sets', () => {
-    const namedTab = {
-      tab_id: 'named',
-      task_id: null,
-      title: 'Named',
-      input_sets: {
-        source: [{ node_id: 'named-source-node', column: 'text' }],
-        classDescriptions: [{ node_id: 'class-node', column: 'class' }],
-      },
-    };
-
-    expect(getTabInputSet(namedTab, 'source')).toEqual([
-      { node_id: 'named-source-node', column: 'text' },
+  it('reorders known tabs and appends omitted tabs without changing identity', () => {
+    const first = tabFromResource(tab);
+    const second = tabFromResource({ ...tab, id: 'tab-2', name: 'Second', analysis_id: null });
+    expect(reorderTabs([first, second], ['tab-2']).map((item) => item.tab_id)).toEqual([
+      'tab-2',
+      'tab-1',
     ]);
-    expect(getTabInputSet(namedTab, 'classDescriptions')).toEqual([
-      { node_id: 'class-node', column: 'class' },
-    ]);
-    expect(getTabInputSet(namedTab, 'missing')).toEqual([]);
-  });
-
-  it('falls back to the first tab when active_tab_id is dangling', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = createTabInState(state, TYPE, 'B', 'b').state;
-    // Simulate a stale active pointer.
-    state = { groups: { [TYPE]: { tabs: getTabs(state, TYPE), active_tab_id: 'gone' } } };
-    expect(getActiveTabId(state, TYPE)).toBe('a');
-  });
-
-  it('reorders a tab to the drop target position without changing the active tab', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = createTabInState(state, TYPE, 'B', 'b').state;
-    state = createTabInState(state, TYPE, 'C', 'c').state; // active = c
-    state = reorderTabsInState(state, TYPE, ['b', 'c', 'a']);
-    expect(getTabs(state, TYPE).map((t) => t.tab_id)).toEqual(['b', 'c', 'a']);
-    expect(getActiveTabId(state, TYPE)).toBe('c');
-  });
-
-  it('keeps omitted tabs and is a no-op for an unchanged order', () => {
-    let state = createTabInState(null, TYPE, 'A', 'a').state;
-    state = createTabInState(state, TYPE, 'B', 'b').state;
-    // Omitting 'b' keeps it appended at the end rather than dropping it.
-    expect(getTabs(reorderTabsInState(state, TYPE, ['a']), TYPE).map((t) => t.tab_id)).toEqual([
-      'a',
-      'b',
-    ]);
-    // Same order leaves the tab sequence unchanged.
-    expect(getTabs(reorderTabsInState(state, TYPE, ['a', 'b']), TYPE).map((t) => t.tab_id)).toEqual(
-      ['a', 'b'],
-    );
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { calculateTokenFrequencies } from '@/api';
-import type { TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
+import { submitTabAnalysis } from '@/api';
+import type { Analysis, TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import {
   resolveTokenFrequencyNodeContext,
@@ -16,6 +16,7 @@ import type { ViewType } from '@/features/views/viewIds';
 
 interface AnalysisState {
   currentWorkspaceId: string | null;
+  tabId: string;
   panelNodeIds: string[];
   panelSelectedNodes: Pick<WorkspaceNodeMetadata, 'id' | 'name'>[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
@@ -63,6 +64,7 @@ interface UseTokenFrequencyTaskFlowParams {
 export const useTokenFrequencyTaskFlow = ({
   state: {
     currentWorkspaceId,
+    tabId,
     panelNodeIds,
     panelSelectedNodes,
     effectiveNodeColumnSelections,
@@ -87,10 +89,8 @@ export const useTokenFrequencyTaskFlow = ({
   navigation: { replaceSelectedNodes, setPendingConcordance, setCurrentView, applyStopSetFromText },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
-  // concordance tab for every token click. Sharing the workspace-tabs query
-  // cache means the tab is created + activated before the concordance view
-  // mounts, so the clicked token always lands in a fresh tab instead of
-  // overwriting an existing concordance search.
+  // concordance tab for every token click. The created tab id travels with the
+  // handoff so only that destination tab can consume it.
   const { createTab: createConcordanceTab } = useWorkspaceTabs(
     currentWorkspaceId,
     ANALYSIS_TAB_GROUPS.concordance,
@@ -139,10 +139,13 @@ export const useTokenFrequencyTaskFlow = ({
     const request: TokenFrequencyRequest = {
       node_ids: requestNodeIds,
       node_columns: nodeColumns,
+      node_tokenizer_models: Object.fromEntries(
+        requestNodeIds.map((nodeId) => [nodeId, (tokenizerModelsByNode[nodeId] ?? '').trim()]),
+      ),
       stop_words: stopWordsArray,
     };
 
-    await runAnalysisTaskEnvelope<TokenFrequencyResponse>({
+    await runAnalysisTaskEnvelope<Analysis>({
       lastFetchedRef,
       runningRef,
       setIsRunning,
@@ -152,33 +155,26 @@ export const useTokenFrequencyTaskFlow = ({
         setResultsSafely(null);
       },
       submit: async () => {
-        const { data: response } = await calculateTokenFrequencies({
-          body: request,
-          path: { workspace_id: currentWorkspaceId },
+        const { data: response } = await submitTabAnalysis({
+          body: { kind: 'token_frequency', ...request },
+          path: { workspace_id: currentWorkspaceId, tab_id: tabId },
           throwOnError: true,
         });
         return response;
       },
       onSuccess: (response) => {
-        setResultsSafely(response);
         setLastCompareNodeIds(request.node_ids);
-
-        if (Array.isArray(response.stop_words)) {
-          const normalizedStops = response.stop_words
-            .map((word: string) => word.trim().toLowerCase())
-            .filter(Boolean);
-          setAppliedStopSet(new Set(normalizedStops));
-          setStopWords(normalizedStops.join(', '));
-        }
+        const normalizedStops = (request.stop_words ?? [])
+          .map((word: string) => word.trim().toLowerCase())
+          .filter(Boolean);
+        setAppliedStopSet(new Set(normalizedStops));
+        setStopWords(normalizedStops.join(', '));
+        if (response.state === 'failed') setResultsSafely(null);
       },
       onError: (error) => {
         console.error('Error calculating token frequencies:', error);
         setLocalTaskId(null);
-        setResultsSafely({
-          state: 'failed',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
-          data: null,
-        });
+        setResultsSafely(null);
       },
     });
   };
@@ -253,38 +249,41 @@ export const useTokenFrequencyTaskFlow = ({
         ? [scopedSelection]
         : resolvedSelections;
 
-      if (uniqueNodeIds.length > 0) {
-        try {
-          replaceSelectedNodes(uniqueNodeIds, uniqueNodeIds.at(-1));
-        } catch (error) {
-          console.warn('Failed to sync workspace selection for concordance handoff:', error);
-        }
-      }
-
       const nodeDetails = uniqueNodeIds.map((id) => ({
         id,
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty locked/derived name should fall back to the next source, not render blank
         name: lockedNodeNameMap[id] || nodeIdToName[id] || id,
       }));
 
-      setPendingConcordance({
-        searchWord: trimmedToken,
-        nodeColumnSelections: effectiveSelections.map((selection) => ({ ...selection })),
-        selectedNodes: nodeDetails,
-        // Auto-run the concordance search on arrival: clicking a token is an
-        // explicit "search for this word" intent, so the fresh tab dispatches
-        // the request itself instead of leaving the user to press Run.
-        autoRun: true,
-        timestamp: Date.now(),
-      });
+      void (async () => {
+        try {
+          const createdTab = await createConcordanceTab(trimmedToken || undefined);
+          if (!createdTab) return;
 
-      // Always hand the clicked token to a fresh concordance tab. Creating +
-      // activating the tab here (before the view switch) guarantees the new
-      // tab's ConcordanceFeature is the instance that consumes the pending
-      // payload, so no existing concordance search is ever overwritten.
-      createConcordanceTab(trimmedToken || undefined);
+          if (uniqueNodeIds.length > 0) {
+            try {
+              replaceSelectedNodes(uniqueNodeIds, uniqueNodeIds.at(-1));
+            } catch (error) {
+              console.warn('Failed to sync workspace selection for concordance handoff:', error);
+            }
+          }
 
-      setCurrentView('concordance');
+          setPendingConcordance({
+            targetTabId: createdTab.id,
+            searchWord: trimmedToken,
+            nodeColumnSelections: effectiveSelections.map((selection) => ({ ...selection })),
+            selectedNodes: nodeDetails,
+            // Auto-run the concordance search on arrival: clicking a token is an
+            // explicit "search for this word" intent, so the fresh tab dispatches
+            // the request itself instead of leaving the user to press Run.
+            autoRun: true,
+            timestamp: Date.now(),
+          });
+          setCurrentView('concordance');
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Failed to open Concordance.');
+        }
+      })();
     },
     [
       results,

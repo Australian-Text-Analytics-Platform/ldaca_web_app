@@ -1,34 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { toast } from 'sonner';
 import type { TopicModelingResponse, TopicModelingTopic } from '@/api';
-import { useAnalysisStore, type TaskItem } from '@/stores/analysisStore';
-import { useUIStore } from '@/stores';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
-import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
-import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
-import { useSafeResult } from '../common/useSafeResult';
-import { executeAnalysisRerun } from '../common/rerunAnalysis';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useUIStore } from '@/stores';
+import { type TaskItem, useAnalysisStore } from '@/stores/analysisStore';
+import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
 import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
+import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
+import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { getAnalysisTaskRequest, getAnalysisTaskResult } from '../common/analysisTasksApi';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { executeAnalysisRerun } from '../common/rerunAnalysis';
+import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
+import { useSafeResult } from '../common/useSafeResult';
+import { analysisInputsFromRequest } from '../common/utils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
-import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
-import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
+import {
+  TopicModelingDetachDialog,
+  type TopicModelingDetachSource,
+} from './components/TopicModelingDetachDialog';
+import { createDefaultTopicModelingDetachColumns } from './components/topicModelingDetachState';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 import {
   DEFAULT_TOPIC_SIZE_VALUE,
   normalizeTopicSampleFractions,
   useTopicModelingParameters,
 } from './hooks/useTopicModelingParameters';
-import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTopicModelingResultControls } from './hooks/useTopicModelingResultControls';
-import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
+import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
+import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 
 /**
  * Renders the topic-modeling workflow for live BERTopic runs and result exploration.
@@ -47,8 +54,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     setInputSet: onTabInputSetChange,
   } = host;
   const { currentWorkspaceId } = useWorkspaceData();
-  const { setNodeColor: persistNodeColor } = useWorkspaceActions();
-  const queryClient = useQueryClient();
+  const { setNodeColor: persistNodeColor, detachTopicModeling } = useWorkspaceActions();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -132,9 +138,13 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const [chartWidth, setChartWidth] = useState<number>(800);
   const chartResizeFrameRef = useRef<number | null>(null);
   const [isClearing, setIsClearing] = useState(false);
+  const [detachDialogOpen, setDetachDialogOpen] = useState(false);
+  const [isDetaching, setIsDetaching] = useState(false);
+  const [detachSourceIds, setDetachSourceIds] = useState<Set<string>>(new Set());
+  const [detachColumns, setDetachColumns] = useState<Record<string, string[]>>({});
+  const [detachNames, setDetachNames] = useState<Record<string, string>>({});
 
   const {
-    resolveTaskId,
     isRunning,
     isStopping,
     setIsRunning,
@@ -149,6 +159,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
     taskType: ANALYSIS_TASK_TYPES.topicModeling,
     workspaceId: currentWorkspaceId,
+    tabId: host.tabId,
     isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
@@ -157,18 +168,18 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     // Called by useAnalysisFeature polling and hydration to load the owned task result.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskResult<TopicModelingResponse>(currentWorkspaceId, taskId);
+      return getAnalysisResultResource<TopicModelingResponse>(currentWorkspaceId, taskId);
     },
     // Called by useAnalysisFeature hydration to restore the task's submitted parameters.
     fetchRequest: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisTaskRequest(ANALYSIS_TAB_GROUPS.topicModeling, currentWorkspaceId, taskId);
+      return getAnalysisRequest(currentWorkspaceId, taskId);
     },
     // Called by useAnalysisFeature after a poll returns a newer result for this task.
     onResultFetched: (resultData) => {
       setResultSafely(resultData);
       if (resultData.state === 'failed') {
-        setError(resultData.message || 'Topic modeling failed');
+        setError(resultData.message ?? 'Topic modeling failed');
       } else if (resultData.state === 'successful') {
         setError(null);
       }
@@ -178,7 +189,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       if (!resultData) return;
       setResultSafely(resultData);
       if (resultData.state === 'failed') {
-        setError(resultData.message || 'Topic modeling failed');
+        setError(resultData.message ?? 'Topic modeling failed');
       } else if (resultData.state === 'successful') {
         setError(null);
       }
@@ -188,6 +199,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       const raw = requestPayload as Record<string, unknown> | null;
       const req = (raw?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!req) return;
+      onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, analysisInputsFromRequest(req, 2));
       hydrateParameters(req);
     },
     // Called by useAnalysisFeature after shared result deletion completes.
@@ -202,7 +214,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       onTabTaskChange(null);
     },
     // Called by useAnalysisFeature clear handling to remove deleted task ids from the global list.
-    pruneGlobalTasks: (taskIds) => {
+    pruneTaskInbox: (taskIds) => {
       setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
     },
     // Read by useAnalysisFeature while resolving status and polling candidates.
@@ -290,7 +302,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       panelNodeIds.length,
     ),
   });
-  const hasLastRun = Boolean(typedServerRequest);
   const hasTopicChanges = !typedServerRequest
     ? true
     : hasParameterDiff(currentTopicParams, serverTopicParams(typedServerRequest)) ||
@@ -303,10 +314,10 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: panelNodeIds.length > 0 && !panelHasMissingColumns,
-    hasLastRun,
+    hasAttachedAnalysis: Boolean(tabTaskId),
+    analysisState: taskStatus.tasks[0]?.state ?? null,
     hasChanges: hasTopicChanges,
     isBusy: isRunning,
-    hasResults: Boolean(result),
   });
 
   /**
@@ -318,7 +329,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     void persistDocumentColumn(nodeId, column);
   };
 
-  const rawTopics: TopicModelingTopic[] = result?.data?.topics ?? [];
+  const rawTopics: TopicModelingTopic[] = result?.data.topics ?? [];
   // Rebuild each topic's label from its representative_words sliced to the
   // current "Words per topic" display cap, so changing that input updates
   // the bottom list without a rerun. Falls back to the server-built label
@@ -337,37 +348,68 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     }
     return filtered;
   })();
+  const detachSources: TopicModelingDetachSource[] = (result?.artifacts.nodes ?? []).map(
+    (node) => ({
+      id: node.node_id,
+      name: node.node_name,
+      columns: node.original_columns,
+      documentColumn: node.text_column,
+    }),
+  );
 
-  // Task-flow hook is intentionally placed after ``topics`` so it can
-  // receive the already-filtered display list as ``displayedTopics`` —
-  // detach builds its ``topic_meanings_override`` from this so the
-  // detached node mirrors what's on screen (post-fit slice + stopword
-  // toggle), not the fit-time artifact.
-  const {
-    handleRun,
-    openDetachDialog,
-    toggleDetachColumn,
-    selectAllDetachColumns,
-    deselectAllDetachColumns,
-    handleDetachConfirm,
-    isDetachLoading,
-    isDetaching,
-    detachDialogOpen,
-    setDetachDialogOpen,
-    detachNodeOptions,
-    selectedDetachColumns,
-  } = useTopicModelingTaskFlow({
+  const openDetachDialog = () => {
+    const sourceIds = new Set(detachSources.map((source) => source.id));
+    setDetachSourceIds(sourceIds);
+    setDetachColumns(createDefaultTopicModelingDetachColumns(detachSources));
+    setDetachNames(
+      Object.fromEntries(detachSources.map((source) => [source.id, `${source.name} topics`])),
+    );
+    setDetachDialogOpen(true);
+  };
+
+  const handleDetach = async () => {
+    if (!tabTaskId || detachSourceIds.size === 0) return;
+    const nodeIds = detachSources
+      .map((source) => source.id)
+      .filter((nodeId) => detachSourceIds.has(nodeId));
+    setIsDetaching(true);
+    try {
+      await detachTopicModeling(tabTaskId, {
+        node_ids: nodeIds,
+        selected_columns: Object.fromEntries(
+          nodeIds.map((nodeId) => [nodeId, detachColumns[nodeId] ?? []]),
+        ),
+        new_node_names: Object.fromEntries(
+          nodeIds.map((nodeId) => [nodeId, detachNames[nodeId]?.trim() ?? '']),
+        ),
+        topic_ids: selectedTopicIds.size > 0 ? [...selectedTopicIds] : null,
+        topic_meanings_override: topics.map((topic) => ({
+          topic_id: topic.id,
+          words: topic.representative_words.slice(0, representativeWordsCount),
+        })),
+      });
+      setDetachDialogOpen(false);
+      toast.success('Topic Modeling detachment started.');
+    } catch (cause) {
+      toast.error('Failed to add Topic Modeling results.', {
+        description: cause instanceof Error ? cause.message : String(cause),
+      });
+    } finally {
+      setIsDetaching(false);
+    }
+  };
+
+  const { handleRun } = useTopicModelingTaskFlow({
     state: {
       currentWorkspaceId,
+      tabId: host.tabId,
       panelNodeIds,
       panelHasMissingColumns,
       effectiveNodeColumnSelections,
       randomSeed,
       representativeWordsCount,
-      selectedTopicIds,
       sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
       minTopicSize: topicSizeValue,
-      displayedTopics: topics,
     },
     actions: {
       setIsRunning,
@@ -375,7 +417,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       setError,
       setResultSafely,
       lastFetchedRef,
-      resolveTopicModelingTaskId: resolveTaskId,
       setLocalTaskId,
       // Persist the run's assigned task id onto the active tab so reload
       // rehydrates the same task.
@@ -383,12 +424,9 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         onTabTaskChange(taskId);
       },
     },
-    lock: {
-      queryClient,
-    },
   });
 
-  const corpusCount = result?.data?.corpus_sizes.length ?? 0;
+  const corpusCount = result?.data.corpus_sizes.length ?? 0;
   const chartPadding = 40;
   const chartHeight = Math.min(520, Math.max(320, Math.round(chartWidth * 0.55)));
 
@@ -446,7 +484,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const handleRunOrUpdate = async () => {
     await ensureNodeColors();
     await executeAnalysisRerun({
-      hasUnrunChanges: hasTopicChanges,
+      hasAttachedAnalysis: Boolean(tabTaskId),
       clearResults,
       runFreshAnalysis: handleRun,
     });
@@ -503,9 +541,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           result={result}
           topics={topics}
           containerRef={containerRef}
-          isDetachLoading={isDetachLoading}
-          isDetaching={isDetaching}
-          openDetachDialog={openDetachDialog}
           chartRef={chartRef}
           handleResetZoom={handleResetZoom}
           isAtGlobalZoom={isAtGlobalZoom}
@@ -522,16 +557,45 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           activeDomain={activeDomain}
           nodeNames={panelSelectedNodes.map((n) => n.name)}
           randomSeed={randomSeed}
-          detachDialogOpen={detachDialogOpen}
-          setDetachDialogOpen={setDetachDialogOpen}
-          detachNodeOptions={detachNodeOptions}
-          selectedDetachColumns={selectedDetachColumns}
-          toggleDetachColumn={toggleDetachColumn}
-          selectAllDetachColumns={selectAllDetachColumns}
-          deselectAllDetachColumns={deselectAllDetachColumns}
-          handleDetachConfirm={handleDetachConfirm}
+          onAddToWorkspace={openDetachDialog}
+          isAddingToWorkspace={isDetaching}
         />
       )}
+      <TopicModelingDetachDialog
+        open={detachDialogOpen}
+        onOpenChange={setDetachDialogOpen}
+        sources={detachSources}
+        selectedSourceIds={detachSourceIds}
+        selectedColumns={detachColumns}
+        names={detachNames}
+        selectedTopicCount={selectedTopicIds.size > 0 ? selectedTopicIds.size : null}
+        isSubmitting={isDetaching}
+        onToggleSource={(nodeId) => {
+          setDetachSourceIds((current) => {
+            const next = new Set(current);
+            if (next.has(nodeId)) next.delete(nodeId);
+            else next.add(nodeId);
+            return next;
+          });
+        }}
+        onToggleColumn={(nodeId, column) => {
+          setDetachColumns((current) => {
+            const columns = current[nodeId] ?? [];
+            return {
+              ...current,
+              [nodeId]: columns.includes(column)
+                ? columns.filter((item) => item !== column)
+                : [...columns, column],
+            };
+          });
+        }}
+        onNameChange={(nodeId, name) => {
+          setDetachNames((current) => ({ ...current, [nodeId]: name }));
+        }}
+        onSubmit={() => {
+          void handleDetach();
+        }}
+      />
     </div>
   );
 }

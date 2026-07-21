@@ -1,6 +1,7 @@
 import type { TokenFrequencyResponse } from '@/api';
-import { isNonEmptyString } from '../common/utils';
+import type { AnalysisTabInput } from '@/features/views/common/tabs/tabStateOps';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import { isNonEmptyString } from '../common/utils';
 
 export interface NodeNameEntry {
   id: string;
@@ -92,6 +93,33 @@ export const deriveStudyNodeOrder = (
   };
 };
 
+/**
+ * Reconciles hydrated request columns without replacing an existing panel order.
+ * Used by: TokenFrequencyFeature result/request hydration because backend
+ * comparison order is [Reference, Study], while parameter-card order belongs
+ * to the user's input layout.
+ */
+export const reconcileHydratedTokenFrequencyInputs = (
+  currentInputs: AnalysisTabInput[],
+  hydratedInputs: AnalysisTabInput[],
+): AnalysisTabInput[] => {
+  const hydratedByNodeId = new Map(hydratedInputs.map((input) => [input.node_id, input]));
+  const hasSameNodes =
+    currentInputs.length === hydratedInputs.length &&
+    new Set(currentInputs.map((input) => input.node_id)).size === currentInputs.length &&
+    currentInputs.every((input) => hydratedByNodeId.has(input.node_id));
+
+  if (!hasSameNodes) return hydratedInputs;
+
+  return currentInputs.map((input) => {
+    const hydrated = hydratedByNodeId.get(input.node_id);
+    return {
+      node_id: input.node_id,
+      column: hydrated?.column ?? input.column,
+    };
+  });
+};
+
 /** Builds the node-id display-name map used by token-click handoffs and result fallbacks. */
 /**
  * Used by: TokenFrequencyFeature.tsx and tokenFrequencyUtils.test.ts because handoffs to concordance and result labels need the same canonical name/id fallback order.
@@ -138,11 +166,7 @@ export const resolveTokenFrequencyDisplayName = ({
  */
 export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null): number | null => {
   if (!results) return null;
-  const candidate =
-    results.token_limit ??
-    (results.analysis_params as Record<string, unknown> | undefined)?.token_limit ??
-    (results.metadata as Record<string, unknown> | undefined)?.token_limit;
-  return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
+  return Number.isFinite(results.token_limit) ? results.token_limit : null;
 };
 
 /** Reads the backend's persisted stop-word list from all supported response locations. */
@@ -154,13 +178,7 @@ export const deriveBackendStopWords = (
   results?: TokenFrequencyResponse | null,
 ): string[] | null => {
   if (!results) return null;
-  const candidate =
-    (Array.isArray(results.stop_words) ? results.stop_words : null) ??
-    (Array.isArray(results.analysis_params?.stop_words)
-      ? results.analysis_params.stop_words
-      : null) ??
-    (Array.isArray(results.metadata?.stop_words) ? results.metadata.stop_words : null);
-  return Array.isArray(candidate) ? candidate.map((item) => String(item)) : null;
+  return results.stop_words;
 };
 
 /** Builds a stable stop-word key for effects that sync backend preferences into UI state. */

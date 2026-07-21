@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
-import { analysisTaskPreferences } from '@/api';
 import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common/utils';
@@ -14,15 +13,11 @@ import {
 } from './tokenFrequencyPreferenceState';
 
 interface UseTokenFrequencyPreferencesParams {
-  currentWorkspaceId: string | null;
   results: TokenFrequencyResponse | null;
   setResults: React.Dispatch<React.SetStateAction<TokenFrequencyResponse | null>>;
-  resolveTokenFrequencyTaskId: () => Promise<string | null>;
   backendTokenLimit: number | null;
   backendStopWordsKey: string;
   maxTokenLimitInput: number;
-  /** When false, the stopwords / token-limit handlers update local client state only and skip the backend persist roundtrip. Defaults to ``true``. */
-  persistEnabled?: boolean;
 }
 
 /** Owns token-frequency preference UI state and persistence for stop words and display limits. */
@@ -33,14 +28,11 @@ interface UseTokenFrequencyPreferencesParams {
  * updates to the active task, patch the displayed result, and expose UI handlers.
  */
 export const useTokenFrequencyPreferences = ({
-  currentWorkspaceId,
   results,
   setResults,
-  resolveTokenFrequencyTaskId,
   backendTokenLimit,
   backendStopWordsKey,
   maxTokenLimitInput,
-  persistEnabled = true,
 }: UseTokenFrequencyPreferencesParams) => {
   const [preferenceState, dispatchPreference] = useReducer(
     tokenFrequencyPreferenceReducer,
@@ -124,84 +116,36 @@ export const useTokenFrequencyPreferences = ({
     return DEFAULT_TOKEN_LIMIT;
   })();
 
-  const persistTokenPreferences = useCallback(
-    async (prefs: { token_limit?: number; stop_words?: string[] }) => {
-      // Local-only mode is already updated by the caller; skip the backend roundtrip.
-      if (!persistEnabled) return;
-      if (!currentWorkspaceId) return;
-      const taskId = await resolveTokenFrequencyTaskId();
-      if (!taskId) return;
-
-      const payload: Record<string, unknown> = {};
-      if (prefs.token_limit !== undefined) {
-        payload.token_limit = Math.min(
-          clampDisplayTokenLimit(prefs.token_limit).limit,
-          maxTokenLimitInput,
-        );
-      }
-      if (prefs.stop_words !== undefined) {
-        payload.stop_words = prefs.stop_words;
-      }
-      if (Object.keys(payload).length === 0) return;
-
-      await analysisTaskPreferences({
-        body: payload,
-        path: { workspace_id: currentWorkspaceId, task_id: taskId },
-        throwOnError: true,
-      });
-    },
-    [persistEnabled, currentWorkspaceId, resolveTokenFrequencyTaskId, maxTokenLimitInput],
-  );
-
   const updateResultsPreferencesLocally = useCallback(
     (prefs: { token_limit?: number; stop_words?: string[] }) => {
       setResults((prev) => {
         if (!prev) return prev;
 
-        const metadata = { ...(prev.metadata ?? {}) } as Record<string, unknown>;
-        const analysisParams = { ...(prev.analysis_params ?? {}) } as Record<string, unknown>;
-
-        let nextTokenLimit: number | undefined;
-        const existingTokenLimit =
-          typeof prev.token_limit === 'number' && Number.isFinite(prev.token_limit)
-            ? prev.token_limit
-            : undefined;
+        let nextTokenLimit = prev.token_limit;
         if (prefs.token_limit !== undefined) {
           nextTokenLimit = prefs.token_limit;
-        } else {
-          nextTokenLimit = existingTokenLimit;
         }
 
-        if (nextTokenLimit !== undefined && Number.isFinite(nextTokenLimit)) {
+        if (Number.isFinite(nextTokenLimit)) {
           const { limit: normalizedLimit } = clampDisplayTokenLimit(nextTokenLimit);
           const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
-          metadata.token_limit = inputLimit;
-          analysisParams.token_limit = inputLimit;
           nextTokenLimit = inputLimit;
         }
 
-        delete metadata.limit;
-        delete analysisParams.limit;
-
         const stopWordsArray =
           prefs.stop_words ??
-          (Array.isArray(prev.stop_words)
-            ? prev.stop_words
-            : Array.isArray(metadata.stop_words)
-              ? metadata.stop_words
-              : []);
-
-        metadata.stop_words = stopWordsArray;
-        analysisParams.stop_words = stopWordsArray;
+          (Array.isArray(prev.stop_words) ? prev.stop_words : prev.metadata.stop_words);
 
         return {
           ...prev,
-          token_limit: nextTokenLimit ?? undefined,
-          analysis_params: analysisParams,
-          metadata,
+          token_limit: nextTokenLimit,
+          analysis_params: {
+            ...prev.analysis_params,
+            token_limit: nextTokenLimit,
+            stop_words: stopWordsArray,
+          },
+          metadata: { ...prev.metadata, token_limit: nextTokenLimit, stop_words: stopWordsArray },
           stop_words: stopWordsArray,
-          message: prev.message,
-          state: prev.state,
         };
       });
     },
@@ -215,7 +159,7 @@ export const useTokenFrequencyPreferences = ({
    * which differ only in how they normalize user input. This keeps persistence,
    * optimistic result metadata, loading state, and failure copy in one path.
    */
-  const persistAndApplyTokenLimit = async (targetLimit: number) => {
+  const persistAndApplyTokenLimit = (targetLimit: number) => {
     if (!results || targetLimit === effectiveTokenLimit) {
       applyTokenLimitState(targetLimit);
       return;
@@ -223,7 +167,6 @@ export const useTokenFrequencyPreferences = ({
 
     dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
     try {
-      await persistTokenPreferences({ token_limit: targetLimit });
       updateResultsPreferencesLocally({ token_limit: targetLimit });
       applyTokenLimitState(targetLimit);
     } catch (error) {
@@ -243,7 +186,7 @@ export const useTokenFrequencyPreferences = ({
    * Flow: parse and clamp the input, short-circuit unchanged/local-only state,
    * otherwise persist the limit and apply it to reducer and result metadata.
    */
-  const applyTokenLimitWithValidation = async () => {
+  const applyTokenLimitWithValidation = () => {
     const parsed = toFiniteNumber(tokenLimitInput);
     if (parsed === null) {
       dispatchPreference({
@@ -274,36 +217,31 @@ export const useTokenFrequencyPreferences = ({
 
     dispatchPreference({ type: 'tokenLimitErrorChanged', error: null });
 
-    await persistAndApplyTokenLimit(targetLimit);
+    persistAndApplyTokenLimit(targetLimit);
   };
 
-  const saveStopWordsToBackend = useCallback(
-    async (words: string[]) => {
-      try {
-        await persistTokenPreferences({ stop_words: words });
-        updateResultsPreferencesLocally({ stop_words: words });
-      } catch (error) {
-        console.warn('Failed to save stop words', error);
-      }
+  const saveStopWordsLocally = useCallback(
+    (words: string[]) => {
+      updateResultsPreferencesLocally({ stop_words: words });
     },
-    [persistTokenPreferences, updateResultsPreferencesLocally],
+    [updateResultsPreferencesLocally],
   );
 
-  // Ref-pattern so this callback can read the *current* saveStopWordsToBackend
+  // Ref-pattern so this callback can read the *current* local stop-word updater
   // without becoming unstable itself. Keeping the returned callback stable
   // across renders matters because it propagates through the task-flow hook's
   // right-click handler down to React.memo'd word-cloud sections; if it
   // churned per render the cloud would re-run d3-cloud layout on every
   // stopword-textarea keystroke.
-  const saveStopWordsToBackendRef = useRef(saveStopWordsToBackend);
+  const saveStopWordsLocallyRef = useRef(saveStopWordsLocally);
   useEffect(() => {
-    saveStopWordsToBackendRef.current = saveStopWordsToBackend;
-  }, [saveStopWordsToBackend]);
+    saveStopWordsLocallyRef.current = saveStopWordsLocally;
+  }, [saveStopWordsLocally]);
 
   const applyStopSetFromText = useCallback((text: string) => {
     const words = parseStopWordsText(text);
     dispatchPreference({ type: 'stopWordsApplied', words });
-    void saveStopWordsToBackendRef.current(words);
+    saveStopWordsLocallyRef.current(words);
   }, []);
 
   /** Sorts the current stop-word text so users can review and export a stable list. */
@@ -314,7 +252,7 @@ export const useTokenFrequencyPreferences = ({
     const words = parseStopWordsText(stopWords);
     words.sort((a, b) => a.localeCompare(b));
     dispatchPreference({ type: 'stopWordsApplied', words });
-    void saveStopWordsToBackend(words);
+    saveStopWordsLocally(words);
   };
 
   /** Mirrors token-limit keystrokes into state while clearing stale validation errors. */
@@ -351,7 +289,7 @@ export const useTokenFrequencyPreferences = ({
    * Returned to `TokenFrequencyFeature` by `useTokenFrequencyPreferences`.
    */
   const handleTokenLimitBlur = () => {
-    void applyTokenLimitWithValidation();
+    applyTokenLimitWithValidation();
   };
 
   // Programmatically apply a numeric cloud-side token limit (used by the
@@ -362,7 +300,7 @@ export const useTokenFrequencyPreferences = ({
    * Called by preference handlers in `useTokenFrequencyPreferences`.
    * Flow: normalize and cap the requested limit, update local input/error state, persist when results exist and value changed, then mirror preferences locally.
    */
-  const applyTokenLimit = async (value: number) => {
+  const applyTokenLimit = (value: number) => {
     if (!Number.isFinite(value) || value <= 0) return;
     const { limit: normalizedLimit } = clampDisplayTokenLimit(Math.floor(value));
     const targetLimit = Math.min(normalizedLimit, maxTokenLimitInput);
@@ -371,7 +309,7 @@ export const useTokenFrequencyPreferences = ({
       input: String(targetLimit),
       clearError: true,
     });
-    await persistAndApplyTokenLimit(targetLimit);
+    persistAndApplyTokenLimit(targetLimit);
   };
 
   /** Adds a chosen language's default stop words to the existing editable list. */
@@ -430,7 +368,6 @@ export const useTokenFrequencyPreferences = ({
     handleTokenLimitBlur,
     applyTokenLimit,
     handleAddDefaultStopWords,
-    persistTokenPreferences,
     resetPreferenceUiState,
   };
 };

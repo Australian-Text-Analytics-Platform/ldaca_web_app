@@ -3,144 +3,210 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { WorkspaceTabsState } from '@/api';
-import { useWorkspaceTabs } from '../useWorkspaceTabs';
-
-const { getWorkspaceTabsMock, putWorkspaceTabsMock, clearTaskMock } = vi.hoisted(() => ({
-  getWorkspaceTabsMock: vi.fn(),
-  putWorkspaceTabsMock: vi.fn(),
-  clearTaskMock: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  listTabs: vi.fn(),
+  createTab: vi.fn(),
+  deleteTab: vi.fn(),
+  renameTab: vi.fn(),
 }));
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  getWorkspaceTabs: getWorkspaceTabsMock,
-  putWorkspaceTabs: putWorkspaceTabsMock,
-  clearTask: clearTaskMock,
+  listTabs: mocks.listTabs,
+  createTab: mocks.createTab,
+  deleteTab: mocks.deleteTab,
+  renameTab: mocks.renameTab,
 }));
 
-const ANALYSIS_TYPE = 'concordance_analysis';
+import { useWorkspaceTabs } from '../useWorkspaceTabs';
+import {
+  analysisTabsPresentationKey,
+  useAnalysisTabsPresentationStore,
+} from '../analysisTabsPresentationStore';
 
-/** Two tabs: one owns a backend task id, one does not. */
-function initialState(): WorkspaceTabsState {
-  return {
-    groups: {
-      [ANALYSIS_TYPE]: {
-        active_tab_id: 'tab-with-task',
-        tabs: [
-          {
-            tab_id: 'tab-with-task',
-            task_id: 'task-1',
-            title: 'A',
-            input_sets: { source: [] },
-            settings: {},
-          },
-          {
-            tab_id: 'tab-no-task',
-            task_id: null,
-            title: 'B',
-            input_sets: { source: [] },
-            settings: {},
-          },
-        ],
-      },
-    },
-  };
-}
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    {children}
+  </QueryClientProvider>
+);
 
-/** Fresh provider per render so cached tab state never leaks across tests. */
-function makeWrapper(): ({ children }: { children: ReactNode }) => ReactNode {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
-  return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-  };
-}
-
-describe('useWorkspaceTabs closeTab cleanup', () => {
-  beforeEach(() => {
-    getWorkspaceTabsMock.mockReset();
-    getWorkspaceTabsMock.mockResolvedValue({ data: initialState(), error: undefined });
-    putWorkspaceTabsMock.mockReset();
-    putWorkspaceTabsMock.mockImplementation(({ body }: { body: WorkspaceTabsState }) =>
-      Promise.resolve({ data: body, error: undefined }),
-    );
-    clearTaskMock.mockReset();
-    clearTaskMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
-  });
-
-  it('clears the backend task when a tab that owns a task id is closed', async () => {
-    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE), {
-      wrapper: makeWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.tabs).toHaveLength(2);
-    });
-
-    act(() => {
-      result.current.closeTab('tab-with-task');
-    });
-
-    expect(clearTaskMock).toHaveBeenCalledWith({
-      path: { task_id: 'task-1' },
-      throwOnError: true,
-    });
-  });
-
-  it('does not call clearTask when the closed tab owns no task id', async () => {
-    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE), {
-      wrapper: makeWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.tabs).toHaveLength(2);
-    });
-
-    act(() => {
-      result.current.closeTab('tab-no-task');
-    });
-
-    expect(clearTaskMock).not.toHaveBeenCalled();
-  });
+const serverTab = (id = 'tab-1') => ({
+  id,
+  name: id,
+  kind: 'concordance' as const,
+  analysis_id: null,
+  created_at: '2026-01-01T00:00:00Z',
+  modified_at: '2026-01-01T00:00:00Z',
+  revision: 1,
 });
 
-describe('useWorkspaceTabs setTabSetting', () => {
+describe('useWorkspaceTabs', () => {
   beforeEach(() => {
-    getWorkspaceTabsMock.mockReset();
-    getWorkspaceTabsMock.mockResolvedValue({ data: initialState(), error: undefined });
-    putWorkspaceTabsMock.mockReset();
-    putWorkspaceTabsMock.mockImplementation(({ body }: { body: WorkspaceTabsState }) =>
-      Promise.resolve({ data: body, error: undefined }),
-    );
-    clearTaskMock.mockReset();
-    clearTaskMock.mockResolvedValue({ data: { cleared: true }, error: undefined });
+    mocks.listTabs.mockReset();
+    mocks.createTab.mockReset();
+    mocks.deleteTab.mockReset();
+    mocks.renameTab.mockReset();
+    mocks.listTabs.mockResolvedValue({ data: [serverTab()], error: undefined });
+    mocks.createTab.mockResolvedValue({ data: serverTab('tab-2'), error: undefined });
+    mocks.deleteTab.mockResolvedValue({ data: undefined, error: undefined });
+    mocks.renameTab.mockResolvedValue({ data: serverTab(), error: undefined });
+    useAnalysisTabsPresentationStore.setState({ activeTabIds: {} });
+    localStorage.removeItem('ldaca-analysis-active-tabs');
   });
 
-  it('persists a free-form tab setting through to the PUT body', async () => {
-    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', ANALYSIS_TYPE), {
-      wrapper: makeWrapper(),
+  it('loads server-owned tabs and keeps active selection device-local', async () => {
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
     });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+    expect(result.current.tabs[0]).toMatchObject({ tab_id: 'tab-1', kind: 'concordance' });
+    act(() => result.current.setActiveTab('tab-1'));
+    expect(result.current.activeTabId).toBe('tab-1');
+  });
 
-    await waitFor(() => {
-      expect(result.current.tabs).toHaveLength(2);
+  it('restores the active tab after the view hook unmounts and remounts', async () => {
+    mocks.listTabs.mockResolvedValue({
+      data: [serverTab('tab-1'), serverTab('tab-2')],
+      error: undefined,
     });
+    let view = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
+    });
+    await waitFor(() => expect(view.result.current.tabs).toHaveLength(2));
 
     act(() => {
-      result.current.setTabSetting('tab-with-task', 'aiProvider', 'openai');
+      view.result.current.setActiveTab('tab-2');
+    });
+    expect(view.result.current.activeTabId).toBe('tab-2');
+    view.unmount();
+
+    view = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
+    });
+    await waitFor(() => expect(view.result.current.tabs).toHaveLength(2));
+
+    expect(view.result.current.activeTabId).toBe('tab-2');
+    expect(
+      useAnalysisTabsPresentationStore.getState().activeTabIds[
+        analysisTabsPresentationKey('workspace-1', 'concordance')
+      ],
+    ).toBe('tab-2');
+  });
+
+  it('repairs a stored tab id that no longer exists', async () => {
+    useAnalysisTabsPresentationStore
+      .getState()
+      .rememberActiveTab('workspace-1', 'concordance', 'missing-tab');
+
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
     });
 
-    // The mutation PUTs the full state; the targeted tab carries the new setting.
     await waitFor(() => {
-      expect(putWorkspaceTabsMock).toHaveBeenCalled();
+      expect(result.current.activeTabId).toBe('tab-1');
+      expect(
+        useAnalysisTabsPresentationStore.getState().activeTabIds[
+          analysisTabsPresentationKey('workspace-1', 'concordance')
+        ],
+      ).toBe('tab-1');
     });
-    const calls = putWorkspaceTabsMock.mock.calls;
-    const lastArg = calls[calls.length - 1]?.[0] as { body: WorkspaceTabsState } | undefined;
-    const body: WorkspaceTabsState | undefined = lastArg?.body;
-    const updatedTab = body?.groups?.[ANALYSIS_TYPE]?.tabs?.find(
-      (t) => t.tab_id === 'tab-with-task',
+  });
+
+  it('selects and remembers a fallback when the active tab is deleted', async () => {
+    mocks.listTabs.mockResolvedValue({
+      data: [serverTab('tab-1'), serverTab('tab-2')],
+      error: undefined,
+    });
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(2));
+    act(() => result.current.setActiveTab('tab-2'));
+
+    act(() => result.current.closeTab('tab-2'));
+
+    await waitFor(() => {
+      expect(result.current.activeTabId).toBe('tab-1');
+      expect(
+        useAnalysisTabsPresentationStore.getState().activeTabIds[
+          analysisTabsPresentationKey('workspace-1', 'concordance')
+        ],
+      ).toBe('tab-1');
+    });
+  });
+
+  it('creates, renames, and deletes durable tabs through canonical endpoints', async () => {
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+    let createdTab = null;
+    await act(async () => {
+      createdTab = await result.current.createTab('Second');
+    });
+    expect(createdTab).toMatchObject({ id: 'tab-2' });
+    await waitFor(() =>
+      expect(mocks.createTab).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: { workspace_id: 'workspace-1' },
+          body: { kind: 'concordance', name: 'Second' },
+        }),
+      ),
     );
-    expect(updatedTab?.settings).toEqual({ aiProvider: 'openai' });
+    act(() => result.current.renameTab('tab-1', 'Renamed'));
+    await waitFor(() =>
+      expect(mocks.renameTab).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
+          body: { name: 'Renamed' },
+        }),
+      ),
+    );
+    act(() => result.current.closeTab('tab-1'));
+    await waitFor(() =>
+      expect(mocks.deleteTab).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
+        }),
+      ),
+    );
+  });
+
+  it('keeps inputs and preferences in frontend memory instead of writing tab settings to the API', async () => {
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+    act(() => {
+      result.current.setTabInputSet('tab-1', 'source', [{ node_id: 'node-1', column: 'text' }]);
+      result.current.setTabSetting('tab-1', 'mode', 'manual');
+    });
+    expect(result.current.tabs[0]?.input_sets.source).toEqual([
+      { node_id: 'node-1', column: 'text' },
+    ]);
+    expect(result.current.tabs[0]?.settings).toEqual({ mode: 'manual' });
+    expect(mocks.renameTab).not.toHaveBeenCalled();
+  });
+
+  it('does not rerender tab state for an identical input write', async () => {
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+
+    act(() => {
+      result.current.setTabInputSet('tab-1', 'source', [
+        { node_id: 'node-1', column: 'text' },
+      ]);
+    });
+    const tabAfterFirstWrite = result.current.tabs[0];
+
+    act(() => {
+      result.current.setTabInputSet('tab-1', 'source', [
+        { node_id: 'node-1', column: 'text' },
+      ]);
+    });
+
+    expect(result.current.tabs[0]).toBe(tabAfterFirstWrite);
   });
 });

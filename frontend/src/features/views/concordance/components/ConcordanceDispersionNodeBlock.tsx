@@ -18,7 +18,6 @@ import {
   getDispersionHits,
   type ConcordanceDispersionChartMode,
   type DispersionDisplayBinCount,
-  type TaggedBinRow,
 } from '../concordanceDispersionDomain';
 import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
@@ -78,12 +77,6 @@ export interface ConcordanceDispersionNodeBlockProps {
   combinedLoading: boolean;
   nodeLoading: Record<string, boolean>;
   nodeDetaching: Record<string, boolean>;
-  nodeMaterializing: Record<string, boolean>;
-  materializedPaths: Record<string, string>;
-  materializeSummaries: Record<
-    string,
-    { recordCount: number; uniqueDocuments: number; totalDocuments: number }
-  >;
 
   // Dispersion-specific state
   proportionalDispersionBars: boolean;
@@ -107,8 +100,6 @@ export interface ConcordanceDispersionNodeBlockProps {
   onClearBinSelection: (blockKey: string) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
-  getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
-  isBlockMaterialised: (nodeKey: string) => boolean;
   onDispersionDetach: (
     nodes: { nodeId: string; column: string; nodeLabel: string }[],
     selectedBins: ReadonlySet<number> | null,
@@ -127,7 +118,6 @@ export interface ConcordanceDispersionNodeBlockProps {
     column: string,
     groupedHits?: ConcordanceGroupedRow,
   ) => void;
-  handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
 }
 
@@ -154,9 +144,6 @@ export function ConcordanceDispersionNodeBlock({
   combinedLoading,
   nodeLoading,
   nodeDetaching,
-  nodeMaterializing,
-  materializedPaths,
-  materializeSummaries,
   proportionalDispersionBars,
   colourMatches,
   lowercaseMatches,
@@ -173,12 +160,9 @@ export function ConcordanceDispersionNodeBlock({
   onClearBinSelection,
   allMatchedTexts,
   matchedTextColorMap,
-  getMaterializedBinsForKey,
-  isBlockMaterialised,
   onDispersionDetach,
   handlePageChange,
   handleRowClick,
-  handleMaterialize,
   setCombinedPage,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
@@ -235,28 +219,7 @@ export function ConcordanceDispersionNodeBlock({
     const combinedNodeIds = takeMostRecent(selectedNodes, 2)
       .map((n) => n.id)
       .filter((id): id is string => Boolean(id));
-    const isAnyCombinedMaterializing = combinedNodeIds.some((id) => Boolean(nodeMaterializing[id]));
-    const allCombinedMaterialized =
-      combinedNodeIds.length > 0 && combinedNodeIds.every((id) => Boolean(materializedPaths[id]));
-    const combinedPageSizeSummary = nodeData.materialized ? (
-      Object.keys(materializeSummaries).length > 0 ? (
-        <GroupedResultsPageSizeSummary
-          groups={[]}
-          totalInstances={Object.values(materializeSummaries).reduce(
-            (sum, s) => sum + s.recordCount,
-            0,
-          )}
-          totalDocuments={Object.values(materializeSummaries).reduce(
-            (sum, s) => sum + s.uniqueDocuments,
-            0,
-          )}
-          totalProcessed={Object.values(materializeSummaries).reduce(
-            (sum, s) => sum + s.totalDocuments,
-            0,
-          )}
-        />
-      ) : null
-    ) : (
+    const combinedPageSizeSummary = (
       <GroupedResultsPageSizeSummary
         groups={nodeData.data}
         totalProcessed={batchProcessedCount(nodeData.pagination)}
@@ -264,11 +227,9 @@ export function ConcordanceDispersionNodeBlock({
     );
     const combinedBelowTable = (
       <>
-        {combinedPageSizeSummary ? (
-          <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-            {combinedPageSizeSummary}
-          </div>
-        ) : null}
+        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+          {combinedPageSizeSummary}
+        </div>
         <ServerPaginationFooter
           table={paginationTable}
           pageIndex={activePage - 1}
@@ -288,59 +249,20 @@ export function ConcordanceDispersionNodeBlock({
           <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
           <div className="ml-auto flex items-center space-x-2">
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
-            <Button
-              onClick={() => {
-                if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                for (const nid of combinedNodeIds) {
-                  if (materializedPaths[nid]) continue;
-                  const col =
-                    effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
-                  if (!col) continue;
-                  void handleMaterialize(nid, col);
-                }
-              }}
-              disabled={
-                isAnyCombinedMaterializing ||
-                allCombinedMaterialized ||
-                !searchWord.trim() ||
-                combinedNodeIds.length === 0
-              }
-              size="sm"
-              variant="outline"
-              className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
-            >
-              {isAnyCombinedMaterializing ? (
-                <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  Processing...
-                </>
-              ) : allCombinedMaterialized ? (
-                <>Processed</>
-              ) : (
-                <>Process Both</>
-              )}
-            </Button>
             {(() => {
               const combinedSelection =
                 (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
                   | ReadonlySet<number>
                   | undefined) ?? EMPTY_BIN_SELECTION;
-              const combinedMaterialisedBins = getMaterializedBinsForKey(
-                CONCORDANCE_COMBINED_NODE_KEY,
-              );
               const combinedHasSelection = combinedSelection.size > 0;
               const detachAction = buildDispersionDetachActionState({
                 isBusy: combinedLoading,
                 hasSearchWord: Boolean(searchWord.trim()),
                 hasDetachTarget: combinedNodeIds.length > 0,
                 hasSelection: combinedHasSelection,
-                hasMaterializedBins: Boolean(combinedMaterialisedBins),
                 colourMatches,
                 allMatchedTexts,
                 hiddenMatchedTexts,
-                materializeSelectionHint:
-                  'Materialise the corpus first (Process Both) to safely apply this bin selection across all source documents.',
                 selectedBinsHint:
                   'Add a per-document aggregation of the selected bin hits to the workspace',
                 allHitsHint: 'Add a per-document aggregation of all hits to the workspace',
@@ -442,8 +364,6 @@ export function ConcordanceDispersionNodeBlock({
             const dispersionRows = rows;
             const sourceNames = panelSelectedNodes.map((n) => n.name).filter(Boolean);
             const dataBlockLabel = sourceNames.length > 0 ? sourceNames.join(', ') : 'Combined';
-            const materialisedBins = getMaterializedBinsForKey(CONCORDANCE_COMBINED_NODE_KEY);
-            const materialised = isBlockMaterialised(CONCORDANCE_COMBINED_NODE_KEY);
             return (
               <ConcordanceDispersionSummary
                 rows={dispersionRows}
@@ -456,8 +376,6 @@ export function ConcordanceDispersionNodeBlock({
                 hiddenMatchedTexts={hiddenMatchedTexts}
                 dataBlockLabel={dataBlockLabel}
                 searchWord={searchWord}
-                materialisedBins={materialisedBins}
-                materialised={materialised}
                 aggregateAll={!colourMatches}
                 sourceColors={sourceColorMap}
                 chartMode={dispersionChartMode}
@@ -511,45 +429,17 @@ export function ConcordanceDispersionNodeBlock({
   const detachingKey = detachNodeId;
   const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
-  // Two side-by-side data blocks share one synced page size, so processing only
-  // one would leave the tables on mismatched units (instances/page vs
-  // documents/page). The Process button therefore materialises every selected
-  // block together; with a single block it processes just that node.
-  // Used by: the per-node ServerPaginationFooter below.
-  const processTogetherNodeIds = takeMostRecent(selectedNodes, 2)
-    .map((n) => n.id)
-    .filter((id): id is string => Boolean(id));
-  const isMultiBlock = processTogetherNodeIds.length > 1;
-  const processTargetIds = isMultiBlock
-    ? processTogetherNodeIds
-    : detachNodeId
-      ? [detachNodeId]
-      : [];
-  const isAnyProcessTargetMaterializing = processTargetIds.some((id) =>
-    Boolean(nodeMaterializing[id]),
-  );
-  const allProcessTargetsMaterialized =
-    processTargetIds.length > 0 && processTargetIds.every((id) => Boolean(materializedPaths[id]));
-
   const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
   // Mirror the table block's fallback: prefer the per-node materialised
   // summary when available, otherwise count from ``nodeData.data`` +
   // pagination so separated dispersion view count lines still render before
   // materialization completes.
-  const pageSizeSummary =
-    nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId] ? (
-      <GroupedResultsPageSizeSummary
-        groups={[]}
-        totalInstances={materializeSummaries[detachNodeId].recordCount}
-        totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
-        totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
-      />
-    ) : (
-      <GroupedResultsPageSizeSummary
-        groups={nodeData.data}
-        totalProcessed={batchProcessedCount(nodeData.pagination)}
-      />
-    );
+  const pageSizeSummary = (
+    <GroupedResultsPageSizeSummary
+      groups={nodeData.data}
+      totalProcessed={batchProcessedCount(nodeData.pagination)}
+    />
+  );
   const belowTable = (
     <>
       <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
@@ -565,63 +455,18 @@ export function ConcordanceDispersionNodeBlock({
         loading={nodeIsLoading}
         showPageSize
       >
-        <Button
-          onClick={() => {
-            if (!searchWord.trim()) return;
-            for (const nid of processTargetIds) {
-              if (materializedPaths[nid]) continue;
-              const col = isMultiBlock
-                ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
-                : column;
-              if (!col) continue;
-              void handleMaterialize(nid, col);
-            }
-          }}
-          disabled={
-            nodeIsLoading ||
-            isAnyProcessTargetMaterializing ||
-            allProcessTargetsMaterialized ||
-            !searchWord.trim() ||
-            !canDetach ||
-            processTargetIds.length === 0
-          }
-          size="sm"
-          variant="outline"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title={
-            isMultiBlock
-              ? 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
-              : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
-          }
-        >
-          {isAnyProcessTargetMaterializing ? (
-            <>
-              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-              Processing...
-            </>
-          ) : allProcessTargetsMaterialized ? (
-            <>Processed</>
-          ) : isMultiBlock ? (
-            <>Process Both Blocks</>
-          ) : (
-            <>Process All</>
-          )}
-        </Button>
         {(() => {
           const nodeSelection =
             (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ?? EMPTY_BIN_SELECTION;
-          const nodeMaterialisedBins = getMaterializedBinsForKey(nodeKey);
           const nodeHasSelection = nodeSelection.size > 0;
           const detachAction = buildDispersionDetachActionState({
             isBusy: nodeIsLoading || isDetaching,
             hasSearchWord: Boolean(searchWord.trim()),
             hasDetachTarget: canDetach && Boolean(detachNodeId),
             hasSelection: nodeHasSelection,
-            hasMaterializedBins: Boolean(nodeMaterialisedBins),
             colourMatches,
             allMatchedTexts,
             hiddenMatchedTexts,
-            materializeSelectionHint: `Materialise the corpus first (${isMultiBlock ? 'Process Both Blocks' : 'Process All'}) to safely apply this bin selection across all documents.`,
             selectedBinsHint:
               'Add a per-document aggregation of the selected bin hits to the workspace',
             allHitsHint: 'Add a per-document aggregation of all hits to the workspace',
@@ -734,8 +579,6 @@ export function ConcordanceDispersionNodeBlock({
           const dispersionRows = rows;
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key
           const dataBlockLabel = context.displayName || nodeKey;
-          const materialisedBins = getMaterializedBinsForKey(nodeKey);
-          const materialised = isBlockMaterialised(nodeKey);
           return (
             <ConcordanceDispersionSummary
               rows={dispersionRows}
@@ -748,8 +591,6 @@ export function ConcordanceDispersionNodeBlock({
               hiddenMatchedTexts={hiddenMatchedTexts}
               dataBlockLabel={dataBlockLabel}
               searchWord={searchWord}
-              materialisedBins={materialisedBins}
-              materialised={materialised}
               aggregateAll={!colourMatches}
               sourceColor={context.nodeColor}
               chartMode={dispersionChartMode}

@@ -9,8 +9,6 @@ interface DispersionDetachActionInput extends VisibleMatchedTextsInput {
   hasSearchWord: boolean;
   hasDetachTarget: boolean;
   hasSelection: boolean;
-  hasMaterializedBins: boolean;
-  materializeSelectionHint: string;
   selectedBinsHint: string;
   allHitsHint: string;
 }
@@ -19,7 +17,6 @@ export interface DispersionDetachActionState {
   disabled: boolean;
   title: string;
   visibleMatchedTexts: string[] | null;
-  scopeMismatch: boolean;
   allLegendHidden: boolean;
 }
 
@@ -42,8 +39,7 @@ export function getVisibleMatchedTexts({
 /**
  * Builds the disabled/title state for Add to Workspace dispersion actions.
  * Used by: ConcordanceDispersionNodeBlock's combined and per-node branches.
- * Flow: derive visible legend terms, block selected-bin detaches until bins are
- * materialized for whole-corpus scope, block all-hidden legends, then apply the
+ * Flow: derive visible legend terms, block all-hidden legends, then apply the
  * shared busy/search/target gates.
  */
 export function buildDispersionDetachActionState({
@@ -51,11 +47,9 @@ export function buildDispersionDetachActionState({
   hasSearchWord,
   hasDetachTarget,
   hasSelection,
-  hasMaterializedBins,
   colourMatches,
   allMatchedTexts,
   hiddenMatchedTexts,
-  materializeSelectionHint,
   selectedBinsHint,
   allHitsHint,
 }: DispersionDetachActionInput): DispersionDetachActionState {
@@ -64,23 +58,19 @@ export function buildDispersionDetachActionState({
     allMatchedTexts,
     hiddenMatchedTexts,
   });
-  const scopeMismatch = hasSelection && !hasMaterializedBins;
   const allLegendHidden =
     visibleMatchedTexts !== null && allMatchedTexts.length > 0 && visibleMatchedTexts.length === 0;
-  const disabled = isBusy || !hasSearchWord || !hasDetachTarget || scopeMismatch || allLegendHidden;
-  const title = scopeMismatch
-    ? materializeSelectionHint
-    : allLegendHidden
-      ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
-      : hasSelection
-        ? selectedBinsHint
-        : allHitsHint;
+  const disabled = isBusy || !hasSearchWord || !hasDetachTarget || allLegendHidden;
+  const title = allLegendHidden
+    ? 'All matched terms are hidden in the legend. Re-enable at least one to detach.'
+    : hasSelection
+      ? selectedBinsHint
+      : allHitsHint;
 
   return {
     disabled,
     title,
     visibleMatchedTexts,
-    scopeMismatch,
     allLegendHidden,
   };
 }

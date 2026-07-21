@@ -1,3 +1,4 @@
+import type { Analysis } from '@/api';
 import { extractAndSetTaskId } from '../extractTaskId';
 
 interface CurrentRef<T> {
@@ -9,21 +10,16 @@ interface AnalysisRunTaskMarker {
   state: string | null;
 }
 
-interface AnalysisRunResponse {
-  state?: string | null;
-}
-
-interface RunAnalysisTaskEnvelopeOptions<TResponse extends AnalysisRunResponse> {
+interface RunAnalysisTaskEnvelopeOptions<TAnalysis extends Analysis> {
   lastFetchedRef: CurrentRef<AnalysisRunTaskMarker>;
   runningRef: CurrentRef<boolean>;
   setIsRunning: (value: boolean) => void;
   setLocalTaskId: (taskId: string | null) => void;
   onTaskIdAssigned: (taskId: string | null) => void;
   resetBeforeRun: () => void;
-  submit: () => Promise<TResponse>;
-  onSuccess: (response: TResponse, taskId: string | null) => void;
+  submit: () => Promise<TAnalysis>;
+  onSuccess: (analysis: TAnalysis, taskId: string | null) => void;
   onError: (error: unknown) => void;
-  shouldReleaseRunning?: (response: TResponse) => boolean;
 }
 
 const releaseRunning = (
@@ -36,19 +32,24 @@ const releaseRunning = (
 
 /**
  * Runs the common frontend submit envelope for async analysis tasks that return
- * a backend task id in their response metadata.
+ * a canonical Analysis resource.
  *
- * Used by: token-frequency and topic-modeling task-flow hooks because both
- * workflows share the same task marker reset, running-flag ownership, task-id
- * handoff, and failed-run cleanup while keeping their request/result handling
- * feature-specific.
+ * Used by: every tab-owned background-analysis submit flow. The workflows
+ * share task marker reset, running-flag ownership, task-id handoff, and
+ * failed-run cleanup while keeping request and Result handling feature-specific.
  *
  * Flow: reset the last fetched marker, mark the run active, let the feature
  * clear its local result/error state, submit the API request, store/report the
- * returned task id, then release the running flag only for failed responses or
- * thrown submit errors.
+ * returned Analysis id, then release the running flag only for rejected
+ * terminal responses or thrown submit errors. Results are fetched separately
+ * from the Analysis result endpoint after completion.
+ *
+ * This interface intentionally accepts only the generated Analysis lifecycle
+ * resource. Immediate-result workflows store their result directly. A hybrid
+ * endpoint must discriminate its response before routing only its background
+ * branch through this envelope.
  */
-export async function runAnalysisTaskEnvelope<TResponse extends AnalysisRunResponse>({
+export async function runAnalysisTaskEnvelope<TAnalysis extends Analysis>({
   lastFetchedRef,
   runningRef,
   setIsRunning,
@@ -58,8 +59,7 @@ export async function runAnalysisTaskEnvelope<TResponse extends AnalysisRunRespo
   submit,
   onSuccess,
   onError,
-  shouldReleaseRunning = (response) => response.state === 'failed',
-}: RunAnalysisTaskEnvelopeOptions<TResponse>): Promise<TResponse | null> {
+}: RunAnalysisTaskEnvelopeOptions<TAnalysis>): Promise<TAnalysis | null> {
   lastFetchedRef.current = { taskId: null, state: null };
   setIsRunning(true);
   runningRef.current = true;
@@ -71,7 +71,7 @@ export async function runAnalysisTaskEnvelope<TResponse extends AnalysisRunRespo
     onTaskIdAssigned(taskId);
     onSuccess(response, taskId);
 
-    if (shouldReleaseRunning(response)) {
+    if (response.state === 'failed' || response.state === 'cancelled') {
       releaseRunning(runningRef, setIsRunning);
     }
 

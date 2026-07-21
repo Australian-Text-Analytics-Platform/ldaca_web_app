@@ -6,10 +6,10 @@ import { cn } from '@/lib/utils';
 interface QuotationEngineSettingsFieldsProps {
   idPrefix: string;
   engineConfig: QuotationEngineConfig;
-  lastRemoteUrl: string;
+  lastRemoteEngineId: string;
   error?: string | null;
   onEngineConfigChange: (config: QuotationEngineConfig) => void;
-  onRemoteUrlChange: (url: string) => void;
+  onRemoteEngineIdChange: (engineId: string) => void;
   className?: string;
 }
 
@@ -28,38 +28,42 @@ const ENGINE_OPTIONS: { value: QuotationEngineType; label: string; description: 
 
 /**
  * Quotation engine task parameter fields used by the Quotation parameter panel.
- * The backend task request stores `local`/`remote`; the UI presents those choices
- * as Built-in/Remote radios with the endpoint input mounted only while Remote is active.
+ * The backend task request stores `local`/`remote` plus an optional engine id;
+ * the UI presents those choices as Built-in/Remote radios with the id input
+ * mounted only while Remote is active.
  * Used by: QuotationFeature because each quotation tab needs local task-level engine controls.
- * Flow: derive the selected engine, switch local task config from radio changes, and keep the in-task remote endpoint synchronized from the conditional input.
+ * Flow: derive the selected engine, switch local task config from radio changes,
+ * and keep the in-task remote engine id synchronized from the conditional input.
  */
 export function QuotationEngineSettingsFields({
   idPrefix,
   engineConfig,
-  lastRemoteUrl,
+  lastRemoteEngineId,
   error,
   onEngineConfigChange,
-  onRemoteUrlChange,
+  onRemoteEngineIdChange,
   className,
 }: QuotationEngineSettingsFieldsProps) {
   const selectedType = engineConfig.type ?? 'local';
-  const endpointValue = engineConfig.type === 'remote' ? (engineConfig.url ?? '') : lastRemoteUrl;
+  const engineIdValue =
+    engineConfig.type === 'remote' ? (engineConfig.engine_id ?? '') : lastRemoteEngineId;
 
   /** Called by: quotation engine radio inputs because the parameter panel needs one local update path for task engine changes. */
   const handleTypeChange = (nextType: QuotationEngineType) => {
     if (nextType === 'remote') {
-      const restoredUrl = lastRemoteUrl.length > 0 ? lastRemoteUrl : (engineConfig.url ?? '');
-      onEngineConfigChange({ type: 'remote', url: restoredUrl });
+      const restoredEngineId =
+        lastRemoteEngineId.length > 0 ? lastRemoteEngineId : (engineConfig.engine_id ?? '');
+      onEngineConfigChange({ type: 'remote', engine_id: restoredEngineId });
       return;
     }
     onEngineConfigChange({ type: 'local' });
   };
 
-  /** Called by: the remote endpoint input because remote URL changes must update both remembered and active task engine state. */
-  const handleEndpointChange = (value: string) => {
-    onRemoteUrlChange(value);
+  /** Called by: the remote engine id input because changes update both remembered and active task state. */
+  const handleEngineIdChange = (value: string) => {
+    onRemoteEngineIdChange(value);
     if (selectedType !== 'remote') {
-      onEngineConfigChange({ type: 'remote', url: value });
+      onEngineConfigChange({ type: 'remote', engine_id: value });
     }
   };
 
@@ -97,15 +101,15 @@ export function QuotationEngineSettingsFields({
       </div>
       {selectedType === 'remote' ? (
         <div className="max-w-xl space-y-2">
-          <Label htmlFor={`${idPrefix}-endpoint`}>Endpoint</Label>
+          <Label htmlFor={`${idPrefix}-engine-id`}>Engine id</Label>
           <Input
-            id={`${idPrefix}-endpoint`}
-            type="url"
-            value={endpointValue}
+            id={`${idPrefix}-engine-id`}
+            type="text"
+            value={engineIdValue}
             onChange={(event) => {
-              handleEndpointChange(event.target.value);
+              handleEngineIdChange(event.target.value);
             }}
-            placeholder="https://quotation.example/api"
+            placeholder="remote-quotation-engine"
             aria-invalid={error ? true : undefined}
           />
           {error ? <p className="text-xs text-destructive">{error}</p> : null}

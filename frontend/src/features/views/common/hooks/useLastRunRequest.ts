@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { getAnalysisTaskRequest, type LastRunAnalysisType } from '../analysisTasksApi';
+import { getAnalysisRequest } from '../analysisApi';
+import type { LastRunAnalysisType } from '../analysisIds';
 
 export type { LastRunAnalysisType };
 
@@ -45,7 +46,7 @@ export function useLastRunRequest({ analysisType, workspaceId, taskId }: Args) {
         return empty;
       }
       try {
-        const request = await getAnalysisTaskRequest(analysisType, workspaceId, taskId);
+        const request = await getAnalysisRequest(workspaceId, taskId);
         const serverRequest =
           request && typeof request === 'object' ? (request as Record<string, unknown>) : null;
         return {

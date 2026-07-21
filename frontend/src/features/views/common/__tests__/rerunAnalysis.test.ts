@@ -3,16 +3,18 @@ import { describe, expect, it, vi } from 'vitest';
 import { executeAnalysisRerun } from '../rerunAnalysis';
 
 describe('executeAnalysisRerun', () => {
-  it('clears previous results before rerunning when current inputs or params changed', async () => {
+  it('clears an attached Analysis before rerunning', async () => {
     const events: string[] = [];
 
     await executeAnalysisRerun({
-      hasUnrunChanges: true,
-      // eslint-disable-next-line @typescript-eslint/require-await -- mock must match async interface
-      clearResults: async () => {
+      hasAttachedAnalysis: true,
+
+      clearResults: async (options) => {
+        expect(options).toEqual({ preserveLocalState: true });
         events.push('clear');
+        return true;
       },
-      // eslint-disable-next-line @typescript-eslint/require-await -- mock must match async interface
+
       runFreshAnalysis: async () => {
         events.push('run');
       },
@@ -21,16 +23,14 @@ describe('executeAnalysisRerun', () => {
     expect(events).toEqual(['clear', 'run']);
   });
 
-  it('runs directly when the current request matches the last run', async () => {
-    const clearResults = vi.fn(async () => {
-      /* no-op mock */
-    });
+  it('runs directly when the Tab has no attached Analysis', async () => {
+    const clearResults = vi.fn(async () => true);
     const runFreshAnalysis = vi.fn(async () => {
       /* no-op mock */
     });
 
     await executeAnalysisRerun({
-      hasUnrunChanges: false,
+      hasAttachedAnalysis: false,
       clearResults,
       runFreshAnalysis,
     });
@@ -39,20 +39,19 @@ describe('executeAnalysisRerun', () => {
     expect(runFreshAnalysis).toHaveBeenCalledTimes(1);
   });
 
-  it('passes rerun clear options through to clearResults', async () => {
-    const clearResults = vi.fn(async () => {
+  it('does not submit a replacement when clearing the attached Analysis fails', async () => {
+    const clearResults = vi.fn(async () => false);
+    const runFreshAnalysis = vi.fn(async () => {
       /* no-op mock */
     });
 
     await executeAnalysisRerun({
-      hasUnrunChanges: true,
+      hasAttachedAnalysis: true,
       clearResults,
-      runFreshAnalysis: vi.fn(async () => {
-        /* no-op mock */
-      }),
-      clearOptionsOnRerun: { preserveLocalState: true },
+      runFreshAnalysis,
     });
 
     expect(clearResults).toHaveBeenCalledWith({ preserveLocalState: true });
+    expect(runFreshAnalysis).not.toHaveBeenCalled();
   });
 });

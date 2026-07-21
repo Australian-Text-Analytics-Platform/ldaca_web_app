@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getNodeRowsTable } from '@/api';
+import { queryWorkspaceSqlTable, sqlIdentifier, sqlTable } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 
 interface UniqueValueCountProps {
@@ -18,14 +18,21 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
     queryKey: queryKeys.columnUniqueValues(workspaceId, nodeId, columnName),
     // Used by: UniqueValueCount query to fetch metadata that informs group-by decisions.
     queryFn: async () => {
-      const response = await getNodeRowsTable({
-        path: { workspace_id: workspaceId, node_id: nodeId },
-        query: { page: 1, page_size: 1000 },
+      const column = sqlIdentifier(columnName);
+      const response = await queryWorkspaceSqlTable({
+        path: { workspace_id: workspaceId },
+        body: {
+          mode: 'query',
+          node_ids: [nodeId],
+          sql: `SELECT COUNT(DISTINCT ${column}) AS unique_count, COUNT(*) > COUNT(${column}) AS has_null FROM ${sqlTable(nodeId)}`,
+          page: 1,
+          page_size: 1,
+        },
       });
-      const values = response.rows.map((row) => row[columnName]);
+      const row = response.rows[0];
       return {
-        unique_count: new Set(values.filter((value) => value !== null)).size,
-        has_null: values.some((value) => value === null),
+        unique_count: Number(row?.unique_count ?? 0),
+        has_null: row?.has_null === true,
       };
     },
     enabled: !!workspaceId && !!nodeId && !!columnName,

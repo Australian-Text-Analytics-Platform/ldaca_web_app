@@ -66,7 +66,7 @@ export interface UseAnalysisTaskStatusOptions {
 
 /** Summarizes the latest task state for an analysis feature's banners and result panels. */
 /**
- * Used by: src/features/views/common/hooks/useMaterializeLifecycle.ts, src/features/views/common/tasks/useAnalysisTaskFlow.ts.
+ * Used by: src/features/views/common/tasks/useAnalysisTaskFlow.ts and analysis feature banners.
  * Flow: normalize task-type inputs, restrict tasks to the requested workspace
  * and optional owner ids, sort by timestamp/event order, then expose active,
  * terminal, and banner task summaries.

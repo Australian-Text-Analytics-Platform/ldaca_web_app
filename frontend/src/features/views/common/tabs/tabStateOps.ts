@@ -1,80 +1,80 @@
 /**
- * Pure, framework-free transforms over the persisted ``WorkspaceTabsState``
- * sidecar shape. Every operation is keyed by ``analysisType`` (the tab-group
- * namespace) and returns a brand-new state object so React Query's optimistic
- * ``setQueryData`` updates stay immutable.
+ * Frontend-only tab presentation state.
  *
- * Used by: useWorkspaceTabs hook because the hook needs deterministic,
- * unit-testable read-modify-write reducers before it PUTs the whole state back
- * to ``/workspaces/{id}/tabs``. Keeping the logic here (not inside the hook)
- * lets the reducers be covered by fast pure tests without mounting React.
+ * The durable Tab resource is owned by the workspace backend. These types keep
+ * drafts, active selection, and input controls in memory while the server
+ * remains the source of truth for tab identity and analysis ownership.
  */
-import type { AnalysisTab, AnalysisTabGroup, AnalysisTabInput, WorkspaceTabsState } from '@/api';
+import type { AnalysisKind, Tab } from '@/api';
 
-/** Empty default returned when a workspace has no tabs sidecar yet. */
-export const EMPTY_TABS_STATE: WorkspaceTabsState = { groups: {} };
-/** Default selector id for the primary source node set. */
+export interface AnalysisTabInput {
+  node_id: string;
+  column?: string | null;
+}
+export type AnalysisTabInputSets = Record<string, AnalysisTabInput[]>;
+
+export interface AnalysisTab {
+  tab_id: string;
+  task_id: string | null;
+  title: string;
+  kind: AnalysisKind;
+  input_sets: AnalysisTabInputSets;
+  settings: Record<string, string>;
+  created_at?: string;
+  modified_at?: string;
+  revision?: number;
+}
+
+interface AnalysisTabGroup {
+  tabs: AnalysisTab[];
+  active_tab_id: string | null;
+}
+
+export interface WorkspaceTabsState {
+  groups: Record<string, AnalysisTabGroup>;
+}
+
 export const DEFAULT_TAB_INPUT_SET_ID = 'source';
-export type AnalysisTabInputSets = NonNullable<AnalysisTab['input_sets']>;
 
-/**
- * Generates a stable unique tab id.
- * Called by: createTabInState because new tabs need a collision-free id that
- * also survives reload/serialization. Uses the platform UUID when available and
- * degrades to a timestamp+random fallback for non-secure/test contexts.
- */
-function newTabId(): string {
-  const cryptoObj = globalThis.crypto as Crypto | undefined;
-  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
-    return cryptoObj.randomUUID();
-  }
-  return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+export function tabFromResource(tab: Tab, local?: Partial<AnalysisTab>): AnalysisTab {
+  return {
+    tab_id: tab.id,
+    task_id: local?.task_id ?? tab.analysis_id,
+    title: local?.title ?? tab.name,
+    kind: tab.kind,
+    input_sets: local?.input_sets ?? { [DEFAULT_TAB_INPUT_SET_ID]: [] },
+    settings: local?.settings ?? {},
+    created_at: tab.created_at,
+    modified_at: tab.modified_at,
+    revision: tab.revision,
+  };
 }
 
-/**
- * Reads the (possibly missing) tab group for one analysis type.
- * Called by: useWorkspaceTabs selectors and the reducers below because all
- * tab operations scope to a single analysis-type namespace.
- */
-function getGroup(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-): AnalysisTabGroup {
-  return state?.groups?.[analysisType] ?? { tabs: [], active_tab_id: null };
-}
-
-/**
- * Returns the ordered tab list for an analysis type (never undefined).
- * Called by: AnalysisTabbedPanel rendering and auto-create checks.
- */
 export function getTabs(
   state: WorkspaceTabsState | null | undefined,
   analysisType: string,
 ): AnalysisTab[] {
-  return getGroup(state, analysisType).tabs ?? [];
+  return state?.groups[analysisType]?.tabs ?? [];
 }
 
-/**
- * Reads one tab-owned selector value by id.
- * Called by: AnalysisTabsHost/useTabNodeInputs to support views with more than
- * one NodeInputsPanel. Flow: read the explicit ``input_sets[selectorId]`` value
- * and return an empty list when the current tab has no such selector.
- */
+export function getActiveTabId(
+  state: WorkspaceTabsState | null | undefined,
+  analysisType: string,
+): string | null {
+  const group = state?.groups[analysisType];
+  if (!group || group.tabs.length === 0) return null;
+  return group.tabs.some((tab) => tab.tab_id === group.active_tab_id)
+    ? group.active_tab_id
+    : (group.tabs[0]?.tab_id ?? null);
+}
+
 export function getTabInputSet(
-  tab: { input_sets?: AnalysisTabInputSets } | null | undefined,
-  selectorId: string = DEFAULT_TAB_INPUT_SET_ID,
+  tab: Pick<AnalysisTab, 'input_sets'> | null | undefined,
+  selectorId = DEFAULT_TAB_INPUT_SET_ID,
 ): AnalysisTabInput[] {
-  const namedInputs = tab?.input_sets?.[selectorId];
-  return namedInputs ?? [];
+  return tab?.input_sets[selectorId] ?? [];
 }
 
-/**
- * Reads one tab-owned free-form setting by key.
- * Called by: AnalysisTabsHost to hydrate a feature's persisted scalar
- * parameters (for example, the Annotation tab's Manual/AI mode, AI provider id,
- * model name, and prompt). Returns undefined when the active tab is missing or
- * never set the key, so callers apply their own default.
- */
 export function getTabSetting(
   tab: Pick<AnalysisTab, 'settings'> | null | undefined,
   key: string,
@@ -82,235 +82,19 @@ export function getTabSetting(
   return tab?.settings[key];
 }
 
-/**
- * Resolves the active tab id, defaulting to the first tab when the persisted
- * pointer is missing or dangling (e.g. the active tab was closed elsewhere).
- * Called by: useWorkspaceTabs so consumers always get a valid active id when at
- * least one tab exists.
- */
-export function getActiveTabId(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-): string | null {
-  const group = getGroup(state, analysisType);
-  const tabs = group.tabs ?? [];
-  if (tabs.length === 0) return null;
-  const active = group.active_tab_id;
-  if (active && tabs.some((t) => t.tab_id === active)) return active;
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- tabs is non-empty (length===0 returns above)
-  return tabs[0]!.tab_id;
-}
-
-/**
- * Replaces one analysis-type group while preserving every other group.
- * Called by: all reducers below as the single immutable write primitive so the
- * rest of ``WorkspaceTabsState`` is never accidentally dropped on PUT.
- */
-function withGroup(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  group: AnalysisTabGroup,
-): WorkspaceTabsState {
-  return {
-    groups: {
-      ...(state?.groups ?? {}),
-      [analysisType]: group,
-    },
-  };
-}
-
-/**
- * Appends a new empty tab and makes it active.
- * Called by: useWorkspaceTabs.createTab and the auto-create flow when entering
- * an empty analysis view. Returns both the next state and the new tab id so the
- * caller can persist and immediately focus the tab.
- * Flow: build a thin tab record (task_id null), append it, then point
- * ``active_tab_id`` at it.
- */
-export function createTabInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  title: string,
-  tabId: string = newTabId(),
-): { state: WorkspaceTabsState; tabId: string } {
-  const group = getGroup(state, analysisType);
-  const tab: AnalysisTab = {
-    tab_id: tabId,
-    task_id: null,
-    title,
-    input_sets: { [DEFAULT_TAB_INPUT_SET_ID]: [] },
-    settings: {},
-  };
-  const nextGroup: AnalysisTabGroup = {
-    tabs: [...(group.tabs ?? []), tab],
-    active_tab_id: tabId,
-  };
-  return { state: withGroup(state, analysisType, nextGroup), tabId };
-}
-
-/**
- * Removes a tab and reselects a neighbour as active when the closed tab was
- * focused.
- * Called by: useWorkspaceTabs.closeTab (the per-tab × button). Chooses the
- * previous tab as the new active one, mirroring Chrome's close behaviour, and
- * falls back to null when the last tab is closed.
- */
-export function closeTabInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  tabId: string,
-): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  const tabs = group.tabs ?? [];
-  const idx = tabs.findIndex((t) => t.tab_id === tabId);
-  if (idx === -1) return withGroup(state, analysisType, group);
-  const nextTabs = tabs.filter((t) => t.tab_id !== tabId);
-  let activeId = group.active_tab_id ?? null;
-  if (activeId === tabId) {
-    if (nextTabs.length === 0) {
-      activeId = null;
-    } else {
-      const neighbour = nextTabs[Math.max(0, idx - 1)];
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- nextTabs is non-empty in this branch (length===0 handled above)
-      activeId = neighbour ? neighbour.tab_id : nextTabs[0]!.tab_id;
-    }
-  }
-  return withGroup(state, analysisType, { tabs: nextTabs, active_tab_id: activeId });
-}
-
-/**
- * Renames a tab's title.
- * Called by: useWorkspaceTabs.renameTab (inline title edit in AnalysisTabbedPanel).
- */
-export function renameTabInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  tabId: string,
-  title: string,
-): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  const nextTabs = (group.tabs ?? []).map((t) => (t.tab_id === tabId ? { ...t, title } : t));
-  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
-}
-
-/**
- * Sets the active tab pointer (no-op when the id is unknown).
- * Called by: useWorkspaceTabs.setActiveTab when the user clicks a tab.
- */
-export function setActiveTabInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  tabId: string,
-): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  if (!(group.tabs ?? []).some((t) => t.tab_id === tabId)) {
-    return withGroup(state, analysisType, group);
-  }
-  return withGroup(state, analysisType, { ...group, active_tab_id: tabId });
-}
-
-/**
- * Associates a tab with a task id (or clears it with null).
- * Called by: useWorkspaceTabs.setTabTask after a run assigns a new task id and
- * after a clear removes it. This is the only place the thin tab record's
- * ``task_id`` changes — the task object itself remains the source of truth for
- * status/request/result.
- */
-export function setTabTaskInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  tabId: string,
-  taskId: string | null,
-): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  const nextTabs = (group.tabs ?? []).map((t) =>
-    t.tab_id === tabId ? { ...t, task_id: taskId } : t,
-  );
-  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
-}
-
-/**
- * Replaces one named input node set (the add-node-as-needed selection).
- * Called by: useWorkspaceTabs.setTabInputSet whenever a feature changes a
- * selector. Single-selector features use the default ``source`` set; multi-
- * selector features add their own ids alongside it.
- */
-export function setTabInputSetInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  tabId: string,
-  selectorId: string,
-  inputs: AnalysisTabInput[],
-): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  const nextTabs = (group.tabs ?? []).map((t) => {
-    if (t.tab_id !== tabId) return t;
-    const input_sets: AnalysisTabInputSets = {
-      ...t.input_sets,
-      [selectorId]: inputs,
-    };
-    return { ...t, input_sets };
-  });
-  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
-}
-
-/**
- * Sets one free-form ``settings`` key on a tab (preserving the other keys).
- * Called by: useWorkspaceTabs.setTabSetting whenever a feature persists a
- * lightweight scalar parameter that is not a node selection — the Annotation
- * tab uses it for its Manual/AI mode, provider id, model name, and prompt so
- * those round-trip with the rest of the tab state. A no-op (unknown tab) leaves
- * the state untouched.
- */
-export function setTabSettingInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  tabId: string,
-  key: string,
-  value: string,
-): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  const nextTabs = (group.tabs ?? []).map((t) =>
-    t.tab_id === tabId ? { ...t, settings: { ...t.settings, [key]: value } } : t,
-  );
-  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
-}
-
-/**
- * Reorders a group's tabs to match ``orderedTabIds`` (a permutation of the
- * current tab ids produced by a drag-and-drop gesture).
- * Called by: useWorkspaceTabs.reorderTabs once a drag drops, persisting the
- * live-preview order the user already saw the strip squeeze into. The active tab
- * pointer is untouched — dragging only changes order, never focus.
- * Flow: index the current tabs by id, rebuild the list in ``orderedTabIds``
- * order, then append any tab the caller omitted so a stale/partial order can
- * never silently drop a tab. A no-op order returns the group unchanged.
- */
-export function reorderTabsInState(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-  orderedTabIds: string[],
-): WorkspaceTabsState {
-  const group = getGroup(state, analysisType);
-  const tabs = group.tabs ?? [];
-  const byId = new Map(tabs.map((t) => [t.tab_id, t]));
-  const nextTabs: AnalysisTab[] = [];
+export function reorderTabs(tabs: AnalysisTab[], orderedIds: string[]): AnalysisTab[] {
+  const byId = new Map(tabs.map((tab) => [tab.tab_id, tab]));
+  const ordered: AnalysisTab[] = [];
   const seen = new Set<string>();
-  for (const id of orderedTabIds) {
+  for (const id of orderedIds) {
     const tab = byId.get(id);
     if (tab && !seen.has(id)) {
-      nextTabs.push(tab);
+      ordered.push(tab);
       seen.add(id);
     }
   }
-  // Safety net: keep any tab the caller did not mention (e.g. created mid-drag).
   for (const tab of tabs) {
-    if (!seen.has(tab.tab_id)) nextTabs.push(tab);
+    if (!seen.has(tab.tab_id)) ordered.push(tab);
   }
-  const unchanged =
-    nextTabs.length === tabs.length &&
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- equal lengths guarantee tabs[index] exists
-    nextTabs.every((tab, index) => tab.tab_id === tabs[index]!.tab_id);
-  if (unchanged) return withGroup(state, analysisType, group);
-  return withGroup(state, analysisType, { ...group, tabs: nextTabs });
+  return ordered;
 }

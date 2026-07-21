@@ -56,12 +56,6 @@ export interface ConcordanceTableNodeBlockProps {
   combinedLoading: boolean;
   nodeLoading: Record<string, boolean>;
   nodeDetaching: Record<string, boolean>;
-  nodeMaterializing: Record<string, boolean>;
-  materializedPaths: Record<string, string>;
-  materializeSummaries: Record<
-    string,
-    { recordCount: number; uniqueDocuments: number; totalDocuments: number }
-  >;
 
   // Handlers
   handleSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
@@ -72,7 +66,6 @@ export interface ConcordanceTableNodeBlockProps {
     column: string,
     groupedHits?: ConcordanceGroupedRow,
   ) => void;
-  handleMaterialize: (nodeId: string, column: string) => Promise<void>;
   setCombinedPage: (page: number) => void;
   openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
 }
@@ -109,20 +102,16 @@ function CombinedConcordanceTable({
   searchWord,
   showMetadata,
   selectedMetadataColumns,
+  effectiveNodeColumnSelections,
   selectedNodes,
   panelSelectedNodes,
-  effectiveNodeColumnSelections,
   sourceColorMap,
   defaultPalette,
   combinedPage,
   globalPageSize,
   onPageSizeChange,
   combinedLoading,
-  nodeMaterializing,
-  materializedPaths,
-  materializeSummaries,
   handleRowClick,
-  handleMaterialize,
   setCombinedPage,
   openDetachDialog,
 }: ConcordanceTableNodeBlockProps) {
@@ -152,28 +141,7 @@ function CombinedConcordanceTable({
   const combinedNodeIds = takeMostRecent(selectedNodes, 2)
     .map((n) => n.id)
     .filter((id): id is string => Boolean(id));
-  const isAnyCombinedMaterializing = combinedNodeIds.some((id) => Boolean(nodeMaterializing[id]));
-  const allCombinedMaterialized =
-    combinedNodeIds.length > 0 && combinedNodeIds.every((id) => Boolean(materializedPaths[id]));
-  const combinedPageSizeSummary = nodeData.materialized ? (
-    Object.keys(materializeSummaries).length > 0 ? (
-      <GroupedResultsPageSizeSummary
-        groups={[]}
-        totalInstances={Object.values(materializeSummaries).reduce(
-          (sum, s) => sum + s.recordCount,
-          0,
-        )}
-        totalDocuments={Object.values(materializeSummaries).reduce(
-          (sum, s) => sum + s.uniqueDocuments,
-          0,
-        )}
-        totalProcessed={Object.values(materializeSummaries).reduce(
-          (sum, s) => sum + s.totalDocuments,
-          0,
-        )}
-      />
-    ) : null
-  ) : (
+  const combinedPageSizeSummary = (
     <GroupedResultsPageSizeSummary
       groups={nodeData.data}
       totalProcessed={batchProcessedCount(nodeData.pagination)}
@@ -181,17 +149,15 @@ function CombinedConcordanceTable({
   );
   const combinedBelowTable = (
     <>
-      {combinedPageSizeSummary ? (
-        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-          {combinedPageSizeSummary}
-        </div>
-      ) : null}
+      <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+        {combinedPageSizeSummary}
+      </div>
       <ServerPaginationFooter
         table={table}
         pageIndex={combinedPage - 1}
         pageSize={globalPageSize}
         rowCount={nodeData.pagination.total_source_rows}
-        pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
+        pageSizeLabel="Documents per batch"
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={combinedLoading}
         showPageSize
@@ -205,39 +171,6 @@ function CombinedConcordanceTable({
         <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
         <div className="ml-auto flex items-center space-x-2">
           <span className="text-xs text-gray-500">Rows colored by source data block</span>
-          <Button
-            onClick={() => {
-              if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-              for (const nid of combinedNodeIds) {
-                if (materializedPaths[nid]) continue;
-                const col =
-                  effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
-                if (!col) continue;
-                void handleMaterialize(nid, col);
-              }
-            }}
-            disabled={
-              isAnyCombinedMaterializing ||
-              allCombinedMaterialized ||
-              !searchWord.trim() ||
-              combinedNodeIds.length === 0
-            }
-            size="sm"
-            variant="outline"
-            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title="Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them"
-          >
-            {isAnyCombinedMaterializing ? (
-              <>
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                Processing...
-              </>
-            ) : allCombinedMaterialized ? (
-              <>Processed</>
-            ) : (
-              <>Process Both</>
-            )}
-          </Button>
           <Button
             onClick={() => {
               if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
@@ -314,21 +247,15 @@ function PerNodeConcordanceTable({
   searchWord,
   showMetadata,
   selectedMetadataColumns,
-  selectedNodes,
   panelSelectedNodes,
-  effectiveNodeColumnSelections,
   nodePagination,
   globalPageSize,
   onPageSizeChange,
   nodeLoading,
   nodeDetaching,
-  nodeMaterializing,
-  materializedPaths,
-  materializeSummaries,
   handleSort,
   handlePageChange,
   handleRowClick,
-  handleMaterialize,
   openDetachDialog,
 }: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
@@ -367,44 +294,13 @@ function PerNodeConcordanceTable({
   const detachingKey = detachNodeId;
   const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
-  // Two side-by-side data blocks share one synced page size, so processing only
-  // one would leave the tables on mismatched units (instances/page vs
-  // documents/page). The Process button therefore materialises every selected
-  // block together; with a single block it processes just that node.
-  // Used by: the per-node footer below.
-  const processTogetherNodeIds = takeMostRecent(selectedNodes, 2)
-    .map((n) => n.id)
-    .filter((id): id is string => Boolean(id));
-  const isMultiBlock = processTogetherNodeIds.length > 1;
-  const processTargetIds = isMultiBlock
-    ? processTogetherNodeIds
-    : detachNodeId
-      ? [detachNodeId]
-      : [];
-  const isAnyProcessTargetMaterializing = processTargetIds.some((id) =>
-    Boolean(nodeMaterializing[id]),
-  );
-  const allProcessTargetsMaterialized =
-    processTargetIds.length > 0 && processTargetIds.every((id) => Boolean(materializedPaths[id]));
-
   const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
-  // Prefer the per-node materialised summary when it's available. Before the
-  // SSE materialization event arrives, fall back to counting from
-  // ``nodeData.data`` + pagination, matching the combined branch.
-  const pageSizeSummary =
-    nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId] ? (
-      <GroupedResultsPageSizeSummary
-        groups={[]}
-        totalInstances={materializeSummaries[detachNodeId].recordCount}
-        totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
-        totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
-      />
-    ) : (
-      <GroupedResultsPageSizeSummary
-        groups={nodeData.data}
-        totalProcessed={batchProcessedCount(nodeData.pagination)}
-      />
-    );
+  const pageSizeSummary = (
+    <GroupedResultsPageSizeSummary
+      groups={nodeData.data}
+      totalProcessed={batchProcessedCount(nodeData.pagination)}
+    />
+  );
   const belowTable = (
     <>
       <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
@@ -415,53 +311,11 @@ function PerNodeConcordanceTable({
         pageIndex={currentPage - 1}
         pageSize={globalPageSize}
         rowCount={nodeData.pagination.total_source_rows}
-        pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per batch'}
+        pageSizeLabel="Documents per batch"
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
         showPageSize
       >
-        <Button
-          onClick={() => {
-            if (!searchWord.trim()) return;
-            for (const nid of processTargetIds) {
-              if (materializedPaths[nid]) continue;
-              const col = isMultiBlock
-                ? (effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '')
-                : column;
-              if (!col) continue;
-              void handleMaterialize(nid, col);
-            }
-          }}
-          disabled={
-            nodeIsLoading ||
-            isAnyProcessTargetMaterializing ||
-            allProcessTargetsMaterialized ||
-            !searchWord.trim() ||
-            !canDetach ||
-            processTargetIds.length === 0
-          }
-          size="sm"
-          variant="outline"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title={
-            isMultiBlock
-              ? 'Cache all occurrence rows for both data blocks so subsequent pagination and Add-to-Workspace reuse them'
-              : 'Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them'
-          }
-        >
-          {isAnyProcessTargetMaterializing ? (
-            <>
-              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-              Processing...
-            </>
-          ) : allProcessTargetsMaterialized ? (
-            <>Processed</>
-          ) : isMultiBlock ? (
-            <>Process Both Blocks</>
-          ) : (
-            <>Process All</>
-          )}
-        </Button>
         <Button
           onClick={() => {
             if (detachNodeId) {

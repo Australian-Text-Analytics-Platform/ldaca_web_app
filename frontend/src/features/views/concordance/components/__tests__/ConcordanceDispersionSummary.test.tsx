@@ -90,7 +90,7 @@ describe('ConcordanceDispersionSummary', () => {
     chartProps.referenceLineProps.length = 0;
   });
 
-  it('renders chart controls with shadcn selects and keeps the unprocessed scope disabled', () => {
+  it('renders chart controls with shadcn selects', () => {
     render(
       <ConcordanceDispersionSummary
         rows={baseRows}
@@ -117,10 +117,6 @@ describe('ConcordanceDispersionSummary', () => {
     expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveAttribute('data-state', 'closed');
     expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveTextContent('Density');
     expect(screen.getByText('Density dispersion')).toBeInTheDocument();
-    const scopeSelect = screen.getByRole('combobox', { name: 'Aggregation scope' });
-    expect(scopeSelect).toHaveAttribute('data-state', 'closed');
-    expect(scopeSelect).toBeDisabled();
-    expect(scopeSelect).toHaveTextContent('page above');
   });
 
   it('uses node colors for aggregate and source-split chart series', () => {
@@ -154,7 +150,18 @@ describe('ConcordanceDispersionSummary', () => {
   it('renders cumulative charts as stepped running totals with source colors', () => {
     render(
       <ConcordanceDispersionSummary
-        rows={[]}
+        rows={[
+          {
+            text: 'x'.repeat(100),
+            __source_node: 'Left Corpus',
+            CONC_dispersion: [{ CONC_start_idx: 0, CONC_end_idx: 1, CONC_matched_text: 'alpha' }],
+          },
+          {
+            text: 'x'.repeat(100),
+            __source_node: 'Right Corpus',
+            CONC_dispersion: [{ CONC_start_idx: 25, CONC_end_idx: 26, CONC_matched_text: 'alpha' }],
+          },
+        ]}
         textColumn="text"
         binCount={20}
         lowercaseMatches={false}
@@ -166,11 +173,6 @@ describe('ConcordanceDispersionSummary', () => {
         searchWord="alpha"
         aggregateAll
         chartMode="cumulative"
-        materialised
-        materialisedBins={[
-          { bin_idx: 0, matched_text: 'alpha', count: 2, __source_node: 'Left Corpus' },
-          { bin_idx: 5, matched_text: 'alpha', count: 3, __source_node: 'Right Corpus' },
-        ]}
         sourceColors={{
           'left corpus': '#aa0000',
           'right corpus': '#00aa00',
@@ -193,18 +195,17 @@ describe('ConcordanceDispersionSummary', () => {
       type: 'step',
       dot: false,
     });
-    expect(chartProps.lineChartProps.at(-1)?.data?.slice(0, 2)).toEqual([
-      {
-        binCenter: 2.5,
-        '__dispersion_total__\0Left Corpus': 2,
-        '__dispersion_total__\0Right Corpus': 0,
-      },
-      {
-        binCenter: 7.5,
-        '__dispersion_total__\0Left Corpus': 2,
-        '__dispersion_total__\0Right Corpus': 3,
-      },
-    ]);
+    const chartData = chartProps.lineChartProps.at(-1)?.data;
+    expect(chartData?.[0]).toMatchObject({
+      binCenter: 2.5,
+      '__dispersion_total__\0Left Corpus': 1,
+      '__dispersion_total__\0Right Corpus': 0,
+    });
+    expect(chartData?.[5]).toMatchObject({
+      binCenter: expect.closeTo(27.5),
+      '__dispersion_total__\0Left Corpus': 1,
+      '__dispersion_total__\0Right Corpus': 1,
+    });
   });
 
   it('shows drag affordances while selecting and commits the dragged bin range', () => {

@@ -7,18 +7,10 @@ import {
   buildMatchedTextColorMap,
   collectConcordanceMatchedTexts,
   findConcordanceSourceNode,
-  getConcordanceNodeIdsForKey,
   getConcordanceSourceColor,
-  getMaterializedBinsForConcordanceKey,
-  isConcordanceBlockMaterialized,
   normalizeConcordanceLabelToNodeMap,
-  resolveConcordanceResultBlock,
 } from '../concordanceSourceDomain';
-import {
-  buildCombinedSlice,
-  CONCORDANCE_COMBINED_NODE_KEY,
-  flattenConcordanceGroups,
-} from '../concordanceTableDomain';
+import { buildCombinedSlice, flattenConcordanceGroups } from '../concordanceTableDomain';
 import type { ConcordanceNodeResult } from '@/api';
 
 describe('concordanceDomains', () => {
@@ -105,27 +97,19 @@ describe('matched-text color view models', () => {
   } as unknown as Record<string, ConcordanceNodeResult>;
 
   it('collects unique sorted matched texts from raw result rows', () => {
-    expect(
-      collectConcordanceMatchedTexts(resultData, {
-        getMaterializedBinsForKey: () => undefined,
-        lowercaseMatches: false,
-      }),
-    ).toEqual(['Alpha', 'beta', 'gamma']);
+    expect(collectConcordanceMatchedTexts(resultData, { lowercaseMatches: false })).toEqual([
+      'Alpha',
+      'beta',
+      'gamma',
+    ]);
   });
 
-  it('prefers cached materialized bins for a node when available and can lowercase matches', () => {
-    expect(
-      collectConcordanceMatchedTexts(resultData, {
-        getMaterializedBinsForKey: (nodeKey) =>
-          nodeKey === 'node-1'
-            ? [
-                { matched_text: 'ALPHA', bin_idx: 0, count: 2 },
-                { matched_text: 'delta', bin_idx: 1, count: 1 },
-              ]
-            : undefined,
-        lowercaseMatches: true,
-      }),
-    ).toEqual(['alpha', 'delta', 'gamma']);
+  it('normalizes matched text labels when the lowercase option is enabled', () => {
+    expect(collectConcordanceMatchedTexts(resultData, { lowercaseMatches: true })).toEqual([
+      'alpha',
+      'beta',
+      'gamma',
+    ]);
   });
 
   it('assigns matched-text colors by palette order', () => {
@@ -134,101 +118,6 @@ describe('matched-text color view models', () => {
       beta: 'blue',
       gamma: 'red',
     });
-  });
-});
-
-describe('materialized concordance key helpers', () => {
-  const selectedNodes = [
-    { id: 'node-1', name: 'Left corpus' },
-    { id: 'node-2', name: 'Right corpus' },
-  ];
-  const labelToNodeId = {
-    'Left result label': 'node-1',
-  };
-  const materializedPaths = {
-    'node-1': '/tmp/node-1.parquet',
-    'node-2': '/tmp/node-2.parquet',
-  };
-  const materializedBins = {
-    'node-1': [{ bin_idx: 0, matched_text: 'Alpha', count: 2 }],
-    'node-2': [{ bin_idx: 1, matched_text: 'Beta', count: 3 }],
-  };
-
-  it('resolves combined blocks to every selected node id and labeled blocks through request metadata', () => {
-    expect(
-      getConcordanceNodeIdsForKey(CONCORDANCE_COMBINED_NODE_KEY, selectedNodes, labelToNodeId),
-    ).toEqual(['node-1', 'node-2']);
-    expect(getConcordanceNodeIdsForKey('Left result label', selectedNodes, labelToNodeId)).toEqual([
-      'node-1',
-    ]);
-  });
-
-  it('leaves an unknown result key unbound when selected-node order changes', () => {
-    expect(
-      resolveConcordanceResultBlock(
-        'Unknown result label',
-        [...selectedNodes].reverse(),
-        [
-          { nodeId: 'node-1', column: 'left_text' },
-          { nodeId: 'node-2', column: 'right_text' },
-        ],
-        labelToNodeId,
-      ),
-    ).toEqual({ node: undefined, nodeId: '', column: '' });
-  });
-
-  it('leaves a stale label-map target unbound when its node is no longer selected', () => {
-    expect(
-      resolveConcordanceResultBlock(
-        'Stale result label',
-        [...selectedNodes].reverse(),
-        [
-          { nodeId: 'node-1', column: 'left_text' },
-          { nodeId: 'node-2', column: 'right_text' },
-          { nodeId: 'deleted-node', column: 'stale_text' },
-        ],
-        { 'Stale result label': 'deleted-node' },
-      ),
-    ).toEqual({ node: undefined, nodeId: '', column: '' });
-  });
-
-  it('reports a result block materialized only when every backing node has a path', () => {
-    expect(
-      isConcordanceBlockMaterialized(CONCORDANCE_COMBINED_NODE_KEY, {
-        selectedNodes,
-        labelToNodeId,
-        materializedPaths,
-      }),
-    ).toBe(true);
-    expect(
-      isConcordanceBlockMaterialized(CONCORDANCE_COMBINED_NODE_KEY, {
-        selectedNodes,
-        labelToNodeId,
-        materializedPaths: { 'node-1': '/tmp/node-1.parquet' },
-      }),
-    ).toBe(false);
-  });
-
-  it('returns tagged server bins only after every backing node has paths and cached bins', () => {
-    expect(
-      getMaterializedBinsForConcordanceKey(CONCORDANCE_COMBINED_NODE_KEY, {
-        selectedNodes,
-        labelToNodeId,
-        materializedPaths,
-        materializedBins,
-      }),
-    ).toEqual([
-      { bin_idx: 0, matched_text: 'Alpha', count: 2, __source_node: 'Left corpus' },
-      { bin_idx: 1, matched_text: 'Beta', count: 3, __source_node: 'Right corpus' },
-    ]);
-    expect(
-      getMaterializedBinsForConcordanceKey(CONCORDANCE_COMBINED_NODE_KEY, {
-        selectedNodes,
-        labelToNodeId,
-        materializedPaths,
-        materializedBins: { 'node-1': materializedBins['node-1'] },
-      }),
-    ).toBeUndefined();
   });
 });
 

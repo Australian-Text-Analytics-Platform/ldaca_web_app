@@ -1,250 +1,296 @@
-/**
- * React Query bridge between the per-workspace ``tabs.json`` sidecar and the
- * analysis tab UI. Mirrors the ui-state sync pattern: a single GET hydrates the
- * whole ``WorkspaceTabsState``, and every mutation does an optimistic
- * read-modify-write of the full state followed by a PUT (full-replacement
- * semantics, matching the backend router).
- *
- * Scoped to one ``analysisType`` (the tab-group namespace) so a feature only
- * sees and mutates its own tabs. The pure reducers in ``tabStateOps`` do the
- * actual state math; this hook owns caching and sidecar persistence while the
- * generated client supplies request authentication.
- *
- * Used by: AnalysisTabsHost to list/create/close/rename/activate tabs and to
- * wire a tab to its task id after a run or clear. Each analysis feature passes
- * its own analysis type.
- */
-import { useCallback } from 'react';
+/** Manage durable Workspace Tabs plus frontend-owned tab presentation state. */
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { clearTask, getWorkspaceTabs, putWorkspaceTabs } from '@/api';
-import type { AnalysisTab, AnalysisTabInput, WorkspaceTabsState } from '@/api';
 import {
-  EMPTY_TABS_STATE,
-  closeTabInState,
-  createTabInState,
-  getActiveTabId,
-  getTabs,
-  renameTabInState,
-  reorderTabsInState,
-  setActiveTabInState,
-  setTabInputSetInState,
-  setTabSettingInState,
-  setTabTaskInState,
+  createTab as createServerTab,
+  deleteTab as deleteServerTab,
+  listTabs,
+  renameTab as renameServerTab,
+} from '@/api';
+import type { AnalysisKind, Tab } from '@/api';
+import {
+  DEFAULT_TAB_INPUT_SET_ID,
+  reorderTabs,
+  tabFromResource,
+  type AnalysisTab,
+  type AnalysisTabInput,
+  type AnalysisTabInputSets,
 } from './tabStateOps';
+import {
+  analysisTabsPresentationKey,
+  useAnalysisTabsPresentationStore,
+} from './analysisTabsPresentationStore';
 
-/**
- * Query key for the whole-workspace tab state (shared across analysis types).
- * Used only within useWorkspaceTabs so every tab mutation reconciles the same
- * React Query cache entry.
- */
-function workspaceTabsQueryKey(workspaceId: string): string[] {
-  return ['workspace-tabs', workspaceId];
-}
+const tabsQueryKey = (workspaceId: string | null | undefined, kind: string) => [
+  'workspace-tabs',
+  workspaceId ?? '__none__',
+  kind,
+];
 
 export interface UseWorkspaceTabsResult {
-  /** Ordered tabs for this analysis type (empty until loaded). */
   tabs: AnalysisTab[];
-  /** Resolved active tab id, or null when there are no tabs. */
   activeTabId: string | null;
-  /** True until the initial GET resolves — gates auto-create to avoid races. */
   isLoading: boolean;
-  /** Appends a new empty tab, focuses it, and returns its id. */
-  createTab: (title?: string) => string | null;
-  /** Removes a tab and reselects a neighbour when needed. */
+  createTab: (title?: string) => Promise<Tab | null>;
   closeTab: (tabId: string) => void;
-  /** Renames a tab's title. */
   renameTab: (tabId: string, title: string) => void;
-  /** Focuses a tab. */
   setActiveTab: (tabId: string) => void;
-  /** Persists a drag-and-drop tab order (full list of tab ids). */
   reorderTabs: (orderedTabIds: string[]) => void;
-  /** Wires a tab to a task id (or clears it with null). */
-  setTabTask: (tabId: string, taskId: string | null) => void;
-  /** Replaces one named input node set for multi-selector views. */
+  setTabTask: (tabId: string, analysisId: string | null) => void;
   setTabInputSet: (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => void;
-  /** Persists one free-form per-view setting (string→string) on a tab. */
   setTabSetting: (tabId: string, key: string, value: string) => void;
 }
 
+interface LocalTabState {
+  task_id?: string | null;
+  input_sets?: AnalysisTabInputSets;
+  settings?: Record<string, string>;
+}
+
+function inputSetsEqual(left: AnalysisTabInput[], right: AnalysisTabInput[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((input, index) => {
+      const other = right.at(index);
+      return other?.node_id === input.node_id && other.column === input.column;
+    })
+  );
+}
+
+const asAnalysisKind = (value: string): AnalysisKind => {
+  if (
+    value === 'annotation' ||
+    value === 'concordance' ||
+    value === 'quotation' ||
+    value === 'sequential' ||
+    value === 'token_frequency' ||
+    value === 'topic_modeling'
+  ) {
+    return value;
+  }
+  throw new Error(`Unsupported analysis tab kind: ${value}`);
+};
+
+function mergeServerTabs(serverTabs: Tab[], local: Record<string, LocalTabState>): AnalysisTab[] {
+  return serverTabs.map((tab) => tabFromResource(tab, local[tab.id]));
+}
+
 /**
- * Manages the analysis tab group for one workspace + analysis type.
- * Used by: AnalysisTabsHost because the tab bar and the keyed feature panel
- * both need the same live tab list, active id, and mutators.
- * Flow: query the full sidecar, derive this type's tabs/active id, then expose
- * mutators that optimistically patch the cache and PUT the whole state back.
+ * Server tabs are authoritative for identity, names, and analysis ownership.
+ * Active selection is device-local and keyed by Workspace and analysis kind.
+ * Ordering, input selections, and settings stay in memory so drafts do not
+ * become a second persistence format.
  */
 export function useWorkspaceTabs(
   workspaceId: string | null | undefined,
   analysisType: string,
 ): UseWorkspaceTabsResult {
   const queryClient = useQueryClient();
+  const kind = asAnalysisKind(analysisType);
+  const queryKey = tabsQueryKey(workspaceId, kind);
+  const presentationKey = analysisTabsPresentationKey(workspaceId, kind);
+  const activeTabId = useAnalysisTabsPresentationStore(
+    (state) => state.activeTabIds[presentationKey] ?? null,
+  );
+  const rememberActiveTab = useAnalysisTabsPresentationStore((state) => state.rememberActiveTab);
+  const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const [localState, setLocalState] = useState<Record<string, LocalTabState>>({});
+  const creatingRef = useRef(false);
 
-  // Single source of truth for the whole workspace's tabs. Disabled until a
-  // workspace is selected so we don't fire an unscoped request.
-  //
-  // The client is the sole author of tab state (every mutation is an optimistic
-  // read-modify-write + PUT), so the cache stays authoritative within a session.
-  // A short staleTime lets cross-view navigation reuse that cache instead of
-  // refetching on every mount. This is deliberate, not just an optimization:
-  // a mount-time GET (the old ``refetchOnMount: 'always'``) could resolve
-  // mid-flight and overwrite a tab that was just created optimistically right
-  // before navigating — exactly the token-click → concordance handoff, where
-  // ``createTab`` runs and then ``setCurrentView('concordance')`` immediately
-  // mounts this hook again under the concordance group. The per-workspace query
-  // key still forces a fresh GET whenever the user switches workspaces.
-  const { data, isLoading } = useQuery({
-    queryKey: workspaceTabsQueryKey(workspaceId ?? '__none__'),
-    enabled: !!workspaceId,
-    staleTime: 30_000,
+  const tabsQuery = useQuery({
+    queryKey,
+    enabled: Boolean(workspaceId),
+    staleTime: 15_000,
     queryFn: async () => {
-      const { data: payload } = await getWorkspaceTabs({
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- query is enabled only when workspaceId is set
-        path: { workspace_id: workspaceId! },
-        throwOnError: true,
-      });
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- API payload may be undefined at runtime
-      return payload ?? EMPTY_TABS_STATE;
-    },
-  });
-
-  const state = data ?? EMPTY_TABS_STATE;
-
-  // Full-replacement PUT. Optimistic cache write keeps the UI instant; the
-  // mutation reconciles with the server response (same shape) on success.
-  const putMutation = useMutation({
-    mutationFn: async (next: WorkspaceTabsState) => {
-      if (!workspaceId) return next;
-      const { data: saved } = await putWorkspaceTabs({
-        body: next,
+      if (!workspaceId) throw new Error('Workspace is required');
+      const { data } = await listTabs({
         path: { workspace_id: workspaceId },
         throwOnError: true,
       });
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- API response may be undefined at runtime
-      return saved ?? next;
-    },
-    // Write the server's authoritative response back into the cache. Without
-    // this, a concurrent mount-time GET that resolved with stale data (one that
-    // raced the PUT) could leave the cache permanently behind the persisted
-    // state — silently dropping a tab that was just created.
-    onSuccess: (saved) => {
-      if (!workspaceId) return;
-      queryClient.setQueryData(workspaceTabsQueryKey(workspaceId), saved);
+      return data.filter((tab) => tab.kind === kind);
     },
   });
 
-  // Applies a pure reducer to the current cached state, optimistically writes
-  // the result, and persists it. Centralizes the read-modify-write so each
-  // mutator below stays a one-liner.
-  const commit = useCallback(
-    (next: WorkspaceTabsState) => {
-      if (!workspaceId) return;
-      queryClient.setQueryData(workspaceTabsQueryKey(workspaceId), next);
-      putMutation.mutate(next);
+  const serverTabs = tabsQuery.data ?? [];
+  const mergedTabs = mergeServerTabs(serverTabs, localState);
+  const orderedTabs = orderedIds.length > 0 ? reorderTabs(mergedTabs, orderedIds) : mergedTabs;
+  const resolvedActiveId =
+    activeTabId && orderedTabs.some((tab) => tab.tab_id === activeTabId)
+      ? activeTabId
+      : (orderedTabs[0]?.tab_id ?? null);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- Reset ephemeral tab drafts when the selected workspace changes. */
+  useEffect(() => {
+    if (!workspaceId) {
+      setOrderedIds([]);
+      setLocalState({});
+      return;
+    }
+    setOrderedIds((current) =>
+      current.length > 0
+        ? current.filter((id) => orderedTabs.some((tab) => tab.tab_id === id))
+        : [],
+    );
+    // The server tab count is the external change that invalidates local ordering;
+    // names and analysis state are already represented by the merged query data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, serverTabs.length]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!workspaceId || tabsQuery.isLoading || activeTabId === resolvedActiveId) return;
+    rememberActiveTab(workspaceId, kind, resolvedActiveId);
+  }, [activeTabId, kind, rememberActiveTab, resolvedActiveId, tabsQuery.isLoading, workspaceId]);
+
+  const setLocalTab = useCallback(
+    (tabId: string, update: (previous: LocalTabState) => LocalTabState) => {
+      setLocalState((current) => {
+        const previous = current[tabId] ?? {};
+        const next = update(previous);
+        return next === previous ? current : { ...current, [tabId]: next };
+      });
     },
-    [workspaceId, queryClient, putMutation],
+    [],
   );
 
-  const readState = useCallback((): WorkspaceTabsState => {
-    if (!workspaceId) return EMPTY_TABS_STATE;
-    return (
-      queryClient.getQueryData<WorkspaceTabsState>(workspaceTabsQueryKey(workspaceId)) ??
-      EMPTY_TABS_STATE
-    );
-  }, [workspaceId, queryClient]);
+  const invalidate = useCallback(() => {
+    if (workspaceId) void queryClient.invalidateQueries({ queryKey });
+  }, [queryClient, queryKey, workspaceId]);
+
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      if (!workspaceId) return null;
+      const { data } = await createServerTab({
+        path: { workspace_id: workspaceId },
+        body: { kind, name },
+        throwOnError: true,
+      });
+      return data;
+    },
+    onSuccess: (tab) => {
+      creatingRef.current = false;
+      if (tab) {
+        rememberActiveTab(workspaceId, kind, tab.id);
+        setOrderedIds((current) => [...current.filter((id) => id !== tab.id), tab.id]);
+      }
+      invalidate();
+    },
+    onError: () => {
+      creatingRef.current = false;
+    },
+  });
 
   const createTab = useCallback(
-    (title?: string): string | null => {
-      if (!workspaceId) return null;
-      const current = readState();
-      const count = getTabs(current, analysisType).length;
-      const { state: next, tabId } = createTabInState(
-        current,
-        analysisType,
-        title ?? `Analysis ${String(count + 1)}`,
-      );
-      commit(next);
-      return tabId;
+    async (title = `Analysis ${String(serverTabs.length + 1)}`): Promise<Tab | null> => {
+      if (!workspaceId || createMutation.isPending || creatingRef.current) return null;
+      creatingRef.current = true;
+      return await createMutation.mutateAsync(title);
     },
-    [workspaceId, analysisType, readState, commit],
+    [createMutation, serverTabs.length, workspaceId],
   );
+
+  const closeMutation = useMutation({
+    mutationFn: async (tabId: string) => {
+      if (!workspaceId) return;
+      await deleteServerTab({
+        path: { workspace_id: workspaceId, tab_id: tabId },
+        throwOnError: true,
+      });
+    },
+    onSuccess: (_value, tabId) => {
+      setLocalState((current) => {
+        const { [tabId]: _removed, ...remaining } = current;
+        return remaining;
+      });
+      setOrderedIds((current) => current.filter((id) => id !== tabId));
+      const currentActive =
+        useAnalysisTabsPresentationStore.getState().activeTabIds[presentationKey] ?? null;
+      if (currentActive === tabId) {
+        const fallbackTabId = orderedTabs.find((tab) => tab.tab_id !== tabId)?.tab_id ?? null;
+        rememberActiveTab(workspaceId, kind, fallbackTabId);
+      }
+      invalidate();
+    },
+  });
 
   const closeTab = useCallback(
     (tabId: string) => {
-      const current = readState();
-      // Capture the task id this tab owns BEFORE dropping it from state. A tab
-      // is the sole owner of its backend task (tab_id -> task_id), so closing it
-      // abandons that task; we must tell the backend to clear its records —
-      // identical to the explicit "Clear results" action — or the server-side
-      // task cache (request/result/materialized artifacts) would leak.
-      const closingTab = getTabs(current, analysisType).find((t) => t.tab_id === tabId);
-      const taskId = closingTab?.task_id ?? null;
-      commit(closeTabInState(current, analysisType, tabId));
-      if (taskId) {
-        // Fire-and-forget: the tab is already removed optimistically, so a
-        // failed cleanup must not block the UI. A miss just leaves a harmless
-        // orphan task for later garbage collection; log it for diagnosis.
-        void clearTask({
-          path: { task_id: taskId },
-          throwOnError: true,
-        }).catch((error: unknown) => {
-          console.warn(`[${analysisType}] Failed to clear task ${taskId} on tab close:`, error);
-        });
-      }
+      if (workspaceId) closeMutation.mutate(tabId);
     },
-    [analysisType, readState, commit],
+    [closeMutation, workspaceId],
   );
+
+  const renameMutation = useMutation({
+    mutationFn: async ({ tabId, title }: { tabId: string; title: string }) => {
+      if (!workspaceId) return;
+      await renameServerTab({
+        path: { workspace_id: workspaceId, tab_id: tabId },
+        body: { name: title },
+        throwOnError: true,
+      });
+    },
+    onSuccess: invalidate,
+  });
 
   const renameTab = useCallback(
     (tabId: string, title: string) => {
-      commit(renameTabInState(readState(), analysisType, tabId, title));
+      if (workspaceId) renameMutation.mutate({ tabId, title });
     },
-    [analysisType, readState, commit],
+    [renameMutation, workspaceId],
   );
 
-  const setActiveTab = useCallback(
-    (tabId: string) => {
-      commit(setActiveTabInState(readState(), analysisType, tabId));
-    },
-    [analysisType, readState, commit],
-  );
+  const setActiveTab = useCallback((tabId: string) => {
+    rememberActiveTab(workspaceId, kind, tabId);
+  }, [kind, rememberActiveTab, workspaceId]);
 
-  const reorderTabs = useCallback(
-    (orderedTabIds: string[]) => {
-      commit(reorderTabsInState(readState(), analysisType, orderedTabIds));
-    },
-    [analysisType, readState, commit],
-  );
+  const reorder = useCallback((ids: string[]) => {
+    setOrderedIds(ids);
+  }, []);
 
   const setTabTask = useCallback(
-    (tabId: string, taskId: string | null) => {
-      commit(setTabTaskInState(readState(), analysisType, tabId, taskId));
+    (tabId: string, analysisId: string | null) => {
+      setLocalTab(tabId, (previous) => ({ ...previous, task_id: analysisId }));
+      invalidate();
     },
-    [analysisType, readState, commit],
+    [invalidate, setLocalTab],
   );
 
   const setTabInputSet = useCallback(
     (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => {
-      commit(setTabInputSetInState(readState(), analysisType, tabId, selectorId, inputs));
+      setLocalTab(tabId, (previous) => {
+        const previousInputs = previous.input_sets?.[selectorId] ?? [];
+        if (inputSetsEqual(previousInputs, inputs)) return previous;
+        return {
+          ...previous,
+          input_sets: {
+            ...(previous.input_sets ?? { [DEFAULT_TAB_INPUT_SET_ID]: [] }),
+            [selectorId]: inputs,
+          },
+        };
+      });
     },
-    [analysisType, readState, commit],
+    [setLocalTab],
   );
 
   const setTabSetting = useCallback(
     (tabId: string, key: string, value: string) => {
-      commit(setTabSettingInState(readState(), analysisType, tabId, key, value));
+      setLocalTab(tabId, (previous) => ({
+        ...previous,
+        settings: { ...(previous.settings ?? {}), [key]: value },
+      }));
     },
-    [analysisType, readState, commit],
+    [setLocalTab],
   );
 
   return {
-    tabs: getTabs(state, analysisType),
-    activeTabId: getActiveTabId(state, analysisType),
-    isLoading: !!workspaceId && isLoading,
+    tabs: orderedTabs,
+    activeTabId: resolvedActiveId,
+    isLoading: Boolean(workspaceId) && tabsQuery.isLoading,
     createTab,
     closeTab,
     renameTab,
     setActiveTab,
-    reorderTabs,
+    reorderTabs: reorder,
     setTabTask,
     setTabInputSet,
     setTabSetting,

@@ -17,25 +17,22 @@ describe('concordance dispersion actions', () => {
     ).toBeNull();
   });
 
-  it('blocks selected-bin detach until materialized bins are available', () => {
+  it('allows selected-bin detach from the current result page', () => {
     const state = buildDispersionDetachActionState({
       isBusy: false,
       hasSearchWord: true,
       hasDetachTarget: true,
       hasSelection: true,
-      hasMaterializedBins: false,
       colourMatches: true,
       allMatchedTexts: ['alpha', 'beta'],
       hiddenMatchedTexts: new Set(['beta']),
-      materializeSelectionHint: 'Process all first.',
       selectedBinsHint: 'Detach selected bins.',
       allHitsHint: 'Detach all hits.',
     });
 
-    expect(state.disabled).toBe(true);
-    expect(state.scopeMismatch).toBe(true);
+    expect(state.disabled).toBe(false);
     expect(state.visibleMatchedTexts).toEqual(['alpha']);
-    expect(state.title).toBe('Process all first.');
+    expect(state.title).toBe('Detach selected bins.');
   });
 
   it('blocks detach when every legend term is hidden', () => {
@@ -44,11 +41,9 @@ describe('concordance dispersion actions', () => {
       hasSearchWord: true,
       hasDetachTarget: true,
       hasSelection: false,
-      hasMaterializedBins: false,
       colourMatches: true,
       allMatchedTexts: ['alpha'],
       hiddenMatchedTexts: new Set(['alpha']),
-      materializeSelectionHint: 'Process all first.',
       selectedBinsHint: 'Detach selected bins.',
       allHitsHint: 'Detach all hits.',
     });
@@ -66,11 +61,9 @@ describe('concordance dispersion actions', () => {
       hasSearchWord: true,
       hasDetachTarget: true,
       hasSelection: false,
-      hasMaterializedBins: false,
       colourMatches: false,
       allMatchedTexts: ['alpha'],
       hiddenMatchedTexts: new Set(['alpha']),
-      materializeSelectionHint: 'Process all first.',
       selectedBinsHint: 'Detach selected bins.',
       allHitsHint: 'Detach all hits.',
     });

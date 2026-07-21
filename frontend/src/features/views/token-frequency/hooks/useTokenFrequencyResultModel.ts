@@ -68,7 +68,7 @@ export const useTokenFrequencyResultModel = ({
   const analysisNodeIds = useMemo(
     () =>
       computeAnalysisNodeIds(
-        results?.analysis_params?.node_ids,
+        results?.analysis_params.node_ids,
         lastCompareNodeIds,
         nodeColumnSelections,
       ),

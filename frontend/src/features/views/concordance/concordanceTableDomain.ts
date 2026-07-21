@@ -119,6 +119,7 @@ export function buildCombinedSlice(
     metadata: {
       concordance_columns: columns.filter((c) => CORE_COLUMN_SET.has(c)),
       metadata_columns: columns.filter((c) => !CORE_COLUMN_SET.has(c)),
+      quotation_columns: [],
       all_columns: columns,
     },
     pagination: {

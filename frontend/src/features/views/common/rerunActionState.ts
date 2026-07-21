@@ -2,28 +2,24 @@ import type { NodeColumnSelection } from './nodeSelectionTypes';
 import { normalizeStringArray } from './parameterComparison';
 
 /**
- * Run/Re-run button policy for the add-node-as-needed model.
+ * Run/Re-run button policy shared by every Analysis view.
  *
- * There is no locking: parameters and node selection are always editable. The
- * button is gated purely by whether anything differs from the last run:
- *
- *   - No last run yet           -> "Run", enabled when inputs + params are valid.
- *   - Last run, nothing changed -> disabled (re-running would be a no-op).
- *   - Last run, something changed-> "Re-run", enabled.
- *
- * Used by: every analysis ``*Feature`` to derive its primary action button and
- * the clear button, so all views share one consistent post-run experience.
+ * The owning Tab's attached Analysis, not Result availability, determines
+ * whether the actions represent Run/Re-run and whether Clear is available.
+ * Active Analyses cannot be replaced; failed and cancelled Analyses may be
+ * retried unchanged; successful Analyses require changed inputs or parameters.
  */
 export interface RerunActionStateInput {
   hasWorkspace: boolean;
   /** Inputs + any required params form a runnable request. */
   isRunnable: boolean;
-  /** A task result currently exists / a run has happened for this tab. */
-  hasLastRun: boolean;
+  /** The backend Tab currently references a root Analysis. */
+  hasAttachedAnalysis: boolean;
+  /** Latest projected lifecycle state for the attached Analysis, when available. */
+  analysisState: 'queued' | 'running' | 'successful' | 'failed' | 'cancelled' | null;
   /** Current params or node inputs differ from the last run. */
   hasChanges: boolean;
   isBusy?: boolean;
-  hasResults?: boolean;
 }
 
 export interface RerunActionState {
@@ -37,28 +33,41 @@ export interface RerunActionState {
  * Derives the primary button label/disabled state and the clear-button state.
  * Called by: analysis features when rendering their run controls because the
  * Run vs Re-run decision must be identical across views.
- * Flow: invalid/busy → disabled Run; valid + no prior run → enabled Run;
- * prior run + changes → enabled Re-run; prior run + no changes → disabled.
+ * Flow: invalid/busy/active → disabled; no attached Analysis → Run; failed or
+ * cancelled Analysis → Re-run; successful Analysis → Re-run only after changes.
  */
 export const getRerunActionState = ({
   hasWorkspace,
   isRunnable,
-  hasLastRun,
+  hasAttachedAnalysis,
+  analysisState,
   hasChanges,
   isBusy = false,
-  hasResults = false,
 }: RerunActionStateInput): RerunActionState => {
-  const runLabel: 'Run' | 'Re-run' = hasLastRun ? 'Re-run' : 'Run';
+  const runLabel: 'Run' | 'Re-run' = hasAttachedAnalysis ? 'Re-run' : 'Run';
+  const isActiveAnalysis = analysisState === 'queued' || analysisState === 'running';
+  const canRetryUnchanged = analysisState === 'failed' || analysisState === 'cancelled';
+  const attachedStateUnavailable = hasAttachedAnalysis && analysisState === null;
 
-  const runDisabled = !hasWorkspace || !isRunnable || isBusy || (hasLastRun && !hasChanges);
+  const runDisabled =
+    !hasWorkspace ||
+    !isRunnable ||
+    isBusy ||
+    isActiveAnalysis ||
+    attachedStateUnavailable ||
+    (hasAttachedAnalysis && !hasChanges && !canRetryUnchanged);
 
-  const clearDisabled = !hasWorkspace || !hasResults;
+  const clearDisabled = !hasWorkspace || !hasAttachedAnalysis;
 
   const runDisabledReason: string | undefined = (() => {
     if (isBusy) return undefined;
     if (!hasWorkspace) return 'Open a workspace first';
     if (!isRunnable) return 'Add a data block and select a column to run';
-    if (hasLastRun && !hasChanges) return 'Change a parameter or the selection to re-run';
+    if (isActiveAnalysis) return 'The analysis is already queued or running';
+    if (attachedStateUnavailable) return 'Clear the current analysis before running again';
+    if (hasAttachedAnalysis && !hasChanges && !canRetryUnchanged) {
+      return 'Change a parameter or the selection to re-run';
+    }
     return undefined;
   })();
 
@@ -88,7 +97,7 @@ const nodeSelectionSignature = (selections: NodeColumnSelection[]): NodeSelectio
 /**
  * True when the current node inputs differ from the last run's node selection.
  * Called by: analysis features (combined with parameter diffing) to decide
- * whether the primary button is an enabled "Re-run".
+ * whether a successful Analysis has an enabled "Re-run".
  * Flow: compare normalized node id sets, then per-node column picks.
  */
 export const hasNodeSelectionChanged = (

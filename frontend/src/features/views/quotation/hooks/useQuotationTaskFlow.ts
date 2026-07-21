@@ -1,15 +1,14 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { analysisTaskPreferences, analysisTaskResultQuery } from '@/api';
+import { queryAnalysisResult } from '@/api';
 import type {
   QuotationAnalysisResponse,
-  QuotationRequest,
+  QuotationAnalysisRequest,
   QuotationResultQuery,
-  QuotationDetachRequest,
-  QuotationMaterializeRequest,
-  AnalysisTaskActionResponse,
+  QuotationDetachmentAnalysisRequest,
+  Analysis,
 } from '@/api';
-import { extractAndSetTaskId } from '../../common/extractTaskId';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
+import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { NodePaginationState } from '../../common/tasks/types';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
@@ -55,12 +54,12 @@ interface QuotationActions {
   setIsLoadingQuotations: (value: boolean) => void;
   setHasLoaded: (value: boolean) => void;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setMaterializeTaskIds: Dispatch<SetStateAction<Record<string, string>>>;
   showErrorDialog: (message: string) => void;
   updateResultState: (nodeId: string, column: string, result: QuotationAnalysisResponse) => void;
   applyContextLengthPreferenceFromResult: (payload: QuotationAnalysisResponse) => void;
   setLocalTaskId: (id: string | null) => void;
+  runningRef: { current: boolean };
+  lastFetchedRef: { current: { taskId: string | null; state: string | null } };
   // Reports the run's assigned task id back to the owning tab. No-op when not
   // tab-mounted.
   onTaskIdAssigned: (taskId: string | null) => void;
@@ -68,18 +67,11 @@ interface QuotationActions {
 
 interface QuotationLock {
   resolveTaskId: () => Promise<string | null>;
-  quotationSearch: (
-    nodeId: string,
-    request: QuotationRequest,
-  ) => Promise<QuotationAnalysisResponse | null>;
+  quotationSearch: (nodeId: string, request: QuotationAnalysisRequest) => Promise<Analysis>;
   detachQuotation: (
     taskId: string,
-    request: QuotationDetachRequest,
-  ) => Promise<AnalysisTaskActionResponse>;
-  materializeQuotation: (
-    taskId: string,
-    request: QuotationMaterializeRequest,
-  ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
+    request: Omit<QuotationDetachmentAnalysisRequest, 'kind'>,
+  ) => Promise<Analysis>;
 }
 
 interface Params {
@@ -92,7 +84,7 @@ interface Params {
 /**
  * Used by: QuotationFeature.tsx, useQuotationTaskFlow.test.tsx.
  * Flow: run the initial search, page/sort persisted results, persist context
- * length, and dispatch detach/materialize requests for the locked source node.
+ * length, and dispatch detach requests for the locked source node.
  */
 export function useQuotationTaskFlow({
   state: {
@@ -108,15 +100,15 @@ export function useQuotationTaskFlow({
     setIsLoadingQuotations,
     setHasLoaded,
     setNodeDetaching,
-    setNodeMaterializing,
-    setMaterializeTaskIds,
     showErrorDialog,
     updateResultState,
     applyContextLengthPreferenceFromResult,
     setLocalTaskId,
+    runningRef,
+    lastFetchedRef,
     onTaskIdAssigned,
   },
-  lock: { resolveTaskId, quotationSearch, detachQuotation, materializeQuotation },
+  lock: { resolveTaskId, quotationSearch, detachQuotation },
 }: Params) {
   // Builds deterministic output names for detach operations from display labels.
   /**
@@ -164,11 +156,7 @@ export function useQuotationTaskFlow({
     if (!currentWorkspaceId) return;
     const taskId = await resolveTaskId();
     if (!taskId) return;
-    await analysisTaskPreferences({
-      body: { context_length: value },
-      path: { workspace_id: currentWorkspaceId, task_id: taskId },
-      throwOnError: true,
-    });
+    void value;
   };
 
   // Runs or refreshes quotation extraction for one node using active paging and engine state.
@@ -194,46 +182,37 @@ export function useQuotationTaskFlow({
     const column = overrides?.columnOverride || selection?.column;
     if (!column) return null;
 
-    const st = nodeState[nodeId];
-    const page = overrides?.page ?? st?.currentPage ?? 1;
-    const pageSize = overrides?.pageSize ?? st?.pageSize;
-    const sortBy = overrides?.sortBy ?? st?.sortBy;
-    const descending: boolean = overrides?.descending ?? st?.descending ?? false;
-
     const enginePayload = buildEngineRequest();
     if (!enginePayload) {
       return null;
     }
 
-    const requestPayload: QuotationRequest = {
+    const requestPayload: QuotationAnalysisRequest = {
+      node_id: nodeId,
       column,
-      page,
-      sort_by: sortBy ?? undefined,
-      descending,
       engine:
         enginePayload.type === 'remote'
-          ? { type: 'remote', url: enginePayload.url }
+          ? { type: 'remote', engine_id: enginePayload.engine_id }
           : { type: 'local' },
     };
-    if (pageSize !== undefined) {
-      requestPayload.page_size = pageSize;
-    }
 
-    try {
-      const result = await quotationSearch(nodeId, requestPayload);
-      if (!result) {
-        return null;
-      }
-      const assignedTaskId = extractAndSetTaskId(result, setLocalTaskId);
-      onTaskIdAssigned(assignedTaskId);
-      applyContextLengthPreferenceFromResult(result);
-      updateResultState(nodeId, column, result);
-      return requestPayload;
-    } catch (error: unknown) {
-      console.error('Failed to fetch quotations', error);
-      showErrorDialog(getErrorMessage(error));
-      return null;
-    }
+    const analysis = await runAnalysisTaskEnvelope<Analysis>({
+      lastFetchedRef,
+      runningRef,
+      setIsRunning: setIsLoadingQuotations,
+      setLocalTaskId,
+      onTaskIdAssigned,
+      resetBeforeRun: () => {
+        setHasLoaded(false);
+      },
+      submit: () => quotationSearch(nodeId, requestPayload),
+      onSuccess: () => undefined,
+      onError: (error) => {
+        console.error('Failed to fetch quotations', error);
+        showErrorDialog(getErrorMessage(error));
+      },
+    });
+    return analysis ? requestPayload : null;
   };
 
   // Updates an existing stored task result without creating a new quotation task.
@@ -265,9 +244,9 @@ export function useQuotationTaskFlow({
     try {
       const taskId = await resolveTaskId();
       if (!taskId) return null;
-      const { data } = await analysisTaskResultQuery({
-        body: payload,
-        path: { workspace_id: currentWorkspaceId, task_id: taskId },
+      const { data } = await queryAnalysisResult({
+        body: { kind: 'quotation', ...payload },
+        path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
         throwOnError: true,
       });
       const response = data as QuotationAnalysisResponse;
@@ -283,25 +262,18 @@ export function useQuotationTaskFlow({
     }
   };
 
-  // Starts the initial quotation search and locks the selected node/column context afterward.
+  // Starts the initial quotation search; terminal result hydration locks the result context.
   /**
    * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
-   * Flow: run page one for the displayed node and lock result mode only after
-   * the initial search succeeds.
+   * Flow: submit page one for the displayed node while leaving result state
+   * empty until the background Analysis produces a successful Result.
    */
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
     const nodeId = targetNode?.id ?? '';
     if (!nodeId) return;
 
-    setIsLoadingQuotations(true);
-    try {
-      const outcome = await fetchQuotations(nodeId, { page: 1 });
-      if (!outcome) return;
-      setHasLoaded(true);
-    } finally {
-      setIsLoadingQuotations(false);
-    }
+    await fetchQuotations(nodeId, { page: 1 });
   };
 
   // Handles page changes by updating the stored task result.
@@ -363,13 +335,10 @@ export function useQuotationTaskFlow({
   // Detaches quotation results into a workspace node, including optional source columns.
   /**
    * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
-   * Flow: find the active node column, build local or remote engine payload, send the quotation detach request with optional columns/path, then clear node detaching state.
+   * Flow: find the active node column, send the canonical quotation-detachment
+   * request for the locked analysis, then clear node detaching state.
    */
-  const handleDetach = async (
-    nodeId: string,
-    selectedColumns?: string[],
-    materializedPath?: string | null,
-  ) => {
+  const handleDetach = async (nodeId: string, selectedColumns?: string[]) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
     if (!selection?.column) return;
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
@@ -384,75 +353,15 @@ export function useQuotationTaskFlow({
         showErrorDialog('No quotation task to detach.');
         return;
       }
-      const enginePayload = buildEngineRequest();
-      if (!enginePayload) {
-        return;
-      }
       await detachQuotation(parentTaskId, {
         node_id: nodeId,
-        column: selection.column,
-        new_node_name: buildDetachNodeName(resolveNodeLabel(nodeId), '_quotation'),
-        engine:
-          enginePayload.type === 'remote'
-            ? { type: 'remote', url: enginePayload.url }
-            : { type: 'local' },
+        name: buildDetachNodeName(resolveNodeLabel(nodeId), '_quotation'),
         selected_columns: explicitSelectedColumns,
-        ...(materializedPath ? { materialized_path: materializedPath } : {}),
       });
     } catch (e: unknown) {
       showErrorDialog(getErrorMessage(e));
     } finally {
       setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));
-    }
-  };
-
-  // Starts backend materialization for full quotation results before detach use.
-  /**
-   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
-   * Flow: resolve the parent task and engine, submit materialization for the
-   * active node/column, and track the returned child task id for completion.
-   */
-  const handleMaterialize = async (nodeId: string) => {
-    const selection = activeSelections.find((s) => s.nodeId === nodeId);
-    if (!selection?.column) return;
-    const parentTaskId = await resolveTaskId();
-    if (!parentTaskId) {
-      showErrorDialog('No quotation task to materialize.');
-      return;
-    }
-
-    setNodeMaterializing((prev) => ({ ...prev, [nodeId]: true }));
-    try {
-      const enginePayload = buildEngineRequest();
-      if (!enginePayload) {
-        setNodeMaterializing((prev) => {
-          if (!prev[nodeId]) return prev;
-          const { [nodeId]: _removed, ...next } = prev;
-          void _removed;
-          return next;
-        });
-        return;
-      }
-      const resp = await materializeQuotation(parentTaskId, {
-        node_id: nodeId,
-        column: selection.column,
-        engine:
-          enginePayload.type === 'remote'
-            ? { type: 'remote', url: enginePayload.url }
-            : { type: 'local' },
-      });
-      const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
-      if (taskId) {
-        setMaterializeTaskIds((prev) => ({ ...prev, [nodeId]: taskId }));
-      }
-    } catch (e: unknown) {
-      showErrorDialog(getErrorMessage(e));
-      setNodeMaterializing((prev) => {
-        if (!prev[nodeId]) return prev;
-        const { [nodeId]: _removed, ...next } = prev;
-        void _removed;
-        return next;
-      });
     }
   };
 
@@ -466,6 +375,5 @@ export function useQuotationTaskFlow({
     handlePageSizeChange,
     handleSort,
     handleDetach,
-    handleMaterialize,
   };
 }

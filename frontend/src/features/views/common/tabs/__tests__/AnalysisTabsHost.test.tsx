@@ -51,7 +51,7 @@ function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspac
     tabs: [],
     activeTabId: null,
     isLoading: false,
-    createTab: vi.fn(() => 'new-tab'),
+    createTab: vi.fn(async () => null),
     closeTab: vi.fn(),
     renameTab: vi.fn(),
     setActiveTab: vi.fn(),
@@ -117,7 +117,7 @@ describe('AnalysisTabsHost', () => {
   });
 
   it('auto-creates one tab when entering an empty functional tab group', async () => {
-    const createTab = vi.fn(() => 'new-tab');
+    const createTab = vi.fn(async () => null);
     mocks.useWorkspaceTabs.mockReturnValue(makeTabsResult({ createTab }));
 
     const { rerender } = render(
@@ -135,7 +135,7 @@ describe('AnalysisTabsHost', () => {
   });
 
   it('does not recreate a tab after the user closes the only tab', () => {
-    const createTab = vi.fn(() => 'new-tab');
+    const createTab = vi.fn(async () => null);
     let tabsResult = makeTabsResult({
       tabs: [tab],
       activeTabId: tab.tab_id,
@@ -198,6 +198,30 @@ describe('AnalysisTabsHost', () => {
     expect(screen.getAllByRole('tab')).toHaveLength(2);
     expect(screen.getByRole('button', { name: /new tab/i })).toBeInTheDocument();
     expect(screen.getByText('Active task task-2')).toBeInTheDocument();
+  });
+
+  it('renders and activates a tab targeted by a cross-view handoff', async () => {
+    const setActiveTab = vi.fn();
+    mocks.useWorkspaceTabs.mockReturnValue(
+      makeTabsResult({
+        tabs: [tab, secondTab],
+        activeTabId: tab.tab_id,
+        setActiveTab,
+      }),
+    );
+
+    render(
+      <AnalysisTabsHost
+        tabGroup="concordance"
+        Feature={FeatureWithTask}
+        preferredTabId={secondTab.tab_id}
+      />,
+    );
+
+    expect(screen.getByText('Active task task-2')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(setActiveTab).toHaveBeenCalledWith(secondTab.tab_id);
+    });
   });
 
   it('binds required feature commands to the active persisted tab', () => {

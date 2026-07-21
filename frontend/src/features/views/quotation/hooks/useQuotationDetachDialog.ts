@@ -1,31 +1,24 @@
 import { useState, type SetStateAction } from 'react';
 
-import { analysisTaskDetachOptions } from '@/api';
 import type { DetachNodeOption } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { useDetachColumnsState } from '../../common/hooks/useDetachColumnsState';
 
-type QuotationDetachHandler = (
-  nodeId: string,
-  selectedColumns: string[],
-  materializedPath: string | null,
-) => Promise<void> | void;
+type QuotationDetachHandler = (nodeId: string, selectedColumns: string[]) => Promise<void> | void;
 
 interface UseQuotationDetachDialogArgs {
-  workspaceId: string | null;
   activeSelections: NodeColumnSelection[];
-  resolveTaskId: () => Promise<string | null>;
+  originalColumnsByNode: Record<string, string[]>;
   handleDetach: QuotationDetachHandler;
-  materializedPaths: Record<string, string>;
   nodeDetaching: Record<string, boolean>;
-  showErrorDialog: (message: string) => void;
 }
 
 /** Builds the dialog's initially empty per-node source-column selections. */
 /**
- * Called by: useQuotationDetachDialog after the backend returns selectable
- * detach columns because quotation output columns are generated automatically
- * while source columns remain opt-in.
+ * Called by: useQuotationDetachDialog when a quotation result is ready for
+ * detachment. The source node's current columns are already available in the
+ * feature state, so opening the dialog is a local operation rather than an
+ * extra API request.
  */
 function emptySelectionForOptions(options: DetachNodeOption[]): Record<string, string[]> {
   const initial: Record<string, string[]> = {};
@@ -40,18 +33,15 @@ function emptySelectionForOptions(options: DetachNodeOption[]): Record<string, s
  * Used by: QuotationFeature so the feature component can keep task lifecycle,
  * parameter state, and result rendering separate from dialog option loading
  * and source-column checklist state.
- * Flow: open by loading available source columns for the active node/column,
- * confirm by dispatching the task-flow detach handler with selected columns
- * and materialized path, then reset the dialog-local pending state.
+ * Flow: open from the active node selection, seed the source-column checklist,
+ * confirm by dispatching the canonical detachment request, then reset the
+ * dialog-local pending state.
  */
 export function useQuotationDetachDialog({
-  workspaceId,
   activeSelections,
-  resolveTaskId,
+  originalColumnsByNode,
   handleDetach,
-  materializedPaths,
   nodeDetaching,
-  showErrorDialog,
 }: UseQuotationDetachDialogArgs) {
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
@@ -71,40 +61,32 @@ export function useQuotationDetachDialog({
     setSelectedDetachColumns({});
   };
 
-  /** Opens the detach dialog after loading selectable columns for the node. */
+  /** Opens the detach dialog using the columns already loaded for the node. */
   /**
    * Called by: QuotationNodeBlock actions via QuotationFeature because users
    * can add a node's quotation results back into the workspace.
-   * Flow: resolve the active text column, load backend detach options, seed
-   * empty source-column selections, then show the dialog or report the error.
+   * Flow: resolve the active text column, build one local option from the
+   * source-node metadata, seed empty source-column selections, then show the
+   * dialog.
    */
-  const openDetachDialog = async (nodeId: string) => {
-    if (!workspaceId) return;
+  const openDetachDialog = (nodeId: string) => {
     const selection = activeSelections.find((item) => item.nodeId === nodeId);
     if (!selection?.column) return;
-
-    try {
-      const taskId = await resolveTaskId();
-      if (!taskId) throw new Error('No quotation task to detach');
-      const { data: response } = await analysisTaskDetachOptions({
-        path: { workspace_id: workspaceId, task_id: taskId },
-        query: { node_id: nodeId, column: selection.column },
-        throwOnError: true,
-      });
-      const nodes = response.data?.nodes ?? [];
-      setPendingDetachNodeId(nodeId);
-      setDetachNodeOptions(nodes);
-      setSelectedDetachColumns(emptySelectionForOptions(nodes));
-      setDetachDialogOpen(true);
-    } catch (error) {
-      resetDialogState();
-      showErrorDialog(
-        error instanceof Error ? error.message : 'Failed to load quotation detach options',
-      );
-    }
+    const nodes: DetachNodeOption[] = [
+      {
+        node_id: nodeId,
+        node_name: nodeId,
+        text_column: selection.column,
+        available_columns: originalColumnsByNode[nodeId] ?? [selection.column],
+      },
+    ];
+    setPendingDetachNodeId(nodeId);
+    setDetachNodeOptions(nodes);
+    setSelectedDetachColumns(emptySelectionForOptions(nodes));
+    setDetachDialogOpen(true);
   };
 
-  /** Confirms detach with selected source columns and the node's cached path. */
+  /** Confirms detach with the selected source columns. */
   /**
    * Called by: QuotationFeature's shared DetachColumnsDialog because its
    * confirm button turns selections into one quotation workspace-detach request.
@@ -112,11 +94,7 @@ export function useQuotationDetachDialog({
   const handleDetachConfirm = async () => {
     if (!pendingDetachNodeId) return;
     const selectedColumns = selectedDetachColumns[pendingDetachNodeId] ?? [];
-    await handleDetach(
-      pendingDetachNodeId,
-      selectedColumns,
-      materializedPaths[pendingDetachNodeId] ?? null,
-    );
+    await handleDetach(pendingDetachNodeId, selectedColumns);
     resetDialogState();
   };
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Wand2 } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 import type { NodeResultView, NormalizedNodeResult } from '../../tokenFrequencyAdapters';
 
 import { TokenFrequencySingleTokenSection } from '../results/TokenFrequencySingleTokenSection';
@@ -334,44 +334,6 @@ export const TokenFrequencyResultsPanel = ({
             listLimit={listLimit}
           />
 
-          {resultsView === 'list' ? (
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold">Filter tokens</h4>
-                  <HelpIcon
-                    targetKey="analysis.token-frequency.token-filter"
-                    label="Token filter"
-                    tooltip="Filter the list views and statistics table by token. Use * as a wildcard (e.g. pre* or *ing). Does not affect the word cloud view."
-                  />
-                </div>
-                <div className="flex flex-1 items-center gap-2 sm:max-w-md">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
-                    value={listTokenFilter}
-                    onChange={(event) => {
-                      setListTokenFilter(event.target.value);
-                    }}
-                    className="h-8"
-                  />
-                  {listTokenFilter ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setListTokenFilter('');
-                      }}
-                    >
-                      Clear
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
           <TokenFrequencyUnifiedTokenSection
             normalizedNodeResults={normalizedNodeResults}
             nodeDisplayResults={nodeDisplayResults}
@@ -392,6 +354,7 @@ export const TokenFrequencyResultsPanel = ({
             onDownloadFrequencyCsv={onDownloadFrequencyCsv}
             view={resultsView}
             tokenFilter={listTokenFilter}
+            onTokenFilterChange={setListTokenFilter}
           />
         </div>
       ) : null}

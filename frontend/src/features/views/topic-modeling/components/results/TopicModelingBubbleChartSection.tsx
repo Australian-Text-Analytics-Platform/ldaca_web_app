@@ -70,7 +70,7 @@ const buildTopicsCSV = (
     const cols = [
       escapeCsv(selectedTopicIds.has(t.id) ? 'Yes' : 'No'),
       escapeCsv(String(t.id)),
-      escapeCsv((t.representative_words ?? []).join(', ')),
+      escapeCsv(t.representative_words.join(', ')),
     ];
     // Per-node document counts
     for (let i = 0; i < nodeNames.length; i++) {

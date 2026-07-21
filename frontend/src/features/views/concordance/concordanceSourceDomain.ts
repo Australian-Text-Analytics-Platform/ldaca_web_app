@@ -1,18 +1,10 @@
-import type { ConcordanceDispersionBinRow, ConcordanceNodeResult } from '@/api';
+import type { ConcordanceNodeResult } from '@/api';
 import { CONCORDANCE_COLUMN_KEYS } from '../common/generatedColumns';
-import type { TaggedBinRow } from './concordanceDispersionDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY, toCellText } from './concordanceTableDomain';
 
 interface ConcordanceNodeIdentity {
   id: string;
   name: string;
-}
-
-interface ConcordanceMaterializedLookupOptions {
-  selectedNodes: ConcordanceNodeIdentity[];
-  labelToNodeId: Record<string, string> | null;
-  materializedPaths: Record<string, string>;
-  materializedBins?: Record<string, ConcordanceDispersionBinRow[]>;
 }
 
 /** Cycles a palette with one explicit empty-palette policy at the caller. */
@@ -195,100 +187,29 @@ export function resolveConcordanceResultBlock<T extends ConcordanceNodeIdentity>
  * combined view can require/process all backing nodes while separated blocks
  * target only their own source node.
  */
-export function getConcordanceNodeIdsForKey(
-  nodeKey: string,
-  selectedNodes: ConcordanceNodeIdentity[],
-  labelToNodeId: Record<string, string> | null,
-): string[] {
-  if (nodeKey === CONCORDANCE_COMBINED_NODE_KEY) {
-    return selectedNodes.map((node) => node.id).filter((id): id is string => Boolean(id));
-  }
-  const id = resolveConcordanceNodeIdForKey(nodeKey, selectedNodes, labelToNodeId);
-  return id ? [id] : [];
-}
-
-/**
- * Reports whether a result block has materialized paths for every backing node.
- * Used by: Concordance table and dispersion blocks to decide whether
- * whole-corpus paging/bins are available for a separated or combined result.
- */
-export function isConcordanceBlockMaterialized(
-  nodeKey: string,
-  { selectedNodes, labelToNodeId, materializedPaths }: ConcordanceMaterializedLookupOptions,
-): boolean {
-  const ids = getConcordanceNodeIdsForKey(nodeKey, selectedNodes, labelToNodeId);
-  return ids.length > 0 && ids.every((id) => id in materializedPaths);
-}
-
-/**
- * Combines cached server-bin rows for every materialized node behind a result block.
- * Used by: ConcordanceFeature before rendering dispersion charts because
- * combined-view charts need one tagged row stream while separated charts still
- * need the same all-nodes-present guard.
- */
-export function getMaterializedBinsForConcordanceKey(
-  nodeKey: string,
-  {
-    selectedNodes,
-    labelToNodeId,
-    materializedPaths,
-    materializedBins = {},
-  }: ConcordanceMaterializedLookupOptions,
-): TaggedBinRow[] | undefined {
-  const ids = getConcordanceNodeIdsForKey(nodeKey, selectedNodes, labelToNodeId);
-  if (ids.length === 0) return undefined;
-  if (!ids.every((id) => id in materializedPaths)) return undefined;
-  if (!ids.every((id) => id in materializedBins)) return undefined;
-
-  const tagged: TaggedBinRow[] = [];
-  for (const id of ids) {
-    const node = selectedNodes.find((entry) => entry.id === id);
-    const sourceLabel = node?.name ?? id;
-    const bins = materializedBins[id];
-    if (!bins) continue;
-    for (const row of bins) {
-      tagged.push({ ...row, __source_node: sourceLabel });
-    }
-  }
-  return tagged;
-}
-
 export interface CollectConcordanceMatchedTextsOptions {
-  getMaterializedBinsForKey: (nodeKey: string) => TaggedBinRow[] | undefined;
   lowercaseMatches: boolean;
 }
 
 /**
  * Collects the unique matched-text series names used by coloured dispersion charts.
  * Used by: ConcordanceFeature because the feature shell needs one tested helper
- * to derive chart series from either cached server bins or the current page's
- * raw concordance rows before assigning stable colours.
+ * to derive chart series from current-page concordance rows before assigning
+ * stable colours.
  *
  * Flow:
  * - Walk each result block in display order.
- * - Prefer materialized server-bin rows when available so whole-corpus charts
- *   and current-page charts label series the same way.
- * - Fall back to grouped page rows for non-materialized results, normalize
- *   case according to the active concordance setting, and return sorted unique
- *   labels for deterministic colour assignment.
+ * - Walk grouped page rows, normalize case according to the active concordance
+ *   setting, and return sorted unique labels for deterministic colour assignment.
  */
 export function collectConcordanceMatchedTexts(
   resultsData: Record<string, ConcordanceNodeResult> | undefined,
-  { getMaterializedBinsForKey, lowercaseMatches }: CollectConcordanceMatchedTextsOptions,
+  { lowercaseMatches }: CollectConcordanceMatchedTextsOptions,
 ): string[] {
   if (!resultsData) return [];
 
   const seen = new Set<string>();
-  for (const [nodeKey, nodeData] of Object.entries(resultsData)) {
-    const binRows = getMaterializedBinsForKey(nodeKey);
-    if (binRows) {
-      for (const row of binRows) {
-        const rawText = row.matched_text ?? '';
-        if (rawText) seen.add(lowercaseMatches ? rawText.toLowerCase() : rawText);
-      }
-      continue;
-    }
-
+  for (const nodeData of Object.values(resultsData)) {
     for (const group of nodeData.data) {
       for (const hit of group) {
         const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);

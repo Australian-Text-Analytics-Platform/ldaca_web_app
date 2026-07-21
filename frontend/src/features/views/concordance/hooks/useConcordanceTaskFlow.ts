@@ -1,18 +1,17 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
-import { analysisTaskResultQuery, runConcordance } from '@/api';
+import { queryAnalysisResult, submitTabAnalysis } from '@/api';
 import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
-  type ConcordanceDetachRequest,
-  type ConcordanceDispersionDetachRequest,
-  type ConcordanceMaterializeRequest,
+  type ConcordanceDetachmentAnalysisRequest,
+  type ConcordanceDispersionDetachmentAnalysisRequest,
   type ConcordanceResultQuery,
-  type AnalysisTaskActionResponse,
+  type Analysis,
 } from '@/api';
 import { formatBinIndicesAsRangeLabel } from '../concordanceDispersionDomain';
-import { extractAndSetTaskId } from '../../common/extractTaskId';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
+import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { NodePaginationState } from '../../common/tasks/types';
 
 export type PaginationState = Record<string, NodePaginationState>;
@@ -26,6 +25,7 @@ export interface ConcordanceHandoffSearchRequest {
 
 interface ConcordanceState {
   currentWorkspaceId: string | null;
+  tabId: string;
   searchWord: string;
   activeNodeIds: string[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
@@ -44,14 +44,13 @@ interface ConcordanceState {
 
 interface ConcordanceActions {
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
-  setViewMode: (mode: 'separated' | 'combined') => void;
   setIsSearching: (value: boolean) => void;
   setResults: Dispatch<SetStateAction<ConcordanceAnalysisResponse | null>>;
   setLocalTaskId: (id: string | null) => void;
+  runningRef: { current: boolean };
+  lastFetchedRef: { current: { taskId: string | null; state: string | null } };
   setNodeLoading: Dispatch<SetStateAction<Record<string, boolean>>>;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setNodeMaterializing: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setMaterializeTaskIds: Dispatch<SetStateAction<Record<string, string>>>;
   /**
    * Notifies AnalysisTabsHost of the task id assigned by a run (or null when
    * none). The host persists it onto the tab record so the tab
@@ -64,16 +63,12 @@ interface ConcordanceLock {
   resolveTaskId: () => Promise<string | null>;
   detachConcordance: (
     taskId: string,
-    request: ConcordanceDetachRequest,
-  ) => Promise<AnalysisTaskActionResponse>;
+    request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'>,
+  ) => Promise<Analysis>;
   detachConcordanceDispersion: (
     taskId: string,
-    request: ConcordanceDispersionDetachRequest,
-  ) => Promise<{ task_id?: string }>;
-  materializeConcordance: (
-    taskId: string,
-    request: ConcordanceMaterializeRequest,
-  ) => Promise<{ metadata?: { task_id?: string | null } | null } | undefined>;
+    request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'>,
+  ) => Promise<Analysis>;
 }
 
 interface Params {
@@ -91,6 +86,7 @@ interface Params {
 export function useConcordanceTaskFlow({
   state: {
     currentWorkspaceId,
+    tabId,
     searchWord,
     activeNodeIds,
     effectiveNodeColumnSelections,
@@ -107,17 +103,16 @@ export function useConcordanceTaskFlow({
   },
   actions: {
     setNodePagination,
-    setViewMode,
     setIsSearching,
     setResults,
     setLocalTaskId,
+    runningRef,
+    lastFetchedRef,
     setNodeLoading,
     setNodeDetaching,
-    setNodeMaterializing,
-    setMaterializeTaskIds,
     onTaskIdAssigned,
   },
-  lock: { resolveTaskId, detachConcordance, detachConcordanceDispersion, materializeConcordance },
+  lock: { resolveTaskId, detachConcordance, detachConcordanceDispersion },
 }: Params) {
   /** Builds stable derived node names for workspace outputs created by concordance actions. */
   /**
@@ -148,9 +143,9 @@ export function useConcordanceTaskFlow({
 
     const taskId = await resolveTaskId();
     if (!taskId) return null;
-    const { data } = await analysisTaskResultQuery({
-      body,
-      path: { workspace_id: currentWorkspaceId, task_id: taskId },
+    const { data } = await queryAnalysisResult({
+      body: { kind: 'concordance', ...body },
+      path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
       throwOnError: true,
     });
     const response = data as ConcordanceAnalysisResponse | null;
@@ -212,55 +207,44 @@ export function useConcordanceTaskFlow({
     });
     setNodePagination(updatedPagination);
 
-    const firstNodeId = requestNodeIds[0];
-    if (firstNodeId === undefined) return;
-    const firstNodePagination = updatedPagination[firstNodeId];
-    if (!firstNodePagination) return;
-
     const nodeColumns: Record<string, string> = {};
     effectiveSelections.forEach((sel) => {
       nodeColumns[sel.nodeId] = sel.column;
     });
 
-    setIsSearching(true);
-    try {
-      const request: ConcordanceAnalysisRequest = {
-        node_ids: requestNodeIds,
-        node_columns: nodeColumns,
-        search_word: trimmedSearch,
-        num_left_tokens: numLeftTokens,
-        num_right_tokens: numRightTokens,
-        regex,
-        whole_word: wholeWord,
-        case_sensitive: caseSensitive,
-        search_mode: searchMode,
-      };
-      if (firstNodePagination.sortBy) {
-        request.sort_by = firstNodePagination.sortBy;
-      }
-
-      const { data: response } = await runConcordance({
-        body: request,
-        path: { workspace_id: currentWorkspaceId },
-        throwOnError: true,
-      });
-      setResults(response);
-      const assignedTaskId = extractAndSetTaskId(response, setLocalTaskId);
-      onTaskIdAssigned(assignedTaskId);
-
-      if (response.combinable === false && viewMode === 'combined') {
-        setViewMode('separated');
-      }
-    } catch (error) {
-      console.error('Error performing concordance search:', error);
-      setResults({
-        state: 'failed',
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
-        data: {},
-      });
-    } finally {
-      setIsSearching(false);
-    }
+    const request: ConcordanceAnalysisRequest = {
+      node_ids: requestNodeIds,
+      node_columns: nodeColumns,
+      search_word: trimmedSearch,
+      num_left_tokens: numLeftTokens,
+      num_right_tokens: numRightTokens,
+      regex,
+      whole_word: wholeWord,
+      case_sensitive: caseSensitive,
+      search_mode: searchMode,
+    };
+    await runAnalysisTaskEnvelope<Analysis>({
+      lastFetchedRef,
+      runningRef,
+      setIsRunning: setIsSearching,
+      setLocalTaskId,
+      onTaskIdAssigned,
+      resetBeforeRun: () => {
+        setResults(null);
+      },
+      submit: async () => {
+        const { data } = await submitTabAnalysis({
+          body: { kind: 'concordance', ...request },
+          path: { workspace_id: currentWorkspaceId, tab_id: tabId },
+          throwOnError: true,
+        });
+        return data;
+      },
+      onSuccess: () => undefined,
+      onError: (error) => {
+        console.error('Error performing concordance search:', error);
+      },
+    });
   };
 
   /** Used by ConcordanceFeature to run a token-frequency handoff from its immutable input snapshot. */
@@ -398,10 +382,9 @@ export function useConcordanceTaskFlow({
    */
   const handleDetach = async (
     nodeId: string,
-    column: string,
+    _column: string,
     nodeLabel?: string,
     selectedColumns?: string[],
-    materializedPath?: string | null,
   ) => {
     if (!currentWorkspaceId || !searchWord.trim()) return;
 
@@ -418,18 +401,10 @@ export function useConcordanceTaskFlow({
         return;
       }
       const resolvedNodeLabel = nodeLabel && nodeLabel.trim().length > 0 ? nodeLabel : nodeId;
-      const request: ConcordanceDetachRequest = {
+      const request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'> = {
         node_id: nodeId,
-        column,
-        search_word: searchWord.trim(),
-        num_left_tokens: numLeftTokens,
-        num_right_tokens: numRightTokens,
-        regex,
-        whole_word: wholeWord,
-        case_sensitive: caseSensitive,
-        new_node_name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
+        name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
         selected_columns: explicitSelectedColumns,
-        ...(materializedPath ? { materialized_path: materializedPath } : {}),
       };
       await detachConcordance(parentTaskId, request);
     } catch (error) {
@@ -450,10 +425,9 @@ export function useConcordanceTaskFlow({
    */
   const handleDispersionDetach = async (
     nodeId: string,
-    column: string,
+    _column: string,
     options: {
       nodeLabel?: string;
-      materializedPath?: string | null;
       selectedBins?: ReadonlySet<number> | null;
       binCount: number;
       selectedColumns?: string[];
@@ -494,18 +468,10 @@ export function useConcordanceTaskFlow({
         toast.error('No concordance task to detach.');
         return;
       }
-      const request: ConcordanceDispersionDetachRequest = {
+      const request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'> = {
         node_id: nodeId,
-        column,
-        search_word: searchWord.trim(),
-        num_left_tokens: numLeftTokens,
-        num_right_tokens: numRightTokens,
-        regex,
-        whole_word: wholeWord,
-        case_sensitive: caseSensitive,
-        new_node_name: buildDetachNodeName(resolvedLabel, suffix),
+        name: buildDetachNodeName(resolvedLabel, suffix),
         selected_columns: explicitSelectedColumns,
-        ...(options.materializedPath ? { materialized_path: options.materializedPath } : {}),
         ...(selectedBinsArr
           ? { selected_bins: selectedBinsArr, total_bins: options.binCount }
           : {}),
@@ -528,52 +494,6 @@ export function useConcordanceTaskFlow({
     }
   };
 
-  /** Starts the backend materialization task that caches all concordance hits for a node. */
-  /**
-   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
-   * Flow: resolve the parent task, submit the current search contract for one
-   * node, and register its materialization task id for terminal tracking.
-   */
-  const handleMaterialize = async (nodeId: string, column: string) => {
-    if (!currentWorkspaceId || !searchWord.trim()) {
-      toast.error('Run a concordance search first.');
-      return;
-    }
-    const parentTaskId = await resolveTaskId();
-    if (!parentTaskId) {
-      toast.error('No concordance task to materialize.');
-      return;
-    }
-
-    setNodeMaterializing((prev) => ({ ...prev, [nodeId]: true }));
-    try {
-      const request: ConcordanceMaterializeRequest = {
-        node_id: nodeId,
-        column,
-        search_word: searchWord.trim(),
-        num_left_tokens: numLeftTokens,
-        num_right_tokens: numRightTokens,
-        regex,
-        whole_word: wholeWord,
-        case_sensitive: caseSensitive,
-        // Must match the live search engine — otherwise materialise runs
-        // the regex flow over raw text and silently drops tokens-mode hits.
-        search_mode: searchMode,
-      };
-      const resp = await materializeConcordance(parentTaskId, request);
-      const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
-      if (taskId) {
-        setMaterializeTaskIds((prev) => ({ ...prev, [nodeId]: taskId }));
-      }
-      toast.success('Materialize started.');
-    } catch (error) {
-      console.error('Error materializing concordance:', error);
-      const msg = error instanceof Error ? error.message : String(error);
-      toast.error(`Error materializing concordance: ${msg}`);
-      setNodeMaterializing((prev) => ({ ...prev, [nodeId]: false }));
-    }
-  };
-
   return {
     handleSearch,
     handleHandoffSearch,
@@ -583,6 +503,5 @@ export function useConcordanceTaskFlow({
     persistResultPreferences,
     handleDetach,
     handleDispersionDetach,
-    handleMaterialize,
   };
 }

@@ -36,7 +36,7 @@ export const createTopicModelingParameterState = (): TopicModelingParameterState
   corpusSamplesUserSet: false,
   topicSizeValue: DEFAULT_TOPIC_SIZE_VALUE,
   topicSizeUserSet: false,
-  randomSeed: 42,
+  randomSeed: 0,
   randomSeedUserSet: false,
   representativeWordsCount: 15,
   representativeWordsCountUserSet: false,
@@ -139,7 +139,7 @@ export const topicModelingParameterReducer = (
       const hasSampling = Array.isArray(action.request.sample_fractions);
       return {
         ...state,
-        randomSeed: Number(action.request.random_seed ?? 42),
+        randomSeed: Number(action.request.random_seed ?? 0),
         randomSeedUserSet: true,
         representativeWordsCount: Number(action.request.representative_words_count ?? 15),
         representativeWordsCountUserSet: true,

@@ -1,5 +1,3 @@
-export type ServerRequestLike = Record<string, unknown>;
-
 /**
  * Produces deterministic structural strings for request comparisons where key
  * order from backend JSON should not mark unchanged parameters as different.
@@ -42,39 +40,4 @@ export const normalizeUnknownStringArray = (value: unknown): string[] => {
       .map((item) => (typeof item === 'string' ? item : null))
       .filter((item): item is string => item !== null),
   );
-};
-
-export interface ServerEngineConfig {
-  type: 'local' | 'remote';
-  url: string | null;
-}
-
-/** Reads nested engine settings from current quotation request payloads. */
-export const getServerEngineConfig = (
-  request: ServerRequestLike,
-  normalizeUrl?: (url: string) => string,
-): ServerEngineConfig => {
-  const requestEngine = (request as { engine?: unknown }).engine;
-  const requestEngineRecord =
-    requestEngine && typeof requestEngine === 'object'
-      ? (requestEngine as Record<string, unknown>)
-      : null;
-
-  const typeFromEngine =
-    requestEngineRecord && typeof requestEngineRecord.type === 'string'
-      ? requestEngineRecord.type
-      : null;
-  const type = typeFromEngine === 'remote' ? 'remote' : 'local';
-
-  const urlFromEngine =
-    requestEngineRecord && typeof requestEngineRecord.url === 'string'
-      ? requestEngineRecord.url
-      : null;
-  const rawUrl = urlFromEngine;
-
-  if (type !== 'remote' || !rawUrl) {
-    return { type, url: null };
-  }
-
-  return { type, url: normalizeUrl ? normalizeUrl(rawUrl) : rawUrl };
 };

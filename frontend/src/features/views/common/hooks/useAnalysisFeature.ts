@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { cancelTask } from '@/api';
+import { toast } from 'sonner';
+import { cancelAnalysis } from '@/api';
 import { collectTaskIds, resolveAnalysisTaskId } from '@/features/views/common/analysisTaskUtils';
 import { useAnalysisHydration, type HydrationState } from '../useAnalysisHydration';
 import { clearAnalysis } from '../clearAnalysis';
@@ -25,14 +26,6 @@ interface AnalysisResultLike {
   metadata?: { task_id?: string };
 }
 
-/**
- * A tabbed analysis feature explicitly owns its task id through
- * `hydrationTaskId`. When that prop is present but null, the tab has not run
- * yet and must not fall back to the workspace's global current/terminal task.
- */
-const hasTabOwnedTaskId = (config: object): boolean =>
-  Object.prototype.hasOwnProperty.call(config, 'hydrationTaskId');
-
 export interface ClearAnalysisUiOptions {
   preserveLocalState?: boolean;
 }
@@ -45,6 +38,7 @@ interface UseAnalysisFeatureConfig<TResult = unknown> {
   analysisType: LastRunAnalysisType;
   taskType: CanonicalAnalysisTaskType | (string & {});
   workspaceId: string | null;
+  tabId: string;
   isTabActive: boolean;
 
   /** Ref to feature-managed result state — hook reads for banner / clear logic */
@@ -65,11 +59,11 @@ interface UseAnalysisFeatureConfig<TResult = unknown> {
   onCleared: (clearedTaskIds: string[], options?: ClearAnalysisUiOptions) => void;
 
   /**
-   * Optional callback to prune global task store entries for the cleared task IDs.
-   * When provided, called automatically during clear — features don't need to
-   * duplicate the pruneTasksById boilerplate in their onCleared.
+   * Optional callback to prune shared task-inbox entries for the cleared task IDs.
+   * When provided, called automatically during clear so features do not duplicate
+   * the task-inbox cleanup.
    */
-  pruneGlobalTasks?: (taskIds: string[]) => void;
+  pruneTaskInbox?: (taskIds: string[]) => void;
 
   /** Extra task ID candidates for resolution beyond the built-in sources */
   getExtraTaskIdCandidates?: () => (string | null | undefined)[];
@@ -78,15 +72,8 @@ interface UseAnalysisFeatureConfig<TResult = unknown> {
   /** Custom check for whether the result indicates a running state (default: result.state === 'running') */
   isResultRunning?: (result: TResult | null) => boolean;
 
-  /**
-   * Task id supplied by an external owner (e.g. the active analysis tab) that
-   * must win task resolution deterministically. Prepended as the first task-id
-   * candidate so it survives the workspace-change ``localTaskId`` reset race —
-   * the tab record, not transient local state, drives which task hydrates.
-   * Callers without tabs pass undefined/null, which ``resolveAnalysisTaskId``
-   * skips, preserving existing behaviour.
-   */
-  hydrationTaskId?: string | null;
+  /** Persisted analysis id supplied by the owning analysis tab. */
+  hydrationTaskId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +96,7 @@ interface UseAnalysisFeatureReturn {
   hydrationState: HydrationState;
 
   stopTask: () => Promise<void>;
-  clearResults: (options?: ClearAnalysisUiOptions) => Promise<void>;
+  clearResults: (options?: ClearAnalysisUiOptions) => Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +153,7 @@ export function useAnalysisFeature<TResult = unknown>(
   }, [config.workspaceId]);
 
   // Returns the cached last-run request data (fetched once by useLastRunRequest).
-  // Used to avoid refetching /current and /request during hydration.
+  // Used to avoid refetching the analysis request during hydration.
   const readLastRunRequestCache = useCallback(
     (taskId?: string | null): CachedLastRunRequest | null => {
       if (!configRef.current.workspaceId) return null;
@@ -200,9 +187,8 @@ export function useAnalysisFeature<TResult = unknown>(
   const taskStatusRef = useRef<AnalysisTaskStatus | null>(null);
 
   // ---- Task ID resolution ----
-  // Prefers, in order: locally-tracked ID → cached result metadata → cached
-  // last-run request taskId (populated by useLastRunRequest) →
-  // in-memory task-flow status → caller-supplied extras.
+  // Prefers the persisted tab id, then the local submission id, result metadata,
+  // and caller-supplied metadata. A tab never searches unrelated workspace tasks.
   /**
    * Resolves the task id from explicit local/tab-owned sources, then records
    * the winning id for future clears.
@@ -215,18 +201,8 @@ export function useAnalysisFeature<TResult = unknown>(
 
     const metadataTaskId =
       (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id ?? null;
-    const status = taskStatusRef.current;
     const extra = cfg.getExtraTaskIdCandidates?.() ?? [];
     const cachedLastRun = readLastRunRequestCache(cfg.hydrationTaskId ?? localTaskIdRef.current);
-    const isTabOwnedTask = hasTabOwnedTaskId(cfg);
-    const statusCandidates = isTabOwnedTask
-      ? []
-      : [
-          status?.activeTaskId,
-          status?.runningTask?.task_id,
-          status?.queuedTask?.task_id,
-          status?.terminalTask?.task_id,
-        ];
 
     return Promise.resolve(
       resolveAnalysisTaskId({
@@ -235,7 +211,6 @@ export function useAnalysisFeature<TResult = unknown>(
           localTaskIdRef.current,
           metadataTaskId,
           cachedLastRun?.taskId ?? null,
-          ...statusCandidates,
           ...extra,
         ],
         onResolved: setLocalTaskId,
@@ -255,21 +230,20 @@ export function useAnalysisFeature<TResult = unknown>(
    */
   const fetchAndApplyResult = async (
     taskId: string | null,
-    expectedState: 'successful' | 'failed',
+    expectedState: 'successful' | 'failed' | 'cancelled',
   ): Promise<void> => {
     const cfg = configRef.current;
     if (!cfg.isTabActive || !cfg.workspaceId) {
       return;
     }
 
-    const isTabOwnedTask = hasTabOwnedTaskId(cfg);
     const ownedTaskIds = collectTaskIds([
       cfg.hydrationTaskId,
       localTaskIdRef.current,
       (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id,
       ...(cfg.getExtraTaskIdCandidates?.() ?? []),
     ]);
-    if (isTabOwnedTask && taskId && !ownedTaskIds.includes(taskId)) {
+    if (taskId && !ownedTaskIds.includes(taskId)) {
       return;
     }
 
@@ -277,7 +251,7 @@ export function useAnalysisFeature<TResult = unknown>(
     if (!resolvedTaskId) {
       return;
     }
-    if (isTabOwnedTask && !ownedTaskIds.includes(resolvedTaskId)) {
+    if (!ownedTaskIds.includes(resolvedTaskId)) {
       return;
     }
 
@@ -288,6 +262,15 @@ export function useAnalysisFeature<TResult = unknown>(
       lastFetchedRef.current.taskId === resolvedTaskId &&
       lastFetchedRef.current.state === expectedState
     ) {
+      return;
+    }
+
+    // Failed and cancelled Analyses have no Result resource. Complete the
+    // lifecycle locally instead of issuing a request that the backend must
+    // reject as "Analysis has not succeeded".
+    if (expectedState !== 'successful') {
+      setIsRunning(false);
+      lastFetchedRef.current = { taskId: resolvedTaskId, state: expectedState };
       return;
     }
 
@@ -313,12 +296,18 @@ export function useAnalysisFeature<TResult = unknown>(
   // ---- Task flow refresh callback (wired into useAnalysisTaskFlow) ----
   /**
    * Bridges task-store terminal events into feature-specific result refreshes
-   * only for active tabs and successful/failed terminal states.
+   * only for active tabs and terminal states. Only success has a Result to fetch.
    * Called by: useAnalysisTaskFlow when the tracked task reaches terminal state.
    */
   const handleTaskRefresh = async (context: AnalysisTaskFlowRefreshContext): Promise<void> => {
     if (!configRef.current.isTabActive) return;
-    if (context.taskState !== 'successful' && context.taskState !== 'failed') return;
+    if (
+      context.taskState !== 'successful' &&
+      context.taskState !== 'failed' &&
+      context.taskState !== 'cancelled'
+    ) {
+      return;
+    }
     await fetchAndApplyResult(context.taskId ?? null, context.taskState);
   };
 
@@ -348,9 +337,7 @@ export function useAnalysisFeature<TResult = unknown>(
     };
   };
 
-  const ownedTaskIds = hasTabOwnedTaskId(config)
-    ? collectTaskIds([config.hydrationTaskId, localTaskId])
-    : undefined;
+  const ownedTaskIds = collectTaskIds([config.hydrationTaskId, localTaskId]);
 
   // ---- Task flow ----
   const { status: taskStatus, banner } = useAnalysisTaskFlow({
@@ -457,38 +444,46 @@ export function useAnalysisFeature<TResult = unknown>(
    * Clears backend task records and every local source of task/result state so
    * feature panels can start a new analysis from an unlocked baseline.
    * Called by: analysis feature clear buttons and task banner cleanup flows.
-   * Flow: collect local/result/status task ids, call clearAnalysis with cleanup hooks, then clear local ids, fetch markers, running state, global tasks, and feature results.
+   * Flow: collect local/result/status task ids, call clearAnalysis with cleanup hooks, then clear local ids, fetch markers, running state, task-inbox entries, and feature results.
    */
-  const clearResults = async (options?: ClearAnalysisUiOptions): Promise<void> => {
+  const clearResults = async (options?: ClearAnalysisUiOptions): Promise<boolean> => {
     const cfg = configRef.current;
-    if (!cfg.workspaceId) return;
+    if (!cfg.workspaceId) return false;
 
     const status = taskStatusRef.current;
     const extraSources = cfg.getClearTaskIdSources?.() ?? [];
 
-    await clearAnalysis({
-      analysisType: cfg.analysisType,
-      workspaceId: cfg.workspaceId,
-      queryClient,
-      taskIdSources: [
-        localTaskIdRef.current,
-        (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id,
-        status?.activeTaskId,
-        status?.runningTask?.task_id,
-        status?.successfulTask?.task_id,
-        status?.failedTask?.task_id,
-        ...extraSources,
-      ],
-      resolveTaskId,
-      /** Called by: clearAnalysis after backend task-cache cleanup completes. */
-      onCleanup: (taskIds) => {
-        setLocalTaskId(null);
-        lastFetchedRef.current = { taskId: null, state: null };
-        setIsRunning(false);
-        cfg.pruneGlobalTasks?.(taskIds);
-        cfg.onCleared(taskIds, options);
-      },
-    });
+    try {
+      await clearAnalysis({
+        analysisType: cfg.analysisType,
+        workspaceId: cfg.workspaceId,
+        tabId: cfg.tabId,
+        queryClient,
+        taskIdSources: [
+          localTaskIdRef.current,
+          (cfg.resultRef.current as AnalysisResultLike | null)?.metadata?.task_id,
+          status?.activeTaskId,
+          status?.runningTask?.task_id,
+          status?.successfulTask?.task_id,
+          status?.failedTask?.task_id,
+          ...extraSources,
+        ],
+        resolveTaskId,
+        /** Called by: clearAnalysis after backend task-cache cleanup completes. */
+        onCleanup: (taskIds) => {
+          setLocalTaskId(null);
+          lastFetchedRef.current = { taskId: null, state: null };
+          setIsRunning(false);
+          cfg.pruneTaskInbox?.(taskIds);
+          cfg.onCleared(taskIds, options);
+        },
+      });
+      return true;
+    } catch (error) {
+      console.warn(`[${cfg.analysisType}] Failed to clear Analysis:`, error);
+      toast.error(error instanceof Error ? error.message : 'Could not clear the analysis.');
+      return false;
+    }
   };
 
   /**
@@ -513,8 +508,8 @@ export function useAnalysisFeature<TResult = unknown>(
 
     setIsStopping(true);
     try {
-      await cancelTask({
-        path: { task_id: taskId },
+      await cancelAnalysis({
+        path: { workspace_id: cfg.workspaceId, analysis_id: taskId },
         throwOnError: true,
       });
       setIsRunning(false);

@@ -110,7 +110,7 @@ const baseProps = {
   topicSizeWarning: null as 'orange' | 'red' | null,
   onTopicSizeValueChange: vi.fn(),
   showSamplingWarning: false,
-  randomSeed: 42,
+  randomSeed: 0,
   randomSeedUserSet: false,
   onRandomSeedChange: vi.fn(),
   representativeWordsCount: 5,

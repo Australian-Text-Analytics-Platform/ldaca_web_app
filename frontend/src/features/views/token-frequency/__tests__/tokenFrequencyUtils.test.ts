@@ -1,19 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { TokenFrequencyResponse } from '@/api';
 import {
-  buildSelectionNameKey,
-  buildSelectionNameById,
   buildNodeIdDisplayNameMap,
-  derivePanelNodeIds,
-  deriveBackendTokenLimit,
+  buildSelectionNameById,
+  buildSelectionNameKey,
   deriveBackendStopWords,
   deriveBackendStopWordsKey,
+  deriveBackendTokenLimit,
+  derivePanelNodeIds,
   deriveStudyNodeOrder,
+  reconcileHydratedTokenFrequencyInputs,
   resolveTokenFrequencyDisplayName,
 } from '../tokenFrequencyUtils';
 
 describe('tokenFrequencyUtils', () => {
-  it('deriveBackendTokenLimit prefers explicit token_limit over metadata/limit', () => {
+  it('derives the canonical token limit from the result resource', () => {
     const result: TokenFrequencyResponse = {
       state: 'successful',
       data: null,
@@ -25,12 +26,13 @@ describe('tokenFrequencyUtils', () => {
     expect(deriveBackendTokenLimit(result)).toBe(42);
   });
 
-  it('deriveBackendStopWords prefers analysis params over metadata when top-level is absent', () => {
+  it('derives stop words from the canonical result resource', () => {
     const result: TokenFrequencyResponse = {
       state: 'successful',
       data: null,
-      metadata: { stop_words: ['the', 'and'] },
-      analysis_params: { stop_words: ['ignored'] },
+      stop_words: ['ignored'],
+      metadata: {},
+      analysis_params: {},
     };
 
     expect(deriveBackendStopWords(result)).toEqual(['ignored']);
@@ -40,7 +42,9 @@ describe('tokenFrequencyUtils', () => {
     const result: TokenFrequencyResponse = {
       state: 'successful',
       data: null,
-      metadata: { stop_words: [' The ', 'AND', '', '  '] },
+      stop_words: [' The ', 'AND', '', '  '],
+      metadata: {},
+      analysis_params: {},
     };
 
     expect(deriveBackendStopWordsKey(result)).toBe('the|and');
@@ -89,6 +93,38 @@ describe('tokenFrequencyUtils', () => {
       effectiveStudyNodeId: 'study',
       orderedPanelNodeIds: ['reference', 'study'],
     });
+  });
+
+  it('preserves parameter-card order while hydrating reference/study request columns', () => {
+    expect(
+      reconcileHydratedTokenFrequencyInputs(
+        [
+          { node_id: 'study', column: 'old-study-column' },
+          { node_id: 'reference', column: 'old-reference-column' },
+        ],
+        [
+          { node_id: 'reference', column: 'reference-column' },
+          { node_id: 'study', column: 'study-column' },
+        ],
+      ),
+    ).toEqual([
+      { node_id: 'study', column: 'study-column' },
+      { node_id: 'reference', column: 'reference-column' },
+    ]);
+  });
+
+  it('adopts hydrated request order when restoring a different node selection', () => {
+    const hydratedInputs = [
+      { node_id: 'reference', column: 'reference-column' },
+      { node_id: 'study', column: 'study-column' },
+    ];
+
+    expect(
+      reconcileHydratedTokenFrequencyInputs(
+        [{ node_id: 'different-node', column: 'text' }],
+        hydratedInputs,
+      ),
+    ).toEqual(hydratedInputs);
   });
 
   it('buildNodeIdDisplayNameMap falls back from empty names to ids', () => {

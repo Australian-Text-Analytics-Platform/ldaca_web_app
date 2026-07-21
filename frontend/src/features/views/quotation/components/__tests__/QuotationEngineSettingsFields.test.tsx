@@ -9,26 +9,26 @@ describe('QuotationEngineSettingsFields', () => {
   it('shows the endpoint input only when remote is selected', async () => {
     const user = userEvent.setup();
     const onEngineConfigChange = vi.fn();
-    const onRemoteUrlChange = vi.fn();
+    const onRemoteEngineIdChange = vi.fn();
 
     function Harness() {
       const [engineConfig, setEngineConfig] = useState<QuotationEngineConfig>({
         type: 'local',
       });
-      const [lastRemoteUrl, setLastRemoteUrl] = useState('https://saved.example/quotation');
+      const [lastRemoteEngineId, setLastRemoteEngineId] = useState('remote-quotation-engine');
       return (
         <QuotationEngineSettingsFields
           idPrefix="test-quotation-engine"
           engineConfig={engineConfig}
-          lastRemoteUrl={lastRemoteUrl}
+          lastRemoteEngineId={lastRemoteEngineId}
           onEngineConfigChange={(config) => {
             onEngineConfigChange(config);
             setEngineConfig(config);
           }}
-          onRemoteUrlChange={(url) => {
-            onRemoteUrlChange(url);
-            setLastRemoteUrl(url);
-            setEngineConfig({ type: 'remote', url });
+          onRemoteEngineIdChange={(engineId) => {
+            onRemoteEngineIdChange(engineId);
+            setLastRemoteEngineId(engineId);
+            setEngineConfig({ type: 'remote', engine_id: engineId });
           }}
         />
       );
@@ -37,19 +37,19 @@ describe('QuotationEngineSettingsFields', () => {
     render(<Harness />);
 
     expect(screen.getByRole('radio', { name: /built-in/i })).toBeChecked();
-    expect(screen.queryByLabelText('Endpoint')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Engine id')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('radio', { name: /remote/i }));
 
     expect(onEngineConfigChange).toHaveBeenCalledWith({
       type: 'remote',
-      url: 'https://saved.example/quotation',
+      engine_id: 'remote-quotation-engine',
     });
 
-    expect(screen.getByLabelText('Endpoint')).toHaveValue('https://saved.example/quotation');
-    await user.clear(screen.getByLabelText('Endpoint'));
-    await user.type(screen.getByLabelText('Endpoint'), 'https://new.example/api');
+    expect(screen.getByLabelText('Engine id')).toHaveValue('remote-quotation-engine');
+    await user.clear(screen.getByLabelText('Engine id'));
+    await user.type(screen.getByLabelText('Engine id'), 'remote-engine-v2');
 
-    expect(onRemoteUrlChange).toHaveBeenLastCalledWith('https://new.example/api');
+    expect(onRemoteEngineIdChange).toHaveBeenLastCalledWith('remote-engine-v2');
   });
 });
