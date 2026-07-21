@@ -25,7 +25,7 @@ flowchart LR
     LOCAL --> ACKS["Per-user device acknowledgment history"]
     PREFS --> GUIDANCE["Guidance provider"]
     ACKS --> GUIDANCE
-    ACTIONS["Successful feature actions"] -->|"request Contextual Hint"| GUIDANCE
+    ACTIONS["Feature-local workflow state"] -->|"request next Contextual Hint"| GUIDANCE
     HELP["Help launchers"] -->|"start Guided Tour"| GUIDANCE
     GUIDANCE --> JOYRIDE["React Joyride"]
     MODALS["Radix modal layer count"] -->|"inert below z-50"| GUIDANCE
@@ -49,10 +49,14 @@ flowchart LR
 - `src/features/preferences/` reads and mutates synchronized account preferences
   through TanStack Query. Server preference data is never mirrored into
   Zustand.
-- `src/features/guidance/` owns empty production registries, explicit
-  Contextual Hint and Guided Tour requests, Joyride adaptation, device-local
-  version acknowledgments, and modal-layer coordination. It does not poll the
-  DOM or infer guidance from global application conditions.
+- `src/features/provider-credentials/` owns the mode-specific Settings facade,
+  the non-devtools multi-user browser store, and request-boundary credential
+  injection. Components receive presence metadata rather than secret values.
+- `src/features/guidance/` owns versioned production definitions, Contextual
+  Hint and Guided Tour requests, Joyride adaptation, device-local version
+  acknowledgments, and modal-layer coordination. Feature-local hooks may
+  request the next relevant hint from workflow state; the guidance boundary
+  does not poll the DOM or infer global application conditions.
 - `src/tutorials/` and `frontend/public/` own the in-app documentation
   registry and content.
 - `src-tauri/` owns the native desktop supervisor and commands.
@@ -61,13 +65,27 @@ The app has one static route so the same built assets work behind FastAPI SPA
 fallback and inside the desktop bundle. View identity is URL search state
 mirrored into client UI state rather than server routing.
 
+Feature content can be nested inside independently resizable sidebar, main, and
+Workspace panes. Layouts within those panes respond to their available width
+through intrinsic wrapping and named container queries. Viewport breakpoints
+remain appropriate for viewport-owned surfaces such as mobile navigation and
+dialogs, but do not determine the layout of nested feature content.
+
 The contextual-guidance master switch is unresolved until the authenticated
 preference query succeeds, so automatic guidance remains off during bootstrap.
 Hint acknowledgments use `user ID -> hint ID -> highest version` in local
 storage. A Guided Tour is deliberately started and does not consult that
 switch. Shared Dialog, AlertDialog, and Sheet content registers the app modal
-count; Joyride remains rendered in a z-40 portal beneath z-50 modals while that
-portal is inert and hidden from assistive technology.
+count. While guidance is active, Joyride renders in a full-viewport z-100
+portal above application content; the portal becomes inert and hidden from
+assistive technology while an app modal is open.
+
+The Data Loader ships the first progressive Contextual Hint sequence. It
+separately explains creating a workspace and loading one from Workspace
+manager, the choice between sample import and personal uploads, the
+file-to-Data-Block transition, and where the resulting Data Block appears. Each
+explanation is requested only when its target and workflow state are present,
+and each is acknowledged independently.
 
 ## Backend Contract Transition
 

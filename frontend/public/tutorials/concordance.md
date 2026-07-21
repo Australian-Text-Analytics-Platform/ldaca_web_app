@@ -197,7 +197,7 @@ If a block has already been processed via Process All, the detach reuses the cac
 
 <h3 id="help-concordance-clear-results">Clear results</h3>
 
-Concordance results are saved in the backend so the tab can reload and preserve your last results. **Clear Results** removes the cached result from the backend and resets the tab. Clearing also discards any Process All caches associated with that task.
+The tab keeps its current Concordance Analysis in the backend so it can reload its lifecycle and Result. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. Clearing also discards its Process All caches. **Re-run** clears the current Analysis before submitting its replacement.
 
 <h2 id="help-concordance-troubleshooting">Troubleshooting</h2>
 

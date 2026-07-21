@@ -99,7 +99,7 @@ If you see orange or red, hover over the input for a short explanation. The most
 
 A number that controls the randomness in the process. Using the **same seed on the same data** will always produce the same result — useful when you want to reproduce a run or compare settings systematically.
 
-- Default: **42** (any non-negative whole number works).
+- Default: **0** (any non-negative whole number works).
 - This value starts greyed-out. Change it to check that your results are not an artefact of a particular random initialisation — run the same settings with two or three different seeds and see whether the topics are stable.
 - If topics change substantially between seeds, the corpus or settings may not be well-suited to the chosen number of topics.
 
@@ -143,13 +143,19 @@ The distance between two bubbles indicates their semantic similarity — the clo
 
 You can click to select or deselect a topic in the bubble chart. Your selection is also reflected in the bottom pane, where all topics are listed in two columns. Selecting topics lets you detach only the documents associated with those topics from the data block(s) as new derived data blocks.
 
+Choose **Add to Workspace** to select the source Data Blocks and source columns,
+confirm the new names, and start the detachment. With no selected topics, all
+topics are included. Each selected source creates a topic-data Data Block and a
+linked topic-meanings Data Block. The original Topic Modeling Result remains
+available in its tab.
+
 A quick wildcard filter can be applied using the **text input** in the right ("All Topics") column, which lets you quickly find all topics that contain a keyword of interest.
 
 **Topic −1 (outliers)** is the group of documents that did not fit well into any topic. A small outlier group is normal; a very large one (e.g. more than a third of documents) may mean the topics are too narrow, the corpus is very diverse, or the sample is too small.
 
 <h3 id="help-topic-modeling-clear-results">Clear results</h3>
 
-Topic modelling results are saved in the backend so this tab can reload and keep persistent pages of the last run. **Clear Results** clears the cached result in the backend and resets the tab.
+The tab keeps its current Topic Modelling Analysis in the backend so it can reload its lifecycle and Result pages. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. **Re-run** clears the current Analysis before submitting its replacement.
 
 <h2 id="help-topic-modeling-troubleshooting">Troubleshooting</h2>
 
@@ -168,7 +174,7 @@ Topic modelling results are saved in the backend so this tab can reload and keep
 | Sampling        | 100% per data block         | Aim for 10,000–50,000 docs in working set     |
 | Topic size mode | Aim Topic No.              | —                                             |
 | Aim Topic No.   | Auto                       | 10–200 depending on corpus size and diversity |
-| Random Seed     | 42                         | Any non-negative whole number                 |
+| Random Seed     | 0                          | Any non-negative whole number                 |
 | Words per topic | 15                         | 10–20                                         |
 
 ## Practice exercise

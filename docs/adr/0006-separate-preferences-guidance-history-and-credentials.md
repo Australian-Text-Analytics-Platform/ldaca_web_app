@@ -1,8 +1,13 @@
 ---
-status: accepted
+status: superseded
+superseded_by: 0009-mode-specific-provider-credential-ownership
 ---
 
 # Separate account preferences, guidance history, and credentials
+
+Superseded by [ADR 0009](0009-mode-specific-provider-credential-ownership.md),
+which retains the preference and guidance separation while changing provider
+credential ownership by deployment mode.
 
 Wordflow stores synchronized non-secret User Preferences in the backend,
 versioned Contextual Hint acknowledgment history per user on each device, and

@@ -15,3 +15,9 @@ and the `EventHub` refresh transport. They do not share durable identity,
 persistence, scheduler capacity, executor state, cancellation, Result, or
 cleanup ownership. This keeps each public resource self-contained and avoids a
 second generic record that would duplicate or contradict its real owner.
+
+An Analysis therefore owns an ordered `output_node_ids` list rather than a
+separate publication resource or a singular output slot. This lets one typed
+child operation, such as Topic Modeling detachment, atomically publish a
+semantic group of Derived Data Blocks while keeping lifecycle, rollback, and
+lineage under the same Workspace mutation.

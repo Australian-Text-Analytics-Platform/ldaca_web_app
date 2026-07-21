@@ -6,24 +6,25 @@
 
 ![Preprocessing screenshot](tutorials/assets/preprocessing.png)
 
-The Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab performs a specific type of transformation, and every action creates a **new data block** — the original is never overwritten and all operations are recoverable. There are currently seven sub-tabs:
+The Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab performs a specific type of transformation. Filter, Find, Create, and Polars Expression can either create a **new Data Block** or update the selected Data Block. Sample, Join, and Stack always create a new Derived Data Block. There are currently seven sub-tabs:
 
-| Sub-tab | What it does |
-|---|---|
-| Filter | Keep only the rows that match one or more conditions |
-| Sample | Extract a contiguous slice or a random subset of rows |
-| Join | Combine two data blocks side-by-side on a shared column |
-| Stack | Vertically concatenate two data blocks that share the same columns |
-| Find | Match text patterns with Regular Expressions, then remove, replace, or extract matches |
-| Create | Build a new column by combining the contents of existing columns |
-| Polars Expression | Write Python-style Polars expressions for advanced transformations |
+| Sub-tab | What it does | Apply behavior |
+|---|---|---|
+| Filter | Keep only the rows that match one or more conditions | Create or update |
+| Sample | Extract a contiguous slice or a random subset of rows | Create only |
+| Join | Combine two data blocks side-by-side on a shared column | Create only |
+| Stack | Vertically concatenate two data blocks that share the same columns | Create only |
+| Find | Match text patterns with Regular Expressions, then remove, replace, or extract matches | Create or update |
+| Create | Build a new column by combining the contents of existing columns | Create or update |
+| Polars Expression | Write Python-style Polars expressions for advanced transformations | Create or update |
 
 The general workflow for any sub-tab is:
 
 1. Select one or more data blocks from the workspace.
 2. Configure the transformation.
 3. Review the **Preview** table to check the expected output.
-4. Click **Add to Workspace** (or **Add to Data Block**) to create the new data block.
+4. For an eligible tool, choose **Create new Data Block** or **Update selected Data Block** under **Apply result as**.
+5. Click **Create Data Block** or **Update Data Block**.
 
 <h2 id="help-preprocessing-common-section">Common controls</h2>
 
@@ -37,9 +38,13 @@ Select one or more data blocks from the workspace graph or the data block list. 
 
 The preview pane shows the result of the current configuration in a paginated format with an estimated row count. Check the preview before applying to confirm the output looks as expected. No data block is created until you click the action button.
 
-<h3 id="help-preprocessing-common-apply-button">Add to Workspace</h3>
+<h3 id="help-preprocessing-common-apply-button">Apply result as</h3>
 
-Click **Add to Workspace** to run the transformation and create a new child data block. The original source data block is not changed.
+For Filter, Find, Create, and Polars Expression, **Create new Data Block** is selected by default. It preserves the source and records the new block's creation lineage. Choose **Update selected Data Block** only when you deliberately want to replace the selected block's current execution plan. The choice remains available for repeated applies in the same tool and source, but resets to Create when you change the tool or selected Data Block. It is not saved as a preference.
+
+Sample (including Slice, Random Sample, and Shuffle), Join, and Stack have no update mode and always create Derived Data Blocks.
+
+An update keeps the selected Data Block's identity, graph edges, parents, descendants, and creation provenance unchanged. Descendants keep their existing independent plans and are not recomputed. Undo/Redo stores only plans for the current open Workspace session, up to 50 edits per Data Block. Closing and reopening the Workspace, importing it, or restarting the backend preserves the latest data but clears Undo/Redo history.
 
 <h2 id="help-preprocessing-filter-section">Filter</h2>
 
@@ -57,12 +62,15 @@ Define one or more column-based filter conditions. The behaviour of each conditi
 - Select **AND** or **OR** to control how conditions are combined.
 - Check **Negate** on any individual condition to invert it.
 - The preview shows how many rows the current condition set would keep. An empty result is possible if no rows satisfy the conditions or if conditions conflict.
+- Categorical values load in ordered pages. Scroll to load more, use search to
+  filter on the server, and use **Select loaded** to select only the values
+  currently available. Existing selections remain selected across searches.
 
 <h3 id="help-preprocessing-filter-new-node-name">New data block name</h3>
 
 ![Filter new data block name screenshot](tutorials/assets/preprocessing/filter_new_node_name.png)
 
-Give the filtered output a descriptive name so it is easy to find in the workspace. The new block is a child of the selected source block.
+In create mode, give the filtered output a descriptive name so it is easy to find in the workspace. The new block is a child of the selected source block. This field is hidden in update mode because the selected Data Block keeps its existing identity and name.
 
 **Practice exercise**
 
@@ -99,12 +107,12 @@ The random sample option extracts a randomly selected set of rows.
 
 The random seed controls reproducibility. Using the same seed on the same data always produces the same rows.
 
-- Use any non-negative integer (e.g. 42).
+- Use any non-negative integer (e.g. 0).
 - Check **No Random Seed** to draw a truly random sample — note that this makes the sample irreproducible and the randomness propagates to all derived child data blocks.
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
-The pre-populated name includes the sampling parameters. Edit it if you need a more descriptive label.
+The pre-populated name includes the sampling parameters. Edit it if you need a more descriptive label. Sample is create-only.
 
 **Practice exercise**
 
@@ -140,7 +148,7 @@ Join type controls how unmatched rows are handled:
 
 <h3 id="help-preprocessing-join-node-name">Join output name</h3>
 
-Give the joined output a clear name. Leave it blank to use the auto-generated suggestion.
+Give the joined output a clear name. Leave it blank to use the auto-generated suggestion. Join is create-only.
 
 **Practice exercise**
 
@@ -166,7 +174,7 @@ Tick **Drop duplicate rows after stacking** to remove exact duplicate rows from 
 
 <h3 id="help-preprocessing-concat-new-node-name">New data block name</h3>
 
-Provide a label for the stacked output. Leave it blank to use the auto-generated suggestion.
+Provide a label for the stacked output. Leave it blank to use the auto-generated suggestion. Stack is create-only.
 
 **Practice exercise**
 
@@ -178,7 +186,7 @@ Provide a label for the stacked output. Leave it blank to use the auto-generated
 
 ![Find screenshot](tutorials/assets/preprocessing/find.png)
 
-The Find sub-tab performs text manipulation on a selected column using Regular Expressions (RegEx). It supports two operations — **Replace** and **Extract** — and the result can either overwrite the existing column or be saved to a new column.
+The Find sub-tab performs text manipulation on a selected column using Regular Expressions (RegEx). It supports two operations — **Replace** and **Extract** — and the transformation can overwrite the source column or write an output column. Separately, **Apply result as** decides whether the transformed plan creates a Data Block or updates the selected one.
 
 **Replace**
 
@@ -196,7 +204,7 @@ Match a pattern and extract all captured matches into a new column. For example,
 
 1. Select a dataset with a text column that contains noise (e.g. XML tags, URLs).
 2. Write a RegEx pattern to match the noise and replace it with an empty string.
-3. Review the preview to confirm the column looks clean, then add the result to the workspace.
+3. Review the preview, choose create or update mode, and apply the result.
 
 <h2 id="help-preprocessing-aggregate-section">Create</h2>
 
@@ -225,13 +233,13 @@ Use the Advanced tab for full control, including helper functions and conditiona
 
 <h3 id="help-preprocessing-aggregate-column-name">New column name</h3>
 
-Set a clear label for the new column so it is easy to find downstream.
+Set a clear label for the new column so it is easy to find downstream. This is a transformation field and remains available in both create and update modes.
 
 **Practice exercise**
 
 1. Select a dataset with a title column and a body or abstract column.
 2. Use the Basic builder to drag both columns into the expression with a space separator.
-3. Preview the combined column, then add it to the data block.
+3. Preview the combined column, choose create or update mode, then apply it.
 
 <h2 id="help-preprocessing-expression-section">Polars Expression</h2>
 
@@ -247,12 +255,12 @@ Five context modes are available:
 | Sort | Sort by one or more expressions, with optional descending order |
 | Group By | Group by a key expression and apply aggregations |
 
-Each mode displays a syntax hint box with examples. Click **Preview** to validate and inspect results before clicking **Add to Workspace**.
+Each mode displays a syntax hint box with examples. Click **Preview** to validate and inspect results, choose create or update mode, then click **Create Data Block** or **Update Data Block**. The new-Data-Block name field is shown only in create mode.
 
 **Practice exercise**
 
 1. Select a dataset and switch to the **Filter** context.
 2. Write a boolean expression such as `pl.col("word_count") > 100`.
-3. Click **Preview** to inspect the filtered rows, then **Add to Workspace** to create the filtered data block.
+3. Click **Preview** to inspect the filtered rows, then choose whether to create a Derived Data Block or update the selected Data Block.
 
 [← Back to tutorial index](./index.md)

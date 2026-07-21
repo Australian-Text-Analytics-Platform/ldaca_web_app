@@ -11,6 +11,7 @@ changing that package.
 - `frontend/`: React 19, Vite, TypeScript, and the Tauri desktop shell
 - `polars-text/`: Polars expression plugins for text analysis
 - `polars-source-utils/`: serialized Polars-plan source-path utilities
+- `ldaca-analytics-sample-data/`: canonical remote sample-data repository
 - `docs/`: current engineering knowledge and operational procedures
 - `specs/`: active and archived change records
 

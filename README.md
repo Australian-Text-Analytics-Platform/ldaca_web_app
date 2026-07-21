@@ -12,6 +12,7 @@ frontend, and a Tauri desktop shell.
   `ldaca_wordflow`) and Workspace, Analysis, and User File APIs
 - `polars-text/`: Rust/PyO3 Polars plugin package for concordance, quotation, tokenization, and related text analysis
 - `polars-source-utils/`: Rust/PyO3 utilities for inspecting and relocating serialized Polars plans
+- `ldaca-analytics-sample-data/`: canonical sample catalogue and downloadable datasets
 
 ## Architecture Summary
 

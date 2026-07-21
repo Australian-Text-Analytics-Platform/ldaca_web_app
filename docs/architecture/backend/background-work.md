@@ -58,9 +58,12 @@ pool, retry, or alternate-executor fallbacks.
 
 Submission durably creates a queued User File Import before it waits for the
 independent `user_file_import_capacity`. Sample imports use cancellable async
-I/O; Data Portal download and tabulation use one private child process. The
-service owns staging, quota reservations, atomic publication, terminal
-persistence, and cleanup for both kinds.
+HTTP I/O against the canonical sample-data repository; Data Portal download and
+tabulation use one private child process. Sample files stream directly into
+private staging before atomic collection publication. The backend does not
+package or read a local sample-data checkout. The service owns staging, quota
+reservations, atomic publication, terminal persistence, and cleanup for both
+kinds.
 
 The import scheduler uses the same fair-selection primitive as Analysis but no
 shared queue, capacity slot, executor, record, or cancellation state. One

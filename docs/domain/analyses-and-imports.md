@@ -42,7 +42,7 @@ never resumed or partially repaired.
 An Analysis is portable Workspace content. A root Analysis is referenced by
 one Tab, and the Tab kind fixes which discriminated root request it accepts.
 The immutable request, lifecycle, safe Failure, terminal Result payload,
-Artifact references, and optional output Data Block identity persist in a
+Artifact references, and the ordered unique `output_node_ids` list persist in a
 strict per-Analysis record beneath the Workspace.
 
 Execution snapshots are created only when the scheduler selects the Analysis.
@@ -51,11 +51,22 @@ and the selected worker receives immutable private inputs rather than a live
 Workspace. Draft request parameters and all presentation preferences remain
 outside the backend resource.
 
-A successful concordance or quotation root may own any number of direct typed
-Child Analyses for supported detachment operations. A child is an ordinary
-Analysis with `parent_analysis_id`; it has the same lifecycle and event
-contract, cannot own a grandchild, and may create a Derived Data Block through
-the Workspace mutation boundary.
+An Annotation submission may carry a write-only Provider Credential to the
+execution boundary. The service removes it before creating the immutable
+Analysis request, so persistence, hydration, retries, Tabs, Results, and
+Artifacts never contain it.
+
+A successful concordance, quotation, or Topic Modeling root may own any number
+of direct typed Child Analyses for supported detachment operations. A child is
+an ordinary Analysis with `parent_analysis_id`; it has the same lifecycle and
+event contract, cannot own a grandchild, and may atomically create one or more
+Derived Data Blocks through the Workspace mutation boundary. Non-publishing
+Analyses use an empty output list. Topic Modeling records each selected source's
+semantic pair while ordering the flat identities as topic data followed by
+topic meanings in source-request order.
+
+`output_node_ids` is a strict current contract. Persisted records with the
+removed singular field or no output list are corrupt rather than migrated.
 
 Clearing a Tab immediately removes its root from the public resource graph and
 allows a new root submission. Queued work is cancelled without starting;
@@ -68,6 +79,17 @@ A User File Import is retained under one user's `users/<user-id>/imports/`
 area as one strict atomic JSON record. It represents publication of either a
 complete sample collection or one Data Portal collection into User Files. Its
 persisted request contains no provider credential.
+
+A Data Portal submission may carry a write-only token for the initial provider
+operation. The service resolves it before retaining the import and passes it
+only through the private execution context; restart recovery therefore never
+attempts to restore or expose a personal token.
+
+Sample collections come only from the canonical remote sample-data repository.
+The backend fetches its catalogue on demand, downloads the selected files
+directly into private staging, and publishes the complete collection under
+`files/sample_data/<collection-id>/`. The backend package carries no sample
+manifest, dataset copy, digest registry, or local-source fallback.
 
 User File Imports have their own service, fair runtime-only scheduler, capacity,
 execution handles, cancellation, persistence, and cleanup. They do not belong

@@ -20,8 +20,9 @@ cannot silently overwrite the aggregate.
 
 A Workspace owns an ordered directed acyclic graph of Data Blocks. Each Data
 Block has stable identity, a name, a lazy tabular plan, optional document and
-tokenization metadata, and zero or more parents. Roots are Source Data Blocks;
-other blocks preserve the lineage of the transformation that created them.
+tokenization metadata, a schema containing physical and optional semantic
+extension types, and zero or more parents. Roots are Source Data Blocks; other
+blocks preserve the lineage of the transformation that created them.
 
 ```mermaid
 flowchart LR
@@ -49,11 +50,65 @@ durable publication, and reconstruction belong to the infrastructure
 Workspace store, while residency and mutation coordination belong to
 `WorkspaceService`.
 
+Arrow extension identity is part of the plan schema rather than parallel Data
+Block metadata. Parquet, serialized plans, Polars expressions, Workspace SQL,
+and Arrow IPC therefore carry the same extension name, physical storage type,
+and extension metadata. The backend retains unregistered foreign extensions as
+generic extensions instead of loading only their storage type. A producer must
+write the extension itself; Wordflow does not infer semantic identity from a
+column name or a coincidentally matching nested shape.
+
+## Workspace SQL
+
+A Workspace SQL command declares one or more existing Data Blocks and executes
+against a temporary lazy SQL context containing only those plans. Each plan is
+bound under its canonical UUID. There is no persistent SQL session, implicit
+Workspace-wide catalogue, or alternate table-name namespace.
+
+Query mode returns one independently computed Arrow page. Pagination and
+one-row lookahead wrap the submitted SQL, so fetching a later page may
+recompute the query. Create mode adds a Derived Data Block; every declared
+input becomes a parent in request order and the exact SQL is retained as
+creation provenance. The resulting plan is serialized independently of the
+temporary context before the mutation commits.
+
+SQL creation starts with empty session history and never edits an existing
+Data Block. Typed creation and edit commands remain separate domain operations.
+
+## Data Block Edits And Session History
+
+Provenance and graph edges describe creation lineage. A Data Block Edit
+replaces only the selected Data Block's lazy plan. Its stable identity,
+parents, children, order, edges, and provenance remain unchanged, and every
+descendant retains the independent plan captured when that descendant was
+created.
+
+Column cast, rename, and delete are always edits. Filter, Find, Create, and
+Polars Expression may either create a Derived Data Block or update the selected
+Data Block. Slice, random sample, shuffle, Join, and Stack always create
+Derived Data Blocks.
+
+Each resident Data Block owns independent Undo and Redo stacks containing at
+most 50 lazy plans. Assigning a successful new plan checkpoints the previous
+plan and clears Redo; Undo and Redo move plans without recursively creating
+checkpoints. Construction, loading, failed validation, and explicit no-ops
+create no history.
+
+This history lasts only while the Workspace remains open in the backend
+process. Snapshots, archives, clones, and imports contain the current plan but
+no stacks, so close/reopen and process restart preserve current data while
+resetting Undo and Redo. Rename retargets document and tokenization references
+where possible, and every edit or history command clears references absent
+from the resulting schema. These metadata adjustments are not part of plan
+history.
+
 ## Persistence Invariants
 
 - Successful mutations publish a complete new snapshot and Revision before
   returning.
 - A failed publication leaves the previous snapshot loadable.
+- A rejected edit or failed publication restores the pre-existing resident
+  plan stacks as well as the committed plan.
 - Ordinary loads are read-only and never relocate serialized plans.
 - Archive import validates and stages the whole graph before making it
   discoverable.

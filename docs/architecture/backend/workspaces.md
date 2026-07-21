@@ -71,8 +71,13 @@ SSE, and response streaming occur outside the gate.
 ## Aggregate And Store
 
 `domain.workspace.Workspace` owns the live Data Block graph. A live `Node`
-contains a Polars `LazyFrame` and resolved parent objects. The aggregate does
-not serialize itself or know about HTTP.
+contains a Polars `LazyFrame`, resolved parent objects, and bounded runtime-only
+Undo/Redo plan stacks. The aggregate does not serialize itself or know about
+HTTP. Provenance and parents record creation lineage; replacing a node plan
+does not rewrite either or propagate into independently owned descendant plans.
+Physical and semantic extension dtypes both remain in that LazyFrame schema;
+there is no second per-node custom-type registry to reconcile with plan
+history.
 
 `infrastructure.storage.WorkspaceStore` is the only snapshot-format boundary.
 It validates the complete `workspace.json` envelope and plan files, constructs
@@ -82,6 +87,9 @@ only after complete validation. Generation-named plan, Tab, and Analysis files
 are written before the atomically replaced `workspace.json` commit point. The
 store shares the central durable-filesystem primitives for file and directory
 `fsync` and same-filesystem atomic replacement.
+
+Snapshots encode only each node's current plan. Construction and reconstruction
+therefore start with empty history, as do clones and imported Workspaces.
 
 The deployment layout is:
 
@@ -117,6 +125,12 @@ aggregate and its gate give commands a single server order. The store still
 checks the expected on-disk Revision at commit so an out-of-boundary writer is
 detected rather than overwritten. Blocking persistence runs in non-abandoned
 threads, so cancellation never releases a gate while its write continues.
+
+Data Block Edit, Undo, and Redo commands use the same mutation gate. Before a
+mutation, the service captures every resident node's plan stacks. If validation
+or publication fails and the aggregate is reconstructed from the committed
+snapshot, matching nodes receive those captured stacks so a rejected command
+neither advances nor erases session history.
 
 Deletion coordinates with private Analysis execution and excludes new
 submission or completion through the same Workspace gate. Once execution has

@@ -10,10 +10,22 @@ open-ended tables expose independent zero-row schema and row-page streams.
 Pages use one-row lookahead and `X-Wordflow-Has-Next` rather than total-count
 queries.
 
+Workspace SQL query mode is another open-ended table boundary: each request
+wraps and collects one requested page as a complete IPC stream. Page changes
+issue new requests rather than seeking within or retaining an Arrow stream.
+
 This boundary preserves Arrow-native scalar, nested, and extension metadata,
 avoids row-wise JSON conversion, and gives the frontend one table decoder.
 Parquet remains the internal durable Data Block and Artifact format where it is
 appropriate; persistence format and wire format are separate concerns.
+
+Extension identity nevertheless remains one end-to-end schema contract. The
+backend configures Polars before import to retain any unregistered Arrow
+extension as a generic extension, and producers write the real extension dtype
+rather than only its physical storage. Parquet and serialized lazy plans then
+preserve the exact extension name, storage type, and metadata through Workspace
+SQL and IPC. A parallel JSON custom-type registry was rejected because it would
+duplicate the schema and diverge from plan-only Undo/Redo.
 
 The API does not offer protobuf table envelopes, JSON table fallbacks, or a
 second Parquet-over-HTTP table representation. Semantic custom values use
@@ -23,9 +35,12 @@ client can still read the physical storage value.
 The backend writes native Polars Arrow IPC without downgrading its compatibility
 level or rewriting valid Arrow storage types for a particular client. The
 frontend uses the official `apache-arrow` JavaScript implementation and derives
-UI column behavior from decoded Arrow types and extension metadata. A type that
-the decoder does not support fails that table request clearly; there is no JSON
-fallback, backend type profile, or alternate decoder.
+UI column behavior from decoded Arrow types and extension metadata. Known
+extensions may select specialized renderers. Unknown foreign extensions retain
+their exact name and metadata while using their decoded storage values; they
+are not mislabeled as an unknown physical type. A type that the decoder cannot
+decode fails that table request clearly; there is no JSON fallback, backend
+type profile, or alternate decoder.
 
 Topic Distribution uses extension name
 `org.ldaca.wordflow.topic_distribution.v1` over

@@ -44,12 +44,13 @@ policy in `deployment.sqlite3`, not an environment setting. `NULL` means
 unlimited; new hosted users receive the database default of 30 GiB. There are
 no file-count, directory-count, Analysis-count, or queue-count quotas.
 
-Each `users/<user-id>/` root contains `files/`, `imports/`,
-schema-versioned non-secret `preferences.toml`, and write-only
-`provider-credentials.toml` when needed. The backend rejects unversioned,
-linked, malformed, or schema-invalid files rather than interpreting earlier
-storage layouts. Provider secrets are accepted only through the dedicated
-write-only credential resource.
+Each `users/<user-id>/` root contains `files/`, `imports/`, and schema-versioned
+non-secret `preferences.toml`. In single-user mode, the only root is
+`users/root/`, and its write-only Provider Credentials are stored separately in
+`provider-credentials.toml`. Multi-user personal credentials never use backend
+user storage; legacy multi-user credential files are ignored. The backend
+rejects linked, malformed, or schema-invalid current files rather than
+interpreting earlier storage layouts.
 
 Both execution capacities default to two and accept any positive integer with
 no schema ceiling or unlimited sentinel. `SHUTDOWN_GRACE_SECONDS` defaults to
@@ -77,7 +78,6 @@ constructs final Settings.
 | Setting | Meaning |
 |---|---|
 | `MULTI_USER` | Enable hosted multi-user mode |
-| `SINGLE_USER_ID`, `SINGLE_USER_NAME`, `SINGLE_USER_EMAIL` | Desktop/local identity |
 | `GOOGLE_CLIENT_ID` | Optional hosted Google provider client ID |
 | `CILOGON_CLIENT_ID` | CILogon OIDC client ID |
 | `CILOGON_CLIENT_SECRET` | CILogon OIDC client secret |
@@ -91,14 +91,20 @@ redirect configuration. `CILOGON_ISSUER` is an origin such as
 `https://cilogon.aaf.edu.au`; discovery is derived internally by appending
 `/.well-known/openid-configuration`.
 
+Single-user identity is not configurable. Startup always provisions and uses
+`root` / `Root User` / `root@localhost`.
+
 ## LDaCA Data Portal
 
 | Setting | Meaning |
 |---|---|
 | `LDACA_ONI_API_BASE_URL` | Oni API base URL |
-| `LDACA_ONI_API_TOKEN` | Optional portal bearer credential, used only by the provider adapter |
+| `LDACA_ONI_API_TOKEN` | Optional deployment Data Portal bearer credential, used only by the provider adapter |
 | `LDACA_ONI_TIMEOUT` | Request timeout |
 | `LDACA_ONI_DOWNLOAD_CONCURRENCY` | Import download concurrency |
 | `LDACA_ONI_FEATURED_COLLECTION_IDS` | Featured collection identifiers |
 
-These provider credentials do not alter Wordflow's own Session transport.
+Single-user Data Portal calls use the root user's credential when configured,
+then this deployment token. Multi-user calls use a transient browser-supplied
+token when present, then this deployment token. These credentials do not alter
+Wordflow's own Session transport.

@@ -57,7 +57,7 @@ In the default *Aim Topic No.* mode, the number is a hint. The model may produce
 No. Topic −1 is the *outlier group* — documents that did not fit neatly into any cluster. A small outlier group is normal and healthy. A very large one (e.g. more than a third of documents) may suggest the topics are too narrow, the corpus is very diverse, or the sample is too small.
 
 **"Running it twice should give the same result."**
-Only if you use the same *Random Seed*. The model has a random element. Lock in a seed (the default is 42) if you want reproducible results. Deliberately running with two or three different seeds is also a useful way to check whether the topics are stable.
+Only if you use the same *Random Seed*. The model has a random element. Lock in a seed (the default is 0) if you want reproducible results. Deliberately running with two or three different seeds is also a useful way to check whether the topics are stable.
 
 **"More words per topic means more accurate topics."**
 Words per topic only affects how many words are *displayed*. The underlying model is unchanged. More words can help you interpret an ambiguous topic, but the topic itself is the same either way.

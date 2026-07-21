@@ -19,6 +19,10 @@ before changing an unfamiliar state or desktop boundary.
 
 - The project uses React Compiler. Do not add `useMemo`, `useCallback`, or
   `React.memo` for routine optimization.
+- Feature content rendered inside resizable or nested panes must respond to its
+  available container width with intrinsic wrapping or named container queries.
+  Reserve viewport breakpoints for surfaces whose width is owned by the viewport,
+  such as mobile navigation and dialogs.
 - React Flow caches node `data`. A callback stored there must not close over
   volatile state that is absent from `nodeSignatureFor`; read that value from
   its store at call time or deliberately include it in the resynchronization

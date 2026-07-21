@@ -38,9 +38,7 @@ Stop words are terms you want to exclude from the frequency count — commonly w
 
 <h2 id="help-token-frequency-run">Step 4 — Run the analysis</h2>
 
-Click **Analyze** to run. The button changes to **Update** once results exist, letting you adjust settings and re-run without clearing first.
-
-If you want to run the analysis on a different data block, click **Clear Results** first to reset the tool.
+Click **Run** to start. After the tab has an Analysis, the button changes to **Re-run**. A successful Analysis can be re-run after you change its inputs or settings; a failed or cancelled Analysis can be retried with the same settings.
 
 <h2 id="help-token-frequency-results">Result panel</h2>
 
@@ -120,7 +118,7 @@ The full table can be downloaded as a CSV file. For further reading on keyword a
 
 <h3 id="help-token-frequency-clear-results">Clear results</h3>
 
-Token Frequency results are saved in the backend so the tab can reload and retain your last run. **Clear Results** removes the cached result and resets the tab. You must clear first before switching to a different data block.
+The tab keeps its current Analysis in the backend so it can reload its lifecycle and Result. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. **Re-run** clears the current Analysis and submits its replacement; if clearing fails, the replacement is not started.
 
 <h2 id="help-token-frequency-troubleshooting">Troubleshooting</h2>
 

@@ -7,6 +7,9 @@ current system documentation.
 
 ## Completed changes
 
+- [Mode-specific provider credentials and fixed local identity](13-mode-specific-provider-credentials/spec.md)
+  ([issue #13](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/13)),
+  completed 2026-07-21.
 - [Backend architecture straightening](8-backend-architecture-straightening/spec.md)
   ([issue #8](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/8)),
   completed 2026-07-16.

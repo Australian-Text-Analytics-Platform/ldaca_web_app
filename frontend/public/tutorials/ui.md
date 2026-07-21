@@ -46,11 +46,11 @@ The **Tasks** panel sits below data selection and tracks time-consuming backgrou
 
 **Note:** The entire right column (Workspace Graph View and Data Viewer) can be collapsed to save screen space. Click the top-right arrow button to hide or show the right pane.
 
-The **Workspace Graph View** occupies the top-right area and visualises how data blocks relate to each other. Every data block is a node and every derivation (filter, join, sample, etc.) draws an edge from parent to child.
+The **Workspace Graph View** occupies the top-right area and visualises Data Block creation lineage. Every Data Block is a node, and creating a Derived Data Block draws an edge from parent to child. Updating an existing Data Block does not change the graph.
 
 - Click a node to select that data block across the entire interface. Click it again to deselect. Selections made here are reflected immediately in the Data Blocks panel (section 2) and vice versa.
+- Hover a Data Block and open its settings menu to **Rename**, **Clone**, **Undo**, **Redo**, or **Delete** it. Undo and Redo availability comes from that Data Block's current backend session history.
 - Use **Rename** to rename the active workspace.
-- Use **Save** to persist the workspace to disk. The workspace is also auto-saved on any change; this button is for peace of mind.
 - Pan and zoom the graph with your mouse to navigate large workspaces. A control panel sits at the top-right corner of the graph with the following buttons:
   - <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="13" height="13" style="display:inline;vertical-align:text-bottom"><path d="M32 18.133H18.133V32h-4.266V18.133H0v-4.266h13.867V0h4.266v13.867H32z"/></svg> **Zoom in** — increases the zoom level.
   - <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 5" width="13" height="2" style="display:inline;vertical-align:middle"><path d="M0 0h32v4.2H0z"/></svg> **Zoom out** — decreases the zoom level.
@@ -66,8 +66,8 @@ The **Data Viewer** fills the bottom-right area and displays the contents of sel
 
 - Tabs along the top let you switch between multiple selected data blocks.
 - The **Data View** sub-tab shows the raw table; the **Rename** button lets you rename the data block.
-- **Undo** and **Redo** buttons revert or reapply the most recent in-place operation (e.g. rename a column, change a data type, create or delete a column).
-- Each column header shows the column name and its data type (e.g. `datetime`, `string`). Click the settings icon on a column to rename it or change its data type (if feasible) — for example, to convert a date column loaded as string to a `datetime` type. When converting, the app attempts to guess the date format automatically. This works for many common formats but can fail or produce incorrect results when the format is ambiguous (e.g. `01/02/03` could be read as DD/MM/YY, MM/DD/YY, or YY/MM/DD). If the conversion fails or the dates look wrong, use the **Format** field to specify the format explicitly using [Python strftime/strptime codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). Common examples:
+- **Undo** and **Redo** revert or reapply the selected Data Block's most recent plan edit. The same actions are available in the graph Data Block menu. History is independent per Data Block, stores at most 50 plans, and lasts only while the Workspace remains open in the backend process. Closing and reopening preserves the latest data but clears both buttons.
+- Each column header shows the column name and its data type (e.g. `datetime`, `string`). Click the settings icon on a column to rename or delete it; use the data-type menu to convert its type. These operations update the selected Data Block without creating a new one. When converting, the app attempts to guess the date format automatically. This works for many common formats but can fail or produce incorrect results when the format is ambiguous (e.g. `01/02/03` could be read as DD/MM/YY, MM/DD/YY, or YY/MM/DD). If the conversion fails or the dates look wrong, use the **Format** field to specify the format explicitly using [Python strftime/strptime codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). Common examples:
   - `%Y-%m-%d` → `2025-05-06`
   - `%d/%m/%Y` → `06/05/2025`
   - `%m/%d/%Y` → `05/06/2025`
@@ -86,7 +86,7 @@ The centre column is the main working area and shows the interface of whichever 
 
 - The tool name and a short description appear at the top.
 - Sub-tabs (e.g. Filter, Sample, Join, Stack, Find, Create in Preprocessing) let you switch between related operations within the same tool.
-- Most tools follow a common workflow: configure parameters → review a preview → click an action button (such as **Add to Workspace**) to produce a new data block.
+- Most tools follow a common workflow: configure parameters → review a preview → choose whether to create or update when offered → click **Create Data Block** or **Update Data Block**. Filter, Find, Create, and Polars Expression offer both modes and default to creating a new block. Sample, Join, and Stack are create-only.
 - Help icons (**?**) are placed next to individual controls and link directly to the relevant written Help section.
 
 <h2 id="help-ui-working-directory">7. Working Directory</h2>

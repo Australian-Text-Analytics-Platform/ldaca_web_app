@@ -17,9 +17,11 @@ pnpm deploy_frontend_to_backend
 uv sync --project backend --frozen --no-dev --no-editable
 ```
 
-The current submodules are `backend`, `polars-text`, and
-`polars-source-utils`. A pull that advances a submodule pointer must be followed
-by the sync/update commands before restart.
+The current submodules are `backend`, `polars-text`, `polars-source-utils`, and
+`ldaca-analytics-sample-data`. A pull that advances a submodule pointer must be
+followed by the sync/update commands before restart. The backend fetches sample
+data from the repository's published raw GitHub URLs at runtime; it does not
+read the submodule checkout.
 
 ## Backend Environment
 
@@ -41,6 +43,32 @@ SESSION_COOKIE_SECURE=true
 
 The secret file supplies only `CILOGON_CLIENT_SECRET`. See
 [CILogon secrets](cilogon-secrets.md).
+
+## Provider Credentials
+
+Do not place users' Annotation or Data Portal credentials in the service
+environment or backend Data Root. In multi-user mode, each user enters personal
+credentials under **Settings → AI** or **Settings → Portal**. Wordflow
+stores them only in that browser's `wordflow-provider-credentials` localStorage
+entry, partitioned by authenticated user ID, and sends them transiently with
+provider calls. Logout deliberately retains the browser entry; a different
+browser profile or device requires re-entry.
+
+`LDACA_ONI_API_TOKEN` is an optional deployment-wide Data Portal fallback and
+may be supplied through the service secret file. It is not a personal
+credential and does not replace the browser-owned Annotation keys required in
+multi-user mode.
+
+After upgrading from server-stored multi-user credentials, existing
+`users/*/provider-credentials.toml` files remain untouched but are never read.
+Have users re-enter their keys, then remove legacy files manually according to
+the deployment's backup and retention policy. Do not automate that deletion as
+part of startup or upgrade.
+
+Browser localStorage removes backend at-rest custody; it does not protect a
+credential from same-origin script injection or a privileged browser
+extension. Treat CSP and XSS hardening as an independent hosted security
+control and follow-up.
 
 ## systemd
 

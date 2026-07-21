@@ -73,7 +73,7 @@ The detached data block can then be analysed with other tools. For example, use 
 
 <h3 id="help-quotation-clear-results">Clear results</h3>
 
-Quotation results are saved in the backend so the tab can reload and keep persistent pages. **Clear Results** clears the cached result in the backend and resets the tab.
+The tab keeps its current Quotation Analysis in the backend so it can reload its lifecycle and Result pages. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. **Re-run** clears the current Analysis before submitting its replacement.
 
 <h2 id="help-quotation-troubleshooting">Troubleshooting</h2>
 

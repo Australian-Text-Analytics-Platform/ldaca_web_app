@@ -148,7 +148,7 @@ The new data block will contain all documents from the selected periods that bel
 
 <h3 id="help-sequential-clear-results">Clear results</h3>
 
-Trends and Sequence results are saved in the backend so the tab can reload and retain previous results. **Clear Results** removes the cached result from the backend and resets the analysis.
+The tab keeps its current Trends and Sequence Analysis in the backend so it can reload its lifecycle and Result. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. **Re-run** clears the current Analysis before submitting its replacement.
 
 <h2 id="help-sequential-troubleshooting">Troubleshooting</h2>
 

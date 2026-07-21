@@ -7,4 +7,4 @@ issue backlogs here.
 
 ## Current implementation work
 
-There are no active specifications.
+No substantial changes are active.

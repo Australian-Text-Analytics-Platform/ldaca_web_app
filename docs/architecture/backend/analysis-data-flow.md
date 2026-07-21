@@ -87,12 +87,17 @@ Topic artifacts with any other physical distribution schema fail integrity
 validation and remain clearable; they are not migrated or decoded through a
 compatibility path.
 
+The Topic Modeling worker writes Topic Distribution as its named Arrow
+extension in the assignment Artifact. Detachment preserves that schema while
+joining selected source columns and publishing the new Data Block, so the
+ordinary Workspace SQL and IPC path needs no Topic-specific metadata repair.
+
 ## Child Analyses
 
-Supported explicit concordance and quotation follow-up work is represented as
-an ordinary direct Child Analysis, never as an `AnalysisOperation` or generic
-child Task. The parent must be successful, the request must match its kind and
-input, and grandchildren are invalid.
+Supported explicit concordance, quotation, and Topic Modeling follow-up work is
+represented as an ordinary direct Child Analysis, never as an
+`AnalysisOperation` or generic child Task. The parent must be successful, the
+request must match its kind and inputs, and grandchildren are invalid.
 
 ```mermaid
 flowchart LR
@@ -100,9 +105,15 @@ flowchart LR
     CREATE --> CHILD["Queued Child Analysis with parent_analysis_id"]
     CHILD --> PROCESS["Same scheduler and fresh-process path"]
     PROCESS --> COMMIT["WorkspaceService completion"]
-    COMMIT --> BLOCK["Derived Data Block"]
-    COMMIT --> RESULT["Child Result with output identity"]
+    COMMIT --> BLOCK["One or more Derived Data Blocks"]
+    COMMIT --> RESULT["Child Result with ordered output identities"]
 ```
+
+Topic Modeling detachment publishes two Data Blocks per requested source in
+one Workspace transaction: the selected source rows with topic columns, then
+the meanings used by that topic-data Data Block. The first retains the source
+as parent and the second retains the first as parent. A validation, file, graph,
+or persistence failure rejects the complete publication.
 
 Root and child Analyses use the same lifecycle, cancellation, Progress, event,
 integrity, persistence, and restart rules. Clearing the Tab removes the whole

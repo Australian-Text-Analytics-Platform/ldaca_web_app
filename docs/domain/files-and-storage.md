@@ -12,6 +12,11 @@ A User File is mutable import material. Adding one to a Workspace snapshots it
 into an immutable Workspace-owned source, so later moves or deletion in the
 user file area cannot rewrite an existing Source Data Block.
 
+Every user area may contain non-secret User Preferences. Only the canonical
+single-user `root` area may contain the separate write-only
+`provider-credentials.toml`; multi-user personal Provider Credentials are
+browser-owned and never part of the backend storage model.
+
 ```mermaid
 flowchart TB
     ROOT["Data Root"] --> USERS["users/<user-id>"]
@@ -22,6 +27,7 @@ flowchart TB
 
     USERS --> FILES["Mutable User Files"]
     USERS --> IMPORTS["User File Import records and staging"]
+    USERS --> PREFERENCES["Non-secret User Preferences"]
     WORKSPACES --> ACCESS["Deployment-only access.json"]
     WORKSPACES --> PORTABLE["Portable metadata, Data Blocks, Tabs, Analyses, and Artifacts"]
     FILES -->|"snapshot on import"| SOURCE["Immutable Source Data Block"]
