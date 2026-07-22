@@ -3,9 +3,11 @@
 `polars-source-utils` is a narrow Rust/PyO3 package for listing and replacing
 source paths inside serialized Polars `LazyFrame` plans.
 
-It exists because Workspace archive relocation and immutable execution-input
-snapshots must rewrite scan roots without collecting a plan or rewriting source
-data. The package owns the broad `polars-plan` deserialization feature surface
+It exists because plans rebuilt from materialized Workspace archives and
+immutable execution-input snapshots must rewrite scan roots without collecting
+a plan or rewriting source data. Portable archives contain Parquet rather than
+serialized plans; the package acts only after import has rebuilt a private lazy
+plan. It owns the broad `polars-plan` deserialization feature surface
 required for that binary operation; `polars-text` remains focused on text
 expressions.
 
@@ -16,7 +18,7 @@ The public interface is intentionally small:
 
 ```mermaid
 flowchart LR
-    ARCHIVE["Workspace archive staging"] --> PLAN["Serialized LazyFrame plan"]
+    ARCHIVE["Plan rebuilt in archive staging"] --> PLAN["Serialized LazyFrame plan"]
     SNAPSHOT["Execution input snapshot"] --> PLAN
     PLAN --> LIST["list_source_paths"]
     LIST --> MAP["Validated old-to-new source mapping"]

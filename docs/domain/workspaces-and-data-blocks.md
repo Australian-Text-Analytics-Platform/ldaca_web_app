@@ -6,8 +6,12 @@ A Workspace is a user-owned resource addressed by UUID. Its portable content
 lives in `workspaces/<workspace-id>/`; the adjacent deployment-only
 `access.json` identifies exactly one owner. Workspace existence and ownership
 come from that folder, not SQLite or a per-user catalogue. Client selection
-does not change identity and is not persisted by the backend. A backend
-resident Workspace is only runtime state and never a discovery source.
+does not change identity. Runtime state is backend-owned but process-local: a
+user has at most one `open` Workspace, while any number may be `closed` or
+`closing`. Opening a target validates it before closing open siblings. A busy
+sibling may continue closing while the target becomes the sole open Workspace.
+The frontend derives this state from Workspace resources and does not restore a
+last Workspace from device storage.
 
 Every persisted Workspace has a monotonically increasing Revision. A mutating
 command runs against the sole open aggregate under its Workspace gate, and the
@@ -87,6 +91,13 @@ Column cast, rename, and delete are always edits. Filter, Find, Create, and
 Polars Expression may either create a Derived Data Block or update the selected
 Data Block. Slice, random sample, shuffle, Join, and Stack always create
 Derived Data Blocks.
+
+Manual Annotation uses the same edit boundary. `set_cell` targets an existing
+string column and absolute row index with a string or null value. Each accepted
+cell change is one checkpoint; assigning the existing value is a no-op.
+`annotation_classes` replaces the submitted class and description rows in one
+checkpoint, validates at most 200 rows, and preserves every unselected column
+positionally by truncating or null-padding it to the submitted row count.
 
 Each resident Data Block owns independent Undo and Redo stacks containing at
 most 50 lazy plans. Assigning a successful new plan checkpoints the previous

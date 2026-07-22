@@ -48,13 +48,31 @@ strict per-Analysis record beneath the Workspace.
 Execution snapshots are created only when the scheduler selects the Analysis.
 The owning Data Blocks are reserved while the Analysis is queued or running,
 and the selected worker receives immutable private inputs rather than a live
-Workspace. Draft request parameters and all presentation preferences remain
-outside the backend resource.
+Workspace. Concordance and Quotation retain that run input after success so
+later Result pages remain tied to the submitted request even if the current
+source Data Block is edited. The stored first Result page is the canonical
+default Result; alternate pages are side-effect-free projections over the
+retained input. If the retained input is unavailable, the query fails rather
+than silently recomputing from live Workspace state. Draft request parameters
+and all presentation preferences remain outside the backend resource.
 
 An Annotation submission may carry a write-only Provider Credential to the
 execution boundary. The service removes it before creating the immutable
 Analysis request, so persistence, hydration, retries, Tabs, Results, and
 Artifacts never contain it.
+
+Annotation has two deliberately separate modes. Manual Annotation is not an
+Analysis: starting a manual column is an expression Data Block Edit, each label
+selection is a `set_cell` edit, and one class-description dialog Save is an
+`annotation_classes` edit. Its Undo and Redo behavior is therefore the selected
+Data Block's ordinary session history. A dedicated empty class-description
+Data Block may be created by a zero-row Workspace SQL projection.
+
+AI Annotation preview is a side-effect-free query and creates no resource. AI
+Run submits the Tab's durable Annotation Analysis through the same root
+submission contract as every other analysis kind. Its immutable request,
+lifecycle, Result, and derived Data Block output hydrate from backend resources
+after reload; the frontend does not copy them into a feature store.
 
 A successful concordance, quotation, or Topic Modeling root may own any number
 of direct typed Child Analyses for supported detachment operations. A child is
@@ -72,6 +90,13 @@ Clearing a Tab immediately removes its root from the public resource graph and
 allows a new root submission. Queued work is cancelled without starting;
 running private execution finishes cancellation and cleanup without being able
 to mutate the cleared Tab.
+
+Closing and reopening a Workspace restores Tabs, terminal Analyses, immutable
+requests, stored Results, Artifacts, and retained query inputs from Workspace
+storage. Portable archive version 4 carries terminal live Analyses and safe
+materialized copies of their query inputs; import rebuilds private lazy input
+snapshots under the new Workspace identity. Browser-local active Tab and
+presentation settings are deliberately outside both storage forms.
 
 ## User File Import
 

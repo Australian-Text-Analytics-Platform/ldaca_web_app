@@ -89,7 +89,7 @@ is removed before a User File Import request is retained.
 | `GET /api/workspaces/{workspace_id}` | `get_workspace_by_id` | 200 | Read lightweight metadata and runtime state |
 | `PATCH /api/workspaces/{workspace_id}` | `update_workspace_by_id` | 200 | Update metadata on an open Workspace |
 | `DELETE /api/workspaces/{workspace_id}` | `delete_workspace_by_id` | 204 | Stop owned execution and atomically remove the Workspace |
-| `PUT /api/workspaces/{workspace_id}/open` | `open_workspace_by_id` | 200 | Idempotently load the Workspace aggregate |
+| `PUT /api/workspaces/{workspace_id}/open` | `open_workspace_by_id` | 200 | Validate and make this the user's sole open Workspace |
 | `DELETE /api/workspaces/{workspace_id}/open` | `close_workspace_by_id` | 204/202 | Close now or enter closing state until Analysis work drains |
 | `GET /api/workspaces/{workspace_id}/archive` | `export_workspace_archive` | 200 ZIP | Snapshot and export portable Workspace content |
 | `POST /api/workspaces/{workspace_id}/sql` | `execute_workspace_sql` | 200 Arrow / 201 JSON | Query declared Data Blocks or create a SQL-derived Data Block |
@@ -101,6 +101,13 @@ self-contained Arrow stream with `ETag`, `Cache-Control: no-store`, and
 plus a required Data Block `name`, and returns the created resource with
 `Location` and `ETag`. Data Blocks are bound by exact UUID and must be quoted
 as SQL identifiers. External `read_*` and `scan_*` functions are rejected.
+
+Open, close, and delete lifecycle commands are serialized per user. Opening a
+Workspace closes idle open siblings and marks busy siblings `closing`; multiple
+closing resources are allowed, but multiple open resources are not. Reopening a
+closing target makes it the sole open resource. If opening fails after a sibling
+transition, the response reports the real error and subsequent collection reads
+expose the resulting backend state.
 
 ## Data Blocks
 
@@ -123,11 +130,15 @@ below require the Workspace to be open.
 | `POST /api/workspaces/{workspace_id}/nodes/{node_id}/annotation-previews` | `preview_annotation` | 200 | Stateless bounded provider preview |
 
 `NodeEditRequest` accepts `cast`, `rename_column`, `delete_column`, `filter`,
-`replace`, or `expression`. Sample, Join, and Stack remain creation-only, and
-cast is not part of the creation request union. Every `WorkspaceNodeInfo`
-contains required `can_undo` and `can_redo` flags. Only the current plan is
-durable; both flags reset after load, clone, import, close/reopen, or backend
-restart.
+`replace`, `expression`, `set_cell`, or `annotation_classes`. `set_cell`
+accepts an existing string column, absolute row index, and string or null value.
+`annotation_classes` accepts class and description columns plus at most 200
+validated rows; it preserves other columns positionally, truncating or
+null-padding them to the new row count. Sample, Join, and Stack remain
+creation-only, and cast is not part of the creation request union. Every
+`WorkspaceNodeInfo` contains required `can_undo` and `can_redo` flags. Only the
+current plan is durable; both flags reset after load, clone, import,
+close/reopen, or backend restart.
 
 ## Tabs
 
@@ -150,7 +161,7 @@ restart.
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}` | `get_analysis` | 200 | Read one live valid Analysis |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/children` | `submit_child_analysis` | 201 | Create a typed Concordance, Quotation, or Topic Modeling direct Child Analysis |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/cancel` | `cancel_analysis` | 200/202 | Cancel queued work or request running cancellation |
-| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result` | `get_analysis_result` | 200 | Typed default Result projection |
+| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result` | `get_analysis_result` | 200 | Stored canonical first Result projection |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free alternate projection |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
@@ -174,7 +185,8 @@ or `503` with `status: stopping`, plus the installed package version.
 - A Workspace content commit advances its server-ordered Revision and returns a
   strong `ETag`. Clients do not submit `If-Match`.
 - A Result before Analysis success is `409 analysis_not_succeeded`; a missing
-  successful Artifact is `410 artifact_gone`.
+  successful Artifact is `410 artifact_gone`; a missing retained input required
+  for a completed on-demand Result query is `410 analysis_result_unavailable`.
 - Cross-user resources are concealed as `404`.
 - Validation uses sanitized `422 ApiError` responses with `X-Request-ID`.
 - Analysis, Workspace SQL, Arrow row-page, and User File Import pagination is one-based and rejects zero.

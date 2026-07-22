@@ -9,6 +9,8 @@ temporary project status.
 
 **Workspace**:
 A user-owned analysis area containing an ordered lineage graph of Data Blocks.
+At runtime, the backend permits at most one open Workspace per user; this is a
+resource state, not a remembered client selection.
 _Avoid_: project, document workspace, current workspace
 
 **Data Block**:
@@ -67,8 +69,10 @@ topic-meanings Data Block for each selected source.
 _Avoid_: child task, sub-job, analysis operation
 
 **Result**:
-The typed, queryable outcome of a successful Analysis. A Result is distinct
-from any retained file that carries its large data.
+The output-only typed outcome of a successful Analysis. Lifecycle, immutable
+request parameters, and ownership remain on the Analysis. A Result is distinct
+from any retained file that carries its large data and from browser-local
+presentation settings.
 _Avoid_: payload, artifact when referring to the typed outcome
 
 **Topic Distribution**:
@@ -154,6 +158,9 @@ _Avoid_: API-key preference, Analysis parameter, Workspace secret
 
 - A Workspace owns an ordered directed acyclic graph of Data Blocks.
 - A Workspace also owns its Tabs and every Analysis reachable from them.
+- A user's backend resources contain zero or one open Workspace. Other
+  Workspaces may be closed or closing, and a client does not infer an open
+  Workspace from device history.
 - A Source Data Block snapshots a User File; later User File changes do not
   mutate the Data Block.
 - A Derived Data Block records one or more parent Data Blocks.
@@ -176,3 +183,5 @@ _Avoid_: API-key preference, Analysis parameter, Workspace secret
   Workspace, an Analysis, or a User File Import.
 - Hint Acknowledgment History is device-local and does not belong to User
   Preferences.
+- Manual Annotation is a sequence of Data Block Edits. AI Annotation preview is
+  side-effect-free, while AI Annotation Run is a durable Analysis.

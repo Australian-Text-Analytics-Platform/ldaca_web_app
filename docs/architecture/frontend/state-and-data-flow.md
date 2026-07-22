@@ -3,10 +3,11 @@
 ## Server And Client State
 
 TanStack Query owns server-derived resources, request identity, and cache
-invalidation. Zustand owns cross-feature client interaction state such as the
-active view, selected Workspace/Data Blocks, preferences, and transient
-background-work presentation. Local component state owns form and panel
-interaction.
+invalidation. This includes Workspace runtime state, Tabs, Analyses, Results,
+imports, SQL pages, and schemas. Zustand owns only cross-feature client
+interaction or device state such as the active view, selected and pinned Data
+Blocks, and scoped presentation preferences. Local component state owns form,
+pagination, dialog, and panel interaction.
 
 ```mermaid
 flowchart TB
@@ -15,7 +16,7 @@ flowchart TB
     DECODER --> FEATURES
     QUERY --> FEATURES["Feature hooks and components"]
 
-    ZUSTAND["Zustand<br/>cross-feature interaction authority"] <--> FEATURES
+    ZUSTAND["Zustand<br/>device and interaction authority"] <--> FEATURES
     LOCAL["Component state<br/>forms and panels"] <--> FEATURES
     URL["URL search state<br/>view identity"] <--> ZUSTAND
     BROWSER_CREDENTIALS["Per-user Provider Credentials<br/>versioned localStorage"] --> CREDENTIAL_FACADE["Mode-specific credential facade<br/>presence and request-boundary injection"]
@@ -71,6 +72,13 @@ slices. Workspace identity is always explicit in server query keys and
 requests. Client selection is not permission to call an implicit backend
 Workspace.
 
+The current Workspace is derived only from the complete Workspace collection:
+zero `open` resources means there is no current Workspace, exactly one is the
+current Workspace, and more than one is a visible invariant error. The client
+does not restore a last Workspace from browser storage or automatically open a
+closed resource. Open, close, and runtime-state events immediately reconcile
+the collection before dependent queries run.
+
 Dagre derives canonical graph positions from Workspace identity, ordered Data
 Block IDs, and lineage endpoints. React Flow owns only temporary drag positions
 and its internal node cache while that topology is unchanged; a Workspace or
@@ -82,24 +90,44 @@ callback stale.
 
 ## Analysis Lifecycle
 
-Analysis features own their selected Data Blocks, current Tab and Analysis
-identity, request hydration, and Result projection. Resource refresh events
-invalidate the query cache; the owning feature retains workflow controls
-because it knows the root/child Analysis relationship.
+One shared controller follows the durable ownership chain from active Tab to
+Analysis to Result. The Analysis query owns request and lifecycle state; the
+separate Result query is enabled only for success and contains output only.
+Selected Data Blocks and submitted parameters hydrate from the immutable
+Analysis request. Resource refresh events invalidate those query keys; the
+feature retains workflow controls because it knows the root/child Analysis
+relationship.
 
-Execution delivery is explicit at the feature adapter. Immediate operations
-store their returned Result directly. Tab-owned background submissions use the
-shared Analysis submission envelope, which records lifecycle identity and keeps
-the Result projection empty until terminal success. A hybrid operation must
-discriminate its immediate and background response branches before applying
-either adapter; callers never infer Result availability from response
-truthiness.
+Every root Analysis uses the shared Tab submission envelope, including
+Quotation and AI Annotation. Only typed child detachment commands use the
+Workspace mutation facade. Features with immediate, background, or hybrid
+execution may present progress differently, but the Tab, Analysis, and Result
+resource chain is unchanged and callers never infer Result availability from
+response truthiness.
 
 The active Tab is device-local presentation state, stored in localStorage by
 Workspace and analysis kind. Returning to an analysis view or reloading the
 client restores the last Tab when that backend Tab still exists. Missing or
 deleted Tab IDs fall back to the first available Tab and repair the local entry;
 the backend remains authoritative for Tab identity, content, and ownership.
+
+All analysis features share one complete Workspace Tab query and filter it by
+kind locally. This prevents independently cached feature lists from disagreeing
+after create, rename, clear, or delete. The Task Inbox reads every Analysis page
+for the active Workspace plus the user's file-import lifecycle and projects
+those Query resources directly; it has no Zustand task collection or
+feature-specific pruning. SSE patches exact resource caches when possible and
+invalidates collection, Tab, and graph queries for authoritative hydration.
+
+Presentation-only settings use browser-local storage partitioned by user,
+Workspace, and analysis kind or Tab as appropriate. They include the active
+Tab, quotation context length, token-frequency display preferences, and
+sequential chart state. These values can be lost without changing the durable
+Analysis or Result and are not exported with a Workspace.
+
+Hydration and deletion prune device-only references to missing Workspaces,
+Tabs, Data Blocks, file paths, presets, and preprocessing inputs. Pruning never
+creates or selects a backend resource.
 
 Action availability follows the Analysis attached to the Tab, not whether that
 Analysis produced a Result. An attached queued or running Analysis cannot be
@@ -111,6 +139,13 @@ succeeds, preserving the one-root-Analysis-per-Tab invariant.
 Preprocessing preview identity includes every serialized input. Switching an
 input cancels the previous request and late responses cannot replace the new
 state.
+
+Result pages remain immutable Query data. Concordance and Quotation pagination
+changes the complete Result-projection query key rather than merging pages into
+component or Zustand state. Initial hydration reads the Analysis's stored
+canonical Result; only an explicit page, page-size, or sort change requests an
+alternate projection. Categorical values use infinite queries, and
+preprocessing previews use debounced, cancellable queries.
 
 Filter, Find, Create, and Polars Expression keep their create/update choice in
 local component state. Create is the default, and changing the tool or selected

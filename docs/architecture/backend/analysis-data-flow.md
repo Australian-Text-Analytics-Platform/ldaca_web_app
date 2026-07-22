@@ -53,9 +53,10 @@ immutable snapshot; there is no Workspace-wide tokenizer override.
 ## Result Projection, Tables, And Artifacts
 
 Every successful Analysis stores one strict kind-specific Result payload in its
-per-Analysis record. Large tables or model data publish atomically beneath the
-Analysis Artifact directory and are referenced by portable semantic identity.
-Public resources never expose host paths.
+per-Analysis record. The public Analysis keeps the immutable request and
+lifecycle; the public Result is output only. Large tables or model data publish
+atomically beneath the Analysis Artifact directory and are referenced by
+portable semantic identity. Public resources never expose host paths.
 
 ```mermaid
 flowchart LR
@@ -75,9 +76,12 @@ flowchart LR
     FILES --> DOWNLOAD["Named non-table Artifact download snapshot"]
 ```
 
-Result queries are side-effect free and carry all semantic projection
-parameters. The backend persists no presentation preferences or
-materialized-result cache. Token-frequency and sequential tables are complete
+`GET result` projects the stored canonical first Result rather than rerunning
+the request. Result queries are side-effect free and carry all semantic
+projection parameters. Concordance and Quotation query their retained immutable
+run input, never the current mutable Data Block; a missing retained input is a
+terminal availability error. The backend persists no presentation preferences
+or materialized-result cache. Token-frequency and sequential tables are complete
 Arrow streams; topic assignments are independent Arrow pages with zero-row
 schema streams. Topic Distribution is a fixed-size semantic Arrow extension
 whose entries are outlier `-1` followed by every real topic. A read may make a

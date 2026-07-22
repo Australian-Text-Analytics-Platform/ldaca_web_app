@@ -36,13 +36,26 @@ to authorize deletion of corrupt content.
 
 ## Service Boundary
 
-`WorkspaceService` is also the sole residency and mutation authority. The
-runtime keeps one coordination slot per Workspace ID and at most one aggregate
-object in that slot. Every load, close, mutation, completion, archive install,
-or deletion for the same Workspace passes through its asynchronous gate.
-Different Workspaces—including those owned by different users—remain
-independent. There is no per-user gate, detached mutation path, selected
-Workspace, automatic load, LRU, idle timer, or automatic eviction.
+`WorkspaceService` is the sole residency and mutation authority. The runtime
+keeps one coordination slot per Workspace ID and at most one aggregate object
+in that slot. Every load, mutation, completion, archive install, or deletion
+for the same Workspace passes through its asynchronous gate.
+
+`WorkspaceLifecycleService` owns public open, close, and delete commands. A
+short-lived per-user gate serializes those commands so one user can have at
+most one `open` Workspace. Opening first validates the target, then requests
+closure of every open sibling, and finally opens the target. An idle sibling
+closes immediately; a busy sibling may remain `closing` until admitted
+Analysis work drains. Multiple closing Workspaces are permitted. Reopening a
+closing target makes it the sole open Workspace. Gates are independent across
+users and are removed when no lifecycle command is waiting or running.
+
+If opening the target fails after sibling closure has begun, the service
+returns the real failure and leaves the resulting runtime states visible. It
+does not fabricate a rollback. Runtime-state events publish every transition,
+and clients reconcile from the resulting Workspace resources. There is no
+detached lifecycle path, remembered selected Workspace, automatic load, LRU,
+idle timer, or automatic eviction.
 
 ```mermaid
 stateDiagram-v2
@@ -116,6 +129,13 @@ atomic rename publishes the complete live directory. Archive import validates
 portable content, always assigns a fresh Workspace ID and owner sidecar, and
 replaces archived timestamps with one new publication timestamp. Export omits
 `access.json`; import rejects an archive-supplied sidecar.
+
+Portable archive version 4 materializes Data Blocks and retained Analysis query
+inputs as Parquet, includes terminal live Analyses and declared Artifacts, and
+contains no serialized executable plans. Import reconstructs private lazy plans
+from those safe files, rebases their sources and Workspace identity after final
+publication, and strictly rejects older archive versions. Queued and running
+Analyses are omitted; their Tabs are exported empty.
 
 ## Mutation And Deletion
 
