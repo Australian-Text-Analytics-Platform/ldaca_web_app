@@ -129,6 +129,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         onNodesChange={graph.handleNodesChange}
         onEdgesChange={graph.handleEdgesChange}
         onNodeClick={graph.handleNodeClick}
+        onNodeDoubleClick={graph.handleNodeDoubleClick}
         onPaneClick={graph.handlePaneClick}
         connectionLineType={graph.connectionLineType}
         defaultEdgeOptions={graph.defaultEdgeOptions}

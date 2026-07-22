@@ -272,4 +272,24 @@ describe('useWorkspaceGraph', () => {
       'node-1',
     );
   });
+
+  it('adds a Data Block to the active tool on double-click, mirroring the + button', () => {
+    const { result } = renderHook(() => useWorkspaceGraph());
+    const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+
+    act(() => {
+      result.current.handleNodeDoubleClick(
+        event as unknown as Parameters<typeof result.current.handleNodeDoubleClick>[0],
+        { id: 'node-1' } as unknown as Parameters<typeof result.current.handleNodeDoubleClick>[1],
+      );
+    });
+
+    // Same add path as the node's "+" button (add-to-selection intent), not a
+    // selection toggle — works whether or not the block is selected.
+    expect(requestNodeInputAddMock).toHaveBeenCalledWith(
+      'workspace-a',
+      expect.any(String),
+      'node-1',
+    );
+  });
 });
