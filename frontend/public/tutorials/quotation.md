@@ -4,100 +4,122 @@
 
 <h1 id="help-quotation-section">Quotation Extraction tutorial</h1>
 
-![Quotation extraction screenshot](tutorials/assets/quotation_extraction.png)
+Quotation Extraction identifies quoted speech, speakers, and speech verbs in
+English news-style text. The built-in rule-based engine is based on the
+[Gender Gap Tracker](https://github.com/sfu-discourse-lab/GenderGapTracker)
+work from Simon Fraser University's Discourse Processing Lab.
 
-Quotation Extraction is a specialised tool for identifying quoted speech, the speaker, and related linguistic information from news articles. It is built on code from the [Gender Gap Tracker](https://github.com/sfu-discourse-lab/GenderGapTracker) project developed by the Discourse Processing Lab at Simon Fraser University, Canada.
-
-**Disclaimer**: The tool is a rule-based algorithm developed for Canadian media research. Its keywords, spelling conventions, and grammar rules may not perform as well on other text types (e.g. social media, novels) or different English varieties (e.g. dialects, UK spelling, historical newspapers). No algorithmic approach can guarantee 100 % precision — always review results at scale to understand the limitations and performance on your specific collection before drawing conclusions.
+The rules were developed for Canadian news. Results may be less accurate for
+social media, fiction, historical documents, or other English varieties.
+Review a representative sample before drawing conclusions from the output.
 
 <h2 id="help-quotation-parameters">Parameter panel</h2>
 
 <h3 id="help-quotation-data-block">Step 1 — Select your data</h3>
 
-Use the data-block selector to choose the data block to analyse. Quotation Extraction processes one data block at a time. For each selected block, pick the **text column** that contains the news article text.
+Add one Data Block and choose the source text column. A fresh selector uses the
+Data Block's saved Document Column Preference when available. The Analysis
+records the exact Data Block and column used for the run.
 
-<h3 id="help-quotation-engine">Step 2 — Configure the engine</h3>
+<h3 id="help-quotation-engine">Step 2 — Choose the engine</h3>
 
-![Quotation engine setting](tutorials/assets/quotation_tool/engine_setting.png)
+The engine is an Analysis parameter in the Quotation panel:
 
-The core quotation extraction model is hosted as a separate service rather than bundled directly into the app. Click the **gear icon** when hovering over the Quotation tab to open the engine configuration dialog.
+- **Built-in** is the default and runs the bundled local quotation engine. It
+  needs no separate service, URL, or user configuration.
+- **Remote** sends the work to an endpoint configured by the deployment
+  operator. Enter the operator-provided **Engine id**. Wordflow does not accept
+  arbitrary service URLs from the browser, and an unknown ID is rejected.
 
-![Quotation engine configure](tutorials/assets/quotation_tool/engine_remote.png)
+Use Remote only when the administrator of your Wordflow deployment has given
+you a valid engine ID and its data-handling policy is appropriate for the text.
+The immutable Analysis request stores `Built-in` or the selected remote engine
+ID, never a host URL.
 
-Two engine modes are available:
+<h3 id="help-quotation-context-length">Step 3 — Set display context</h3>
 
-- **Local Engine** — connects to a quotation service running on your own machine. Use this if you have deployed the Docker container locally for faster processing.
-- **Remote Engine** — sends documents to the LDaCA-hosted service at `http://legacy-tools.ldaca.edu.au:8801/api/v1/quotation/extract` (default). This service has size and rate limits; avoid sending large batches simultaneously and expect slower processing for large collections.
+**Context length (words per side)** controls how much source text the Result
+table displays around the highlighted quotation spans. It is a presentation
+setting, not an extraction-engine parameter.
 
-Contact [sih.info@sydney.edu.au](mailto:sih.info@sydney.edu.au) if you need to set up a local deployment.
+- Default: 5 words per side.
+- Range: 0–2000.
+- Use 0 to keep the display close to the extracted speaker, quote, and verb.
 
-<h3 id="help-quotation-context-length">Step 3 — Context length</h3>
+<h2 id="help-quotation-run">Step 4 — Run or re-run</h2>
 
-The **Context Length** (words per side) controls how many words are extracted as surrounding context before and after each found quotation entity. The extracted quotation components themselves (speaker, quote, and verb) are always included as separate columns; this setting adds extra surrounding text to help you evaluate the extractions in context.
+Click **Run** to create a Quotation Analysis. If the Data Block, text column,
+or engine changes afterward, click **Re-run** to replace the Tab's current
+Analysis with a new immutable request.
 
-- Default: 5 words per side. Range: 0–2000.
-- Increase the context if the surrounding text is important for interpreting the results.
-- Set to 0 if you only need the extracted components themselves.
-
-<h2 id="help-quotation-run">Step 4 — Run the extraction</h2>
-
-Click **Run** to start the extraction. The button changes to **Update** once results exist. Processing time depends on corpus size and whether you are using the remote or local engine.
+The successful Analysis keeps its initial Result page and retained input
+snapshot. Later page and sort requests use that snapshot, not the current
+mutable Data Block. Navigating away does not expire a successful Result.
 
 <h2 id="help-quotation-results">Result panel</h2>
 
-The result panel displays a paginated table of extracted quotation entities. Each row represents one extracted entity from a source document.
+The table pages through source documents and omits documents with no extracted
+quotation. A source document can contribute several quotation rows.
 
-<h3 id="help-quotation-highlights">Result highlights</h3>
-
-Each result row shows the source text with colour-coded highlights for the three extracted entity types:
-
-| Colour | Entity | What it identifies |
+| Colour | Entity | Meaning |
 |---|---|---|
-| Blue | Speaker | The person attributed as saying the quote |
-| Green | Quote | The quoted text itself |
-| Violet | Verb | The speech verb (e.g. *said*, *stated*, *argued*) |
+| Blue | Speaker | The person attributed as speaking |
+| Green | Quote | The quoted text |
+| Violet | Verb | The speech verb, such as *said* or *argued* |
 
-The optional metadata columns from the source data block can be shown or hidden using the column picker in the results header. The pagination footer shows **Documents searched / N matches found**, where matches are the total extracted quotation rows across documents searched on that page.
+Click a row to inspect the full source document. The metadata selector can add
+source fields and generated quotation fields to the table. The virtual
+`QUOTE_extraction` document header sorts by the Analysis's selected source text
+column. Other source metadata headers remain sortable; generated quotation
+headers are display-only because they are produced after source paging.
+
+Changing the page, documents-per-batch value, or sort order creates another
+projection of the same completed Analysis. It does not submit a new run.
 
 <h3 id="help-quotation-detach">Add to Workspace</h3>
 
-![Quotation detach](tutorials/assets/quotation_tool/detach_options.png)
+Click **Add to Workspace** to submit a direct Child Analysis that creates a
+Derived Data Block from the completed Quotation Analysis. The child reads the
+parent's immutable request and retained input snapshot, so later edits to the
+source Data Block cannot alter its meaning.
 
-Click **Add to Workspace** to extract the results as a new derived data block. A dialog lets you choose which optional columns from the parent data block to carry over — pick the metadata you need for downstream analysis (e.g. date, source, author).
-
-The picker also lists **`QUOTE_extraction`** as an opt-in column. When ticked, every detached row carries the raw source document text under this canonical name, regardless of what the source column was originally called. Useful when you want to share or re-analyse the detached block alongside the original text without depending on a project-specific column name.
-
-Mandatory generated columns (`QUOTE_speaker`, `QUOTE_quote`, `QUOTE_verb`, and the various index / type columns) are always included and don't appear in the picker.
-
-The detached data block can then be analysed with other tools. For example, use Trends and Sequence to plot quoted speech over time, or Concordance to inspect how specific speakers or speech verbs are used.
+Choose which optional source columns to copy. Generated quotation columns such
+as `QUOTE_speaker`, `QUOTE_quote`, `QUOTE_verb`, their offsets, and quote type
+are included by the operation. Select `QUOTE_extraction` when you also want the
+raw source document under that canonical output name.
 
 <h3 id="help-quotation-clear-results">Clear results</h3>
 
-The tab keeps its current Quotation Analysis in the backend so it can reload its lifecycle and Result pages. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. **Re-run** clears the current Analysis before submitting its replacement.
+The Tab retains its Quotation Analysis and durable Result across navigation and
+Workspace reopen. **Clear Results** removes the Analysis and resets the Tab,
+including after failure or cancellation. **Re-run** clears the current Analysis
+before submitting its replacement.
 
 <h2 id="help-quotation-troubleshooting">Troubleshooting</h2>
 
 | Symptom | Likely cause | What to try |
 |---|---|---|
-| No results returned | Engine unreachable or wrong endpoint | Check engine configuration; verify the service is running |
-| Very low precision (many wrong extractions) | Text type not suited to the rule-based model | Review the disclaimer above; the tool is optimised for news articles |
-| Processing is very slow | Remote engine rate limit or large batch | Reduce the corpus size, or set up a local Docker deployment |
-| Results disappear after navigating away | Normal — cached results expire | Re-run or use **Add to Workspace** to persist results as a data block |
+| Remote engine is rejected | The ID is empty or not configured by the operator | Use **Built-in** or ask the deployment administrator for a valid ID |
+| No quotations are shown on one page | The current source-document batch has no extracted quote | Continue to the next page |
+| Precision is low | The text differs from the news style targeted by the rules | Review the disclaimer and validate a representative sample |
+| A generated header does not sort | Generated quote fields are computed after source paging | Sort by the document header or source metadata |
+| Results do not reflect a later Data Block edit | You are viewing the historical Analysis snapshot | Click **Re-run** to submit the changed source deliberately |
 
 <h2 id="help-quotation-defaults">Quick-reference defaults</h2>
 
 | Setting | Default | Notes |
 |---|---|---|
-| Engine | Remote | Configure via gear icon on the tab |
-| Remote endpoint | `http://legacy-tools.ldaca.edu.au:8801/api/v1/quotation/extract` | Changeable in the engine dialog |
-| Context length | 5 words per side | Range 0–2000 |
+| Engine | Built-in | Remote requires an operator-configured engine ID |
+| Context length | 5 words per side | Display-only, range 0–2000 |
+| Result source | Immutable run snapshot | Page and sort changes do not re-run |
 
 ## Practice exercise
 
-1. Select a data block of news articles and run Quotation Extraction with the default context length.
-2. Browse the results and identify a row where the speaker colour highlight looks incorrect — check what rule-based error caused it.
-3. Increase the context length to 20 and re-run to see more surrounding text for ambiguous cases.
-4. Click **Add to Workspace** to detach the results; include a date column if one is available.
-5. Switch to Trends and Sequence, select the detached block, and plot quoted speech frequency over time.
+1. Select a news Data Block and run the built-in engine.
+2. Inspect highlighted speaker, quote, and verb spans in several rows.
+3. Change the display context length without re-running.
+4. Sort by the virtual document header and a source metadata column.
+5. Add selected output columns to the Workspace and inspect the Derived Data
+   Block.
 
 [← Back to tutorial index](./index.md)

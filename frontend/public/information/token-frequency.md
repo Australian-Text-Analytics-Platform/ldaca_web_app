@@ -12,12 +12,7 @@ Token Frequency
 
 The word cloud currently displays the top 25 tokens by default. Because of known limitations of such visualisations and critiques of how they represent frequency, it is recommended to use the frequency list for analysis rather than relying on the word cloud visualisation.
 
-The output differs depending on how a ‘token’ is defined. For example, whether punctuation counts as a token, whether a word like high-school is treated as one or two tokens or whether contractions like you’re, don’t, isn’t are treated as one or two tokens. The default tokeniser included in this tool is the [Bert-base-uncased](https://huggingface.co/google-bert/bert-base-uncased). Key behaviors of this tokenizer:
-
-> - **Lowercases** text (uncased model);
-> - **Punctuation** is split into separate tokens (e.g., "don't" → "don", "'", "t");
-> - **Hyphenated words** like "high-school" are split (e.g., "high", "-", "school");
-> - **Contractions** like "you're" are split at the apostrophe.
+The output differs depending on how a ‘token’ is defined. For example, whether punctuation counts as a token, whether a word like high-school is treated as one or two tokens or whether contractions like you’re, don’t, isn’t are treated as one or two tokens. Choose a tokenizer model for every selected data block before running the analysis. The choice is saved as that data block's tokenizer preference for fresh selectors, but each submitted Analysis keeps the exact model mapping it used. There is no account-wide default, and changing a data block preference does not rewrite historical results.
 
 The frequency list that you can download includes the raw/absolute frequencies for each token (word). When comparing token frequency across different text collections yourself, you need to normalise the raw/absolute frequencies if the text collections have different sizes (for example, you can calculate a frequency per 100,000 words using Excel). Alternatively, if you select two data blocks (two text collections) within the Token Frequency tool, you can use the tool to identify the key words in a text collection by using in-built statistical measures (this is commonly called keywords analysis in corpus linguistics). Key words are words that are (statistically speaking) unusual in their frequency in the _study_ text collection, through comparison to the _reference_ text collection. You can only create a list of key words when you compare two text collections.
 

@@ -16,7 +16,9 @@ Use the data-block selector to choose which corpus (or corpora) to analyse. The 
 
 When two are selected, the tool runs in comparison mode and produces the Juxtorpus cloud and statistical measures in addition to the per-block results.
 
-For each selected block, choose the **text column** that contains the documents you want to count. Only columns that hold plain text are available.
+For each selected block, choose the **text column** that contains the documents you want to count and a **tokenizer model** that defines the tokens. Only columns that hold plain text are available. Each choice is saved independently on that data block and initializes the corresponding control the next time you add it to a fresh Token Frequency or Concordance selector. Clearing one does not clear the other.
+
+Every Token Frequency run requires a tokenizer model for every selected data block. The Analysis stores the exact model mapping it used, so reopening a historical result does not substitute a tokenizer preference that was changed later.
 
 <h3 id="help-token-frequency-reference">Step 2 — Study and reference corpora (comparison mode)</h3>
 
@@ -130,13 +132,14 @@ The tab keeps its current Analysis in the backend so it can reload its lifecycle
 | Keyword Analysis table shows no significant words       | Corpora are very similar or one is very small                  | Try a larger or more distinct pair of data blocks                                         |
 | A workspace block I selected isn't showing in the panel | Token Frequency caps the panel to the 2 most-recent selections | Deselect a newer block to make room, or run the comparison on the visible pair            |
 | Right-clicked stop word is hard to find                 | List was already long when the word was added                  | New words are inserted at the top — scroll to the start, or click **Sort** to alphabetise |
-| Analyze button is disabled                              | No data block selected, or no text column chosen               | Select a data block and pick a text column                                                |
+| Analyze button is disabled                              | No data block, text column, or tokenizer model selected        | Select a data block, text column, and tokenizer model                                     |
 
 <h2 id="help-token-frequency-defaults">Quick-reference defaults</h2>
 
 | Setting              | Default              | Notes                                                                                                                                         |
 | -------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | Data blocks          | None                 | Up to 2; comparison mode activates when 2 are selected. If more than 2 are selected workspace-wide, only the 2 most recent show in the panel. |
+| Tokenizer model      | Saved Data Block preference or none | Required for each selected block; the submitted Analysis freezes the exact mapping                                                |
 | Corpus role switches | First selected block is Study Corpus | Changes O1/O2 assignment in the statistics table                                                                                  |
 | Stop words           | Empty                | Click **Fill Default** for language-matched default stop words                                                                                |
 | Cloud display limit  | 50                   | Range 10–100; mirrors to list limit                                                                                                           |

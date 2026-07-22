@@ -2,20 +2,40 @@
 
 <h2 id="info-quotation-overview">About Quotation Extraction</h2>
 
-- What is this?
-This is a tool that identifies and extracts quoted content from newspaper texts. It identifies the quoted content, its speaker, and the quoting expression (e.g. say, claim, admit). It also identifies the type of quote construction. It contains code that was adapted and developed (with permission) from the [GenderGapTracker](https://github.com/sfu-discourse-lab/GenderGapTracker).
+Quotation Extraction identifies quoted speech, speakers, and speech verbs in
+English news-style text. The built-in rules are based on the
+[Gender Gap Tracker](https://github.com/sfu-discourse-lab/GenderGapTracker)
+and were developed for Canadian news, so validate a representative sample when
+working with another genre or English variety.
 
-This tool has been designed to work with newspaper texts and should not be used for other text types. It will be slow to run the first time due to the needs of downloading necessary model files. Processing large datasets can be quite time consuming, hence Wordflow will process a small batch of documents at each page flipping.
+- What do I select?
+  Add one Data Block and choose its source text column. A fresh selector uses
+  the Data Block's Document Column Preference when available, while a reopened
+  Analysis keeps the exact column stored in its immutable request.
 
-- Can I change any of the settings/parameters?
-No. The quotation tool is based on a rigorous set of pre-defined linguistic rules, therefore the user cannot change anything on the interface. There is also a caveat that these fundamental rules are designed to extract quotations from newspaper articles published in North America (Canada), therefore, the accuracy of the tool may be affected when different dialects are processed for extraction.
+- Which engine should I use?
+  **Built-in** runs the bundled local quotation engine and requires no service
+  configuration. **Remote** uses an engine ID configured by the deployment
+  operator; it does not accept an arbitrary service URL. Ask the operator for a
+  valid ID and confirm that the service's data-handling policy is suitable.
 
-- Where can I read more about this method?
-We recommend reading this [open access article](https://doi.org/10.1515/cllt-2023-0104) or [this blog post](https://www.atap.edu.au/posts/quotation-tool/).
+- What happens after I run it?
+  A successful Analysis keeps a durable initial Result and retained input
+  snapshot. Page and sort controls query that snapshot rather than the current
+  mutable Data Block. If you deliberately change the Data Block, text column,
+  or engine, use **Re-run** to create a replacement Analysis.
 
-- Is there a notebook version?
-Yes. The Quotation tool notebook also includes added functionalities such as classifying the speakers and quoted content according to entity types (e.g. whether the speaker is a person or an organisation). You can find this notebook here: https://github.com/Australian-Text-Analytics-Platform/quotation-tool. Note that this notebook was based on modified functions from the original Gender Gap Tracker functions, in order to include some customised functionalities, statistics and visualisation within the notebook. This means that the results from extracting quotations via the Quotation tool notebook could be slightly different from the results derived from the original codes that is directly integrated within Wordflow.
+- How do sorting and detachment work?
+  The `QUOTE_extraction` header sorts by the selected source text column, and
+  source metadata columns remain sortable. Generated quotation fields are
+  display-only. **Add to Workspace** creates a Derived Data Block from the
+  completed Analysis and its retained snapshot.
+
+- Where can I read more?
+  See the [open access article](https://doi.org/10.1515/cllt-2023-0104), the
+  [ATAP overview](https://www.atap.edu.au/posts/quotation-tool/), or the full
+  Quotation tutorial in Help.
 
 - Where can I get help?
-Please use the embedded feedback button at the bottom left of the interface to get in touch with the developer team in the Sydney Informatics Hub.
-
+  Use the Feedback button in the sidebar to contact the Sydney Informatics Hub
+  development team.

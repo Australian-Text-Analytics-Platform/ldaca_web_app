@@ -35,12 +35,18 @@ Below the tool list, the **Data Blocks** panel shows every data block in the act
 
 <h2 id="help-ui-task-centre">3. Task Centre</h2>
 
-The **Tasks** panel sits below data selection and tracks time-consuming background operations such as topic modelling or large data transformations.
+The **Tasks** panel sits below data selection and projects background Analyses
+from the active Workspace together with your retained User File Imports.
 
-- While a task is running, a progress bar and status message appear. Click **Stop** to cancel it.
-- **Successful tasks fade out automatically** after roughly 8 seconds and are removed from the list without any action needed.
-- **Failed or stopped tasks remain** on screen until you dismiss them manually — click **Clear** on the individual task card to remove it.
-- **Live updates** keeps the panel refreshed automatically so you can continue working while tasks run in the background.
+- Analysis rows show progress and status only. Use the Analysis's owning Tab to
+  cancel, clear, or re-run it.
+- Queued and running User File Imports show **Stop**. The row remains visible if
+  cancellation fails so you can try again.
+- Successful, failed, and cancelled User File Imports remain available until
+  you click **Clear**. Clearing the task removes its retained history record,
+  not any files it successfully imported.
+- **Live updates** keeps the panel refreshed automatically so you can continue
+  working while tasks run in the background.
 
 <h2 id="help-ui-workspace-graph-view">4. Workspace Graph View</h2>
 
