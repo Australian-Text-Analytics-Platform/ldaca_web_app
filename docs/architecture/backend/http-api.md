@@ -18,7 +18,7 @@ flowchart LR
     API --> STORAGE["current-principal storage"]
     API --> EVENTS["unified events"]
     API --> PREFERENCES["user preferences"]
-    API --> CREDENTIALS["write-only provider credentials"]
+    API --> CREDENTIALS["safe provider configuration metadata<br/>and write-only credentials"]
     API --> FILES["user-files"]
     API --> SAMPLES["sample collections"]
     API --> PORTAL["data portal"]
@@ -63,13 +63,24 @@ Workspace, Analysis, and User File Import lookups are concealed as not found.
 
 Account preferences and provider credentials are independent current-principal
 resources. Preference responses contain only synchronized non-secret choices.
-Single-user credential reads return presence metadata only and writes target
-the canonical root credential file. Multi-user credential reads report browser
-ownership and deployment-token availability, while credential writes are
+Single-user credential reads return the ordered safe Annotation Provider
+Configuration collection and Data Portal presence; collection CRUD writes the
+canonical root credential file. Multi-user credential reads return
+`annotation_providers: null` to report browser ownership and still expose
+deployment-token availability, while every backend configuration write is
 denied. Personal multi-user secrets enter only through provider-operation
 request bodies and are resolved for that call without backend persistence or
-caching. Annotation and retained Data Portal submission models are converted to
-secret-free domain requests before persistence.
+caching.
+
+Annotation model discovery, previews, and submissions carry the selected
+configuration UUID, provider type, and optional normalized Custom base URL.
+Single-user mode verifies that snapshot against the stored configuration before
+resolving its secret. Multi-user mode uses the transient request key. Services
+strip the key and retain only the safe snapshot in an immutable Analysis
+request. Custom base URLs deliberately accept any syntactically valid absolute
+HTTP(S) destination, including private and loopback hosts; bounded provider
+timeouts, retries, concurrency, and generic error translation remain the
+operational controls for this trusted-user SSRF boundary.
 
 ## Control And Table Data Planes
 

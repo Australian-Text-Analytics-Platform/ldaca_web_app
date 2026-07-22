@@ -50,8 +50,9 @@ flowchart LR
   through TanStack Query. Server preference data is never mirrored into
   Zustand.
 - `src/features/provider-credentials/` owns the mode-specific Settings facade,
-  the non-devtools multi-user browser store, and request-boundary credential
-  injection. Components receive presence metadata rather than secret values.
+  the non-devtools multi-user provider-configuration store, and request-boundary
+  credential injection. Components receive safe ordered configuration metadata
+  rather than secret values.
 - `src/features/guidance/` owns versioned production definitions, Contextual
   Hint and Guided Tour requests, Joyride adaptation, device-local version
   acknowledgments, and modal-layer coordination. Feature-local hooks may

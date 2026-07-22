@@ -16,12 +16,16 @@ proof, except provider callbacks with their own one-use validation.
 | `POST /api/auth/google/callback` | `google_callback` | 303 | Public Google credential callback |
 | `GET /api/auth/cilogon/login` | `cilogon_login` | 302 | Public CILogon authorization redirect |
 | `GET /api/auth/cilogon/callback` | `cilogon_callback` | 303 | Public CILogon OIDC callback |
-| `POST /api/annotation-providers/{provider}/models` | `list_annotation_models` | 200 | Resolve provider model IDs with an optional write-only request key |
+| `POST /api/annotation-providers/models` | `list_annotation_models` | 200 | Attempt model discovery for one safe provider-configuration snapshot and optional write-only request key |
 | `GET /api/preferences` | `get_preferences` | 200 | Read synchronized non-secret current-principal preferences |
 | `PATCH /api/preferences` | `update_preferences` | 200 | Partially update synchronized current-principal preferences |
-| `GET /api/provider-credentials` | `get_provider_credentials` | 200 | Read configured-provider status without returning secrets |
-| `PATCH /api/provider-credentials` | `update_provider_credentials` | 200 | Update single-user root Provider Credentials |
+| `GET /api/provider-credentials` | `get_provider_credentials` | 200 | Read safe provider-configuration metadata and Data Portal status without returning secrets |
+| `PATCH /api/provider-credentials` | `update_data_portal_credential` | 200 | Update the single-user root Data Portal credential |
 | `DELETE /api/provider-credentials` | `clear_provider_credentials` | 204 | Clear all single-user root Provider Credentials |
+| `POST /api/provider-credentials/annotation-providers` | `create_annotation_provider_configuration` | 201 | Create one single-user Annotation Provider Configuration |
+| `DELETE /api/provider-credentials/annotation-providers` | `clear_annotation_provider_configurations` | 204 | Clear all single-user Annotation Provider Configurations |
+| `PATCH /api/provider-credentials/annotation-providers/{configuration_id}` | `rename_annotation_provider_configuration` | 200 | Rename one single-user Annotation Provider Configuration |
+| `DELETE /api/provider-credentials/annotation-providers/{configuration_id}` | `delete_annotation_provider_configuration` | 204 | Delete one single-user Annotation Provider Configuration |
 | `GET /api/tokenizer-models` | `list_tokenizer_models` | 200 | List backend-supported tokenizer models |
 | `GET /api/storage` | `get_storage` | 200 | Fresh current-principal allocated-byte quota status |
 | `GET /api/events` | `backend_events` | 200 SSE | Unified bounded resource-refresh stream |
@@ -32,18 +36,30 @@ only fields present in the request. Unknown fields and invalid nulls are
 rejected. The durable `preferences.toml` schema is version 2; earlier schemas
 are rejected. Provider credential responses never include secret values.
 
-`GET /api/provider-credentials` reports `storage: backend` plus configured
-presence in single-user mode. In multi-user mode it reports `storage: browser`,
-does not claim knowledge of personal credential presence, and still reports
-whether a deployment Data Portal token is available. `PATCH` and `DELETE` are
-single-user-only; multi-user attempts return `403 access_denied`.
+`GET /api/provider-credentials` reports `storage: backend`, the ordered safe
+`annotation_providers` collection, and Data Portal presence in single-user
+mode. Each configuration exposes only UUID, duplicate-allowed name, provider
+type, optional normalized Custom base URL, and key presence. In multi-user mode
+it reports `storage: browser`, returns `annotation_providers: null`, and still
+reports whether a deployment Data Portal token is available. Every credential
+write is single-user-only; multi-user attempts return `403 access_denied`.
 
 Annotation model, preview, and root Analysis submission bodies accept an
-optional write-only `api_key`. Single-user mode rejects request keys and
-resolves the root credential file. Multi-user mode requires the request key.
-Any missing resolved Annotation credential returns
-`409 provider_credential_missing`. The submission field is removed before an
-`AnnotationAnalysisRequest` is persisted.
+immutable safe snapshot: `provider_configuration_id`, provider type, and an
+optional normalized Custom base URL. They also accept an optional write-only
+`api_key`. Single-user mode rejects request keys, verifies the snapshot against
+the root credential file, and resolves the stored key. Multi-user mode requires
+a request key for built-ins; Custom configurations may be keyless. A missing
+required credential returns `409 provider_credential_missing`. The key is
+removed before an `AnnotationAnalysisRequest` is persisted. Display names are
+never part of the request.
+
+Built-in configuration identity is provider type plus API key. Custom identity
+is normalized base URL plus key-or-absence. Duplicate identities return a
+conflict, while duplicate names are valid. Only names can change in place.
+Custom bases must be absolute HTTP(S) URLs with a host and no user information,
+query, or fragment. Public, private, loopback, `localhost`, and `127.0.0.1`
+destinations are deliberately accepted for trusted authenticated users.
 
 ## User Files And External Data
 
@@ -109,8 +125,8 @@ closing target makes it the sole open resource. If opening fails after a sibling
 transition, the response reports the real error and subsequent collection reads
 expose the resulting backend state.
 
-Native Workspace snapshots use schema version 6 and portable archives use
-format version 5. Readers accept only those exact versions; import and open do
+Native Workspace snapshots use schema version 7 and portable archives use
+format version 6. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks

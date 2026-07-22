@@ -163,10 +163,19 @@ _Avoid_: Workspace state, credential store, device state
 
 **Provider Credential**:
 A user-owned secret that authorizes Wordflow to call an external provider on
-that user's behalf. It is consumed only for the provider request and is neither
-synchronized User Preferences nor portable Workspace, Analysis, or User File
-Import state.
+that user's behalf. An Annotation Provider Configuration may contain one
+write-only Provider Credential. The secret is consumed only for the provider
+request and is neither synchronized User Preferences nor portable Workspace,
+Analysis, or User File Import state.
 _Avoid_: API-key preference, Analysis parameter, Workspace secret
+
+**Annotation Provider Configuration**:
+An ordered, user-named Annotation connection with an opaque identity, provider
+type, immutable provider locator, and one optional write-only Provider
+Credential. Multiple configurations may use the same provider type or display
+name. An Analysis retains the selected safe identity, type, and Custom base URL,
+but never the display name or credential.
+_Avoid_: provider type, credential slot, model preference
 
 ## Relationships
 
@@ -196,8 +205,9 @@ _Avoid_: API-key preference, Analysis parameter, Workspace secret
 - A hosted Session identifies a user; single-user mode always identifies the
   fixed Root User by the backend process.
 - User Preferences belong to one user independently of every Workspace.
-- A Provider Credential belongs to one user but never to User Preferences, a
-  Workspace, an Analysis, or a User File Import.
+- Annotation Provider Configurations belong to one user. Their Provider
+  Credentials never belong to User Preferences, a Workspace, an Analysis, or a
+  User File Import.
 - Hint Acknowledgment History is device-local and does not belong to User
   Preferences.
 - Manual Annotation is a sequence of Data Block Edits. AI Annotation preview is

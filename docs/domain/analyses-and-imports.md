@@ -56,10 +56,16 @@ retained input. If the retained input is unavailable, the query fails rather
 than silently recomputing from live Workspace state. Draft request parameters
 and all presentation preferences remain outside the backend resource.
 
-An Annotation submission may carry a write-only Provider Credential to the
-execution boundary. The service removes it before creating the immutable
-Analysis request, so persistence, hydration, retries, Tabs, Results, and
-Artifacts never contain it.
+An Annotation model-list, preview, or submission request identifies one
+Annotation Provider Configuration by UUID and repeats its safe provider type
+and optional normalized Custom base URL. Single-user execution verifies this
+snapshot against the stored configuration; multi-user execution may carry its
+browser-owned write-only Provider Credential to the request boundary. The
+service captures the key separately for immediate execution and retains only
+the safe UUID, type, and Custom base URL in the immutable Analysis request.
+Names and secrets therefore never enter persistence, hydration, retries, Tabs,
+Results, Artifacts, provenance, logs, or telemetry. Execution never falls back
+to a later mutable configuration.
 
 Annotation has two deliberately separate modes. Manual Annotation is not an
 Analysis: starting a manual column is an expression Data Block Edit, each label
@@ -93,7 +99,7 @@ to mutate the cleared Tab.
 
 Closing and reopening a Workspace restores Tabs, terminal Analyses, immutable
 requests, stored Results, Artifacts, and retained query inputs from Workspace
-storage. Portable archive version 5 carries terminal live Analyses and safe
+storage. Portable archive version 6 carries terminal live Analyses and safe
 materialized copies of their query inputs; import rebuilds private lazy input
 snapshots under the new Workspace identity. Browser-local active Tab and
 presentation settings are deliberately outside both storage forms.

@@ -49,15 +49,21 @@ The secret file supplies only `CILOGON_CLIENT_SECRET`. See
 Do not place users' Annotation or Data Portal credentials in the service
 environment or backend Data Root. In multi-user mode, each user enters personal
 credentials under **Settings → AI** or **Settings → Portal**. Wordflow
-stores them only in that browser's `wordflow-provider-credentials` localStorage
-entry, partitioned by authenticated user ID, and sends them transiently with
-provider calls. Logout deliberately retains the browser entry; a different
-browser profile or device requires re-entry.
+stores the ordered, named Annotation configuration collection and its secrets
+only in that browser's `wordflow-provider-credentials` version 2 localStorage
+entry, partitioned by authenticated user ID, and sends the selected secret
+transiently with provider calls. Logout deliberately retains the browser entry;
+a different browser profile or device requires re-entry.
 
 `LDACA_ONI_API_TOKEN` is an optional deployment-wide Data Portal fallback and
 may be supplied through the service secret file. It is not a personal
 credential and does not replace the browser-owned Annotation keys required in
 multi-user mode.
+
+Authenticated hosted users may configure a Custom OpenAI-compatible absolute
+HTTP(S) base URL, including private or loopback destinations. The backend makes
+model-list and Chat Completions requests to that user-selected destination.
+Deploy only where this deliberate trusted-user SSRF boundary is acceptable.
 
 After upgrading from server-stored multi-user credentials, existing
 `users/*/provider-credentials.toml` files remain untouched but are never read.

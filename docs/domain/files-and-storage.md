@@ -14,8 +14,10 @@ user file area cannot rewrite an existing Source Data Block.
 
 Every user area may contain non-secret User Preferences. Only the canonical
 single-user `root` area may contain the separate write-only
-`provider-credentials.toml`; multi-user personal Provider Credentials are
-browser-owned and never part of the backend storage model.
+`provider-credentials.toml` schema 2, containing named Annotation Provider
+Configurations and the independent Data Portal token. Multi-user personal
+configurations and Provider Credentials are browser-owned and never part of the
+backend storage model.
 
 ```mermaid
 flowchart TB
@@ -28,6 +30,7 @@ flowchart TB
     USERS --> FILES["Mutable User Files"]
     USERS --> IMPORTS["User File Import records and staging"]
     USERS --> PREFERENCES["Non-secret User Preferences"]
+    USERS --> ROOT_CREDENTIALS["Single-user root only<br/>provider-credentials.toml schema 2"]
     WORKSPACES --> ACCESS["Deployment-only access.json"]
     WORKSPACES --> PORTABLE["Portable metadata, Data Blocks, Tabs, Analyses, and Artifacts"]
     FILES -->|"snapshot on import"| SOURCE["Immutable Source Data Block"]
@@ -56,7 +59,7 @@ flowchart TB
   `access.json` ownership is checked before portable content is exposed.
 - Archive exports omit deployment ownership, and imports reject embedded
   ownership before generating a new sidecar for the importer.
-- Portable Workspace archive version 5 contains materialized Data Blocks,
+- Portable Workspace archive version 6 contains materialized Data Blocks,
   terminal live Analyses, declared Artifacts, and materialized immutable query
   inputs. It contains no serialized executable plans. Import assigns a fresh
   Workspace identity, rebuilds and rebases the private lazy plans, and rejects

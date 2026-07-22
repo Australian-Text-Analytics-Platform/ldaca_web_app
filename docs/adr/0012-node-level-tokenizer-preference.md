@@ -29,7 +29,7 @@ Wordflow separates these concerns into three authorities:
 
 Document and tokenizer controls persist through independent partial Data Block
 updates. There is no account-wide tokenizer default and no per-column
-tokenization registry. Native Workspace schema 6, portable archive format 5,
+tokenization registry. Native Workspace schema 7, portable archive format 6,
 and `preferences.toml` schema 2 establish one current persisted contract;
 earlier versions are rejected rather than migrated at runtime.
 

@@ -61,9 +61,10 @@ this direction and the absence of removed facades.
   Analyses, and User File Imports; it is not durable state.
 - `SessionService` and `OAuthService` own identity state and provider exchange.
 - `UserPreferenceStore` owns only per-user non-secret preferences.
-  `ProviderCredentialStore` independently owns the single-user root credential
-  file and mode-aware transient credential resolution. It never reads or
-  writes personal credential files in multi-user mode.
+  `ProviderCredentialStore` independently owns the single-user root's ordered
+  Annotation Provider Configuration collection, Data Portal credential, and
+  mode-aware transient credential resolution. It never reads or writes
+  personal credential files in multi-user mode.
 - `UserFileStore` and `WorkspaceArchiveService` own their respective storage
   boundaries.
 

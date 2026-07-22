@@ -19,7 +19,7 @@ flowchart TB
     ZUSTAND["Zustand<br/>device and interaction authority"] <--> FEATURES
     LOCAL["Component state<br/>forms and panels"] <--> FEATURES
     URL["URL search state<br/>view identity"] <--> ZUSTAND
-    BROWSER_CREDENTIALS["Per-user Provider Credentials<br/>versioned localStorage"] --> CREDENTIAL_FACADE["Mode-specific credential facade<br/>presence and request-boundary injection"]
+    BROWSER_CREDENTIALS["Per-user provider configurations and secrets<br/>versioned localStorage"] --> CREDENTIAL_FACADE["Mode-specific credential facade<br/>safe metadata and request-boundary injection"]
     CREDENTIAL_FACADE --> FEATURES
     CREDENTIAL_FACADE --> BACKEND
 
@@ -46,17 +46,27 @@ conveniently, such as complete table URLs, native downloads, or SSE, and still
 follow the backend's cookie, CSRF, Origin, and typed resource contracts. There
 is no JSON table decoder, backend compatibility rewrite, or alternate decoder.
 
-Provider Credentials are an intentional separate boundary. In multi-user mode,
-a non-devtools Zustand store persists secrets by authenticated user ID under
-`wordflow-provider-credentials` and exposes only presence metadata to
-components. A request facade reads the current account's secret synchronously
-inside the final generated SDK call. Safe credential revision numbers may
-invalidate model and preview queries; secret values never enter query keys,
-mutation variables, Tab state, hydrated requests, errors, or telemetry. Logout
-does not delete another account's browser partition, and browser storage events
-synchronize replacement and deletion across tabs. In single-user mode, the
-same facade uses backend status and write-only mutations and never creates a
+Annotation Provider Configurations are an intentional separate boundary. In
+multi-user mode, a non-devtools Zustand store persists the ordered, user-named
+configuration collection and its secrets by authenticated user ID under
+`wordflow-provider-credentials` version 2. Components receive only safe
+configuration metadata. A request facade reads the selected configuration's
+secret synchronously by UUID inside the final generated SDK call. Model-list
+queries are keyed by configuration UUID and a safe credential revision; secret
+values never enter query keys, mutation state, Tab state, hydrated requests,
+errors, or telemetry. Logout does not delete another account's browser
+partition, and browser storage events synchronize replacement and deletion
+across tabs. In single-user mode, the same facade projects the backend-owned
+collection and invokes its write-only CRUD operations without creating a
 browser credential entry.
+
+Annotation Tab presentation state retains the selected configuration UUID,
+provider type, and a per-configuration model map. Fresh Tabs choose the first
+configured entry. If the selected entry disappears, the first remaining entry
+of the same provider type is chosen; otherwise the selection is cleared.
+Hydrating a historical Analysis first restores its exact safe request snapshot,
+so any fallback is visible to re-run change detection rather than rewriting the
+historical request.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts

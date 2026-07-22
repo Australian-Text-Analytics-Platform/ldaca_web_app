@@ -35,3 +35,8 @@ but unread so operators can remove them deliberately; users re-enter keys in
 their browser. No non-`root` single-user data is migrated. Browser storage
 removes server-at-rest custody but does not defend against XSS or privileged
 browser extensions, so hosted CSP and XSS hardening remain separate work.
+
+[ADR 0013](0013-multi-instance-annotation-provider-configurations.md)
+supersedes the fixed Annotation slots, browser version 1 shape, and
+built-in-only key requirement described above. The deployment-mode ownership
+decision remains in force.

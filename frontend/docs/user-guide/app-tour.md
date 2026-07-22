@@ -42,16 +42,26 @@ reset their history from **Settings → Guidance**.
 
 **Answer:** Select a node in the graph to view its table in the lower data view section.
 
-## Step 6 — Provider credentials in Settings
+## Step 6 — Annotation providers and Data Portal credentials
 
 **Question:** *Where do I configure AI and LDaCA Data Portal credentials?*
 
-**Answer:** Use **Settings → AI** and **Settings → Portal**. Credential
-inputs are always blank and write-only: **Save** replaces a value and **Clear**
-removes it. When Wordflow runs locally in single-user mode, the local backend
-stores credentials for the fixed Root User. In hosted multi-user mode,
-credentials stay in this browser for the signed-in account, remain after
-logout, and must be entered again in another browser or device.
+**Answer:** Use **Settings → AI** to add any number of named Annotation Provider
+Configurations. Choose OpenRouter, OpenAI, Anthropic, Google, or a Custom
+OpenAI-compatible base URL; built-ins require an API key and Custom may be
+keyless. Duplicate names are allowed, so names such as `OpenRouter-personal`
+and `OpenRouter-org` help distinguish multiple keys. Rename or delete entries
+from the ordered list; changing provider type, URL, or credential means adding
+a replacement and deleting the old entry.
+
+The Annotation provider dropdown shows only configured entries and keeps **Add
+Provider** at the bottom. Model discovery is attempted for Custom entries, but
+you can type a model name when discovery fails. **Settings → Portal** manages
+the independent Data Portal token. When Wordflow runs locally in single-user
+mode, the local backend stores configurations for the fixed Root User. In
+hosted multi-user mode, configurations and secrets stay in this browser for the
+signed-in account, remain after logout, and must be entered again in another
+browser or device.
 
 ## Recap
 

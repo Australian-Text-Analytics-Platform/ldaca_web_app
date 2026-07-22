@@ -7,6 +7,9 @@ current system documentation.
 
 ## Completed changes
 
+- [Multi-instance Annotation provider configurations](15-annotation-provider-configurations/spec.md)
+  ([issue #15](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/15)),
+  completed 2026-07-23.
 - [Mode-specific provider credentials and fixed local identity](13-mode-specific-provider-credentials/spec.md)
   ([issue #13](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/13)),
   completed 2026-07-21.

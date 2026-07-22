@@ -47,10 +47,12 @@ no file-count, directory-count, Analysis-count, or queue-count quotas.
 Each `users/<user-id>/` root contains `files/`, `imports/`, and schema-versioned
 non-secret `preferences.toml`. In single-user mode, the only root is
 `users/root/`, and its write-only Provider Credentials are stored separately in
-`provider-credentials.toml`. Multi-user personal credentials never use backend
-user storage; legacy multi-user credential files are ignored. The backend
-rejects linked, malformed, or schema-invalid current files rather than
-interpreting earlier storage layouts.
+`provider-credentials.toml` schema 2. That strict file contains the ordered,
+UUID-backed Annotation Provider Configuration collection and the independent
+Data Portal token. Multi-user personal credentials never use backend user
+storage; legacy multi-user credential files are ignored. The backend rejects
+linked, malformed, or schema-invalid current files, including schema 1, rather
+than interpreting earlier storage layouts.
 
 Both execution capacities default to two and accept any positive integer with
 no schema ceiling or unlimited sentinel. `SHUTDOWN_GRACE_SECONDS` defaults to
