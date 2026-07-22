@@ -119,7 +119,6 @@ describe('useWorkspaceDataTable', () => {
       expect(queryWorkspaceSqlTableMock).toHaveBeenCalledTimes(1);
     });
 
-    const request = { page: 1, page_size: 20, sort_by: null, descending: false };
     expect(queryWorkspaceSqlTableMock).toHaveBeenLastCalledWith({
       path: { workspace_id: 'workspace-1' },
       body: {
@@ -137,7 +136,17 @@ describe('useWorkspaceDataTable', () => {
         .some(
           (query) =>
             JSON.stringify(query.queryKey) ===
-            JSON.stringify(['workspaces', 'workspace-1', 'nodes', 'node-b', 'data', request]),
+            JSON.stringify([
+              'workspaces',
+              'workspace-1',
+              'sql',
+              {
+                nodeIds: ['node-b'],
+                sql: 'SELECT * FROM "node-b"',
+                page: 1,
+                pageSize: 20,
+              },
+            ]),
         ),
     ).toBe(true);
   });

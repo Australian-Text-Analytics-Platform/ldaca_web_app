@@ -8,13 +8,10 @@ import { useWorkspaceTransformMutations } from './useWorkspaceTransformMutations
 
 interface WorkspaceNodeMutationsParams {
   currentWorkspaceId: string | null;
-  setCurrentWorkspaceId: (workspaceId: string | null) => void;
   removeNode: (nodeId: string) => void;
   replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
   clearSelection: () => void;
   queryClient: QueryClient;
-  startOperation: (operationId: string) => void;
-  endOperation: (operationId: string) => void;
 }
 
 /**
@@ -27,21 +24,14 @@ interface WorkspaceNodeMutationsParams {
  */
 export const useWorkspaceNodeMutations = ({
   currentWorkspaceId,
-  setCurrentWorkspaceId,
   removeNode,
   replaceSelectedNodes,
   clearSelection,
   queryClient,
-  startOperation,
-  endOperation,
 }: WorkspaceNodeMutationsParams) => {
   const { actions: managementActions } = useWorkspaceManagementMutations({
     currentWorkspaceId,
-    setCurrentWorkspaceId,
-    clearSelection,
     queryClient,
-    startOperation,
-    endOperation,
   });
 
   const { actions: graphActions } = useWorkspaceGraphMutations({
@@ -50,22 +40,16 @@ export const useWorkspaceNodeMutations = ({
     replaceSelectedNodes,
     clearSelection,
     queryClient,
-    startOperation,
-    endOperation,
   });
 
   const { actions: transformActions } = useWorkspaceTransformMutations({
     currentWorkspaceId,
     queryClient,
-    startOperation,
-    endOperation,
   });
 
   const { actions: analysisActions } = useWorkspaceAnalysisMutations({
     currentWorkspaceId,
     queryClient,
-    startOperation,
-    endOperation,
   });
 
   // Memoize the action surface so consumers (the WorkspaceProvider context

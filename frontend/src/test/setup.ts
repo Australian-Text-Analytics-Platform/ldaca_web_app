@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll } from 'vitest';
+import { JSDOM } from 'jsdom';
 // Vitest is configured without globals, so Testing Library cannot register its
 // automatic cleanup hook. Keep the explicit teardown to prevent DOM leakage
 // between tests.
@@ -10,6 +11,20 @@ import { enableMapSet } from 'immer';
 import { server } from './msw/server';
 
 enableMapSet();
+
+// Node 25 exposes an incomplete process-level localStorage unless a backing
+// file is configured. Bind the global name to jsdom's real Storage instance so
+// StorageEvent validation and Storage.prototype spies retain browser semantics.
+const storageDom = new JSDOM('', { url: 'http://localhost/' });
+const browserLocalStorage = storageDom.window.localStorage;
+Object.defineProperty(globalThis, 'Storage', {
+  configurable: true,
+  value: storageDom.window.Storage,
+});
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: browserLocalStorage,
+});
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
@@ -22,6 +37,7 @@ afterEach(() => {
 
 afterAll(() => {
   server.close();
+  storageDom.window.close();
 });
 
 const TEST_RESIZE_OBSERVER_WIDTH = 1024;

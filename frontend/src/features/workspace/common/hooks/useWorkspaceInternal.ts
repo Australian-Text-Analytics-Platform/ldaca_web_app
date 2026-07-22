@@ -1,9 +1,13 @@
-import { useEffect, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef } from 'react';
+import { useIsMutating, useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceCore } from './useWorkspaceCore';
 import { useWorkspaceQueries } from './useWorkspaceQueries';
 import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
-import { useDevicePreferencesStore } from '@/stores/preferencesStore';
+import { usePreprocessingInputsStore } from '@/stores/preprocessingInputsStore';
+import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
+import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
+import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
+import { useAnalysisTabsPresentationStore } from '@/features/views/common/tabs/analysisTabsPresentationStore';
 
 /**
  * Orchestrates core state, queries, and mutations into the single internal
@@ -15,13 +19,11 @@ import { useDevicePreferencesStore } from '@/stores/preferencesStore';
 export const useWorkspaceInternal = () => {
   const core = useWorkspaceCore();
   const queryClient = useQueryClient();
-  const lastWorkspaceId = useDevicePreferencesStore((state) => state.lastWorkspaceId);
-  const setLastWorkspaceId = useDevicePreferencesStore((state) => state.setLastWorkspaceId);
+  const loadingOperationCount = useIsMutating({ mutationKey: ['workspace'] });
 
   const {
     isAuthenticated,
-    currentWorkspaceId,
-    setCurrentWorkspaceId,
+    userId,
     activeNodeId,
     selectedNodeIds,
     activateNode,
@@ -30,9 +32,6 @@ export const useWorkspaceInternal = () => {
     replaceSelectedNodes,
     toggleNode,
     clearSelection,
-    loadingOperationCount,
-    startOperation,
-    endOperation,
   } = core;
 
   const {
@@ -43,43 +42,59 @@ export const useWorkspaceInternal = () => {
     selectedNode,
     selectedNodes,
     queryLoadingState,
+    currentWorkspaceId,
+    workspacesHydrated,
+    nodesHydrated,
   } = useWorkspaceQueries({
     isAuthenticated,
-    currentWorkspaceId,
     activeNodeId,
     selectedNodeIds,
   });
 
+  const previousWorkspaceIdRef = useRef<string | null>(currentWorkspaceId);
   useEffect(() => {
-    if (!isAuthenticated) {
-      if (currentWorkspaceId !== null) setCurrentWorkspaceId(null);
-      return;
+    if (previousWorkspaceIdRef.current === currentWorkspaceId) return;
+    clearSelection();
+    previousWorkspaceIdRef.current = currentWorkspaceId;
+  }, [clearSelection, currentWorkspaceId]);
+
+  useEffect(() => {
+    if (!workspacesHydrated) return;
+    const workspaceIds = workspaces.map((workspace) => workspace.id);
+    usePreprocessingInputsStore.getState().pruneWorkspaces(userId, workspaceIds);
+    useRecentSelectionsStore.getState().pruneWorkspaces(userId, workspaceIds);
+    useAnalysisTabsPresentationStore.getState().pruneWorkspaces(userId, workspaceIds);
+  }, [userId, workspaces, workspacesHydrated]);
+
+  useEffect(() => {
+    if (!currentWorkspaceId || !nodesHydrated) return;
+    const nodeIds = nodes.map((node) => node.id);
+    const valid = new Set(nodeIds);
+    const validSelectedIds = selectedNodeIds.filter((nodeId) => valid.has(nodeId));
+    const validActiveNodeId = activeNodeId && valid.has(activeNodeId) ? activeNodeId : null;
+    if (validSelectedIds.length !== selectedNodeIds.length || validActiveNodeId !== activeNodeId) {
+      replaceSelectedNodes(validSelectedIds, validActiveNodeId);
     }
-    if (currentWorkspaceId === null && lastWorkspaceId) {
-      if (workspaces.some((workspace) => workspace.id === lastWorkspaceId)) {
-        setCurrentWorkspaceId(lastWorkspaceId);
-      } else {
-        setLastWorkspaceId(null);
-      }
-    }
+    usePreprocessingInputsStore.getState().pruneNodes(userId, currentWorkspaceId, nodeIds);
+    useRecentSelectionsStore.getState().pruneNodes(userId, currentWorkspaceId, nodeIds);
+    usePinnedNodesStore.getState().prune(nodeIds);
+    useNodeInputRequestsStore.getState().prune(currentWorkspaceId, nodeIds);
   }, [
+    activeNodeId,
     currentWorkspaceId,
-    isAuthenticated,
-    lastWorkspaceId,
-    setCurrentWorkspaceId,
-    setLastWorkspaceId,
-    workspaces,
+    nodes,
+    nodesHydrated,
+    replaceSelectedNodes,
+    selectedNodeIds,
+    userId,
   ]);
 
   const { actions: nodeActions } = useWorkspaceNodeMutations({
     currentWorkspaceId,
-    setCurrentWorkspaceId,
     removeNode,
     replaceSelectedNodes,
     clearSelection,
     queryClient,
-    startOperation,
-    endOperation,
   });
 
   const selectionActions = useMemo(

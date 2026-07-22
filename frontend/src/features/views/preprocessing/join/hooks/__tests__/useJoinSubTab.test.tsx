@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Field, Utf8 } from 'apache-arrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +12,13 @@ vi.mock('@/api', () => ({
 
 import { useJoinSubTab } from '../useJoinSubTab';
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+
+const createWrapper = () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+};
 
 describe('useJoinSubTab preview adapter', () => {
   beforeEach(() => {
@@ -53,7 +62,7 @@ describe('useJoinSubTab preview adapter', () => {
           isLoading: { operations: false },
           onAlert: vi.fn(),
         }),
-      { initialProps: { workspaceId: 'workspace-request-1' } },
+      { initialProps: { workspaceId: 'workspace-request-1' }, wrapper: createWrapper() },
     );
 
     await act(async () => {
@@ -108,30 +117,44 @@ describe('useJoinSubTab preview adapter', () => {
       projectWorkspaceNodeMetadata({ id: 'right', name: 'Candidates' }),
     ];
 
-    renderHook(() =>
-      useJoinSubTab({
-        selectedNodeIds: ['left', 'right'],
-        selectedNodeColumns: {
-          left: 'tweet_id',
-          right: 'party',
-        },
-        setSelectedNodeColumns,
-        currentWorkspaceId: null,
-        workspaceNodes,
-        getColumnInfos: (node) =>
-          node.id === 'left'
-            ? [
-                { name: 'tweet_id', dataType: 'string', field: new Field('tweet_id', new Utf8()) },
-                { name: 'username', dataType: 'string', field: new Field('username', new Utf8()) },
-              ]
-            : [
-                { name: 'party', dataType: 'string', field: new Field('party', new Utf8()) },
-                { name: 'username', dataType: 'string', field: new Field('username', new Utf8()) },
-              ],
-        joinNodes: vi.fn(),
-        isLoading: { operations: false },
-        onAlert: vi.fn(),
-      }),
+    renderHook(
+      () =>
+        useJoinSubTab({
+          selectedNodeIds: ['left', 'right'],
+          selectedNodeColumns: {
+            left: 'tweet_id',
+            right: 'party',
+          },
+          setSelectedNodeColumns,
+          currentWorkspaceId: null,
+          workspaceNodes,
+          getColumnInfos: (node) =>
+            node.id === 'left'
+              ? [
+                  {
+                    name: 'tweet_id',
+                    dataType: 'string',
+                    field: new Field('tweet_id', new Utf8()),
+                  },
+                  {
+                    name: 'username',
+                    dataType: 'string',
+                    field: new Field('username', new Utf8()),
+                  },
+                ]
+              : [
+                  { name: 'party', dataType: 'string', field: new Field('party', new Utf8()) },
+                  {
+                    name: 'username',
+                    dataType: 'string',
+                    field: new Field('username', new Utf8()),
+                  },
+                ],
+          joinNodes: vi.fn(),
+          isLoading: { operations: false },
+          onAlert: vi.fn(),
+        }),
+      { wrapper: createWrapper() },
     );
 
     expect(setSelectedNodeColumns).toHaveBeenCalledOnce();

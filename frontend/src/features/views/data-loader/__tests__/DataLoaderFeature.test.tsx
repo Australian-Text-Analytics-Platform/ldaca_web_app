@@ -226,6 +226,7 @@ describe('DataLoaderFeature citation UI', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     mockHandleUploadFile.mockResolvedValue(true);
     mockRawFile.mockResolvedValue({ data: '# ADO Citation\n\nReference text.', error: undefined });
     mockCreateFolder.mockResolvedValue({
@@ -346,7 +347,8 @@ describe('DataLoaderFeature citation UI', () => {
 
   it('persists folder collapsed state in localStorage', () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-    localStorage.setItem('ldaca_wordflow_collapsed_folders', JSON.stringify(['sample_data/Other']));
+    const storageKey = 'ldaca-wordflow-collapsed-folders-v2:__anonymous__:ws-1';
+    localStorage.setItem(storageKey, JSON.stringify(['sample_data/Other']));
 
     renderWithProviders(<DataLoaderFeature />);
 
@@ -354,17 +356,11 @@ describe('DataLoaderFeature citation UI', () => {
     const toggleFolderAdo = screen.getByRole('button', { name: /^ADO$/i });
     fireEvent.click(toggleFolderAdo);
 
-    expect(setItemSpy).toHaveBeenCalledWith(
-      'ldaca_wordflow_collapsed_folders',
-      expect.stringContaining('sample_data/ADO'),
-    );
+    expect(setItemSpy).toHaveBeenCalledWith(storageKey, expect.stringContaining('sample_data/ADO'));
 
     // Toggle back to open
     fireEvent.click(toggleFolderAdo);
-    expect(setItemSpy).toHaveBeenLastCalledWith(
-      'ldaca_wordflow_collapsed_folders',
-      JSON.stringify(['sample_data/Other']),
-    );
+    expect(setItemSpy).toHaveBeenLastCalledWith(storageKey, JSON.stringify(['sample_data/Other']));
 
     setItemSpy.mockRestore();
     localStorage.clear();

@@ -19,7 +19,6 @@ import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWork
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
-import { useSelectionStore } from '@/stores/selectionStore';
 import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 import { projectWorkspaceGraphNodeCard, type WorkspaceGraphNodeCard } from '../graphNodeModel';
@@ -202,6 +201,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
+  const currentWorkspaceIdRef = useRef(currentWorkspaceId);
+  useEffect(() => {
+    currentWorkspaceIdRef.current = currentWorkspaceId;
+  }, [currentWorkspaceId]);
 
   /**
    * Requests that the active view add this node to its owned input selection.
@@ -224,7 +227,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     (nodeId: string) => {
       if (!nodeId) return;
       const activeView = useUIStore.getState().currentView;
-      const workspaceId = useSelectionStore.getState().currentWorkspaceId;
+      const workspaceId = currentWorkspaceIdRef.current;
       requestNodeInputAdd(workspaceId, activeView, nodeId);
       if (workspaceId) markInteracted(workspaceId, [nodeId]);
     },
@@ -425,11 +428,11 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         // A click counts as "I've seen this" — clear the fresh-node
         // highlight even if the resulting selection toggle didn't
         // actually fire (e.g. parent disabled clicks).
-        const workspaceId = useSelectionStore.getState().currentWorkspaceId;
+        const workspaceId = currentWorkspaceId;
         if (workspaceId) markInteracted(workspaceId, [node.id]);
       }
     },
-    [toggleNode, markInteracted],
+    [currentWorkspaceId, toggleNode, markInteracted],
   );
 
   /** No-op connection handler because graph edges are backend-derived. */

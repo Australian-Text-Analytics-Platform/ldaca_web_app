@@ -8,14 +8,14 @@ import {
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
 import { getOperatorsForType } from '../../utils/typeUtils';
-import type { ConditionRange, FilterConditionWithId } from '../../types';
+import type { ConditionColumnOption, ConditionRange, FilterConditionWithId } from '../../types';
 import { FilterValueChecklist, type FilterChecklistOption } from './FilterValueChecklist';
 import {
   getCategoricalOptionKey,
   toCategoricalPrimitive,
-  type CategoricalOptionsByKey,
   type CategoricalPrimitive,
 } from '../utils/categoricalOptions';
+import { useFilterCategoricalOptionQuery } from '../hooks/useFilterCategoricalOptionQuery';
 
 type OnConditionChange = <Key extends keyof FilterConditionWithId>(
   id: string,
@@ -27,11 +27,10 @@ interface FilterConditionValueInputProps {
   condition: FilterConditionWithId;
   disabled: boolean;
   hasSelection: boolean;
-  categoricalOptions: CategoricalOptionsByKey;
+  workspaceId: string | null;
+  nodeId: string | null;
+  columnOption?: ConditionColumnOption;
   optionSearchQueries: Record<string, string>;
-  getCategoricalKey: (column: string) => string;
-  ensureCategoricalOptions: (column: string, dataType: string) => Promise<void> | void;
-  loadMoreCategoricalOptions: (column: string, dataType: string) => Promise<void> | void;
   onOptionSearchQueryChange: (conditionId: string, query: string) => void;
   onConditionChange: OnConditionChange;
 }
@@ -50,14 +49,26 @@ export function FilterConditionValueInput({
   condition,
   disabled,
   hasSelection,
-  categoricalOptions,
+  workspaceId,
+  nodeId,
+  columnOption,
   optionSearchQueries,
-  getCategoricalKey,
-  ensureCategoricalOptions,
-  loadMoreCategoricalOptions,
   onOptionSearchQueryChange,
   onConditionChange,
 }: FilterConditionValueInputProps) {
+  // Empty dataType should fall back to 'string', so keep `||`.
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  const dataType = condition.dataType || 'string';
+  const searchQuery = optionSearchQueries[condition.id] ?? '';
+  const optionState = useFilterCategoricalOptionQuery({
+    workspaceId,
+    nodeId,
+    column: condition.column,
+    dataType,
+    searchQuery,
+    columnOption,
+  });
+
   if (disabled) {
     return (
       <input
@@ -72,10 +83,6 @@ export function FilterConditionValueInput({
     );
   }
 
-  // Empty dataType should fall back to 'string', so keep `||`.
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const dataType = condition.dataType || 'string';
-
   if (dataType === 'topic-distribution') {
     // Topic-distribution column: render [topic dropdown] [operator] [value %].
     // The generic operator select is hidden in the parent ConditionBuilder so
@@ -88,9 +95,7 @@ export function FilterConditionValueInput({
       onConditionChange(condition.id, 'value', { ...current, ...next });
     };
 
-    const key = condition.column ? getCategoricalKey(condition.column) : null;
-    const optionState = key ? categoricalOptions[key] : undefined;
-    const topicIds = (optionState?.options ?? [])
+    const topicIds = optionState.options
       .map((opt) => Number(opt.value))
       .filter((n) => Number.isFinite(n))
       .sort((a, b) => a - b);
@@ -106,7 +111,7 @@ export function FilterConditionValueInput({
           disabled={topicIds.length === 0}
         >
           <SelectTrigger className="w-32" aria-label="Topic">
-            <SelectValue placeholder={optionState?.loading ? 'Loading...' : 'Topic'} />
+            <SelectValue placeholder={optionState.loading ? 'Loading...' : 'Topic'} />
           </SelectTrigger>
           <SelectContent>
             {topicIds.map((topicId) => (
@@ -157,16 +162,13 @@ export function FilterConditionValueInput({
 
   if (dataType === 'categorical' || dataType === 'string-list') {
     const column = condition.column;
-    const key = column ? getCategoricalKey(column) : null;
-    const optionState = key ? categoricalOptions[key] : undefined;
-    const optionEntries = optionState?.options ?? [];
-    const searchQuery = optionSearchQueries[condition.id] ?? '';
+    const optionEntries = optionState.options;
     const selectedValues = Array.isArray(condition.value)
       ? (condition.value as unknown[]).map(toCategoricalPrimitive)
       : [];
     const selectedKeys = new Set(selectedValues.map((entry) => getCategoricalOptionKey(entry)));
-    const isLoadingOptions = optionState?.loading ?? false;
-    const optionError = optionState?.error ?? null;
+    const isLoadingOptions = optionState.loading;
+    const optionError = optionState.error;
 
     /**
      * Writes checklist selections back into the condition value field.
@@ -242,18 +244,18 @@ export function FilterConditionValueInput({
         onToggleOption={toggleValue}
         onSelectAll={onSelectAllForMode}
         onClearAll={handleClearAll}
-        hasNext={optionState?.hasNext ?? false}
+        hasNext={optionState.hasNext}
         onLoadMore={
           column
             ? () => {
-                void loadMoreCategoricalOptions(column, dataType);
+                void optionState.loadMore();
               }
             : undefined
         }
         onRetry={
           column
             ? () => {
-                void ensureCategoricalOptions(column, dataType);
+                void optionState.retry();
               }
             : undefined
         }

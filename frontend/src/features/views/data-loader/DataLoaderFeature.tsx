@@ -13,7 +13,11 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceDownloads } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
-import { isPendingTaskState, isRunningTaskState, useAnalysisStore } from '@/stores/analysisStore';
+import {
+  isPendingTaskState,
+  isRunningTaskState,
+} from '@/features/workspace/task-stream/taskProjection';
+import { useTaskResources } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
 import { ActiveWorkspaceCard } from './components/ActiveWorkspaceCard';
 import { DataLoaderDialogs } from './components/DataLoaderDialogs';
 import { FileTree } from './components/FileTree';
@@ -277,7 +281,7 @@ function DataLoaderFeature() {
   // Block workspace switching/unloading while a task on the active workspace
   // is still running — switching while a materialisation is in flight has
   // corrupted the workspace state in past incidents.
-  const tasks = useAnalysisStore((state) => state.tasks);
+  const { tasks } = useTaskResources(currentWorkspaceId);
   const hasActiveTask = currentWorkspaceId
     ? tasks.some(
         (task) =>
@@ -478,6 +482,7 @@ function DataLoaderFeature() {
                           selectedFile={selectedFile}
                           loadingFiles={loadingFiles}
                           hasWorkspaceSelected={hasWorkspaceSelected}
+                          workspaceId={currentWorkspaceId}
                           onPreviewFile={setPreviewFile}
                           onAddFile={setAddFileName}
                           onSelectFile={setSelectedFile}

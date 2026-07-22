@@ -11,6 +11,7 @@ import {
   preprocessingInputsKey,
   usePreprocessingInputsStore,
 } from '@/stores/preprocessingInputsStore';
+import { useAuthStore } from '@/stores/authStore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +63,7 @@ const PolarsExpressionFallback = () => (
  */
 function DataPreprocessingFeature() {
   const { currentWorkspaceId } = useWorkspaceData();
+  const userId = useAuthStore((state) => state.session?.user?.id ?? '__anonymous__');
   const {
     filterNode,
     filterPreview,
@@ -82,7 +84,7 @@ function DataPreprocessingFeature() {
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
-  const preprocessingInputKey = preprocessingInputsKey(currentWorkspaceId, activeSubtab);
+  const preprocessingInputKey = preprocessingInputsKey(userId, currentWorkspaceId, activeSubtab);
   const persistedInputs = usePreprocessingInputsStore(
     (state) => state.byKey[preprocessingInputKey] ?? EMPTY_PREPROCESSING_INPUTS,
   );
@@ -93,7 +95,7 @@ function DataPreprocessingFeature() {
     tabInputSets: { [DEFAULT_TAB_INPUT_SET_ID]: persistedInputs },
     onTabInputSetChange: (_selectorId, inputs) => {
       if (!currentWorkspaceId) return;
-      setPersistedInputs(currentWorkspaceId, activeSubtab, inputs);
+      setPersistedInputs(userId, currentWorkspaceId, activeSubtab, inputs);
     },
     constraints: {
       maxNodes: maxInputNodes,
@@ -126,6 +128,7 @@ function DataPreprocessingFeature() {
   const setSelectedJoinColumns = (columns: Record<string, string>) => {
     if (!currentWorkspaceId) return;
     setPersistedInputs(
+      userId,
       currentWorkspaceId,
       'join',
       persistedInputs.map((input) => {

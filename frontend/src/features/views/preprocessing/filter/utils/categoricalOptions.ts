@@ -9,19 +9,6 @@ export interface CategoricalOptionEntry {
   isNull: boolean;
 }
 
-interface CategoricalOptionState {
-  options: CategoricalOptionEntry[];
-  hasNull: boolean;
-  loading: boolean;
-  error: string | null;
-  page: number;
-  hasNext: boolean;
-  etag: string | null;
-  searchQuery: string;
-}
-
-export type CategoricalOptionsByKey = Record<string, CategoricalOptionState>;
-
 export const NULL_OPTION_KEY = '__LDACA_NULL__';
 
 /**

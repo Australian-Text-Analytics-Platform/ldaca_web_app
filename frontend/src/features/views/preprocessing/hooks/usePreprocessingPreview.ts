@@ -1,12 +1,12 @@
-import { useEffect, useEffectEvent, useReducer } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { PreviewPagination, PreviewRow } from '../types';
-import {
-  createPreprocessingPreviewState,
-  preprocessingPreviewReducer,
-  resolvePreviewPaging,
-  type PreviewFetcherResult,
-  type PreviewSignatureContext,
-} from './preprocessingPreviewState';
+
+interface PreviewFetcherResult<Row = PreviewRow> {
+  data: Row[];
+  columns: string[];
+  pagination: PreviewPagination | null;
+}
 
 export interface UsePreprocessingPreviewOptions<RequestPayload, Row = PreviewRow> {
   /** The fully prepared request payload required by the preview endpoint. */
@@ -54,8 +54,7 @@ const DEFAULT_PAGE_SIZE = 10;
  * Used directly by Join and Concat, and by `useNodePreviewWithRawFallback` for
  * operation previews in the remaining preprocessing tabs.
  * Flow: debounce request signatures, bind pagination to the active signature,
- * call the latest provided fetcher through a React effect event, and drop
- * stale responses through effect cleanup.
+ * and let TanStack Query own cancellation, errors, and immutable results.
  */
 export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
   options: UsePreprocessingPreviewOptions<RequestPayload, Row>,
@@ -83,26 +82,24 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     }
   })();
 
-  const signatureContext: PreviewSignatureContext = {
+  const [paginationState, setPaginationState] = useState({
     signature: derivedSignature,
-    initialPage,
-    initialPageSize,
-  };
-
-  const [state, dispatch] = useReducer(
-    preprocessingPreviewReducer<Row>,
-    createPreprocessingPreviewState<Row>(signatureContext),
-  );
-  const { page, pageSize } = resolvePreviewPaging(state, signatureContext);
+    page: initialPage,
+    pageSize: initialPageSize,
+  });
+  const page = paginationState.signature === derivedSignature ? paginationState.page : initialPage;
+  const pageSize =
+    paginationState.signature === derivedSignature ? paginationState.pageSize : initialPageSize;
+  const [debouncedSignature, setDebouncedSignature] = useState('disabled');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   /**
    * Stores pagination with the active request signature to avoid stale pages.
    * Called by the public `setPage` action below.
    */
   const setPaginationDraft = (nextPage: number, nextPageSize: number) => {
-    dispatch({
-      type: 'set-page',
-      context: signatureContext,
+    setPaginationState({
+      signature: derivedSignature,
       page: nextPage,
       pageSize: nextPageSize,
     });
@@ -116,75 +113,37 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     setPaginationDraft(nextPage, pageSize);
   };
 
-  // React 19 effect events let the scheduled fetch read the latest request and
-  // fetcher without making inline caller callbacks restart the debounce.
-  const fetchPreview = useEffectEvent(
-    async (
-      context: {
-        page: number;
-        pageSize: number;
-      },
-      signal: AbortSignal,
-    ) => {
-      if (!request) return null;
-      return fetcher({ request, page: context.page, pageSize: context.pageSize, signal });
-    },
-  );
-
-  // Debounced preview fetcher shared by all preprocessing operations.
+  // Debounce only changes Query enablement. Changing identity while a request
+  // is active changes the key immediately, so TanStack Query aborts the old
+  // request through the signal passed to the operation adapter.
   useEffect(() => {
-    const context = {
-      signature: derivedSignature,
-      initialPage,
-      initialPageSize,
-      page,
-      pageSize,
-    };
-
     if (!ready) {
-      dispatch({ type: 'disabled', context });
       return;
     }
-
-    let cancelled = false;
-    const controller = new AbortController();
-    dispatch({ type: 'loading', context });
-
     const timeoutId = window.setTimeout(() => {
-      void fetchPreview(context, controller.signal)
-        .then((response) => {
-          if (cancelled || !response) return;
-          dispatch({ type: 'success', response, context });
-        })
-        .catch((err: unknown) => {
-          if (cancelled || controller.signal.aborted) return;
-          const message = err instanceof Error ? err.message : 'Failed to load preview data';
-          dispatch({ type: 'error', message });
-        });
+      setDebouncedSignature(derivedSignature);
     }, debounceMs);
-
     return () => {
-      cancelled = true;
-      controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [
-    ready,
-    page,
-    pageSize,
-    debounceMs,
-    state.refreshKey,
-    derivedSignature,
-    initialPage,
-    initialPageSize,
-  ]);
+  }, [debounceMs, derivedSignature, ready]);
+
+  const previewQuery = useQuery({
+    queryKey: ['preprocessing-preview', derivedSignature, page, pageSize, refreshKey],
+    enabled: ready && debouncedSignature === derivedSignature,
+    retry: false,
+    queryFn: async ({ signal }): Promise<PreviewFetcherResult<Row>> => {
+      if (!request) throw new Error('Preview request is unavailable');
+      return fetcher({ request, page, pageSize, signal });
+    },
+  });
 
   /**
    * Resets preview paging when consumers choose a different page size.
    * Returned to preview tables as `setPageSize`.
    */
   const handleSetPageSize = (size: number) => {
-    dispatch({ type: 'set-page-size', context: signatureContext, pageSize: size });
+    setPaginationDraft(initialPage, size);
   };
 
   /**
@@ -192,15 +151,23 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
    * Returned to feature hooks as the manual `refresh` action.
    */
   const refresh = () => {
-    dispatch({ type: 'refresh' });
+    setRefreshKey((current) => current + 1);
   };
 
+  const response = ready ? previewQuery.data : undefined;
+  const queryError = previewQuery.error;
+
   return {
-    data: state.data,
-    columns: state.columns,
-    pagination: state.pagination,
-    loading: state.loading,
-    error: state.error,
+    data: response?.data ?? [],
+    columns: response?.columns ?? [],
+    pagination: response?.pagination ?? null,
+    loading: ready && (debouncedSignature !== derivedSignature || previewQuery.isFetching),
+    error:
+      ready && queryError
+        ? queryError instanceof Error
+          ? queryError.message
+          : 'Failed to load preview data'
+        : null,
     ready,
     page,
     pageSize,

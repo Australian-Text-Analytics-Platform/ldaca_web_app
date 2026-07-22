@@ -72,9 +72,6 @@ export const invalidateNodeWorkspaceQueries = (
   invalidateWorkspaceGraphQuery(queryClient, workspaceId);
   if (options.includeData) {
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.nodeData(workspaceId, nodeId),
-    });
-    void queryClient.invalidateQueries({
       predicate: (query) => {
         const key = query.queryKey;
         if (

@@ -11,7 +11,6 @@ import {
 import { buildFilterRequestPayload, isConditionComplete } from '../utils/serializers';
 import { applyFilterConditionFieldChange, createFilterCondition } from '../utils/conditionState';
 import { FilterConditionValueInput } from '../components/FilterConditionValueInput';
-import { useFilterCategoricalOptions } from './useFilterCategoricalOptions';
 import type {
   ConditionRange,
   ConditionValue,
@@ -155,21 +154,33 @@ export const useFilterSubTabSections = (
     value: string;
   }>({ nodeId: selectedNodeId, value: '' });
   const [isFiltering, setIsFiltering] = useState(false);
-  const {
-    categoricalOptions,
-    optionSearchQueries,
-    getCategoricalKey,
-    ensureCategoricalOptions,
-    loadMoreCategoricalOptions,
-    setOptionSearchQuery,
-    resetOptionSearchQuery,
-    removeOptionSearchQuery,
-  } = useFilterCategoricalOptions({
-    currentWorkspaceId,
-    selectedNodeId,
-    conditions,
-    columnOptions,
-  });
+  const optionSearchScope = `${currentWorkspaceId ?? ''}\0${selectedNodeId ?? ''}`;
+  const [optionSearchState, setOptionSearchState] = useState<{
+    scope: string;
+    values: Record<string, string>;
+  }>({ scope: optionSearchScope, values: {} });
+  const optionSearchQueries =
+    optionSearchState.scope === optionSearchScope ? optionSearchState.values : {};
+  const updateOptionSearchQueries = (
+    update: (current: Record<string, string>) => Record<string, string>,
+  ) => {
+    setOptionSearchState((current) => ({
+      scope: optionSearchScope,
+      values: update(current.scope === optionSearchScope ? current.values : {}),
+    }));
+  };
+  const setOptionSearchQuery = (conditionId: string, query: string) => {
+    updateOptionSearchQueries((current) => ({ ...current, [conditionId]: query }));
+  };
+  const resetOptionSearchQuery = (conditionId: string) => {
+    updateOptionSearchQueries((current) => ({ ...current, [conditionId]: '' }));
+  };
+  const removeOptionSearchQuery = (conditionId: string) => {
+    updateOptionSearchQueries((current) => {
+      const { [conditionId]: _removed, ...next } = current;
+      return next;
+    });
+  };
 
   const availableColumns = columnOptions
     .filter((option) => option.name.length > 0)
@@ -265,13 +276,12 @@ export const useFilterSubTabSections = (
     const targetCondition = conditions.find((condition) => condition.id === id);
     if (!targetCondition) return;
 
-    const { condition, checklistLoadRequest, prefillRequest, shouldResetSearch } =
-      applyFilterConditionFieldChange({
-        condition: targetCondition,
-        field,
-        value,
-        availableColumns,
-      });
+    const { condition, prefillRequest, shouldResetSearch } = applyFilterConditionFieldChange({
+      condition: targetCondition,
+      field,
+      value,
+      availableColumns,
+    });
 
     setConditions(
       conditions.map((entry) => {
@@ -298,10 +308,6 @@ export const useFilterSubTabSections = (
           prefillRequest.operator,
         );
       }
-    }
-
-    if (checklistLoadRequest) {
-      void ensureCategoricalOptions(checklistLoadRequest.column, checklistLoadRequest.dataType);
     }
   };
 
@@ -478,11 +484,10 @@ export const useFilterSubTabSections = (
       condition={condition}
       disabled={disabled}
       hasSelection={hasSelection}
-      categoricalOptions={categoricalOptions}
+      workspaceId={currentWorkspaceId}
+      nodeId={selectedNodeId}
+      columnOption={availableColumns.find((option) => option.name === condition.column)}
       optionSearchQueries={optionSearchQueries}
-      getCategoricalKey={getCategoricalKey}
-      ensureCategoricalOptions={ensureCategoricalOptions}
-      loadMoreCategoricalOptions={loadMoreCategoricalOptions}
       onOptionSearchQueryChange={setOptionSearchQuery}
       onConditionChange={handleConditionChange}
     />

@@ -36,6 +36,7 @@ interface NodeInputRequestsActions {
     nodeId: string,
   ) => void;
   consume: (id: number) => void;
+  prune: (workspaceId: string, nodeIds: readonly string[]) => void;
 }
 
 export type NodeInputRequestsStore = NodeInputRequestsState & NodeInputRequestsActions;
@@ -64,6 +65,18 @@ export const useNodeInputRequestsStore = create<NodeInputRequestsStore>()(
       consume: (id) => {
         set((state) => {
           state.requests = state.requests.filter((request) => request.id !== id);
+        });
+      },
+
+      /** Drops transient add intents whose authoritative target disappeared. */
+      prune: (workspaceId, nodeIds) => {
+        set((state) => {
+          const valid = new Set(nodeIds);
+          state.requests = state.requests.filter(
+            (request) =>
+              request.workspaceId !== workspaceId ||
+              request.nodeIds.every((nodeId) => valid.has(nodeId)),
+          );
         });
       },
     })),

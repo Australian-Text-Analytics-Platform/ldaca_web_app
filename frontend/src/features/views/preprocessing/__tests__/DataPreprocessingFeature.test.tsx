@@ -101,20 +101,23 @@ vi.mock('@/stores/preprocessingInputsStore', () => {
   const selectedInput = [{ node_id: 'node-1', column: null }];
   const state = {
     byKey: {
-      'ws-1::filter': selectedInput,
-      'ws-1::slice': selectedInput,
-      'ws-1::find': selectedInput,
-      'ws-1::aggregate': selectedInput,
-      'ws-1::expression': selectedInput,
-      'ws-1::join': selectedInput,
-      'ws-1::concat': selectedInput,
+      '__anonymous__::ws-1::filter': selectedInput,
+      '__anonymous__::ws-1::slice': selectedInput,
+      '__anonymous__::ws-1::find': selectedInput,
+      '__anonymous__::ws-1::aggregate': selectedInput,
+      '__anonymous__::ws-1::expression': selectedInput,
+      '__anonymous__::ws-1::join': selectedInput,
+      '__anonymous__::ws-1::concat': selectedInput,
     },
     setInputs: vi.fn(),
     clearInputs: vi.fn(),
   };
   return {
-    preprocessingInputsKey: (workspaceId: string | null | undefined, subtabId: string) =>
-      `${workspaceId ?? '__none__'}::${subtabId}`,
+    preprocessingInputsKey: (
+      userId: string | null | undefined,
+      workspaceId: string | null | undefined,
+      subtabId: string,
+    ) => `${userId ?? '__anonymous__'}::${workspaceId ?? '__none__'}::${subtabId}`,
     usePreprocessingInputsStore: (selector: (store: typeof state) => unknown) => selector(state),
   };
 });

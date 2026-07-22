@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listNodes, listWorkspaces } from '@/api';
 import type { WorkspaceGraphResponse } from '@/api';
@@ -7,7 +6,6 @@ import type { WorkspaceNodeInfo as GraphNode } from '@/api';
 
 interface WorkspaceQueriesParams {
   isAuthenticated: boolean;
-  currentWorkspaceId: string | null;
   activeNodeId: string | null;
   selectedNodeIds: string[];
 }
@@ -24,7 +22,6 @@ interface WorkspaceQueriesParams {
  */
 export const useWorkspaceQueries = ({
   isAuthenticated,
-  currentWorkspaceId,
   activeNodeId,
   selectedNodeIds,
 }: WorkspaceQueriesParams) => {
@@ -41,6 +38,16 @@ export const useWorkspaceQueries = ({
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
+
+  const workspaces = workspacesQuery.data ?? [];
+  const openWorkspaces = workspaces.filter((workspace) => workspace.runtime_state === 'open');
+  if (openWorkspaces.length > 1) {
+    throw new Error(
+      `Workspace runtime invariant violated: ${String(openWorkspaces.length)} Workspaces are open`,
+    );
+  }
+  const currentWorkspace = openWorkspaces[0] ?? null;
+  const currentWorkspaceId = currentWorkspace?.id ?? null;
 
   const nodesQuery = useQuery({
     queryKey: currentWorkspaceId
@@ -70,9 +77,6 @@ export const useWorkspaceQueries = ({
     staleTime: 30 * 1000,
   });
 
-  const workspaces = workspacesQuery.data ?? [];
-  const currentWorkspace =
-    workspaces.find((workspace) => workspace.id === currentWorkspaceId) ?? null;
   const workspaceGraph = nodesQuery.data ?? null;
 
   const nodes = workspaceGraph?.nodes ?? [];
@@ -82,15 +86,12 @@ export const useWorkspaceQueries = ({
     .map((id: string) => nodes.find((node) => node.id === id))
     .filter((n): n is GraphNode => Boolean(n));
 
-  const queryLoadingState = useMemo(
-    () => ({
-      workspaces: workspacesQuery.isLoading,
-      currentWorkspace: workspacesQuery.isLoading,
-      nodes: nodesQuery.isLoading,
-      graph: nodesQuery.isLoading,
-    }),
-    [workspacesQuery.isLoading, nodesQuery.isLoading],
-  );
+  const queryLoadingState = {
+    workspaces: workspacesQuery.isLoading,
+    currentWorkspace: workspacesQuery.isLoading,
+    nodes: nodesQuery.isLoading,
+    graph: nodesQuery.isLoading,
+  };
 
   return {
     workspaces,
@@ -100,7 +101,8 @@ export const useWorkspaceQueries = ({
     selectedNode,
     selectedNodes,
     queryLoadingState,
-    currentWorkspaceIdFromQuery: currentWorkspaceId,
-    currentWorkspaceQueryError: false,
+    currentWorkspaceId,
+    workspacesHydrated: workspacesQuery.isSuccess,
+    nodesHydrated: nodesQuery.isSuccess,
   } as const;
 };

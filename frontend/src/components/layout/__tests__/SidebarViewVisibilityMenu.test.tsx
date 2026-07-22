@@ -57,6 +57,7 @@ vi.mock('@/features/workspace/task-stream/useWorkspaceTaskInbox', () => ({
   useWorkspaceTaskInbox: () => ({
     status: 'closed',
     error: null,
+    tasks: [],
     reconnect: vi.fn(),
   }),
 }));
@@ -79,13 +80,6 @@ vi.mock('@/features/preferences/useUserPreferences', () => ({
     },
   }),
   useUpdateUserPreferences: () => ({ mutate: preferenceFixture.mutate }),
-}));
-
-vi.mock('@/stores/analysisStore', () => ({
-  /** Used by: Sidebar tests to expose an empty analysis-task store fixture. */
-  useAnalysisStore: (
-    selector: (state: { tasks: []; setTasks: ReturnType<typeof vi.fn> }) => unknown,
-  ) => selector({ tasks: [], setTasks: vi.fn() }),
 }));
 
 /** Called by: Sidebar view-visibility tests before querying menu behavior. */

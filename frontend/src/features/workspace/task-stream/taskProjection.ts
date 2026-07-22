@@ -1,0 +1,93 @@
+import type { Analysis, CorruptAnalysis, UserFileImport } from '@/api';
+
+type TaskState = 'queued' | 'running' | 'successful' | 'failed' | 'cancelled';
+
+export interface TaskItem {
+  task_id: string;
+  task_type?: string;
+  name?: string;
+  user_id?: string;
+  workspace_id?: string;
+  state?: TaskState;
+  progress?: number;
+  message?: string;
+  created_at?: string;
+  updated_at?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error?: string | null;
+  [key: string]: unknown;
+}
+
+const PENDING_TASK_STATES: ReadonlySet<string> = new Set(['queued']);
+const RUNNING_TASK_STATES: ReadonlySet<string> = new Set(['running']);
+
+export const isPendingTaskState = (state: string | null | undefined): boolean =>
+  Boolean(state && PENDING_TASK_STATES.has(state));
+
+export const isRunningTaskState = (state: string | null | undefined): boolean =>
+  Boolean(state && RUNNING_TASK_STATES.has(state));
+
+const toTaskState = (state: Analysis['state']): TaskState =>
+  state === 'succeeded' ? 'successful' : state;
+
+const failureMessage = (value: unknown): string | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const message = (value as { message?: unknown }).message;
+  return typeof message === 'string' ? message : undefined;
+};
+
+export const analysisToTask = (
+  resource: Analysis | CorruptAnalysis,
+  workspaceId: string,
+): TaskItem => {
+  if ('request' in resource) {
+    const progress = 'progress' in resource ? resource.progress : null;
+    return {
+      task_id: resource.id,
+      task_type: resource.request.kind,
+      workspace_id: workspaceId,
+      state: toTaskState(resource.state),
+      progress: progress?.fraction ?? undefined,
+      progress_message: progress?.message ?? undefined,
+      message: failureMessage(resource.error) ?? progress?.message ?? undefined,
+      created_at: resource.created_at,
+      started_at: resource.started_at,
+      finished_at: resource.finished_at,
+      error: failureMessage(resource.error) ?? null,
+    };
+  }
+
+  return {
+    task_id: resource.id,
+    task_type: 'analysis_corrupt',
+    workspace_id: workspaceId,
+    state: 'failed',
+    message: 'This analysis record is corrupt and must be cleared.',
+    error: resource.code ?? 'analysis_corrupt',
+  };
+};
+
+export const importToTask = (resource: UserFileImport): TaskItem => {
+  const progress = resource.progress;
+  return {
+    task_id: resource.id,
+    task_type: resource.request.kind === 'sample' ? 'sample_import' : 'data_portal_import',
+    state: toTaskState(resource.state),
+    progress: progress.fraction ?? undefined,
+    progress_message: progress.message ?? undefined,
+    message: failureMessage(resource.error) ?? progress.message ?? undefined,
+    created_at: resource.created_at,
+    started_at: resource.started_at,
+    finished_at: resource.finished_at,
+    error: failureMessage(resource.error) ?? null,
+  };
+};
+
+const taskTimestamp = (task: TaskItem): number => {
+  const value = Date.parse(task.finished_at ?? task.started_at ?? task.created_at ?? '');
+  return Number.isNaN(value) ? 0 : value;
+};
+
+export const sortTasks = (tasks: TaskItem[]): TaskItem[] =>
+  tasks.toSorted((left, right) => taskTimestamp(right) - taskTimestamp(left));

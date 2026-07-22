@@ -5,9 +5,6 @@ import { immer } from 'zustand/middleware/immer';
 /**
  * Workspace + node selection state.
  *
- * `currentWorkspaceId` is the canonical "which workspace is open" pointer;
- * the server `current.get` query only bootstraps this store.
- *
  * `activeNodeId` is the focused node that drives single-node surfaces;
  * `selectedNodeIds` is ordered membership for the tab strip and multi-node
  * tools. Semantic actions keep the active pointer valid without treating tab
@@ -18,19 +15,11 @@ import { immer } from 'zustand/middleware/immer';
  */
 
 interface SelectionState {
-  currentWorkspaceId: string | null;
   activeNodeId: string | null;
   selectedNodeIds: string[];
 }
 
 interface SelectionActions {
-  /**
-   * Set the active workspace id. Pass `null` to clear. Node selection is
-   * reset only by callers (the workspace-change effect in
-   * `useWorkspaceCore`); intentionally not bundled here so mutations that
-   * just rehydrate the same workspace don't clobber selection.
-   */
-  setCurrentWorkspaceId: (workspaceId: string | null) => void;
   /** Focus a selected node without changing ordered membership. */
   activateNode: (nodeId: string) => void;
   /** Reorder selected nodes while retaining every current member. */
@@ -60,16 +49,8 @@ const uniqueNodeIds = (nodeIds: readonly string[]): string[] =>
 export const useSelectionStore = create<SelectionStore>()(
   devtools(
     immer((set) => ({
-      currentWorkspaceId: null,
       activeNodeId: null,
       selectedNodeIds: [],
-
-      /** Used by workspace bootstrap and management mutations to change the active workspace. */
-      setCurrentWorkspaceId: (workspaceId) => {
-        set((state) => {
-          state.currentWorkspaceId = workspaceId;
-        });
-      },
 
       /** Used by data-table tab activation to focus a member without reordering tabs. */
       activateNode: (nodeId) => {

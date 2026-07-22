@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ChevronRightIcon,
   Download as DownloadIcon,
@@ -26,17 +26,24 @@ import {
   getVisibleDirectoryChildren,
 } from '../utils/fileTreeHelpers';
 import { formatBytes } from '../utils/format';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 interface FileMoveTarget {
   key: string;
   directoryPath: string;
 }
 
+const directoryPathsIn = (nodes: FileTreeNode[]): string[] =>
+  nodes.flatMap((node) =>
+    node.type === 'directory' ? [node.path, ...directoryPathsIn(node.children)] : [],
+  );
+
 export interface FileTreeProps {
   nodes: FileTreeNode[];
   selectedFile: string | null;
   loadingFiles: boolean;
   hasWorkspaceSelected: boolean;
+  workspaceId: string | null;
   onPreviewFile: (path: string) => void;
   onAddFile: (path: string) => void;
   onSelectFile: (path: string) => void;
@@ -47,6 +54,23 @@ export interface FileTreeProps {
   onMoveFile: (sourcePath: string, targetDirectoryPath: string) => Promise<void> | void;
 }
 
+interface FileTreeContentProps extends FileTreeProps {
+  collapsedStorageKey: string;
+}
+
+/** Remounts device-local folder presentation when its user/Workspace scope changes. */
+export function FileTree(props: FileTreeProps) {
+  const userId = useAuth().user?.id ?? '__anonymous__';
+  const collapsedStorageKey = `ldaca-wordflow-collapsed-folders-v2:${userId}:${props.workspaceId ?? '__none__'}`;
+  return (
+    <FileTreeContent
+      key={collapsedStorageKey}
+      {...props}
+      collapsedStorageKey={collapsedStorageKey}
+    />
+  );
+}
+
 /**
  * Renders the nested file browser for uploaded data. `DataLoaderFeature` uses
  * it for preview/add/download/delete actions plus drag-to-move file handling.
@@ -54,11 +78,12 @@ export interface FileTreeProps {
  * Flow: build rows from the browser tree, attach move/drop/create-folder handlers, and expose
  * add/preview/delete/download actions for selected files.
  */
-export function FileTree({
+function FileTreeContent({
   nodes,
   selectedFile,
   loadingFiles,
   hasWorkspaceSelected,
+  collapsedStorageKey,
   onPreviewFile,
   onAddFile,
   onSelectFile,
@@ -67,29 +92,46 @@ export function FileTree({
   onCreateFolderInside,
   onOpenCitation,
   onMoveFile,
-}: FileTreeProps) {
+}: FileTreeContentProps) {
   const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
   const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
 
-  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(() => {
+  const [storedCollapsedPaths, setStoredCollapsedPaths] = useState<Set<string>>(() => {
     try {
-      const persisted = localStorage.getItem('ldaca_wordflow_collapsed_folders');
+      const persisted = localStorage.getItem(collapsedStorageKey);
       return persisted ? new Set<string>(JSON.parse(persisted) as string[]) : new Set<string>();
     } catch {
       return new Set<string>();
     }
   });
+  const authoritativeDirectoryPaths = useMemo(() => new Set(directoryPathsIn(nodes)), [nodes]);
+  const collapsedPaths = useMemo(
+    () =>
+      new Set([...storedCollapsedPaths].filter((path) => authoritativeDirectoryPaths.has(path))),
+    [authoritativeDirectoryPaths, storedCollapsedPaths],
+  );
+
+  useEffect(() => {
+    if (collapsedPaths.size === storedCollapsedPaths.size) return;
+    try {
+      localStorage.setItem(collapsedStorageKey, JSON.stringify([...collapsedPaths]));
+    } catch {
+      // Device-local presentation persistence is best effort.
+    }
+  }, [collapsedPaths, collapsedStorageKey, storedCollapsedPaths.size]);
 
   const handleToggleCollapse = (path: string, isOpen: boolean) => {
-    setCollapsedPaths((prev) => {
-      const next = new Set(prev);
+    setStoredCollapsedPaths((previous) => {
+      const next = new Set(
+        [...previous].filter((candidate) => authoritativeDirectoryPaths.has(candidate)),
+      );
       if (isOpen) {
         next.delete(path);
       } else {
         next.add(path);
       }
       try {
-        localStorage.setItem('ldaca_wordflow_collapsed_folders', JSON.stringify(Array.from(next)));
+        localStorage.setItem(collapsedStorageKey, JSON.stringify(Array.from(next)));
       } catch (e) {
         console.error('Failed to persist collapsed folders:', e);
       }

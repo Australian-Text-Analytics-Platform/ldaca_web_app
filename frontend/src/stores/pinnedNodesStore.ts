@@ -17,6 +17,7 @@ interface PinnedNodesState {
   isPinned: (nodeId: string) => boolean;
   togglePinnedNode: (nodeId: string) => void;
   unpinNode: (nodeId: string) => void;
+  prune: (nodeIds: readonly string[]) => void;
   reset: () => void;
 }
 
@@ -44,6 +45,14 @@ export const usePinnedNodesStore = create<PinnedNodesState>()(
     unpinNode: (nodeId) => {
       set((state) => {
         state.pinnedNodeIds = state.pinnedNodeIds.filter((id) => id !== nodeId);
+      });
+    },
+
+    /** Discards pins whose authoritative Data Blocks no longer exist. */
+    prune: (nodeIds) => {
+      set((state) => {
+        const valid = new Set(nodeIds);
+        state.pinnedNodeIds = state.pinnedNodeIds.filter((id) => valid.has(id));
       });
     },
 

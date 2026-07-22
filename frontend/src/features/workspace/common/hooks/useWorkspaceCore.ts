@@ -1,8 +1,6 @@
-import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useSelectionStore } from '@/stores/selectionStore';
-import { useUIStore } from '@/stores/uiStore';
 
 /**
  * Reads the selection store fields the workspace feature owns.
@@ -12,8 +10,6 @@ import { useUIStore } from '@/stores/uiStore';
 const useSelectionSlice = () =>
   useSelectionStore(
     useShallow((state) => ({
-      currentWorkspaceId: state.currentWorkspaceId,
-      setCurrentWorkspaceId: state.setCurrentWorkspaceId,
       activeNodeId: state.activeNodeId,
       selectedNodeIds: state.selectedNodeIds,
       activateNode: state.activateNode,
@@ -26,22 +22,7 @@ const useSelectionSlice = () =>
   );
 
 /**
- * Reads operation loading helpers from the UI store.
- * Called only by useWorkspaceCore to avoid subscribing the workspace provider
- * to unrelated UI fields.
- */
-const useUISlice = () =>
-  useUIStore(
-    useShallow((state) => ({
-      loadingOperations: state.loadingOperations,
-      startOperation: state.startOperation,
-      endOperation: state.endOperation,
-    })),
-  );
-
-/**
- * Core workspace wiring for auth, current-workspace identity, semantic node
- * selection, and operation status. Data-view request state is intentionally
+ * Core workspace wiring for auth and semantic node selection. Data-view request state is intentionally
  * absent: `useWorkspaceDataTable` owns its per-node pagination/sort/filter
  * lifecycle and server query.
  * Used by: `useWorkspaceInternal`, which supplies these client-state inputs to
@@ -51,10 +32,8 @@ const useUISlice = () =>
  * selection actions, and operation helpers to the workspace orchestrator.
  */
 export const useWorkspaceCore = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const {
-    currentWorkspaceId,
-    setCurrentWorkspaceId,
     activeNodeId,
     selectedNodeIds,
     activateNode,
@@ -64,25 +43,10 @@ export const useWorkspaceCore = () => {
     toggleNode,
     clearSelection,
   } = useSelectionSlice();
-  const ui = useUISlice();
-
-  // Reset selection when the workspace changes. First render is
-  // skipped (previous ref starts as null) so we don't clobber the caller's
-  // freshly-chosen workspace.
-  const previousWorkspaceIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    const previous = previousWorkspaceIdRef.current;
-    if (previous === currentWorkspaceId) return;
-    if (previous !== null) clearSelection();
-    previousWorkspaceIdRef.current = currentWorkspaceId;
-  }, [clearSelection, currentWorkspaceId]);
 
   return {
     isAuthenticated,
-
-    currentWorkspaceId,
-    setCurrentWorkspaceId,
-
+    userId: user?.id ?? '__anonymous__',
     activeNodeId,
     selectedNodeIds,
     activateNode,
@@ -91,9 +55,5 @@ export const useWorkspaceCore = () => {
     replaceSelectedNodes,
     toggleNode,
     clearSelection,
-
-    loadingOperationCount: ui.loadingOperations.size,
-    startOperation: ui.startOperation,
-    endOperation: ui.endOperation,
   } as const;
 };

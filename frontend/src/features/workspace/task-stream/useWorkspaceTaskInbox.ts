@@ -1,119 +1,96 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect } from 'react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { getAnalysis, getUserFileImport, listAnalyses, listUserFileImports } from '@/api';
-import type { Analysis, CorruptAnalysis, UserFileImport } from '@/api';
-import { useAnalysisStore } from '@/stores/analysisStore';
+import type { AnalysisPage, UserFileImportPage, WorkspaceResource } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
-import type { TaskItem } from '@/stores/analysisStore';
+import { analysisToTask, importToTask, sortTasks, type TaskItem } from './taskProjection';
 import {
   type BackendEvent,
   useWorkspaceTaskStreamClient,
   type WorkspaceTaskStreamClientState,
 } from './useWorkspaceTaskStreamClient';
 
-const toTaskState = (state: Analysis['state']): TaskItem['state'] =>
-  state === 'succeeded' ? 'successful' : state;
+const ANALYSIS_PAGE_SIZE = 500;
+const IMPORT_PAGE_SIZE = 100;
 
-const failureMessage = (value: unknown): string | undefined => {
-  if (!value || typeof value !== 'object') return undefined;
-  const message = (value as { message?: unknown }).message;
-  return typeof message === 'string' ? message : undefined;
-};
+const nextPage = (page: { page: number; total_pages: number }): number | undefined =>
+  page.page < page.total_pages ? page.page + 1 : undefined;
 
-const toTaskItem = (
-  resource: Analysis | CorruptAnalysis | UserFileImport,
-  workspaceId?: string,
-): TaskItem => {
-  if ('request' in resource) {
-    const kind = resource.request.kind;
-    const progress = 'progress' in resource ? resource.progress : null;
-    return {
-      task_id: resource.id,
-      task_type: kind,
-      workspace_id: workspaceId,
-      state: toTaskState(resource.state),
-      progress: progress?.fraction ?? undefined,
-      progress_message: progress?.message ?? undefined,
-      message: failureMessage(resource.error) ?? progress?.message ?? undefined,
-      created_at: resource.created_at,
-      started_at: resource.started_at,
-      finished_at: resource.finished_at,
-      error: failureMessage(resource.error) ?? null,
-    };
-  }
-
-  return {
-    task_id: resource.id,
-    task_type: 'analysis_corrupt',
-    workspace_id: workspaceId,
-    state: 'failed',
-    message: 'This analysis record is corrupt and must be cleared.',
-    error: resource.code ?? 'analysis_corrupt',
-  };
-};
-
-const toImportTask = (resource: UserFileImport): TaskItem => {
-  const progress = resource.progress;
-  const taskType = resource.request.kind === 'sample' ? 'sample_import' : 'data_portal_import';
-  return {
-    task_id: resource.id,
-    task_type: taskType,
-    state: toTaskState(resource.state),
-    progress: progress.fraction ?? undefined,
-    progress_message: progress.message ?? undefined,
-    message: failureMessage(resource.error) ?? progress.message ?? undefined,
-    created_at: resource.created_at,
-    started_at: resource.started_at,
-    finished_at: resource.finished_at,
-    error: failureMessage(resource.error) ?? null,
-  };
-};
-
-const upsertTask = (task: TaskItem, previous: TaskItem[]): TaskItem[] => {
-  const next = previous.filter((entry) => entry.task_id !== task.task_id);
-  return [task, ...next].sort((left, right) => {
-    const leftTime = Date.parse(left.finished_at ?? left.started_at ?? left.created_at ?? '');
-    const rightTime = Date.parse(right.finished_at ?? right.started_at ?? right.created_at ?? '');
-    return rightTime - leftTime;
+/** Reads the complete Task Inbox projection directly from paginated backend resources. */
+export const useTaskResources = (workspaceId: string | null) => {
+  const analysesQuery = useInfiniteQuery({
+    queryKey: workspaceId ? queryKeys.workspaceAnalyses(workspaceId) : ['analyses', 'disabled'],
+    queryFn: async ({ pageParam }): Promise<AnalysisPage> => {
+      if (!workspaceId) throw new Error('Missing workspace ID');
+      const { data } = await listAnalyses({
+        path: { workspace_id: workspaceId },
+        query: { page: pageParam, page_size: ANALYSIS_PAGE_SIZE },
+        throwOnError: true,
+      });
+      return data;
+    },
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    enabled: Boolean(workspaceId),
   });
-};
 
-/** Rebuilds the task projection from authoritative resources after stream ready/resync. */
-const loadTasks = async (workspaceId: string | null): Promise<TaskItem[]> => {
-  const [importsResponse, analysesResponse] = await Promise.all([
-    listUserFileImports({ query: { page: 1, page_size: 100 }, throwOnError: true }),
-    workspaceId
-      ? listAnalyses({
-          path: { workspace_id: workspaceId },
-          query: { page: 1, page_size: 500 },
-          throwOnError: true,
-        })
-      : Promise.resolve(null),
-  ]);
-  const imports = importsResponse.data.items.map(toImportTask);
-  const analyses = analysesResponse
-    ? analysesResponse.data.items.map((analysis) => toTaskItem(analysis, workspaceId ?? undefined))
-    : [];
-  return [...imports, ...analyses];
-};
+  const importsQuery = useInfiniteQuery({
+    queryKey: queryKeys.userFileImports,
+    queryFn: async ({ pageParam }): Promise<UserFileImportPage> => {
+      const { data } = await listUserFileImports({
+        query: { page: pageParam, page_size: IMPORT_PAGE_SIZE },
+        throwOnError: true,
+      });
+      return data;
+    },
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+  });
+  const {
+    fetchNextPage: fetchNextAnalysisPage,
+    hasNextPage: hasNextAnalysisPage,
+    isFetchingNextPage: isFetchingNextAnalysisPage,
+  } = analysesQuery;
+  const {
+    fetchNextPage: fetchNextImportPage,
+    hasNextPage: hasNextImportPage,
+    isFetchingNextPage: isFetchingNextImportPage,
+  } = importsQuery;
 
-/** Connects authoritative analysis/import resources to the shared activity UI. */
-export const useWorkspaceTaskInbox = (
-  workspaceId: string | null,
-): WorkspaceTaskStreamClientState => {
-  const queryClient = useQueryClient();
-  const setTasks = useAnalysisStore((state) => state.setTasks);
-  const [transientError, setTransientError] = useState<string | null>(null);
-
-  const refreshTasks = useCallback(async () => {
-    try {
-      const tasks = await loadTasks(workspaceId);
-      setTasks(tasks);
-      setTransientError(null);
-    } catch (error) {
-      setTransientError(error instanceof Error ? error.message : 'Could not refresh activity');
+  useEffect(() => {
+    if (hasNextAnalysisPage && !isFetchingNextAnalysisPage) {
+      void fetchNextAnalysisPage();
     }
-  }, [setTasks, workspaceId]);
+  }, [fetchNextAnalysisPage, hasNextAnalysisPage, isFetchingNextAnalysisPage]);
+
+  useEffect(() => {
+    if (hasNextImportPage && !isFetchingNextImportPage) {
+      void fetchNextImportPage();
+    }
+  }, [fetchNextImportPage, hasNextImportPage, isFetchingNextImportPage]);
+
+  const analyses = workspaceId
+    ? (analysesQuery.data?.pages.flatMap((page) => page.items) ?? []).map((analysis) =>
+        analysisToTask(analysis, workspaceId),
+      )
+    : [];
+  const imports = (importsQuery.data?.pages.flatMap((page) => page.items) ?? []).map(importToTask);
+  const error = analysesQuery.error ?? importsQuery.error;
+
+  return {
+    tasks: sortTasks([...analyses, ...imports]),
+    error: error?.message ?? null,
+  } as const;
+};
+
+export interface WorkspaceTaskInboxState extends WorkspaceTaskStreamClientState {
+  tasks: TaskItem[];
+}
+
+/** Connects backend events to the same Query resources projected by the Task Inbox. */
+export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTaskInboxState => {
+  const queryClient = useQueryClient();
+  const { tasks, error: resourceError } = useTaskResources(workspaceId);
 
   const refreshResource = useCallback(
     async (event: Extract<BackendEvent, { type: 'resource_changed' | 'resource_progress' }>) => {
@@ -124,7 +101,15 @@ export const useWorkspaceTaskInbox = (
             path: { workspace_id: workspaceId, analysis_id: event.resource_id },
             throwOnError: true,
           });
-          setTasks((previous) => upsertTask(toTaskItem(data, workspaceId), previous));
+          queryClient.setQueryData(queryKeys.analysis(workspaceId, event.resource_id), data);
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.workspaceAnalyses(workspaceId),
+          });
+          if (data.state === 'succeeded') {
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.analysisResults(workspaceId, event.resource_id),
+            });
+          }
         } catch (error) {
           console.warn('Could not refresh analysis activity', error);
         }
@@ -137,7 +122,8 @@ export const useWorkspaceTaskInbox = (
             path: { import_id: event.resource_id },
             throwOnError: true,
           });
-          setTasks((previous) => upsertTask(toImportTask(data), previous));
+          queryClient.setQueryData(queryKeys.userFileImport(event.resource_id), data);
+          void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
           if (data.state === 'succeeded') {
             void queryClient.invalidateQueries({ queryKey: queryKeys.files });
           }
@@ -146,22 +132,23 @@ export const useWorkspaceTaskInbox = (
         }
       }
     },
-    [queryClient, setTasks, workspaceId],
+    [queryClient, workspaceId],
   );
 
   const removeResource = useCallback(
     (event: Extract<BackendEvent, { type: 'resource_removed' }>) => {
-      if (
-        event.resource_type === 'analysis' &&
-        workspaceId &&
-        event.workspace_id !== null &&
-        event.workspace_id !== workspaceId
-      ) {
-        return;
+      if (event.resource_type === 'analysis') {
+        if (!workspaceId || (event.workspace_id && event.workspace_id !== workspaceId)) return;
+        queryClient.removeQueries({
+          queryKey: queryKeys.analysisSession(workspaceId, event.resource_id),
+        });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceAnalyses(workspaceId) });
+      } else if (event.resource_type === 'user_file_import') {
+        queryClient.removeQueries({ queryKey: queryKeys.userFileImport(event.resource_id) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
       }
-      setTasks((previous) => previous.filter((task) => task.task_id !== event.resource_id));
     },
-    [setTasks, workspaceId],
+    [queryClient, workspaceId],
   );
 
   const handleEvent = useCallback(
@@ -169,43 +156,62 @@ export const useWorkspaceTaskInbox = (
       switch (event.type) {
         case 'stream_ready':
         case 'resync_required':
-          void refreshTasks();
+          void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+          if (workspaceId) {
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.workspaceAnalyses(workspaceId),
+            });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
+          }
           break;
         case 'resource_changed':
         case 'resource_progress':
           void refreshResource(event);
-          if (
-            event.resource_type === 'workspace' &&
-            workspaceId &&
-            event.workspace_id === workspaceId
-          ) {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(workspaceId) });
-            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceNodes(workspaceId) });
+          if (event.resource_type === 'tab' && workspaceId && event.workspace_id === workspaceId) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
+          }
+          if (event.resource_type === 'workspace') {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+            if (workspaceId && event.workspace_id === workspaceId) {
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.workspaceGraph(workspaceId),
+              });
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.workspaceTabs(workspaceId),
+              });
+            }
           }
           break;
         case 'resource_removed':
           removeResource(event);
-          if (event.resource_type === 'workspace' && event.workspace_id === workspaceId) {
+          if (event.resource_type === 'tab' && workspaceId && event.workspace_id === workspaceId) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
+          }
+          if (event.resource_type === 'workspace') {
             void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
           }
           break;
         case 'workspace_runtime_changed':
+          queryClient.setQueryData<WorkspaceResource[]>(queryKeys.workspaces, (previous) =>
+            previous?.map((workspace) =>
+              workspace.id === event.workspace_id
+                ? { ...workspace, runtime_state: event.runtime_state }
+                : workspace,
+            ),
+          );
           if (event.workspace_id === workspaceId) {
             void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(workspaceId) });
-            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceNodes(workspaceId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
           }
           break;
       }
     },
-    [queryClient, refreshResource, refreshTasks, removeResource, workspaceId],
+    [queryClient, refreshResource, removeResource, workspaceId],
   );
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Initial synchronization hydrates the store from the backend resource list. */
-  useEffect(() => {
-    void refreshTasks();
-  }, [refreshTasks]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   const clientState = useWorkspaceTaskStreamClient({ enabled: true, onEvent: handleEvent });
-  return transientError ? { ...clientState, status: 'error', error: transientError } : clientState;
+  return resourceError
+    ? { ...clientState, tasks, status: 'error', error: resourceError }
+    : { ...clientState, tasks };
 };

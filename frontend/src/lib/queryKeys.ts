@@ -5,6 +5,8 @@ export interface NodeDataRequest {
   descending: boolean;
 }
 
+export type AnalysisResultQueryKey = Readonly<Record<string, unknown>>;
+
 /**
  * Builds the complete node-data query shape used by SQL and cache identity.
  * Used by: Data View plus node-page consumers such as annotation and language
@@ -35,18 +37,34 @@ export const queryKeys = {
   /** All workspace-related queries (broad invalidation). */
   workspaces: ['workspaces'] as const,
 
-  /** Nodes list for a workspace; invalidated after graph-changing workspace mutations. */
-  workspaceNodes: (workspaceId: string) => ['workspaces', workspaceId, 'nodes'] as const,
+  /** Every cached server resource owned by one Analysis session. */
+  analysisSession: (workspaceId: string, analysisId: string) =>
+    ['workspaces', workspaceId, 'analyses', analysisId] as const,
 
-  /** Paginated node data keyed by the exact generated request query. */
-  /**
-   * Returns the node-data prefix for broad invalidation, or appends
-   * page/sort/filter values for a concrete table request.
-   */
-  nodeData: (workspaceId: string, nodeId: string, request?: NodeDataRequest) => {
-    const base = ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const;
-    return request ? ([...base, request] as const) : base;
-  },
+  /** Stable paginated list of Analyses owned by one Workspace. */
+  workspaceAnalyses: (workspaceId: string) =>
+    ['workspaces', workspaceId, 'analyses', 'list'] as const,
+
+  /** Canonical lifecycle and immutable request for one Analysis. */
+  analysis: (workspaceId: string, analysisId: string) =>
+    ['workspaces', workspaceId, 'analyses', analysisId, 'resource'] as const,
+
+  /** Every output projection belonging to one successful Analysis. */
+  analysisResults: (workspaceId: string, analysisId: string) =>
+    ['workspaces', workspaceId, 'analyses', analysisId, 'results'] as const,
+
+  /** Output-only Result keyed by the complete projection query. */
+  analysisResult: (workspaceId: string, analysisId: string, query?: AnalysisResultQueryKey) =>
+    [...queryKeys.analysisResults(workspaceId, analysisId), query ?? { kind: 'default' }] as const,
+
+  /** Paginated user-owned file imports shown in the Task Inbox. */
+  userFileImports: ['user-file-imports', 'list'] as const,
+
+  /** One authoritative user-owned file import resource. */
+  userFileImport: (importId: string) => ['user-file-imports', importId] as const,
+
+  /** All durable Tabs for one Workspace, shared by every analysis view. */
+  workspaceTabs: (workspaceId: string) => ['workspaces', workspaceId, 'tabs'] as const,
 
   /** Workspace SQL pages include every declared Data Block dependency. */
   workspaceSql: (
@@ -57,32 +75,22 @@ export const queryKeys = {
     pageSize: number,
   ) => ['workspaces', workspaceId, 'sql', { nodeIds: [...nodeIds], sql, page, pageSize }] as const,
 
-  /** Authoritative Arrow schema for one data block. */
-  nodeSchema: (workspaceId: string, nodeId: string) =>
-    ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
+  /** Infinite SQL projection whose page identity is owned by TanStack Query's page params. */
+  workspaceSqlInfinite: (workspaceId: string, nodeIds: string[], sql: string, pageSize: number) =>
+    ['workspaces', workspaceId, 'sql', { nodeIds: [...nodeIds], sql, pageSize }] as const,
 
-  /** Annotation class-description rows for one selected class table node. */
-  annotationClassDescriptions: (
-    workspaceId: string,
-    nodeId: string,
-    classColumn: string,
-    descriptionColumn: string,
-  ) =>
+  /** Complete multi-page SQL projection drained into one immutable resource. */
+  workspaceSqlDrain: (workspaceId: string, nodeIds: string[], sql: string, pageSize: number) =>
     [
       'workspaces',
       workspaceId,
-      'annotation',
-      'class-descriptions',
-      nodeId,
-      classColumn,
-      descriptionColumn,
+      'sql',
+      { mode: 'drain', nodeIds: [...nodeIds], sql, pageSize },
     ] as const,
 
-  /**
-   * Full backend node metadata excluding its Arrow schema.
-   */
-  nodeInfo: (workspaceId: string, nodeId: string) =>
-    ['workspaces', workspaceId, 'nodes', nodeId, 'info'] as const,
+  /** Authoritative Arrow schema for one data block. */
+  nodeSchema: (workspaceId: string, nodeId: string) =>
+    ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
 
   /** Batched backend node info for selectors that need metadata for several nodes at once. */
   nodeInfos: (workspaceId: string, nodeIds: string[]) =>
@@ -103,8 +111,4 @@ export const queryKeys = {
   /** Per-column unique-value counts (used by sequential-analysis). */
   columnUniqueValues: (workspaceId: string, nodeId: string, columnName: string) =>
     ['workspaces', workspaceId, 'nodes', nodeId, 'columns', columnName, 'unique-values'] as const,
-
-  /** Per-(analysisType, workspace) last-run request used by Run/Re-run diffing. */
-  analysisLastRunRequest: (analysisType: string, workspaceId: string | null) =>
-    ['analysis', analysisType, 'last-run-request', workspaceId] as const,
 };

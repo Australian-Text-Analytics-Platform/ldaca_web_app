@@ -91,11 +91,7 @@ const guidanceStyles = {
   },
 } satisfies NonNullable<JoyrideProps['styles']>;
 
-function ContextualHintTooltip({
-  primaryProps,
-  step,
-  tooltipProps,
-}: TooltipRenderProps) {
+function ContextualHintTooltip({ primaryProps, step, tooltipProps }: TooltipRenderProps) {
   const requestDisable = useContext(DisableContextualHintsContext);
   const { content, styles, title } = step;
 

@@ -19,7 +19,6 @@ import {
   invalidateWorkspaceGraphQuery,
   invalidateWorkspaceSummaries,
 } from './workspaceMutationCache';
-import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceGraphMutationsParams {
   currentWorkspaceId: string | null;
@@ -27,8 +26,6 @@ interface WorkspaceGraphMutationsParams {
   replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
   clearSelection: () => void;
   queryClient: QueryClient;
-  startOperation: (operationId: string) => void;
-  endOperation: (operationId: string) => void;
 }
 
 /** Complete identity and transport context for a cancellable stack preview. */
@@ -56,8 +53,6 @@ export const useWorkspaceGraphMutations = ({
   replaceSelectedNodes,
   clearSelection,
   queryClient,
-  startOperation,
-  endOperation,
 }: WorkspaceGraphMutationsParams) => {
   const ensureWorkspaceSelected = () => {
     if (!currentWorkspaceId) {
@@ -65,12 +60,8 @@ export const useWorkspaceGraphMutations = ({
     }
     return currentWorkspaceId;
   };
-  const operationLifecycle = createWorkspaceOperationLifecycle({
-    startOperation,
-    endOperation,
-  });
-
   const renameNodeMutation = useMutation({
+    mutationKey: ['workspace', 'rename-node'],
     mutationFn: ({ nodeId, newName }: { nodeId: string; newName: string }) =>
       updateNode({
         body: { name: newName },
@@ -79,14 +70,13 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => {
         return data;
       }),
-    onMutate: operationLifecycle.onMutate('renameNode'),
-    onSuccess: operationLifecycle.onSuccess('renameNode', () => {
+    onSuccess: () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
-    }),
-    onError: operationLifecycle.onError('renameNode'),
+    },
   });
 
   const copyNodeMutation = useMutation({
+    mutationKey: ['workspace', 'copy-node'],
     mutationFn: ({ nodeId }: { nodeId: string }) =>
       createNode({
         body: { kind: 'clone', source_node_id: nodeId },
@@ -95,15 +85,14 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => {
         return data;
       }),
-    onMutate: operationLifecycle.onMutate('copyNode'),
-    onSuccess: operationLifecycle.onSuccess('copyNode', () => {
+    onSuccess: () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       invalidateWorkspaceSummaries(queryClient);
-    }),
-    onError: operationLifecycle.onError('copyNode'),
+    },
   });
 
   const setNodeColorMutation = useMutation({
+    mutationKey: ['workspace', 'set-node-color'],
     mutationFn: ({ nodeId, color }: { nodeId: string; color: string }) =>
       updateNode({
         body: { color },
@@ -112,16 +101,15 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => {
         return data;
       }),
-    onMutate: operationLifecycle.onMutate('setNodeColor'),
-    onSuccess: operationLifecycle.onSuccess('setNodeColor', (_data, { nodeId }) => {
+    onSuccess: (_data, { nodeId }) => {
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
         includeNodeInfo: true,
       });
-    }),
-    onError: operationLifecycle.onError('setNodeColor'),
+    },
   });
 
   const deleteNodeMutation = useMutation({
+    mutationKey: ['workspace', 'delete-node'],
     mutationFn: ({ nodeId }: { nodeId: string }) =>
       deleteNode({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
@@ -130,18 +118,17 @@ export const useWorkspaceGraphMutations = ({
         if (data !== undefined) throw new Error('Node deletion returned a body');
         return undefined;
       }),
-    onMutate: operationLifecycle.onMutate('deleteNode'),
-    onSuccess: operationLifecycle.onSuccess('deleteNode', (_, { nodeId }) => {
+    onSuccess: (_, { nodeId }) => {
       removeNode(nodeId);
       invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
         includeData: true,
       });
       invalidateWorkspaceSummaries(queryClient);
-    }),
-    onError: operationLifecycle.onError('deleteNode'),
+    },
   });
 
   const createNodeMutation = useMutation({
+    mutationKey: ['workspace', 'create-node'],
     mutationFn: ({ filename, sheetName }: { filename: string; sheetName?: string }) =>
       createNode({
         path: { workspace_id: ensureWorkspaceSelected() },
@@ -150,8 +137,7 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => {
         return data;
       }),
-    onMutate: operationLifecycle.onMutate('createNode'),
-    onSuccess: operationLifecycle.onSuccess('createNode', (response: NodeInfoResponse) => {
+    onSuccess: (response: NodeInfoResponse) => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       invalidateWorkspaceSummaries(queryClient);
       const changes = response.dtype_normalization;
@@ -168,11 +154,11 @@ export const useWorkspaceGraphMutations = ({
           duration: 10000,
         });
       }
-    }),
-    onError: operationLifecycle.onError('createNode'),
+    },
   });
 
   const joinNodesMutation = useMutation({
+    mutationKey: ['workspace', 'join-nodes'],
     mutationFn: ({
       leftNodeId,
       rightNodeId,
@@ -203,17 +189,17 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => {
         return data;
       }),
-    onMutate: operationLifecycle.onMutate('joinNodes', () => {
+    onMutate: () => {
       clearSelection();
-    }),
-    onSuccess: operationLifecycle.onSuccess('joinNodes', (createdNode: NodeInfoResponse) => {
+    },
+    onSuccess: (createdNode: NodeInfoResponse) => {
       replaceSelectedNodes([createdNode.id], createdNode.id);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
-    }),
-    onError: operationLifecycle.onError('joinNodes'),
+    },
   });
 
   const concatNodesMutation = useMutation({
+    mutationKey: ['workspace', 'concat-nodes'],
     mutationFn: ({
       nodeIds,
       newNodeName,
@@ -230,14 +216,13 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => {
         return data;
       }),
-    onMutate: operationLifecycle.onMutate('concatNodes', () => {
+    onMutate: () => {
       clearSelection();
-    }),
-    onSuccess: operationLifecycle.onSuccess('concatNodes', (createdNode: NodeInfoResponse) => {
+    },
+    onSuccess: (createdNode: NodeInfoResponse) => {
       replaceSelectedNodes([createdNode.id], createdNode.id);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
-    }),
-    onError: operationLifecycle.onError('concatNodes'),
+    },
   });
 
   const reorderNodesMutation = useMutation<
@@ -246,6 +231,7 @@ export const useWorkspaceGraphMutations = ({
     { orderedIds: string[] },
     { previousGraph: WorkspaceGraphResponse | undefined }
   >({
+    mutationKey: ['workspace', 'reorder-nodes'],
     mutationFn: ({ orderedIds }: { orderedIds: string[] }) => {
       if (!currentWorkspaceId) {
         throw new Error('No workspace selected');
@@ -256,7 +242,7 @@ export const useWorkspaceGraphMutations = ({
         throwOnError: true,
       }).then(() => undefined);
     },
-    onMutate: operationLifecycle.onMutate('reorderNodes', async ({ orderedIds }) => {
+    onMutate: async ({ orderedIds }) => {
       if (!currentWorkspaceId) {
         return { previousGraph: undefined };
       }
@@ -276,18 +262,18 @@ export const useWorkspaceGraphMutations = ({
         });
       }
       return { previousGraph };
-    }),
-    onSuccess: operationLifecycle.onSuccess('reorderNodes', () => {
+    },
+    onSuccess: () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
-    }),
-    onError: operationLifecycle.onError('reorderNodes', (_error, _vars, context) => {
+    },
+    onError: (_error, _vars, context) => {
       if (currentWorkspaceId && context?.previousGraph) {
         queryClient.setQueryData(
           queryKeys.workspaceGraph(currentWorkspaceId),
           context.previousGraph,
         );
       }
-    }),
+    },
   });
 
   const actions = useMemo(

@@ -1,5 +1,4 @@
 import { Suspense, lazy } from 'react';
-import { useDevicePreferencesInit } from '@/features/preferences/useUserPreferences';
 import { useSidebarResize } from '@/hooks/useSidebarResize';
 import { useRightPanelResize } from '@/hooks/useRightPanelResize';
 import { QueryProvider } from '@/providers/QueryProvider';
@@ -28,7 +27,6 @@ export function WorkspaceShell() {
 }
 
 function WorkspaceShellContent() {
-  useDevicePreferencesInit();
   const currentView = useUIStore((s) => s.currentView);
   const isTabbedMain = isTabbedMainView(currentView);
 

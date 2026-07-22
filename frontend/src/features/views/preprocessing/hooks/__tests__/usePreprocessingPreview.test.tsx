@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PreviewPagination } from '../../types';
 import { usePreprocessingPreview } from '../usePreprocessingPreview';
@@ -12,7 +14,18 @@ const pagination = (page: number, pageSize = 10): PreviewPagination => ({
 const flushPreviewTimer = async (ms: number) => {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
+    await Promise.resolve();
+    await vi.runOnlyPendingTimersAsync();
   });
+};
+
+const createWrapper = () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
 };
 
 describe('usePreprocessingPreview', () => {
@@ -28,13 +41,15 @@ describe('usePreprocessingPreview', () => {
       pagination: pagination(1),
     });
 
-    const { result } = renderHook(() =>
-      usePreprocessingPreview({
-        request: { nodeId: 'node-1' },
-        signature: 'node-1::preview',
-        debounceMs: 25,
-        fetcher,
-      }),
+    const { result } = renderHook(
+      () =>
+        usePreprocessingPreview({
+          request: { nodeId: 'node-1' },
+          signature: 'node-1::preview',
+          debounceMs: 25,
+          fetcher,
+        }),
+      { wrapper: createWrapper() },
     );
 
     expect(fetcher).not.toHaveBeenCalled();
@@ -47,7 +62,9 @@ describe('usePreprocessingPreview', () => {
       pageSize: 10,
       signal: expect.any(AbortSignal),
     });
-    expect(result.current.data).toEqual([{ token: 'hello' }]);
+    await vi.waitFor(() => {
+      expect(result.current.data).toEqual([{ token: 'hello' }]);
+    });
     expect(result.current.columns).toEqual(['token']);
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
@@ -74,7 +91,7 @@ describe('usePreprocessingPreview', () => {
           debounceMs: 25,
           fetcher,
         }),
-      { initialProps: { fetcher: firstFetcher } },
+      { initialProps: { fetcher: firstFetcher }, wrapper: createWrapper() },
     );
 
     rerender({ fetcher: secondFetcher });
@@ -82,7 +99,9 @@ describe('usePreprocessingPreview', () => {
 
     expect(firstFetcher).not.toHaveBeenCalled();
     expect(secondFetcher).toHaveBeenCalledTimes(1);
-    expect(result.current.data).toEqual([{ token: 'second' }]);
+    await vi.waitFor(() => {
+      expect(result.current.data).toEqual([{ token: 'second' }]);
+    });
   });
 
   it('resets to page one when page size changes', async () => {
@@ -93,13 +112,15 @@ describe('usePreprocessingPreview', () => {
       pagination: pagination(1, 10),
     });
 
-    const { result } = renderHook(() =>
-      usePreprocessingPreview({
-        request: { nodeId: 'node-1' },
-        signature: 'node-1::preview',
-        debounceMs: 25,
-        fetcher,
-      }),
+    const { result } = renderHook(
+      () =>
+        usePreprocessingPreview({
+          request: { nodeId: 'node-1' },
+          signature: 'node-1::preview',
+          debounceMs: 25,
+          fetcher,
+        }),
+      { wrapper: createWrapper() },
     );
 
     await flushPreviewTimer(25);
@@ -143,11 +164,13 @@ describe('usePreprocessingPreview', () => {
           debounceMs: 25,
           fetcher,
         }),
-      { initialProps },
+      { initialProps, wrapper: createWrapper() },
     );
 
     await flushPreviewTimer(25);
-    expect(result.current.data).toEqual([{ token: 'hello' }]);
+    await vi.waitFor(() => {
+      expect(result.current.data).toEqual([{ token: 'hello' }]);
+    });
 
     rerender({ request: null });
 
@@ -190,7 +213,7 @@ describe('usePreprocessingPreview', () => {
           debounceMs: 0,
           fetcher,
         }),
-      { initialProps: { workspaceId: 'workspace-1' } },
+      { initialProps: { workspaceId: 'workspace-1' }, wrapper: createWrapper() },
     );
 
     await flushPreviewTimer(0);
@@ -201,7 +224,9 @@ describe('usePreprocessingPreview', () => {
 
     expect(firstSignal.aborted).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(result.current.data).toEqual([{ workspace: 'workspace-2' }]);
+    await vi.waitFor(() => {
+      expect(result.current.data).toEqual([{ workspace: 'workspace-2' }]);
+    });
 
     await act(async () => {
       resolveFirst?.({

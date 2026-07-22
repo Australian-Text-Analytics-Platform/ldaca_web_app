@@ -5,12 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   userPreferencesKey,
-  useDevicePreferencesInit,
   useUpdateUserPreferences,
   useUserPreferences,
 } from '../useUserPreferences';
 import type { UserPreferences } from '@/api';
-import { useDevicePreferencesStore } from '@/stores/preferencesStore';
 
 const fixture = vi.hoisted(() => ({
   userId: 'user-1' as string | null,
@@ -66,7 +64,6 @@ describe('user preferences hooks', () => {
     fixture.updatePreferences.mockImplementation(({ body }: { body: Partial<UserPreferences> }) =>
       Promise.resolve({ data: preferences(body) }),
     );
-    useDevicePreferencesStore.setState({ userId: null, lastWorkspaceId: null });
     localStorage.clear();
   });
 
@@ -121,19 +118,5 @@ describe('user preferences hooks', () => {
       ).toBe(true),
     );
     expect(fixture.toastError).toHaveBeenCalledWith('save failed');
-  });
-
-  it('resets device-only preferences when the authenticated user changes', async () => {
-    const { wrapper } = setupClient();
-    const view = renderHook(() => useDevicePreferencesInit(), { wrapper });
-
-    await waitFor(() => expect(useDevicePreferencesStore.getState().userId).toBe('user-1'));
-    useDevicePreferencesStore.getState().setLastWorkspaceId('workspace-1');
-
-    fixture.userId = 'user-2';
-    view.rerender();
-
-    await waitFor(() => expect(useDevicePreferencesStore.getState().userId).toBe('user-2'));
-    expect(useDevicePreferencesStore.getState().lastWorkspaceId).toBeNull();
   });
 });

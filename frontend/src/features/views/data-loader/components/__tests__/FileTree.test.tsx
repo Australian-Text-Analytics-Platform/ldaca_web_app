@@ -11,6 +11,7 @@ describe('FileTree workspace routing', () => {
         selectedFile={null}
         loadingFiles={false}
         hasWorkspaceSelected={false}
+        workspaceId={null}
         onPreviewFile={vi.fn()}
         onAddFile={onAddFile}
         onSelectFile={vi.fn()}
@@ -31,9 +32,7 @@ describe('FileTree workspace routing', () => {
       '@container/file-row',
       'flex-wrap',
     );
-    expect(
-      screen.getByRole('button', { name: 'Download records.csv' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download records.csv' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete records.csv' })).toBeInTheDocument();
     fireEvent.click(addButton);
     expect(onAddFile).not.toHaveBeenCalled();
@@ -46,6 +45,7 @@ describe('FileTree workspace routing', () => {
         selectedFile={null}
         loadingFiles={false}
         hasWorkspaceSelected
+        workspaceId="workspace-1"
         onPreviewFile={vi.fn()}
         onAddFile={vi.fn()}
         onSelectFile={vi.fn()}

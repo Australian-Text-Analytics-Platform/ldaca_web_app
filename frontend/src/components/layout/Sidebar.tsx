@@ -23,7 +23,6 @@ import { cn } from '@/lib/utils';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceTaskInbox } from '@/features/workspace/task-stream/useWorkspaceTaskInbox';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { tutorialIndexTarget } from '@/tutorials/documentationRegistry';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -124,8 +123,8 @@ function Sidebar() {
     queryClient.clear();
     await logout();
   };
-  const tasks = useAnalysisStore((state) => state.tasks);
   const {
+    tasks,
     status: taskStreamStatus,
     error: taskStreamError,
     reconnect: reconnectTaskStream,

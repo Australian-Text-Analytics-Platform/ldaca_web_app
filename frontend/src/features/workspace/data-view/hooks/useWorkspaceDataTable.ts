@@ -187,6 +187,13 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const nodeTableRequest = tableStateKey
     ? (requestByNode[tableStateKey] ?? DEFAULT_NODE_TABLE_REQUEST)
     : DEFAULT_NODE_TABLE_REQUEST;
+  const nodeTableSql = activeNodeId
+    ? `SELECT * FROM ${sqlTable(activeNodeId)}${
+        nodeTableRequest.sort_by
+          ? ` ORDER BY ${sqlOrder(nodeTableRequest.sort_by, nodeTableRequest.descending)}`
+          : ''
+      }`
+    : '';
 
   /**
    * Updates the active table request without coupling it to selection state.
@@ -204,7 +211,13 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   };
 
   const nodeDataQuery = useQuery({
-    queryKey: queryKeys.nodeData(currentWorkspaceId ?? '', activeNodeId ?? '', nodeTableRequest),
+    queryKey: queryKeys.workspaceSql(
+      currentWorkspaceId ?? '',
+      activeNodeId ? [activeNodeId] : [],
+      nodeTableSql,
+      nodeTableRequest.page,
+      nodeTableRequest.page_size,
+    ),
     enabled: Boolean(currentWorkspaceId && activeNodeId),
     /**
      * Fetches the active node page for `WorkspaceTable`.
@@ -216,17 +229,12 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       if (!currentWorkspaceId || !activeNodeId) {
         throw new Error('Missing workspace or node ID');
       }
-      const sql = `SELECT * FROM ${sqlTable(activeNodeId)}${
-        nodeTableRequest.sort_by
-          ? ` ORDER BY ${sqlOrder(nodeTableRequest.sort_by, nodeTableRequest.descending)}`
-          : ''
-      }`;
       const data = await queryWorkspaceSqlTable({
         path: { workspace_id: currentWorkspaceId },
         body: {
           mode: 'query',
           node_ids: [activeNodeId],
-          sql,
+          sql: nodeTableSql,
           page: nodeTableRequest.page,
           page_size: nodeTableRequest.page_size,
         },

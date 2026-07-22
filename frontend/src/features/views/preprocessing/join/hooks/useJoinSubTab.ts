@@ -198,12 +198,9 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const preferredJoinColumn = sharedColumns[0];
   const joinPairSignature =
     joinLeftNodeId && joinRightNodeId && leftColumns.length > 0 && rightColumns.length > 0
-      ? [
-          joinLeftNodeId,
-          joinRightNodeId,
-          columnsKey(leftColumns),
-          columnsKey(rightColumns),
-        ].join('\0')
+      ? [joinLeftNodeId, joinRightNodeId, columnsKey(leftColumns), columnsKey(rightColumns)].join(
+          '\0',
+        )
       : '';
   const initializedJoinPairRef = useRef<string | null>(null);
   const selectedLeftColumn = selectedNodeColumns[joinLeftNodeId] ?? '';
@@ -221,8 +218,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     if (!preferredJoinColumn) return;
 
     const alreadyUsesFirstShared =
-      selectedLeftColumn === preferredJoinColumn &&
-      selectedRightColumn === preferredJoinColumn;
+      selectedLeftColumn === preferredJoinColumn && selectedRightColumn === preferredJoinColumn;
     const stillUsesInitialDefaults =
       (!selectedLeftColumn || selectedLeftColumn === defaultLeftColumn) &&
       (!selectedRightColumn || selectedRightColumn === defaultRightColumn);

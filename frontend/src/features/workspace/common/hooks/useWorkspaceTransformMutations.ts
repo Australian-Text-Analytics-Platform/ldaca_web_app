@@ -1,7 +1,19 @@
 import { useMemo } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
-import { createNode, editNode, previewNodeCreationTable, redoNode, undoNode } from '@/api';
-import type { CreateNodeData, EditNodeData, PreviewNodeCreationData } from '@/api';
+import {
+  createNode,
+  createWorkspaceSqlDataBlock,
+  editNode,
+  previewNodeCreationTable,
+  redoNode,
+  undoNode,
+} from '@/api';
+import type {
+  AnnotationClassRow,
+  CreateNodeData,
+  EditNodeData,
+  PreviewNodeCreationData,
+} from '@/api';
 import type { PolarsExpressionRequest } from '@/api';
 import type { FilterRequest as FilterRequestPayload } from '@/features/views/preprocessing/types';
 import type { SliceRequestPayload } from '@/features/views/preprocessing/slice/hooks/sliceFormModel';
@@ -11,13 +23,10 @@ import {
   invalidateNodeWorkspaceQueries,
   invalidateWorkspaceGraphQuery,
 } from './workspaceMutationCache';
-import { createWorkspaceOperationLifecycle } from './workspaceMutationLifecycle';
 
 interface WorkspaceTransformMutationsParams {
   currentWorkspaceId: string | null;
   queryClient: QueryClient;
-  startOperation: (operationId: string) => void;
-  endOperation: (operationId: string) => void;
 }
 
 /** Complete identity and transport context for one cancellable preprocessing preview. */
@@ -52,8 +61,6 @@ const toPreviewResponse = (
 export const useWorkspaceTransformMutations = ({
   currentWorkspaceId,
   queryClient,
-  startOperation,
-  endOperation,
 }: WorkspaceTransformMutationsParams) => {
   const requireNode = <T>(value: T | undefined): T => {
     if (value === undefined) throw new Error('Node operation returned no resource');
@@ -65,11 +72,6 @@ export const useWorkspaceTransformMutations = ({
     }
     return currentWorkspaceId;
   };
-  const operationLifecycle = createWorkspaceOperationLifecycle({
-    startOperation,
-    endOperation,
-  });
-
   type NodeCreateBody = NonNullable<CreateNodeData['body']>;
   type NodeEditBody = NonNullable<EditNodeData['body']>;
   type NodePreviewBody = NonNullable<PreviewNodeCreationData['body']>;
@@ -145,6 +147,7 @@ export const useWorkspaceTransformMutations = ({
   };
 
   const filterNodeMutation = useMutation({
+    mutationKey: ['workspace', 'filter-node'],
     mutationFn: ({
       nodeId,
       request,
@@ -168,18 +171,17 @@ export const useWorkspaceTransformMutations = ({
       ).then(({ data }) => {
         requireNode(data);
       }),
-    onMutate: operationLifecycle.onMutate('filterNode'),
-    onSuccess: operationLifecycle.onSuccess('filterNode', (_response, variables) => {
+    onSuccess: (_response, variables) => {
       if (variables.mode === 'update') {
         invalidateEditedNode(variables.nodeId);
       } else {
         invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       }
-    }),
-    onError: operationLifecycle.onError('filterNode'),
+    },
   });
 
   const replaceTextMutation = useMutation({
+    mutationKey: ['workspace', 'replace-text'],
     mutationFn: ({
       nodeId,
       request,
@@ -201,32 +203,30 @@ export const useWorkspaceTransformMutations = ({
             throwOnError: true,
           })
       ).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('replaceText'),
-    onSuccess: operationLifecycle.onSuccess('replaceText', (_response, variables) => {
+    onSuccess: (_response, variables) => {
       if (variables.mode === 'update') {
         invalidateEditedNode(variables.nodeId);
       } else {
         invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       }
-    }),
-    onError: operationLifecycle.onError('replaceText'),
+    },
   });
 
   const sliceNodeMutation = useMutation({
+    mutationKey: ['workspace', 'slice-node'],
     mutationFn: ({ nodeId, request }: { nodeId: string; request: SliceRequestPayload }) =>
       createNode({
         body: sliceBody(nodeId, request),
         path: { workspace_id: ensureWorkspaceSelected() },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('sliceNode'),
-    onSuccess: operationLifecycle.onSuccess('sliceNode', () => {
+    onSuccess: () => {
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
-    }),
-    onError: operationLifecycle.onError('sliceNode'),
+    },
   });
 
   const castNodeMutation = useMutation({
+    mutationKey: ['workspace', 'cast-node'],
     mutationFn: ({
       nodeId,
       column,
@@ -248,14 +248,13 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('castNode'),
-    onSuccess: operationLifecycle.onSuccess('castNode', (_data, variables) => {
+    onSuccess: (_data, variables) => {
       invalidateEditedNode(variables.nodeId);
-    }),
-    onError: operationLifecycle.onError('castNode'),
+    },
   });
 
   const renameColumnMutation = useMutation({
+    mutationKey: ['workspace', 'rename-column'],
     mutationFn: ({
       nodeId,
       column,
@@ -270,28 +269,26 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('renameColumn'),
-    onSuccess: operationLifecycle.onSuccess('renameColumn', (_response, variables) => {
+    onSuccess: (_response, variables) => {
       invalidateEditedNode(variables.nodeId);
-    }),
-    onError: operationLifecycle.onError('renameColumn'),
+    },
   });
 
   const deleteColumnMutation = useMutation({
+    mutationKey: ['workspace', 'delete-column'],
     mutationFn: ({ nodeId, column }: { nodeId: string; column: string }) =>
       editNode({
         body: { kind: 'delete_column', column },
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('deleteColumn'),
-    onSuccess: operationLifecycle.onSuccess('deleteColumn', (_response, variables) => {
+    onSuccess: (_response, variables) => {
       invalidateEditedNode(variables.nodeId);
-    }),
-    onError: operationLifecycle.onError('deleteColumn'),
+    },
   });
 
   const expressionMutation = useMutation({
+    mutationKey: ['workspace', 'expression'],
     mutationFn: ({
       nodeId,
       request,
@@ -313,41 +310,100 @@ export const useWorkspaceTransformMutations = ({
             throwOnError: true,
           })
       ).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('polarsExpressionApply'),
-    onSuccess: operationLifecycle.onSuccess('polarsExpressionApply', (_response, variables) => {
+    onSuccess: (_response, variables) => {
       if (variables.mode === 'update') {
         invalidateEditedNode(variables.nodeId);
       } else {
         invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       }
-    }),
-    onError: operationLifecycle.onError('polarsExpressionApply'),
+    },
   });
 
   const undoNodeMutation = useMutation({
+    mutationKey: ['workspace', 'undo-node'],
     mutationFn: (nodeId: string) =>
       undoNode({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('undoNode'),
-    onSuccess: operationLifecycle.onSuccess('undoNode', (_response, nodeId) => {
+    onSuccess: (_response, nodeId) => {
       invalidateEditedNode(nodeId);
-    }),
-    onError: operationLifecycle.onError('undoNode'),
+    },
   });
 
   const redoNodeMutation = useMutation({
+    mutationKey: ['workspace', 'redo-node'],
     mutationFn: (nodeId: string) =>
       redoNode({
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
-    onMutate: operationLifecycle.onMutate('redoNode'),
-    onSuccess: operationLifecycle.onSuccess('redoNode', (_response, nodeId) => {
+    onSuccess: (_response, nodeId) => {
       invalidateEditedNode(nodeId);
-    }),
-    onError: operationLifecycle.onError('redoNode'),
+    },
+  });
+
+  const setCellMutation = useMutation({
+    mutationKey: ['workspace', 'set-cell'],
+    mutationFn: ({
+      nodeId,
+      column,
+      rowIndex,
+      value,
+    }: {
+      nodeId: string;
+      column: string;
+      rowIndex: number;
+      value: string | null;
+    }) =>
+      editNode({
+        body: { kind: 'set_cell', column, row_index: rowIndex, value },
+        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => requireNode(data)),
+    onSuccess: (_response, variables) => {
+      invalidateEditedNode(variables.nodeId);
+    },
+  });
+
+  const annotationClassesMutation = useMutation({
+    mutationKey: ['workspace', 'annotation-classes'],
+    mutationFn: ({
+      nodeId,
+      classColumn,
+      descriptionColumn,
+      rows,
+    }: {
+      nodeId: string;
+      classColumn: string;
+      descriptionColumn: string;
+      rows: AnnotationClassRow[];
+    }) =>
+      editNode({
+        body: {
+          kind: 'annotation_classes',
+          class_column: classColumn,
+          description_column: descriptionColumn,
+          rows,
+        },
+        path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
+        throwOnError: true,
+      }).then(({ data }) => requireNode(data)),
+    onSuccess: (_response, variables) => {
+      invalidateEditedNode(variables.nodeId);
+    },
+  });
+
+  const createSqlDataBlockMutation = useMutation({
+    mutationKey: ['workspace', 'create-sql-data-block'],
+    mutationFn: ({ nodeIds, sql, name }: { nodeIds: string[]; sql: string; name: string }) =>
+      createWorkspaceSqlDataBlock({
+        path: { workspace_id: ensureWorkspaceSelected() },
+        body: { mode: 'create', node_ids: nodeIds, sql, name },
+      }),
+    onSuccess: () => {
+      invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
+    },
   });
 
   const actions = useMemo(
@@ -433,6 +489,22 @@ export const useWorkspaceTransformMutations = ({
         deleteColumnMutation.mutateAsync({ nodeId, column }),
       undoNode: (nodeId: string) => undoNodeMutation.mutateAsync(nodeId),
       redoNode: (nodeId: string) => redoNodeMutation.mutateAsync(nodeId),
+      setCell: (nodeId: string, column: string, rowIndex: number, value: string | null) =>
+        setCellMutation.mutateAsync({ nodeId, column, rowIndex, value }),
+      saveAnnotationClasses: (
+        nodeId: string,
+        classColumn: string,
+        descriptionColumn: string,
+        rows: AnnotationClassRow[],
+      ) =>
+        annotationClassesMutation.mutateAsync({
+          nodeId,
+          classColumn,
+          descriptionColumn,
+          rows,
+        }),
+      createSqlDataBlock: (nodeIds: string[], sql: string, name: string) =>
+        createSqlDataBlockMutation.mutateAsync({ nodeIds, sql, name }),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutation refs intentionally omitted; mutateAsync identities are stable
     [currentWorkspaceId, queryClient],

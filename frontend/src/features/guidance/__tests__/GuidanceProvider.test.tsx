@@ -1,11 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  EVENTS,
-  type Props as JoyrideProps,
-  STATUS,
-  type TooltipRenderProps,
-} from 'react-joyride';
+import { EVENTS, type Props as JoyrideProps, STATUS, type TooltipRenderProps } from 'react-joyride';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useGuidanceAcknowledgmentsStore } from '../acknowledgmentsStore';

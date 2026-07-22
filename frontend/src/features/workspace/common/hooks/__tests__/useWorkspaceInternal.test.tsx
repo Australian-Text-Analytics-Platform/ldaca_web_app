@@ -6,6 +6,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const useWorkspaceCoreMock = vi.hoisted(() => vi.fn());
 const useWorkspaceQueriesMock = vi.hoisted(() => vi.fn());
 const useWorkspaceNodeMutationsMock = vi.hoisted(() => vi.fn());
+const useIsMutatingMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@tanstack/react-query', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useIsMutating: useIsMutatingMock,
+}));
 
 vi.mock('../useWorkspaceCore', () => ({ useWorkspaceCore: useWorkspaceCoreMock }));
 vi.mock('../useWorkspaceQueries', () => ({ useWorkspaceQueries: useWorkspaceQueriesMock }));
@@ -17,8 +23,7 @@ import { useWorkspaceInternal } from '../useWorkspaceInternal';
 
 const coreDefaults = {
   isAuthenticated: true,
-  currentWorkspaceId: null,
-  setCurrentWorkspaceId: vi.fn(),
+  userId: 'user-1',
   activeNodeId: null,
   selectedNodeIds: [],
   activateNode: vi.fn(),
@@ -27,9 +32,6 @@ const coreDefaults = {
   replaceSelectedNodes: vi.fn(),
   toggleNode: vi.fn(),
   clearSelection: vi.fn(),
-  loadingOperationCount: 0,
-  startOperation: vi.fn(),
-  endOperation: vi.fn(),
 };
 
 const queryDefaults = {
@@ -40,6 +42,9 @@ const queryDefaults = {
   selectedNode: null,
   selectedNodes: [],
   queryLoadingState: {},
+  currentWorkspaceId: null,
+  workspacesHydrated: true,
+  nodesHydrated: true,
 };
 
 const renderInternal = () => {
@@ -53,36 +58,40 @@ const renderInternal = () => {
 describe('useWorkspaceInternal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useIsMutatingMock.mockReturnValue(0);
     useWorkspaceCoreMock.mockReturnValue({ ...coreDefaults });
     useWorkspaceQueriesMock.mockReturnValue({ ...queryDefaults });
     useWorkspaceNodeMutationsMock.mockReturnValue({ actions: { createWorkspace: vi.fn() } });
   });
 
-  it('clears an explicitly selected workspace when authentication ends', () => {
-    const setCurrentWorkspaceId = vi.fn();
+  it('selects nothing when the backend reports no open Workspace', () => {
     useWorkspaceCoreMock.mockReturnValue({
       ...coreDefaults,
       isAuthenticated: false,
-      currentWorkspaceId: 'workspace-1',
-      setCurrentWorkspaceId,
     });
-    renderInternal();
-    expect(setCurrentWorkspaceId).toHaveBeenCalledWith(null);
+    const { result } = renderInternal();
+    expect(result.current.currentWorkspaceId).toBeNull();
+    expect(result.current.currentWorkspace).toBeNull();
   });
 
-  it('does not consult or write a backend current-workspace resource', () => {
-    const setCurrentWorkspaceId = vi.fn();
-    useWorkspaceCoreMock.mockReturnValue({ ...coreDefaults, setCurrentWorkspaceId });
+  it('clears local Data Block selection when the backend open Workspace changes', () => {
+    const clearSelection = vi.fn();
+    useWorkspaceCoreMock.mockReturnValue({ ...coreDefaults, clearSelection });
     useWorkspaceQueriesMock.mockReturnValue({
       ...queryDefaults,
-      workspaces: [{ id: 'workspace-1' }],
+      currentWorkspaceId: 'workspace-1',
     });
-    renderInternal();
-    expect(setCurrentWorkspaceId).not.toHaveBeenCalled();
+    const { rerender } = renderInternal();
+    useWorkspaceQueriesMock.mockReturnValue({
+      ...queryDefaults,
+      currentWorkspaceId: 'workspace-2',
+    });
+    rerender();
+    expect(clearSelection).toHaveBeenCalledOnce();
   });
 
   it('combines operation loading with query loading', () => {
-    useWorkspaceCoreMock.mockReturnValue({ ...coreDefaults, loadingOperationCount: 1 });
+    useIsMutatingMock.mockReturnValue(1);
     useWorkspaceQueriesMock.mockReturnValue({
       ...queryDefaults,
       queryLoadingState: { workspaces: true },
@@ -92,14 +101,11 @@ describe('useWorkspaceInternal', () => {
   });
 
   it('exposes selected workspace and graph data from the local selection plus canonical queries', () => {
-    useWorkspaceCoreMock.mockReturnValue({
-      ...coreDefaults,
-      currentWorkspaceId: 'workspace-1',
-      activeNodeId: 'node-1',
-    });
+    useWorkspaceCoreMock.mockReturnValue({ ...coreDefaults, activeNodeId: 'node-1' });
     useWorkspaceQueriesMock.mockReturnValue({
       ...queryDefaults,
       currentWorkspace: { id: 'workspace-1' },
+      currentWorkspaceId: 'workspace-1',
       workspaceGraph: { nodes: [{ id: 'node-1' }] },
     });
     const { result } = renderInternal();

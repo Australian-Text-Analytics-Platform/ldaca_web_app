@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -9,7 +8,6 @@ import {
   type UserPreferencesPatch,
 } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useDevicePreferencesStore } from '@/stores/preferencesStore';
 
 export const userPreferencesKey = (userId: string | null) => ['user-preferences', userId] as const;
 
@@ -66,14 +64,4 @@ export function useUpdateUserPreferences() {
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   });
-}
-
-/** Scopes device-only preferences to the current authenticated user. */
-export function useDevicePreferencesInit() {
-  const userId = useAuth().user?.id ?? null;
-  const setDeviceUser = useDevicePreferencesStore((state) => state.setUser);
-
-  useEffect(() => {
-    setDeviceUser(userId);
-  }, [setDeviceUser, userId]);
 }

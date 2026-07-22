@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Field, Utf8 } from 'apache-arrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +11,13 @@ const pagination = {
   has_next: false,
   page: 1,
   page_size: 10,
+};
+
+const createWrapper = () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
 };
 
 describe('useConcatSubTab preview adapter', () => {
@@ -48,7 +57,7 @@ describe('useConcatSubTab preview adapter', () => {
           isLoading: { operations: false },
           onAlert: vi.fn(),
         }),
-      { initialProps: { workspaceId: 'workspace-request-1' } },
+      { initialProps: { workspaceId: 'workspace-request-1' }, wrapper: createWrapper() },
     );
 
     await act(async () => {

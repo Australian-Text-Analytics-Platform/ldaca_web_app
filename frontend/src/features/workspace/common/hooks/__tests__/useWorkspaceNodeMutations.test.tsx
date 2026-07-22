@@ -39,17 +39,12 @@ const wrapWithClient =
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
 
-const operationSpy = () => vi.fn() as unknown as (operationId: string) => void;
-
 const buildArgs = (queryClient: QueryClient, currentWorkspaceId: string | null = 'ws-1') => ({
   currentWorkspaceId,
-  setCurrentWorkspaceId: vi.fn(),
   removeNode: vi.fn(),
   replaceSelectedNodes: vi.fn(),
   clearSelection: vi.fn(),
   queryClient,
-  startOperation: operationSpy(),
-  endOperation: operationSpy(),
 });
 
 describe('useWorkspaceNodeMutations', () => {
@@ -74,7 +69,7 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
-  it('opens a workspace before updating the local selection', async () => {
+  it('opens a Workspace and reconciles through the authoritative Workspace list', async () => {
     const queryClient = createTestClient();
     workspaceSdkMock.openWorkspaceById.mockResolvedValue({ data: { id: 'ws-2' } });
     const args = buildArgs(queryClient);
@@ -90,8 +85,7 @@ describe('useWorkspaceNodeMutations', () => {
       path: { workspace_id: 'ws-2' },
       throwOnError: true,
     });
-    expect(args.setCurrentWorkspaceId).toHaveBeenCalledWith('ws-2');
-    expect(args.clearSelection).toHaveBeenCalledOnce();
+    expect(args.clearSelection).not.toHaveBeenCalled();
   });
 
   it('closes the selected workspace when the selection is cleared', async () => {
@@ -330,9 +324,6 @@ describe('useWorkspaceNodeMutations', () => {
       queryKey: ['workspaces', 'ws-1', 'graph'],
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'data'],
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['workspaces', 'ws-1', 'nodes', 'node-1', 'schema'],
     });
     expect(invalidateQueries.mock.calls.some(([options]) => 'predicate' in options)).toBe(true);
@@ -394,27 +385,38 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
-  it('submits quotation analyses through the tab analysis resource', async () => {
+  it('submits manual Annotation changes through Data Block edits', async () => {
     const queryClient = createTestClient();
-    workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'analysis-2' } });
+    workspaceSdkMock.editNode.mockResolvedValue({ data: { id: 'node-1' } });
     const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
       wrapper: wrapWithClient(queryClient),
     });
 
     await act(async () => {
-      await result.current.actions.quotationSearch('tab-1', {
-        node_ids: ['node-1'],
-        node_columns: { 'node-1': 'text' },
-      });
+      await result.current.actions.setCell('node-1', 'label', 4, 'positive');
+      await result.current.actions.saveAnnotationClasses('node-1', 'class', 'description', [
+        { class_name: 'positive', description: 'Positive stance' },
+      ]);
     });
 
-    expect(workspaceSdkMock.submitTabAnalysis).toHaveBeenCalledWith({
+    expect(workspaceSdkMock.editNode).toHaveBeenNthCalledWith(1, {
       body: {
-        kind: 'quotation',
-        node_ids: ['node-1'],
-        node_columns: { 'node-1': 'text' },
+        kind: 'set_cell',
+        column: 'label',
+        row_index: 4,
+        value: 'positive',
       },
-      path: { workspace_id: 'ws-1', tab_id: 'tab-1' },
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
+      throwOnError: true,
+    });
+    expect(workspaceSdkMock.editNode).toHaveBeenNthCalledWith(2, {
+      body: {
+        kind: 'annotation_classes',
+        class_column: 'class',
+        description_column: 'description',
+        rows: [{ class_name: 'positive', description: 'Positive stance' }],
+      },
+      path: { workspace_id: 'ws-1', node_id: 'node-1' },
       throwOnError: true,
     });
   });
