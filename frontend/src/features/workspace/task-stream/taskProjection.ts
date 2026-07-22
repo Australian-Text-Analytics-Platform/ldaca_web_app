@@ -2,22 +2,31 @@ import type { Analysis, CorruptAnalysis, UserFileImport } from '@/api';
 
 type TaskState = 'queued' | 'running' | 'successful' | 'failed' | 'cancelled';
 
-export interface TaskItem {
+interface TaskItemBase {
   task_id: string;
-  task_type?: string;
+  task_type: string;
   name?: string;
-  user_id?: string;
-  workspace_id?: string;
-  state?: TaskState;
+  state: TaskState;
   progress?: number;
+  progress_message?: string;
   message?: string;
   created_at?: string;
   updated_at?: string;
   started_at?: string | null;
   finished_at?: string | null;
   error?: string | null;
-  [key: string]: unknown;
 }
+
+interface AnalysisTaskItem extends TaskItemBase {
+  resource_type: 'analysis';
+  workspace_id: string;
+}
+
+interface UserFileImportTaskItem extends TaskItemBase {
+  resource_type: 'user_file_import';
+}
+
+export type TaskItem = AnalysisTaskItem | UserFileImportTaskItem;
 
 const PENDING_TASK_STATES: ReadonlySet<string> = new Set(['queued']);
 const RUNNING_TASK_STATES: ReadonlySet<string> = new Set(['running']);
@@ -44,6 +53,7 @@ export const analysisToTask = (
   if ('request' in resource) {
     const progress = 'progress' in resource ? resource.progress : null;
     return {
+      resource_type: 'analysis',
       task_id: resource.id,
       task_type: resource.request.kind,
       workspace_id: workspaceId,
@@ -59,6 +69,7 @@ export const analysisToTask = (
   }
 
   return {
+    resource_type: 'analysis',
     task_id: resource.id,
     task_type: 'analysis_corrupt',
     workspace_id: workspaceId,
@@ -71,6 +82,7 @@ export const analysisToTask = (
 export const importToTask = (resource: UserFileImport): TaskItem => {
   const progress = resource.progress;
   return {
+    resource_type: 'user_file_import',
     task_id: resource.id,
     task_type: resource.request.kind === 'sample' ? 'sample_import' : 'data_portal_import',
     state: toTaskState(resource.state),

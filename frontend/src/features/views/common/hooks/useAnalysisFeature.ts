@@ -51,6 +51,7 @@ const taskState = (analysis: Analysis): TaskItem['state'] =>
   analysis.state === 'succeeded' ? 'successful' : analysis.state;
 
 const analysisTask = (analysis: Analysis, workspaceId: string, taskType: string): TaskItem => ({
+  resource_type: 'analysis',
   task_id: analysis.id,
   task_type: taskType,
   workspace_id: workspaceId,

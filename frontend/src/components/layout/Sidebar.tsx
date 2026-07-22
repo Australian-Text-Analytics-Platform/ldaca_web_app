@@ -128,6 +128,10 @@ function Sidebar() {
     status: taskStreamStatus,
     error: taskStreamError,
     reconnect: reconnectTaskStream,
+    stopUserFileImport,
+    clearUserFileImport,
+    stoppingImportId,
+    clearingImportId,
   } = useWorkspaceTaskInbox(currentWorkspaceId);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = React.useState(false);
 
@@ -435,6 +439,10 @@ function Sidebar() {
                             isConnecting={isConnecting}
                             connectionError={connectionError}
                             onReconnect={reconnectTaskStream}
+                            onStopUserFileImport={stopUserFileImport}
+                            onClearUserFileImport={clearUserFileImport}
+                            stoppingImportId={stoppingImportId}
+                            clearingImportId={clearingImportId}
                           />
                         )}
                       </div>

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { AlertCircle, CheckCircle, ChevronDown, Clock, Square, XCircle } from 'lucide-react';
-import type { SidebarTaskRecord } from './types';
+import type { TaskItem } from '@/features/workspace/task-stream/taskProjection';
 
 /** Task states treated as attention-worthy in the sidebar task list. */
 const PROBLEMATIC_STATES = new Set(['failed', 'cancelled']);
@@ -26,11 +26,15 @@ const STATUS_META: Record<string, { icon: typeof Clock; className: string; label
 };
 
 interface SidebarTasksSectionProps {
-  tasks: SidebarTaskRecord[];
+  tasks: TaskItem[];
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
   onReconnect: () => void;
+  onStopUserFileImport: (importId: string) => void;
+  onClearUserFileImport: (importId: string) => void;
+  stoppingImportId: string | null;
+  clearingImportId: string | null;
 }
 
 /** Called by: SidebarTasksSection sorting and expanded timestamp formatting. */
@@ -55,12 +59,12 @@ const formatTimestamp = (value: unknown): string => {
 };
 
 /** Called by: SidebarTasksSection task sorting. */
-const taskTimestamp = (task: SidebarTaskRecord): number =>
+const taskTimestamp = (task: TaskItem): number =>
   normalizeTimestamp(task.finished_at ?? task.started_at ?? task.created_at ?? 0);
 
 /** Called by: SidebarTasksSection task sorting. */
-const taskPriority = (task: SidebarTaskRecord): number => {
-  const state = (task.state ?? '').toLowerCase();
+const taskPriority = (task: TaskItem): number => {
+  const state = task.state.toLowerCase();
   if (PROBLEMATIC_STATES.has(state)) return 0;
   if (ACTIVE_STATES.has(state)) return 1;
   if (state === 'successful') return 2;
@@ -68,9 +72,8 @@ const taskPriority = (task: SidebarTaskRecord): number => {
 };
 
 /** Called by: SidebarTasksSection row rendering and accessibility labels. */
-const taskLabel = (task: SidebarTaskRecord): string => {
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall back to generic label when task_type is an empty string, not only null/undefined
-  const typeLabel = task.task_type?.replace(/_/g, ' ') || 'task';
+const taskLabel = (task: TaskItem): string => {
+  const typeLabel = task.task_type.replace(/_/g, ' ') || 'task';
   return task.name ? `${typeLabel}: ${task.name}` : typeLabel;
 };
 
@@ -87,6 +90,10 @@ function SidebarTasksSection({
   isConnecting,
   connectionError,
   onReconnect,
+  onStopUserFileImport,
+  onClearUserFileImport,
+  stoppingImportId,
+  clearingImportId,
 }: SidebarTasksSectionProps) {
   const sortedTasks = Array.isArray(tasks)
     ? tasks.slice().sort((a, b) => {
@@ -157,13 +164,23 @@ function SidebarTasksSection({
               (task.state === 'running' || task.state === 'successful');
             const expanded = expandedTaskIds.has(task.task_id);
             const label = taskLabel(task);
+            const isUserFileImport = task.resource_type === 'user_file_import';
+            const canStop =
+              isUserFileImport && (task.state === 'queued' || task.state === 'running');
+            const canClear =
+              isUserFileImport &&
+              (task.state === 'successful' ||
+                task.state === 'failed' ||
+                task.state === 'cancelled');
+            const isStopping = stoppingImportId === task.task_id;
+            const isClearing = clearingImportId === task.task_id;
 
             return (
               <div
                 key={task.task_id}
                 className={cn(
                   'rounded-md border bg-background text-left transition-colors',
-                  PROBLEMATIC_STATES.has((task.state ?? '').toLowerCase())
+                  PROBLEMATIC_STATES.has(task.state.toLowerCase())
                     ? 'border-red-200 bg-red-50/50 dark:border-red-950 dark:bg-red-950/20'
                     : 'border-border/40',
                 )}
@@ -234,6 +251,38 @@ function SidebarTasksSection({
                       <dt>Finished</dt>
                       <dd className="truncate">{formatTimestamp(task.finished_at)}</dd>
                     </dl>
+                    {(canStop || canClear) && (
+                      <div className="flex justify-end border-t border-border/40 pt-2">
+                        {canStop ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-[11px]"
+                            disabled={isStopping || isClearing}
+                            onClick={() => {
+                              onStopUserFileImport(task.task_id);
+                            }}
+                          >
+                            {isStopping ? 'Stopping...' : 'Stop'}
+                          </Button>
+                        ) : null}
+                        {canClear ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-[11px]"
+                            disabled={isStopping || isClearing}
+                            onClick={() => {
+                              onClearUserFileImport(task.task_id);
+                            }}
+                          >
+                            {isClearing ? 'Clearing...' : 'Clear'}
+                          </Button>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

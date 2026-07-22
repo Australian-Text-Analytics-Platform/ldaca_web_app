@@ -1,7 +1,20 @@
 import { useCallback, useEffect } from 'react';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { getAnalysis, getUserFileImport, listAnalyses, listUserFileImports } from '@/api';
-import type { AnalysisPage, UserFileImportPage, WorkspaceResource } from '@/api';
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  cancelUserFileImport,
+  deleteUserFileImport,
+  getAnalysis,
+  getUserFileImport,
+  listAnalyses,
+  listUserFileImports,
+} from '@/api';
+import type { AnalysisPage, UserFileImport, UserFileImportPage, WorkspaceResource } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { analysisToTask, importToTask, sortTasks, type TaskItem } from './taskProjection';
 import {
@@ -85,12 +98,68 @@ export const useTaskResources = (workspaceId: string | null) => {
 
 export interface WorkspaceTaskInboxState extends WorkspaceTaskStreamClientState {
   tasks: TaskItem[];
+  stopUserFileImport: (importId: string) => void;
+  clearUserFileImport: (importId: string) => void;
+  stoppingImportId: string | null;
+  clearingImportId: string | null;
 }
+
+const replaceImportInPages = (
+  previous: InfiniteData<UserFileImportPage> | undefined,
+  resource: UserFileImport,
+): InfiniteData<UserFileImportPage> | undefined =>
+  previous
+    ? {
+        ...previous,
+        pages: previous.pages.map((page) => ({
+          ...page,
+          items: page.items.map((item) => (item.id === resource.id ? resource : item)),
+        })),
+      }
+    : previous;
 
 /** Connects backend events to the same Query resources projected by the Task Inbox. */
 export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTaskInboxState => {
   const queryClient = useQueryClient();
   const { tasks, error: resourceError } = useTaskResources(workspaceId);
+
+  const cancelImportMutation = useMutation({
+    mutationFn: async (importId: string) => {
+      const { data } = await cancelUserFileImport({
+        path: { import_id: importId },
+        throwOnError: true,
+      });
+      return data;
+    },
+    onSuccess: (resource) => {
+      queryClient.setQueryData(queryKeys.userFileImport(resource.id), resource);
+      queryClient.setQueryData<InfiniteData<UserFileImportPage>>(
+        queryKeys.userFileImports,
+        (previous) => replaceImportInPages(previous, resource),
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Could not stop the file import.');
+    },
+  });
+
+  const deleteImportMutation = useMutation({
+    mutationFn: async (importId: string) => {
+      await deleteUserFileImport({
+        path: { import_id: importId },
+        throwOnError: true,
+      });
+      return importId;
+    },
+    onSuccess: (importId) => {
+      queryClient.removeQueries({ queryKey: queryKeys.userFileImport(importId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Could not clear the file import.');
+    },
+  });
 
   const refreshResource = useCallback(
     async (event: Extract<BackendEvent, { type: 'resource_changed' | 'resource_progress' }>) => {
@@ -211,7 +280,17 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
   );
 
   const clientState = useWorkspaceTaskStreamClient({ enabled: true, onEvent: handleEvent });
+  const lifecycleState = {
+    stopUserFileImport: (importId: string) => {
+      cancelImportMutation.mutate(importId);
+    },
+    clearUserFileImport: (importId: string) => {
+      deleteImportMutation.mutate(importId);
+    },
+    stoppingImportId: cancelImportMutation.isPending ? cancelImportMutation.variables : null,
+    clearingImportId: deleteImportMutation.isPending ? deleteImportMutation.variables : null,
+  };
   return resourceError
-    ? { ...clientState, tasks, status: 'error', error: resourceError }
-    : { ...clientState, tasks };
+    ? { ...clientState, ...lifecycleState, tasks, status: 'error', error: resourceError }
+    : { ...clientState, ...lifecycleState, tasks };
 };

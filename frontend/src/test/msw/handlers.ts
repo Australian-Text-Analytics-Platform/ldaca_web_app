@@ -99,6 +99,10 @@ export const handlers = [
   http.post(apiPath('/user-file-imports/:import_id/cancel'), () =>
     HttpResponse.json(acceptedAnalysis()),
   ),
+  http.delete(
+    apiPath('/user-file-imports/:import_id'),
+    () => new HttpResponse(null, { status: 204 }),
+  ),
   http.get(apiPath('/user-files/resource'), () => HttpResponse.json(fileResponse())),
   http.get(apiPath('/user-files/raw'), () => new HttpResponse('text')),
   http.get(apiPath('/user-files/content'), () => new HttpResponse(new Blob(['text']))),

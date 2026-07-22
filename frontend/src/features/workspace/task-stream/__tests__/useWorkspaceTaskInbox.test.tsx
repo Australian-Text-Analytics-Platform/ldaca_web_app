@@ -7,10 +7,14 @@ import { http, HttpResponse } from 'msw';
 import { queryKeys } from '@/lib/queryKeys';
 import { analysisResponse } from '@/test/msw/fixtures';
 import { server } from '@/test/msw/server';
+import type { UserFileImport } from '@/api';
 import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
 import { useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
 
 let emitEvent: ((payload: unknown) => void) | undefined;
+const mocks = vi.hoisted(() => ({ toastError: vi.fn() }));
+
+vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }));
 
 vi.mock('../useWorkspaceTaskStreamClient', () => ({
   useWorkspaceTaskStreamClient: (options: WorkspaceTaskStreamClientOptions) => {
@@ -25,9 +29,33 @@ vi.mock('../useWorkspaceTaskStreamClient', () => ({
   },
 }));
 
+const userFileImportResponse = (overrides: Partial<UserFileImport> = {}): UserFileImport => ({
+  id: 'import-1',
+  state: 'running',
+  cancellation_requested_at: null,
+  created_at: '2026-01-01T00:00:00Z',
+  started_at: '2026-01-01T00:00:01Z',
+  finished_at: null,
+  revision: 1,
+  progress: { fraction: 0.5, message: 'Importing' },
+  error: null,
+  request: { kind: 'sample', collection_id: 'sample-1' },
+  result: null,
+  ...overrides,
+});
+
+const importPage = (items: UserFileImport[]) => ({
+  items,
+  page: 1,
+  page_size: 100,
+  total_items: items.length,
+  total_pages: items.length > 0 ? 1 : 0,
+});
+
 describe('useWorkspaceTaskInbox', () => {
   beforeEach(() => {
     emitEvent = undefined;
+    mocks.toastError.mockReset();
   });
 
   it('refreshes the workspace analysis projection when the canonical SSE event arrives', async () => {
@@ -122,5 +150,128 @@ describe('useWorkspaceTaskInbox', () => {
     });
 
     await waitFor(() => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true));
+  });
+
+  it('cancels a User File Import and patches the returned resource into Query state', async () => {
+    let resource = userFileImportResponse();
+    server.use(
+      http.get('*/api/user-file-imports', () => HttpResponse.json(importPage([resource]))),
+      http.post('*/api/user-file-imports/:import_id/cancel', () => {
+        resource = userFileImportResponse({
+          state: 'cancelled',
+          cancellation_requested_at: '2026-01-01T00:00:02Z',
+          finished_at: '2026-01-01T00:00:02Z',
+          progress: { fraction: 0.5, message: 'Cancelled' },
+          revision: 2,
+        });
+        return HttpResponse.json(resource);
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    await waitFor(() =>
+      expect(view.result.current.tasks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            resource_type: 'user_file_import',
+            task_id: 'import-1',
+            state: 'running',
+          }),
+        ]),
+      ),
+    );
+    act(() => {
+      view.result.current.stopUserFileImport('import-1');
+    });
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData(queryKeys.userFileImport('import-1'))).toMatchObject({
+        id: 'import-1',
+        state: 'cancelled',
+      }),
+    );
+    await waitFor(() =>
+      expect(view.result.current.tasks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ task_id: 'import-1', state: 'cancelled' }),
+        ]),
+      ),
+    );
+  });
+
+  it('deletes a terminal User File Import, evicts its detail, and refreshes the list', async () => {
+    let resources = [
+      userFileImportResponse({
+        state: 'succeeded',
+        progress: { fraction: 1, message: 'Complete' },
+        finished_at: '2026-01-01T00:00:03Z',
+      }),
+    ];
+    server.use(
+      http.get('*/api/user-file-imports', () => HttpResponse.json(importPage(resources))),
+      http.delete('*/api/user-file-imports/:import_id', () => {
+        resources = [];
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    queryClient.setQueryData(queryKeys.userFileImport('import-1'), resources[0]);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    await waitFor(() =>
+      expect(view.result.current.tasks.some((task) => task.task_id === 'import-1')).toBe(true),
+    );
+    act(() => {
+      view.result.current.clearUserFileImport('import-1');
+    });
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData(queryKeys.userFileImport('import-1'))).toBeUndefined(),
+    );
+    await waitFor(() =>
+      expect(view.result.current.tasks.some((task) => task.task_id === 'import-1')).toBe(false),
+    );
+  });
+
+  it('preserves the import row and reports an error when deletion fails', async () => {
+    const resource = userFileImportResponse({
+      state: 'failed',
+      error: { code: 'import_failed', message: 'Import failed' },
+      finished_at: '2026-01-01T00:00:03Z',
+    });
+    server.use(
+      http.get('*/api/user-file-imports', () => HttpResponse.json(importPage([resource]))),
+      http.delete('*/api/user-file-imports/:import_id', () =>
+        HttpResponse.json({ code: 'delete_failed', message: 'Delete failed' }, { status: 500 }),
+      ),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    await waitFor(() =>
+      expect(view.result.current.tasks.some((task) => task.task_id === 'import-1')).toBe(true),
+    );
+    act(() => {
+      view.result.current.clearUserFileImport('import-1');
+    });
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1));
+    expect(view.result.current.tasks.some((task) => task.task_id === 'import-1')).toBe(true);
   });
 });
