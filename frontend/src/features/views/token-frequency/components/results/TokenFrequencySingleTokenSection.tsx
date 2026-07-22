@@ -7,6 +7,7 @@ import { Download } from 'lucide-react';
 import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
 import { useElementWidth } from '@/lib/useElementWidth';
+import { toBgColor } from '@/features/views/common/vizPalette';
 
 interface TokenFrequencySingleTokenSectionProps {
   nodeDisplayResults: NodeResultView[];
@@ -371,7 +372,7 @@ const TokenFrequencySingleTokenSectionInner = ({
                       >
                         <span
                           className="absolute inset-y-0 left-0 rounded bg-primary/20 group-hover:bg-primary/30"
-                          style={{ width: `${String(widthPct)}%`, backgroundColor: color }}
+                          style={{ width: `${String(widthPct)}%`, backgroundColor: toBgColor(color) }}
                         />
                         <span className="relative z-10 block truncate px-2 text-sm font-medium">
                           {row.token}

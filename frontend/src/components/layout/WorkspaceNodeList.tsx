@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
+import { GREY, toBgColor } from '@/features/views/common/vizPalette';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -151,9 +152,11 @@ function WorkspaceNodeList({
                 const isPinned = pinnedIdSet.has(node.id);
                 const pinnedRowAction = isPinned ? renderPinnedRowAction(node) : null;
                 const rowActions = renderRowActions(node);
-                // Persisted node colour drawn as a thin left spine on the row so
-                // the right-aligned name and its left fade stay fully legible.
-                const accentColor = normalizeNodeAccentColor(node.color);
+                // Block colour: the row is always filled with the light background
+                // tint of the block's colour (grey for unset / un-analysed blocks),
+                // with a 4px FG spine on the left; a selected row also takes the
+                // full FG colour as its border.
+                const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
 
                 return (
                   <Tooltip key={node.id}>
@@ -178,22 +181,30 @@ function WorkspaceNodeList({
                         {/* Inner box carries the border/background. */}
                         <div
                           className={cn(
-                            'relative flex items-center gap-2 overflow-visible rounded-md border bg-background/70 px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
+                            'relative flex items-center gap-2 overflow-visible rounded-md border px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
                             isPinned && pinnedRowAction && 'pl-8',
                             checked
-                              ? 'border-primary/70 bg-primary/10 ring-1 ring-primary/20'
-                              : 'border-border/60 group-hover/row:border-border group-hover/row:bg-accent/60',
+                              ? 'ring-1 ring-primary/20'
+                              : 'border-border/60 group-hover/row:border-border',
                           )}
                           data-testid={`workspace-node-row-${node.id}`}
-                          style={
-                            accentColor
+                          style={{
+                            backgroundColor: toBgColor(effectiveColor),
+                            // Selected: full FG-colour border. Unselected keeps the
+                            // neutral border class; both keep the 4px FG left spine.
+                            // Use per-side longhands (not the `borderColor`
+                            // shorthand) so they never conflict with borderLeftColor.
+                            ...(checked
                               ? {
-                                  borderLeftColor: accentColor,
-                                  borderLeftWidth: '4px',
-                                  borderLeftStyle: 'solid',
+                                  borderTopColor: effectiveColor,
+                                  borderRightColor: effectiveColor,
+                                  borderBottomColor: effectiveColor,
                                 }
-                              : undefined
-                          }
+                              : {}),
+                            borderLeftColor: effectiveColor,
+                            borderLeftWidth: '4px',
+                            borderLeftStyle: 'solid',
+                          }}
                         >
                           {pinnedRowAction && (
                             <div

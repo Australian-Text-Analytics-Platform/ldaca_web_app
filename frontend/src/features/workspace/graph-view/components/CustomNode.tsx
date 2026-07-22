@@ -21,6 +21,7 @@ import {
 import type { WorkspaceGraphNodeCard } from '../graphNodeModel';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
+import { GREY, toBgColor } from '@/features/views/common/vizPalette';
 import { CUSTOM_NODE_TOOLBAR_BUTTON_CLASS, CustomNodeActionMenu } from './CustomNodeActionMenu';
 import { CustomNodeRenameForm } from './CustomNodeRenameForm';
 import {
@@ -181,14 +182,18 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const nodeName = node.name;
   const nodeShape = node.shape;
 
-  // Optional per-node accent. A valid ``#rrggbb`` ``Node.color`` is drawn as a
-  // solid left spine on both the full and compact card so the colour reads
-  // clearly while the header/body backgrounds stay untouched for text contrast.
-  // Empty object when unset spreads to nothing, leaving the default card look.
-  const accentColor = normalizeNodeAccentColor(node.color);
-  const accentBorderStyle: React.CSSProperties = accentColor
-    ? { borderLeftColor: accentColor, borderLeftWidth: 6, borderLeftStyle: 'solid' }
-    : {};
+  // Per-node colour. A valid ``#rrggbb`` ``Node.color`` is the block's identity
+  // colour; unset / un-analysed blocks default to grey. The colour is drawn as a
+  // 6px solid left spine on both cards, and a light background tint (`fillColor`)
+  // fills the whole compact card when zoomed out, or just the header strip when
+  // zoomed in, so the colour reads clearly while black text stays legible.
+  const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
+  const accentBorderStyle: React.CSSProperties = {
+    borderLeftColor: effectiveColor,
+    borderLeftWidth: 6,
+    borderLeftStyle: 'solid',
+  };
+  const fillColor = toBgColor(effectiveColor);
 
   /** Shows this node's toolbar and claims singleton ownership so any other
    * node's hover toolbar hides at once. Called on node/toolbar mouse-enter. */
@@ -502,6 +507,9 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
           minWidth: '180px',
           maxWidth: '300px',
           position: 'relative',
+          // Zoomed out: fill the whole compact card with the block's background
+          // tint, keeping the 6px FG spine and the normal selection border.
+          backgroundColor: fillColor,
           // ``isFresh`` red "new" dot rendered below marks newly-created
           // nodes the user hasn't acknowledged yet.
           ...accentBorderStyle,
@@ -549,12 +557,15 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       }}
     >
       {newDot}
-      {/* Node Header — primary-tinted strip when selected, muted otherwise. */}
+      {/* Node Header — zoomed in, only this top strip carries the block's
+          background tint; the body stays white so metadata reads cleanly.
+          The border keeps its normal selected/unselected treatment. */}
       <div
         className={cn(
           'flex items-start justify-between p-2 rounded-t-lg border-b-2 min-h-fit relative',
-          isSelected ? 'bg-primary/10 border-primary/40' : 'bg-muted border-border',
+          isSelected ? 'border-primary/40' : 'border-border',
         )}
+        style={{ backgroundColor: fillColor }}
       >
         <div className="flex items-center flex-1 mr-2">
           {isRenaming ? (
