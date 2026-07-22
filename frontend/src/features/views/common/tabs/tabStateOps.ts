@@ -25,15 +25,6 @@ export interface AnalysisTab {
   revision?: number;
 }
 
-interface AnalysisTabGroup {
-  tabs: AnalysisTab[];
-  active_tab_id: string | null;
-}
-
-export interface WorkspaceTabsState {
-  groups: Record<string, AnalysisTabGroup>;
-}
-
 export const DEFAULT_TAB_INPUT_SET_ID = 'source';
 
 export function tabFromResource(tab: Tab, local?: Partial<AnalysisTab>): AnalysisTab {
@@ -50,36 +41,11 @@ export function tabFromResource(tab: Tab, local?: Partial<AnalysisTab>): Analysi
   };
 }
 
-export function getTabs(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-): AnalysisTab[] {
-  return state?.groups[analysisType]?.tabs ?? [];
-}
-
-export function getActiveTabId(
-  state: WorkspaceTabsState | null | undefined,
-  analysisType: string,
-): string | null {
-  const group = state?.groups[analysisType];
-  if (!group || group.tabs.length === 0) return null;
-  return group.tabs.some((tab) => tab.tab_id === group.active_tab_id)
-    ? group.active_tab_id
-    : (group.tabs[0]?.tab_id ?? null);
-}
-
 export function getTabInputSet(
   tab: Pick<AnalysisTab, 'input_sets'> | null | undefined,
   selectorId = DEFAULT_TAB_INPUT_SET_ID,
 ): AnalysisTabInput[] {
   return tab?.input_sets[selectorId] ?? [];
-}
-
-export function getTabSetting(
-  tab: Pick<AnalysisTab, 'settings'> | null | undefined,
-  key: string,
-): string | undefined {
-  return tab?.settings[key];
 }
 
 export function reorderTabs(tabs: AnalysisTab[], orderedIds: string[]): AnalysisTab[] {

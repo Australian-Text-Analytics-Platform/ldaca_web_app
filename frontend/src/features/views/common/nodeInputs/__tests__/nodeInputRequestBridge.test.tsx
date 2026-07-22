@@ -1,7 +1,7 @@
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AnalysisTabInput } from '@/api';
+import type { AnalysisTabInput } from '../../tabs/tabStateOps';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';

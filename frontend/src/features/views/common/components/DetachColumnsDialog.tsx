@@ -43,7 +43,7 @@ interface DetachColumnsDialogProps {
 
 /**
  * Renders the shared detach-columns confirmation dialog used by analysis tools
- * that can materialize selected optional columns into the workspace.
+ * that can copy selected optional columns into a derived Data Block.
  * Used by: concordance, quotation, and topic-modeling detach flows.
  */
 export function DetachColumnsDialog({

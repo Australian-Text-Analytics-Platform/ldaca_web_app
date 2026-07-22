@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { FilterSubTab } from './filter/FilterSubTab';
 import { JoinSubTab } from './join/JoinSubTab';
 import { ConcatSubTab } from './concat/ConcatSubTab';
@@ -208,36 +209,46 @@ function DataPreprocessingFeature() {
         }}
         className="space-y-4"
       >
-        <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
-          <TabsTrigger value="filter">
-            <Filter className="mr-1.5 h-4 w-4" />
-            Filter
-          </TabsTrigger>
-          <TabsTrigger value="slice">
-            <Shuffle className="mr-1.5 h-4 w-4" />
-            Sample
-          </TabsTrigger>
-          <TabsTrigger value="join">
-            <Merge className="mr-1.5 h-4 w-4" />
-            Join
-          </TabsTrigger>
-          <TabsTrigger value="concat">
-            <Layers className="mr-1.5 h-4 w-4" />
-            Stack
-          </TabsTrigger>
-          <TabsTrigger value="find">
-            <Search className="mr-1.5 h-4 w-4" />
-            Find
-          </TabsTrigger>
-          <TabsTrigger value="aggregate">
-            <Calculator className="mr-1.5 h-4 w-4" />
-            Create
-          </TabsTrigger>
-          <TabsTrigger value="expression">
-            <Code2 className="mr-1.5 h-4 w-4" />
-            Polars Expression
-          </TabsTrigger>
-        </TabsList>
+        <ScrollArea
+          data-testid="preprocessing-tabs-scroll-area"
+          scrollbars="horizontal"
+          type="always"
+          className="h-12 w-full"
+        >
+          <TabsList
+            aria-label="Data preprocessing sub-views"
+            className="flex w-max flex-nowrap justify-start gap-2"
+          >
+            <TabsTrigger value="filter">
+              <Filter className="mr-1.5 h-4 w-4" />
+              Filter
+            </TabsTrigger>
+            <TabsTrigger value="slice">
+              <Shuffle className="mr-1.5 h-4 w-4" />
+              Sample
+            </TabsTrigger>
+            <TabsTrigger value="join">
+              <Merge className="mr-1.5 h-4 w-4" />
+              Join
+            </TabsTrigger>
+            <TabsTrigger value="concat">
+              <Layers className="mr-1.5 h-4 w-4" />
+              Stack
+            </TabsTrigger>
+            <TabsTrigger value="find">
+              <Search className="mr-1.5 h-4 w-4" />
+              Find
+            </TabsTrigger>
+            <TabsTrigger value="aggregate">
+              <Calculator className="mr-1.5 h-4 w-4" />
+              Create
+            </TabsTrigger>
+            <TabsTrigger value="expression">
+              <Code2 className="mr-1.5 h-4 w-4" />
+              Polars Expression
+            </TabsTrigger>
+          </TabsList>
+        </ScrollArea>
 
         {supportsUpdateMode && (
           <PreprocessingApplyModeControl value={applyMode} onChange={setApplyMode} />

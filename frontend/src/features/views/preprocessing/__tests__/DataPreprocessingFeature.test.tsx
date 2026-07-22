@@ -238,6 +238,23 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
   });
 
+  it('keeps preprocessing tabs on one row with a persistent horizontal scrollbar', () => {
+    renderPreprocessingFeature();
+
+    const scrollArea = screen.getByTestId('preprocessing-tabs-scroll-area');
+    expect(scrollArea).toHaveClass('h-12', 'w-full');
+    // Radix scrollbars do not expose a semantic role to query through Testing Library.
+    // eslint-disable-next-line testing-library/no-node-access
+    const horizontalScrollbar = scrollArea.querySelector(
+      '[data-slot="scroll-area-scrollbar"][data-orientation="horizontal"]',
+    );
+    expect(horizontalScrollbar).toHaveAttribute('data-state', 'visible');
+
+    const tabList = screen.getByRole('tablist', { name: 'Data preprocessing sub-views' });
+    expect(tabList).toHaveClass('w-max', 'flex-nowrap', 'justify-start');
+    expect(tabList).not.toHaveClass('flex-wrap');
+  });
+
   it('builds a regex replace expression from the Find tab', async () => {
     const user = userEvent.setup();
     const regexPattern = String.raw`\d+`;

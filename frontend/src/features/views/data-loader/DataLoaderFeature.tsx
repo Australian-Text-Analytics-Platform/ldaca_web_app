@@ -278,13 +278,13 @@ function DataLoaderFeature() {
   };
 
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
-  // Block workspace switching/unloading while a task on the active workspace
-  // is still running — switching while a materialisation is in flight has
-  // corrupted the workspace state in past incidents.
+  // Block workspace switching or unloading while an Analysis on the active
+  // Workspace is still running. User File Imports have no Workspace owner.
   const { tasks } = useTaskResources(currentWorkspaceId);
   const hasActiveTask = currentWorkspaceId
     ? tasks.some(
         (task) =>
+          task.resource_type === 'analysis' &&
           task.workspace_id === currentWorkspaceId &&
           (isRunningTaskState(task.state) || isPendingTaskState(task.state)),
       )

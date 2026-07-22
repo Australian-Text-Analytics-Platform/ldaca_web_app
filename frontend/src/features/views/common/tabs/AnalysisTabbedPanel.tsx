@@ -15,10 +15,10 @@
  * panel content.
  */
 import { type ReactNode } from 'react';
-import type { AnalysisTab } from '@/api';
 import { type ChromeTabItem, ChromeTabs } from '@/components/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import type { AnalysisTab } from './tabStateOps';
 
 export interface AnalysisTabbedPanelProps {
   tabs: AnalysisTab[];

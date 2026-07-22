@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { AnalysisTabInput } from '@/api';
+import type { AnalysisTabInput } from '@/features/views/common/tabs/tabStateOps';
 
 /**
  * Frontend-persisted input node sets for preprocessing subtabs.

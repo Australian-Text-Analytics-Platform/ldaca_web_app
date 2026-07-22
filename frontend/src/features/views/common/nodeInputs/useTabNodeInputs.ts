@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { AnalysisTabInput, WorkspaceNodeInfo } from '@/api';
+import type { WorkspaceNodeInfo } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import {
   DEFAULT_TAB_INPUT_SET_ID,
   getTabInputSet,
+  type AnalysisTabInput,
   type AnalysisTabInputSets,
 } from '../tabs/tabStateOps';
 import type { NodeAddRejection, NodeInputConstraints } from './nodeInputsCore';

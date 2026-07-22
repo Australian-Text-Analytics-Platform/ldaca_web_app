@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AnalysisTab } from '@/api';
+import type { AnalysisTab } from '../tabStateOps';
 import { AnalysisTabsHost, type AnalysisTabFeatureProps } from '../AnalysisTabsHost';
 import type { UseWorkspaceTabsResult } from '../useWorkspaceTabs';
 

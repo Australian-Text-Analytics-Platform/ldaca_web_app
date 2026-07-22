@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  getActiveTabId,
-  getTabInputSet,
-  getTabSetting,
-  getTabs,
-  reorderTabs,
-  tabFromResource,
-} from '../tabStateOps';
+import { getTabInputSet, reorderTabs, tabFromResource } from '../tabStateOps';
 
 const tab = {
   id: 'tab-1',
@@ -35,17 +28,12 @@ describe('tabStateOps', () => {
     });
   });
 
-  it('resolves groups, active ids, named inputs, and settings without server persistence', () => {
+  it('resolves named frontend input sets', () => {
     const projected = tabFromResource(tab, {
       input_sets: { source: [{ node_id: 'node-1', column: 'text' }] },
       settings: { mode: 'manual' },
     });
-    const state = { groups: { concordance: { tabs: [projected], active_tab_id: 'tab-1' } } };
-    expect(getTabs(state, 'concordance')).toEqual([projected]);
-    expect(getActiveTabId(state, 'concordance')).toBe('tab-1');
     expect(getTabInputSet(projected, 'source')).toEqual([{ node_id: 'node-1', column: 'text' }]);
-    expect(getTabSetting(projected, 'mode')).toBe('manual');
-    expect(getTabSetting(projected, 'missing')).toBeUndefined();
   });
 
   it('reorders known tabs and appends omitted tabs without changing identity', () => {

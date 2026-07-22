@@ -17,7 +17,7 @@ interface WorkspaceAnalysisMutationsParams {
 /**
  * Owns text-analysis actions exposed through the workspace action facade.
  * Used by: useWorkspaceNodeMutations because analysis views need detached
- * result nodes, materialization, and quotation search without coupling the
+ * result nodes without coupling the
  * main workspace mutation hook to each analysis endpoint.
  * Flow: build generated-SDK mutations, guard detach operations that need an
  * active workspace id, refresh graph state after detach, and return stable
