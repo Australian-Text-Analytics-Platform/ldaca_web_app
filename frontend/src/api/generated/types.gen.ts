@@ -241,6 +241,46 @@ export type AnnotationClassOutput = {
 };
 
 /**
+ * AnnotationClassRow
+ *
+ * One validated manual Annotation class-description row.
+ */
+export type AnnotationClassRow = {
+    /**
+     * Class
+     */
+    class: string;
+    /**
+     * Description
+     */
+    description?: string;
+};
+
+/**
+ * AnnotationClassesNodeEditRequest
+ *
+ * Replace class-description rows while preserving other columns.
+ */
+export type AnnotationClassesNodeEditRequest = {
+    /**
+     * Class Column
+     */
+    class_column: string;
+    /**
+     * Description Column
+     */
+    description_column: string;
+    /**
+     * Kind
+     */
+    kind?: 'annotation_classes';
+    /**
+     * Rows
+     */
+    rows?: Array<AnnotationClassRow>;
+};
+
+/**
  * AnnotationCredentialStatus
  */
 export type AnnotationCredentialStatus = {
@@ -924,60 +964,6 @@ export type ConcatStringExpressionOutput = {
 };
 
 /**
- * ConcordanceAnalysisParameters
- */
-export type ConcordanceAnalysisParameters = {
-    /**
-     * Case Sensitive
-     */
-    case_sensitive?: boolean;
-    /**
-     * Label To Node Map
-     */
-    label_to_node_map?: {
-        [key: string]: string;
-    };
-    /**
-     * Node Columns
-     */
-    node_columns: {
-        [key: string]: string;
-    };
-    /**
-     * Node Ids
-     */
-    node_ids: Array<string>;
-    /**
-     * Num Left Tokens
-     */
-    num_left_tokens?: number;
-    /**
-     * Num Right Tokens
-     */
-    num_right_tokens?: number;
-    /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Regex
-     */
-    regex?: boolean;
-    /**
-     * Search Mode
-     */
-    search_mode?: 'regex' | 'tokens';
-    /**
-     * Search Word
-     */
-    search_word: string;
-    /**
-     * Whole Word
-     */
-    whole_word?: boolean;
-};
-
-/**
  * ConcordanceAnalysisRequest
  */
 export type ConcordanceAnalysisRequest = {
@@ -1172,22 +1158,15 @@ export type ConcordancePage = {
  * ConcordanceResult
  */
 export type ConcordanceResult = {
-    analysis_params: ConcordanceAnalysisParameters;
-    /**
-     * Combinable
-     */
-    combinable: boolean;
-    /**
-     * Data
-     */
-    data: {
-        [key: string]: ConcordancePage;
-    };
     /**
      * Kind
      */
     kind?: 'concordance';
     query: ConcordanceResultQuery;
+    /**
+     * Sources
+     */
+    sources: Array<ConcordanceSourceResult>;
 };
 
 /**
@@ -1218,6 +1197,21 @@ export type ConcordanceResultQuery = {
      * Sort By
      */
     sort_by?: string | null;
+};
+
+/**
+ * ConcordanceSourceResult
+ */
+export type ConcordanceSourceResult = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+    result: ConcordancePage;
 };
 
 /**
@@ -2318,10 +2312,6 @@ export type QuotationResult = {
  */
 export type QuotationResultQuery = {
     /**
-     * Context Length
-     */
-    context_length?: number;
-    /**
      * Descending
      */
     descending?: boolean;
@@ -2858,6 +2848,30 @@ export type SessionUser = {
 };
 
 /**
+ * SetCellNodeEditRequest
+ *
+ * Replace one string cell at an absolute Data Block row index.
+ */
+export type SetCellNodeEditRequest = {
+    /**
+     * Column
+     */
+    column: string;
+    /**
+     * Kind
+     */
+    kind?: 'set_cell';
+    /**
+     * Row Index
+     */
+    row_index: number;
+    /**
+     * Value
+     */
+    value?: string | null;
+};
+
+/**
  * SliceDerivation
  */
 export type SliceDerivation = {
@@ -3120,40 +3134,6 @@ export type TabRename = {
 };
 
 /**
- * TokenAnalysisParameters
- */
-export type TokenAnalysisParameters = {
-    /**
-     * Node Columns
-     */
-    node_columns: {
-        [key: string]: string;
-    };
-    /**
-     * Node Ids
-     */
-    node_ids: Array<string>;
-    /**
-     * Node Tokenizer Models
-     */
-    node_tokenizer_models: {
-        [key: string]: string;
-    };
-    /**
-     * Server Limit
-     */
-    server_limit: number;
-    /**
-     * Stop Words
-     */
-    stop_words: Array<string>;
-    /**
-     * Token Limit
-     */
-    token_limit: number;
-};
-
-/**
  * TokenFrequencyAnalysisRequest
  */
 export type TokenFrequencyAnalysisRequest = {
@@ -3191,21 +3171,12 @@ export type TokenFrequencyAnalysisRequest = {
  * TokenFrequencyResult
  */
 export type TokenFrequencyResult = {
-    analysis_params: TokenAnalysisParameters;
     /**
      * Kind
      */
     kind?: 'token_frequency';
     metadata: TokenResultMetadata;
-    /**
-     * Stop Words
-     */
-    stop_words: Array<string>;
     tables: TokenTableResources;
-    /**
-     * Token Limit
-     */
-    token_limit: number;
 };
 
 /**
@@ -3213,29 +3184,13 @@ export type TokenFrequencyResult = {
  */
 export type TokenResultMetadata = {
     /**
-     * Node Display Names
+     * Effective Token Limit
      */
-    node_display_names: {
-        [key: string]: string;
-    };
+    effective_token_limit: number;
     /**
-     * Node Tokenizer Models
+     * Server Token Limit
      */
-    node_tokenizer_models: {
-        [key: string]: string;
-    };
-    /**
-     * Server Limit
-     */
-    server_limit: number;
-    /**
-     * Stop Words
-     */
-    stop_words: Array<string>;
-    /**
-     * Token Limit
-     */
-    token_limit: number;
+    server_token_limit: number;
 };
 
 /**
@@ -7196,7 +7151,11 @@ export type EditNodeData = {
         kind: 'replace';
     } & ReplaceNodeEditRequest) | ({
         kind: 'expression';
-    } & ExpressionNodeEditRequest);
+    } & ExpressionNodeEditRequest) | ({
+        kind: 'set_cell';
+    } & SetCellNodeEditRequest) | ({
+        kind: 'annotation_classes';
+    } & AnnotationClassesNodeEditRequest);
     path: {
         /**
          * Workspace Id

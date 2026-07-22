@@ -6,7 +6,6 @@
  * that is assembled by React components after an API response is received.
  */
 import type {
-  Analysis,
   ConcordancePage,
   ConcordanceResult,
   DataPortalRecord,
@@ -30,18 +29,6 @@ import type {
 } from './generated/types.gen';
 import type { ColumnKind } from '@/lib/arrow/arrowTable';
 
-export interface AnalysisResultUiState {
-  state: 'queued' | 'running' | 'successful' | 'failed' | 'cancelled';
-  message?: string;
-}
-
-export interface AnalysisTaskMetadata {
-  task_id?: string | null;
-  metadata_columns?: string[];
-  concordance_columns?: string[];
-  quotation_columns?: string[];
-}
-
 export type ConcordanceNodeResult = Omit<ConcordancePage, 'metadata'> & {
   metadata: ResultColumnMetadata & {
     metadata_columns: string[];
@@ -50,11 +37,11 @@ export type ConcordanceNodeResult = Omit<ConcordancePage, 'metadata'> & {
   };
 };
 
-export type ConcordanceAnalysisResponse = Omit<ConcordanceResult, 'data'> &
-  AnalysisResultUiState & {
-    data: Record<string, ConcordanceNodeResult>;
-    metadata?: AnalysisTaskMetadata;
-  };
+export type ConcordanceAnalysisResponse = ConcordanceResult & {
+  data: Record<string, ConcordanceNodeResult>;
+  combinable: boolean;
+  metadata: ResultColumnMetadata;
+};
 
 export interface TokenFrequencyStatisticsEntry {
   token: string;
@@ -72,37 +59,27 @@ export interface TokenFrequencyStatisticsEntry {
   significance?: string;
 }
 
-export type TokenFrequencyResponse = Omit<TokenFrequencyResult, 'tables'> &
-  AnalysisResultUiState & {
-    metadata: TokenFrequencyResult['metadata'] & AnalysisTaskMetadata;
-    tables?: TokenFrequencyResult['tables'];
-    data: Record<string, { data: Record<string, unknown>[]; metadata: Record<string, unknown> }>;
-    statistics?: TokenFrequencyStatisticsEntry[];
-  };
+export type TokenFrequencyResponse = Omit<TokenFrequencyResult, 'tables'> & {
+  tables?: TokenFrequencyResult['tables'];
+  data: Record<string, { data: Record<string, unknown>[]; metadata: Record<string, unknown> }>;
+  statistics?: TokenFrequencyStatisticsEntry[];
+};
 
-export type TopicModelingResponse = Omit<TopicModelingResult, 'topics'> &
-  AnalysisResultUiState & {
-    metadata?: AnalysisTaskMetadata;
-    data: {
-      topics: TopicModelingResult['topics'];
-      corpus_sizes: number[];
-      per_corpus_topic_counts?: Record<string, number>[] | null;
-    };
+export type TopicModelingResponse = Omit<TopicModelingResult, 'topics'> & {
+  topics: TopicModelingResult['topics'];
+  data: {
+    topics: TopicModelingResult['topics'];
+    corpus_sizes: number[];
+    per_corpus_topic_counts?: Record<string, number>[] | null;
   };
+};
 
-export type QuotationAnalysisResponse = QuotationResult &
-  AnalysisResultUiState & {
-    metadata: QuotationResult['metadata'] & AnalysisTaskMetadata;
-  };
+export type QuotationAnalysisResponse = QuotationResult;
 
-export type SequentialAnalysisResponse = Omit<SequentialResult, 'table'> &
-  AnalysisResultUiState & {
-    table?: SequentialResult['table'];
-    data: Record<string, unknown>[];
-    metadata?: AnalysisTaskMetadata;
-    chart_type?: string;
-    analysis_params?: Record<string, unknown>;
-  };
+export type SequentialAnalysisResponse = Omit<SequentialResult, 'table'> & {
+  table?: SequentialResult['table'];
+  data: Record<string, unknown>[];
+};
 
 export type WorkspaceGraphNode = WorkspaceNodeInfo;
 export interface WorkspaceGraphEdge {
@@ -212,7 +189,7 @@ export type TokenFrequencyRequest = TokenFrequencyAnalysisRequest;
 export type TopicModelingRequest = TopicModelingAnalysisRequest;
 export type QuotationRequest = QuotationAnalysisRequest;
 export type QuotationEngineConfig = QuotationEngineSelection;
-export type QuotationMetadata = ResultColumnMetadata & AnalysisTaskMetadata;
+export type QuotationMetadata = ResultColumnMetadata;
 export type TopicModelingTopic = TopicItem;
 
 export interface TokenizerModelInfo {
@@ -264,86 +241,6 @@ export function toFileTree(resources: FileResource[]): FileTreeNodeResponse[] {
     else roots.push(file);
   }
   return roots;
-}
-
-function analysisUiState(analysis: Analysis): AnalysisResultUiState {
-  return {
-    state: analysis.state === 'succeeded' ? 'successful' : analysis.state,
-    message: analysis.error?.message,
-  };
-}
-
-const analysisTaskMetadata = (analysis: Analysis): AnalysisTaskMetadata => ({
-  task_id: analysis.id,
-});
-
-/** Combine the canonical Analysis resource and typed result into a view-only model. */
-export function normalizeAnalysisResult(result: unknown, analysis: Analysis): unknown {
-  const ui = analysisUiState(analysis);
-  if (!result || typeof result !== 'object') return { ...ui };
-  const value = result as Record<string, unknown>;
-  switch (value.kind) {
-    case 'concordance': {
-      const data: Record<string, ConcordanceNodeResult> = {};
-      const rawData = value.data;
-      if (rawData && typeof rawData === 'object') {
-        Object.entries(rawData).forEach(([key, entry]) => {
-          if (!entry || typeof entry !== 'object') return;
-          const page = entry as ConcordancePage;
-          data[key] = {
-            ...page,
-            metadata: {
-              ...page.metadata,
-              metadata_columns: page.metadata.metadata_columns ?? [],
-              concordance_columns: page.metadata.concordance_columns ?? [],
-              quotation_columns: page.metadata.quotation_columns ?? [],
-            },
-          };
-        });
-      }
-      const firstPage = Object.values(data)[0];
-      return {
-        ...value,
-        ...ui,
-        data,
-        metadata: {
-          ...analysisTaskMetadata(analysis),
-          metadata_columns: firstPage?.metadata.metadata_columns ?? [],
-          concordance_columns: firstPage?.metadata.concordance_columns ?? [],
-          quotation_columns: firstPage?.metadata.quotation_columns ?? [],
-        },
-      };
-    }
-    case 'token_frequency':
-      return {
-        ...value,
-        ...ui,
-        metadata: { ...(value.metadata as object), ...analysisTaskMetadata(analysis) },
-        statistics: Array.isArray(value.statistics) ? value.statistics : [],
-      };
-    case 'topic_modeling':
-      return {
-        ...value,
-        ...ui,
-        metadata: analysisTaskMetadata(analysis),
-        data: {
-          topics: value.topics as TopicModelingResult['topics'],
-          corpus_sizes: value.corpus_sizes as number[],
-          per_corpus_topic_counts:
-            (value.per_corpus_topic_counts as Record<string, number>[] | null) ?? null,
-        },
-      };
-    case 'quotation':
-      return {
-        ...value,
-        ...ui,
-        metadata: { ...(value.metadata as object), ...analysisTaskMetadata(analysis) },
-      };
-    case 'sequential':
-      return { ...value, ...ui, metadata: analysisTaskMetadata(analysis) };
-    default:
-      return { ...value, ...ui };
-  }
 }
 
 export type GeneratedTab = Tab;

@@ -61,8 +61,3 @@ export function formatErrorDetail(detail: unknown): string | null {
   // eslint-disable-next-line @typescript-eslint/no-base-to-string -- detail is a non-object primitive here (string/array/object handled above); String() is the safe fallback
   return String(detail);
 }
-
-/** Lets callers identify fetch-level failures without coupling to TypeError text. */
-/** Used by: src/features/views/common/useAnalysisHydration.ts. */
-export const isNetworkError = (error: unknown): boolean =>
-  error instanceof ApiError && error.code === 'NETWORK';

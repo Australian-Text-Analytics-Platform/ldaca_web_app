@@ -1398,7 +1398,7 @@ export const closeWorkspaceByIdMutation = (options?: Partial<Options<CloseWorksp
 /**
  * Open Workspace By Id
  *
- * Idempotently load one Workspace into its process-local slot.
+ * Make one Workspace the user's sole open process-local aggregate.
  */
 export const openWorkspaceByIdMutation = (options?: Partial<Options<OpenWorkspaceByIdData>>): UseMutationOptions<OpenWorkspaceByIdResponse, OpenWorkspaceByIdError, Options<OpenWorkspaceByIdData>> => {
     const mutationOptions: UseMutationOptions<OpenWorkspaceByIdResponse, OpenWorkspaceByIdError, Options<OpenWorkspaceByIdData>> = {

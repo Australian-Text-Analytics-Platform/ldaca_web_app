@@ -1031,7 +1031,7 @@ export const closeWorkspaceById = <ThrowOnError extends boolean = false>(options
 /**
  * Open Workspace By Id
  *
- * Idempotently load one Workspace into its process-local slot.
+ * Make one Workspace the user's sole open process-local aggregate.
  */
 export const openWorkspaceById = <ThrowOnError extends boolean = false>(options: Options<OpenWorkspaceByIdData, ThrowOnError>): RequestResult<OpenWorkspaceByIdResponses, OpenWorkspaceByIdErrors, ThrowOnError> => (options.client ?? client).put<OpenWorkspaceByIdResponses, OpenWorkspaceByIdErrors, ThrowOnError>({
     security: [{

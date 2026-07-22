@@ -492,6 +492,67 @@
         "title": "AnnotationClass",
         "type": "object"
       },
+      "AnnotationClassRow": {
+        "additionalProperties": false,
+        "description": "One validated manual Annotation class-description row.",
+        "properties": {
+          "class": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Class",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "class"
+        ],
+        "title": "AnnotationClassRow",
+        "type": "object"
+      },
+      "AnnotationClassesNodeEditRequest": {
+        "additionalProperties": false,
+        "description": "Replace class-description rows while preserving other columns.",
+        "properties": {
+          "class_column": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Class Column",
+            "type": "string"
+          },
+          "description_column": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Description Column",
+            "type": "string"
+          },
+          "kind": {
+            "const": "annotation_classes",
+            "default": "annotation_classes",
+            "title": "Kind",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationClassRow"
+            },
+            "maxItems": 200,
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "class_column",
+          "description_column"
+        ],
+        "title": "AnnotationClassesNodeEditRequest",
+        "type": "object"
+      },
       "AnnotationCredentialStatus": {
         "additionalProperties": false,
         "properties": {
@@ -2014,93 +2075,6 @@
         "title": "ConcatStringExpression",
         "type": "object"
       },
-      "ConcordanceAnalysisParameters": {
-        "additionalProperties": false,
-        "properties": {
-          "case_sensitive": {
-            "default": false,
-            "title": "Case Sensitive",
-            "type": "boolean"
-          },
-          "label_to_node_map": {
-            "additionalProperties": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Label To Node Map",
-            "type": "object"
-          },
-          "node_columns": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Node Columns",
-            "type": "object"
-          },
-          "node_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Node Ids",
-            "type": "array"
-          },
-          "num_left_tokens": {
-            "default": 10,
-            "maximum": 1000.0,
-            "minimum": 0.0,
-            "title": "Num Left Tokens",
-            "type": "integer"
-          },
-          "num_right_tokens": {
-            "default": 10,
-            "maximum": 1000.0,
-            "minimum": 0.0,
-            "title": "Num Right Tokens",
-            "type": "integer"
-          },
-          "page": {
-            "default": 1,
-            "minimum": 1.0,
-            "title": "Page",
-            "type": "integer"
-          },
-          "regex": {
-            "default": false,
-            "title": "Regex",
-            "type": "boolean"
-          },
-          "search_mode": {
-            "default": "regex",
-            "enum": [
-              "regex",
-              "tokens"
-            ],
-            "title": "Search Mode",
-            "type": "string"
-          },
-          "search_word": {
-            "minLength": 1,
-            "title": "Search Word",
-            "type": "string"
-          },
-          "whole_word": {
-            "default": false,
-            "title": "Whole Word",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "node_ids",
-          "node_columns",
-          "search_word"
-        ],
-        "title": "ConcordanceAnalysisParameters",
-        "type": "object"
-      },
       "ConcordanceAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2466,23 +2440,6 @@
       "ConcordanceResult": {
         "additionalProperties": false,
         "properties": {
-          "analysis_params": {
-            "$ref": "#/components/schemas/ConcordanceAnalysisParameters"
-          },
-          "combinable": {
-            "title": "Combinable",
-            "type": "boolean"
-          },
-          "data": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/ConcordancePage"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Data",
-            "type": "object"
-          },
           "kind": {
             "const": "concordance",
             "default": "concordance",
@@ -2491,12 +2448,19 @@
           },
           "query": {
             "$ref": "#/components/schemas/ConcordanceResultQuery"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConcordanceSourceResult"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
           }
         },
         "required": [
-          "data",
-          "analysis_params",
-          "combinable",
+          "sources",
           "query"
         ],
         "title": "ConcordanceResult",
@@ -2554,6 +2518,32 @@
           }
         },
         "title": "ConcordanceResultQuery",
+        "type": "object"
+      },
+      "ConcordanceSourceResult": {
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "format": "uuid",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Node Name",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ConcordancePage"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_name",
+          "result"
+        ],
+        "title": "ConcordanceSourceResult",
         "type": "object"
       },
       "CorruptAnalysis": {
@@ -4801,13 +4791,6 @@
       "QuotationResultQuery": {
         "additionalProperties": false,
         "properties": {
-          "context_length": {
-            "default": 20,
-            "maximum": 1000.0,
-            "minimum": 0.0,
-            "title": "Context Length",
-            "type": "integer"
-          },
           "descending": {
             "default": false,
             "title": "Descending",
@@ -5833,6 +5816,46 @@
         "title": "SessionUser",
         "type": "object"
       },
+      "SetCellNodeEditRequest": {
+        "additionalProperties": false,
+        "description": "Replace one string cell at an absolute Data Block row index.",
+        "properties": {
+          "column": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Column",
+            "type": "string"
+          },
+          "kind": {
+            "const": "set_cell",
+            "default": "set_cell",
+            "title": "Kind",
+            "type": "string"
+          },
+          "row_index": {
+            "minimum": 0.0,
+            "title": "Row Index",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "column",
+          "row_index"
+        ],
+        "title": "SetCellNodeEditRequest",
+        "type": "object"
+      },
       "SliceDerivation": {
         "additionalProperties": false,
         "properties": {
@@ -6368,66 +6391,6 @@
         "title": "TabRename",
         "type": "object"
       },
-      "TokenAnalysisParameters": {
-        "additionalProperties": false,
-        "properties": {
-          "node_columns": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Node Columns",
-            "type": "object"
-          },
-          "node_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Node Ids",
-            "type": "array"
-          },
-          "node_tokenizer_models": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Node Tokenizer Models",
-            "type": "object"
-          },
-          "server_limit": {
-            "minimum": 1.0,
-            "title": "Server Limit",
-            "type": "integer"
-          },
-          "stop_words": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Stop Words",
-            "type": "array"
-          },
-          "token_limit": {
-            "minimum": 1.0,
-            "title": "Token Limit",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "node_ids",
-          "node_columns",
-          "token_limit",
-          "server_limit",
-          "stop_words",
-          "node_tokenizer_models"
-        ],
-        "title": "TokenAnalysisParameters",
-        "type": "object"
-      },
       "TokenFrequencyAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6494,9 +6457,6 @@
       "TokenFrequencyResult": {
         "additionalProperties": false,
         "properties": {
-          "analysis_params": {
-            "$ref": "#/components/schemas/TokenAnalysisParameters"
-          },
           "kind": {
             "const": "token_frequency",
             "default": "token_frequency",
@@ -6506,27 +6466,12 @@
           "metadata": {
             "$ref": "#/components/schemas/TokenResultMetadata"
           },
-          "stop_words": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Stop Words",
-            "type": "array"
-          },
           "tables": {
             "$ref": "#/components/schemas/_TokenTableResources"
-          },
-          "token_limit": {
-            "minimum": 1.0,
-            "title": "Token Limit",
-            "type": "integer"
           }
         },
         "required": [
-          "token_limit",
-          "analysis_params",
           "metadata",
-          "stop_words",
           "tables"
         ],
         "title": "TokenFrequencyResult",
@@ -6535,50 +6480,20 @@
       "TokenResultMetadata": {
         "additionalProperties": false,
         "properties": {
-          "node_display_names": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Node Display Names",
-            "type": "object"
-          },
-          "node_tokenizer_models": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Node Tokenizer Models",
-            "type": "object"
-          },
-          "server_limit": {
+          "effective_token_limit": {
             "minimum": 1.0,
-            "title": "Server Limit",
+            "title": "Effective Token Limit",
             "type": "integer"
           },
-          "stop_words": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Stop Words",
-            "type": "array"
-          },
-          "token_limit": {
+          "server_token_limit": {
             "minimum": 1.0,
-            "title": "Token Limit",
+            "title": "Server Token Limit",
             "type": "integer"
           }
         },
         "required": [
-          "token_limit",
-          "server_limit",
-          "stop_words",
-          "node_tokenizer_models",
-          "node_display_names"
+          "effective_token_limit",
+          "server_token_limit"
         ],
         "title": "TokenResultMetadata",
         "type": "object"
@@ -14245,12 +14160,14 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
+                    "annotation_classes": "#/components/schemas/AnnotationClassesNodeEditRequest",
                     "cast": "#/components/schemas/CastNodeEditRequest",
                     "delete_column": "#/components/schemas/DeleteColumnNodeEditRequest",
                     "expression": "#/components/schemas/ExpressionNodeEditRequest",
                     "filter": "#/components/schemas/FilterNodeEditRequest",
                     "rename_column": "#/components/schemas/RenameColumnNodeEditRequest",
-                    "replace": "#/components/schemas/ReplaceNodeEditRequest"
+                    "replace": "#/components/schemas/ReplaceNodeEditRequest",
+                    "set_cell": "#/components/schemas/SetCellNodeEditRequest"
                   },
                   "propertyName": "kind"
                 },
@@ -14272,6 +14189,12 @@
                   },
                   {
                     "$ref": "#/components/schemas/ExpressionNodeEditRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SetCellNodeEditRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AnnotationClassesNodeEditRequest"
                   }
                 ],
                 "title": "Request"
@@ -14763,7 +14686,7 @@
         ]
       },
       "put": {
-        "description": "Idempotently load one Workspace into its process-local slot.",
+        "description": "Make one Workspace the user's sole open process-local aggregate.",
         "operationId": "open_workspace_by_id",
         "parameters": [
           {
