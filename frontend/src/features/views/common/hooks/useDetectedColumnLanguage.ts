@@ -41,14 +41,17 @@ export function useDetectedColumnLanguage({
   enabled = true,
 }: UseDetectedColumnLanguageArgs): DetectedColumnLanguage {
   const canFetchSample = Boolean(enabled && workspaceId && nodeId && column);
+  const sql = nodeId && column ? `SELECT ${sqlIdentifier(column)} FROM ${sqlTable(nodeId)}` : '';
   const sampleQuery = useQuery({
     queryKey:
       workspaceId && nodeId
-        ? [
-            ...queryKeys.nodeData(workspaceId, nodeId, LANGUAGE_SAMPLE_REQUEST),
-            'language-sample',
-            column,
-          ]
+        ? queryKeys.workspaceSql(
+            workspaceId,
+            [nodeId],
+            sql,
+            LANGUAGE_SAMPLE_REQUEST.page,
+            LANGUAGE_SAMPLE_REQUEST.page_size,
+          )
         : ['tokenizer-language-sample', nodeId, column],
     enabled: canFetchSample,
     staleTime: 60_000,
@@ -62,7 +65,7 @@ export function useDetectedColumnLanguage({
         body: {
           mode: 'query',
           node_ids: [nodeId],
-          sql: `SELECT ${sqlIdentifier(column)} FROM ${sqlTable(nodeId)}`,
+          sql,
           page: LANGUAGE_SAMPLE_REQUEST.page,
           page_size: LANGUAGE_SAMPLE_REQUEST.page_size,
         },

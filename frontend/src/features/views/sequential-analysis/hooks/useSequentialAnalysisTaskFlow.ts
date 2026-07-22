@@ -23,17 +23,10 @@ interface SequentialAnalysisState {
   customIntervalValue: number | null;
   customIntervalUnit: SequentialCustomIntervalUnit | null;
   caseSensitive: boolean;
-  results: Record<string, unknown> | null;
 }
 
 interface SequentialAnalysisActions {
   setIsAnalyzing: (value: boolean) => void;
-  setResults: (
-    value:
-      | Record<string, unknown>
-      | null
-      | ((prev: Record<string, unknown> | null) => Record<string, unknown> | null),
-  ) => void;
   setChartType: (value: ChartTypeOption) => void;
   setLocalTaskId: (value: string | null) => void;
   runningRef: { current: boolean };
@@ -76,11 +69,9 @@ export function useSequentialAnalysisTaskFlow({
     customIntervalValue,
     customIntervalUnit,
     caseSensitive,
-    results,
   },
   actions: {
     setIsAnalyzing,
-    setResults,
     setChartType,
     setLocalTaskId,
     runningRef,
@@ -107,12 +98,7 @@ export function useSequentialAnalysisTaskFlow({
 
     /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty column/time strings must fall through to the next fallback source */
     const picked =
-      nodeColumnSelections.find((s) => s.nodeId === nodeIdForAnalysis)?.column ||
-      timeColumn ||
-      ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as
-        | string
-        | undefined) ||
-      '';
+      nodeColumnSelections.find((s) => s.nodeId === nodeIdForAnalysis)?.column || timeColumn || '';
     /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
     if (!picked) {
       toast.error('Please select a time column');
@@ -171,9 +157,7 @@ export function useSequentialAnalysisTaskFlow({
       setIsRunning: setIsAnalyzing,
       setLocalTaskId,
       onTaskIdAssigned,
-      resetBeforeRun: () => {
-        setResults(null);
-      },
+      resetBeforeRun: () => undefined,
       submit: async () => {
         const { data } = await submitTabAnalysis({
           body: { kind: 'sequential', ...request },
@@ -200,17 +184,12 @@ export function useSequentialAnalysisTaskFlow({
    */
   const handleClearResults = () => clearResults();
 
-  // Persists chart-type changes onto both local result state and the stored task result.
+  // Persists chart-type changes in device-local presentation state.
   /**
    * Returned to `SequentialAnalysisFeature` by `useSequentialAnalysisTaskFlow`.
    */
   const handleChartTypeChange = (value: ChartTypeOption) => {
     setChartType(value);
-    setResults((prev: Record<string, unknown> | null) =>
-      prev ? { ...prev, chart_type: value } : prev,
-    );
-
-    // Chart type is presentation state and remains local to the frontend.
   };
 
   return {

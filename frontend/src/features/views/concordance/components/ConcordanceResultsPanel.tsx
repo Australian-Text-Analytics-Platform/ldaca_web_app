@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, type RefObject } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -201,21 +201,14 @@ export function ConcordanceResultsPanel({
     <Card ref={resultsRef}>
       <CardHeader className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              Search Results
-              <HelpIcon
-                targetKey="analysis.concordance.results"
-                label="Concordance results"
-                tooltip="Browse keyword-in-context hits, switch between separated/combined views, and adjust pagination."
-              />
-            </CardTitle>
-            {results.message && (
-              <CardDescription className="max-w-2xl text-sm text-muted-foreground">
-                {results.message}
-              </CardDescription>
-            )}
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            Search Results
+            <HelpIcon
+              targetKey="analysis.concordance.results"
+              label="Concordance results"
+              tooltip="Browse keyword-in-context hits, switch between separated/combined views, and adjust pagination."
+            />
+          </CardTitle>
           {panelSelectedNodes.length > 1 && (
             <Tabs
               value={viewMode}

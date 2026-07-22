@@ -1,5 +1,4 @@
 import type { Analysis } from '@/api';
-import { extractAndSetTaskId } from '../extractTaskId';
 
 interface CurrentRef<T> {
   current: T;
@@ -67,7 +66,8 @@ export async function runAnalysisTaskEnvelope<TAnalysis extends Analysis>({
 
   try {
     const response = await submit();
-    const taskId = extractAndSetTaskId(response, setLocalTaskId);
+    const taskId = response.id;
+    setLocalTaskId(taskId);
     onTaskIdAssigned(taskId);
     onSuccess(response, taskId);
 

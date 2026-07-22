@@ -1,28 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
-import type { ConcordanceAnalysisResponse } from '@/api';
+import type { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse } from '@/api';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useAnalysisStore } from '@/stores/analysisStore';
-import { useUIStore } from '@/stores';
 import { Card, CardContent } from '@/components/ui/card';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { executeAnalysisRerun } from '../common/rerunAnalysis';
-import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
-import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
+import { getAnalysisResultResource } from '../common/analysisApi';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
-import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { useConcordanceTaskFlow } from './hooks/useConcordanceTaskFlow';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
-import { useConcordancePendingHandoff } from './hooks/useConcordancePendingHandoff';
 import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
 import { useConcordanceDetachDialogs } from './hooks/useConcordanceDetachDialogs';
 import { useConcordanceDispersionControls } from './hooks/useConcordanceDispersionControls';
@@ -64,11 +59,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const {
     detachConcordance,
     detachConcordanceDispersion,
-    replaceSelectedNodes,
     setNodeColor: persistNodeColor,
   } = useWorkspaceActions();
-  const currentView = useUIStore((state) => state.currentView);
-  const isActiveTab = currentView === 'concordance';
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
   });
@@ -116,19 +108,10 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     nodes: panelSelectedNodes,
     persistNodeColor,
   });
-  // Last-run request, used only to compute the Run vs Re-run button state.
-  const { serverRequest } = useLastRunRequest({
-    analysisType: ANALYSIS_TAB_GROUPS.concordance,
-    workspaceId: currentWorkspaceId,
-    taskId: tabTaskId,
-  });
   /** Replaces this tab's inputs from a node/column selection list (hydration + handoff). */
   const applyInputsFromSelections = (sels: { nodeId: string; column?: string | null }[]) => {
     onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(sels));
   };
-  const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
-  const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
-  const setTasks = useAnalysisStore((state) => state.setTasks);
   const concordanceParameters = useConcordanceParameters();
   const {
     searchWord,
@@ -174,66 +157,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   } = useConcordanceDispersionControls();
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
-  const {
-    results,
-    resultRef: concordanceResultsRef,
-    setResults,
-    nodePagination,
-    setNodePagination,
-    nodeLoading,
-    setNodeLoading,
-    nodeDetaching,
-    setNodeDetaching,
-    globalPageSize,
-    applyGlobalPageSize,
-    reset: resetResultSession,
-    labelToNodeId,
-    defaultPalette,
-    nodeColors,
-    sourceColorMap,
-    allMatchedTexts,
-    matchedTextColorMap,
-    resolveNodeIdForKey,
-  } = useConcordanceResultSession({
-    selectedNodes: panelSelectedNodes,
-    showDispersion,
-    colourMatches,
-    lowercaseMatches,
-    nodeColorOverrides,
-  });
-
   const [viewMode, setViewMode] = useState<'separated' | 'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
-
-  useEffect(() => {
-    const element = resultsViewportRef.current;
-    if (!element) {
-      return;
-    }
-
-    /** Keeps dispersion column sizing synced with the rendered results viewport. */
-    /**
-     * Called by the layout effect and its ResizeObserver callback.
-     */
-    const updateWidth = () => {
-      setResultsViewportWidth(element.clientWidth);
-    };
-
-    updateWidth();
-
-    if (typeof ResizeObserver === 'undefined') {
-      return;
-    }
-
-    const observer = new ResizeObserver(() => {
-      updateWidth();
-    });
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [results]);
 
   // Concordance has two engines. ``regex`` walks raw text (the historical
   // default, preserving ``equ\w*``-style affordances); ``tokens`` walks the
@@ -250,6 +175,100 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     effectiveNodeColumnSelections: nodeColumnSelections,
     nodeInfoCache,
   });
+
+  const {
+    request: serverRequest,
+    resolveTaskId,
+    setLocalTaskId: setLocalConcordanceTaskId,
+    isRunning: isSearching,
+    setIsRunning: setIsSearching,
+    runningRef,
+    lastFetchedRef,
+    taskStatus: concordanceTaskStatus,
+    banner: concordanceWaitingBanner,
+    clearResults,
+    stopTask,
+    isStopping,
+    analysisError,
+    result: baseResult,
+  } = useAnalysisFeature<ConcordanceAnalysisResponse, ConcordanceAnalysisRequest>({
+    taskType: ANALYSIS_TASK_TYPES.concordance,
+    workspaceId: currentWorkspaceId,
+    tabId: host.tabId,
+    // The host's persisted task id wins task resolution over transient local state.
+    hydrationTaskId: tabTaskId,
+    /** Fetches a completed concordance task result for polling and hydration. */
+    fetchResult: async (taskId) => {
+      if (!currentWorkspaceId) throw new Error('No workspace selected');
+      return getAnalysisResultResource<ConcordanceAnalysisResponse>(currentWorkspaceId, taskId);
+    },
+    /** Restores concordance form controls from a saved request. */
+    onRequest: (requestPayload) => {
+      const reqObj = requestPayload as unknown as Record<string, unknown>;
+      applyInputsFromSelections(concordanceParameters.applyHydratedRequest(reqObj));
+      // Combined view is a client-only synthesis and is never persisted, so
+      // hydrated tasks always restore to separated; the user can re-enter
+      // combined via the toggle (which re-pages both nodes on demand).
+      setViewMode('separated');
+    },
+    /** Clears result-specific state while preserving local controls when requested by handoff flows. */
+    onCleared: (_, options) => {
+      setCombinedPage(1);
+      if (options?.preserveLocalState) {
+        return;
+      }
+      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
+      // a task the user explicitly cleared. Preserve-local-state clears (handoff
+      // flows) intentionally keep the tab→task link. Inputs are intentionally
+      // left intact so the user keeps their curated selection after clearing.
+      onTabTaskChange(null);
+    },
+  });
+
+  const {
+    results,
+    nodePagination,
+    setNodePagination,
+    nodeLoading,
+    nodeDetaching,
+    setNodeDetaching,
+    globalPageSize,
+    applyGlobalPageSize,
+    combinedLoading,
+    labelToNodeId,
+    defaultPalette,
+    nodeColors,
+    sourceColorMap,
+    allMatchedTexts,
+    matchedTextColorMap,
+    resolveNodeIdForKey,
+  } = useConcordanceResultSession({
+    workspaceId: currentWorkspaceId,
+    analysisId: tabTaskId,
+    baseResult,
+    viewMode,
+    combinedPage,
+    selectedNodes: panelSelectedNodes,
+    showDispersion,
+    colourMatches,
+    lowercaseMatches,
+    nodeColorOverrides,
+  });
+
+  useEffect(() => {
+    const element = resultsViewportRef.current;
+    if (!element) return;
+    const updateWidth = () => {
+      setResultsViewportWidth(element.clientWidth);
+    };
+    updateWidth();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, [results]);
 
   const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } =
     useConcordanceMetadataColumns({
@@ -270,84 +289,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       searchWord,
     });
 
-  const {
-    resolveTaskId,
-    setLocalTaskId: setLocalConcordanceTaskId,
-    isRunning: isSearching,
-    setIsRunning: setIsSearching,
-    runningRef,
-    lastFetchedRef,
-    taskStatus: concordanceTaskStatus,
-    banner: concordanceWaitingBanner,
-    hydrationState,
-    clearResults,
-    stopTask,
-    isStopping,
-  } = useAnalysisFeature<ConcordanceAnalysisResponse>({
-    analysisType: ANALYSIS_TAB_GROUPS.concordance,
-    taskType: ANALYSIS_TASK_TYPES.concordance,
-    workspaceId: currentWorkspaceId,
-    tabId: host.tabId,
-    isTabActive: isActiveTab,
-    // The host's persisted task id wins task resolution over transient local state.
-    hydrationTaskId: tabTaskId,
-    resultRef: concordanceResultsRef,
-    /** Fetches a completed concordance task result for polling and hydration. */
-    fetchResult: async (taskId) => {
-      if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisResultResource<ConcordanceAnalysisResponse>(currentWorkspaceId, taskId);
-    },
-    /** Fetches the saved request so hydration can restore the analysis controls. */
-    fetchRequest: async (taskId) => {
-      if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisRequest(currentWorkspaceId, taskId);
-    },
-    /** Copies freshly fetched task results into the feature's safe-result state. */
-    onResultFetched: (resultData) => {
-      setResults(resultData);
-    },
-    /** Accepts restored result payloads from persisted analysis tasks. */
-    onHydratedResult: (resultPayload) => {
-      const res = resultPayload?.data ?? resultPayload;
-      if (res) {
-        setResults(resultPayload);
-      }
-    },
-    /** Restores concordance form controls from a saved request. */
-    onHydratedRequest: (requestPayload) => {
-      const req = (requestPayload as Record<string, unknown> | undefined)?.data ?? requestPayload;
-      if (!req || typeof req !== 'object') return;
-      const reqObj = req as Record<string, unknown>;
-      applyInputsFromSelections(concordanceParameters.applyHydratedRequest(reqObj));
-      // Combined view is a client-only synthesis and is never persisted, so
-      // hydrated tasks always restore to separated; the user can re-enter
-      // combined via the toggle (which re-pages both nodes on demand).
-      setViewMode('separated');
-    },
-    /** Clears result-specific state while preserving local controls when requested by handoff flows. */
-    onCleared: (_, options) => {
-      resetResultSession();
-      setCombinedPage(1);
-      if (options?.preserveLocalState) {
-        return;
-      }
-      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared. Preserve-local-state clears (handoff
-      // flows) intentionally keep the tab→task link. Inputs are intentionally
-      // left intact so the user keeps their curated selection after clearing.
-      onTabTaskChange(null);
-    },
-    /** Keeps the shared task inbox free of concordance task duplicates after lifecycle updates. */
-    pruneTaskInbox: (taskIds) => {
-      setTasks((prev) => {
-        if (!Array.isArray(prev)) return prev;
-        return taskIds.length > 0 ? pruneTasksById(prev, taskIds) : prev;
-      });
-    },
-    /** Lets the shared analysis lifecycle recognize in-flight concordance responses. */
-    isResultRunning: (r) => r?.state === 'running',
-  });
-
   // No auto-selection on activation: Show metadata starts empty and the user
   // explicitly ticks the columns they want. We just clean up any selections
   // that are no longer in the available set (e.g. after a re-run that drops
@@ -364,8 +305,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
 
   const {
     handleSearch,
-    handleHandoffSearch,
-    updateStoredResult,
     handleSort,
     handlePageChange,
     persistResultPreferences,
@@ -392,11 +331,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     actions: {
       setNodePagination,
       setIsSearching,
-      setResults,
       setLocalTaskId: setLocalConcordanceTaskId,
       runningRef,
       lastFetchedRef,
-      setNodeLoading,
       setNodeDetaching,
       // Persist the run's assigned task id onto the active tab so reload
       // rehydrates the same task. No-op when not tab-mounted.
@@ -426,7 +363,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   // (resetting to page 1), then persist unless the panel is read-only.
   const handleGlobalPageSizeChange = (newSize: number) => {
     applyGlobalPageSize(newSize);
-    void persistResultPreferences({ pageSize: newSize });
+    persistResultPreferences({ pageSize: newSize });
   };
 
   // Run vs Re-run: with no locking, the primary button is gated purely by
@@ -437,8 +374,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     : hasParameterDiff(currentConcordanceParams, readConcordanceServerParams(lastRunRequest)) ||
       hasNodeSelectionChanged(
         nodeColumnSelections,
-        lastRunRequest.node_ids as string[] | undefined,
-        lastRunRequest.node_columns as Record<string, string> | undefined,
+        lastRunRequest.node_ids,
+        lastRunRequest.node_columns,
       );
 
   const actionState = getRerunActionState({
@@ -471,19 +408,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     }
   }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
-  const { autoSearchRequest } = useConcordancePendingHandoff({
-    tabId: host.tabId,
-    pendingConcordance,
-    clearPendingConcordance,
-    hydrationState,
-    selectedNodes,
-    setSearchWord,
-    setNodeColumnSelections: (sels) => {
-      applyInputsFromSelections(sels);
-    },
-    replaceSelectedNodes,
-  });
-
   // No auto-column recompute: a node's default column is chosen at add-time by
   // the node-inputs model, so there is no unlocked recompute effect here.
 
@@ -513,15 +437,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     recordTokenizerModel(nodeId, model);
   };
 
-  const submittedAutoSearchRef = useRef<typeof autoSearchRequest>(null);
-  useEffect(() => {
-    if (!autoSearchRequest || submittedAutoSearchRef.current === autoSearchRequest) {
-      return;
-    }
-    submittedAutoSearchRef.current = autoSearchRequest;
-    void handleHandoffSearch(autoSearchRequest);
-  }, [autoSearchRequest, handleHandoffSearch]);
-
   /** Delegates clearing to the shared analysis lifecycle only when a workspace is active. */
   /**
    * Passed to the analysis action controls as the clear handler.
@@ -545,14 +460,11 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     });
   };
 
-  const { combinedLoading, handleViewModeChange } = useConcordanceViewModeSwap({
+  const { handleViewModeChange } = useConcordanceViewModeSwap({
     viewMode,
     setViewMode,
     results,
-    setResults,
-    combinedPage,
-    globalPageSize,
-    updateStoredResult,
+    combinedLoading,
     resultsRef,
   });
 
@@ -611,7 +523,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       )}
 
       {/* Results */}
-      {results?.state === 'successful' && (
+      {results && (
         <ConcordanceResultsPanel
           shell={{
             resultsRef,
@@ -684,11 +596,11 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         />
       )}
 
-      {results?.state === 'failed' && (
+      {analysisError && (
         <Card>
           <CardContent>
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {results.message}
+              {analysisError}
             </div>
           </CardContent>
         </Card>

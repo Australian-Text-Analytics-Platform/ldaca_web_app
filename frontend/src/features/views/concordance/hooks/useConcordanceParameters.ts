@@ -33,7 +33,7 @@ export function useConcordanceParameters() {
   /**
    * Updates the search phrase while preserving the React set-state signature
    * expected by the panel and token-frequency handoff.
-   * Called by: ConcordanceParameterPanel and useConcordancePendingHandoff.
+   * Called by: ConcordanceParameterPanel and saved-request hydration.
    */
   const setSearchWord: Dispatch<SetStateAction<string>> = (value) => {
     dispatchParameters({ type: 'setSearchWord', value });

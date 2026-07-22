@@ -18,31 +18,28 @@ describe('runAnalysisTaskEnvelope', () => {
   it('stores the task id and leaves running tasks active for stream hydration', async () => {
     const options = baseOptions();
     options.submit.mockResolvedValue({
+      id: 'task-1',
       state: 'running',
-      metadata: { task_id: 'task-1' },
     });
 
     const result = await runAnalysisTaskEnvelope(options);
 
-    expect(result).toEqual({ state: 'running', metadata: { task_id: 'task-1' } });
+    expect(result).toEqual({ id: 'task-1', state: 'running' });
     expect(options.lastFetchedRef.current).toEqual({ taskId: null, state: null });
     expect(options.setIsRunning).toHaveBeenCalledWith(true);
     expect(options.runningRef.current).toBe(true);
     expect(options.resetBeforeRun).toHaveBeenCalledOnce();
     expect(options.setLocalTaskId).toHaveBeenCalledWith('task-1');
     expect(options.onTaskIdAssigned).toHaveBeenCalledWith('task-1');
-    expect(options.onSuccess).toHaveBeenCalledWith(
-      { state: 'running', metadata: { task_id: 'task-1' } },
-      'task-1',
-    );
+    expect(options.onSuccess).toHaveBeenCalledWith({ id: 'task-1', state: 'running' }, 'task-1');
     expect(options.onError).not.toHaveBeenCalled();
   });
 
   it('releases the local running flag when the response has already failed', async () => {
     const options = baseOptions();
     options.submit.mockResolvedValue({
+      id: 'task-2',
       state: 'failed',
-      metadata: { task_id: 'task-2' },
     });
 
     await runAnalysisTaskEnvelope(options);

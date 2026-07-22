@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
-import type { QuotationAnalysisResponse, QuotationEngineConfig } from '@/api';
+import { useState } from 'react';
+import {
+  getAnalysisResult,
+  queryAnalysisResult,
+  type QuotationAnalysisRequest,
+  type QuotationAnalysisResponse,
+  type QuotationEngineConfig,
+  type QuotationResultQuery,
+} from '@/api';
 
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useUIStore } from '@/stores/uiStore';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import {
   AlertDialog,
@@ -15,16 +21,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { analysisInputsFromRequest } from '../common/utils';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { executeAnalysisRerun } from '../common/rerunAnalysis';
-import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
 
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { useQuotationContextPreference } from './hooks/useQuotationContextPreference';
@@ -64,9 +68,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     setInputSet: onTabInputSetChange,
   } = host;
   const { currentWorkspaceId } = useWorkspaceData();
-  const { quotationSearch, detachQuotation } = useWorkspaceActions();
-  const currentView = useUIStore((state) => state.currentView);
-  const isActiveTab = currentView === 'quotation';
+  const { detachQuotation } = useWorkspaceActions();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -80,11 +82,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   const setNodeColumnSelection = nodeInputs.setColumn;
   const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
   const activeSelections = nodeColumnSelections;
-  const { serverRequest } = useLastRunRequest({
-    analysisType: ANALYSIS_TAB_GROUPS.quotation,
-    workspaceId: currentWorkspaceId,
-    taskId: tabTaskId,
-  });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
   });
@@ -101,32 +98,10 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     buildEngineRequest,
   } = useQuotationEngineSettings();
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
-  const [liveHasLoaded, setHasLoaded] = useState(false);
+  const [resultQuery, setResultQuery] = useState<QuotationResultQuery | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
-  const hydratedResultTargetRef = useRef<{
-    taskId: string | null;
-    nodeId: string;
-    column: string;
-  } | null>(null);
-  const persistContextPreferenceRef = useRef<(value: number) => Promise<unknown>>(() =>
-    Promise.resolve(undefined),
-  );
-  const {
-    contextLength,
-    contextLengthInput,
-    contextLengthError,
-    isSavingContextLength,
-    setContextLengthInput,
-    handleContextLengthBlur,
-    handleContextLengthKeyDown,
-    applyPreferenceFromResult: applyContextLengthPreferenceFromResult,
-  } = useQuotationContextPreference({
-    currentWorkspaceId,
-    hasLoaded: liveHasLoaded,
-    persistPreference: (value) => persistContextPreferenceRef.current(value),
-  });
   const {
     detailPayload,
     detailOpen,
@@ -153,35 +128,8 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     setErrorDialogOpen(true);
   };
 
-  const quotationResultRef = useRef<QuotationAnalysisResponse | null>(null);
-  const quotationResultTaskIdRef = useRef<string | null>(null);
   const {
-    nodeState,
-    nodeDetaching,
-    setNodeDetaching,
-    resultsByNode,
-    updateResultState,
-    resetAfterClear,
-  } = useQuotationResultControls();
-
-  const applyQuotationResult = (
-    result: QuotationAnalysisResponse,
-    taskId: string | null,
-    target?: { nodeId: string; column: string },
-  ) => {
-    quotationResultRef.current = result;
-    quotationResultTaskIdRef.current = taskId;
-    const targetNode = displayedNodes[0];
-    const nodeId = target?.nodeId ?? targetNode?.id ?? '';
-    const selection = activeSelections.find((candidate) => candidate.nodeId === nodeId);
-    const column = target?.column ?? selection?.column ?? '';
-    if (!nodeId || !column) return;
-    applyContextLengthPreferenceFromResult(result);
-    updateResultState(nodeId, column, result);
-    setHasLoaded(true);
-  };
-
-  const {
+    request: serverRequest,
     resolveTaskId,
     setLocalTaskId,
     isRunning: isLoadingQuotations,
@@ -193,96 +141,90 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     clearResults,
     stopTask,
     isStopping,
-  } = useAnalysisFeature<QuotationAnalysisResponse>({
-    analysisType: ANALYSIS_TAB_GROUPS.quotation,
+    result,
+  } = useAnalysisFeature<QuotationAnalysisResponse, QuotationAnalysisRequest>({
     taskType: ANALYSIS_TASK_TYPES.quotation,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
     hydrationTaskId: tabTaskId,
-    resultRef: quotationResultRef,
-    // Loads the latest quotation result for polling and task resumption.
-    fetchResult: async (taskId) => {
+    resultQuery: resultQuery ?? undefined,
+    // Initial hydration reads the stored canonical Result. Only an explicit
+    // page or sort change requests an alternate immutable projection.
+    fetchResult: async (taskId, rawQuery) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      const data = await getAnalysisResultResource<QuotationAnalysisResponse>(
-        currentWorkspaceId,
-        taskId,
-      );
-      return data;
-    },
-    // Retrieves the submitted quotation request so hydration can restore engine and selection state.
-    fetchRequest: async (taskId) => {
-      if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisRequest(currentWorkspaceId, taskId);
-    },
-    // Applies freshly fetched results to the active node table after lifecycle polling finishes.
-    // Resolve the active node/column, apply persisted context length, then replace its result.
-    onResultFetched: (result, taskId) => {
-      // defensive: the analysis lifecycle may deliver an empty result on edge cases
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!result) return;
-      const hydratedTarget = hydratedResultTargetRef.current;
-      applyQuotationResult(
-        result,
-        taskId,
-        hydratedTarget?.taskId === taskId ? hydratedTarget : undefined,
-      );
-    },
-    // Rebuilds result state from a cached task payload when the quotation tab hydrates.
-    onHydratedResult: (resultPayload) => {
-      const res = resultPayload;
-      if (!res) return;
-      const hydratedTarget = hydratedResultTargetRef.current;
-      const selection = nodeColumnSelections[0];
-      const target =
-        hydratedTarget?.taskId === tabTaskId
-          ? hydratedTarget
-          : selection
-            ? { nodeId: selection.nodeId, column: selection.column }
-            : undefined;
-      applyQuotationResult(res, tabTaskId, target);
+      if (!rawQuery) {
+        const { data } = await getAnalysisResult({
+          path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
+          throwOnError: true,
+        });
+        return data as QuotationAnalysisResponse;
+      }
+      const query = rawQuery as QuotationResultQuery;
+      const { data } = await queryAnalysisResult({
+        body: { kind: 'quotation', ...query },
+        path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
+        throwOnError: true,
+      });
+      return data as QuotationAnalysisResponse;
     },
     // Restores saved request settings after reload.
     // Called by: useAnalysisFeature hydration to restore the quotation engine
     // configuration before rendering results.
-    onHydratedRequest: (requestPayload) => {
-      const requestData = ((requestPayload as Record<string, unknown>).data ??
-        requestPayload) as Record<string, unknown> | null;
-      if (!requestData) return;
+    onRequest: (requestPayload) => {
+      const requestData = requestPayload as unknown as Record<string, unknown>;
       const nodeId = typeof requestData.node_id === 'string' ? requestData.node_id : '';
       const column = typeof requestData.column === 'string' ? requestData.column : '';
       if (!nodeId || !column) return;
-      const target = { taskId: tabTaskId, nodeId, column };
-      hydratedResultTargetRef.current = target;
-      onTabInputSetChange(
-        DEFAULT_TAB_INPUT_SET_ID,
-        analysisInputsFromRequest(requestData, 1),
-      );
+      onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, analysisInputsFromRequest(requestData, 1));
       hydrateEngineConfig((requestData.engine as QuotationEngineConfig | null) ?? null);
       setSelectedMetadataColumns([]);
-      if (
-        quotationResultRef.current &&
-        quotationResultTaskIdRef.current === tabTaskId
-      ) {
-        applyQuotationResult(quotationResultRef.current, tabTaskId, target);
-      }
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
     onCleared: (_, options) => {
       setIsClearing(false);
-      setHasLoaded(false);
-      quotationResultRef.current = null;
-      quotationResultTaskIdRef.current = null;
-      hydratedResultTargetRef.current = null;
-      resetAfterClear();
+      setResultQuery(null);
       if (options?.preserveLocalState) {
         return;
       }
       // Detach the cleared task from the owning tab so a reload doesn't rehydrate
       // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange(null);
+    },
+  });
+
+  const resultNodeId =
+    serverRequest && typeof serverRequest.node_id === 'string'
+      ? serverRequest.node_id
+      : (displayedNodes[0]?.id ?? '');
+  const resultColumn =
+    serverRequest && typeof serverRequest.column === 'string'
+      ? serverRequest.column
+      : (activeSelections.find((selection) => selection.nodeId === resultNodeId)?.column ?? '');
+  const { nodeState, nodeDetaching, setNodeDetaching, resultsByNode } = useQuotationResultControls({
+    result,
+    nodeId: resultNodeId,
+    column: resultColumn,
+  });
+  const hasLoaded = Boolean(result);
+
+  const savedContextLength = Number(host.settings['quotation.contextLength']);
+  const {
+    contextLength,
+    contextLengthInput,
+    contextLengthError,
+    isSavingContextLength,
+    setContextLengthInput,
+    handleContextLengthBlur,
+    handleContextLengthKeyDown,
+  } = useQuotationContextPreference({
+    currentWorkspaceId,
+    hasLoaded,
+    savedValue: Number.isFinite(savedContextLength) ? savedContextLength : undefined,
+    persistPreference: (value) => {
+      host.setSetting('quotation.contextLength', String(value));
+      return Promise.resolve();
     },
   });
 
@@ -299,8 +241,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     displayedNodes.length > 0 &&
     !hasIncompleteSelections &&
     engineReady;
-
-  const hasLoaded = liveHasLoaded;
 
   const lastRunRequest = serverRequest ?? null;
   const currentQuotationParams = {
@@ -354,51 +294,42 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
 
   const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);
 
-  const {
-    persistContextLengthPreference,
-    handleSearchAll,
-    handlePageChange,
-    handlePageSizeChange,
-    handleSort,
-    handleDetach,
-  } = useQuotationTaskFlow({
-    state: {
-      currentWorkspaceId,
-      hasLoaded,
-      displayedNodes,
-      activeSelections,
-      nodeState,
-      originalColumnsByNode,
-      buildEngineRequest,
-    },
-    actions: {
-      setIsLoadingQuotations,
-      setHasLoaded,
-      setNodeDetaching,
-      showErrorDialog,
-      updateResultState,
-      applyContextLengthPreferenceFromResult,
-      setLocalTaskId,
-      runningRef,
-      lastFetchedRef,
-      // Persist the run's assigned task id onto the active tab so reload
-      // rehydrates the same task.
-      onTaskIdAssigned: (taskId) => {
-        onTabTaskChange(taskId);
+  const { handleSearchAll, handlePageChange, handlePageSizeChange, handleSort, handleDetach } =
+    useQuotationTaskFlow({
+      state: {
+        currentWorkspaceId,
+        tabId: host.tabId,
+        hasLoaded,
+        displayedNodes,
+        activeSelections,
+        nodeState,
+        originalColumnsByNode,
+        buildEngineRequest,
       },
-    },
-    lock: {
-      resolveTaskId,
-      quotationSearch: async (_nodeId, request) => {
-        return quotationSearch(host.tabId, request);
+      actions: {
+        setIsLoadingQuotations,
+        setNodeDetaching,
+        showErrorDialog,
+        setResultQuery: (query) => {
+          setResultQuery(query);
+        },
+        resetResultQuery: () => {
+          setResultQuery(null);
+        },
+        setLocalTaskId,
+        runningRef,
+        lastFetchedRef,
+        // Persist the run's assigned task id onto the active tab so reload
+        // rehydrates the same task.
+        onTaskIdAssigned: (taskId) => {
+          onTabTaskChange(taskId);
+        },
       },
-      detachQuotation,
-    },
-  });
-
-  useEffect(() => {
-    persistContextPreferenceRef.current = persistContextLengthPreference;
-  }, [persistContextLengthPreference]);
+      lock: {
+        resolveTaskId,
+        detachQuotation,
+      },
+    });
 
   const { openDetachDialog, detachDialog } = useQuotationDetachDialog({
     activeSelections,
@@ -423,7 +354,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
    * Passed to quotation result blocks as the page-change callback.
    */
   const effHandlePageChange = (newPage: number) => {
-    void handlePageChange(newPage);
+    handlePageChange(newPage);
   };
 
   // Applies page-size changes to live task results.
@@ -431,7 +362,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
    * Passed to quotation result blocks as the page-size callback.
    */
   const effHandlePageSizeChange = (newSize: number) => {
-    void handlePageSizeChange(newSize);
+    handlePageSizeChange(newSize);
   };
 
   // Applies column sorting to live task results.

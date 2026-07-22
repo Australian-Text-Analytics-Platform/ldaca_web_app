@@ -9,8 +9,9 @@ import {
 } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
 import { useUIStore } from '@/stores';
+import { useAuthStore } from '@/stores/authStore';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
-import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
+import { recentSelectionsScopeKey, useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
 import { toast } from 'sonner';
 import {
   DEFAULT_TAB_INPUT_SET_ID,
@@ -35,7 +36,7 @@ export interface UseTabNodeInputsConfig {
   selectorId?: string;
   /** All named input sets for the active tab. */
   tabInputSets?: AnalysisTabInputSets;
-  /** Commit one named input set for the active tab (persists to tabs.json). */
+  /** Commit one named draft input set for the active client tab. */
   onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** Per-view constraints (allowed column types, max nodes, document-only). */
   constraints: NodeInputConstraints;
@@ -86,6 +87,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     consumeNodeInputRequests = true,
   } = config;
   const { nodes, currentWorkspaceId } = useWorkspaceData();
+  const userId = useAuthStore((state) => state.session?.user?.id ?? '__anonymous__');
   const { selectedNodeIds } = useWorkspaceSelection();
   const currentView = useUIStore((state) => state.currentView);
 
@@ -158,7 +160,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   // the stored groups resolved against live nodes for the "Add preset" list.
   const recordRecent = useRecentSelectionsStore((s) => s.record);
   const recentGroups = useRecentSelectionsStore(
-    (s) => s.byWorkspace[currentWorkspaceId ?? '__none__'],
+    (s) => s.byScope[recentSelectionsScopeKey(userId, currentWorkspaceId)],
   );
   const inputRequests = useNodeInputRequestsStore((s) => s.requests);
   const consumeInputRequest = useNodeInputRequestsStore((s) => s.consume);
@@ -172,11 +174,11 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
       const accepted = ids.filter((id) => !rejected.has(id));
       if (accepted.length > 0) {
         const resulting = [...effectiveInputs.map((i) => i.node_id), ...accepted];
-        recordRecent(currentWorkspaceId, resulting);
+        recordRecent(userId, currentWorkspaceId, resulting);
       }
       return rejections;
     },
-    [baseAddNodes, effectiveInputs, recordRecent, currentWorkspaceId],
+    [baseAddNodes, effectiveInputs, recordRecent, userId, currentWorkspaceId],
   );
 
   useEffect(() => {

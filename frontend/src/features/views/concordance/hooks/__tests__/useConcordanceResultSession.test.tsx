@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
@@ -6,9 +8,14 @@ import type { ConcordanceAnalysisResponse } from '@/api';
 import { useConcordanceResultSession } from '../useConcordanceResultSession';
 
 const result: ConcordanceAnalysisResponse = {
-  state: 'successful',
-  metadata: { task_id: 'analysis-1' },
-  analysis_params: {},
+  kind: 'concordance',
+  sources: [],
+  metadata: {
+    metadata_columns: [],
+    concordance_columns: ['CONC_matched_text'],
+    quotation_columns: [],
+    all_columns: ['CONC_matched_text'],
+  },
   query: { page: 1, page_size: 20 },
   data: {
     'node-1': {
@@ -18,6 +25,7 @@ const result: ConcordanceAnalysisResponse = {
         metadata_columns: [],
         concordance_columns: ['CONC_matched_text'],
         quotation_columns: [],
+        all_columns: ['CONC_matched_text'],
       },
       pagination: {
         page: 1,
@@ -33,39 +41,56 @@ const result: ConcordanceAnalysisResponse = {
   },
 };
 
+const createWrapper = () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+};
+
 describe('useConcordanceResultSession', () => {
   it('projects the canonical analysis result into display colors and matched-text filters', () => {
-    const { result: hook } = renderHook(() =>
-      useConcordanceResultSession({
-        selectedNodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
-        showDispersion: true,
-        colourMatches: true,
-        lowercaseMatches: true,
-      }),
+    const { result: hook } = renderHook(
+      () =>
+        useConcordanceResultSession({
+          workspaceId: 'workspace-1',
+          analysisId: 'analysis-1',
+          baseResult: result,
+          viewMode: 'separated',
+          combinedPage: 1,
+          selectedNodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
+          showDispersion: true,
+          colourMatches: true,
+          lowercaseMatches: true,
+        }),
+      { wrapper: createWrapper() },
     );
 
-    act(() => hook.current.setResults(result));
-
-    expect(hook.current.taskId).toBe('analysis-1');
     expect(hook.current.nodeColors['node-1']).toBe('#2563eb');
     expect(hook.current.sourceColorMap.corpus).toBe('#2563eb');
     expect(hook.current.allMatchedTexts).toEqual(['alpha', 'beta']);
   });
 
   it('clears result pagination and loading state when reset', () => {
-    const { result: hook } = renderHook(() =>
-      useConcordanceResultSession({
-        selectedNodes: [],
-        showDispersion: false,
-        colourMatches: false,
-        lowercaseMatches: false,
-      }),
+    const { result: hook } = renderHook(
+      () =>
+        useConcordanceResultSession({
+          workspaceId: null,
+          analysisId: null,
+          baseResult: null,
+          viewMode: 'separated',
+          combinedPage: 1,
+          selectedNodes: [],
+          showDispersion: false,
+          colourMatches: false,
+          lowercaseMatches: false,
+        }),
+      { wrapper: createWrapper() },
     );
     act(() => {
       hook.current.setNodePagination({
         'node-1': { currentPage: 2, pageSize: 20, sortBy: '', descending: false },
       });
-      hook.current.setNodeLoading({ 'node-1': true });
       hook.current.reset();
     });
     expect(hook.current.results).toBeNull();

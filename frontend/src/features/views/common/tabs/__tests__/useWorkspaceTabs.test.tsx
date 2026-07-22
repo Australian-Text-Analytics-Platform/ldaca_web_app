@@ -30,10 +30,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 );
 
-const serverTab = (id = 'tab-1') => ({
+const serverTab = (id = 'tab-1', kind: 'concordance' | 'quotation' = 'concordance') => ({
   id,
   name: id,
-  kind: 'concordance' as const,
+  kind,
   analysis_id: null,
   created_at: '2026-01-01T00:00:00Z',
   modified_at: '2026-01-01T00:00:00Z',
@@ -50,8 +50,8 @@ describe('useWorkspaceTabs', () => {
     mocks.createTab.mockResolvedValue({ data: serverTab('tab-2'), error: undefined });
     mocks.deleteTab.mockResolvedValue({ data: undefined, error: undefined });
     mocks.renameTab.mockResolvedValue({ data: serverTab(), error: undefined });
-    useAnalysisTabsPresentationStore.setState({ activeTabIds: {} });
-    localStorage.removeItem('ldaca-analysis-active-tabs');
+    useAnalysisTabsPresentationStore.setState({ activeTabIds: {}, tabSettings: {} });
+    localStorage.removeItem('ldaca-analysis-tab-presentation-v2');
   });
 
   it('loads server-owned tabs and keeps active selection device-local', async () => {
@@ -88,7 +88,7 @@ describe('useWorkspaceTabs', () => {
     expect(view.result.current.activeTabId).toBe('tab-2');
     expect(
       useAnalysisTabsPresentationStore.getState().activeTabIds[
-        analysisTabsPresentationKey('workspace-1', 'concordance')
+        analysisTabsPresentationKey('__anonymous__', 'workspace-1', 'concordance')
       ],
     ).toBe('tab-2');
   });
@@ -96,7 +96,7 @@ describe('useWorkspaceTabs', () => {
   it('repairs a stored tab id that no longer exists', async () => {
     useAnalysisTabsPresentationStore
       .getState()
-      .rememberActiveTab('workspace-1', 'concordance', 'missing-tab');
+      .rememberActiveTab('__anonymous__', 'workspace-1', 'concordance', 'missing-tab');
 
     const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
       wrapper,
@@ -106,7 +106,7 @@ describe('useWorkspaceTabs', () => {
       expect(result.current.activeTabId).toBe('tab-1');
       expect(
         useAnalysisTabsPresentationStore.getState().activeTabIds[
-          analysisTabsPresentationKey('workspace-1', 'concordance')
+          analysisTabsPresentationKey('__anonymous__', 'workspace-1', 'concordance')
         ],
       ).toBe('tab-1');
     });
@@ -129,7 +129,7 @@ describe('useWorkspaceTabs', () => {
       expect(result.current.activeTabId).toBe('tab-1');
       expect(
         useAnalysisTabsPresentationStore.getState().activeTabIds[
-          analysisTabsPresentationKey('workspace-1', 'concordance')
+          analysisTabsPresentationKey('__anonymous__', 'workspace-1', 'concordance')
         ],
       ).toBe('tab-1');
     });
@@ -172,20 +172,48 @@ describe('useWorkspaceTabs', () => {
     );
   });
 
-  it('keeps inputs and preferences in frontend memory instead of writing tab settings to the API', async () => {
-    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+  it('keeps drafts in memory and restores presentation settings from device-local storage', async () => {
+    let view = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
       wrapper,
     });
-    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+    await waitFor(() => expect(view.result.current.tabs).toHaveLength(1));
     act(() => {
-      result.current.setTabInputSet('tab-1', 'source', [{ node_id: 'node-1', column: 'text' }]);
-      result.current.setTabSetting('tab-1', 'mode', 'manual');
+      view.result.current.setTabInputSet('tab-1', 'source', [
+        { node_id: 'node-1', column: 'text' },
+      ]);
+      view.result.current.setTabSetting('tab-1', 'mode', 'manual');
     });
-    expect(result.current.tabs[0]?.input_sets.source).toEqual([
+    expect(view.result.current.tabs[0]?.input_sets.source).toEqual([
       { node_id: 'node-1', column: 'text' },
     ]);
-    expect(result.current.tabs[0]?.settings).toEqual({ mode: 'manual' });
+    expect(view.result.current.tabs[0]?.settings).toEqual({ mode: 'manual' });
     expect(mocks.renameTab).not.toHaveBeenCalled();
+
+    view.unmount();
+    view = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), { wrapper });
+    await waitFor(() => expect(view.result.current.tabs).toHaveLength(1));
+    expect(view.result.current.tabs[0]?.input_sets.source).toEqual([]);
+    expect(view.result.current.tabs[0]?.settings).toEqual({ mode: 'manual' });
+  });
+
+  it('shares one all-tabs request between analysis kinds', async () => {
+    mocks.listTabs.mockResolvedValue({
+      data: [serverTab('tab-c', 'concordance'), serverTab('tab-q', 'quotation')],
+      error: undefined,
+    });
+    const { result } = renderHook(
+      () => ({
+        concordance: useWorkspaceTabs('workspace-1', 'concordance'),
+        quotation: useWorkspaceTabs('workspace-1', 'quotation'),
+      }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.concordance.tabs).toHaveLength(1);
+      expect(result.current.quotation.tabs).toHaveLength(1);
+    });
+    expect(mocks.listTabs).toHaveBeenCalledTimes(1);
   });
 
   it('does not rerender tab state for an identical input write', async () => {
@@ -195,16 +223,12 @@ describe('useWorkspaceTabs', () => {
     await waitFor(() => expect(result.current.tabs).toHaveLength(1));
 
     act(() => {
-      result.current.setTabInputSet('tab-1', 'source', [
-        { node_id: 'node-1', column: 'text' },
-      ]);
+      result.current.setTabInputSet('tab-1', 'source', [{ node_id: 'node-1', column: 'text' }]);
     });
     const tabAfterFirstWrite = result.current.tabs[0];
 
     act(() => {
-      result.current.setTabInputSet('tab-1', 'source', [
-        { node_id: 'node-1', column: 'text' },
-      ]);
+      result.current.setTabInputSet('tab-1', 'source', [{ node_id: 'node-1', column: 'text' }]);
     });
 
     expect(result.current.tabs[0]).toBe(tabAfterFirstWrite);

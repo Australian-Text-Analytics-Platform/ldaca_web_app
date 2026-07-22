@@ -1,9 +1,10 @@
-import { useReducer, type KeyboardEvent } from 'react';
+import { useEffect, useReducer, type KeyboardEvent } from 'react';
 import { DEFAULT_CONTEXT_LENGTH, clampContextLength } from '../quotationTextClip';
 
 interface UseQuotationContextPreferenceArgs {
   currentWorkspaceId: string | null;
   hasLoaded: boolean;
+  savedValue?: number;
   persistPreference: (value: number) => Promise<unknown>;
 }
 
@@ -27,7 +28,6 @@ export interface UseQuotationContextPreferenceResult extends QuotationContextPre
   applyContextLengthInput: () => Promise<void>;
   handleContextLengthBlur: () => void;
   handleContextLengthKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
-  applyPreferenceFromResult: (payload: unknown) => void;
 }
 
 const INVALID_CONTEXT_LENGTH_MESSAGE = 'Enter a non-negative number.';
@@ -95,26 +95,20 @@ const reducer = (
 export function useQuotationContextPreference({
   currentWorkspaceId,
   hasLoaded,
+  savedValue,
   persistPreference,
 }: UseQuotationContextPreferenceArgs): UseQuotationContextPreferenceResult {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  useEffect(() => {
+    if (typeof savedValue !== 'number' || !Number.isFinite(savedValue) || savedValue < 0) return;
+    dispatch({ type: 'hydrate', value: clampContextLength(savedValue) });
+  }, [savedValue]);
 
   /** Updates the editable draft and clears any prior validation error. */
   // Called by: QuotationFeature context-length input because each keystroke should not immediately alter the rendered quote clipping.
   const setContextLengthInput = (input: string) => {
     dispatch({ type: 'edit', input });
-  };
-
-  /** Applies persisted context-length preferences returned with quotation task results. */
-  // Called by: QuotationFeature task hydration and polling callbacks because saved task preferences should restore the toolbar and clipping value together.
-  const applyPreferenceFromResult = (payload: unknown) => {
-    const payloadObject = payload as Record<string, unknown> | null | undefined;
-    const prefs = payloadObject?.preferences as Record<string, unknown> | undefined;
-    const prefValue = Number(prefs?.context_length ?? prefs?.contextLength);
-    if (!Number.isFinite(prefValue)) {
-      return;
-    }
-    dispatch({ type: 'hydrate', value: clampContextLength(prefValue) });
   };
 
   /** Validates the draft, commits it locally, and persists changed loaded-task preferences. */
@@ -175,6 +169,5 @@ export function useQuotationContextPreference({
     applyContextLengthInput,
     handleContextLengthBlur,
     handleContextLengthKeyDown,
-    applyPreferenceFromResult,
   };
 }

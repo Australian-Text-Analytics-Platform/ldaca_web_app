@@ -21,8 +21,8 @@ const model = buildSequentialChartModel({
         sequential_count: 2,
       },
     ],
-    analysis_params: { column_type: 'datetime' },
   },
+  parameters: { column_type: 'datetime' },
   fallbacks: {
     timeColumn: 'date',
     groupBy: [],

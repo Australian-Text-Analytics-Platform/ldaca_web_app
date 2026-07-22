@@ -18,7 +18,6 @@ describe('useSequentialAnalysisTaskFlow', () => {
       },
     });
     const setIsAnalyzing = vi.fn();
-    const setResults = vi.fn();
     const onTaskIdAssigned = vi.fn();
 
     const { result } = renderHook(() =>
@@ -38,11 +37,9 @@ describe('useSequentialAnalysisTaskFlow', () => {
           customIntervalValue: null,
           customIntervalUnit: null,
           caseSensitive: false,
-          results: null,
         },
         actions: {
           setIsAnalyzing,
-          setResults,
           setChartType: vi.fn(),
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
@@ -59,8 +56,6 @@ describe('useSequentialAnalysisTaskFlow', () => {
     await act(async () => result.current.handleAnalyze());
 
     expect(onTaskIdAssigned).toHaveBeenCalledWith('analysis-1');
-    expect(setResults).toHaveBeenCalledOnce();
-    expect(setResults).toHaveBeenCalledWith(null);
     expect(setIsAnalyzing).toHaveBeenCalledTimes(1);
     expect(setIsAnalyzing).toHaveBeenCalledWith(true);
   });

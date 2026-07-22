@@ -1,12 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
-import { queryAnalysisResult, submitTabAnalysis } from '@/api';
+import { submitTabAnalysis } from '@/api';
 import {
   type ConcordanceAnalysisRequest,
-  type ConcordanceAnalysisResponse,
   type ConcordanceDetachmentAnalysisRequest,
   type ConcordanceDispersionDetachmentAnalysisRequest,
-  type ConcordanceResultQuery,
   type Analysis,
 } from '@/api';
 import { formatBinIndicesAsRangeLabel } from '../concordanceDispersionDomain';
@@ -15,13 +13,6 @@ import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvel
 import type { NodePaginationState } from '../../common/tasks/types';
 
 export type PaginationState = Record<string, NodePaginationState>;
-
-/** Runnable token-handoff snapshot used by the pending-handoff hook and direct submission path to bypass not-yet-rendered form state. */
-export interface ConcordanceHandoffSearchRequest {
-  searchWord: string;
-  nodeIds: string[];
-  nodeColumnSelections: NodeColumnSelection[];
-}
 
 interface ConcordanceState {
   currentWorkspaceId: string | null;
@@ -45,11 +36,9 @@ interface ConcordanceState {
 interface ConcordanceActions {
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
   setIsSearching: (value: boolean) => void;
-  setResults: Dispatch<SetStateAction<ConcordanceAnalysisResponse | null>>;
   setLocalTaskId: (id: string | null) => void;
   runningRef: { current: boolean };
   lastFetchedRef: { current: { taskId: string | null; state: string | null } };
-  setNodeLoading: Dispatch<SetStateAction<Record<string, boolean>>>;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
   /**
    * Notifies AnalysisTabsHost of the task id assigned by a run (or null when
@@ -80,8 +69,8 @@ interface Params {
 /** Centralizes concordance submit, pagination, sorting, detach, and materialize actions. */
 /**
  * Used by: `ConcordanceFeature`; its feature test mocks this hook boundary.
- * Flow: submit concordance requests, refetch stored results after paging/sort
- * changes, persist result preferences, and expose detach/materialize actions.
+ * Flow: submit concordance requests, update local page controls, and expose
+ * child-analysis detach commands. TanStack Query owns every result page.
  */
 export function useConcordanceTaskFlow({
   state: {
@@ -104,11 +93,9 @@ export function useConcordanceTaskFlow({
   actions: {
     setNodePagination,
     setIsSearching,
-    setResults,
     setLocalTaskId,
     runningRef,
     lastFetchedRef,
-    setNodeLoading,
     setNodeDetaching,
     onTaskIdAssigned,
   },
@@ -125,69 +112,28 @@ export function useConcordanceTaskFlow({
     return `${normalized}${suffix}`;
   };
 
-  /** Refetches the stored concordance task result after preference or page changes. */
-  /**
-   * Called by sort/page/preference handlers and returned for view-mode swaps.
-   *
-   * When ``mergeNodeData`` is set, the response is treated as a partial,
-   * single-node update (separated view per-node page/sort): only the returned
-   * node slices overwrite their entries in the existing results, so the sibling
-   * table keeps its independently-paged data. Otherwise the whole result object
-   * is replaced (fresh search, global page-size change, combined view).
-   */
-  const updateStoredResult = async (
-    body: ConcordanceResultQuery,
-    options?: { mergeNodeData?: boolean },
-  ): Promise<ConcordanceAnalysisResponse | null> => {
-    if (!currentWorkspaceId) return null;
-
-    const taskId = await resolveTaskId();
-    if (!taskId) return null;
-    const { data } = await queryAnalysisResult({
-      body: { kind: 'concordance', ...body },
-      path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
-      throwOnError: true,
-    });
-    const response = data as ConcordanceAnalysisResponse | null;
-    if (response) {
-      if (options?.mergeNodeData) {
-        setResults((prev) =>
-          prev?.data
-            ? {
-                ...response,
-                data: { ...prev.data, ...response.data },
-              }
-            : response,
-        );
-      } else {
-        setResults(response);
-      }
-    }
-    return response;
-  };
-
   /** Starts a fresh concordance analysis or targeted update while preserving the analysis lock. */
   /**
    * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
    * Flow: validate search text and node columns, reset relevant pagination,
    * run the analysis, record the assigned task id, and publish result/error state.
    */
-  const handleSearch = async (handoffRequest?: ConcordanceHandoffSearchRequest) => {
+  const handleSearch = async () => {
     if (!currentWorkspaceId) return;
 
-    const trimmedSearch = (handoffRequest?.searchWord ?? searchWord).trim();
+    const trimmedSearch = searchWord.trim();
     if (!trimmedSearch) {
       toast.error('Please enter a search word.');
       return;
     }
 
-    const requestNodeIds = (handoffRequest?.nodeIds ?? activeNodeIds).slice(0, 2);
+    const requestNodeIds = activeNodeIds.slice(0, 2);
 
     if (requestNodeIds.length === 0) return;
 
-    const effectiveSelections = (
-      handoffRequest?.nodeColumnSelections ?? effectiveNodeColumnSelections
-    ).filter((sel) => requestNodeIds.includes(sel.nodeId));
+    const effectiveSelections = effectiveNodeColumnSelections.filter((sel) =>
+      requestNodeIds.includes(sel.nodeId),
+    );
 
     const incompleteSelections = effectiveSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
@@ -229,9 +175,7 @@ export function useConcordanceTaskFlow({
       setIsRunning: setIsSearching,
       setLocalTaskId,
       onTaskIdAssigned,
-      resetBeforeRun: () => {
-        setResults(null);
-      },
+      resetBeforeRun: () => undefined,
       submit: async () => {
         const { data } = await submitTabAnalysis({
           body: { kind: 'concordance', ...request },
@@ -247,16 +191,12 @@ export function useConcordanceTaskFlow({
     });
   };
 
-  /** Used by ConcordanceFeature to run a token-frequency handoff from its immutable input snapshot. */
-  const handleHandoffSearch = (request: ConcordanceHandoffSearchRequest) => handleSearch(request);
-
-  /** Applies a column sort for a node block and refetches that result page. */
+  /** Applies a column sort for a node block; the keyed Query fetches the page. */
   /**
    * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
-   * Flow: toggle the selected column's direction, reset that node to page one,
-   * and merge its refetched slice without disturbing sibling node pages.
+   * Flow: toggle the selected column's direction and reset that node to page one.
    */
-  const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
+  const handleSort = (columnName: string, nodeKey: string, _requestNodeId?: string) => {
     const currentNodePagination = nodePagination[nodeKey] ?? {
       currentPage: 1,
       pageSize: globalPageSize,
@@ -276,33 +216,14 @@ export function useConcordanceTaskFlow({
         descending: newDescending,
       },
     }));
-
-    const pageSize = currentNodePagination.pageSize;
-    if (!currentWorkspaceId) return;
-    const targetNodeId = requestNodeId ?? nodeKey;
-    void (async () => {
-      setNodeLoading((prev) => ({ ...prev, [nodeKey]: true }));
-      try {
-        const overrides: ConcordanceResultQuery = {
-          node_id: targetNodeId,
-          sort_by: columnName,
-          descending: newDescending,
-          page: 1,
-          page_size: pageSize,
-        };
-        await updateStoredResult(overrides, { mergeNodeData: true });
-      } finally {
-        setNodeLoading((prev) => ({ ...prev, [nodeKey]: false }));
-      }
-    })();
   };
 
-  /** Moves a node block to a new source page and refreshes the persisted result. */
+  /** Moves a node block to a new source page; the keyed Query fetches it. */
   /**
    * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
-   * Flow: read current node pagination, update the target page locally, then refetch stored results with page/sort overrides while toggling node loading.
+   * Flow: read current node pagination and update the target page locally.
    */
-  const handlePageChange = (newPage: number, nodeKey: string, requestNodeId?: string) => {
+  const handlePageChange = (newPage: number, nodeKey: string, _requestNodeId?: string) => {
     const currentNodePagination = nodePagination[nodeKey] ?? {
       currentPage: 1,
       pageSize: globalPageSize,
@@ -317,62 +238,28 @@ export function useConcordanceTaskFlow({
         currentPage: newPage,
       },
     }));
-
-    if (!currentWorkspaceId) return;
-    const targetNodeId = requestNodeId ?? nodeKey;
-    void (async () => {
-      setNodeLoading((prev) => ({ ...prev, [nodeKey]: true }));
-      try {
-        const overrides: ConcordanceResultQuery = {
-          node_id: targetNodeId,
-          page: newPage,
-          page_size: currentNodePagination.pageSize,
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty-string sortBy means "no sort" and must collapse to undefined
-          sort_by: currentNodePagination.sortBy || undefined,
-          descending: currentNodePagination.descending,
-        };
-        await updateStoredResult(overrides, { mergeNodeData: true });
-      } finally {
-        setNodeLoading((prev) => ({ ...prev, [nodeKey]: false }));
-      }
-    })();
   };
 
-  /** Persists result display preferences so refetches keep the current user-facing shape. */
+  /** Applies a page-size preference to all local result projections. */
   /**
-   * Called by request and task handlers in `useConcordanceTaskFlow`.
-   * Flow: build page-size preference updates, merge view-mode fetch params, call updateStoredResult, then surface failures to the caller.
+   * Called when the shared page-size control changes. Result presentation
+   * controls are device-local and are not written into the immutable Analysis.
    */
-  const persistResultPreferences = async (partial: { pageSize?: number }) => {
-    if (!currentWorkspaceId) return;
-
-    const preferenceUpdates: Record<string, unknown> = {};
-    if (partial.pageSize !== undefined) {
-      preferenceUpdates.page_size = partial.pageSize;
-    }
-
-    if (Object.keys(preferenceUpdates).length === 0) return;
-
-    try {
-      // Combined view is synthesized client-side, so this only persists the
-      // per-node page-size preference. In combined mode the swap hook's
-      // page/page-size effect rebuilds the __COMBINED__ block afterwards.
-      const fetchParams: Record<string, unknown> = {
-        page: viewMode === 'combined' ? combinedPage : 1,
-        page_size: partial.pageSize ?? globalPageSize,
-      };
-
-      const mergedBody = {
-        ...preferenceUpdates,
-        ...fetchParams,
-        update_only: false,
-      } as ConcordanceResultQuery;
-
-      return await updateStoredResult(mergedBody);
-    } catch (error) {
-      console.error('Failed to persist concordance preferences', error);
-      throw error;
-    }
+  const persistResultPreferences = (partial: { pageSize?: number }) => {
+    if (!currentWorkspaceId || partial.pageSize === undefined) return;
+    const pageSize = partial.pageSize;
+    setNodePagination((previous) =>
+      Object.fromEntries(
+        Object.entries(previous).map(([nodeId, value]) => [
+          nodeId,
+          {
+            ...value,
+            currentPage: viewMode === 'combined' ? combinedPage : 1,
+            pageSize,
+          },
+        ]),
+      ),
+    );
   };
 
   /** Requests a per-hit concordance workspace node for the selected source block. */
@@ -496,8 +383,6 @@ export function useConcordanceTaskFlow({
 
   return {
     handleSearch,
-    handleHandoffSearch,
-    updateStoredResult,
     handleSort,
     handlePageChange,
     persistResultPreferences,

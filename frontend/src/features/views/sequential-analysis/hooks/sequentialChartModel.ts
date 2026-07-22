@@ -11,7 +11,6 @@ export type SequentialXAxisType = 'category' | 'number';
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
-const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
 const CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
   'seconds',
   'minutes',
@@ -44,10 +43,6 @@ const SEQUENTIAL_ANALYSIS_PALETTE = [
   '#0ea5e9',
   '#22c55e',
 ] as const;
-
-/** Narrows stored or server-provided chart values to supported UI options. */
-export const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
-  typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
 
 /** Assigns deterministic colours shared by chart, legend, and export metadata. */
 const getSequentialPaletteColor = (index: number) => {
@@ -150,6 +145,7 @@ interface SequentialVisibilityCounts {
 
 export interface BuildSequentialChartModelInput {
   results: Record<string, unknown> | null | undefined;
+  parameters: Record<string, unknown> | null | undefined;
   fallbacks: SequentialResultSummaryFallbacks;
   chartType: ChartTypeOption;
   xAxisType: SequentialXAxisType;
@@ -203,15 +199,13 @@ function finiteNumberOrNull(value: unknown, fallback: number | null): number | n
 }
 
 function buildSummary(
-  results: Record<string, unknown> | null | undefined,
+  parameters: Record<string, unknown> | null | undefined,
   fallbacks: SequentialResultSummaryFallbacks,
   diagnostics: SequentialChartDiagnostic[],
 ): SequentialResultSummary {
-  const rawParams = results?.analysis_params;
+  const rawParams = parameters;
   const params =
-    rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams)
-      ? (rawParams as Record<string, unknown>)
-      : {};
+    rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {};
   const invalidParameter = (message: string) => {
     diagnostics.push({ code: 'invalid-parameters', message });
   };
@@ -509,6 +503,7 @@ function normalizeRows(
  */
 export function buildSequentialChartModel({
   results,
+  parameters,
   fallbacks,
   chartType,
   xAxisType,
@@ -517,7 +512,7 @@ export function buildSequentialChartModel({
   sourceDocumentCount,
 }: BuildSequentialChartModelInput): SequentialChartModel {
   const diagnostics: SequentialChartDiagnostic[] = [];
-  const summary = buildSummary(results, fallbacks, diagnostics);
+  const summary = buildSummary(parameters, fallbacks, diagnostics);
   const canonicalRows = normalizeRows(results, summary, diagnostics);
 
   const groupsById = new Map<string, Omit<SequentialChartGroup, 'color' | 'hidden'>>();

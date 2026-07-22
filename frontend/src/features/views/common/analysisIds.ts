@@ -12,10 +12,8 @@ export const ANALYSIS_TAB_GROUPS = {
   topicModeling: 'topic_modeling',
 } as const;
 
-type AnalysisTabGroup = (typeof ANALYSIS_TAB_GROUPS)[keyof typeof ANALYSIS_TAB_GROUPS];
-export type LastRunAnalysisType = Exclude<AnalysisTabGroup, typeof ANALYSIS_TAB_GROUPS.annotation>;
-
 export const ANALYSIS_TASK_TYPES = {
+  annotation: 'annotation',
   concordance: 'concordance',
   quotation: 'quotation',
   sequential: 'sequential',

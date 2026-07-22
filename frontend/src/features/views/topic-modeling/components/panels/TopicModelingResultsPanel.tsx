@@ -78,18 +78,17 @@ export function TopicModelingResultsPanel({
   onAddToWorkspace,
   isAddingToWorkspace,
 }: Props) {
-  const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
+  const isRunningState = Boolean(topicWaitingBanner);
   const runningMessage =
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty message should fall back to the next source, not render blank
-    runningTask?.message || topicWaitingBanner?.message || result?.message || 'Task running';
+    runningTask?.message || topicWaitingBanner?.message || 'Task running';
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty task id should fall back to the banner's id, so falsy '' must fall through
   const runningTaskId = runningTask?.task_id || topicWaitingBanner?.taskId;
   const runningProgress = typeof runningTask?.progress === 'number' ? runningTask.progress : null;
-  const isFailedState = result?.state === 'failed' && !isRunningState;
-  const isErrorState = Boolean(error) && result?.state !== 'failed' && !isRunningState;
-  const isSuccessfulState = result?.state === 'successful' && !isRunningState;
+  const isErrorState = Boolean(error) && !isRunningState;
+  const isSuccessfulState = Boolean(result) && !isRunningState && !isErrorState;
 
-  const cardTone: 'default' | 'error' = isFailedState || isErrorState ? 'error' : 'default';
+  const cardTone: 'default' | 'error' = isErrorState ? 'error' : 'default';
   const cardTitle = 'Topic Modeling Results';
   const helperConfig = {
     targetKey: 'analysis.topic-modeling.results',
@@ -112,12 +111,6 @@ export function TopicModelingResultsPanel({
             progress={runningProgress}
             startedAt={runningTask?.started_at}
           />
-        ) : null}
-
-        {isFailedState ? (
-          <p className="text-sm text-muted-foreground">
-            {result.message ?? 'Topic modeling failed'}
-          </p>
         ) : null}
 
         {isErrorState ? <p className="text-sm text-muted-foreground">{error}</p> : null}

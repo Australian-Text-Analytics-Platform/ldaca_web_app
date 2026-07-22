@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type { TopicModelingResponse, TopicModelingTopic } from '@/api';
-import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
+import type {
+  TopicModelingAnalysisRequest,
+  TopicModelingResponse,
+  TopicModelingTopic,
+} from '@/api';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useUIStore } from '@/stores';
-import { type TaskItem, useAnalysisStore } from '@/stores/analysisStore';
-import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
-import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { getAnalysisResultResource } from '../common/analysisApi';
+import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
-import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
@@ -18,7 +18,6 @@ import { hasParameterDiff } from '../common/parameterComparison';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
-import { useSafeResult } from '../common/useSafeResult';
 import { analysisInputsFromRequest } from '../common/utils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
@@ -72,31 +71,11 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     .map((node) => node.id)
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
-  const { serverRequest } = useLastRunRequest({
-    analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
-    workspaceId: currentWorkspaceId,
-    taskId: tabTaskId,
-  });
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
   });
 
-  const typedServerRequest = serverRequest as {
-    node_ids?: string[];
-    node_columns?: Record<string, string>;
-    min_topic_size?: number;
-    random_seed?: number;
-    representative_words_count?: number;
-    sample_fractions?: (number | null)[];
-  } | null;
-  const currentView = useUIStore((state) => state.currentView);
-  const isActiveTab = currentView === 'topic-modeling';
-  const setTasks = useAnalysisStore((state) => state.setTasks);
   const [error, setError] = useState<string | null>(null);
-  const [liveResult, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
-
-  const result: TopicModelingResponse | null = liveResult;
-
   const {
     corpusSamples,
     updateCorpusSample,
@@ -145,6 +124,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const [detachNames, setDetachNames] = useState<Record<string, string>>({});
 
   const {
+    request: serverRequest,
     isRunning,
     isStopping,
     setIsRunning,
@@ -155,56 +135,28 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     stopTask,
     setLocalTaskId,
     banner: topicWaitingBanner,
-  } = useAnalysisFeature<TopicModelingResponse>({
-    analysisType: ANALYSIS_TAB_GROUPS.topicModeling,
+    analysisError,
+    result,
+  } = useAnalysisFeature<TopicModelingResponse, TopicModelingAnalysisRequest>({
     taskType: ANALYSIS_TASK_TYPES.topicModeling,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
     hydrationTaskId: tabTaskId,
-    resultRef,
     // Called by useAnalysisFeature polling and hydration to load the owned task result.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisResultResource<TopicModelingResponse>(currentWorkspaceId, taskId);
     },
-    // Called by useAnalysisFeature hydration to restore the task's submitted parameters.
-    fetchRequest: async (taskId) => {
-      if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisRequest(currentWorkspaceId, taskId);
-    },
-    // Called by useAnalysisFeature after a poll returns a newer result for this task.
-    onResultFetched: (resultData) => {
-      setResultSafely(resultData);
-      if (resultData.state === 'failed') {
-        setError(resultData.message ?? 'Topic modeling failed');
-      } else if (resultData.state === 'successful') {
-        setError(null);
-      }
-    },
-    // Called by useAnalysisFeature hydration to rebuild result/error state after reload.
-    onHydratedResult: (resultData) => {
-      if (!resultData) return;
-      setResultSafely(resultData);
-      if (resultData.state === 'failed') {
-        setError(resultData.message ?? 'Topic modeling failed');
-      } else if (resultData.state === 'successful') {
-        setError(null);
-      }
-    },
     // Called by useAnalysisFeature hydration to restore parameters from the stored request envelope.
-    onHydratedRequest: (requestPayload) => {
-      const raw = requestPayload as Record<string, unknown> | null;
-      const req = (raw?.data ?? requestPayload) as Record<string, unknown> | null;
-      if (!req) return;
+    onRequest: (requestPayload) => {
+      const req = requestPayload as unknown as Record<string, unknown>;
       onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, analysisInputsFromRequest(req, 2));
       hydrateParameters(req);
     },
     // Called by useAnalysisFeature after shared result deletion completes.
     onCleared: (_, options) => {
-      setResultSafely(null);
       setError(null);
       if (options?.preserveLocalState) {
         return;
@@ -213,17 +165,15 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange(null);
     },
-    // Called by useAnalysisFeature clear handling to remove deleted task ids from the global list.
-    pruneTaskInbox: (taskIds) => {
-      setTasks((prev: TaskItem[]) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
-    },
-    // Read by useAnalysisFeature while resolving status and polling candidates.
-    getExtraTaskIdCandidates: () => [resultRef.current?.metadata?.task_id],
-    // Read by useAnalysisFeature while collecting every task id to clear.
-    getClearTaskIdSources: () => [resultRef.current?.metadata?.task_id],
-    // Called by useAnalysisFeature to derive running state from the hydrated result ref.
-    isResultRunning: (r) => r?.state === 'running',
   });
+  const typedServerRequest = serverRequest as {
+    node_ids?: string[];
+    node_columns?: Record<string, string>;
+    min_topic_size?: number;
+    random_seed?: number;
+    representative_words_count?: number;
+    sample_fractions?: (number | null)[];
+  } | null;
 
   /**
    * Clears live topic results and result-view controls while preserving explicitly tuned parameters.
@@ -415,7 +365,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       setIsRunning,
       runningRef,
       setError,
-      setResultSafely,
       lastFetchedRef,
       setLocalTaskId,
       // Persist the run's assigned task id onto the active tab so reload
@@ -525,7 +474,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         }}
         onClear={handleClear}
         hasMissingColumns={panelHasMissingColumns}
-        resultState={result?.state}
+        hasResult={Boolean(result ?? analysisError ?? error)}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
           void setNodeColor(nodeId, color);
@@ -537,7 +486,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         <TopicModelingResultsPanel
           topicWaitingBanner={topicWaitingBanner}
           runningTask={topicRunningTask}
-          error={error}
+          error={error ?? analysisError}
           result={result}
           topics={topics}
           containerRef={containerRef}

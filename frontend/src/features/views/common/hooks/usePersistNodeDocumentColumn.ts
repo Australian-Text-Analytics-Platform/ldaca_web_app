@@ -27,22 +27,15 @@ function toGraphNodeSummary(
 }
 
 /**
- * Updates node-info and graph-summary caches after node preference writes so
- * graph panels and analysis selectors immediately see the persisted metadata.
- * Called by: node document-column and tokenization preference persistence hooks.
- * Flow: write full node-info into the node-info query, write only graph-facing
- * fields into the workspace-graph query, then invalidate both caches so
- * selectors and graph panels refetch if needed.
+ * Updates graph-summary caches after node preference writes so graph panels see
+ * the persisted metadata immediately, then invalidates every batched node-info
+ * query that contains the edited Data Block.
  */
 function updateWorkspaceNodeInfoCache(
   queryClient: QueryClient,
   workspaceId: string,
   nodeInfo: WorkspaceNodeInfo,
 ) {
-  queryClient.setQueryData<WorkspaceNodeInfo>(
-    queryKeys.nodeInfo(workspaceId, nodeInfo.id),
-    nodeInfo,
-  );
   queryClient.setQueryData<WorkspaceGraphResponse>(
     queryKeys.workspaceGraph(workspaceId),
     (previous) => {

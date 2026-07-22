@@ -33,6 +33,8 @@ vi.mock('@/stores/nodeInputRequestsStore', () => ({
 }));
 
 vi.mock('@/stores/recentSelectionsStore', () => ({
+  recentSelectionsScopeKey: (userId: string, workspaceId: string | null) =>
+    `${userId}:${workspaceId ?? '__none__'}`,
   useRecentSelectionsStore: mocks.useRecentSelectionsStore,
 }));
 
@@ -64,8 +66,10 @@ function nodeInputRequestsStore(
 
 function recentSelectionsStore(overrides: Partial<RecentSelectionsStore> = {}) {
   const store: RecentSelectionsStore = {
-    byWorkspace: {},
+    byScope: {},
     record: vi.fn(),
+    pruneWorkspaces: vi.fn(),
+    pruneNodes: vi.fn(),
     ...overrides,
   };
   mocks.useRecentSelectionsStore.mockImplementation(

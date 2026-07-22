@@ -22,9 +22,16 @@ const build = (
   overrides: Partial<Omit<BuildSequentialChartModelInput, 'results' | 'fallbacks'>> & {
     fallbacks?: SequentialResultSummaryFallbacks;
   } = {},
-) =>
-  buildSequentialChartModel({
-    results,
+) => {
+  const parameters =
+    results?.analysis_params && typeof results.analysis_params === 'object'
+      ? (results.analysis_params as Record<string, unknown>)
+      : null;
+  const output = results ? { ...results } : null;
+  if (output) delete output.analysis_params;
+  return buildSequentialChartModel({
+    results: output,
+    parameters,
     fallbacks: overrides.fallbacks ?? fallbacks,
     chartType: overrides.chartType ?? 'line',
     xAxisType: overrides.xAxisType ?? 'category',
@@ -32,6 +39,7 @@ const build = (
     selectedPeriodIndices: overrides.selectedPeriodIndices ?? new Set(),
     sourceDocumentCount: overrides.sourceDocumentCount,
   });
+};
 
 describe('buildSequentialChartModel', () => {
   it('returns an explicit empty model when no rows exist', () => {

@@ -55,10 +55,10 @@ export interface UseNodeInputsResult {
  * Backing-agnostic node-selection hook for the add-node-as-needed model.
  *
  * Owns no storage of its own: callers pass ``value``/``onChange`` bound to
- * whatever persists the inputs — an analysis tab input set (backend tabs.json
- * via useWorkspaceTabs), the preprocessing inputs store (frontend-persisted),
- * or plain ``useState`` (annotation class descriptions, in-memory). This
- * keeps every view on one selection contract while letting persistence differ.
+ * whatever owns the draft inputs — an analysis tab component, the scoped
+ * preprocessing inputs store, or plain ``useState``. Submitted inputs are
+ * recovered from the backend's immutable Analysis request. This
+ * keeps every view on one selection contract while letting draft ownership differ.
  *
  * Used by: ``useTabNodeInputs``, which supplies each named analysis or
  * preprocessing selector's effective value and needs a uniform

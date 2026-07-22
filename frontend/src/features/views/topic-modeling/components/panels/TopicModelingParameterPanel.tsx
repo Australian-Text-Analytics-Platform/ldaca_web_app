@@ -61,7 +61,7 @@ interface Props {
   onStop?: () => void | Promise<void>;
   onClear: () => void | Promise<void>;
   hasMissingColumns: boolean;
-  resultState?: string;
+  hasResult: boolean;
 }
 /**
  * Renders topic-modeling node inputs, sampling controls, run parameters, and shared actions.
@@ -99,7 +99,7 @@ export function TopicModelingParameterPanel({
   onStop,
   onClear,
   hasMissingColumns,
-  resultState,
+  hasResult,
 }: Props) {
   const [topicSizeDraft, setTopicSizeDraft] = useState<NumericInputDraft>(() => ({
     source: topicSizeValue,
@@ -218,7 +218,7 @@ export function TopicModelingParameterPanel({
         isRunning,
         isStopping,
         isClearing,
-        hasResult: resultState === 'successful' || resultState === 'failed',
+        hasResult,
         runLabel: actionState.runLabel,
       }}
     >

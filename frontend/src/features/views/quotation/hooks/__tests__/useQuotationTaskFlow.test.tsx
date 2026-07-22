@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Analysis } from '@/api';
 import { useQuotationTaskFlow } from '../useQuotationTaskFlow';
 
+const submitTabAnalysis = vi.hoisted(() => vi.fn());
+vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal()), submitTabAnalysis }));
+
 const queuedQuotationAnalysis = (): Analysis => ({
   cancellation_requested_at: null,
   created_at: '2026-07-20T00:00:00Z',
@@ -26,12 +29,13 @@ const queuedQuotationAnalysis = (): Analysis => ({
 
 describe('useQuotationTaskFlow', () => {
   it('submits the typed quotation request through the tab-owned analysis action', async () => {
-    const quotationSearch = vi.fn(async () => queuedQuotationAnalysis());
+    submitTabAnalysis.mockResolvedValueOnce({ data: queuedQuotationAnalysis() });
     const onTaskIdAssigned = vi.fn();
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
         state: {
           currentWorkspaceId: 'workspace-1',
+          tabId: 'tab-1',
           hasLoaded: false,
           displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
           activeSelections: [{ nodeId: 'node-1', column: 'text' }],
@@ -41,11 +45,10 @@ describe('useQuotationTaskFlow', () => {
         },
         actions: {
           setIsLoadingQuotations: vi.fn(),
-          setHasLoaded: vi.fn(),
           setNodeDetaching: vi.fn(),
           showErrorDialog: vi.fn(),
-          updateResultState: vi.fn(),
-          applyContextLengthPreferenceFromResult: vi.fn(),
+          setResultQuery: vi.fn(),
+          resetResultQuery: vi.fn(),
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
           lastFetchedRef: { current: { taskId: null, state: null } },
@@ -53,26 +56,33 @@ describe('useQuotationTaskFlow', () => {
         },
         lock: {
           resolveTaskId: vi.fn(async () => null),
-          quotationSearch,
           detachQuotation: vi.fn(),
         },
       }),
     );
     await act(async () => result.current.fetchQuotations('node-1'));
-    expect(quotationSearch).toHaveBeenCalledWith('node-1', {
-      node_id: 'node-1',
-      column: 'text',
-      engine: { type: 'local' },
+    expect(submitTabAnalysis).toHaveBeenCalledWith({
+      body: {
+        kind: 'quotation',
+        node_id: 'node-1',
+        column: 'text',
+        engine: { type: 'local' },
+      },
+      path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
+      throwOnError: true,
     });
     expect(onTaskIdAssigned).toHaveBeenCalledWith('analysis-1');
   });
 
-  it('does not mark quotation results loaded when the background submission is only queued', async () => {
-    const setHasLoaded = vi.fn();
+  it('does not synthesize a Result while the submitted Analysis is queued', async () => {
+    submitTabAnalysis.mockResolvedValueOnce({ data: queuedQuotationAnalysis() });
+    const setResultQuery = vi.fn();
+    const resetResultQuery = vi.fn();
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
         state: {
           currentWorkspaceId: 'workspace-1',
+          tabId: 'tab-1',
           hasLoaded: false,
           displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
           activeSelections: [{ nodeId: 'node-1', column: 'text' }],
@@ -82,11 +92,10 @@ describe('useQuotationTaskFlow', () => {
         },
         actions: {
           setIsLoadingQuotations: vi.fn(),
-          setHasLoaded,
           setNodeDetaching: vi.fn(),
           showErrorDialog: vi.fn(),
-          updateResultState: vi.fn(),
-          applyContextLengthPreferenceFromResult: vi.fn(),
+          setResultQuery,
+          resetResultQuery,
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
           lastFetchedRef: { current: { taskId: null, state: null } },
@@ -94,7 +103,6 @@ describe('useQuotationTaskFlow', () => {
         },
         lock: {
           resolveTaskId: vi.fn(async () => null),
-          quotationSearch: vi.fn(async () => queuedQuotationAnalysis()),
           detachQuotation: vi.fn(),
         },
       }),
@@ -102,6 +110,7 @@ describe('useQuotationTaskFlow', () => {
 
     await act(async () => result.current.handleSearchAll());
 
-    expect(setHasLoaded).not.toHaveBeenCalledWith(true);
+    expect(resetResultQuery).toHaveBeenCalledOnce();
+    expect(setResultQuery).not.toHaveBeenCalled();
   });
 });

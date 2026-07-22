@@ -27,110 +27,61 @@ export interface QuotationResultState {
 
 type QuotationHitRow = Record<string, unknown>;
 type QuotationGroupedRow = QuotationHitRow[];
-
-interface QuotationResultControlsState {
-  nodeState: Record<string, NodePaginationState>;
-  nodeDetaching: Record<string, boolean>;
-  resultsByNode: Record<string, QuotationResultState>;
-}
-
 type BooleanMapUpdater = SetStateAction<Record<string, boolean>>;
 
-type QuotationResultControlsAction =
-  | { type: 'store-result'; nodeId: string; normalized: QuotationResultState }
-  | { type: 'reset-after-clear' }
-  | { type: 'set-node-detaching'; updater: BooleanMapUpdater };
-
-const initialState: QuotationResultControlsState = {
-  nodeState: {},
-  nodeDetaching: {},
-  resultsByNode: {},
-};
-
-function applyMapUpdater<T>(current: T, updater: SetStateAction<T>): T {
-  return typeof updater === 'function' ? (updater as (previous: T) => T)(current) : updater;
-}
-
-function buildQuotationResultState(
+const buildQuotationResultState = (
   result: QuotationAnalysisResponse,
   column: string,
-): QuotationResultState {
+): QuotationResultState => {
   const groupedRows = result.data;
-  const rows = groupedRows
-    .flatMap((group) => group)
-    .map((row) => normalizeQuotationRow(row, column));
-
   return {
     groupedRows,
-    rows,
+    rows: groupedRows.flatMap((group) => group).map((row) => normalizeQuotationRow(row, column)),
     columns: result.metadata.all_columns.slice(),
     metadata: result.metadata,
     pagination: result.pagination,
     sorting: result.sorting,
     column,
   };
+};
+
+interface UseQuotationResultControlsOptions {
+  result: QuotationAnalysisResponse | null;
+  nodeId: string;
+  column: string;
 }
 
-function reducer(
-  state: QuotationResultControlsState,
-  action: QuotationResultControlsAction,
-): QuotationResultControlsState {
-  switch (action.type) {
-    case 'store-result':
-      return {
-        ...state,
-        resultsByNode: { ...state.resultsByNode, [action.nodeId]: action.normalized },
-        nodeState: {
-          ...state.nodeState,
-          [action.nodeId]: {
-            currentPage: action.normalized.pagination.page,
-            pageSize: action.normalized.pagination.page_size,
-            sortBy: action.normalized.sorting.sort_by ?? undefined,
-            descending: action.normalized.sorting.descending,
-          },
-        },
-      };
-    case 'reset-after-clear':
-      return initialState;
-    case 'set-node-detaching':
-      return {
-        ...state,
-        nodeDetaching: applyMapUpdater(state.nodeDetaching, action.updater),
-      };
-  }
-}
-
-/** Owns normalized quotation rows, pagination state, and detach progress. */
-export function useQuotationResultControls() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+/** Projects immutable Query result data and owns only detach progress. */
+export function useQuotationResultControls({
+  result,
+  nodeId,
+  column,
+}: UseQuotationResultControlsOptions) {
+  const [nodeDetaching, dispatch] = useReducer(
+    (state: Record<string, boolean>, updater: BooleanMapUpdater) =>
+      typeof updater === 'function' ? updater(state) : updater,
+    {},
+  );
 
   const setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>> = useCallback(
     (updater) => {
-      dispatch({ type: 'set-node-detaching', updater });
+      dispatch(updater);
     },
     [],
   );
 
-  const updateResultState = (
-    nodeId: string,
-    column: string,
-    result: QuotationAnalysisResponse,
-  ): QuotationResultState => {
-    const normalized = buildQuotationResultState(result, column);
-    dispatch({ type: 'store-result', nodeId, normalized });
-    return normalized;
-  };
+  const normalized = result && nodeId && column ? buildQuotationResultState(result, column) : null;
+  const resultsByNode = normalized ? { [nodeId]: normalized } : {};
+  const nodeState: Record<string, NodePaginationState> = normalized
+    ? {
+        [nodeId]: {
+          currentPage: normalized.pagination.page,
+          pageSize: normalized.pagination.page_size,
+          sortBy: normalized.sorting.sort_by ?? undefined,
+          descending: normalized.sorting.descending,
+        },
+      }
+    : {};
 
-  const resetAfterClear = () => {
-    dispatch({ type: 'reset-after-clear' });
-  };
-
-  return {
-    nodeState: state.nodeState,
-    nodeDetaching: state.nodeDetaching,
-    setNodeDetaching,
-    resultsByNode: state.resultsByNode,
-    updateResultState,
-    resetAfterClear,
-  };
+  return { nodeState, nodeDetaching, setNodeDetaching, resultsByNode };
 }

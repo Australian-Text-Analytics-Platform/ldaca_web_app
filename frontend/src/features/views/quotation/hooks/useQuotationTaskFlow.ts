@@ -1,12 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { queryAnalysisResult } from '@/api';
 import type {
-  QuotationAnalysisResponse,
   QuotationAnalysisRequest,
   QuotationResultQuery,
   QuotationDetachmentAnalysisRequest,
   Analysis,
 } from '@/api';
+import { submitTabAnalysis } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { NodePaginationState } from '../../common/tasks/types';
@@ -42,6 +41,7 @@ function getErrorMessage(error: unknown): string {
 
 interface QuotationState {
   currentWorkspaceId: string | null;
+  tabId: string;
   hasLoaded: boolean;
   displayedNodes: Pick<WorkspaceNodeMetadata, 'id' | 'name'>[];
   activeSelections: NodeColumnSelection[];
@@ -52,11 +52,10 @@ interface QuotationState {
 
 interface QuotationActions {
   setIsLoadingQuotations: (value: boolean) => void;
-  setHasLoaded: (value: boolean) => void;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
   showErrorDialog: (message: string) => void;
-  updateResultState: (nodeId: string, column: string, result: QuotationAnalysisResponse) => void;
-  applyContextLengthPreferenceFromResult: (payload: QuotationAnalysisResponse) => void;
+  setResultQuery: (query: QuotationResultQuery) => void;
+  resetResultQuery: () => void;
   setLocalTaskId: (id: string | null) => void;
   runningRef: { current: boolean };
   lastFetchedRef: { current: { taskId: string | null; state: string | null } };
@@ -67,7 +66,6 @@ interface QuotationActions {
 
 interface QuotationLock {
   resolveTaskId: () => Promise<string | null>;
-  quotationSearch: (nodeId: string, request: QuotationAnalysisRequest) => Promise<Analysis>;
   detachQuotation: (
     taskId: string,
     request: Omit<QuotationDetachmentAnalysisRequest, 'kind'>,
@@ -89,6 +87,7 @@ interface Params {
 export function useQuotationTaskFlow({
   state: {
     currentWorkspaceId,
+    tabId,
     hasLoaded,
     displayedNodes,
     activeSelections,
@@ -98,17 +97,16 @@ export function useQuotationTaskFlow({
   },
   actions: {
     setIsLoadingQuotations,
-    setHasLoaded,
     setNodeDetaching,
     showErrorDialog,
-    updateResultState,
-    applyContextLengthPreferenceFromResult,
+    setResultQuery,
+    resetResultQuery,
     setLocalTaskId,
     runningRef,
     lastFetchedRef,
     onTaskIdAssigned,
   },
-  lock: { resolveTaskId, quotationSearch, detachQuotation },
+  lock: { resolveTaskId, detachQuotation },
 }: Params) {
   // Builds deterministic output names for detach operations from display labels.
   /**
@@ -146,17 +144,6 @@ export function useQuotationTaskFlow({
     const column = selection?.column;
     if (!column) return null;
     return { nodeId, column };
-  };
-
-  // Persists the user's context-length preference onto the stored quotation task result.
-  /**
-   * Called by request and task handlers in `useQuotationTaskFlow`.
-   */
-  const persistContextLengthPreference = async (value: number) => {
-    if (!currentWorkspaceId) return;
-    const taskId = await resolveTaskId();
-    if (!taskId) return;
-    void value;
   };
 
   // Runs or refreshes quotation extraction for one node using active paging and engine state.
@@ -203,9 +190,16 @@ export function useQuotationTaskFlow({
       setLocalTaskId,
       onTaskIdAssigned,
       resetBeforeRun: () => {
-        setHasLoaded(false);
+        resetResultQuery();
       },
-      submit: () => quotationSearch(nodeId, requestPayload),
+      submit: async () => {
+        const { data } = await submitTabAnalysis({
+          body: { kind: 'quotation', ...requestPayload },
+          path: { workspace_id: currentWorkspaceId, tab_id: tabId },
+          throwOnError: true,
+        });
+        return data;
+      },
       onSuccess: () => undefined,
       onError: (error) => {
         console.error('Failed to fetch quotations', error);
@@ -215,18 +209,18 @@ export function useQuotationTaskFlow({
     return analysis ? requestPayload : null;
   };
 
-  // Updates an existing stored task result without creating a new quotation task.
+  // Updates the immutable Result projection query without creating a new Analysis.
   /**
    * Called by request and task handlers in `useQuotationTaskFlow`.
    * Flow: resolve the locked task/source context, query the requested page or
-   * sort state, then replace the stored result and mark it loaded.
+   * sort state, then replace the Query-owned projection parameters.
    */
-  const updateStoredQuotationResult = async (overrides: Partial<QuotationResultQuery> = {}) => {
+  const updateStoredQuotationResult = (overrides: Partial<QuotationResultQuery> = {}) => {
     if (!currentWorkspaceId) return null;
     const context = resolveLockedNodeContext();
     if (!context) return null;
 
-    const { nodeId, column } = context;
+    const { nodeId } = context;
     const st = nodeState[nodeId] ?? {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
@@ -241,25 +235,8 @@ export function useQuotationTaskFlow({
       descending: overrides.descending ?? st.descending,
     };
 
-    try {
-      const taskId = await resolveTaskId();
-      if (!taskId) return null;
-      const { data } = await queryAnalysisResult({
-        body: { kind: 'quotation', ...payload },
-        path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
-        throwOnError: true,
-      });
-      const response = data as QuotationAnalysisResponse;
-      if (!('columns' in response)) return null;
-      applyContextLengthPreferenceFromResult(response);
-      updateResultState(nodeId, column, response);
-      setHasLoaded(true);
-      return response;
-    } catch (error: unknown) {
-      console.error('Failed to refresh quotation results', error);
-      showErrorDialog(getErrorMessage(error));
-      return null;
-    }
+    setResultQuery(payload);
+    return payload;
   };
 
   // Starts the initial quotation search; terminal result hydration locks the result context.
@@ -276,35 +253,35 @@ export function useQuotationTaskFlow({
     await fetchQuotations(nodeId, { page: 1 });
   };
 
-  // Handles page changes by updating the stored task result.
+  // Handles page changes by updating the Result projection query.
   /**
    * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
    */
-  const handlePageChange = async (newPage: number) => {
+  const handlePageChange = (newPage: number) => {
     const targetNode = displayedNodes[0];
     const nodeId = targetNode?.id ?? '';
     if (!nodeId || !hasLoaded) return;
-    await updateStoredQuotationResult({ page: newPage });
+    updateStoredQuotationResult({ page: newPage });
   };
 
-  // Handles page-size changes while preserving the stored task as the source of truth in locked mode.
+  // Handles page-size changes while preserving the completed Analysis as the source of truth.
   /**
    * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
    */
-  const handlePageSizeChange = async (pageSize: number) => {
+  const handlePageSizeChange = (pageSize: number) => {
     const targetNode = displayedNodes[0];
     const nodeId = targetNode?.id ?? '';
     if (!nodeId || !hasLoaded) return;
-    await updateStoredQuotationResult({
+    updateStoredQuotationResult({
       page: 1,
       page_size: pageSize,
     });
   };
 
-  // Applies sortable-column requests either through a fresh search or stored result update.
+  // Applies sortable-column requests either through a fresh search or Result projection update.
   /**
    * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
-   * Flow: ignore non-sortable columns, toggle sort direction for repeated columns, then fetch fresh unlocked results or update locked stored results.
+   * Flow: ignore non-sortable columns, toggle sort direction for repeated columns, then submit fresh unlocked work or update the locked Result projection.
    */
   const handleSort = async (nodeId: string, column: string) => {
     const sortableColumns = new Set(originalColumnsByNode[nodeId] ?? []);
@@ -325,7 +302,7 @@ export function useQuotationTaskFlow({
       });
       return;
     }
-    await updateStoredQuotationResult({
+    updateStoredQuotationResult({
       page: 1,
       sort_by: column,
       descending: nextDescending,
@@ -367,7 +344,6 @@ export function useQuotationTaskFlow({
 
   return {
     resolveLockedNodeContext,
-    persistContextLengthPreference,
     fetchQuotations,
     updateStoredQuotationResult,
     handleSearchAll,

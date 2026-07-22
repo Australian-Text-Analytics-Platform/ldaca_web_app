@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
-import type { Analysis, TopicModelingRequest, TopicModelingResponse } from '@/api';
+import type { Analysis, TopicModelingRequest } from '@/api';
 import { runAnalysisTaskEnvelope } from '@/features/views/common/tasks/runAnalysisTaskEnvelope';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
@@ -22,7 +22,6 @@ interface TopicModelingActions {
   setIsRunning: (value: boolean) => void;
   runningRef: React.RefObject<boolean>;
   setError: (value: string | null) => void;
-  setResultSafely: (value: TopicModelingResponse | null) => void;
   lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
   setLocalTaskId: (id: string | null) => void;
   onTaskIdAssigned: (taskId: string | null) => void;
@@ -46,15 +45,7 @@ export function useTopicModelingTaskFlow({
     sampleFractions,
     minTopicSize,
   },
-  actions: {
-    setIsRunning,
-    runningRef,
-    setError,
-    setResultSafely,
-    lastFetchedRef,
-    setLocalTaskId,
-    onTaskIdAssigned,
-  },
+  actions: { setIsRunning, runningRef, setError, lastFetchedRef, setLocalTaskId, onTaskIdAssigned },
 }: Params) {
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0 || runningRef.current) return;
@@ -88,7 +79,6 @@ export function useTopicModelingTaskFlow({
       onTaskIdAssigned,
       resetBeforeRun: () => {
         setError(null);
-        setResultSafely(null);
       },
       submit: async () => {
         const { data } = await submitTabAnalysis({

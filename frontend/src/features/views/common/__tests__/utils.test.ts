@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  analysisInputsFromRequest,
-  clampDisplayTokenLimit,
-  DEFAULT_TOKEN_LIMIT,
-} from '../utils';
+import { analysisInputsFromRequest, clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT } from '../utils';
 
 describe('analysis common utils', () => {
   it('uses 25 as the default token limit when no value is provided', () => {

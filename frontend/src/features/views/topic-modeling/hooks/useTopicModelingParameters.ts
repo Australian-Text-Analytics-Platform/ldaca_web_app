@@ -154,7 +154,7 @@ export function useTopicModelingParameters({
   };
 
   /** Restores saved request parameters when the analysis lifecycle hydrates a task. */
-  // Called by: TopicModelingFeature.onHydratedRequest because persisted tasks should reopen with the same run parameters the backend stored.
+  // Called by: TopicModelingFeature.onRequest because persisted tasks should reopen with the same run parameters the backend stored.
   const hydrateParameters = (request: Record<string, unknown>) => {
     if (Array.isArray(request.sample_fractions)) {
       const nodeCount = Math.max(request.sample_fractions.length, panelSelectedNodes.length);

@@ -1,17 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { TokenFrequencyResponse } from '@/api';
-import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
+import type { TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
 import { usePersistNodeDocumentColumn } from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores/uiStore';
-import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
-import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { getAnalysisResultResource } from '../common/analysisApi';
+import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
-import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
@@ -19,7 +16,6 @@ import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunAct
 import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
-import { useSafeResult } from '../common/useSafeResult';
 import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest } from '../common/utils';
 import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
@@ -79,17 +75,12 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const nodeColumnSelections = nodeInputs.nodeColumnSelections;
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
-  const { replaceSelectedNodes, setNodeColor: persistNodeColor } = useWorkspaceActions();
-  const currentView = useUIStore((state) => state.currentView);
+  const { setNodeColor: persistNodeColor } = useWorkspaceActions();
   const setCurrentView = useUIStore((state) => state.setCurrentView);
-  const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
-  const setTasks = useAnalysisStore((state) => state.setTasks);
 
-  const [liveResults, resultRef, setResultSafely] = useSafeResult<TokenFrequencyResponse>();
   const [liveLastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
   const [liveStudyNodeId, setStudyNodeId] = useState<string | null>(null);
 
-  const results = liveResults;
   const lastCompareNodeIds = liveLastCompareNodeIds;
   const studyNodeId = liveStudyNodeId;
 
@@ -146,14 +137,8 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     persistNodeColor,
   });
 
-  const isActiveTab = currentView === 'token-frequency';
-  const { serverRequest } = useLastRunRequest({
-    analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
-    workspaceId: currentWorkspaceId,
-    taskId: tabTaskId,
-  });
-
   const {
+    request: serverRequest,
     isRunning,
     isStopping,
     setIsRunning,
@@ -163,76 +148,41 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     clearResults,
     stopTask,
     setLocalTaskId,
-  } = useAnalysisFeature<TokenFrequencyResponse>({
-    analysisType: ANALYSIS_TAB_GROUPS.tokenFrequencies,
+    result: results,
+  } = useAnalysisFeature<TokenFrequencyResponse, TokenFrequencyRequest>({
     taskType: ANALYSIS_TASK_TYPES.tokenFrequencies,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
     hydrationTaskId: tabTaskId,
-    resultRef,
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       return getAnalysisResultResource<TokenFrequencyResponse>(currentWorkspaceId, taskId);
-    },
-    /** Fetches the saved task request so a reopened task can restore panel state. */
-    fetchRequest: async (taskId) => {
-      if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisRequest(currentWorkspaceId, taskId);
-    },
-    /** Pushes fetched task results into guarded component state. */
-    onResultFetched: (result) => {
-      // Restore the compared node ids from the authoritative result, not just
-      // the raw result blob. onResultFetched and onHydratedResult race on a
-      // fresh tab mount (both share the hook's fetch-dedup refs); whichever
-      // wins marks the task fetched and short-circuits the other. If the
-      // task-flow refresh path won and we only set results here, the unified
-      // word cloud + comparative statistics table would vanish on tab return
-      // because they gate on lastCompareNodeIds.length === 2. Re-deriving the
-      // ids from result.analysis_params keeps that gate satisfied regardless
-      // of which path applies the result. During a live run these ids match
-      // what the submit handler already set, so this is a no-op overwrite.
-      restoreAnalysisNodeContext(result.analysis_params);
-      setResultSafely(result);
-    },
-    /**
-     * Rehydrates controls from a persisted result when the feature reconnects
-     * to a task. Flow: restore compared/study nodes, token limit, guarded
-     * results, and the normalized stop-word editor/filter state.
-     */
-    onHydratedResult: (result) => {
-      if (!result) return;
-      const requestData = result.analysis_params;
-      restoreAnalysisNodeContext(requestData);
-      applyTokenLimitState(
-        typeof requestData.token_limit === 'number' ? requestData.token_limit : null,
-      );
-      setResultSafely(result);
-      if (Array.isArray(result.stop_words)) {
-        const normalizedStops = result.stop_words
-          .map((word) => word.trim().toLowerCase())
-          .filter(Boolean);
-        setAppliedStopSet(new Set(normalizedStops));
-        setStopWords(normalizedStops.join(', '));
-      }
     },
     /**
      * Rehydrates the complete node-input context from a persisted request.
      * Flow: unwrap the saved request, then restore columns, tokenizer models,
      * and study/reference roles while retaining an existing parameter-card order.
      */
-    onHydratedRequest: (requestPayload) => {
-      const raw = requestPayload as Record<string, unknown> | null;
-      const req = raw?.data ?? raw;
-      if (!req || typeof req !== 'object') return;
-      restoreAnalysisNodeContext(req as Record<string, unknown>);
+    onRequest: (requestPayload) => {
+      const requestData = requestPayload as unknown as Record<string, unknown>;
+      restoreAnalysisNodeContext(requestData);
+      applyTokenLimitState(
+        typeof requestData.token_limit === 'number' ? requestData.token_limit : null,
+      );
+      const requestedStopWords = Array.isArray(requestData.stop_words)
+        ? requestData.stop_words.filter((word): word is string => typeof word === 'string')
+        : [];
+      const normalizedStops = requestedStopWords
+        .map((word) => word.trim().toLowerCase())
+        .filter(Boolean);
+      setAppliedStopSet(new Set(normalizedStops));
+      setStopWords(normalizedStops.join(', '));
     },
     /** Clears local result and selection state when the feature reset action runs. */
     onCleared: (_, options) => {
-      setResultSafely(null);
       if (options?.preserveLocalState) {
         return;
       }
@@ -242,10 +192,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       setLastCompareNodeIds([]);
       setStudyNodeId(null);
       resetPreferenceUiState();
-    },
-    /** Removes token-frequency tasks from the shared analysis store after local cleanup. */
-    pruneTaskInbox: (taskIds) => {
-      setTasks((prev) => (Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev));
     },
   });
 
@@ -273,7 +219,8 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   );
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
-  const backendStopWordsKey = deriveBackendStopWordsKey(results);
+  const backendStopWordsKey = deriveBackendStopWordsKey(serverRequest);
+  const savedTokenLimit = Number(host.settings['tokenFrequency.tokenLimit']);
   // Primary node/column the "Add Default" dialog samples to guess a language.
   // Language is not stored per column (a column may mix languages), so the guess
   // is derived on demand from the first selected text column and the user
@@ -304,10 +251,17 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     resetPreferenceUiState,
   } = useTokenFrequencyPreferences({
     results,
-    setResults: setResultSafely,
     backendTokenLimit,
     backendStopWordsKey,
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
+    savedTokenLimit: Number.isFinite(savedTokenLimit) ? savedTokenLimit : undefined,
+    savedStopWordsJson: host.settings['tokenFrequency.stopWords'],
+    onTokenLimitChange: (value) => {
+      host.setSetting('tokenFrequency.tokenLimit', String(value));
+    },
+    onStopWordsChange: (words) => {
+      host.setSetting('tokenFrequency.stopWords', JSON.stringify(words));
+    },
   });
 
   const lockedNodeNameMap = useMemo(
@@ -333,16 +287,12 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       effectiveNodeColumnSelections,
       tokenizerModelsByNode: effectiveTokenizerModelsByNode,
       stopWords,
-      results,
-      lockedNodeNameMap,
-      nodeIdToName,
       lastCompareNodeIds,
     },
     actions: {
       setLocalTaskId,
       setIsRunning,
       runningRef,
-      setResultsSafely: setResultSafely,
       setLastCompareNodeIds,
       setAppliedStopSet,
       setStopWords,
@@ -354,8 +304,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       },
     },
     navigation: {
-      replaceSelectedNodes,
-      setPendingConcordance,
       setCurrentView,
       applyStopSetFromText,
     },
@@ -418,8 +366,8 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     : hasParameterDiff(currentTokenFrequencyParams, serverTokenFrequencyParams(lastRunRequest)) ||
       hasNodeSelectionChanged(
         nodeColumnSelections,
-        lastRunRequest.node_ids as string[] | undefined,
-        lastRunRequest.node_columns as Record<string, string> | undefined,
+        lastRunRequest.node_ids,
+        lastRunRequest.node_columns,
       );
   const baseActionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),

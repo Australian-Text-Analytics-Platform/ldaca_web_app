@@ -15,7 +15,6 @@ const renderWithClient = (ui: React.ReactElement) => {
 };
 
 const handleSearchMock = vi.fn();
-const handleHandoffSearchMock = vi.fn();
 const clearResultsMock = vi.fn(async () => {
   /* mock: resolves immediately */
 });
@@ -39,14 +38,11 @@ const detachDialogMocks = vi.hoisted(() => ({
   },
 }));
 let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
-let mockPendingConcordance: Record<string, unknown> | null = null;
-let mockHydrationState = { status: 'idle' as const, lastHydratedAt: 1 };
+let mockHydrationState = { status: 'idle' as const };
 let mockInitialResult: Record<string, unknown> | null = null;
 let mockAnalysisState: 'successful' | null = null;
-let mockSetSafeResult: React.Dispatch<React.SetStateAction<Record<string, unknown> | null>> | null =
-  null;
 let latestAnalysisFeatureConfig: {
-  onHydratedRequest?: (request: unknown) => void | Promise<void>;
+  onRequest?: (request: unknown) => void | Promise<void>;
 } | null = null;
 
 vi.mock('sonner', () => ({
@@ -237,17 +233,6 @@ vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   }),
 }));
 
-vi.mock('@/stores/analysisStore', () => ({
-  /** Feeds pending handoff state and materialized events into the feature under test. */
-  useAnalysisStore: (selector: (state: Record<string, unknown>) => unknown) =>
-    selector({
-      pendingConcordance: mockPendingConcordance,
-      clearPendingConcordance: vi.fn(),
-      setTasks: vi.fn(),
-      materializedEvents: [],
-    }),
-}));
-
 vi.mock('@/stores', () => ({
   /** Pins the UI store to the concordance tab so lifecycle hooks stay active. */
   useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
@@ -256,11 +241,6 @@ vi.mock('@/stores', () => ({
 
 vi.mock('@/hooks/analysisTaskUtils', () => ({
   pruneTasksById: vi.fn((tasks) => tasks),
-  /** Keeps task dedupe candidates scoped to the requested type. */
-  getTaskTypeCandidates: (taskType: string) => [taskType],
-  /** Produces deterministic task dedupe keys for lifecycle assertions. */
-  normalizeTaskDedupeKey: (taskId: string | null, state: string | null) =>
-    taskId && state ? `${taskId}:${state}` : null,
 }));
 
 vi.mock('../generatedColumns', () => ({
@@ -281,7 +261,6 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
     latestTaskFlowParams = params;
     return {
       handleSearch: handleSearchMock,
-      handleHandoffSearch: handleHandoffSearchMock,
       updateStoredResult: vi.fn(),
       handleSort: vi.fn(),
       handlePageChange: vi.fn(),
@@ -320,69 +299,60 @@ vi.mock('../../common/components/DetachColumnsDialog', () => ({
   },
 }));
 
-vi.mock('../../common/hooks/useLastRunRequest', () => ({
-  /** Supplies the last-run request used only for Run/Re-run button diffing. */
-  useLastRunRequest: () => ({
-    serverRequest: {
-      node_ids: ['node-1'],
-      node_columns: { 'node-1': 'text' },
-      search_word: 'old value',
-      num_left_tokens: 10,
-      num_right_tokens: 10,
-      regex: false,
-      case_sensitive: false,
-    },
-    hasServerRequest: true,
-    taskId: null,
-    isLoading: false,
-    isFetching: false,
-    refetch: vi.fn(),
-  }),
-}));
-
 vi.mock('../../common/hooks/useAnalysisFeature', () => ({
-  /** Supplies analysis lifecycle state and mockable clear behavior for feature tests. */
+  /** Supplies canonical Query-owned Analysis and Result resources for feature tests. */
   useAnalysisFeature: (config: {
-    onHydratedRequest?: (request: unknown) => void | Promise<void>;
+    hydrationTaskId?: string | null;
+    onRequest?: (request: unknown) => void | Promise<void>;
   }) => {
     latestAnalysisFeatureConfig = config;
+    const request = config.hydrationTaskId
+      ? {
+          kind: 'concordance',
+          node_ids: ['node-1'],
+          node_columns: { 'node-1': 'text' },
+          search_word: 'old value',
+          num_left_tokens: 10,
+          num_right_tokens: 10,
+          regex: false,
+          whole_word: true,
+          case_sensitive: false,
+          search_mode: 'tokens',
+        }
+      : null;
+    const result =
+      config.hydrationTaskId && mockInitialResult
+        ? {
+            kind: 'concordance',
+            sources: [],
+            metadata: {},
+            query: { kind: 'concordance' },
+            ...mockInitialResult,
+          }
+        : null;
     return {
+      analysisId: config.hydrationTaskId ?? null,
+      request,
+      analysisState: mockAnalysisState === 'successful' ? 'succeeded' : null,
+      analysisError: null,
+      result,
       resolveTaskId: vi.fn(() => 'task-1'),
       setLocalTaskId: vi.fn(),
       isRunning: false,
       setIsRunning: vi.fn(),
+      runningRef: { current: false },
+      lastFetchedRef: { current: { taskId: null, state: null } },
       taskStatus: {
         tasks: mockAnalysisState ? [{ state: mockAnalysisState }] : [],
       },
       banner: null,
       hydrationState: mockHydrationState,
       clearResults: clearResultsMock,
+      stopTask: vi.fn(),
+      isStopping: false,
     };
   },
 }));
-
-vi.mock('../../common/useSafeResult', async () => {
-  const ReactModule = await import('react');
-  return {
-    /** Emulates the shared safe-result hook while exposing the setter to tests. */
-    useSafeResult: () => {
-      const initial = mockInitialResult
-        ? {
-            query: { page: 1, page_size: 20 },
-            analysis_params: {},
-            ...mockInitialResult,
-          }
-        : null;
-      const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(initial);
-      const ref = ReactModule.useRef<Record<string, unknown> | null>(result);
-      ReactModule.useEffect(() => {
-        ref.current = result;
-        mockSetSafeResult = setResult;
-      }, [result, setResult]);
-      return [result, ref, setResult];
-    },
-  };
-});
 
 vi.mock('../../common/hooks/useNodeColorControls', () => ({
   /** Supplies deterministic source colours for feature tests. */
@@ -421,17 +391,17 @@ const renderConcordanceFeature = (taskId: string | null = null) => {
   const setInputSet = vi.fn();
   return {
     ...renderWithClient(
-    <ConcordanceFeature
-      host={{
-        tabId: 'tab-1',
-        taskId,
-        inputSets: {},
-        settings: {},
-        setTaskId: vi.fn(),
-        setInputSet,
-        setSetting: vi.fn(),
-      }}
-    />,
+      <ConcordanceFeature
+        host={{
+          tabId: 'tab-1',
+          taskId,
+          inputSets: {},
+          settings: {},
+          setTaskId: vi.fn(),
+          setInputSet,
+          setSetting: vi.fn(),
+        }}
+      />,
     ),
     setInputSet,
   };
@@ -442,25 +412,20 @@ describe('ConcordanceFeature', () => {
     handleSearchMock.mockClear();
     clearResultsMock.mockClear();
     latestTaskFlowParams = null;
-    mockPendingConcordance = null;
-    mockHydrationState = { status: 'idle', lastHydratedAt: 1 };
+    mockHydrationState = { status: 'idle' };
     mockInitialResult = null;
     mockAnalysisState = null;
-    mockSetSafeResult = null;
     latestAnalysisFeatureConfig = null;
     detachDialogMocks.render.mockClear();
 
-    clearResultsMock.mockImplementation(async () => {
-      mockSetSafeResult?.(null);
-      return true;
-    });
+    clearResultsMock.mockResolvedValue(true);
   });
 
   it('restores the persisted Analysis Data Blocks into the owning Tab input set', async () => {
     const { setInputSet } = renderConcordanceFeature('analysis-1');
 
     await act(async () => {
-      await latestAnalysisFeatureConfig?.onHydratedRequest?.({
+      await latestAnalysisFeatureConfig?.onRequest?.({
         node_ids: ['node-2', 'node-1'],
         node_columns: { 'node-1': 'text', 'node-2': 'body' },
         search_word: 'queensland',
@@ -474,7 +439,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('owns table and dispersion detach copy and forwards each dialog handler set', () => {
-    const { unmount } = renderConcordanceFeature();
+    const { unmount } = renderConcordanceFeature('analysis-1');
 
     const calls = detachDialogMocks.render.mock.calls.map(([props]) => props);
     const table = calls.find((props) => props.title === 'Detach Concordance Results');
@@ -532,7 +497,7 @@ describe('ConcordanceFeature', () => {
   });
 
   it('defaults whole-word on and disables it when regex is enabled', () => {
-    const { unmount } = renderConcordanceFeature();
+    const { unmount } = renderConcordanceFeature('analysis-1');
 
     const wholeWordCheckbox = screen.getByRole('checkbox', { name: /whole word/i });
     const regexCheckbox = screen.getByRole('checkbox', { name: /use regular expression/i });
@@ -547,101 +512,6 @@ describe('ConcordanceFeature', () => {
     expect(wholeWordCheckbox).not.toBeChecked();
     expect(wholeWordCheckbox).toBeDisabled();
     expect(latestTaskFlowParams?.state?.wholeWord).toBe(false);
-
-    unmount();
-  });
-
-  it('fills the concordance search box from a pending token handoff when no results exist', async () => {
-    mockPendingConcordance = {
-      targetTabId: 'tab-1',
-      searchWord: 'keyword',
-      selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
-      nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
-      autoRun: false,
-      timestamp: 1,
-    };
-
-    const { unmount } = renderConcordanceFeature();
-
-    await waitFor(() => {
-      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue(
-        'keyword',
-      );
-    });
-
-    unmount();
-  });
-
-  it('submits an auto-run token handoff once with the handed-off inputs', async () => {
-    mockPendingConcordance = {
-      targetTabId: 'tab-1',
-      searchWord: 'keyword',
-      selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
-      nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
-      autoRun: true,
-      timestamp: 3,
-    };
-
-    const { unmount } = renderConcordanceFeature();
-
-    await waitFor(() => {
-      expect(handleHandoffSearchMock).toHaveBeenCalledWith({
-        searchWord: 'keyword',
-        nodeIds: ['node-1'],
-        nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
-      });
-    });
-    expect(handleHandoffSearchMock).toHaveBeenCalledTimes(1);
-
-    unmount();
-  });
-
-  it('fills the concordance search box directly from a token handoff even when results already exist', async () => {
-    mockPendingConcordance = {
-      targetTabId: 'tab-1',
-      searchWord: 'replacement',
-      selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
-      nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
-      autoRun: false,
-      timestamp: 2,
-    };
-    mockInitialResult = {
-      state: 'successful',
-      data: {
-        'node-1': {
-          data: [],
-          columns: [],
-          metadata: {
-            metadata_columns: [],
-            concordance_columns: [],
-            all_columns: [],
-          },
-          pagination: {
-            page: 1,
-            page_size: 20,
-            total_source_rows: 0,
-            total_source_pages: 1,
-            result_count: 0,
-            has_prev: false,
-            has_next: false,
-          },
-          sorting: { descending: false },
-        },
-      },
-    };
-
-    const { unmount } = renderConcordanceFeature();
-
-    await waitFor(() => {
-      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue(
-        'replacement',
-      );
-    });
-
-    // Token clicks always open a fresh tab, so the handoff applies unconditionally:
-    // no overwrite prompt is shown and results are never force-cleared.
-    expect(screen.queryByText('Replace concordance results?')).not.toBeInTheDocument();
-    expect(clearResultsMock).not.toHaveBeenCalledWith({ preserveLocalState: true });
 
     unmount();
   });
@@ -697,7 +567,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = renderConcordanceFeature();
+    const { unmount } = renderConcordanceFeature('analysis-1');
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
@@ -770,7 +640,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = renderConcordanceFeature();
+    const { unmount } = renderConcordanceFeature('analysis-1');
 
     fireEvent.click(screen.getByRole('tab', { name: /dispersion view/i }));
 
@@ -857,7 +727,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    renderConcordanceFeature();
+    renderConcordanceFeature('analysis-1');
 
     await waitFor(() => {
       expect(screen.getByText('CONC_left_context')).toBeInTheDocument();
@@ -915,7 +785,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    renderConcordanceFeature();
+    renderConcordanceFeature('analysis-1');
 
     expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
     // total_source_rows from the mock pagination (1) is now preferred over
@@ -953,7 +823,7 @@ describe('ConcordanceFeature', () => {
       },
     };
 
-    const { unmount } = renderConcordanceFeature();
+    const { unmount } = renderConcordanceFeature('analysis-1');
 
     expect(
       screen.queryByRole('checkbox', { name: /bar length proportional to text length/i }),

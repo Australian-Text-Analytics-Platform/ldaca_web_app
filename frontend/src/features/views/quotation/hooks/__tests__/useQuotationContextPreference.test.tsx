@@ -11,24 +11,6 @@ describe('useQuotationContextPreference', () => {
     vi.clearAllMocks();
   });
 
-  it('hydrates saved preferences into the displayed input and value', () => {
-    const { result } = renderHook(() =>
-      useQuotationContextPreference({
-        currentWorkspaceId: 'workspace-1',
-        hasLoaded: true,
-        persistPreference,
-      }),
-    );
-
-    act(() => {
-      result.current.applyPreferenceFromResult({ preferences: { context_length: 12 } });
-    });
-
-    expect(result.current.contextLength).toBe(12);
-    expect(result.current.contextLengthInput).toBe('12');
-    expect(result.current.contextLengthError).toBeNull();
-  });
-
   it('validates and clamps edits before updating the active context length', async () => {
     const { result } = renderHook(() =>
       useQuotationContextPreference({
@@ -92,5 +74,22 @@ describe('useQuotationContextPreference', () => {
 
     expect(persistPreference).toHaveBeenCalledWith(10);
     expect(result.current.isSavingContextLength).toBe(false);
+  });
+
+  it('hydrates a client-local value without writing it back', async () => {
+    const { result } = renderHook(() =>
+      useQuotationContextPreference({
+        currentWorkspaceId: 'workspace-1',
+        hasLoaded: true,
+        savedValue: 14,
+        persistPreference,
+      }),
+    );
+
+    await act(async () => undefined);
+
+    expect(result.current.contextLength).toBe(14);
+    expect(result.current.contextLengthInput).toBe('14');
+    expect(persistPreference).not.toHaveBeenCalled();
   });
 });

@@ -16,38 +16,19 @@ import {
 describe('tokenFrequencyUtils', () => {
   it('derives the canonical token limit from the result resource', () => {
     const result: TokenFrequencyResponse = {
-      state: 'successful',
-      data: null,
-      token_limit: 42,
-      analysis_params: { token_limit: 11 },
-      metadata: { token_limit: 7, limit: 99 },
+      data: {},
+      metadata: { effective_token_limit: 42, server_token_limit: 100 },
     };
 
     expect(deriveBackendTokenLimit(result)).toBe(42);
   });
 
-  it('derives stop words from the canonical result resource', () => {
-    const result: TokenFrequencyResponse = {
-      state: 'successful',
-      data: null,
-      stop_words: ['ignored'],
-      metadata: {},
-      analysis_params: {},
-    };
-
-    expect(deriveBackendStopWords(result)).toEqual(['ignored']);
+  it('derives stop words from the immutable analysis request', () => {
+    expect(deriveBackendStopWords({ stop_words: ['ignored'] })).toEqual(['ignored']);
   });
 
   it('deriveBackendStopWordsKey normalizes and joins stop words deterministically', () => {
-    const result: TokenFrequencyResponse = {
-      state: 'successful',
-      data: null,
-      stop_words: [' The ', 'AND', '', '  '],
-      metadata: {},
-      analysis_params: {},
-    };
-
-    expect(deriveBackendStopWordsKey(result)).toBe('the|and');
+    expect(deriveBackendStopWordsKey({ stop_words: [' The ', 'AND', '', '  '] })).toBe('the|and');
   });
 
   it('buildSelectionNameById merges selected + panel nodes with panel precedence', () => {

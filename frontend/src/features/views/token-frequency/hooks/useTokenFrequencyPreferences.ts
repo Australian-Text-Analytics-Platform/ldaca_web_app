@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer } from 'react';
 import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common/utils';
@@ -14,10 +14,13 @@ import {
 
 interface UseTokenFrequencyPreferencesParams {
   results: TokenFrequencyResponse | null;
-  setResults: React.Dispatch<React.SetStateAction<TokenFrequencyResponse | null>>;
   backendTokenLimit: number | null;
   backendStopWordsKey: string;
   maxTokenLimitInput: number;
+  savedTokenLimit?: number;
+  savedStopWordsJson?: string;
+  onTokenLimitChange?: (value: number) => void;
+  onStopWordsChange?: (words: string[]) => void;
 }
 
 /** Owns token-frequency preference UI state and persistence for stop words and display limits. */
@@ -29,10 +32,13 @@ interface UseTokenFrequencyPreferencesParams {
  */
 export const useTokenFrequencyPreferences = ({
   results,
-  setResults,
   backendTokenLimit,
   backendStopWordsKey,
   maxTokenLimitInput,
+  savedTokenLimit,
+  savedStopWordsJson,
+  onTokenLimitChange,
+  onStopWordsChange,
 }: UseTokenFrequencyPreferencesParams) => {
   const [preferenceState, dispatchPreference] = useReducer(
     tokenFrequencyPreferenceReducer,
@@ -72,10 +78,15 @@ export const useTokenFrequencyPreferences = ({
   );
 
   useEffect(() => {
-    const backendLimit =
-      typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)
-        ? backendTokenLimit
+    const persistedLimit =
+      typeof savedTokenLimit === 'number' && Number.isFinite(savedTokenLimit)
+        ? savedTokenLimit
         : null;
+    const backendLimit =
+      persistedLimit ??
+      (typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)
+        ? backendTokenLimit
+        : null);
     let nextLimit: number | null = null;
     if (backendLimit !== null) {
       const { limit: sanitizedBackendLimit } = clampDisplayTokenLimit(backendLimit);
@@ -89,12 +100,23 @@ export const useTokenFrequencyPreferences = ({
         applyTokenLimitState(nextLimit);
       });
     }
-  }, [applyTokenLimitState, backendTokenLimit, tokenLimitOverride]);
+  }, [applyTokenLimitState, backendTokenLimit, savedTokenLimit, tokenLimitOverride]);
 
   useEffect(() => {
-    const normalized = backendStopWordsKey
-      ? backendStopWordsKey.split('|').filter((word) => word.length > 0)
-      : [];
+    let savedStopWords: string[] | null = null;
+    if (savedStopWordsJson) {
+      try {
+        const parsed: unknown = JSON.parse(savedStopWordsJson);
+        if (Array.isArray(parsed) && parsed.every((word) => typeof word === 'string')) {
+          savedStopWords = parsed;
+        }
+      } catch {
+        savedStopWords = null;
+      }
+    }
+    const normalized =
+      savedStopWords ??
+      (backendStopWordsKey ? backendStopWordsKey.split('|').filter((word) => word.length > 0) : []);
 
     void Promise.resolve().then(() => {
       if (!results) {
@@ -104,53 +126,20 @@ export const useTokenFrequencyPreferences = ({
 
       dispatchPreference({ type: 'stopWordsApplied', words: normalized });
     });
-  }, [backendStopWordsKey, results]);
+  }, [backendStopWordsKey, results, savedStopWordsJson]);
 
   const effectiveTokenLimit = (() => {
     if (typeof tokenLimitOverride === 'number' && Number.isFinite(tokenLimitOverride)) {
       return Math.min(tokenLimitOverride, maxTokenLimitInput);
+    }
+    if (typeof savedTokenLimit === 'number' && Number.isFinite(savedTokenLimit)) {
+      return Math.min(clampDisplayTokenLimit(savedTokenLimit).limit, maxTokenLimitInput);
     }
     if (typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)) {
       return Math.min(clampDisplayTokenLimit(backendTokenLimit).limit, maxTokenLimitInput);
     }
     return DEFAULT_TOKEN_LIMIT;
   })();
-
-  const updateResultsPreferencesLocally = useCallback(
-    (prefs: { token_limit?: number; stop_words?: string[] }) => {
-      setResults((prev) => {
-        if (!prev) return prev;
-
-        let nextTokenLimit = prev.token_limit;
-        if (prefs.token_limit !== undefined) {
-          nextTokenLimit = prefs.token_limit;
-        }
-
-        if (Number.isFinite(nextTokenLimit)) {
-          const { limit: normalizedLimit } = clampDisplayTokenLimit(nextTokenLimit);
-          const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
-          nextTokenLimit = inputLimit;
-        }
-
-        const stopWordsArray =
-          prefs.stop_words ??
-          (Array.isArray(prev.stop_words) ? prev.stop_words : prev.metadata.stop_words);
-
-        return {
-          ...prev,
-          token_limit: nextTokenLimit,
-          analysis_params: {
-            ...prev.analysis_params,
-            token_limit: nextTokenLimit,
-            stop_words: stopWordsArray,
-          },
-          metadata: { ...prev.metadata, token_limit: nextTokenLimit, stop_words: stopWordsArray },
-          stop_words: stopWordsArray,
-        };
-      });
-    },
-    [setResults, maxTokenLimitInput],
-  );
 
   /**
    * Apply one already-normalized token limit locally and persist it when live
@@ -167,8 +156,8 @@ export const useTokenFrequencyPreferences = ({
 
     dispatchPreference({ type: 'tokenLimitApplyingChanged', active: true });
     try {
-      updateResultsPreferencesLocally({ token_limit: targetLimit });
       applyTokenLimitState(targetLimit);
+      onTokenLimitChange?.(targetLimit);
     } catch (error) {
       console.error('Failed to update token limit', error);
       dispatchPreference({
@@ -220,29 +209,14 @@ export const useTokenFrequencyPreferences = ({
     persistAndApplyTokenLimit(targetLimit);
   };
 
-  const saveStopWordsLocally = useCallback(
-    (words: string[]) => {
-      updateResultsPreferencesLocally({ stop_words: words });
+  const applyStopSetFromText = useCallback(
+    (text: string) => {
+      const words = parseStopWordsText(text);
+      dispatchPreference({ type: 'stopWordsApplied', words });
+      if (results) onStopWordsChange?.(words);
     },
-    [updateResultsPreferencesLocally],
+    [onStopWordsChange, results],
   );
-
-  // Ref-pattern so this callback can read the *current* local stop-word updater
-  // without becoming unstable itself. Keeping the returned callback stable
-  // across renders matters because it propagates through the task-flow hook's
-  // right-click handler down to React.memo'd word-cloud sections; if it
-  // churned per render the cloud would re-run d3-cloud layout on every
-  // stopword-textarea keystroke.
-  const saveStopWordsLocallyRef = useRef(saveStopWordsLocally);
-  useEffect(() => {
-    saveStopWordsLocallyRef.current = saveStopWordsLocally;
-  }, [saveStopWordsLocally]);
-
-  const applyStopSetFromText = useCallback((text: string) => {
-    const words = parseStopWordsText(text);
-    dispatchPreference({ type: 'stopWordsApplied', words });
-    saveStopWordsLocallyRef.current(words);
-  }, []);
 
   /** Sorts the current stop-word text so users can review and export a stable list. */
   /**
@@ -252,7 +226,7 @@ export const useTokenFrequencyPreferences = ({
     const words = parseStopWordsText(stopWords);
     words.sort((a, b) => a.localeCompare(b));
     dispatchPreference({ type: 'stopWordsApplied', words });
-    saveStopWordsLocally(words);
+    if (results) onStopWordsChange?.(words);
   };
 
   /** Mirrors token-limit keystrokes into state while clearing stale validation errors. */

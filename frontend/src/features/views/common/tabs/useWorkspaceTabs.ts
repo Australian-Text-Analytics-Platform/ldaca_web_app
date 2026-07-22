@@ -8,6 +8,8 @@ import {
   renameTab as renameServerTab,
 } from '@/api';
 import type { AnalysisKind, Tab } from '@/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { useAuthStore } from '@/stores/authStore';
 import {
   DEFAULT_TAB_INPUT_SET_ID,
   reorderTabs,
@@ -17,15 +19,10 @@ import {
   type AnalysisTabInputSets,
 } from './tabStateOps';
 import {
+  analysisTabSettingsKey,
   analysisTabsPresentationKey,
   useAnalysisTabsPresentationStore,
 } from './analysisTabsPresentationStore';
-
-const tabsQueryKey = (workspaceId: string | null | undefined, kind: string) => [
-  'workspace-tabs',
-  workspaceId ?? '__none__',
-  kind,
-];
 
 export interface UseWorkspaceTabsResult {
   tabs: AnalysisTab[];
@@ -42,9 +39,7 @@ export interface UseWorkspaceTabsResult {
 }
 
 interface LocalTabState {
-  task_id?: string | null;
   input_sets?: AnalysisTabInputSets;
-  settings?: Record<string, string>;
 }
 
 function inputSetsEqual(left: AnalysisTabInput[], right: AnalysisTabInput[]): boolean {
@@ -71,8 +66,14 @@ const asAnalysisKind = (value: string): AnalysisKind => {
   throw new Error(`Unsupported analysis tab kind: ${value}`);
 };
 
-function mergeServerTabs(serverTabs: Tab[], local: Record<string, LocalTabState>): AnalysisTab[] {
-  return serverTabs.map((tab) => tabFromResource(tab, local[tab.id]));
+function mergeServerTabs(
+  serverTabs: Tab[],
+  local: Record<string, LocalTabState>,
+  settingsFor: (tabId: string) => Record<string, string> | undefined,
+): AnalysisTab[] {
+  return serverTabs.map((tab) =>
+    tabFromResource(tab, { ...local[tab.id], settings: settingsFor(tab.id) }),
+  );
 }
 
 /**
@@ -86,13 +87,18 @@ export function useWorkspaceTabs(
   analysisType: string,
 ): UseWorkspaceTabsResult {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.session?.user?.id ?? '__anonymous__');
   const kind = asAnalysisKind(analysisType);
-  const queryKey = tabsQueryKey(workspaceId, kind);
-  const presentationKey = analysisTabsPresentationKey(workspaceId, kind);
+  const queryKey = queryKeys.workspaceTabs(workspaceId ?? '__none__');
+  const presentationKey = analysisTabsPresentationKey(userId, workspaceId, kind);
   const activeTabId = useAnalysisTabsPresentationStore(
     (state) => state.activeTabIds[presentationKey] ?? null,
   );
+  const tabSettings = useAnalysisTabsPresentationStore((state) => state.tabSettings);
   const rememberActiveTab = useAnalysisTabsPresentationStore((state) => state.rememberActiveTab);
+  const rememberTabSetting = useAnalysisTabsPresentationStore((state) => state.rememberTabSetting);
+  const forgetTabSettings = useAnalysisTabsPresentationStore((state) => state.forgetTabSettings);
+  const pruneTabs = useAnalysisTabsPresentationStore((state) => state.pruneTabs);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [localState, setLocalState] = useState<Record<string, LocalTabState>>({});
   const creatingRef = useRef(false);
@@ -107,17 +113,30 @@ export function useWorkspaceTabs(
         path: { workspace_id: workspaceId },
         throwOnError: true,
       });
-      return data.filter((tab) => tab.kind === kind);
+      return data;
     },
   });
 
-  const serverTabs = tabsQuery.data ?? [];
-  const mergedTabs = mergeServerTabs(serverTabs, localState);
+  const serverTabs = (tabsQuery.data ?? []).filter((tab) => tab.kind === kind);
+  const mergedTabs = mergeServerTabs(
+    serverTabs,
+    localState,
+    (tabId) => tabSettings[analysisTabSettingsKey(userId, workspaceId, tabId)],
+  );
   const orderedTabs = orderedIds.length > 0 ? reorderTabs(mergedTabs, orderedIds) : mergedTabs;
   const resolvedActiveId =
     activeTabId && orderedTabs.some((tab) => tab.tab_id === activeTabId)
       ? activeTabId
       : (orderedTabs[0]?.tab_id ?? null);
+
+  useEffect(() => {
+    if (!workspaceId || !tabsQuery.isSuccess) return;
+    pruneTabs(
+      userId,
+      workspaceId,
+      tabsQuery.data.map((tab) => tab.id),
+    );
+  }, [pruneTabs, tabsQuery.data, tabsQuery.isSuccess, userId, workspaceId]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- Reset ephemeral tab drafts when the selected workspace changes. */
   useEffect(() => {
@@ -139,8 +158,16 @@ export function useWorkspaceTabs(
 
   useEffect(() => {
     if (!workspaceId || tabsQuery.isLoading || activeTabId === resolvedActiveId) return;
-    rememberActiveTab(workspaceId, kind, resolvedActiveId);
-  }, [activeTabId, kind, rememberActiveTab, resolvedActiveId, tabsQuery.isLoading, workspaceId]);
+    rememberActiveTab(userId, workspaceId, kind, resolvedActiveId);
+  }, [
+    activeTabId,
+    kind,
+    rememberActiveTab,
+    resolvedActiveId,
+    tabsQuery.isLoading,
+    userId,
+    workspaceId,
+  ]);
 
   const setLocalTab = useCallback(
     (tabId: string, update: (previous: LocalTabState) => LocalTabState) => {
@@ -170,7 +197,7 @@ export function useWorkspaceTabs(
     onSuccess: (tab) => {
       creatingRef.current = false;
       if (tab) {
-        rememberActiveTab(workspaceId, kind, tab.id);
+        rememberActiveTab(userId, workspaceId, kind, tab.id);
         setOrderedIds((current) => [...current.filter((id) => id !== tab.id), tab.id]);
       }
       invalidate();
@@ -203,11 +230,12 @@ export function useWorkspaceTabs(
         return remaining;
       });
       setOrderedIds((current) => current.filter((id) => id !== tabId));
+      forgetTabSettings(userId, workspaceId, tabId);
       const currentActive =
         useAnalysisTabsPresentationStore.getState().activeTabIds[presentationKey] ?? null;
       if (currentActive === tabId) {
         const fallbackTabId = orderedTabs.find((tab) => tab.tab_id !== tabId)?.tab_id ?? null;
-        rememberActiveTab(workspaceId, kind, fallbackTabId);
+        rememberActiveTab(userId, workspaceId, kind, fallbackTabId);
       }
       invalidate();
     },
@@ -239,20 +267,30 @@ export function useWorkspaceTabs(
     [renameMutation, workspaceId],
   );
 
-  const setActiveTab = useCallback((tabId: string) => {
-    rememberActiveTab(workspaceId, kind, tabId);
-  }, [kind, rememberActiveTab, workspaceId]);
+  const setActiveTab = useCallback(
+    (tabId: string) => {
+      if (resolvedActiveId && resolvedActiveId !== tabId) {
+        setLocalState((current) => {
+          const { [resolvedActiveId]: _discardedDraft, ...remaining } = current;
+          return remaining;
+        });
+      }
+      rememberActiveTab(userId, workspaceId, kind, tabId);
+    },
+    [kind, rememberActiveTab, resolvedActiveId, userId, workspaceId],
+  );
 
   const reorder = useCallback((ids: string[]) => {
     setOrderedIds(ids);
   }, []);
 
   const setTabTask = useCallback(
-    (tabId: string, analysisId: string | null) => {
-      setLocalTab(tabId, (previous) => ({ ...previous, task_id: analysisId }));
+    (_tabId: string, _analysisId: string | null) => {
+      // Tab.analysis_id is written by the backend submission/clear command.
+      // Refetch it instead of creating a competing client-side owner.
       invalidate();
     },
-    [invalidate, setLocalTab],
+    [invalidate],
   );
 
   const setTabInputSet = useCallback(
@@ -274,12 +312,9 @@ export function useWorkspaceTabs(
 
   const setTabSetting = useCallback(
     (tabId: string, key: string, value: string) => {
-      setLocalTab(tabId, (previous) => ({
-        ...previous,
-        settings: { ...(previous.settings ?? {}), [key]: value },
-      }));
+      rememberTabSetting(userId, workspaceId, tabId, key, value);
     },
-    [setLocalTab],
+    [rememberTabSetting, userId, workspaceId],
   );
 
   return {

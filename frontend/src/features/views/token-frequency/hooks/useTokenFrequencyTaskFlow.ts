@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { submitTabAnalysis } from '@/api';
-import type { Analysis, TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
+import { deleteTab, submitTabAnalysis } from '@/api';
+import type { Analysis, ConcordanceAnalysisRequest, TokenFrequencyRequest } from '@/api';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
-import {
-  resolveTokenFrequencyNodeContext,
-  type TokenFrequencyAnalysisParams,
-} from '@/features/views/token-frequency/tokenFrequencyHelpers';
+import { resolveTokenFrequencyNodeContext } from '@/features/views/token-frequency/tokenFrequencyHelpers';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
-import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/features/views/viewIds';
 
 interface AnalysisState {
@@ -22,17 +18,13 @@ interface AnalysisState {
   effectiveNodeColumnSelections: NodeColumnSelection[];
   tokenizerModelsByNode: Record<string, string>;
   stopWords: string;
-  results: TokenFrequencyResponse | null;
   lastCompareNodeIds: string[];
-  lockedNodeNameMap: Record<string, string>;
-  nodeIdToName: Record<string, string>;
 }
 
 interface AnalysisActions {
   setLocalTaskId: (value: string | null) => void;
   setIsRunning: (value: boolean) => void;
   runningRef: React.RefObject<boolean>;
-  setResultsSafely: (value: TokenFrequencyResponse | null) => void;
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
@@ -43,8 +35,6 @@ interface AnalysisActions {
 }
 
 interface NavigationActions {
-  replaceSelectedNodes: (nodeIds: string[], activeNodeId?: string | null) => void;
-  setPendingConcordance: (payload: PendingConcordance) => void;
   setCurrentView: (view: ViewType) => void;
   applyStopSetFromText: (text: string) => void;
 }
@@ -70,28 +60,24 @@ export const useTokenFrequencyTaskFlow = ({
     effectiveNodeColumnSelections,
     tokenizerModelsByNode,
     stopWords,
-    results,
-    lockedNodeNameMap,
-    nodeIdToName,
     lastCompareNodeIds,
   },
   actions: {
     setLocalTaskId,
     setIsRunning,
     runningRef,
-    setResultsSafely,
     setLastCompareNodeIds,
     setAppliedStopSet,
     setStopWords,
     lastFetchedRef,
     onTaskIdAssigned,
   },
-  navigation: { replaceSelectedNodes, setPendingConcordance, setCurrentView, applyStopSetFromText },
+  navigation: { setCurrentView, applyStopSetFromText },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
   // concordance tab for every token click. The created tab id travels with the
   // handoff so only that destination tab can consume it.
-  const { createTab: createConcordanceTab } = useWorkspaceTabs(
+  const { createTab: createConcordanceTab, setTabTask: setConcordanceTabTask } = useWorkspaceTabs(
     currentWorkspaceId,
     ANALYSIS_TAB_GROUPS.concordance,
   );
@@ -151,9 +137,7 @@ export const useTokenFrequencyTaskFlow = ({
       setIsRunning,
       setLocalTaskId,
       onTaskIdAssigned,
-      resetBeforeRun: () => {
-        setResultsSafely(null);
-      },
+      resetBeforeRun: () => undefined,
       submit: async () => {
         const { data: response } = await submitTabAnalysis({
           body: { kind: 'token_frequency', ...request },
@@ -162,19 +146,17 @@ export const useTokenFrequencyTaskFlow = ({
         });
         return response;
       },
-      onSuccess: (response) => {
+      onSuccess: () => {
         setLastCompareNodeIds(request.node_ids);
         const normalizedStops = (request.stop_words ?? [])
           .map((word: string) => word.trim().toLowerCase())
           .filter(Boolean);
         setAppliedStopSet(new Set(normalizedStops));
         setStopWords(normalizedStops.join(', '));
-        if (response.state === 'failed') setResultsSafely(null);
       },
       onError: (error) => {
         console.error('Error calculating token frequencies:', error);
         setLocalTaskId(null);
-        setResultsSafely(null);
       },
     });
   };
@@ -198,13 +180,11 @@ export const useTokenFrequencyTaskFlow = ({
     // and the comparative statistics table omit it, so the handoff keeps both
     // compared nodes (the prior behaviour).
     (token: string, sourceNodeId?: string) => {
+      if (!currentWorkspaceId) return;
       const trimmedToken = token;
-      const analysisParams = (results?.analysis_params ??
-        null) as TokenFrequencyAnalysisParams | null;
-
       const resolvedContext = resolveTokenFrequencyNodeContext({
         lastCompareNodeIds,
-        analysisParams,
+        analysisParams: null,
         selectedNodes: panelSelectedNodes.map((node) => ({ id: node.id })),
         nodeColumnSelections: effectiveNodeColumnSelections,
         maxNodes: 2,
@@ -249,53 +229,58 @@ export const useTokenFrequencyTaskFlow = ({
         ? [scopedSelection]
         : resolvedSelections;
 
-      const nodeDetails = uniqueNodeIds.map((id) => ({
-        id,
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty locked/derived name should fall back to the next source, not render blank
-        name: lockedNodeNameMap[id] || nodeIdToName[id] || id,
-      }));
-
       void (async () => {
+        let createdTabId: string | null = null;
         try {
           const createdTab = await createConcordanceTab(trimmedToken || undefined);
           if (!createdTab) return;
+          createdTabId = createdTab.id;
 
-          if (uniqueNodeIds.length > 0) {
-            try {
-              replaceSelectedNodes(uniqueNodeIds, uniqueNodeIds.at(-1));
-            } catch (error) {
-              console.warn('Failed to sync workspace selection for concordance handoff:', error);
-            }
-          }
-
-          setPendingConcordance({
-            targetTabId: createdTab.id,
-            searchWord: trimmedToken,
-            nodeColumnSelections: effectiveSelections.map((selection) => ({ ...selection })),
-            selectedNodes: nodeDetails,
-            // Auto-run the concordance search on arrival: clicking a token is an
-            // explicit "search for this word" intent, so the fresh tab dispatches
-            // the request itself instead of leaving the user to press Run.
-            autoRun: true,
-            timestamp: Date.now(),
+          const nodeColumns = Object.fromEntries(
+            effectiveSelections.map((selection) => [selection.nodeId, selection.column]),
+          );
+          const request: ConcordanceAnalysisRequest = {
+            node_ids: uniqueNodeIds,
+            node_columns: nodeColumns,
+            search_word: trimmedToken,
+            num_left_tokens: 10,
+            num_right_tokens: 10,
+            regex: false,
+            whole_word: true,
+            case_sensitive: false,
+            search_mode: 'tokens',
+          };
+          const { data: analysis } = await submitTabAnalysis({
+            body: { kind: 'concordance', ...request },
+            path: { workspace_id: currentWorkspaceId, tab_id: createdTab.id },
+            throwOnError: true,
           });
+          setConcordanceTabTask(createdTab.id, analysis.id);
           setCurrentView('concordance');
         } catch (error) {
+          if (createdTabId) {
+            try {
+              await deleteTab({
+                path: { workspace_id: currentWorkspaceId, tab_id: createdTabId },
+                throwOnError: true,
+              });
+              setConcordanceTabTask(createdTabId, null);
+            } catch (cleanupError) {
+              console.warn('Failed to remove empty Concordance tab:', cleanupError);
+            }
+          }
           toast.error(error instanceof Error ? error.message : 'Failed to open Concordance.');
         }
       })();
     },
     [
-      results,
       lastCompareNodeIds,
       panelSelectedNodes,
       effectiveNodeColumnSelections,
       panelNodeIds,
-      lockedNodeNameMap,
-      nodeIdToName,
-      replaceSelectedNodes,
-      setPendingConcordance,
+      currentWorkspaceId,
       createConcordanceTab,
+      setConcordanceTabTask,
       setCurrentView,
     ],
   );

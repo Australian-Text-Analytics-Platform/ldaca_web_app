@@ -39,7 +39,7 @@ export const DEFAULT_TAB_INPUT_SET_ID = 'source';
 export function tabFromResource(tab: Tab, local?: Partial<AnalysisTab>): AnalysisTab {
   return {
     tab_id: tab.id,
-    task_id: local?.task_id ?? tab.analysis_id,
+    task_id: tab.analysis_id,
     title: local?.title ?? tab.name,
     kind: tab.kind,
     input_sets: local?.input_sets ?? { [DEFAULT_TAB_INPUT_SET_ID]: [] },

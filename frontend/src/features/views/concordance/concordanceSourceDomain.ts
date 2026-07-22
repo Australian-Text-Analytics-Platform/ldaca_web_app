@@ -15,30 +15,6 @@ const cyclePalette = (palette: readonly string[], index: number, emptyColor: str
   );
 
 /**
- * Normalizes backend `analysis_params.label_to_node_map` into a strict
- * label->node-id map.
- * Used by: useConcordanceResultSession before rendering result blocks because
- * the generated API type keeps analysis params loose while downstream lookup
- * helpers need only valid string pairs.
- */
-export function normalizeConcordanceLabelToNodeMap(
-  analysisParams: unknown,
-): Record<string, string> | null {
-  if (!analysisParams || typeof analysisParams !== 'object') return null;
-  const params = analysisParams as Record<string, unknown>;
-  const mapping = params.label_to_node_map;
-  if (!mapping || typeof mapping !== 'object') return null;
-
-  const normalized: Record<string, string> = {};
-  for (const [label, value] of Object.entries(mapping)) {
-    if (typeof label === 'string' && label && typeof value === 'string' && value) {
-      normalized[label] = value;
-    }
-  }
-  return Object.keys(normalized).length > 0 ? normalized : null;
-}
-
-/**
  * Assigns visual colours to each selected concordance node id variant.
  * Used by: useConcordanceResultSession and metadata-column grouping because
  * combined result rows should resolve the selected node id to the same source

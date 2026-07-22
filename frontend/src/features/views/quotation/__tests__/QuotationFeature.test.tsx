@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const detachDialogMocks = vi.hoisted(() => ({
   render: vi.fn(),
@@ -11,13 +11,26 @@ const detachDialogMocks = vi.hoisted(() => ({
   handleDetachConfirm: vi.fn(),
 }));
 
+const resultApiMocks = vi.hoisted(() => ({
+  getAnalysisResult: vi.fn(),
+  queryAnalysisResult: vi.fn(),
+}));
+
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getAnalysisResult: resultApiMocks.getAnalysisResult,
+  queryAnalysisResult: resultApiMocks.queryAnalysisResult,
+}));
+
 const quotationHydrationMocks = vi.hoisted(() => ({
   latestConfig: null as {
-    onResultFetched?: (result: unknown, taskId: string) => void | Promise<void>;
-    onHydratedRequest?: (request: unknown) => void | Promise<void>;
-    onHydratedResult?: (result: unknown) => void | Promise<void>;
+    onRequest?: (request: unknown) => void | Promise<void>;
+    resultQuery?: Readonly<Record<string, unknown>>;
+    fetchResult: (taskId: string, query?: Readonly<Record<string, unknown>>) => Promise<unknown>;
   } | null,
-  updateResultState: vi.fn(),
+  request: null as Record<string, unknown> | null,
+  result: null as Record<string, unknown> | null,
+  latestResultControlsArgs: null as Record<string, unknown> | null,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
@@ -54,21 +67,27 @@ vi.mock('../../common/nodeInputs', () => ({
   }),
 }));
 
-vi.mock('../../common/hooks/useLastRunRequest', () => ({
-  useLastRunRequest: () => ({ serverRequest: null }),
-}));
-
 vi.mock('../../common/hooks/useAnalysisFeature', () => ({
   useAnalysisFeature: (config: NonNullable<typeof quotationHydrationMocks.latestConfig>) => {
     quotationHydrationMocks.latestConfig = config;
     return {
-    resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
-    setLocalTaskId: vi.fn(),
-    banner: null,
-    taskStatus: { tasks: [] },
-    clearResults: vi.fn(() => Promise.resolve(true)),
-    stopTask: vi.fn(() => Promise.resolve()),
-    isStopping: false,
+      analysisId: 'task-1',
+      request: quotationHydrationMocks.request,
+      analysisState: 'succeeded',
+      analysisError: null,
+      result: quotationHydrationMocks.result,
+      resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
+      setLocalTaskId: vi.fn(),
+      isRunning: false,
+      setIsRunning: vi.fn(),
+      runningRef: { current: false },
+      lastFetchedRef: { current: { taskId: null, state: null } },
+      banner: null,
+      taskStatus: { tasks: [] },
+      hydrationState: { status: 'idle' },
+      clearResults: vi.fn(() => Promise.resolve(true)),
+      stopTask: vi.fn(() => Promise.resolve()),
+      isStopping: false,
     };
   },
 }));
@@ -115,21 +134,23 @@ vi.mock('../hooks/useQuotationRowDetail', () => ({
 }));
 
 vi.mock('../hooks/useQuotationResultControls', () => ({
-  useQuotationResultControls: () => ({
-    nodeState: {},
-    nodeDetaching: {},
-    setNodeDetaching: vi.fn(),
-    nodeMaterializing: {},
-    setNodeMaterializing: vi.fn(),
-    materializeTaskIds: {},
-    setMaterializeTaskIds: vi.fn(),
-    materializedPaths: {},
-    materializeSummary: {},
-    resultsByNode: {},
-    updateResultState: quotationHydrationMocks.updateResultState,
-    applyMaterializedRequest: vi.fn(),
-    resetAfterClear: vi.fn(),
-  }),
+  useQuotationResultControls: (args: Record<string, unknown>) => {
+    quotationHydrationMocks.latestResultControlsArgs = args;
+    return {
+      nodeState: {},
+      nodeDetaching: {},
+      setNodeDetaching: vi.fn(),
+      nodeMaterializing: {},
+      setNodeMaterializing: vi.fn(),
+      materializeTaskIds: {},
+      setMaterializeTaskIds: vi.fn(),
+      materializedPaths: {},
+      materializeSummary: {},
+      resultsByNode: {},
+      applyMaterializedRequest: vi.fn(),
+      resetAfterClear: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('../hooks/useQuotationTaskFlow', () => ({
@@ -213,6 +234,15 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 import QuotationFeature from '../QuotationFeature';
 
 describe('QuotationFeature detach dialog', () => {
+  beforeEach(() => {
+    resultApiMocks.getAnalysisResult.mockReset();
+    resultApiMocks.queryAnalysisResult.mockReset();
+    quotationHydrationMocks.latestConfig = null;
+    quotationHydrationMocks.request = null;
+    quotationHydrationMocks.result = null;
+    quotationHydrationMocks.latestResultControlsArgs = null;
+  });
+
   it('owns quotation copy and forwards the hook-owned handlers', () => {
     render(
       <QuotationFeature
@@ -241,7 +271,7 @@ describe('QuotationFeature detach dialog', () => {
     );
   });
 
-  it('restores the persisted result after hydrating its saved request', async () => {
+  it('passes the persisted Query-owned Result to quotation controls after hydration', async () => {
     const host = {
       taskId: 'task-1',
       inputSets: {},
@@ -250,11 +280,8 @@ describe('QuotationFeature detach dialog', () => {
       setInputSet: vi.fn(),
       setSetting: vi.fn(),
     };
-    render(<QuotationFeature host={host} />);
-
     const persistedResult = {
       kind: 'quotation',
-      state: 'successful',
       data: [],
       columns: ['QUOTE_extraction'],
       metadata: { all_columns: ['QUOTE_extraction'] },
@@ -270,21 +297,68 @@ describe('QuotationFeature detach dialog', () => {
       query: { kind: 'quotation', page: 1, page_size: 50 },
       sorting: { sort_by: null, descending: false },
     };
-
-    await quotationHydrationMocks.latestConfig?.onHydratedRequest?.({
+    quotationHydrationMocks.request = {
       kind: 'quotation',
       node_id: 'node-1',
       column: 'text',
       engine: { type: 'local' },
+    };
+    quotationHydrationMocks.result = persistedResult;
+
+    render(<QuotationFeature host={host} />);
+
+    await quotationHydrationMocks.latestConfig?.onRequest?.(quotationHydrationMocks.request);
+
+    expect(host.setInputSet).toHaveBeenCalledWith('source', [
+      { node_id: 'node-1', column: 'text' },
+    ]);
+    expect(quotationHydrationMocks.latestResultControlsArgs).toEqual({
+      result: persistedResult,
+      nodeId: 'node-1',
+      column: 'text',
     });
-    expect(quotationHydrationMocks.updateResultState).not.toHaveBeenCalled();
+  });
 
-    await quotationHydrationMocks.latestConfig?.onResultFetched?.(persistedResult, 'task-1');
+  it('hydrates the canonical Result before requesting alternate projections', async () => {
+    const canonicalResult = { kind: 'quotation', data: [] };
+    const projectedResult = { kind: 'quotation', data: [[{ text: 'projected' }]] };
+    resultApiMocks.getAnalysisResult.mockResolvedValueOnce({ data: canonicalResult });
+    resultApiMocks.queryAnalysisResult.mockResolvedValueOnce({ data: projectedResult });
 
-    expect(quotationHydrationMocks.updateResultState).toHaveBeenCalledWith(
-      'node-1',
-      'text',
-      expect.objectContaining({ kind: 'quotation', state: 'successful' }),
+    render(
+      <QuotationFeature
+        host={{
+          taskId: 'task-1',
+          inputSets: {},
+          settings: {},
+          setTaskId: vi.fn(),
+          setInputSet: vi.fn(),
+          setSetting: vi.fn(),
+        }}
+      />,
     );
+
+    const config = quotationHydrationMocks.latestConfig;
+    if (!config) throw new Error('Quotation analysis config was not captured');
+    expect(config.resultQuery).toBeUndefined();
+    await expect(config.fetchResult('task-1')).resolves.toBe(canonicalResult);
+    expect(resultApiMocks.getAnalysisResult).toHaveBeenCalledWith({
+      path: { workspace_id: 'workspace-1', analysis_id: 'task-1' },
+      throwOnError: true,
+    });
+    expect(resultApiMocks.queryAnalysisResult).not.toHaveBeenCalled();
+
+    const projection = {
+      page: 2,
+      page_size: 50,
+      sort_by: null,
+      descending: false,
+    };
+    await expect(config.fetchResult('task-1', projection)).resolves.toBe(projectedResult);
+    expect(resultApiMocks.queryAnalysisResult).toHaveBeenCalledWith({
+      body: { kind: 'quotation', ...projection },
+      path: { workspace_id: 'workspace-1', analysis_id: 'task-1' },
+      throwOnError: true,
+    });
   });
 });

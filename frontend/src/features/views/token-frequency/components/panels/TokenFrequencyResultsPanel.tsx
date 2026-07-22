@@ -109,8 +109,7 @@ export const TokenFrequencyResultsPanel = ({
   onDownloadFrequencyCsv,
 }: TokenFrequencyResultsPanelProps) => {
   const isRunningState = isRunning;
-  const isFailedState = results?.state === 'failed' && !isRunningState;
-  const isSuccessfulState = results?.state === 'successful' && !isRunningState;
+  const isSuccessfulState = Boolean(results) && !isRunningState;
   const [resultsView, setResultsView] = React.useState<ResultsView>('cloud');
   // Token wildcard filter (list view only). Lives here so it applies to all
   // three list-view cards (left list, right list, and the statistics table)
@@ -141,12 +140,9 @@ export const TokenFrequencyResultsPanel = ({
     runningTask?.progress_message || runningTask?.message || 'Running token frequency analysis…';
   const runningTaskId = runningTask?.task_id;
   const runningProgress = typeof runningTask?.progress === 'number' ? runningTask.progress : null;
-  const cardTone: 'default' | 'error' = isFailedState ? 'error' : 'default';
-
   return (
     <AnalysisCardLayout
       title="Token Frequency Results"
-      tone={cardTone}
       help={{
         targetKey: 'analysis.token-frequency.results',
         label: 'Token frequency results',
@@ -159,13 +155,6 @@ export const TokenFrequencyResultsPanel = ({
           taskId={runningTaskId}
           progress={runningProgress}
         />
-      ) : null}
-
-      {isFailedState ? (
-        <p className="text-sm text-muted-foreground">
-          {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty failure message should fall back to the default text, not render blank */}
-          {results.message || 'Analysis failed to complete.'}
-        </p>
       ) : null}
 
       {isSuccessfulState ? (
@@ -338,7 +327,7 @@ export const TokenFrequencyResultsPanel = ({
             normalizedNodeResults={normalizedNodeResults}
             nodeDisplayResults={nodeDisplayResults}
             lastCompareNodeIds={lastCompareNodeIds}
-            statistics={results.statistics}
+            statistics={results?.statistics}
             appliedStopSet={appliedStopSet}
             effectiveTokenLimit={effectiveTokenLimit}
             defaultTokenLimit={defaultTokenLimit}

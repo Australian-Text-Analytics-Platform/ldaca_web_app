@@ -3,30 +3,23 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { useUIStore } from '@/stores/uiStore';
 import { useSchemaManagement } from '@/features/workspace/common/hooks/useSchemaManagement';
 
 import { arrowSchemaToKinds } from '@/features/workspace/common/hooks/useSchemaManagement';
 import { fetchNodeSchema } from '@/lib/nodeSchema';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import { useLastRunRequest } from '../common/hooks/useLastRunRequest';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
-import { useSafeResult } from '../common/useSafeResult';
 import { executeAnalysisRerun } from '../common/rerunAnalysis';
-import { ANALYSIS_TAB_GROUPS, ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { analysisInputsFromRequest } from '../common/utils';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { getAnalysisRequest, getAnalysisResultResource } from '../common/analysisApi';
+import { getAnalysisResultResource } from '../common/analysisApi';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { useSequentialAnalysisTaskFlow } from './hooks/useSequentialAnalysisTaskFlow';
 import { buildSequentialChartExportMetadata } from './hooks/sequentialChartExport';
-import {
-  buildSequentialChartModel,
-  isChartTypeOption,
-  type ChartTypeOption,
-} from './hooks/sequentialChartModel';
+import { buildSequentialChartModel, type ChartTypeOption } from './hooks/sequentialChartModel';
 import {
   deriveSequentialParameterValues,
   readSequentialServerParams,
@@ -40,6 +33,7 @@ import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDial
 import { downloadChartAs, findSvgInContainer, type ChartImageFormat } from '@/lib/chartExport';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
+import type { SequentialAnalysisRequest, SequentialAnalysisResponse } from '@/api';
 
 const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
 const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
@@ -64,8 +58,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
-  const currentView = useUIStore((state) => state.currentView);
-  const isActiveTab = currentView === 'analysis';
 
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
@@ -91,12 +83,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(selections));
   };
-  const { serverRequest } = useLastRunRequest({
-    analysisType: ANALYSIS_TAB_GROUPS.sequential,
-    workspaceId: currentWorkspaceId,
-    taskId: tabTaskId,
-  });
-
   const sequentialParameters = useSequentialAnalysisParameters();
   const {
     timeColumn,
@@ -115,7 +101,14 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     customIntervalUnit,
     setCustomIntervalUnit,
   } = sequentialParameters;
-  const [chartType, setChartType] = useState<ChartTypeOption>('line');
+  const savedChartType = host.settings['sequential.chartType'];
+  const [chartType, setChartTypeState] = useState<ChartTypeOption>(
+    savedChartType === 'bar' || savedChartType === 'area' ? savedChartType : 'line',
+  );
+  const setChartType = (value: ChartTypeOption) => {
+    setChartTypeState(value);
+    host.setSetting('sequential.chartType', value);
+  };
   const chartControls = useSequentialChartControls();
   const {
     xAxisType,
@@ -134,11 +127,11 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     workspaceId: currentWorkspaceId ?? undefined,
   });
 
-  const [liveResults, resultRef, setResults] = useSafeResult<Record<string, unknown>>();
   const [hydratingSelection, setHydratingSelection] = useState(false);
   const hydratedParamsRef = useRef<SequentialHydratedParams | null>(null);
 
   const {
+    request: serverRequest,
     setLocalTaskId,
     isRunning: isAnalyzing,
     isStopping,
@@ -149,90 +142,28 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     taskStatus,
     clearResults,
     stopTask,
-  } = useAnalysisFeature<Record<string, unknown>>({
-    analysisType: ANALYSIS_TAB_GROUPS.sequential,
+    result: results,
+  } = useAnalysisFeature<SequentialAnalysisResponse, SequentialAnalysisRequest>({
     taskType: ANALYSIS_TASK_TYPES.sequential,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    isTabActive: isActiveTab,
     // Tab-driven deterministic hydration: the tab's persisted task id wins task
     // resolution over transient local state.
     hydrationTaskId: tabTaskId,
-    resultRef,
     // Loads the latest sequential-analysis result for polling and task resumption.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisResultResource<Record<string, unknown>>(currentWorkspaceId, taskId);
-    },
-    // Retrieves the submitted request so hydration can restore parameters and locks.
-    fetchRequest: async (taskId) => {
-      if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisRequest(currentWorkspaceId, taskId);
-    },
-    // Applies freshly fetched task results to chart state after lifecycle polling completes.
-    // Reset result selection, merge the fetched payload, and adopt its chart type.
-    onResultFetched: (resultData) => {
-      chartControls.resetResultSelection();
-      const resolvedChartType = isChartTypeOption(resultData.chart_type)
-        ? resultData.chart_type
-        : chartType;
-      setResults({
-        ...resultData,
-        analysis_params: {
-          ...(results?.analysis_params ?? {}),
-          ...(resultData.analysis_params ?? {}),
-        },
-        chart_type: resolvedChartType,
-      });
-      setChartType(resolvedChartType);
-    },
-    // Rebuilds chart state from a cached result payload and any hydrated request parameters.
-    // Merge hydrated request parameters into the cached result before restoring chart state.
-    onHydratedResult: (resultPayload) => {
-      if (!resultPayload) return;
-      chartControls.resetResultSelection();
-      const hydratedParams = hydratedParamsRef.current;
-      const enriched = {
-        ...resultPayload,
-        analysis_params: {
-          ...(resultPayload.analysis_params as Record<string, unknown>),
-          ...(hydratedParams
-            ? {
-                group_by_columns: hydratedParams.groupByColumns,
-                time_column: hydratedParams.timeColumn,
-                frequency: hydratedParams.frequency,
-                column_type: hydratedParams.columnType,
-                numeric_origin: hydratedParams.numericOrigin,
-                numeric_interval: hydratedParams.numericInterval,
-                custom_interval_value: hydratedParams.customIntervalValue,
-                custom_interval_unit: hydratedParams.customIntervalUnit,
-                case_sensitive: hydratedParams.caseSensitive,
-              }
-            : {}),
-        },
-      };
-      const resolvedChartType = isChartTypeOption(resultPayload.chart_type)
-        ? resultPayload.chart_type
-        : chartType;
-      setResults({ ...enriched, chart_type: resolvedChartType });
-      setChartType(resolvedChartType);
+      return getAnalysisResultResource<SequentialAnalysisResponse>(currentWorkspaceId, taskId);
     },
     // Restores sequential request parameters, selection lock, and schema after reload.
     // Called by: useAnalysisFeature hydration because Trends restores must rebuild time-column selection, bucket settings, grouping columns, and case handling from the submitted request. Flow: unwrap request data, apply numeric or datetime controls, restore node/group selections, then release hydration state.
-    onHydratedRequest: async (requestPayload) => {
-      const req = ((requestPayload as Record<string, unknown>).data ?? requestPayload) as Record<
-        string,
-        unknown
-      > | null;
-      if (!req) return;
+    onRequest: async (requestPayload) => {
+      const req = requestPayload as unknown as Record<string, unknown>;
       setHydratingSelection(true);
       try {
         const hydrated = sequentialParameters.applyHydratedRequest(req);
         const nodeIdStr = hydrated.nodeId;
-        onTabInputSetChange(
-          DEFAULT_TAB_INPUT_SET_ID,
-          analysisInputsFromRequest(req, 1),
-        );
+        onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, analysisInputsFromRequest(req, 1));
         hydratedParamsRef.current = hydrated.hydratedParams;
         if (nodeIdStr && currentWorkspaceId) {
           const schema = await fetchNodeSchema({
@@ -248,7 +179,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     },
     // Clears sequential-specific state after the shared lifecycle removes the task result.
     onCleared: (_, options) => {
-      setResults(null);
       chartControls.resetAfterClear();
       if (options?.preserveLocalState) {
         return;
@@ -257,24 +187,9 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
       // a task the user explicitly cleared. Inputs are intentionally preserved.
       onTabTaskChange(null);
       setLockedSchema(null);
-      setChartType('line');
       sequentialParameters.resetAfterClear();
     },
-    // Finds task ids embedded in result metadata for status recovery.
-    getExtraTaskIdCandidates: () =>
-      [resultRef.current?.metadata as Record<string, unknown> | undefined].map(
-        (m) => m?.task_id as string | undefined,
-      ),
-    // Finds task ids embedded in result metadata for clear operations.
-    getClearTaskIdSources: () =>
-      [resultRef.current?.metadata as Record<string, unknown> | undefined].map(
-        (m) => m?.task_id as string | undefined,
-      ),
-    // Treats hydrated running results as active tasks for the shared banner/action state.
-    isResultRunning: (r: Record<string, unknown> | null) => Boolean(r) && r?.state === 'running',
   });
-
-  const results: Record<string, unknown> | null = liveResults;
 
   const timeCompatibleColumns = availableColumns
     .filter((column) =>
@@ -296,11 +211,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
     if (selection?.column) return selection.column;
     if (timeColumn) return timeColumn;
-    const hydratedTime =
-      ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as
-        | string
-        | undefined) ?? '';
-    return hydratedTime;
+    return '';
   })();
 
   const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
@@ -320,7 +231,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const lastRunRequest = serverRequest ?? null;
   const serverNodeId =
     lastRunRequest && typeof lastRunRequest.node_id === 'string' ? lastRunRequest.node_id : '';
-  const serverColumn = lastRunRequest ? ((lastRunRequest.time_column ?? '') as string) : '';
+  const serverColumn = lastRunRequest ? lastRunRequest.time_column : '';
   const hasParamsChanged = !lastRunRequest
     ? true
     : hasParameterDiff(currentSequentialParams, readSequentialServerParams(lastRunRequest)) ||
@@ -380,11 +291,9 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         customIntervalValue,
         customIntervalUnit: customIntervalUnitValue,
         caseSensitive,
-        results,
       },
       actions: {
         setIsAnalyzing,
-        setResults,
         setChartType,
         setLocalTaskId,
         runningRef,
@@ -417,6 +326,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
 
   const chartModel = buildSequentialChartModel({
     results,
+    parameters: serverRequest,
     fallbacks: {
       timeColumn,
       groupBy: groupByColumns,

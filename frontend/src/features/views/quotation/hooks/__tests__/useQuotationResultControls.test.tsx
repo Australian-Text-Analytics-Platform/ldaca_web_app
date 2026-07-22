@@ -27,8 +27,9 @@ const response: QuotationAnalysisResponse = {
 
 describe('useQuotationResultControls', () => {
   it('normalizes a canonical quotation result and owns only transient detach state', () => {
-    const { result } = renderHook(() => useQuotationResultControls());
-    act(() => result.current.updateResultState('node-1', 'text', response));
+    const { result } = renderHook(() =>
+      useQuotationResultControls({ result: response, nodeId: 'node-1', column: 'text' }),
+    );
     expect(result.current.resultsByNode['node-1']?.rows).toHaveLength(1);
     expect(result.current.nodeState['node-1']).toEqual({
       currentPage: 3,
@@ -38,8 +39,5 @@ describe('useQuotationResultControls', () => {
     });
     act(() => result.current.setNodeDetaching({ 'node-1': true }));
     expect(result.current.nodeDetaching).toEqual({ 'node-1': true });
-    act(() => result.current.resetAfterClear());
-    expect(result.current.resultsByNode).toEqual({});
-    expect(result.current.nodeDetaching).toEqual({});
   });
 });

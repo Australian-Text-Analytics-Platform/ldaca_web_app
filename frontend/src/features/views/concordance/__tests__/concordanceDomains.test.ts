@@ -8,7 +8,6 @@ import {
   collectConcordanceMatchedTexts,
   findConcordanceSourceNode,
   getConcordanceSourceColor,
-  normalizeConcordanceLabelToNodeMap,
 } from '../concordanceSourceDomain';
 import { buildCombinedSlice, flattenConcordanceGroups } from '../concordanceTableDomain';
 import type { ConcordanceNodeResult } from '@/api';
@@ -126,20 +125,6 @@ describe('concordance source display helpers', () => {
     { id: 'node-1', name: 'Left Corpus' },
     { id: 'node-2', name: 'Right Corpus' },
   ];
-
-  it('normalizes backend label-to-node maps and drops invalid entries', () => {
-    expect(
-      normalizeConcordanceLabelToNodeMap({
-        label_to_node_map: {
-          'Left result': 'node-1',
-          Missing: null,
-          Empty: '',
-        },
-      }),
-    ).toEqual({ 'Left result': 'node-1' });
-    expect(normalizeConcordanceLabelToNodeMap({ label_to_node_map: { Empty: '' } })).toBeNull();
-    expect(normalizeConcordanceLabelToNodeMap(null)).toBeNull();
-  });
 
   it('builds node and source colour maps from canonical ids and names', () => {
     const nodeColors = buildConcordanceNodeColorMap(

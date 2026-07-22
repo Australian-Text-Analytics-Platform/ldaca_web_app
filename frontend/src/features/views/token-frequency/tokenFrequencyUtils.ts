@@ -166,27 +166,28 @@ export const resolveTokenFrequencyDisplayName = ({
  */
 export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null): number | null => {
   if (!results) return null;
-  return Number.isFinite(results.token_limit) ? results.token_limit : null;
+  return Number.isFinite(results.metadata.effective_token_limit)
+    ? results.metadata.effective_token_limit
+    : null;
 };
 
-/** Reads the backend's persisted stop-word list from all supported response locations. */
+/** Reads the immutable stop-word list from the canonical Analysis request. */
 /**
  * Used by: tokenFrequencyUtils.test.ts.
- * Flow: check top-level, analysis_params, and metadata stop-word arrays in order, stringify entries, then return null when none exist.
  */
 export const deriveBackendStopWords = (
-  results?: TokenFrequencyResponse | null,
+  request?: Record<string, unknown> | null,
 ): string[] | null => {
-  if (!results) return null;
-  return results.stop_words;
+  if (!request || !Array.isArray(request.stop_words)) return null;
+  return request.stop_words.filter((word): word is string => typeof word === 'string');
 };
 
 /** Builds a stable stop-word key for effects that sync backend preferences into UI state. */
 /**
  * Used by: tokenFrequencyUtils.test.ts, TokenFrequencyFeature.tsx.
  */
-export const deriveBackendStopWordsKey = (results?: TokenFrequencyResponse | null): string => {
-  const stopWords = deriveBackendStopWords(results);
+export const deriveBackendStopWordsKey = (request?: Record<string, unknown> | null): string => {
+  const stopWords = deriveBackendStopWords(request);
   if (!Array.isArray(stopWords) || stopWords.length === 0) return '';
   return stopWords
     .map((item) => item.trim().toLowerCase())

@@ -1,37 +1,16 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { useTokenFrequencyPreferences } from '../useTokenFrequencyPreferences';
-
-const { analysisTaskPreferencesMock } = vi.hoisted(() => ({
-  analysisTaskPreferencesMock: vi.fn(),
-}));
-
-vi.mock('@/api', async (importOriginal) => ({
-  ...(await importOriginal()),
-  analysisTaskPreferences: analysisTaskPreferencesMock,
-}));
 
 /** Provides the default hook arguments shared across preference tests. */
 const baseArgs = {
-  currentWorkspaceId: 'ws-1',
   results: null,
-  setResults: vi.fn(),
-  /** Resolves a stable task ID so persistence code can address a result. */
-  resolveTokenFrequencyTaskId: () => Promise.resolve('task-1'),
   backendTokenLimit: null,
   backendStopWordsKey: '',
   maxTokenLimitInput: 100,
 };
 
 describe('useTokenFrequencyPreferences', () => {
-  beforeEach(() => {
-    analysisTaskPreferencesMock.mockReset();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('adds default stop words for the chosen language', async () => {
     const { result } = renderHook(() => useTokenFrequencyPreferences({ ...baseArgs }));
 
@@ -99,5 +78,44 @@ describe('useTokenFrequencyPreferences', () => {
     await waitFor(() => {
       expect(result.current.tokenLimitError).toBe('Enter a whole number greater than zero.');
     });
+  });
+
+  it('prefers saved per-tab presentation values over the run defaults', async () => {
+    const { result } = renderHook(() =>
+      useTokenFrequencyPreferences({
+        ...baseArgs,
+        results: {} as never,
+        backendTokenLimit: 25,
+        backendStopWordsKey: 'from|request',
+        savedTokenLimit: 40,
+        savedStopWordsJson: JSON.stringify(['saved', 'words']),
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.effectiveTokenLimit).toBe(40);
+      expect([...result.current.appliedStopSet]).toEqual(['saved', 'words']);
+    });
+  });
+
+  it('reports committed result presentation changes to the tab store', async () => {
+    const onTokenLimitChange = vi.fn();
+    const onStopWordsChange = vi.fn();
+    const { result } = renderHook(() =>
+      useTokenFrequencyPreferences({
+        ...baseArgs,
+        results: {} as never,
+        onTokenLimitChange,
+        onStopWordsChange,
+      }),
+    );
+
+    act(() => {
+      result.current.applyTokenLimit(30);
+      result.current.applyStopSetFromText('alpha, beta');
+    });
+
+    expect(onTokenLimitChange).toHaveBeenCalledWith(30);
+    expect(onStopWordsChange).toHaveBeenCalledWith(['alpha', 'beta']);
   });
 });
