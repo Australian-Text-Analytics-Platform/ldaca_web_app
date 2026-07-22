@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TokenFrequencyResponse } from '@/api';
+import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { pruneTasksById } from '@/features/views/common/analysisTaskUtils';
 import { usePersistNodeDocumentColumn } from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
@@ -67,6 +69,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const { currentWorkspace } = useWorkspaceData();
   const currentWorkspaceId = currentWorkspace?.id ?? null;
+  const queryClient = useQueryClient();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -197,6 +200,11 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       // what the submit handler already set, so this is a no-op overwrite.
       restoreAnalysisNodeContext(result.analysis_params);
       setResultSafely(result);
+      // A run persists each source column's tokenizer model to the node
+      // (Node.tokenization -> node info's tokenizer_models). Refresh cached node
+      // info so the chosen model pre-fills as the default next time the block is
+      // used here or in another tool, instead of forcing a re-select.
+      if (currentWorkspaceId) invalidateNodeInfoQuery(queryClient, currentWorkspaceId);
     },
     /**
      * Rehydrates controls from a persisted result when the feature reconnects
@@ -491,7 +499,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
         }}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
-          void setNodeColor(nodeId, color);
+          setNodeColor(nodeId, color);
         }}
         computeDisplayName={computeDisplayName}
         renderTokenizerModelSelector={({ nodeId, column }) => (

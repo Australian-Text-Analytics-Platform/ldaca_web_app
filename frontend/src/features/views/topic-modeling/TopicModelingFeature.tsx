@@ -528,7 +528,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         resultState={result?.state}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
-          void setNodeColor(nodeId, color);
+          setNodeColor(nodeId, color);
         }}
         defaultPalette={defaultPalette}
       />

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ConcordanceAnalysisResponse } from '@/api';
+import { invalidateNodeInfoQuery } from '@/lib/nodeInfo';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -61,6 +63,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
+  const queryClient = useQueryClient();
   const {
     detachConcordance,
     detachConcordanceDispersion,
@@ -305,6 +308,11 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     /** Copies freshly fetched task results into the feature's safe-result state. */
     onResultFetched: (resultData) => {
       setResults(resultData);
+      // A tokens-mode run persists each source column's tokenizer model to the
+      // node (Node.tokenization -> node info's tokenizer_models). Refresh cached
+      // node info so the chosen model pre-fills as the default next time the
+      // block is used here or in another tool, instead of forcing a re-select.
+      if (currentWorkspaceId) invalidateNodeInfoQuery(queryClient, currentWorkspaceId);
     },
     /** Accepts restored result payloads from persisted analysis tasks. */
     onHydratedResult: (resultPayload) => {
@@ -563,7 +571,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         handleColumnChange={handleColumnChange}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
-          void setNodeColor(nodeId, color);
+          setNodeColor(nodeId, color);
         }}
         defaultPalette={defaultPalette}
         searchWord={searchWord}
