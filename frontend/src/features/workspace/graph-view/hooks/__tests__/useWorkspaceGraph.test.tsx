@@ -37,12 +37,17 @@ vi.mock('../../services/graphLayout', () => ({
 
 import { useWorkspaceGraph } from '../useWorkspaceGraph';
 
-const makeGraph = (color: string, edgeLabel: string) => ({
+const makeGraph = (
+  color: string,
+  edgeLabel: string,
+  shape: [number | null, number | null] = [10, 3],
+) => ({
   nodes: [
     {
       id: 'node-1',
       name: 'Node one',
       color,
+      shape,
       document: 'text',
       can_undo: false,
       can_redo: true,
@@ -64,7 +69,12 @@ const makeIndependentGraph = (nodeIds: string[]) => ({
 });
 
 interface TestNodeData {
-  node: { color: string | null; canUndo: boolean; canRedo: boolean };
+  node: {
+    color: string | null;
+    shape: [number | null, number | null];
+    canUndo: boolean;
+    canRedo: boolean;
+  };
   onUndo: (nodeId: string) => void;
   onRedo: (nodeId: string) => void;
   onAddToSelection: (nodeId: string) => void;
@@ -148,13 +158,15 @@ describe('useWorkspaceGraph', () => {
 
     useWorkspaceDataMock.mockReturnValue({
       currentWorkspaceId: 'workspace-a',
-      workspaceGraph: makeGraph('#0000ff', 'second label'),
+      workspaceGraph: makeGraph('#0000ff', 'second label', [20, 4]),
     });
     rerender();
 
     expect(result.current.nodes[0]?.position).toEqual(draggedPosition);
     expect(result.current.nodes[0]?.dragging).toBe(true);
-    expect((result.current.nodes[0]?.data as unknown as TestNodeData).node.color).toBe('#0000ff');
+    const refreshedNode = (result.current.nodes[0]?.data as unknown as TestNodeData).node;
+    expect(refreshedNode.color).toBe('#0000ff');
+    expect(refreshedNode.shape).toEqual([20, 4]);
     expect(result.current.edges[0]?.label).toBe('second label');
   });
 

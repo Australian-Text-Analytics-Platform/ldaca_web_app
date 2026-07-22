@@ -17,7 +17,7 @@ export const projectWorkspaceGraphNodeCard = (
   id: node.id,
   name: node.name,
   color: node.color ?? null,
-  shape: [null, null],
+  shape: node.shape ?? [null, null],
   canUndo: node.can_undo,
   canRedo: node.can_redo,
 });
