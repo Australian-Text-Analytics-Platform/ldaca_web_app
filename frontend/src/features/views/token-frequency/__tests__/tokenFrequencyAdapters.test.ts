@@ -1,5 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { deriveNodeDisplayResults, type NormalizedNodeResult } from '../tokenFrequencyAdapters';
+import {
+  computeAnalysisNodeIds,
+  deriveNodeDisplayResults,
+  type NormalizedNodeResult,
+} from '../tokenFrequencyAdapters';
+
+describe('computeAnalysisNodeIds', () => {
+  it('orders by the selection panel, not the study-last request/echo order', () => {
+    // Selection panel order is [stories, comments]; the backend echo puts the
+    // study corpus last -> [comments, stories]. Display must follow selection.
+    const selection = [{ nodeId: 'stories' }, { nodeId: 'comments' }];
+    const backendEcho = ['comments', 'stories'];
+    const lastCompare = ['comments', 'stories'];
+
+    expect(computeAnalysisNodeIds(backendEcho, lastCompare, selection)).toEqual([
+      'stories',
+      'comments',
+    ]);
+  });
+
+  it('appends result nodes not present in the current selection (no duplicates)', () => {
+    const selection = [{ nodeId: 'stories' }];
+    expect(computeAnalysisNodeIds(['comments', 'stories'], [], selection)).toEqual([
+      'stories',
+      'comments',
+    ]);
+  });
+
+  it('falls back to the backend echo order when there is no selection', () => {
+    expect(computeAnalysisNodeIds(['comments', 'stories'], [], [])).toEqual([
+      'comments',
+      'stories',
+    ]);
+  });
+});
 
 /** Builds descending token-frequency rows for adapter boundary tests. */
 const buildRows = (tokens: string[]) =>

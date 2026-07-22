@@ -118,12 +118,19 @@ export const computeAnalysisNodeIds = (
   lastCompareNodeIds: string[],
   nodeColumnSelections: { nodeId: string }[],
 ): string[] => {
+  // Display order follows the current selection panel (nodeColumnSelections) so
+  // the per-node results line up left-to-right with the "Selected Data Blocks"
+  // panel. The study-corpus is submitted last for the backend comparison, so the
+  // request/echo order (paramsNodeIds, lastCompareNodeIds) must NOT drive display
+  // order — it only fills in any node not currently in the panel. The resulting
+  // set is unchanged (union + dedupe); only the ORDER differs, and
+  // normalizeNodeResults matches each node's data by id, so this is display-only.
   const combined: (string | null | undefined)[] = [];
+  combined.push(...nodeColumnSelections.map((sel) => sel.nodeId));
   if (Array.isArray(paramsNodeIds)) {
     combined.push(...(paramsNodeIds as string[]));
   }
   combined.push(...lastCompareNodeIds);
-  combined.push(...nodeColumnSelections.map((sel) => sel.nodeId));
 
   const seen = new Set<string>();
   const deduped: string[] = [];
