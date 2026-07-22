@@ -84,7 +84,7 @@ describe('WorkspaceNodeList', () => {
     expect(screen.getByText('Corpus')).toBeInTheDocument();
   });
 
-  it('renders no accent style for a node without a color', () => {
+  it('defaults an uncoloured node to a grey spine and a background fill', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -95,8 +95,12 @@ describe('WorkspaceNodeList', () => {
       />,
     );
 
+    // Un-analysed blocks default to grey: a 4px left spine plus a light fill,
+    // rather than no accent at all.
     const accentBox = screen.getByTestId('workspace-node-row-node-1');
-    expect(accentBox.style.borderLeftWidth).toBe('');
+    expect(accentBox).toHaveStyle({ borderLeftWidth: '4px' });
+    expect(accentBox.style.borderLeftColor).not.toBe('');
+    expect(accentBox.style.backgroundColor).not.toBe('');
   });
 
   it('groups pinned nodes before selected non-pinned nodes and regular nodes', () => {
