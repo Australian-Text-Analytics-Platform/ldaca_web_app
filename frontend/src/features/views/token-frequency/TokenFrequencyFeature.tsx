@@ -452,7 +452,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
         }}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
-          void setNodeColor(nodeId, color);
+          setNodeColor(nodeId, color);
         }}
         computeDisplayName={computeDisplayName}
         renderTokenizerModelSelector={({ nodeId, column }) => (

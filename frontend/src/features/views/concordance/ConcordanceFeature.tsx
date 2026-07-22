@@ -510,7 +510,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         handleColumnChange={handleColumnChange}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
-          void setNodeColor(nodeId, color);
+          setNodeColor(nodeId, color);
         }}
         defaultPalette={defaultPalette}
         searchWord={searchWord}
