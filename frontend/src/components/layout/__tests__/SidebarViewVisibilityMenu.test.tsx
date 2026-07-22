@@ -74,7 +74,6 @@ vi.mock('@/features/preferences/useUserPreferences', () => ({
     preferences: {
       hidden_views: preferenceFixture.hiddenViews,
       favorite_workspaces: [],
-      default_tokenizer_model: null,
       analysis_multi_tab_enabled: false,
       contextual_hints_enabled: true,
     },

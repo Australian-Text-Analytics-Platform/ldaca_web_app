@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -64,10 +62,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { preferences } = useUserPreferences();
   const updatePreferences = useUpdateUserPreferences();
   const favoriteWorkspaces = preferences.favorite_workspaces ?? [];
-  const defaultTokenizerModel = preferences.default_tokenizer_model ?? null;
   const analysisMultiTabEnabled = preferences.analysis_multi_tab_enabled ?? false;
   const contextualHintsEnabled = preferences.contextual_hints_enabled ?? false;
-  const tokenizerInputRef = useRef<HTMLInputElement>(null);
   /**
    * Called by: the shadcn Switch for the analysis multi-tab preference.
    * The preference controls chrome visibility only, so both directions write
@@ -81,17 +77,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const handleResetHints = () => {
     if (userId) resetAcknowledgments(userId);
     toast('Contextual Hint history reset. Eligible hints can appear again.');
-  };
-
-  /** Called by: Settings general tokenizer save button because tokenization-aware tools read their default from the preference store. */
-  const handleSaveTokenizer = () => {
-    const nextModel = tokenizerInputRef.current?.value ?? '';
-    updatePreferences.mutate({
-      default_tokenizer_model: nextModel.trim() || null,
-    });
-    toast.success(
-      nextModel.trim() ? 'Default tokenizer model saved' : 'Default tokenizer model cleared',
-    );
   };
 
   /** Called by: workspace favorites panel because Settings needs labels where the workspace list already has them. */
@@ -160,25 +145,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       checked={analysisMultiTabEnabled}
                       onCheckedChange={handleAnalysisMultiTabChange}
                     />
-                  </div>
-                </section>
-                <section className="space-y-3 border-t border-border/60 pt-4">
-                  <div>
-                    <h3 className="text-sm font-semibold">Default Tokenizer Model</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Used by tokenization-aware analysis tools when they offer a default model.
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      ref={tokenizerInputRef}
-                      defaultValue={defaultTokenizerModel ?? ''}
-                      placeholder="No default model"
-                      aria-label="Default tokenizer model"
-                    />
-                    <Button type="button" onClick={handleSaveTokenizer}>
-                      Save
-                    </Button>
                   </div>
                 </section>
               </TabsContent>

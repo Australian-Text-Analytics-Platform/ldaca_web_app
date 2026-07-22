@@ -33,6 +33,7 @@ describe('useConcordanceTaskFlow', () => {
           wholeWord: true,
           caseSensitive: false,
           searchMode: 'tokens',
+          tokenizerModelsByNode: { 'node-1': 'native:plain_words_en' },
         },
         actions: {
           setNodePagination: vi.fn(),
@@ -60,7 +61,9 @@ describe('useConcordanceTaskFlow', () => {
         kind: 'concordance',
         node_ids: ['node-1'],
         node_columns: { 'node-1': 'text' },
+        node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
         search_word: 'keyword',
+        search_mode: 'tokens',
       }),
       path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
       throwOnError: true,

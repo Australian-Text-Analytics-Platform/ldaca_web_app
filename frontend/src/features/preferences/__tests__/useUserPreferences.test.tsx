@@ -35,7 +35,6 @@ vi.mock('sonner', () => ({
 const preferences = (overrides: Partial<UserPreferences> = {}): UserPreferences => ({
   hidden_views: [],
   favorite_workspaces: [],
-  default_tokenizer_model: null,
   analysis_multi_tab_enabled: false,
   contextual_hints_enabled: true,
   ...overrides,

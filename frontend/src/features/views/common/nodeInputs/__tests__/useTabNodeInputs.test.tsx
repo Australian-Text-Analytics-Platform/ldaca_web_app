@@ -190,7 +190,7 @@ describe('useTabNodeInputs', () => {
             id: 'node-a',
             name: 'Node A',
             document: 'document',
-            tokenizer_models: { document: 'native:plain_words_en' },
+            tokenizer_model: 'native:plain_words_en',
           }
         : undefined;
       return {
@@ -240,7 +240,7 @@ describe('useTabNodeInputs', () => {
       id: 'node-a',
       name: 'Node A',
       document: 'document',
-      tokenizerModels: { document: 'native:plain_words_en' },
+      tokenizerModel: 'native:plain_words_en',
     });
     expect(result.current.nodeColumnSelections).toEqual([{ nodeId: 'node-a', column: 'document' }]);
   });

@@ -215,8 +215,8 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Stubs workspace mutations that are outside this feature-level test boundary. */
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
-    materializeConcordance: vi.fn(),
-    replaceSelectedNodes: vi.fn(),
+    detachConcordanceDispersion: vi.fn(),
+    setNodeColor: vi.fn(),
   }),
 }));
 
@@ -261,12 +261,11 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
     latestTaskFlowParams = params;
     return {
       handleSearch: handleSearchMock,
-      updateStoredResult: vi.fn(),
       handleSort: vi.fn(),
       handlePageChange: vi.fn(),
       persistResultPreferences: vi.fn(),
       handleDetach: vi.fn(),
-      handleMaterialize: vi.fn(),
+      handleDispersionDetach: vi.fn(),
     };
   },
 }));
@@ -311,6 +310,7 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
           kind: 'concordance',
           node_ids: ['node-1'],
           node_columns: { 'node-1': 'text' },
+          node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
           search_word: 'old value',
           num_left_tokens: 10,
           num_right_tokens: 10,
@@ -428,7 +428,11 @@ describe('ConcordanceFeature', () => {
       await latestAnalysisFeatureConfig?.onRequest?.({
         node_ids: ['node-2', 'node-1'],
         node_columns: { 'node-1': 'text', 'node-2': 'body' },
+        node_tokenizer_models: {
+          'node-2': 'historical-model',
+        },
         search_word: 'queensland',
+        search_mode: 'regex',
       });
     });
 
@@ -436,6 +440,15 @@ describe('ConcordanceFeature', () => {
       { node_id: 'node-2', column: 'body' },
       { node_id: 'node-1', column: 'text' },
     ]);
+    await waitFor(() => {
+      expect(latestTaskFlowParams?.state).toMatchObject({
+        searchMode: 'regex',
+        tokenizerModelsByNode: {
+          'node-2': 'historical-model',
+          'node-1': '',
+        },
+      });
+    });
   });
 
   it('owns table and dispersion detach copy and forwards each dialog handler set', () => {

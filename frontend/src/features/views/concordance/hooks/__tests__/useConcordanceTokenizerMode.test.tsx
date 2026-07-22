@@ -19,7 +19,7 @@ describe('useConcordanceTokenizerMode', () => {
             'node-a': {
               id: 'node-a',
               name: 'Node A',
-              tokenizer_models: liveModel ? { text: liveModel } : {},
+              tokenizer_model: liveModel ?? null,
             },
           },
         }),
@@ -44,7 +44,7 @@ describe('useConcordanceTokenizerMode', () => {
           'node-a': {
             id: 'node-a',
             name: 'Node A',
-            tokenizer_models: { text: 'native:plain_words_en' },
+            tokenizer_model: 'native:plain_words_en',
           },
         },
       }),
@@ -69,7 +69,7 @@ describe('useConcordanceTokenizerMode', () => {
             'node-a': {
               id: 'node-a',
               name: 'Node A',
-              tokenizer_models: hasModel ? { text: 'native:plain_words_en' } : {},
+              tokenizer_model: hasModel ? 'native:plain_words_en' : null,
             },
           },
         }),
@@ -78,9 +78,6 @@ describe('useConcordanceTokenizerMode', () => {
     await flushDeferredState();
     expect(result.current.searchMode).toBe('tokens');
 
-    act(() => {
-      result.current.setSearchModeFromUser('tokens');
-    });
     rerender({ hasModel: false });
     await flushDeferredState();
 
@@ -107,11 +104,60 @@ describe('useConcordanceTokenizerMode', () => {
     expect(result.current.searchMode).toBe('tokens');
 
     act(() => {
-      result.current.clearTokenizerModel('node-a');
+      result.current.recordTokenizerModel('node-a', '');
     });
     await flushDeferredState();
 
-    expect(result.current.effectiveTokenizerModelsByNode).toEqual({});
+    expect(result.current.effectiveTokenizerModelsByNode).toEqual({ 'node-a': '' });
     expect(result.current.searchMode).toBe('regex');
+  });
+
+  it('hydrates historical request models and explicit absences ahead of current metadata', async () => {
+    const { result } = renderHook(() =>
+      useConcordanceTokenizerMode({
+        effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
+        nodeInfoCache: {
+          'node-a': { id: 'node-a', name: 'Node A', tokenizer_model: 'current-model' },
+        },
+      }),
+    );
+    await flushDeferredState();
+
+    act(() => {
+      result.current.hydrateTokenizerState(['node-a'], { 'node-a': 'historical-model' }, 'regex');
+    });
+    await flushDeferredState();
+
+    expect(result.current.effectiveTokenizerModelsByNode).toEqual({
+      'node-a': 'historical-model',
+    });
+    expect(result.current.searchMode).toBe('regex');
+
+    act(() => {
+      result.current.hydrateTokenizerState(['node-a'], {}, 'regex');
+    });
+    await flushDeferredState();
+
+    expect(result.current.effectiveTokenizerModelsByNode).toEqual({ 'node-a': '' });
+    expect(result.current.tokensModeAvailable).toBe(false);
+  });
+
+  it('keeps hydrated tokens mode when hydration precedes the initial deferred auto-mode update', async () => {
+    const { result } = renderHook(() =>
+      useConcordanceTokenizerMode({
+        effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
+        nodeInfoCache: {
+          'node-a': { id: 'node-a', name: 'Node A', tokenizer_model: null },
+        },
+      }),
+    );
+
+    act(() => {
+      result.current.hydrateTokenizerState(['node-a'], { 'node-a': 'historical-model' }, 'tokens');
+    });
+    await flushDeferredState();
+
+    expect(result.current.tokensModeAvailable).toBe(true);
+    expect(result.current.searchMode).toBe('tokens');
   });
 });

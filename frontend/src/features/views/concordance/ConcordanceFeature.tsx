@@ -33,6 +33,7 @@ import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
 import { DetachColumnsDialog } from '../common/components/DetachColumnsDialog';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
+import { usePersistNodeTokenizerModel } from '../common/hooks/usePersistNodeTokenizerModel';
 import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
 
 /** Orchestrates the full concordance analysis UI, task lifecycle, and detach flows. */
@@ -62,6 +63,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     setNodeColor: persistNodeColor,
   } = useWorkspaceActions();
   const persistDocumentColumn = usePersistNodeDocumentColumn({
+    workspaceId: currentWorkspaceId,
+  });
+  const persistTokenizerModel = usePersistNodeTokenizerModel({
     workspaceId: currentWorkspaceId,
   });
   const {
@@ -170,7 +174,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     effectiveTokenizerModelsByNode,
     setSearchModeFromUser,
     recordTokenizerModel,
-    clearTokenizerModel,
+    hydrateTokenizerState,
   } = useConcordanceTokenizerMode({
     effectiveNodeColumnSelections: nodeColumnSelections,
     nodeInfoCache,
@@ -205,7 +209,21 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     /** Restores concordance form controls from a saved request. */
     onRequest: (requestPayload) => {
       const reqObj = requestPayload as unknown as Record<string, unknown>;
-      applyInputsFromSelections(concordanceParameters.applyHydratedRequest(reqObj));
+      const hydratedSelections = concordanceParameters.applyHydratedRequest(reqObj);
+      applyInputsFromSelections(hydratedSelections);
+      const rawModels =
+        reqObj.node_tokenizer_models && typeof reqObj.node_tokenizer_models === 'object'
+          ? (reqObj.node_tokenizer_models as Record<string, unknown>)
+          : {};
+      hydrateTokenizerState(
+        hydratedSelections.map((selection) => selection.nodeId),
+        Object.fromEntries(
+          Object.entries(rawModels).flatMap(([nodeId, model]) =>
+            typeof model === 'string' ? [[nodeId, model]] : [],
+          ),
+        ),
+        reqObj.search_mode === 'tokens' ? 'tokens' : 'regex',
+      );
       // Combined view is a client-only synthesis and is never persisted, so
       // hydrated tasks always restore to separated; the user can re-enter
       // combined via the toggle (which re-pages both nodes on demand).
@@ -327,6 +345,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       wholeWord,
       caseSensitive,
       searchMode,
+      tokenizerModelsByNode: effectiveTokenizerModelsByNode,
     },
     actions: {
       setNodePagination,
@@ -369,9 +388,27 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   // Run vs Re-run: with no locking, the primary button is gated purely by
   // whether the current params or node inputs differ from the last run.
   const lastRunRequest = serverRequest ?? null;
+  const currentRequestParams = {
+    ...currentConcordanceParams,
+    search_mode: searchMode,
+    node_tokenizer_models: Object.fromEntries(
+      activeNodeIds.flatMap((nodeId) => {
+        const model = (effectiveTokenizerModelsByNode[nodeId] ?? '').trim();
+        return model ? [[nodeId, model]] : [];
+      }),
+    ),
+  };
+  const serverRequestParams = (request: Record<string, unknown>) => ({
+    ...readConcordanceServerParams(request),
+    search_mode: request.search_mode === 'tokens' ? 'tokens' : 'regex',
+    node_tokenizer_models:
+      request.node_tokenizer_models && typeof request.node_tokenizer_models === 'object'
+        ? request.node_tokenizer_models
+        : {},
+  });
   const hasChanges = !lastRunRequest
     ? true
-    : hasParameterDiff(currentConcordanceParams, readConcordanceServerParams(lastRunRequest)) ||
+    : hasParameterDiff(currentRequestParams, serverRequestParams(lastRunRequest)) ||
       hasNodeSelectionChanged(
         nodeColumnSelections,
         lastRunRequest.node_ids,
@@ -419,9 +456,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
     void persistDocumentColumn(nodeId, column);
-    // Clear the tokenizer model for this node when the column changes; model
-    // preferences are scoped to source columns.
-    clearTokenizerModel(nodeId);
   };
 
   /** Persists the tokenizer model chosen for a node/column when tokens mode is available. */
@@ -435,6 +469,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     _language: string | null,
   ) => {
     recordTokenizerModel(nodeId, model);
+    void persistTokenizerModel(nodeId, model);
   };
 
   /** Delegates clearing to the shared analysis lifecycle only when a workspace is active. */

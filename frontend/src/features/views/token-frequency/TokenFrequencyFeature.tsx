@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
 import { usePersistNodeDocumentColumn } from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
+import { usePersistNodeTokenizerModel } from '@/features/views/common/hooks/usePersistNodeTokenizerModel';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -359,8 +360,20 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   );
 
   const lastRunRequest = serverRequest ?? null;
-  const currentTokenFrequencyParams = {};
-  const serverTokenFrequencyParams = (_request: Record<string, unknown>) => ({});
+  const currentTokenFrequencyParams = {
+    node_tokenizer_models: Object.fromEntries(
+      orderedPanelNodeIds.flatMap((nodeId) => {
+        const model = (effectiveTokenizerModelsByNode[nodeId] ?? '').trim();
+        return model ? [[nodeId, model]] : [];
+      }),
+    ),
+  };
+  const serverTokenFrequencyParams = (request: Record<string, unknown>) => ({
+    node_tokenizer_models:
+      request.node_tokenizer_models && typeof request.node_tokenizer_models === 'object'
+        ? request.node_tokenizer_models
+        : {},
+  });
   const hasChanges = !lastRunRequest
     ? true
     : hasParameterDiff(currentTokenFrequencyParams, serverTokenFrequencyParams(lastRunRequest)) ||
@@ -389,6 +402,9 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
   });
+  const persistTokenizerModel = usePersistNodeTokenizerModel({
+    workspaceId: currentWorkspaceId,
+  });
 
   /** Passed to TokenFrequencyParameterPanel to update and persist a node's document column. */
   const handleColumnChange = (nodeId: string, column: string) => {
@@ -398,7 +414,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
 
   /**
    * Passed to each parameter-panel tokenizer selector to update its live model
-   * and persist the model together with the detected language.
+   * and persist the node-level model independently from the document column.
    */
   const handleTokenizerModelChange = (
     nodeId: string,
@@ -406,11 +422,8 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     model: string,
     _language: string | null,
   ) => {
-    setLiveTokenizerModelsByNode((prev) => {
-      if (model) return { ...prev, [nodeId]: model };
-      const { [nodeId]: _removed, ...rest } = prev;
-      return rest;
-    });
+    setLiveTokenizerModelsByNode((prev) => ({ ...prev, [nodeId]: model.trim() }));
+    void persistTokenizerModel(nodeId, model);
   };
 
   return (

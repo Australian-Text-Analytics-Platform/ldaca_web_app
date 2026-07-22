@@ -116,7 +116,7 @@ describe('useTokenFrequencyTaskFlow', () => {
           ],
           tokenizerModelsByNode: {
             'node-1': 'native:plain_words_en',
-            'node-2': 'native:plain_words_en',
+            'node-2': 'lindera:jieba',
           },
           stopWords: '',
           lastCompareNodeIds: ['node-1', 'node-2'],
@@ -152,7 +152,9 @@ describe('useTokenFrequencyTaskFlow', () => {
           kind: 'concordance',
           node_ids: ['node-2'],
           node_columns: { 'node-2': 'text' },
+          node_tokenizer_models: { 'node-2': 'lindera:jieba' },
           search_word: 'hello',
+          search_mode: 'tokens',
         }),
         path: { workspace_id: 'workspace-1', tab_id: 'concordance-tab' },
         throwOnError: true,
@@ -176,6 +178,10 @@ describe('useTokenFrequencyTaskFlow', () => {
             kind: 'concordance',
             node_ids: ['node-1', 'node-2'],
             node_columns: { 'node-1': 'text', 'node-2': 'text' },
+            node_tokenizer_models: {
+              'node-1': 'native:plain_words_en',
+              'node-2': 'lindera:jieba',
+            },
           }),
         }),
       );

@@ -8,8 +8,8 @@ export interface TokenizerModelColumnSelection {
 /** Combines backend-persisted tokenizer choices with live per-node edits. */
 /**
  * Used by: token-frequency and concordance analysis features because both render per-node tokenizer selectors whose defaults come from backend node metadata but must immediately reflect current-tab edits.
- * Flow: read selected columns, look up authoritative node-info metadata by id,
- * copy stored model ids for those columns, then let live overrides win.
+ * Flow: read selected Data Blocks, look up their node-level preference, then
+ * let explicit live overrides (including an empty clear) win.
  */
 export const deriveTokenizerModelsByNode = (
   selections: TokenizerModelColumnSelection[],
@@ -18,9 +18,8 @@ export const deriveTokenizerModelsByNode = (
 ): Record<string, string> => {
   const fromNodes: Record<string, string> = {};
   for (const selection of selections) {
-    if (!selection.column) continue;
     const node = nodeInfoCache[selection.nodeId];
-    const stored = node?.tokenizer_models?.[selection.column];
+    const stored = node?.tokenizer_model;
     if (stored) fromNodes[selection.nodeId] = stored;
   }
   return { ...fromNodes, ...liveTokenizerModelsByNode };

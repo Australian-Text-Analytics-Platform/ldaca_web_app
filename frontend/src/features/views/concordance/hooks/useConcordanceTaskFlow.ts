@@ -31,6 +31,7 @@ interface ConcordanceState {
   caseSensitive: boolean;
   /** Selected concordance engine. */
   searchMode: 'regex' | 'tokens';
+  tokenizerModelsByNode: Record<string, string>;
 }
 
 interface ConcordanceActions {
@@ -66,7 +67,7 @@ interface Params {
   lock: ConcordanceLock;
 }
 
-/** Centralizes concordance submit, pagination, sorting, detach, and materialize actions. */
+/** Centralizes concordance submit, pagination, sorting, and detach actions. */
 /**
  * Used by: `ConcordanceFeature`; its feature test mocks this hook boundary.
  * Flow: submit concordance requests, update local page controls, and expose
@@ -88,6 +89,7 @@ export function useConcordanceTaskFlow({
     regex,
     wholeWord,
     searchMode,
+    tokenizerModelsByNode,
     caseSensitive,
   },
   actions: {
@@ -157,6 +159,19 @@ export function useConcordanceTaskFlow({
     effectiveSelections.forEach((sel) => {
       nodeColumns[sel.nodeId] = sel.column;
     });
+    const nodeTokenizerModels = Object.fromEntries(
+      requestNodeIds.flatMap((nodeId) => {
+        const model = (tokenizerModelsByNode[nodeId] ?? '').trim();
+        return model ? [[nodeId, model]] : [];
+      }),
+    );
+    if (
+      searchMode === 'tokens' &&
+      Object.keys(nodeTokenizerModels).length !== requestNodeIds.length
+    ) {
+      toast.error('Select a tokenizer model for each selected data block.');
+      return;
+    }
 
     const request: ConcordanceAnalysisRequest = {
       node_ids: requestNodeIds,
@@ -168,6 +183,7 @@ export function useConcordanceTaskFlow({
       whole_word: wholeWord,
       case_sensitive: caseSensitive,
       search_mode: searchMode,
+      node_tokenizer_models: nodeTokenizerModels,
     };
     await runAnalysisTaskEnvelope<Analysis>({
       lastFetchedRef,

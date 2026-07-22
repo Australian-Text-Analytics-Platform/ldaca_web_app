@@ -242,6 +242,9 @@ export const useTokenFrequencyTaskFlow = ({
           const request: ConcordanceAnalysisRequest = {
             node_ids: uniqueNodeIds,
             node_columns: nodeColumns,
+            node_tokenizer_models: Object.fromEntries(
+              uniqueNodeIds.map((nodeId) => [nodeId, (tokenizerModelsByNode[nodeId] ?? '').trim()]),
+            ),
             search_word: trimmedToken,
             num_left_tokens: 10,
             num_right_tokens: 10,
@@ -282,6 +285,7 @@ export const useTokenFrequencyTaskFlow = ({
       createConcordanceTab,
       setConcordanceTabTask,
       setCurrentView,
+      tokenizerModelsByNode,
     ],
   );
 

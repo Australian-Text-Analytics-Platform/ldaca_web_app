@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { WorkspaceNodeInfo } from '@/api';
 import {
   deriveTokenizerModelsByNode,
@@ -18,13 +18,19 @@ interface UseConcordanceTokenizerModeResult {
   effectiveTokenizerModelsByNode: Record<string, string>;
   setSearchModeFromUser: (mode: ConcordanceSearchMode) => void;
   recordTokenizerModel: (nodeId: string, model: string) => void;
-  clearTokenizerModel: (nodeId: string) => void;
+  hydrateTokenizerState: (
+    nodeIds: string[],
+    modelsByNode: Record<string, string>,
+    mode: ConcordanceSearchMode,
+  ) => void;
 }
 
 /** Owns Concordance's tokenizer-backed search-mode state and live model overrides. */
 /**
  * Used by: ConcordanceFeature because token-mode availability depends on selected columns, backend-persisted tokenizer preferences, and current-tab edits that should not leak into global state.
- * Flow: merge persisted/live tokenizer models, derive whether every selected column is covered, auto-select tokens mode until the user overrides it, and force regex when token coverage disappears.
+ * Flow: merge persisted/live tokenizer models, derive whether every selected
+ * column is covered, auto-select tokens mode until the user overrides it, and
+ * preserve historical request state as explicit local values.
  */
 export function useConcordanceTokenizerMode({
   effectiveNodeColumnSelections,
@@ -32,6 +38,7 @@ export function useConcordanceTokenizerMode({
 }: UseConcordanceTokenizerModeOptions): UseConcordanceTokenizerModeResult {
   const [searchMode, setSearchMode] = useState<ConcordanceSearchMode>('regex');
   const [searchModeUserSet, setSearchModeUserSet] = useState(false);
+  const searchModeUserSetRef = useRef(false);
   const [tokenizerModelsByNode, setTokenizerModelsByNode] = useState<Record<string, string>>({});
 
   const effectiveTokenizerModelsByNode = deriveTokenizerModelsByNode(
@@ -52,33 +59,39 @@ export function useConcordanceTokenizerMode({
   useEffect(() => {
     void Promise.resolve().then(() => {
       if (!tokensModeAvailable) {
-        setSearchMode('regex');
-        setSearchModeUserSet(false);
+        if (!searchModeUserSetRef.current) setSearchMode('regex');
         return;
       }
-      if (searchModeUserSet) return;
+      if (searchModeUserSetRef.current) return;
       setSearchMode('tokens');
     });
   }, [tokensModeAvailable, searchModeUserSet]);
 
   const setSearchModeFromUser = (mode: ConcordanceSearchMode) => {
+    searchModeUserSetRef.current = true;
     setSearchMode(mode);
     setSearchModeUserSet(true);
   };
 
   const recordTokenizerModel = (nodeId: string, model: string) => {
-    setTokenizerModelsByNode((prev) => {
-      if (model) return { ...prev, [nodeId]: model };
-      const { [nodeId]: _removed, ...rest } = prev;
-      return rest;
-    });
+    const normalized = model.trim();
+    setTokenizerModelsByNode((prev) => ({ ...prev, [nodeId]: normalized }));
+    if (!normalized) {
+      setSearchMode('regex');
+    }
   };
 
-  const clearTokenizerModel = (nodeId: string) => {
-    setTokenizerModelsByNode((prev) => {
-      const { [nodeId]: _removed, ...rest } = prev;
-      return rest;
-    });
+  const hydrateTokenizerState = (
+    nodeIds: string[],
+    modelsByNode: Record<string, string>,
+    mode: ConcordanceSearchMode,
+  ) => {
+    searchModeUserSetRef.current = true;
+    setTokenizerModelsByNode(
+      Object.fromEntries(nodeIds.map((nodeId) => [nodeId, (modelsByNode[nodeId] ?? '').trim()])),
+    );
+    setSearchMode(mode);
+    setSearchModeUserSet(true);
   };
 
   return {
@@ -87,6 +100,6 @@ export function useConcordanceTokenizerMode({
     effectiveTokenizerModelsByNode,
     setSearchModeFromUser,
     recordTokenizerModel,
-    clearTokenizerModel,
+    hydrateTokenizerState,
   };
 }

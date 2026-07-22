@@ -10,11 +10,9 @@ import {
 } from '@/features/views/common/components/NodeInputsPanel';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { RerunActionState } from '@/features/views/common/rerunActionState';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
-import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 export interface ConcordanceParameterPanelProps {
   // Selection (add-node-as-needed)
@@ -89,7 +87,6 @@ export function ConcordanceParameterPanel({
   renderTokenizerModelSelector,
 }: ConcordanceParameterPanelProps) {
   const effectiveNodeColumnSelections: NodeColumnSelection[] = nodeInputs.nodeColumnSelections;
-  const panelSelectedNodes: WorkspaceNodeMetadata[] = nodeInputs.selectedNodes;
   const runDisabledReason = (() => {
     if (isSearching) return undefined;
     if (actionState.runDisabledReason) return actionState.runDisabledReason;
@@ -126,11 +123,6 @@ export function ConcordanceParameterPanel({
           nodeColors={nodeColors}
           onNodeColorChange={onNodeColorChange}
           renderColumnAddon={renderTokenizerModelSelector}
-        />
-
-        <TokensColumnMismatchNotice
-          nodes={panelSelectedNodes}
-          selections={effectiveNodeColumnSelections}
         />
 
         <div className="space-y-4">
@@ -195,7 +187,7 @@ export function ConcordanceParameterPanel({
 
           <div className="flex flex-wrap items-center gap-4 text-sm">
             {/* Search mode picker. ``tokens`` is auto-selected when every selected
-              source column has a tokenizer model. The regex / whole-word / case
+              Data Block has a tokenizer model. The regex / whole-word / case
               checkboxes only apply to text mode, so they're hidden entirely when
               tokens mode is active. */}
             <div className="flex items-center gap-1">
@@ -215,7 +207,7 @@ export function ConcordanceParameterPanel({
                     reason={
                       tokensModeAvailable
                         ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                        : 'Tokens mode needs a tokenizer model for each selected column.'
+                        : 'Tokens mode needs a tokenizer model for each selected data block.'
                     }
                   >
                     <TabsTrigger value="tokens" disabled={!tokensModeAvailable} className="text-xs">

@@ -11,7 +11,7 @@ export interface WorkspaceNodeMetadata {
   color: string | null;
   document: string | null;
   shape: WorkspaceNodeInfo['shape'];
-  tokenizerModels: Record<string, string>;
+  tokenizerModel: string | null;
 }
 
 /**
@@ -33,5 +33,7 @@ export const projectWorkspaceNodeMetadata = (
   color: nodeInfo?.color ?? graphNode.color ?? null,
   document: nodeInfo?.document ?? graphNode.document ?? null,
   shape: nodeInfo?.shape,
-  tokenizerModels: nodeInfo?.tokenizer_models ?? {},
+  tokenizerModel: nodeInfo
+    ? (nodeInfo.tokenizer_model ?? null)
+    : (graphNode.tokenizer_model ?? null),
 });

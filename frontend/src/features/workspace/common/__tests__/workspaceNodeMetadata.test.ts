@@ -16,7 +16,7 @@ describe('projectWorkspaceNodeMetadata', () => {
       color: '#dc2626',
       document: 'document',
       shape: [12, 2],
-      tokenizer_models: { document: 'native:plain_words_en' },
+      tokenizer_model: 'native:plain_words_en',
     };
 
     expect(projectWorkspaceNodeMetadata(graphNode, nodeInfo)).toEqual({
@@ -25,7 +25,7 @@ describe('projectWorkspaceNodeMetadata', () => {
       color: '#dc2626',
       document: 'document',
       shape: [12, 2],
-      tokenizerModels: { document: 'native:plain_words_en' },
+      tokenizerModel: 'native:plain_words_en',
     });
   });
 
@@ -41,7 +41,7 @@ describe('projectWorkspaceNodeMetadata', () => {
       color: null,
       document: null,
       shape: undefined,
-      tokenizerModels: {},
+      tokenizerModel: null,
     });
   });
 });

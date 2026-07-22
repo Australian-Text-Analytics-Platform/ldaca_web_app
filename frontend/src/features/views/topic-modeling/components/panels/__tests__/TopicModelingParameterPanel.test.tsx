@@ -51,7 +51,7 @@ const workspaceNodeFixture = (
   columns: ['text'],
   schema: { text: 'String' },
   shape: undefined,
-  tokenizerModels: {},
+  tokenizerModel: null,
   canUndo: false,
   canRedo: false,
   ...overrides,

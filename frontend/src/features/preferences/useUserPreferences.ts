@@ -14,7 +14,6 @@ export const userPreferencesKey = (userId: string | null) => ['user-preferences'
 const DEFAULT_PREFERENCES: Required<UserPreferences> = {
   hidden_views: [],
   favorite_workspaces: [],
-  default_tokenizer_model: null,
   analysis_multi_tab_enabled: false,
   contextual_hints_enabled: true,
 };

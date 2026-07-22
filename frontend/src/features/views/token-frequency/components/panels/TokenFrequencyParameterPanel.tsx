@@ -2,8 +2,6 @@ import {
   NodeInputsPanel,
   type NodeInputColumnAddonArgs,
 } from '@/features/views/common/components/NodeInputsPanel';
-import { TokensColumnMismatchNotice } from '@/features/views/common/components/TokensColumnMismatchNotice';
-import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import { Switch } from '@/components/ui/switch';
@@ -115,7 +113,6 @@ export const TokenFrequencyParameterPanel = ({
   renderTokenizerModelSelector,
 }: TokenFrequencyParameterPanelProps) => {
   const panelSelectedNodes = nodeInputs.selectedNodes;
-  const effectiveNodeColumnSelections: NodeColumnSelection[] = nodeInputs.nodeColumnSelections;
   const nodeOptions = panelSelectedNodes
     .map((node) => {
       const nodeId = typeof node.id === 'string' ? node.id : '';
@@ -192,11 +189,6 @@ export const TokenFrequencyParameterPanel = ({
         onNodeColorChange={onNodeColorChange}
         renderColumnAddon={renderTokenizerModelSelector}
         renderExtraNodeContent={renderCorpusRoleSwitch}
-      />
-      <TokensColumnMismatchNotice
-        nodes={panelSelectedNodes}
-        selections={effectiveNodeColumnSelections}
-        className="mt-3"
       />
     </AnalysisCardLayout>
   );
