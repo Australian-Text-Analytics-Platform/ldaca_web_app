@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { cancelAnalysis, cancelUserFileImport, cilogonCallback, cilogonLogin, clearProviderCredentials, clearTabAnalysis, closeWorkspaceById, createFolder, createNode, createTab, createWorkspace, deleteFile, deleteNode, deleteSession, deleteTab, deleteUserFileImport, deleteWorkspaceById, downloadAnalysisArtifact, downloadAnalysisTable, downloadFile, editNode, executeWorkspaceSql, exportWorkspaceArchive, getAnalysis, getAnalysisResult, getAnalysisTableRows, getAnalysisTableSchema, getNode, getNodeSchema, getPreferences, getProviderCredentials, getRawFile, getSession, getStorage, getTab, getTabAnalysis, getUserFileImport, getUserFileResource, getWorkspaceById, googleCallback, healthCheck, importWorkspaceArchive, listAnalyses, listAnnotationModels, listFeaturedDataPortalCollections, listFileWorksheets, listNodes, listSampleCollections, listTabs, listTokenizerModels, listUserFileImports, listUserFiles, listWorkspaces, moveFile, openWorkspaceById, type Options, previewAnnotation, previewFile, previewFileSchema, previewNodeCreation, queryAnalysisResult, redoNode, renameTab, reorderWorkspaceNodesById, searchDataPortal, submitChildAnalysis, submitDataPortalImport, submitSampleImport, submitTabAnalysis, undoNode, updateNode, updatePreferences, updateProviderCredentials, updateWorkspaceById, uploadFile } from '../sdk.gen';
-import type { CancelAnalysisData, CancelAnalysisError, CancelAnalysisResponse, CancelUserFileImportData, CancelUserFileImportError, CancelUserFileImportResponse, CilogonCallbackData, CilogonCallbackError, CilogonLoginData, CilogonLoginError, ClearProviderCredentialsData, ClearProviderCredentialsError, ClearProviderCredentialsResponse, ClearTabAnalysisData, ClearTabAnalysisError, ClearTabAnalysisResponse, CloseWorkspaceByIdData, CloseWorkspaceByIdError, CloseWorkspaceByIdResponse, CreateFolderData, CreateFolderError, CreateFolderResponse, CreateNodeData, CreateNodeError, CreateNodeResponse, CreateTabData, CreateTabError, CreateTabResponse, CreateWorkspaceData, CreateWorkspaceError, CreateWorkspaceResponse, DeleteFileData, DeleteFileError, DeleteFileResponse, DeleteNodeData, DeleteNodeError, DeleteNodeResponse, DeleteSessionData, DeleteSessionError, DeleteSessionResponse, DeleteTabData, DeleteTabError, DeleteTabResponse, DeleteUserFileImportData, DeleteUserFileImportError, DeleteUserFileImportResponse, DeleteWorkspaceByIdData, DeleteWorkspaceByIdError, DeleteWorkspaceByIdResponse, DownloadAnalysisArtifactData, DownloadAnalysisArtifactError, DownloadAnalysisArtifactResponse, DownloadAnalysisTableData, DownloadAnalysisTableError, DownloadAnalysisTableResponse, DownloadFileData, DownloadFileError, DownloadFileResponse, EditNodeData, EditNodeError, EditNodeResponse, ExecuteWorkspaceSqlData, ExecuteWorkspaceSqlError, ExecuteWorkspaceSqlResponse, ExportWorkspaceArchiveData, ExportWorkspaceArchiveError, ExportWorkspaceArchiveResponse, GetAnalysisData, GetAnalysisError, GetAnalysisResponse, GetAnalysisResultData, GetAnalysisResultError, GetAnalysisResultResponse, GetAnalysisTableRowsData, GetAnalysisTableRowsError, GetAnalysisTableRowsResponse, GetAnalysisTableSchemaData, GetAnalysisTableSchemaError, GetAnalysisTableSchemaResponse, GetNodeData, GetNodeError, GetNodeResponse, GetNodeSchemaData, GetNodeSchemaError, GetNodeSchemaResponse, GetPreferencesData, GetPreferencesError, GetPreferencesResponse, GetProviderCredentialsData, GetProviderCredentialsError, GetProviderCredentialsResponse, GetRawFileData, GetRawFileError, GetRawFileResponse, GetSessionData, GetSessionResponse, GetStorageData, GetStorageError, GetStorageResponse, GetTabAnalysisData, GetTabAnalysisError, GetTabAnalysisResponse, GetTabData, GetTabError, GetTabResponse, GetUserFileImportData, GetUserFileImportError, GetUserFileImportResponse, GetUserFileResourceData, GetUserFileResourceError, GetUserFileResourceResponse, GetWorkspaceByIdData, GetWorkspaceByIdError, GetWorkspaceByIdResponse, GoogleCallbackData, GoogleCallbackError, HealthCheckData, HealthCheckError, HealthCheckResponse, ImportWorkspaceArchiveData, ImportWorkspaceArchiveError, ImportWorkspaceArchiveResponse, ListAnalysesData, ListAnalysesError, ListAnalysesResponse, ListAnnotationModelsData, ListAnnotationModelsError, ListAnnotationModelsResponse, ListFeaturedDataPortalCollectionsData, ListFeaturedDataPortalCollectionsError, ListFeaturedDataPortalCollectionsResponse, ListFileWorksheetsData, ListFileWorksheetsError, ListFileWorksheetsResponse, ListNodesData, ListNodesError, ListNodesResponse, ListSampleCollectionsData, ListSampleCollectionsError, ListSampleCollectionsResponse, ListTabsData, ListTabsError, ListTabsResponse, ListTokenizerModelsData, ListTokenizerModelsError, ListTokenizerModelsResponse, ListUserFileImportsData, ListUserFileImportsError, ListUserFileImportsResponse, ListUserFilesData, ListUserFilesError, ListUserFilesResponse, ListWorkspacesData, ListWorkspacesError, ListWorkspacesResponse, MoveFileData, MoveFileError, MoveFileResponse, OpenWorkspaceByIdData, OpenWorkspaceByIdError, OpenWorkspaceByIdResponse, PreviewAnnotationData, PreviewAnnotationError, PreviewAnnotationResponse, PreviewFileData, PreviewFileError, PreviewFileResponse, PreviewFileSchemaData, PreviewFileSchemaError, PreviewFileSchemaResponse, PreviewNodeCreationData, PreviewNodeCreationError, PreviewNodeCreationResponse, QueryAnalysisResultData, QueryAnalysisResultError, QueryAnalysisResultResponse, RedoNodeData, RedoNodeError, RedoNodeResponse, RenameTabData, RenameTabError, RenameTabResponse, ReorderWorkspaceNodesByIdData, ReorderWorkspaceNodesByIdError, ReorderWorkspaceNodesByIdResponse, SearchDataPortalData, SearchDataPortalError, SearchDataPortalResponse, SubmitChildAnalysisData, SubmitChildAnalysisError, SubmitChildAnalysisResponse, SubmitDataPortalImportData, SubmitDataPortalImportError, SubmitDataPortalImportResponse, SubmitSampleImportData, SubmitSampleImportError, SubmitSampleImportResponse, SubmitTabAnalysisData, SubmitTabAnalysisError, SubmitTabAnalysisResponse, UndoNodeData, UndoNodeError, UndoNodeResponse, UpdateNodeData, UpdateNodeError, UpdateNodeResponse, UpdatePreferencesData, UpdatePreferencesError, UpdatePreferencesResponse, UpdateProviderCredentialsData, UpdateProviderCredentialsError, UpdateProviderCredentialsResponse, UpdateWorkspaceByIdData, UpdateWorkspaceByIdError, UpdateWorkspaceByIdResponse, UploadFileData, UploadFileError, UploadFileResponse } from '../types.gen';
+import { cancelAnalysis, cancelUserFileImport, cilogonCallback, cilogonLogin, clearAnnotationProviderConfigurations, clearProviderCredentials, clearTabAnalysis, closeWorkspaceById, createAnnotationProviderConfiguration, createFolder, createNode, createTab, createWorkspace, deleteAnnotationProviderConfiguration, deleteFile, deleteNode, deleteSession, deleteTab, deleteUserFileImport, deleteWorkspaceById, downloadAnalysisArtifact, downloadAnalysisTable, downloadFile, editNode, executeWorkspaceSql, exportWorkspaceArchive, getAnalysis, getAnalysisResult, getAnalysisTableRows, getAnalysisTableSchema, getNode, getNodeSchema, getPreferences, getProviderCredentials, getRawFile, getSession, getStorage, getTab, getTabAnalysis, getUserFileImport, getUserFileResource, getWorkspaceById, googleCallback, healthCheck, importWorkspaceArchive, listAnalyses, listAnnotationModels, listFeaturedDataPortalCollections, listFileWorksheets, listNodes, listSampleCollections, listTabs, listTokenizerModels, listUserFileImports, listUserFiles, listWorkspaces, moveFile, openWorkspaceById, type Options, previewAnnotation, previewFile, previewFileSchema, previewNodeCreation, queryAnalysisResult, redoNode, renameAnnotationProviderConfiguration, renameTab, reorderWorkspaceNodesById, searchDataPortal, submitChildAnalysis, submitDataPortalImport, submitSampleImport, submitTabAnalysis, undoNode, updateDataPortalCredential, updateNode, updatePreferences, updateWorkspaceById, uploadFile } from '../sdk.gen';
+import type { CancelAnalysisData, CancelAnalysisError, CancelAnalysisResponse, CancelUserFileImportData, CancelUserFileImportError, CancelUserFileImportResponse, CilogonCallbackData, CilogonCallbackError, CilogonLoginData, CilogonLoginError, ClearAnnotationProviderConfigurationsData, ClearAnnotationProviderConfigurationsError, ClearAnnotationProviderConfigurationsResponse, ClearProviderCredentialsData, ClearProviderCredentialsError, ClearProviderCredentialsResponse, ClearTabAnalysisData, ClearTabAnalysisError, ClearTabAnalysisResponse, CloseWorkspaceByIdData, CloseWorkspaceByIdError, CloseWorkspaceByIdResponse, CreateAnnotationProviderConfigurationData, CreateAnnotationProviderConfigurationError, CreateAnnotationProviderConfigurationResponse, CreateFolderData, CreateFolderError, CreateFolderResponse, CreateNodeData, CreateNodeError, CreateNodeResponse, CreateTabData, CreateTabError, CreateTabResponse, CreateWorkspaceData, CreateWorkspaceError, CreateWorkspaceResponse, DeleteAnnotationProviderConfigurationData, DeleteAnnotationProviderConfigurationError, DeleteAnnotationProviderConfigurationResponse, DeleteFileData, DeleteFileError, DeleteFileResponse, DeleteNodeData, DeleteNodeError, DeleteNodeResponse, DeleteSessionData, DeleteSessionError, DeleteSessionResponse, DeleteTabData, DeleteTabError, DeleteTabResponse, DeleteUserFileImportData, DeleteUserFileImportError, DeleteUserFileImportResponse, DeleteWorkspaceByIdData, DeleteWorkspaceByIdError, DeleteWorkspaceByIdResponse, DownloadAnalysisArtifactData, DownloadAnalysisArtifactError, DownloadAnalysisArtifactResponse, DownloadAnalysisTableData, DownloadAnalysisTableError, DownloadAnalysisTableResponse, DownloadFileData, DownloadFileError, DownloadFileResponse, EditNodeData, EditNodeError, EditNodeResponse, ExecuteWorkspaceSqlData, ExecuteWorkspaceSqlError, ExecuteWorkspaceSqlResponse, ExportWorkspaceArchiveData, ExportWorkspaceArchiveError, ExportWorkspaceArchiveResponse, GetAnalysisData, GetAnalysisError, GetAnalysisResponse, GetAnalysisResultData, GetAnalysisResultError, GetAnalysisResultResponse, GetAnalysisTableRowsData, GetAnalysisTableRowsError, GetAnalysisTableRowsResponse, GetAnalysisTableSchemaData, GetAnalysisTableSchemaError, GetAnalysisTableSchemaResponse, GetNodeData, GetNodeError, GetNodeResponse, GetNodeSchemaData, GetNodeSchemaError, GetNodeSchemaResponse, GetPreferencesData, GetPreferencesError, GetPreferencesResponse, GetProviderCredentialsData, GetProviderCredentialsError, GetProviderCredentialsResponse, GetRawFileData, GetRawFileError, GetRawFileResponse, GetSessionData, GetSessionResponse, GetStorageData, GetStorageError, GetStorageResponse, GetTabAnalysisData, GetTabAnalysisError, GetTabAnalysisResponse, GetTabData, GetTabError, GetTabResponse, GetUserFileImportData, GetUserFileImportError, GetUserFileImportResponse, GetUserFileResourceData, GetUserFileResourceError, GetUserFileResourceResponse, GetWorkspaceByIdData, GetWorkspaceByIdError, GetWorkspaceByIdResponse, GoogleCallbackData, GoogleCallbackError, HealthCheckData, HealthCheckError, HealthCheckResponse, ImportWorkspaceArchiveData, ImportWorkspaceArchiveError, ImportWorkspaceArchiveResponse, ListAnalysesData, ListAnalysesError, ListAnalysesResponse, ListAnnotationModelsData, ListAnnotationModelsError, ListAnnotationModelsResponse, ListFeaturedDataPortalCollectionsData, ListFeaturedDataPortalCollectionsError, ListFeaturedDataPortalCollectionsResponse, ListFileWorksheetsData, ListFileWorksheetsError, ListFileWorksheetsResponse, ListNodesData, ListNodesError, ListNodesResponse, ListSampleCollectionsData, ListSampleCollectionsError, ListSampleCollectionsResponse, ListTabsData, ListTabsError, ListTabsResponse, ListTokenizerModelsData, ListTokenizerModelsError, ListTokenizerModelsResponse, ListUserFileImportsData, ListUserFileImportsError, ListUserFileImportsResponse, ListUserFilesData, ListUserFilesError, ListUserFilesResponse, ListWorkspacesData, ListWorkspacesError, ListWorkspacesResponse, MoveFileData, MoveFileError, MoveFileResponse, OpenWorkspaceByIdData, OpenWorkspaceByIdError, OpenWorkspaceByIdResponse, PreviewAnnotationData, PreviewAnnotationError, PreviewAnnotationResponse, PreviewFileData, PreviewFileError, PreviewFileResponse, PreviewFileSchemaData, PreviewFileSchemaError, PreviewFileSchemaResponse, PreviewNodeCreationData, PreviewNodeCreationError, PreviewNodeCreationResponse, QueryAnalysisResultData, QueryAnalysisResultError, QueryAnalysisResultResponse, RedoNodeData, RedoNodeError, RedoNodeResponse, RenameAnnotationProviderConfigurationData, RenameAnnotationProviderConfigurationError, RenameAnnotationProviderConfigurationResponse, RenameTabData, RenameTabError, RenameTabResponse, ReorderWorkspaceNodesByIdData, ReorderWorkspaceNodesByIdError, ReorderWorkspaceNodesByIdResponse, SearchDataPortalData, SearchDataPortalError, SearchDataPortalResponse, SubmitChildAnalysisData, SubmitChildAnalysisError, SubmitChildAnalysisResponse, SubmitDataPortalImportData, SubmitDataPortalImportError, SubmitDataPortalImportResponse, SubmitSampleImportData, SubmitSampleImportError, SubmitSampleImportResponse, SubmitTabAnalysisData, SubmitTabAnalysisError, SubmitTabAnalysisResponse, UndoNodeData, UndoNodeError, UndoNodeResponse, UpdateDataPortalCredentialData, UpdateDataPortalCredentialError, UpdateDataPortalCredentialResponse, UpdateNodeData, UpdateNodeError, UpdateNodeResponse, UpdatePreferencesData, UpdatePreferencesError, UpdatePreferencesResponse, UpdateWorkspaceByIdData, UpdateWorkspaceByIdError, UpdateWorkspaceByIdResponse, UploadFileData, UploadFileError, UploadFileResponse } from '../types.gen';
 
 /**
  * List Annotation Models
@@ -245,12 +245,80 @@ export const getProviderCredentialsOptions = (options?: Options<GetProviderCrede
 });
 
 /**
- * Update Provider Credentials
+ * Update Data Portal Credential
  */
-export const updateProviderCredentialsMutation = (options?: Partial<Options<UpdateProviderCredentialsData>>): UseMutationOptions<UpdateProviderCredentialsResponse, UpdateProviderCredentialsError, Options<UpdateProviderCredentialsData>> => {
-    const mutationOptions: UseMutationOptions<UpdateProviderCredentialsResponse, UpdateProviderCredentialsError, Options<UpdateProviderCredentialsData>> = {
+export const updateDataPortalCredentialMutation = (options?: Partial<Options<UpdateDataPortalCredentialData>>): UseMutationOptions<UpdateDataPortalCredentialResponse, UpdateDataPortalCredentialError, Options<UpdateDataPortalCredentialData>> => {
+    const mutationOptions: UseMutationOptions<UpdateDataPortalCredentialResponse, UpdateDataPortalCredentialError, Options<UpdateDataPortalCredentialData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await updateProviderCredentials({
+            const { data } = await updateDataPortalCredential({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Clear Annotation Provider Configurations
+ */
+export const clearAnnotationProviderConfigurationsMutation = (options?: Partial<Options<ClearAnnotationProviderConfigurationsData>>): UseMutationOptions<ClearAnnotationProviderConfigurationsResponse, ClearAnnotationProviderConfigurationsError, Options<ClearAnnotationProviderConfigurationsData>> => {
+    const mutationOptions: UseMutationOptions<ClearAnnotationProviderConfigurationsResponse, ClearAnnotationProviderConfigurationsError, Options<ClearAnnotationProviderConfigurationsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await clearAnnotationProviderConfigurations({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Create Annotation Provider Configuration
+ */
+export const createAnnotationProviderConfigurationMutation = (options?: Partial<Options<CreateAnnotationProviderConfigurationData>>): UseMutationOptions<CreateAnnotationProviderConfigurationResponse, CreateAnnotationProviderConfigurationError, Options<CreateAnnotationProviderConfigurationData>> => {
+    const mutationOptions: UseMutationOptions<CreateAnnotationProviderConfigurationResponse, CreateAnnotationProviderConfigurationError, Options<CreateAnnotationProviderConfigurationData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createAnnotationProviderConfiguration({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Delete Annotation Provider Configuration
+ */
+export const deleteAnnotationProviderConfigurationMutation = (options?: Partial<Options<DeleteAnnotationProviderConfigurationData>>): UseMutationOptions<DeleteAnnotationProviderConfigurationResponse, DeleteAnnotationProviderConfigurationError, Options<DeleteAnnotationProviderConfigurationData>> => {
+    const mutationOptions: UseMutationOptions<DeleteAnnotationProviderConfigurationResponse, DeleteAnnotationProviderConfigurationError, Options<DeleteAnnotationProviderConfigurationData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteAnnotationProviderConfiguration({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Rename Annotation Provider Configuration
+ */
+export const renameAnnotationProviderConfigurationMutation = (options?: Partial<Options<RenameAnnotationProviderConfigurationData>>): UseMutationOptions<RenameAnnotationProviderConfigurationResponse, RenameAnnotationProviderConfigurationError, Options<RenameAnnotationProviderConfigurationData>> => {
+    const mutationOptions: UseMutationOptions<RenameAnnotationProviderConfigurationResponse, RenameAnnotationProviderConfigurationError, Options<RenameAnnotationProviderConfigurationData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await renameAnnotationProviderConfiguration({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

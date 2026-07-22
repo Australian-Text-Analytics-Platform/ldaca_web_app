@@ -307,9 +307,27 @@
               "openai",
               "openrouter",
               "anthropic",
-              "google"
+              "google",
+              "custom"
             ],
             "title": "Provider",
+            "type": "string"
+          },
+          "provider_base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Base Url"
+          },
+          "provider_configuration_id": {
+            "format": "uuid",
+            "title": "Provider Configuration Id",
             "type": "string"
           },
           "reasoning_effort": {
@@ -342,11 +360,12 @@
           }
         },
         "required": [
+          "provider_configuration_id",
+          "provider",
           "node_id",
           "text_column",
           "annotation_column",
           "classes",
-          "provider",
           "model",
           "instruction",
           "output_node_name"
@@ -423,9 +442,27 @@
               "openai",
               "openrouter",
               "anthropic",
-              "google"
+              "google",
+              "custom"
             ],
             "title": "Provider",
+            "type": "string"
+          },
+          "provider_base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Base Url"
+          },
+          "provider_configuration_id": {
+            "format": "uuid",
+            "title": "Provider Configuration Id",
             "type": "string"
           },
           "reasoning_effort": {
@@ -458,11 +495,12 @@
           }
         },
         "required": [
+          "provider_configuration_id",
+          "provider",
           "node_id",
           "text_column",
           "annotation_column",
           "classes",
-          "provider",
           "model",
           "instruction",
           "output_node_name"
@@ -554,35 +592,6 @@
         "title": "AnnotationClassesNodeEditRequest",
         "type": "object"
       },
-      "AnnotationCredentialStatus": {
-        "additionalProperties": false,
-        "properties": {
-          "anthropic": {
-            "title": "Anthropic",
-            "type": "boolean"
-          },
-          "google": {
-            "title": "Google",
-            "type": "boolean"
-          },
-          "openai": {
-            "title": "Openai",
-            "type": "boolean"
-          },
-          "openrouter": {
-            "title": "Openrouter",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "openai",
-          "openrouter",
-          "anthropic",
-          "google"
-        ],
-        "title": "AnnotationCredentialStatus",
-        "type": "object"
-      },
       "AnnotationDerivation": {
         "additionalProperties": false,
         "properties": {
@@ -609,7 +618,8 @@
               "openai",
               "openrouter",
               "anthropic",
-              "google"
+              "google",
+              "custom"
             ],
             "title": "Provider",
             "type": "string"
@@ -642,8 +652,40 @@
             ],
             "title": "Api Key",
             "writeOnly": true
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "openrouter",
+              "anthropic",
+              "google",
+              "custom"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Base Url"
+          },
+          "provider_configuration_id": {
+            "format": "uuid",
+            "title": "Provider Configuration Id",
+            "type": "string"
           }
         },
+        "required": [
+          "provider_configuration_id",
+          "provider"
+        ],
         "title": "AnnotationModelsRequest",
         "type": "object"
       },
@@ -663,13 +705,32 @@
               "openai",
               "openrouter",
               "anthropic",
-              "google"
+              "google",
+              "custom"
             ],
             "title": "Provider",
+            "type": "string"
+          },
+          "provider_base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Base Url"
+          },
+          "provider_configuration_id": {
+            "format": "uuid",
+            "title": "Provider Configuration Id",
             "type": "string"
           }
         },
         "required": [
+          "provider_configuration_id",
           "provider",
           "models"
         ],
@@ -769,9 +830,27 @@
               "openai",
               "openrouter",
               "anthropic",
-              "google"
+              "google",
+              "custom"
             ],
             "title": "Provider",
+            "type": "string"
+          },
+          "provider_base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Base Url"
+          },
+          "provider_configuration_id": {
+            "format": "uuid",
+            "title": "Provider Configuration Id",
             "type": "string"
           },
           "reasoning_effort": {
@@ -804,10 +883,11 @@
           }
         },
         "required": [
+          "provider_configuration_id",
+          "provider",
           "text_column",
           "annotation_column",
           "classes",
-          "provider",
           "model",
           "instruction"
         ],
@@ -853,6 +933,130 @@
           "labels"
         ],
         "title": "AnnotationPreviewResource",
+        "type": "object"
+      },
+      "AnnotationProviderConfigurationCreate": {
+        "additionalProperties": false,
+        "description": "Create command containing one write-only provider credential.",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "openrouter",
+              "anthropic",
+              "google",
+              "custom"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "provider"
+        ],
+        "title": "AnnotationProviderConfigurationCreate",
+        "type": "object"
+      },
+      "AnnotationProviderConfigurationRename": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AnnotationProviderConfigurationRename",
+        "type": "object"
+      },
+      "AnnotationProviderConfigurationResource": {
+        "additionalProperties": false,
+        "description": "Safe provider-configuration metadata returned to clients.",
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "has_api_key": {
+            "title": "Has Api Key",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "openrouter",
+              "anthropic",
+              "google",
+              "custom"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "provider",
+          "id",
+          "has_api_key"
+        ],
+        "title": "AnnotationProviderConfigurationResource",
         "type": "object"
       },
       "AnnotationResult": {
@@ -2612,6 +2816,29 @@
           "name"
         ],
         "title": "CreateFolderRequest",
+        "type": "object"
+      },
+      "DataPortalCredentialPatch": {
+        "additionalProperties": false,
+        "description": "Write-only Data Portal credential update.",
+        "properties": {
+          "data_portal_api_token": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Portal Api Token"
+          }
+        },
+        "title": "DataPortalCredentialPatch",
         "type": "object"
       },
       "DataPortalCredentialStatus": {
@@ -4445,102 +4672,23 @@
         "title": "Progress",
         "type": "object"
       },
-      "ProviderCredentialPatch": {
-        "additionalProperties": false,
-        "description": "Write-only partial update; omitted fields remain unchanged.",
-        "properties": {
-          "anthropic_api_key": {
-            "anyOf": [
-              {
-                "format": "password",
-                "maxLength": 4000,
-                "minLength": 1,
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Anthropic Api Key"
-          },
-          "data_portal_api_token": {
-            "anyOf": [
-              {
-                "format": "password",
-                "maxLength": 4000,
-                "minLength": 1,
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data Portal Api Token"
-          },
-          "google_api_key": {
-            "anyOf": [
-              {
-                "format": "password",
-                "maxLength": 4000,
-                "minLength": 1,
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Google Api Key"
-          },
-          "openai_api_key": {
-            "anyOf": [
-              {
-                "format": "password",
-                "maxLength": 4000,
-                "minLength": 1,
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Openai Api Key"
-          },
-          "openrouter_api_key": {
-            "anyOf": [
-              {
-                "format": "password",
-                "maxLength": 4000,
-                "minLength": 1,
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Openrouter Api Key"
-          }
-        },
-        "title": "ProviderCredentialPatch",
-        "type": "object"
-      },
       "ProviderCredentialSummary": {
         "additionalProperties": false,
         "description": "Safe credential presence information; never contains secret values.",
         "properties": {
-          "annotation": {
+          "annotation_providers": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AnnotationCredentialStatus"
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationProviderConfigurationResource"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Annotation Providers"
           },
           "data_portal": {
             "$ref": "#/components/schemas/DataPortalCredentialStatus"
@@ -4556,7 +4704,7 @@
         },
         "required": [
           "storage",
-          "annotation",
+          "annotation_providers",
           "data_portal"
         ],
         "title": "ProviderCredentialSummary",
@@ -8200,27 +8348,10 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/annotation-providers/{provider}/models": {
+    "/api/annotation-providers/models": {
       "post": {
         "description": "Discover models using the mode-appropriate request boundary.",
         "operationId": "list_annotation_models",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "provider",
-            "required": true,
-            "schema": {
-              "enum": [
-                "openai",
-                "openrouter",
-                "anthropic",
-                "google"
-              ],
-              "title": "Provider",
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -9083,12 +9214,12 @@
         ]
       },
       "patch": {
-        "operationId": "update_provider_credentials",
+        "operationId": "update_data_portal_credential",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProviderCredentialPatch"
+                "$ref": "#/components/schemas/DataPortalCredentialPatch"
               }
             }
           },
@@ -9171,7 +9302,357 @@
             "WordflowSession": []
           }
         ],
-        "summary": "Update Provider Credentials",
+        "summary": "Update Data Portal Credential",
+        "tags": [
+          "provider-credentials"
+        ]
+      }
+    },
+    "/api/provider-credentials/annotation-providers": {
+      "delete": {
+        "operationId": "clear_annotation_provider_configurations",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Clear Annotation Provider Configurations",
+        "tags": [
+          "provider-credentials"
+        ]
+      },
+      "post": {
+        "operationId": "create_annotation_provider_configuration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationProviderConfigurationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationProviderConfigurationResource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Create Annotation Provider Configuration",
+        "tags": [
+          "provider-credentials"
+        ]
+      }
+    },
+    "/api/provider-credentials/annotation-providers/{configuration_id}": {
+      "delete": {
+        "operationId": "delete_annotation_provider_configuration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Delete Annotation Provider Configuration",
+        "tags": [
+          "provider-credentials"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_annotation_provider_configuration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationProviderConfigurationRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationProviderConfigurationResource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Rename Annotation Provider Configuration",
         "tags": [
           "provider-credentials"
         ]

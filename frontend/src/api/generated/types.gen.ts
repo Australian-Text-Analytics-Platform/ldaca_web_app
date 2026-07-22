@@ -151,7 +151,15 @@ export type AnnotationAnalysisRequest = {
     /**
      * Provider
      */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
     /**
      * Reasoning Effort
      */
@@ -207,7 +215,15 @@ export type AnnotationAnalysisSubmission = {
     /**
      * Provider
      */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
     /**
      * Reasoning Effort
      */
@@ -283,28 +299,6 @@ export type AnnotationClassesNodeEditRequest = {
 };
 
 /**
- * AnnotationCredentialStatus
- */
-export type AnnotationCredentialStatus = {
-    /**
-     * Anthropic
-     */
-    anthropic: boolean;
-    /**
-     * Google
-     */
-    google: boolean;
-    /**
-     * Openai
-     */
-    openai: boolean;
-    /**
-     * Openrouter
-     */
-    openrouter: boolean;
-};
-
-/**
  * AnnotationDerivation
  */
 export type AnnotationDerivation = {
@@ -323,7 +317,7 @@ export type AnnotationDerivation = {
     /**
      * Provider
      */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
 };
 
 /**
@@ -333,9 +327,17 @@ export type AnnotationDerivation = {
  */
 export type AnnotationModelsRequest = {
     /**
-     * Api Key
+     * Provider
      */
-    api_key?: string | null;
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
 };
 
 /**
@@ -351,7 +353,15 @@ export type AnnotationModelsResource = {
     /**
      * Provider
      */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
 };
 
 /**
@@ -403,7 +413,15 @@ export type AnnotationPreviewRequest = {
     /**
      * Provider
      */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
     /**
      * Reasoning Effort
      */
@@ -448,6 +466,68 @@ export type AnnotationPreviewResource = {
      * Total Rows
      */
     total_rows: number;
+};
+
+/**
+ * AnnotationProviderConfigurationCreate
+ *
+ * Create command containing one write-only provider credential.
+ */
+export type AnnotationProviderConfigurationCreate = {
+    /**
+     * Api Key
+     */
+    api_key?: null;
+    /**
+     * Base Url
+     */
+    base_url?: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+};
+
+/**
+ * AnnotationProviderConfigurationRename
+ */
+export type AnnotationProviderConfigurationRename = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * AnnotationProviderConfigurationResource
+ *
+ * Safe provider-configuration metadata returned to clients.
+ */
+export type AnnotationProviderConfigurationResource = {
+    /**
+     * Base Url
+     */
+    base_url?: string | null;
+    /**
+     * Has Api Key
+     */
+    has_api_key: boolean;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
 };
 
 /**
@@ -1260,6 +1340,18 @@ export type CreateFolderRequest = {
      * Parent Path
      */
     parent_path?: string;
+};
+
+/**
+ * DataPortalCredentialPatch
+ *
+ * Write-only Data Portal credential update.
+ */
+export type DataPortalCredentialPatch = {
+    /**
+     * Data Portal Api Token
+     */
+    data_portal_api_token?: null;
 };
 
 /**
@@ -2137,40 +2229,15 @@ export type Progress = {
 };
 
 /**
- * ProviderCredentialPatch
- *
- * Write-only partial update; omitted fields remain unchanged.
- */
-export type ProviderCredentialPatch = {
-    /**
-     * Anthropic Api Key
-     */
-    anthropic_api_key?: null;
-    /**
-     * Data Portal Api Token
-     */
-    data_portal_api_token?: null;
-    /**
-     * Google Api Key
-     */
-    google_api_key?: null;
-    /**
-     * Openai Api Key
-     */
-    openai_api_key?: null;
-    /**
-     * Openrouter Api Key
-     */
-    openrouter_api_key?: null;
-};
-
-/**
  * ProviderCredentialSummary
  *
  * Safe credential presence information; never contains secret values.
  */
 export type ProviderCredentialSummary = {
-    annotation: AnnotationCredentialStatus | null;
+    /**
+     * Annotation Providers
+     */
+    annotation_providers: Array<AnnotationProviderConfigurationResource> | null;
     data_portal: DataPortalCredentialStatus;
     /**
      * Storage
@@ -4064,7 +4131,15 @@ export type AnnotationAnalysisSubmissionWritable = {
     /**
      * Provider
      */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
     /**
      * Reasoning Effort
      */
@@ -4081,6 +4156,30 @@ export type AnnotationAnalysisSubmissionWritable = {
      * Text Column
      */
     text_column: string;
+};
+
+/**
+ * AnnotationModelsRequest
+ *
+ * Optional request-only credential for provider model discovery.
+ */
+export type AnnotationModelsRequestWritable = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
 };
 
 /**
@@ -4120,7 +4219,15 @@ export type AnnotationPreviewRequestWritable = {
     /**
      * Provider
      */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+    /**
+     * Provider Base Url
+     */
+    provider_base_url?: string | null;
+    /**
+     * Provider Configuration Id
+     */
+    provider_configuration_id: string;
     /**
      * Reasoning Effort
      */
@@ -4137,6 +4244,42 @@ export type AnnotationPreviewRequestWritable = {
      * Text Column
      */
     text_column: string;
+};
+
+/**
+ * AnnotationProviderConfigurationCreate
+ *
+ * Create command containing one write-only provider credential.
+ */
+export type AnnotationProviderConfigurationCreateWritable = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Base Url
+     */
+    base_url?: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Provider
+     */
+    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+};
+
+/**
+ * DataPortalCredentialPatch
+ *
+ * Write-only Data Portal credential update.
+ */
+export type DataPortalCredentialPatchWritable = {
+    /**
+     * Data Portal Api Token
+     */
+    data_portal_api_token?: string | null;
 };
 
 /**
@@ -4192,44 +4335,11 @@ export type JsonDataOutputWritable = string | number | number | boolean | Array<
     [key: string]: JsonDataOutputWritable;
 } | null;
 
-/**
- * ProviderCredentialPatch
- *
- * Write-only partial update; omitted fields remain unchanged.
- */
-export type ProviderCredentialPatchWritable = {
-    /**
-     * Anthropic Api Key
-     */
-    anthropic_api_key?: string | null;
-    /**
-     * Data Portal Api Token
-     */
-    data_portal_api_token?: string | null;
-    /**
-     * Google Api Key
-     */
-    google_api_key?: string | null;
-    /**
-     * Openai Api Key
-     */
-    openai_api_key?: string | null;
-    /**
-     * Openrouter Api Key
-     */
-    openrouter_api_key?: string | null;
-};
-
 export type ListAnnotationModelsData = {
-    body: AnnotationModelsRequest;
-    path: {
-        /**
-         * Provider
-         */
-        provider: 'openai' | 'openrouter' | 'anthropic' | 'google';
-    };
+    body: AnnotationModelsRequestWritable;
+    path?: never;
     query?: never;
-    url: '/api/annotation-providers/{provider}/models';
+    url: '/api/annotation-providers/models';
 };
 
 export type ListAnnotationModelsErrors = {
@@ -4646,14 +4756,14 @@ export type GetProviderCredentialsResponses = {
 
 export type GetProviderCredentialsResponse = GetProviderCredentialsResponses[keyof GetProviderCredentialsResponses];
 
-export type UpdateProviderCredentialsData = {
-    body: ProviderCredentialPatchWritable;
+export type UpdateDataPortalCredentialData = {
+    body: DataPortalCredentialPatchWritable;
     path?: never;
     query?: never;
     url: '/api/provider-credentials';
 };
 
-export type UpdateProviderCredentialsErrors = {
+export type UpdateDataPortalCredentialErrors = {
     /**
      * Invalid request
      */
@@ -4680,16 +4790,198 @@ export type UpdateProviderCredentialsErrors = {
     500: ApiError;
 };
 
-export type UpdateProviderCredentialsError = UpdateProviderCredentialsErrors[keyof UpdateProviderCredentialsErrors];
+export type UpdateDataPortalCredentialError = UpdateDataPortalCredentialErrors[keyof UpdateDataPortalCredentialErrors];
 
-export type UpdateProviderCredentialsResponses = {
+export type UpdateDataPortalCredentialResponses = {
     /**
      * Successful Response
      */
     200: ProviderCredentialSummary;
 };
 
-export type UpdateProviderCredentialsResponse = UpdateProviderCredentialsResponses[keyof UpdateProviderCredentialsResponses];
+export type UpdateDataPortalCredentialResponse = UpdateDataPortalCredentialResponses[keyof UpdateDataPortalCredentialResponses];
+
+export type ClearAnnotationProviderConfigurationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/provider-credentials/annotation-providers';
+};
+
+export type ClearAnnotationProviderConfigurationsErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type ClearAnnotationProviderConfigurationsError = ClearAnnotationProviderConfigurationsErrors[keyof ClearAnnotationProviderConfigurationsErrors];
+
+export type ClearAnnotationProviderConfigurationsResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ClearAnnotationProviderConfigurationsResponse = ClearAnnotationProviderConfigurationsResponses[keyof ClearAnnotationProviderConfigurationsResponses];
+
+export type CreateAnnotationProviderConfigurationData = {
+    body: AnnotationProviderConfigurationCreateWritable;
+    path?: never;
+    query?: never;
+    url: '/api/provider-credentials/annotation-providers';
+};
+
+export type CreateAnnotationProviderConfigurationErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type CreateAnnotationProviderConfigurationError = CreateAnnotationProviderConfigurationErrors[keyof CreateAnnotationProviderConfigurationErrors];
+
+export type CreateAnnotationProviderConfigurationResponses = {
+    /**
+     * Successful Response
+     */
+    201: AnnotationProviderConfigurationResource;
+};
+
+export type CreateAnnotationProviderConfigurationResponse = CreateAnnotationProviderConfigurationResponses[keyof CreateAnnotationProviderConfigurationResponses];
+
+export type DeleteAnnotationProviderConfigurationData = {
+    body?: never;
+    path: {
+        /**
+         * Configuration Id
+         */
+        configuration_id: string;
+    };
+    query?: never;
+    url: '/api/provider-credentials/annotation-providers/{configuration_id}';
+};
+
+export type DeleteAnnotationProviderConfigurationErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type DeleteAnnotationProviderConfigurationError = DeleteAnnotationProviderConfigurationErrors[keyof DeleteAnnotationProviderConfigurationErrors];
+
+export type DeleteAnnotationProviderConfigurationResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteAnnotationProviderConfigurationResponse = DeleteAnnotationProviderConfigurationResponses[keyof DeleteAnnotationProviderConfigurationResponses];
+
+export type RenameAnnotationProviderConfigurationData = {
+    body: AnnotationProviderConfigurationRename;
+    path: {
+        /**
+         * Configuration Id
+         */
+        configuration_id: string;
+    };
+    query?: never;
+    url: '/api/provider-credentials/annotation-providers/{configuration_id}';
+};
+
+export type RenameAnnotationProviderConfigurationErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+};
+
+export type RenameAnnotationProviderConfigurationError = RenameAnnotationProviderConfigurationErrors[keyof RenameAnnotationProviderConfigurationErrors];
+
+export type RenameAnnotationProviderConfigurationResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationProviderConfigurationResource;
+};
+
+export type RenameAnnotationProviderConfigurationResponse = RenameAnnotationProviderConfigurationResponses[keyof RenameAnnotationProviderConfigurationResponses];
 
 export type ListSampleCollectionsData = {
     body?: never;
