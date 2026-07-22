@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Analysis, AnnotationAnalysisRequest, AnnotationResult } from '@/api';
 import { sqlIdentifier, sqlTable } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import {
   DEFAULT_ANNOTATION_PROMPT,
 } from './components/AnnotationPromptInput';
 import { AnnotationResultsPanel } from './components/AnnotationResultsPanel';
-import { canAnnotate, getBuiltinProvider, type BuiltinAnnotationAiProviderId } from './aiProviders';
+import { canAnnotate, resolveAnnotationProviderConfiguration } from './aiProviders';
 import { useAnnotationTabSettings } from './hooks/useAnnotationTabSettings';
 import { nodeInputsFromSelections, useTabNodeInputs } from '@/features/views/common/nodeInputs';
 import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
@@ -169,9 +169,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAnnotationMode,
     aiProviderModels,
     persistAiProviderModels,
-    aiProvider,
+    aiProviderConfigurationId,
+    aiProviderType,
     aiModel,
+    setAiModel,
     selectAiProvider,
+    clearAiProvider,
     aiPrompt,
     setAiPrompt,
     commitAiPrompt,
@@ -185,6 +188,32 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAnnotationTarget,
   } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
   const providerCredentials = useProviderCredentials();
+  const selectedAiProvider =
+    providerCredentials.annotationProviders.find(
+      (configuration) => configuration.id === aiProviderConfigurationId,
+    ) ?? null;
+
+  useEffect(() => {
+    if (selectedAiProvider) return;
+    const fallback = resolveAnnotationProviderConfiguration(
+      providerCredentials.annotationProviders,
+      aiProviderConfigurationId,
+      aiProviderType,
+    );
+    if (fallback) {
+      selectAiProvider(fallback.id, fallback.provider, aiProviderModels[fallback.id] ?? '');
+    } else if (aiProviderConfigurationId) {
+      clearAiProvider();
+    }
+  }, [
+    aiProviderConfigurationId,
+    aiProviderModels,
+    aiProviderType,
+    clearAiProvider,
+    providerCredentials.annotationProviders,
+    selectAiProvider,
+    selectedAiProvider,
+  ]);
   // Annotation-column choice per example node (plain columns only — no "Start
   // new annotation" option, since examples reference existing labels).
   const [exampleAnnotationColumns, setExampleAnnotationColumns] = useState<Record<string, string>>(
@@ -343,17 +372,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     ? newColumnName.trim() || defaultNewColumnName
     : sourceAnnotationColumn;
 
-  // AI-mode preview wiring. Resolve the selected provider (built-in or custom),
-  // its persisted key, and the prompt (user text or the grayed default). The
+  // AI-mode preview wiring. Resolve the selected named provider configuration
+  // and prompt (user text or the grayed default). The
   // Preview button is gated on having a runnable provider/model/key plus a class
   // node with both columns chosen AND at least one class row — the backend needs a
   // non-empty class list to classify into, so previewing an empty class node would
   // only ever return blanks.
-  const resolvedAiProvider = getBuiltinProvider(aiProvider);
-  const configuredProviders = providerCredentials.annotation as Partial<
-    Record<BuiltinAnnotationAiProviderId, boolean>
-  >;
-  const providerConfigured = configuredProviders[resolvedAiProvider.id] === true;
   const resolvedSystemPrompt = aiPrompt.trim() || DEFAULT_ANNOTATION_PROMPT;
   const hasClassNodeForAi = Boolean(
     classDescriptionNode && classDescriptionClassColumn && classDescriptionDescriptionColumn,
@@ -362,7 +386,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     Boolean(sourceNode) &&
     hasClassNodeForAi &&
     aiClassCount > 0 &&
-    canAnnotate(resolvedAiProvider, providerConfigured, aiModel);
+    canAnnotate(selectedAiProvider, aiModel);
 
   // Manual Start creates the nullable string column as one ordinary Data Block
   // edit. Later dropdown changes are independent set_cell edits, so the normal
@@ -452,6 +476,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   const currentAiRequest: AnnotationAnalysisRequest | null =
     sourceNode &&
     currentWorkspaceId &&
+    selectedAiProvider &&
     isStartNewAnnotation &&
     !sourceColumns.includes(resolvedAnnotationColumn) &&
     canPreviewAi
@@ -461,7 +486,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           text_column: sourceNode.column,
           annotation_column: resolvedAnnotationColumn,
           classes: aiClasses,
-          provider: resolvedAiProvider.requestProviderId,
+          provider_configuration_id: selectedAiProvider.id,
+          provider: selectedAiProvider.provider,
+          provider_base_url: selectedAiProvider.base_url,
           model: aiModel,
           instruction: resolvedSystemPrompt,
           temperature: aiTemperature,
@@ -512,8 +539,11 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         ...current,
         [hydrated.node_id]: hydrated.annotation_column,
       }));
-      persistAiProviderModels({ ...aiProviderModels, [hydrated.provider]: hydrated.model });
-      selectAiProvider(hydrated.provider, hydrated.model);
+      persistAiProviderModels({
+        ...aiProviderModels,
+        [hydrated.provider_configuration_id]: hydrated.model,
+      });
+      selectAiProvider(hydrated.provider_configuration_id, hydrated.provider, hydrated.model);
       setAiPrompt(hydrated.instruction);
       commitAiPrompt(hydrated.instruction);
       commitAiTemperature(hydrated.temperature ?? 0);
@@ -580,13 +610,15 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     classNodeId: classDescriptionNode?.id ?? null,
     classColumn: classDescriptionClassColumn,
     descriptionColumn: classDescriptionDescriptionColumn,
-    providerId: resolvedAiProvider.requestProviderId,
+    providerConfigurationId: selectedAiProvider?.id ?? null,
+    providerType: selectedAiProvider?.provider ?? null,
+    providerBaseUrl: selectedAiProvider?.base_url ?? null,
     model: aiModel,
     systemPrompt: resolvedSystemPrompt,
     temperature: aiTemperature,
     reasoningEnabled: aiReasoningEnabled,
     reasoningEffort: aiReasoningEffort,
-    credentialRevision: providerCredentials.revision,
+    credentialRevision: selectedAiProvider?.credentialRevision ?? 0,
     isOpen: isPreviewing,
     targetValid: true,
     onOpenChange: setIsPreviewing,
@@ -702,7 +734,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     void handleCreateClassTable();
                   }}
                 >
-                  {isCreatingClassTable ? 'Creating...' : 'Create empty Data Block'}
+                  {isCreatingClassTable ? 'Creating...' : 'Create empty class Data Block'}
                 </Button>
               </div>
               <div>
@@ -772,10 +804,18 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 <div className="mt-4">
                   <AnnotationAiSettings
                     workspaceId={currentWorkspaceId ?? null}
-                    provider={aiProvider}
-                    onProviderChange={selectAiProvider}
-                    configuredProviders={configuredProviders}
-                    credentialRevision={providerCredentials.revision}
+                    configurations={providerCredentials.annotationProviders}
+                    selectedConfigurationId={aiProviderConfigurationId}
+                    onProviderChange={(configuration, model) => {
+                      selectAiProvider(configuration.id, configuration.provider, model);
+                    }}
+                    onModelChange={setAiModel}
+                    onModelCommit={(configurationId, model) => {
+                      persistAiProviderModels({
+                        ...aiProviderModels,
+                        [configurationId]: model,
+                      });
+                    }}
                     providerModels={aiProviderModels}
                     model={aiModel}
                     disabled={controlsLocked}

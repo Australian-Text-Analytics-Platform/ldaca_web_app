@@ -10,8 +10,11 @@ describe('useAnnotationTabSettings', () => {
         onTabSettingChange: vi.fn(),
         tabSettings: {
           annotationMode: 'ai',
-          aiProvider: 'openai',
-          aiProviderModels: JSON.stringify({ openai: 'gpt-4o' }),
+          aiProviderConfigurationId: '8a342ceb-1ed6-433a-bc3f-75b6fd5dba38',
+          aiProviderType: 'openai',
+          aiProviderModels: JSON.stringify({
+            '8a342ceb-1ed6-433a-bc3f-75b6fd5dba38': 'gpt-4o',
+          }),
           aiPrompt: 'Classify stance.',
           aiTemperature: '0.7',
           aiReasoningEnabled: 'true',
@@ -22,8 +25,11 @@ describe('useAnnotationTabSettings', () => {
     );
 
     expect(result.current.annotationMode).toBe('ai');
-    expect(result.current.aiProvider).toBe('openai');
-    expect(result.current.aiProviderModels).toEqual({ openai: 'gpt-4o' });
+    expect(result.current.aiProviderConfigurationId).toBe('8a342ceb-1ed6-433a-bc3f-75b6fd5dba38');
+    expect(result.current.aiProviderType).toBe('openai');
+    expect(result.current.aiProviderModels).toEqual({
+      '8a342ceb-1ed6-433a-bc3f-75b6fd5dba38': 'gpt-4o',
+    });
     expect(result.current.aiModel).toBe('gpt-4o');
     expect(result.current.aiPrompt).toBe('Classify stance.');
     expect(result.current.aiTemperature).toBe(0.7);
@@ -40,8 +46,14 @@ describe('useAnnotationTabSettings', () => {
 
     act(() => {
       result.current.setAnnotationMode('ai');
-      result.current.selectAiProvider('openrouter', 'openai/gpt-4o');
-      result.current.persistAiProviderModels({ openrouter: 'openai/gpt-4o' });
+      result.current.selectAiProvider(
+        '74a93227-c081-4db9-af2e-ad357b62278d',
+        'openrouter',
+        'openai/gpt-4o',
+      );
+      result.current.persistAiProviderModels({
+        '74a93227-c081-4db9-af2e-ad357b62278d': 'openai/gpt-4o',
+      });
       result.current.commitAiPrompt('Use concise labels.');
       result.current.commitAiTemperature(0.3);
       result.current.setAiReasoningEnabled(true);
@@ -50,10 +62,14 @@ describe('useAnnotationTabSettings', () => {
     });
 
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiProvider', 'openrouter');
+    expect(onTabSettingChange).toHaveBeenCalledWith(
+      'aiProviderConfigurationId',
+      '74a93227-c081-4db9-af2e-ad357b62278d',
+    );
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiProviderType', 'openrouter');
     expect(onTabSettingChange).toHaveBeenCalledWith(
       'aiProviderModels',
-      JSON.stringify({ openrouter: 'openai/gpt-4o' }),
+      JSON.stringify({ '74a93227-c081-4db9-af2e-ad357b62278d': 'openai/gpt-4o' }),
     );
     expect(onTabSettingChange).toHaveBeenCalledWith('aiPrompt', 'Use concise labels.');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiTemperature', '0.3');
@@ -96,7 +112,8 @@ describe('useAnnotationTabSettings', () => {
       useAnnotationTabSettings({
         onTabSettingChange: vi.fn(),
         tabSettings: {
-          aiProvider: 'openrouter',
+          aiProviderConfigurationId: '74a93227-c081-4db9-af2e-ad357b62278d',
+          aiProviderType: 'openrouter',
           aiProviderModels: '{broken',
         },
       }),
@@ -110,5 +127,26 @@ describe('useAnnotationTabSettings', () => {
     );
 
     warnSpy.mockRestore();
+  });
+
+  it('clears a missing configuration without erasing its provider type', () => {
+    const onTabSettingChange = vi.fn();
+    const { result } = renderHook(() =>
+      useAnnotationTabSettings({
+        onTabSettingChange,
+        tabSettings: {
+          aiProviderConfigurationId: '74a93227-c081-4db9-af2e-ad357b62278d',
+          aiProviderType: 'openrouter',
+        },
+      }),
+    );
+
+    act(() => {
+      result.current.clearAiProvider();
+    });
+
+    expect(result.current.aiProviderConfigurationId).toBeNull();
+    expect(result.current.aiProviderType).toBe('openrouter');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiProviderConfigurationId', '');
   });
 });

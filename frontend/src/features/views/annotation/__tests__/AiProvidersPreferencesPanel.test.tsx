@@ -1,69 +1,94 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  saveAnnotationCredential: vi.fn(),
-  clearAnnotationCredential: vi.fn(),
-  clearAnnotationCredentials: vi.fn(),
+  renameAnnotationProvider: vi.fn(),
+  deleteAnnotationProvider: vi.fn(),
+  clearAnnotationProviders: vi.fn(),
 }));
 
 vi.mock('@/features/provider-credentials/useProviderCredentials', () => ({
   useProviderCredentials: () => ({
     storage: 'browser',
-    annotation: { openai: false, openrouter: true, anthropic: false, google: false },
-    dataPortal: { userConfigured: false, deploymentConfigured: false },
-    revision: 1,
-    isLoading: false,
-    error: null,
-    saveAnnotationCredential: mocks.saveAnnotationCredential,
-    clearAnnotationCredential: mocks.clearAnnotationCredential,
-    clearAnnotationCredentials: mocks.clearAnnotationCredentials,
+    annotationProviders: [
+      {
+        id: '74a93227-c081-4db9-af2e-ad357b62278d',
+        name: 'OpenRouter personal',
+        provider: 'openrouter',
+        base_url: null,
+        has_api_key: true,
+        credentialRevision: 1,
+      },
+      {
+        id: '8a342ceb-1ed6-433a-bc3f-75b6fd5dba38',
+        name: 'OpenRouter org',
+        provider: 'openrouter',
+        base_url: null,
+        has_api_key: true,
+        credentialRevision: 1,
+      },
+    ],
+    renameAnnotationProvider: mocks.renameAnnotationProvider,
+    deleteAnnotationProvider: mocks.deleteAnnotationProvider,
+    clearAnnotationProviders: mocks.clearAnnotationProviders,
   }),
+}));
+
+vi.mock('../components/AddAnnotationProviderDialog', () => ({
+  AddAnnotationProviderDialog: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog">Add provider form</div> : null,
 }));
 
 import { AiProvidersPreferencesPanel } from '../components/AiProvidersPreferencesPanel';
 
-const renderPanel = () => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
+const renderPanel = () =>
+  render(
+    <QueryClientProvider client={new QueryClient()}>
       <AiProvidersPreferencesPanel />
     </QueryClientProvider>,
   );
-};
 
 describe('AiProvidersPreferencesPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.saveAnnotationCredential.mockResolvedValue(undefined);
-    mocks.clearAnnotationCredential.mockResolvedValue(undefined);
-    mocks.clearAnnotationCredentials.mockResolvedValue(undefined);
+    mocks.renameAnnotationProvider.mockResolvedValue(undefined);
+    mocks.deleteAnnotationProvider.mockResolvedValue(undefined);
+    mocks.clearAnnotationProviders.mockResolvedValue(undefined);
   });
 
-  it('shows only credential presence and keeps every input blank', () => {
-    renderPanel();
-    expect(screen.getByText('AI provider credentials')).toBeInTheDocument();
-    expect(screen.getByText('OpenRouter')).toBeInTheDocument();
-    expect(screen.getByText('Configured')).toBeInTheDocument();
-    expect(screen.getAllByText('Not configured')).toHaveLength(3);
-    const inputs = screen.getAllByLabelText(/API key$/);
-    expect(inputs).toHaveLength(4);
-    for (const input of inputs) expect(input).toHaveValue('');
-  });
-
-  it('passes replacements and explicit clears through the credential facade', async () => {
+  it('shows ordered named configurations and opens the shared Add dialog', async () => {
     const user = userEvent.setup();
     renderPanel();
+    expect(screen.getByText('OpenRouter personal')).toBeInTheDocument();
+    expect(screen.getByText('OpenRouter org')).toBeInTheDocument();
+    expect(screen.getAllByText('Key saved')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Add Provider' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Add provider form');
+  });
 
-    const input = screen.getByLabelText('OpenAI API key');
-    await user.type(input, 'sk-test');
-    await user.click(screen.getAllByRole('button', { name: 'Save' })[1]!);
-    expect(mocks.saveAnnotationCredential).toHaveBeenCalledWith('openai', 'sk-test');
-    expect(input).toHaveValue('');
+  it('renames and confirms deletion through the collection facade', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getAllByRole('button', { name: 'Rename' })[0]!);
+    const input = screen.getByLabelText('Rename OpenRouter personal');
+    await user.clear(input);
+    await user.type(input, 'Personal router');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(mocks.renameAnnotationProvider).toHaveBeenCalledWith(
+        '74a93227-c081-4db9-af2e-ad357b62278d',
+        'Personal router',
+      ),
+    );
 
-    await user.click(screen.getAllByRole('button', { name: 'Clear' })[0]!);
-    expect(mocks.clearAnnotationCredential).toHaveBeenCalledWith('openrouter');
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!);
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() =>
+      expect(mocks.deleteAnnotationProvider).toHaveBeenCalledWith(
+        '74a93227-c081-4db9-af2e-ad357b62278d',
+      ),
+    );
   });
 });

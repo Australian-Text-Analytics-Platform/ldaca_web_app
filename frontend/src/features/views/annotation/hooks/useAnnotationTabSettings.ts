@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { AnnotationAiProviderId } from '../aiProviders';
+import type { AnnotationProviderType } from '../aiProviders';
 
 export type AnnotationMode = 'manual' | 'ai';
 
@@ -9,12 +9,12 @@ interface UseAnnotationTabSettingsArgs {
 }
 
 /**
- * Parse a persisted tab-setting string as a provider-card model map.
+ * Parse a persisted tab-setting string as a provider-configuration model map.
  *
  * Used by: useAnnotationTabSettings when hydrating the AI provider dropdown.
  * The value lives in the backend Tab resource as a string map because generic tab settings are
  * Record<string,string>; malformed user-edited JSON is ignored with a warning so
- * the tab still opens and the user can save a fresh provider card.
+ * the tab still opens and the user can save a fresh provider configuration.
  */
 const parseStringMapSetting = (
   value: string | undefined,
@@ -62,21 +62,27 @@ export function useAnnotationTabSettings({
       '[annotation] Ignoring malformed AI provider model setting:',
     ),
   );
-  const [aiProvider, setAiProviderState] = useState<AnnotationAiProviderId>(() =>
-    tabSettings.aiProvider === 'openrouter' ||
-    tabSettings.aiProvider === 'openai' ||
-    tabSettings.aiProvider === 'anthropic' ||
-    tabSettings.aiProvider === 'google'
-      ? tabSettings.aiProvider
-      : 'openrouter',
-  );
+  const [aiProviderConfigurationId, setAiProviderConfigurationId] = useState<string | null>(() => {
+    const saved = tabSettings.aiProviderConfigurationId?.trim() ?? '';
+    return saved.length > 0 ? saved : null;
+  });
+  const [aiProviderType, setAiProviderType] = useState<AnnotationProviderType | null>(() => {
+    const value = tabSettings.aiProviderType;
+    return value === 'openrouter' ||
+      value === 'openai' ||
+      value === 'anthropic' ||
+      value === 'google' ||
+      value === 'custom'
+      ? value
+      : null;
+  });
   const [aiModel, setAiModel] = useState(() => {
     const providerModels = parseStringMapSetting(
       tabSettings.aiProviderModels,
       '[annotation] Ignoring malformed AI provider model setting:',
     );
-    const providerId = tabSettings.aiProvider ?? '';
-    return providerModels[providerId] ?? '';
+    const configurationId = tabSettings.aiProviderConfigurationId ?? '';
+    return providerModels[configurationId] ?? '';
   });
 
   const persistAiProviderModels = (models: Record<string, string>) => {
@@ -84,10 +90,22 @@ export function useAnnotationTabSettings({
     onTabSettingChange('aiProviderModels', JSON.stringify(models));
   };
 
-  const selectAiProvider = (id: AnnotationAiProviderId, modelForProvider: string) => {
-    setAiProviderState(id);
+  const selectAiProvider = (
+    configurationId: string,
+    providerType: AnnotationProviderType,
+    modelForProvider: string,
+  ) => {
+    setAiProviderConfigurationId(configurationId);
+    setAiProviderType(providerType);
     setAiModel(modelForProvider);
-    onTabSettingChange('aiProvider', id);
+    onTabSettingChange('aiProviderConfigurationId', configurationId);
+    onTabSettingChange('aiProviderType', providerType);
+  };
+
+  const clearAiProvider = () => {
+    setAiProviderConfigurationId(null);
+    setAiModel('');
+    onTabSettingChange('aiProviderConfigurationId', '');
   };
 
   const [aiPrompt, setAiPrompt] = useState(() => tabSettings.aiPrompt ?? '');
@@ -142,9 +160,12 @@ export function useAnnotationTabSettings({
     setAnnotationMode,
     aiProviderModels,
     persistAiProviderModels,
-    aiProvider,
+    aiProviderConfigurationId,
+    aiProviderType,
     aiModel,
+    setAiModel,
     selectAiProvider,
+    clearAiProvider,
     aiPrompt,
     setAiPrompt,
     commitAiPrompt,

@@ -1,64 +1,44 @@
-/**
- * Built-in annotation provider metadata.
- *
- * The frontend stores only the selected provider and model in the tab's local
- * presentation state. Credential presence and request-time resolution come
- * through the mode-specific provider-credential facade.
- */
+import type { AnnotationProviderConfigurationResource } from '@/api';
 
-export type BuiltinAnnotationAiProviderId = 'openrouter' | 'openai' | 'anthropic' | 'google';
-export type AnnotationAiProviderId = BuiltinAnnotationAiProviderId;
+export type AnnotationProviderType = AnnotationProviderConfigurationResource['provider'];
 
-export interface AnnotationAiProvider {
-  id: BuiltinAnnotationAiProviderId;
-  requestProviderId: BuiltinAnnotationAiProviderId;
+export interface AnnotationProviderDefinition {
+  id: AnnotationProviderType;
   label: string;
   requiresApiKey: boolean;
-  supportsModelListing: boolean;
 }
 
-export const ANNOTATION_AI_PROVIDERS = [
-  {
-    id: 'openrouter',
-    requestProviderId: 'openrouter',
-    label: 'OpenRouter',
-    requiresApiKey: true,
-    supportsModelListing: true,
-  },
-  {
-    id: 'openai',
-    requestProviderId: 'openai',
-    label: 'OpenAI',
-    requiresApiKey: true,
-    supportsModelListing: true,
-  },
-  {
-    id: 'anthropic',
-    requestProviderId: 'anthropic',
-    label: 'Anthropic',
-    requiresApiKey: true,
-    supportsModelListing: true,
-  },
-  {
-    id: 'google',
-    requestProviderId: 'google',
-    label: 'Google',
-    requiresApiKey: true,
-    supportsModelListing: true,
-  },
-] as const satisfies readonly AnnotationAiProvider[];
+export const ANNOTATION_PROVIDER_DEFINITIONS = [
+  { id: 'openrouter', label: 'OpenRouter', requiresApiKey: true },
+  { id: 'openai', label: 'OpenAI', requiresApiKey: true },
+  { id: 'anthropic', label: 'Anthropic', requiresApiKey: true },
+  { id: 'google', label: 'Google', requiresApiKey: true },
+  { id: 'custom', label: 'Custom', requiresApiKey: false },
+] as const satisfies readonly AnnotationProviderDefinition[];
 
-export function getBuiltinProvider(id: AnnotationAiProviderId): AnnotationAiProvider {
-  return (
-    ANNOTATION_AI_PROVIDERS.find((provider) => provider.id === id) ?? ANNOTATION_AI_PROVIDERS[0]
-  );
+export function getProviderDefinition(type: AnnotationProviderType): AnnotationProviderDefinition {
+  const definition = ANNOTATION_PROVIDER_DEFINITIONS.find((provider) => provider.id === type);
+  if (!definition) throw new Error(`Unsupported Annotation provider: ${type}`);
+  return definition;
+}
+
+export function providerConfigurationSecondaryText(
+  configuration: AnnotationProviderConfigurationResource,
+): string {
+  if (configuration.provider !== 'custom') {
+    return getProviderDefinition(configuration.provider).label;
+  }
+  if (!configuration.base_url) {
+    throw new Error('Custom Annotation provider is missing its base URL');
+  }
+  return configuration.base_url;
 }
 
 export function canListModels(
-  provider: AnnotationAiProvider,
-  credentialConfigured: boolean,
+  configuration: AnnotationProviderConfigurationResource | null,
 ): boolean {
-  return provider.supportsModelListing && (!provider.requiresApiKey || credentialConfigured);
+  if (!configuration) return false;
+  return configuration.provider === 'custom' || configuration.has_api_key;
 }
 
 /** A class the model may assign, with an optional guiding description. */
@@ -68,9 +48,22 @@ export interface AnnotationClassOption {
 }
 
 export function canAnnotate(
-  provider: AnnotationAiProvider,
-  credentialConfigured: boolean,
+  configuration: AnnotationProviderConfigurationResource | null,
   model: string,
 ): boolean {
-  return credentialConfigured && model.trim().length > 0 && provider.id.length > 0;
+  return canListModels(configuration) && model.trim().length > 0;
+}
+
+/** Resolve a saved selection, then the first same-type fallback, then a fresh default. */
+export function resolveAnnotationProviderConfiguration(
+  configurations: AnnotationProviderConfigurationResource[],
+  selectedId: string | null,
+  selectedType: AnnotationProviderType | null,
+): AnnotationProviderConfigurationResource | null {
+  const selected = configurations.find((configuration) => configuration.id === selectedId);
+  if (selected) return selected;
+  if (selectedType) {
+    return configurations.find((configuration) => configuration.provider === selectedType) ?? null;
+  }
+  return configurations[0] ?? null;
 }

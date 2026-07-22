@@ -119,8 +119,8 @@ describe('SettingsDialog', () => {
 
     await user.click(screen.getByRole('tab', { name: 'AI' }));
 
-    expect(await screen.findByText('AI provider credentials')).toBeInTheDocument();
-    expect(screen.getByText('OpenRouter')).toBeInTheDocument();
-    expect(screen.getAllByText('Not configured').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Annotation providers')).toBeInTheDocument();
+    expect(screen.getByText('No Annotation providers configured.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Provider' })).toBeInTheDocument();
   });
 });

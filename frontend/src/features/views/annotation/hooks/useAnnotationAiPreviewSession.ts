@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { AnnotationPreviewLabel } from '@/api';
 import { previewAnnotationWithProviderCredential } from '@/features/provider-credentials/providerCredentialRequests';
-import type { AnnotationClassOption, AnnotationAiProviderId } from '../aiProviders';
+import type { AnnotationClassOption, AnnotationProviderType } from '../aiProviders';
 import { useAnnotationClassDescriptions } from './useAnnotationClassDescriptions';
 import { useAnnotationNodePage } from './useAnnotationNodePage';
 
@@ -17,7 +17,9 @@ interface AnnotationAiPreviewSessionConfig {
   classNodeId: string | null;
   classColumn: string | null;
   descriptionColumn: string | null;
-  providerId: AnnotationAiProviderId;
+  providerConfigurationId: string | null;
+  providerType: AnnotationProviderType | null;
+  providerBaseUrl: string | null;
   model: string;
   systemPrompt: string;
   temperature: number;
@@ -56,7 +58,9 @@ export function useAnnotationAiPreviewSession({
   classNodeId,
   classColumn,
   descriptionColumn,
-  providerId,
+  providerConfigurationId,
+  providerType,
+  providerBaseUrl,
   model,
   systemPrompt,
   temperature,
@@ -92,7 +96,9 @@ export function useAnnotationAiPreviewSession({
     nodeId,
     textColumn,
     annotationColumn,
-    providerId,
+    providerConfigurationId,
+    providerType,
+    providerBaseUrl,
     model,
     systemPrompt,
     temperature,
@@ -107,12 +113,14 @@ export function useAnnotationAiPreviewSession({
     enabled:
       isOpen &&
       targetValid &&
-      Boolean(workspaceId && nodeId && model && providerId) &&
+      Boolean(workspaceId && nodeId && model && providerConfigurationId && providerType) &&
       classes.length > 0 &&
       nodePage.rows.length > 0,
     retry: false,
     queryFn: async ({ signal }) => {
-      if (!workspaceId || !nodeId) throw new Error('Missing annotation preview identity');
+      if (!workspaceId || !nodeId || !providerConfigurationId || !providerType) {
+        throw new Error('Missing annotation preview identity');
+      }
       const { data } = await previewAnnotationWithProviderCredential({
         workspaceId,
         nodeId,
@@ -120,7 +128,9 @@ export function useAnnotationAiPreviewSession({
           text_column: textColumn,
           annotation_column: annotationColumn,
           classes,
-          provider: providerId,
+          provider_configuration_id: providerConfigurationId,
+          provider: providerType,
+          provider_base_url: providerBaseUrl,
           model,
           instruction: systemPrompt,
           temperature,

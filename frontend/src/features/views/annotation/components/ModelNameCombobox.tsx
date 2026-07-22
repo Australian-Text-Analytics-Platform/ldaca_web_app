@@ -22,7 +22,8 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { type AnnotationAiProvider, canListModels } from '../aiProviders';
+import type { AnnotationProviderConfigurationView } from '@/features/provider-credentials/providerCredentialsStore';
+import { canListModels } from '../aiProviders';
 
 interface ModelDropdownOption {
   id: string;
@@ -30,9 +31,7 @@ interface ModelDropdownOption {
 
 interface ModelNameComboboxProps {
   workspaceId: string | null;
-  provider: AnnotationAiProvider;
-  credentialConfigured: boolean;
-  credentialRevision: number;
+  configuration: AnnotationProviderConfigurationView;
   value: string;
   onChange: (value: string) => void;
   /**
@@ -75,9 +74,7 @@ function modelMatchesQuery(option: ModelDropdownOption, query: string): boolean 
 
 export function ModelNameCombobox({
   workspaceId,
-  provider,
-  credentialConfigured,
-  credentialRevision,
+  configuration,
   value,
   onChange,
   onCommit,
@@ -87,24 +84,20 @@ export function ModelNameCombobox({
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
 
-  const listingEnabled = canListModels(provider, credentialConfigured);
+  const listingEnabled = canListModels(configuration);
 
   // The request facade injects browser-owned multi-user credentials only at the
   // network boundary. Single-user credentials remain backend-owned.
   const modelsQuery = useQuery<ModelDropdownOption[]>({
     queryKey: [
       'annotation-ai-models',
+      configuration.id,
+      configuration.credentialRevision,
       workspaceId ?? '',
-      provider.id,
-      provider.requestProviderId,
-      credentialRevision,
     ],
     queryFn: async ({ signal }) => {
       if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await listAnnotationModelsWithProviderCredential(
-        provider.requestProviderId,
-        signal,
-      );
+      const { data } = await listAnnotationModelsWithProviderCredential(configuration, signal);
       return data.models.map((modelId) => ({ id: modelId }));
     },
     enabled: open && listingEnabled && Boolean(workspaceId),
@@ -183,9 +176,11 @@ export function ModelNameCombobox({
               </div>
             ) : modelsQuery.isError ? (
               <div className="px-2 py-3 text-sm text-destructive">
-                {modelsQuery.error instanceof Error
-                  ? modelsQuery.error.message
-                  : 'Failed to load models'}
+                {configuration.provider === 'custom'
+                  ? 'Could not list models; type a model name'
+                  : modelsQuery.error instanceof Error
+                    ? modelsQuery.error.message
+                    : 'Failed to load models'}
               </div>
             ) : filtered.length === 0 ? (
               <div className="px-2 py-3 text-sm text-muted-foreground">No matching models</div>
