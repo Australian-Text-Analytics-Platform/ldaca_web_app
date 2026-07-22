@@ -126,7 +126,7 @@ export const providerCredentialResponse = (
   overrides: Partial<ProviderCredentialSummary> = {},
 ): ProviderCredentialSummary => ({
   storage: 'backend',
-  annotation: { anthropic: false, google: false, openai: false, openrouter: false },
+  annotation_providers: [],
   data_portal: { deployment_configured: false, user_configured: false },
   ...overrides,
 });

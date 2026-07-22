@@ -1,21 +1,37 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const PROVIDER_CREDENTIAL_STORAGE_KEY = 'wordflow-provider-credentials';
-const PROVIDER_CREDENTIAL_STORAGE_VERSION = 1;
+import type { AnnotationProviderConfigurationResource } from '@/api';
 
-export type ProviderCredentialField =
-  | 'openai'
-  | 'openrouter'
-  | 'anthropic'
-  | 'google'
-  | 'dataPortal';
+export const PROVIDER_CREDENTIAL_STORAGE_KEY = 'wordflow-provider-credentials';
+const PROVIDER_CREDENTIAL_STORAGE_VERSION = 2;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type AnnotationProviderType = AnnotationProviderConfigurationResource['provider'];
+
+export interface AnnotationProviderConfigurationInput {
+  name: string;
+  provider: AnnotationProviderType;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+}
+
+export interface AnnotationProviderConfigurationView
+  extends AnnotationProviderConfigurationResource {
+  credentialRevision: number;
+}
+
+interface StoredAnnotationProviderConfiguration {
+  id: string;
+  name: string;
+  provider: AnnotationProviderType;
+  baseUrl?: string;
+  apiKey?: string;
+  credentialRevision: number;
+}
 
 interface StoredUserProviderCredentials {
-  openai?: string;
-  openrouter?: string;
-  anthropic?: string;
-  google?: string;
+  annotationProviders: StoredAnnotationProviderConfiguration[];
   dataPortal?: string;
   revision: number;
 }
@@ -25,33 +41,45 @@ interface ProviderCredentialsState {
 }
 
 interface ProviderCredentialsActions {
-  setCredential: (userId: string, field: ProviderCredentialField, value: string) => void;
-  clearCredential: (userId: string, field: ProviderCredentialField) => void;
-  clearAnnotationCredentials: (userId: string) => void;
+  addAnnotationProvider: (
+    userId: string,
+    input: AnnotationProviderConfigurationInput,
+  ) => AnnotationProviderConfigurationView;
+  renameAnnotationProvider: (userId: string, configurationId: string, name: string) => void;
+  deleteAnnotationProvider: (userId: string, configurationId: string) => void;
+  clearAnnotationProviders: (userId: string) => void;
+  setDataPortalCredential: (userId: string, value: string) => void;
+  clearDataPortalCredential: (userId: string) => void;
 }
 
 type ProviderCredentialsStore = ProviderCredentialsState & ProviderCredentialsActions;
 
 export interface ProviderCredentialPresence {
-  annotation: {
-    openai: boolean;
-    openrouter: boolean;
-    anthropic: boolean;
-    google: boolean;
-  };
+  annotationProviders: AnnotationProviderConfigurationView[];
   dataPortal: boolean;
   revision: number;
 }
 
+const emptyEntry = (): StoredUserProviderCredentials => ({
+  annotationProviders: [],
+  revision: 0,
+});
+
 const emptyPresence = (): ProviderCredentialPresence => ({
-  annotation: {
-    openai: false,
-    openrouter: false,
-    anthropic: false,
-    google: false,
-  },
+  annotationProviders: [],
   dataPortal: false,
   revision: 0,
+});
+
+const configurationView = (
+  configuration: StoredAnnotationProviderConfiguration,
+): AnnotationProviderConfigurationView => ({
+  id: configuration.id,
+  name: configuration.name,
+  provider: configuration.provider,
+  base_url: configuration.baseUrl ?? null,
+  has_api_key: Boolean(configuration.apiKey),
+  credentialRevision: configuration.credentialRevision,
 });
 
 const presenceFromEntry = (
@@ -59,34 +87,173 @@ const presenceFromEntry = (
 ): ProviderCredentialPresence => {
   if (!entry) return emptyPresence();
   return {
-    annotation: {
-      openai: Boolean(entry.openai),
-      openrouter: Boolean(entry.openrouter),
-      anthropic: Boolean(entry.anthropic),
-      google: Boolean(entry.google),
-    },
+    annotationProviders: entry.annotationProviders.map(configurationView),
     dataPortal: Boolean(entry.dataPortal),
     revision: entry.revision,
   };
 };
 
-/** Browser-only provider secrets, intentionally kept outside Zustand devtools. */
+const providerTypes = new Set<AnnotationProviderType>([
+  'openrouter',
+  'openai',
+  'anthropic',
+  'google',
+  'custom',
+]);
+
+const isProviderType = (value: unknown): value is AnnotationProviderType =>
+  typeof value === 'string' && providerTypes.has(value as AnnotationProviderType);
+
+export const normalizeCustomProviderBaseUrl = (value: string): string => {
+  let parsed: URL;
+  try {
+    parsed = new URL(value.trim());
+  } catch {
+    throw new Error('Enter an absolute HTTP or HTTPS Custom Base URL');
+  }
+  if (
+    (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+    !parsed.hostname ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error('Custom Base URL must be HTTP(S) with no user information, query, or fragment');
+  }
+  const path = parsed.pathname.replace(/\/+$/, '');
+  return `${parsed.protocol}//${parsed.host}${path}`;
+};
+
+const normalizeConfigurationInput = (
+  input: AnnotationProviderConfigurationInput,
+): Omit<StoredAnnotationProviderConfiguration, 'id' | 'credentialRevision'> => {
+  const name = input.name.trim();
+  if (!name || name.length > 200) throw new Error('Enter a provider name');
+  const trimmedApiKey = input.apiKey?.trim() ?? '';
+  const apiKey = trimmedApiKey.length > 0 ? trimmedApiKey : undefined;
+  if (input.provider !== 'custom' && !apiKey) {
+    throw new Error('Built-in providers require an API key');
+  }
+  if (input.provider === 'custom') {
+    if (!input.baseUrl?.trim()) throw new Error('Enter a Custom Base URL');
+    return {
+      name,
+      provider: input.provider,
+      baseUrl: normalizeCustomProviderBaseUrl(input.baseUrl),
+      apiKey,
+    };
+  }
+  if (input.baseUrl) throw new Error('Built-in providers cannot define a Custom Base URL');
+  return { name, provider: input.provider, apiKey };
+};
+
+const sameIdentity = (
+  left: Pick<StoredAnnotationProviderConfiguration, 'provider' | 'baseUrl' | 'apiKey'>,
+  right: Pick<StoredAnnotationProviderConfiguration, 'provider' | 'baseUrl' | 'apiKey'>,
+): boolean => {
+  if (left.provider !== right.provider) return false;
+  if (left.provider === 'custom' && left.baseUrl !== right.baseUrl) return false;
+  return (left.apiKey ?? '') === (right.apiKey ?? '');
+};
+
+/** Browser-owned provider secrets, intentionally kept outside Zustand devtools. */
 export const useProviderCredentialsStore = create<ProviderCredentialsStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       byUser: {},
 
-      setCredential: (userId, field, value) => {
-        if (!userId || !value) return;
+      addAnnotationProvider: (userId, input) => {
+        if (!userId) throw new Error('No authenticated user is available');
+        const normalized = normalizeConfigurationInput(input);
+        const current = get().byUser[userId] ?? emptyEntry();
+        if (
+          current.annotationProviders.some((configuration) =>
+            sameIdentity(configuration, normalized),
+          )
+        ) {
+          throw new Error('This Annotation provider identity is already configured');
+        }
+        const configuration: StoredAnnotationProviderConfiguration = {
+          ...normalized,
+          id: crypto.randomUUID(),
+          credentialRevision: 1,
+        };
+        set((state) => ({
+          byUser: {
+            ...state.byUser,
+            [userId]: {
+              ...current,
+              annotationProviders: [...current.annotationProviders, configuration],
+              revision: current.revision + 1,
+            },
+          },
+        }));
+        return configurationView(configuration);
+      },
+
+      renameAnnotationProvider: (userId, configurationId, name) => {
+        const trimmed = name.trim();
+        if (!trimmed || trimmed.length > 200) throw new Error('Enter a provider name');
+        const current = get().byUser[userId];
+        if (!current) throw new Error('Annotation provider configuration not found');
+        if (
+          !current.annotationProviders.some((configuration) => configuration.id === configurationId)
+        ) {
+          throw new Error('Annotation provider configuration not found');
+        }
+        const annotationProviders = current.annotationProviders.map((configuration) => {
+          if (configuration.id !== configurationId) return configuration;
+          return { ...configuration, name: trimmed };
+        });
+        set((state) => ({
+          byUser: {
+            ...state.byUser,
+            [userId]: { ...current, annotationProviders, revision: current.revision + 1 },
+          },
+        }));
+      },
+
+      deleteAnnotationProvider: (userId, configurationId) => {
+        const current = get().byUser[userId];
+        if (!current) throw new Error('Annotation provider configuration not found');
+        const annotationProviders = current.annotationProviders.filter(
+          (configuration) => configuration.id !== configurationId,
+        );
+        if (annotationProviders.length === current.annotationProviders.length) {
+          throw new Error('Annotation provider configuration not found');
+        }
+        set((state) => ({
+          byUser: {
+            ...state.byUser,
+            [userId]: { ...current, annotationProviders, revision: current.revision + 1 },
+          },
+        }));
+      },
+
+      clearAnnotationProviders: (userId) => {
+        const current = get().byUser[userId];
+        if (!current || current.annotationProviders.length === 0) return;
+        set((state) => ({
+          byUser: {
+            ...state.byUser,
+            [userId]: { ...current, annotationProviders: [], revision: current.revision + 1 },
+          },
+        }));
+      },
+
+      setDataPortalCredential: (userId, value) => {
+        const credential = value.trim();
+        if (!userId || !credential) return;
         set((state) => {
-          const current = state.byUser[userId] ?? { revision: 0 };
-          if (current[field] === value) return state;
+          const current = state.byUser[userId] ?? emptyEntry();
+          if (current.dataPortal === credential) return state;
           return {
             byUser: {
               ...state.byUser,
               [userId]: {
                 ...current,
-                [field]: value,
+                dataPortal: credential,
                 revision: current.revision + 1,
               },
             },
@@ -94,33 +261,20 @@ export const useProviderCredentialsStore = create<ProviderCredentialsStore>()(
         });
       },
 
-      clearCredential: (userId, field) => {
+      clearDataPortalCredential: (userId) => {
         set((state) => {
           const current = state.byUser[userId];
-          if (!current?.[field]) return state;
-          const next = { ...current, [field]: undefined, revision: current.revision + 1 };
-          return { byUser: { ...state.byUser, [userId]: next } };
-        });
-      },
-
-      clearAnnotationCredentials: (userId) => {
-        set((state) => {
-          const current = state.byUser[userId];
-          if (
-            !current ||
-            ![current.openai, current.openrouter, current.anthropic, current.google].some(Boolean)
-          ) {
-            return state;
-          }
-          const next = {
-            ...current,
-            openai: undefined,
-            openrouter: undefined,
-            anthropic: undefined,
-            google: undefined,
-            revision: current.revision + 1,
+          if (!current?.dataPortal) return state;
+          return {
+            byUser: {
+              ...state.byUser,
+              [userId]: {
+                ...current,
+                dataPortal: undefined,
+                revision: current.revision + 1,
+              },
+            },
           };
-          return { byUser: { ...state.byUser, [userId]: next } };
         });
       },
     }),
@@ -128,15 +282,29 @@ export const useProviderCredentialsStore = create<ProviderCredentialsStore>()(
       name: PROVIDER_CREDENTIAL_STORAGE_KEY,
       version: PROVIDER_CREDENTIAL_STORAGE_VERSION,
       partialize: (state) => ({ byUser: state.byUser }),
+      merge: (persisted, current) => ({
+        ...current,
+        byUser:
+          sanitizePartitions((persisted as { byUser?: unknown } | null | undefined)?.byUser) ?? {},
+      }),
     },
   ),
 );
 
-export const getBrowserProviderCredential = (
+export const getBrowserAnnotationProviderCredential = (
   userId: string | null | undefined,
-  field: ProviderCredentialField,
+  configurationId: string,
+): string | undefined => {
+  if (!userId) return undefined;
+  return useProviderCredentialsStore
+    .getState()
+    .byUser[userId]?.annotationProviders.find((item) => item.id === configurationId)?.apiKey;
+};
+
+export const getBrowserDataPortalCredential = (
+  userId: string | null | undefined,
 ): string | undefined =>
-  userId ? useProviderCredentialsStore.getState().byUser[userId]?.[field] : undefined;
+  userId ? useProviderCredentialsStore.getState().byUser[userId]?.dataPortal : undefined;
 
 export const providerCredentialPresence = (
   userId: string | null | undefined,
@@ -150,24 +318,90 @@ export const useBrowserProviderCredentialPresence = (
   return presenceFromEntry(entry);
 };
 
+const sanitizeConfiguration = (value: unknown): StoredAnnotationProviderConfiguration | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  if (
+    typeof source.id !== 'string' ||
+    !UUID_PATTERN.test(source.id) ||
+    typeof source.name !== 'string' ||
+    source.name.trim().length === 0 ||
+    source.name.length > 200 ||
+    !isProviderType(source.provider) ||
+    typeof source.credentialRevision !== 'number' ||
+    !Number.isSafeInteger(source.credentialRevision) ||
+    source.credentialRevision < 1
+  ) {
+    return null;
+  }
+  const apiKey =
+    typeof source.apiKey === 'string' && source.apiKey.length > 0 && source.apiKey.length <= 4_000
+      ? source.apiKey
+      : undefined;
+  if (source.provider !== 'custom' && !apiKey) return null;
+  let baseUrl: string | undefined;
+  if (source.provider === 'custom') {
+    if (typeof source.baseUrl !== 'string') return null;
+    try {
+      baseUrl = normalizeCustomProviderBaseUrl(source.baseUrl);
+    } catch {
+      return null;
+    }
+  } else if (source.baseUrl !== undefined) {
+    return null;
+  }
+  return {
+    id: source.id,
+    name: source.name.trim(),
+    provider: source.provider,
+    baseUrl,
+    apiKey,
+    credentialRevision: source.credentialRevision,
+  };
+};
+
 const sanitizeEntry = (value: unknown): StoredUserProviderCredentials | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const source = value as Record<string, unknown>;
-  const entry: StoredUserProviderCredentials = {
-    revision:
-      typeof source.revision === 'number' &&
-      Number.isSafeInteger(source.revision) &&
-      source.revision >= 0
-        ? source.revision
-        : 0,
-  };
-  for (const field of ['openai', 'openrouter', 'anthropic', 'google', 'dataPortal'] as const) {
-    const credential = source[field];
-    if (typeof credential === 'string' && credential.length > 0 && credential.length <= 4_000) {
-      entry[field] = credential;
-    }
+  if (!Array.isArray(source.annotationProviders)) return null;
+  const annotationProviders = source.annotationProviders.map(sanitizeConfiguration);
+  if (annotationProviders.some((item) => item === null)) return null;
+  const configurations = annotationProviders as StoredAnnotationProviderConfiguration[];
+  if (
+    new Set(configurations.map((item) => item.id)).size !== configurations.length ||
+    configurations.some((item, index) =>
+      configurations.slice(0, index).some((existing) => sameIdentity(existing, item)),
+    )
+  ) {
+    return null;
   }
-  return entry;
+  const dataPortal =
+    typeof source.dataPortal === 'string' &&
+    source.dataPortal.length > 0 &&
+    source.dataPortal.length <= 4_000
+      ? source.dataPortal
+      : undefined;
+  if (
+    typeof source.revision !== 'number' ||
+    !Number.isSafeInteger(source.revision) ||
+    source.revision < 0
+  ) {
+    return null;
+  }
+  return { annotationProviders: configurations, dataPortal, revision: source.revision };
+};
+
+const sanitizePartitions = (
+  value: unknown,
+): Record<string, StoredUserProviderCredentials> | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const result: Record<string, StoredUserProviderCredentials> = {};
+  for (const [userId, entryValue] of Object.entries(value)) {
+    const entry = userId ? sanitizeEntry(entryValue) : null;
+    if (!entry) return null;
+    result[userId] = entry;
+  }
+  return result;
 };
 
 const parseStoredPartitions = (
@@ -180,14 +414,7 @@ const parseStoredPartitions = (
     if (envelope.version !== PROVIDER_CREDENTIAL_STORAGE_VERSION) return null;
     const state = envelope.state;
     if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
-    const byUser = (state as Record<string, unknown>).byUser;
-    if (!byUser || typeof byUser !== 'object' || Array.isArray(byUser)) return null;
-    return Object.fromEntries(
-      Object.entries(byUser).flatMap(([userId, value]) => {
-        const entry = userId ? sanitizeEntry(value) : null;
-        return entry ? [[userId, entry] as const] : [];
-      }),
-    );
+    return sanitizePartitions((state as Record<string, unknown>).byUser);
   } catch {
     return null;
   }

@@ -8,6 +8,7 @@ import {
 } from '@/api';
 import type {
   AnnotationAnalysisRequest,
+  AnnotationProviderConfigurationResource,
   AnnotationPreviewRequest,
   ConcordanceAnalysisRequest,
   DataPortalImportSubmitRequest,
@@ -19,9 +20,10 @@ import type {
   TopicModelingAnalysisRequest,
 } from '@/api';
 import { useAuthStore } from '@/stores/authStore';
-import { getBrowserProviderCredential } from './providerCredentialsStore';
-
-type AnnotationProvider = AnnotationAnalysisRequest['provider'];
+import {
+  getBrowserAnnotationProviderCredential,
+  getBrowserDataPortalCredential,
+} from './providerCredentialsStore';
 
 export type SecretFreeRootAnalysisSubmission =
   | TokenFrequencyAnalysisRequest
@@ -37,24 +39,28 @@ const currentMultiUserId = (): string | null => {
   return session.user.id;
 };
 
-const annotationCredential = (provider: AnnotationProvider): string | undefined => {
+const annotationCredential = (configurationId: string): string | undefined => {
   const userId = currentMultiUserId();
-  return getBrowserProviderCredential(userId, provider);
+  return getBrowserAnnotationProviderCredential(userId, configurationId);
 };
 
 const dataPortalCredential = (): string | undefined => {
   const userId = currentMultiUserId();
-  return getBrowserProviderCredential(userId, 'dataPortal');
+  return getBrowserDataPortalCredential(userId);
 };
 
 export const listAnnotationModelsWithProviderCredential = (
-  provider: AnnotationProvider,
+  configuration: AnnotationProviderConfigurationResource,
   signal?: AbortSignal,
 ) => {
-  const apiKey = annotationCredential(provider);
+  const apiKey = annotationCredential(configuration.id);
   return listAnnotationModels({
-    path: { provider },
-    body: apiKey ? { api_key: apiKey } : {},
+    body: {
+      provider_configuration_id: configuration.id,
+      provider: configuration.provider,
+      provider_base_url: configuration.base_url ?? null,
+      ...(apiKey ? { api_key: apiKey } : {}),
+    },
     signal,
     throwOnError: true,
   });
@@ -71,7 +77,7 @@ export const previewAnnotationWithProviderCredential = ({
   request: AnnotationPreviewRequest;
   signal?: AbortSignal;
 }) => {
-  const apiKey = annotationCredential(request.provider);
+  const apiKey = annotationCredential(request.provider_configuration_id);
   return previewAnnotation({
     headers: { 'x-client-timeout-ms': '120000' },
     path: { workspace_id: workspaceId, node_id: nodeId },
@@ -90,7 +96,10 @@ export const submitTabAnalysisWithProviderCredential = ({
   tabId: string;
   request: SecretFreeRootAnalysisSubmission;
 }) => {
-  const apiKey = request.kind === 'annotation' ? annotationCredential(request.provider) : undefined;
+  const apiKey =
+    request.kind === 'annotation'
+      ? annotationCredential(request.provider_configuration_id)
+      : undefined;
   const body = request.kind === 'annotation' && apiKey ? { ...request, api_key: apiKey } : request;
   return submitTabAnalysis({
     body: body as SubmitTabAnalysisData['body'],
