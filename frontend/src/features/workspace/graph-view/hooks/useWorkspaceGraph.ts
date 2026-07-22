@@ -39,6 +39,7 @@ export interface WorkspaceGraphViewModel {
   totalNodes: number;
   canClearSelection: boolean;
   handleNodeClick: NodeMouseHandler;
+  handleNodeDoubleClick: NodeMouseHandler;
   handleNodesChange: ReturnType<typeof useNodesState<Node>>[2];
   handleEdgesChange: ReturnType<typeof useEdgesState<Edge>>[2];
   handlePaneClick: () => void;
@@ -432,6 +433,21 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [toggleNode, markInteracted],
   );
 
+  /**
+   * Double-click is a shortcut for the node's "+" Add-to-selection button: it
+   * adds the block to the active tool's inputs (works whether or not the block
+   * is currently selected). Single-click still toggles selection — the two
+   * single-clicks a double-click also fires net out to no selection change.
+   */
+  const handleNodeDoubleClick: NodeMouseHandler = useCallback(
+    (event, node) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (node.id) handleAddToSelection(node.id);
+    },
+    [handleAddToSelection],
+  );
+
   /** No-op connection handler because graph edges are backend-derived. */
   const handleConnect = useCallback((_connection: Connection) => {
     // No-op: graph edges are backend-derived, so user-drawn connections are ignored.
@@ -475,6 +491,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     totalNodes,
     canClearSelection: selectedCount > 0,
     handleNodeClick,
+    handleNodeDoubleClick,
     handleNodesChange,
     handleEdgesChange: onEdgesChange,
     handlePaneClick,
