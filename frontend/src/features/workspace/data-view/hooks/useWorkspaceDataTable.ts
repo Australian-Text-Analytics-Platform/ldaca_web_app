@@ -229,7 +229,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       if (!currentWorkspaceId || !activeNodeId) {
         throw new Error('Missing workspace or node ID');
       }
-      const data = await queryWorkspaceSqlTable({
+      return await queryWorkspaceSqlTable({
         path: { workspace_id: currentWorkspaceId },
         body: {
           mode: 'query',
@@ -239,18 +239,24 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
           page_size: nodeTableRequest.page_size,
         },
       });
-      return {
-        page: nodeTableRequest.page,
-        page_size: nodeTableRequest.page_size,
-        rows: data.rows,
-        columns: data.columns,
-        columnKinds: Object.fromEntries(data.schema.map((column) => [column.name, column.kind])),
-        has_next: data.hasNext,
-      } satisfies NodeDataResponse;
     },
     staleTime: 30 * 1000,
   });
-  const nodeData = nodeDataQuery.data ?? EMPTY_NODE_DATA;
+  // Every consumer of a Workspace SQL key shares the raw Arrow page. Data View
+  // derives its presentation model after the cache boundary so Annotation and
+  // other feature projections cannot install an incompatible cached shape.
+  const nodeData: NodeDataResponse = nodeDataQuery.data
+    ? {
+        page: nodeTableRequest.page,
+        page_size: nodeTableRequest.page_size,
+        rows: nodeDataQuery.data.rows,
+        columns: nodeDataQuery.data.columns,
+        columnKinds: Object.fromEntries(
+          nodeDataQuery.data.schema.map((column) => [column.name, column.kind]),
+        ),
+        has_next: nodeDataQuery.data.hasNext,
+      }
+    : EMPTY_NODE_DATA;
 
   const header: WorkspaceDataTableHeaderInfo = {
     nodeLabel: resolveNodeDisplayLabel(selectedNode) ?? 'Unknown node',

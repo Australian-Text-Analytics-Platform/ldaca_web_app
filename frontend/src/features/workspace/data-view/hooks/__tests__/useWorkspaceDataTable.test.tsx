@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryKeys } from '@/lib/queryKeys';
 
 const queryWorkspaceSqlTableMock = vi.hoisted(() => vi.fn());
 const useWorkspaceDataMock = vi.hoisted(() => vi.fn());
@@ -34,13 +35,16 @@ const activateNode = vi.fn();
 const reorderSelectedNodes = vi.fn();
 const removeNode = vi.fn();
 
-const makeNodeDataResponse = () => ({
-  rows: [{ text: 'row' }],
-  page: 1,
-  page_size: 20,
-  columns: ['text'],
-  dtypes: { text: 'String' },
+const makeArrowPage = (
+  columns: { name: string; kind: 'string' | 'integer' }[] = [{ name: 'text', kind: 'string' }],
+  rows: Record<string, unknown>[] = [{ text: 'row' }],
+) => ({
+  table: {},
+  rows,
+  columns: columns.map((column) => column.name),
+  schema: columns.map((column) => ({ ...column, field: {} })),
   hasNext: false,
+  etag: 'etag-1',
 });
 
 const createWrapper = (queryClient: QueryClient) =>
@@ -54,10 +58,9 @@ describe('useWorkspaceDataTable', () => {
     reorderSelectedNodes.mockReset();
     removeNode.mockReset();
     queryWorkspaceSqlTableMock.mockReset();
-    queryWorkspaceSqlTableMock.mockResolvedValue(makeNodeDataResponse());
+    queryWorkspaceSqlTableMock.mockResolvedValue(makeArrowPage());
     useWorkspaceDataMock.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
-      nodeData: makeNodeDataResponse(),
     });
     const selectedNodes = [
       { id: 'node-a', name: 'A' },
@@ -149,5 +152,51 @@ describe('useWorkspaceDataTable', () => {
             ]),
         ),
     ).toBe(true);
+  });
+
+  it('projects a raw Workspace SQL page already cached by Annotation', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(
+      queryKeys.workspaceSql('workspace-1', ['node-b'], 'SELECT * FROM "node-b"', 1, 20),
+      makeArrowPage(),
+    );
+
+    const { result } = renderHook(() => useWorkspaceDataTable(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.table.data).toEqual([{ text: 'row' }]);
+    expect(result.current.table.columns).toEqual(['text']);
+    expect(result.current.table.columnKinds).toEqual({ text: 'string' });
+  });
+
+  it('preserves the schema of an empty class-description Data Block', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(
+      queryKeys.workspaceSql('workspace-1', ['node-b'], 'SELECT * FROM "node-b"', 1, 20),
+      makeArrowPage(
+        [
+          { name: 'class', kind: 'string' },
+          { name: 'description', kind: 'string' },
+        ],
+        [],
+      ),
+    );
+
+    const { result } = renderHook(() => useWorkspaceDataTable(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.header.isEmptyTable).toBe(true);
+    expect(result.current.table.data).toEqual([]);
+    expect(result.current.table.columns).toEqual(['class', 'description']);
+    expect(result.current.table.columnKinds).toEqual({
+      class: 'string',
+      description: 'string',
+    });
   });
 });
