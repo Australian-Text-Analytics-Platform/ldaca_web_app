@@ -27,10 +27,10 @@ proof, except provider callbacks with their own one-use validation.
 | `GET /api/events` | `backend_events` | 200 SSE | Unified bounded resource-refresh stream |
 
 `UserPreferences` has exactly `hidden_views`, `favorite_workspaces`,
-`default_tokenizer_model`, `analysis_multi_tab_enabled`, and
-`contextual_hints_enabled`. `PATCH` changes only fields present in the request;
-an explicit `null` clears `default_tokenizer_model`. Unknown fields and invalid
-nulls are rejected. Provider credential responses never include secret values.
+`analysis_multi_tab_enabled`, and `contextual_hints_enabled`. `PATCH` changes
+only fields present in the request. Unknown fields and invalid nulls are
+rejected. The durable `preferences.toml` schema is version 2; earlier schemas
+are rejected. Provider credential responses never include secret values.
 
 `GET /api/provider-credentials` reports `storage: backend` plus configured
 presence in single-user mode. In multi-user mode it reports `storage: browser`,
@@ -109,6 +109,10 @@ closing target makes it the sole open resource. If opening fails after a sibling
 transition, the response reports the real error and subsequent collection reads
 expose the resulting backend state.
 
+Native Workspace snapshots use schema version 6 and portable archives use
+format version 5. Readers accept only those exact versions; import and open do
+not migrate an earlier format at runtime.
+
 ## Data Blocks
 
 The API uses `nodes` for the backend representation of Data Blocks. All routes
@@ -121,7 +125,7 @@ below require the Workspace to be open.
 | `POST /api/workspaces/{workspace_id}/nodes/previews` | `preview_node_creation` | 200 Arrow | Side-effect-free derived Data Block row page |
 | `PUT /api/workspaces/{workspace_id}/nodes/order` | `reorder_workspace_nodes_by_id` | 200 | Persist the complete Data Block order |
 | `GET /api/workspaces/{workspace_id}/nodes/{node_id}` | `get_node` | 200 | Read complete Data Block metadata |
-| `PATCH /api/workspaces/{workspace_id}/nodes/{node_id}` | `update_node` | 200 | Update Data Block name, document column, or color metadata |
+| `PATCH /api/workspaces/{workspace_id}/nodes/{node_id}` | `update_node` | 200 | Update Data Block name, document column, tokenizer model, or color metadata |
 | `POST /api/workspaces/{workspace_id}/nodes/{node_id}/edits` | `edit_node` | 200 | Replace the selected Data Block plan with a typed identity-preserving edit |
 | `POST /api/workspaces/{workspace_id}/nodes/{node_id}/undo` | `undo_node` | 200 | Restore the previous plan from this open Workspace session |
 | `POST /api/workspaces/{workspace_id}/nodes/{node_id}/redo` | `redo_node` | 200 | Restore the next plan from this open Workspace session |
@@ -136,9 +140,14 @@ accepts an existing string column, absolute row index, and string or null value.
 validated rows; it preserves other columns positionally, truncating or
 null-padding them to the new row count. Sample, Join, and Stack remain
 creation-only, and cast is not part of the creation request union. Every
-`WorkspaceNodeInfo` contains required `can_undo` and `can_redo` flags. Only the
-current plan is durable; both flags reset after load, clone, import,
-close/reopen, or backend restart.
+`WorkspaceNodeInfo` contains required `can_undo` and `can_redo` flags plus the
+nullable scalar `tokenizer_model`. `NodeUpdateRequest.tokenizer_model` is an
+opaque identifier of at most 500 characters; surrounding whitespace is
+trimmed, and an empty string or `null` clears it. Document and tokenizer fields
+are independent partial updates. Existing Data Block preferences survive
+Workspace and archive round trips, while Derived Data Blocks never inherit a
+Tokenizer Preference. Only the current plan is durable; both history flags
+reset after load, clone, import, close/reopen, or backend restart.
 
 ## Tabs
 
@@ -173,6 +182,13 @@ The list is empty until a publishing Analysis succeeds. Existing single-output
 operations return one ID; Topic Modeling detachment returns topic-data then
 topic-meanings IDs for each source in request order. The removed singular field
 is not accepted.
+
+`TokenFrequencyAnalysisRequest.node_tokenizer_models` must contain exactly the
+selected Data Block IDs. `ConcordanceAnalysisRequest.node_tokenizer_models`
+may contain any subset of selected IDs in Text mode, but must contain exactly
+all selected IDs in Tokens mode. Execution and later Result projections use
+these immutable request mappings and the retained input snapshot; current Data
+Block preferences are never fallbacks.
 
 ## Readiness And Common Semantics
 

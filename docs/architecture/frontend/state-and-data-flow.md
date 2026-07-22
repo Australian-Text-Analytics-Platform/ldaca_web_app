@@ -118,6 +118,10 @@ for the active Workspace plus the user's file-import lifecycle and projects
 those Query resources directly; it has no Zustand task collection or
 feature-specific pruning. SSE patches exact resource caches when possible and
 invalidates collection, Tab, and graph queries for authoritative hydration.
+Analysis rows are read-only in the Task Inbox because their owning Tabs control
+lifecycle. Queued or running User File Imports expose cancellation there;
+terminal imports expose deletion of the retained history record. Successful and
+failed imports do not expire automatically.
 
 Presentation-only settings use browser-local storage partitioned by user,
 Workspace, and analysis kind or Tab as appropriate. They include the active
@@ -154,6 +158,31 @@ Sample, Join, and Stack expose no update mode. Successful edits and history
 commands invalidate the graph, node metadata, row, and schema queries together.
 Data View and graph menus derive Undo/Redo disabled state only from the
 backend's `can_undo` and `can_redo` flags.
+
+## Data Block Preferences
+
+Fetched Data Block metadata projects independent optional Document Column and
+Tokenizer Preferences. A fresh selector uses the applicable value only as its
+initial choice. Token Frequency and Concordance expose and immediately persist
+both controls; Quotation and Topic Modeling expose and persist only the
+document column. No function writes a preference for a control it does not
+show.
+
+Each control uses its own partial Data Block `PATCH`. A successful mutation
+merges only that field into every matching node-info cache before invalidating
+the resource, so overlapping document and tokenizer writes cannot replay stale
+values over one another. A local explicit clear and a draft whose persistence
+failed remain authoritative for the current selector rather than falling back
+to refreshed Data Block metadata.
+
+Analysis hydration has a stronger authority. Stored document-column and
+tokenizer-model mappings, plus Concordance search mode, come from the immutable
+Analysis request and replace selector defaults, including explicit absence.
+They also participate in re-run change detection. Token Frequency passes its
+exact submitted tokenizer mapping into a Concordance handoff instead of
+consulting current Data Block preferences. On a fresh Concordance selection,
+Tokens mode is selected automatically when every selected Data Block has a
+model unless the user explicitly chose Text mode.
 
 ## Documentation Registry
 

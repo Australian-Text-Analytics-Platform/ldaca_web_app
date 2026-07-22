@@ -93,7 +93,7 @@ to mutate the cleared Tab.
 
 Closing and reopening a Workspace restores Tabs, terminal Analyses, immutable
 requests, stored Results, Artifacts, and retained query inputs from Workspace
-storage. Portable archive version 4 carries terminal live Analyses and safe
+storage. Portable archive version 5 carries terminal live Analyses and safe
 materialized copies of their query inputs; import rebuilds private lazy input
 snapshots under the new Workspace identity. Browser-local active Tab and
 presentation settings are deliberately outside both storage forms.

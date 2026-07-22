@@ -48,27 +48,33 @@ flowchart TB
   than introducing pagination or truncation.
 - Downloads stream response-owned snapshots so concurrent source mutation
   cannot truncate an accepted response.
-- Workspace archives are inspected and extracted into staging before an atomic
-  install.
+- Workspace archives are inspected and extracted into staging before
+  publication. The remaining crash window around final publication and plan
+  rebasing is tracked in the
+  [persistence-integrity reference](../reference/persistence-integrity.md).
 - Workspace discovery is a fresh scan of the global catalogue; exact
   `access.json` ownership is checked before portable content is exposed.
 - Archive exports omit deployment ownership, and imports reject embedded
   ownership before generating a new sidecar for the importer.
-- Portable Workspace archive version 4 contains materialized Data Blocks,
+- Portable Workspace archive version 5 contains materialized Data Blocks,
   terminal live Analyses, declared Artifacts, and materialized immutable query
   inputs. It contains no serialized executable plans. Import assigns a fresh
   Workspace identity, rebuilds and rebases the private lazy plans, and rejects
   earlier archive versions rather than guessing at missing lifecycle content.
-- One `QuotaService` owns total allocated-byte admission for every principal.
-  A finite policy is read from SQLite for every status or write check; `NULL`
-  is unlimited and performs no quota scan or accounting probe.
+- One `QuotaService` owns total allocated-byte policy and usage snapshots for
+  every principal. `StorageAdmissionService` applies that policy to Workspace,
+  User File, import, Analysis, and response-snapshot writes. User Preferences
+  and single-user Provider Credential writes do not yet use that admission
+  boundary.
+- A finite policy is read from SQLite for every status or admitted-write check;
+  `NULL` is unlimited and performs no quota scan or accounting probe.
 - Finite usage is a fresh filesystem-allocation scan of the principal's user
   area plus live and trashed Workspaces attributed by `access.json`. It uses
   allocated blocks with a one-allocation-unit floor for every regular file and
   directory, and persists no usage counter or ledger.
-- In-process reservations prevent concurrent writes from overcommitting a
-  finite limit. Staged output is measured and the current SQLite policy is
-  checked again before atomic publication.
+- In-process reservations prevent admitted concurrent writes from
+  overcommitting a finite limit. Their staged output is measured and the
+  current SQLite policy is checked again before atomic publication.
 - Quota admission precedes the separate Data Root free-space reserve. Quota
   failures return `storage_quota_exceeded` with the four allocation values;
   shared capacity failures return `storage_capacity_exceeded` without host

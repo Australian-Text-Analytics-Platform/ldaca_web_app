@@ -25,7 +25,7 @@ identity and display preferences are local to the browser, scoped by user and
 Workspace or Tab. Submitted inputs recover from the immutable Analysis request,
 so a client reload does not depend on an inbox entry or feature-owned cache.
 
-Portable Workspace archive version 4 includes terminal live Analyses, declared
+Portable Workspace archive version 5 includes terminal live Analyses, declared
 Artifacts, and materialized immutable query inputs. Import rebuilds and rebases
 private lazy snapshots beneath a fresh Workspace identity. Serialized Polars
 plans are not portable archive content, non-terminal Analyses are omitted, and

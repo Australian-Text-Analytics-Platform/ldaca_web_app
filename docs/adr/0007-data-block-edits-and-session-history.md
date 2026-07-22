@@ -19,9 +19,12 @@ Each open backend Data Block keeps independent Undo and Redo stacks of at most
 50 lazy plans. A successful edit checkpoints the previous plan and clears
 Redo. History is process-local, plan-only interaction state: snapshots and
 archives persist only the current plan, and load, clone, import, close/reopen,
-or process restart begins with empty stacks. Metadata reconciliation keeps
-document and tokenization references valid after an edit or history command,
-but those metadata adjustments are deliberately not undoable.
+or process restart begins with empty stacks. Metadata reconciliation keeps a
+Document Column Preference valid after an edit or history command, but that
+adjustment is deliberately not undoable. [ADR 0012](0012-node-level-tokenizer-preference.md)
+supersedes this decision's former tokenization-metadata reconciliation clause:
+the scalar Tokenizer Preference is independent of columns and is not changed
+by an edit or history command.
 
 The Workspace mutation gate publishes the current plan and Revision for every
 edit, Undo, and Redo. Publication rollback restores the previously committed

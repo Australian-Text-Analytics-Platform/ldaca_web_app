@@ -19,6 +19,20 @@ metadata. Backend code and HTTP schemas represent a Data Block as a `Node`;
 `Node` is an implementation/API term rather than the product term.
 _Avoid_: node in product-facing prose, dataframe, table
 
+**Document Column Preference**:
+An optional Data Block convenience value identifying the raw-text column that
+a newly added analysis selector should choose. A function may expose this
+preference, the Tokenizer Preference, both, or neither. The two preferences are
+independent, and a submitted Analysis retains its own document-column mapping.
+_Avoid_: required document column, Analysis document parameter
+
+**Tokenizer Preference**:
+An optional Data Block convenience value identifying the tokenizer model that
+a newly added analysis selector should choose. It is independent of the
+Document Column Preference and is neither an Analysis parameter nor cached
+token content. A submitted Analysis retains its own tokenizer-model mapping.
+_Avoid_: tokenization column, account tokenizer default, cached tokenizer
+
 **Semantic Column Type**:
 A globally named column meaning layered over a physical tabular storage type.
 It may be owned by Wordflow or by the producer of imported data and remains
@@ -164,6 +178,9 @@ _Avoid_: API-key preference, Analysis parameter, Workspace secret
 - A Source Data Block snapshots a User File; later User File changes do not
   mutate the Data Block.
 - A Derived Data Block records one or more parent Data Blocks.
+- A Data Block may have a Document Column Preference, a Tokenizer Preference,
+  both, or neither. Analysis controls expose and persist only the preferences
+  they use, and submitted Analyses retain their exact mappings independently.
 - A Semantic Column Type remains part of a Data Block's schema across storage,
   derivation, and tabular transport; an unknown producer does not erase it.
 - A Workspace SQL Query may read only its declared Data Blocks. SQL creation

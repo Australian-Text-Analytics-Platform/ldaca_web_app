@@ -23,10 +23,11 @@ cannot silently overwrite the aggregate.
 ## Data Block Graph
 
 A Workspace owns an ordered directed acyclic graph of Data Blocks. Each Data
-Block has stable identity, a name, a lazy tabular plan, optional document and
-tokenization metadata, a schema containing physical and optional semantic
-extension types, and zero or more parents. Roots are Source Data Blocks; other
-blocks preserve the lineage of the transformation that created them.
+Block has stable identity, a name, a lazy tabular plan, independent optional
+Document Column and Tokenizer Preferences, a schema containing physical and
+optional semantic extension types, and zero or more parents. Roots are Source
+Data Blocks; other blocks preserve the lineage of the transformation that
+created them.
 
 ```mermaid
 flowchart LR
@@ -108,10 +109,19 @@ create no history.
 This history lasts only while the Workspace remains open in the backend
 process. Snapshots, archives, clones, and imports contain the current plan but
 no stacks, so close/reopen and process restart preserve current data while
-resetting Undo and Redo. Rename retargets document and tokenization references
-where possible, and every edit or history command clears references absent
-from the resulting schema. These metadata adjustments are not part of plan
-history.
+resetting Undo and Redo. Rename retargets the Document Column Preference where
+possible, and every edit or history command clears that preference when its
+column is absent from the resulting schema. The Tokenizer Preference is not
+column-bound and is never changed by a column edit. These metadata adjustments
+are not part of plan history.
+
+Document Column and Tokenizer Preferences are convenience metadata for fresh
+analysis selectors, not execution parameters. Either may exist without the
+other, and functions persist only controls they expose. Workspace save/reopen
+and archive export/import preserve the preferences already owned by each Data
+Block. Creation of a Derived Data Block may carry a Document Column Preference
+when its operation defines that behavior, but never inherits a Tokenizer
+Preference from a source, clone, or detached Analysis output.
 
 ## Persistence Invariants
 

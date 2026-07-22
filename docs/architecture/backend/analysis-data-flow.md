@@ -46,9 +46,21 @@ The child receives no Workspace object, service, database connection, request,
 or private gate. Workers never report terminal Progress; the owning service
 validates each raw report and writes `1.0` only with durable success.
 
-Token-frequency submission resolves one exact source column and tokenizer
-model per selected Data Block. The worker validates those mappings against the
-immutable snapshot; there is no Workspace-wide tokenizer override.
+Token Frequency submission requires one exact source column and tokenizer
+model per selected Data Block. Concordance always records the submitted
+tokenizer-model selections: Text mode accepts a partial mapping and searches
+the source text without tokenizing, while Tokens mode requires one model for
+every selected Data Block. These mappings and Concordance search mode are
+immutable Analysis request parameters.
+
+Execution combines only that request with the retained input snapshot. It
+never reads a mutable Data Block Tokenizer Preference or an account default.
+The selected source column is tokenized dynamically for Tokens mode and Token
+Frequency. `native:plain_words_en` executes directly without DuckDB; other
+models use the per-user cache keyed by the model, tokenization parameters, and
+source-text content hash. Initial Concordance work, later Result pages,
+dispersion, handoffs, and detachment all follow the same request-owned path.
+Derived Data Blocks do not inherit a Tokenizer Preference.
 
 ## Result Projection, Tables, And Artifacts
 

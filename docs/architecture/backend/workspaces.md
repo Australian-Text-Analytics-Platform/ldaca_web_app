@@ -127,10 +127,13 @@ data_root/
 Creation builds the snapshot and access sidecar below `.staging/`, then one
 atomic rename publishes the complete live directory. Archive import validates
 portable content, always assigns a fresh Workspace ID and owner sidecar, and
-replaces archived timestamps with one new publication timestamp. Export omits
-`access.json`; import rejects an archive-supplied sidecar.
+replaces archived timestamps with one new publication timestamp. Its current
+final-source rebase occurs after the live rename; the resulting crash window is
+tracked in the
+[persistence-integrity reference](../../reference/persistence-integrity.md).
+Export omits `access.json`; import rejects an archive-supplied sidecar.
 
-Portable archive version 4 materializes Data Blocks and retained Analysis query
+Portable archive version 5 materializes Data Blocks and retained Analysis query
 inputs as Parquet, includes terminal live Analyses and declared Artifacts, and
 contains no serialized executable plans. Import reconstructs private lazy plans
 from those safe files, rebases their sources and Workspace identity after final
