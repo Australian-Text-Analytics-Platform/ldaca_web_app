@@ -47,9 +47,15 @@ export function useAnnotationClassDescriptions({
   descriptionColumn,
 }: UseAnnotationClassDescriptionsArgs) {
   const canLoad = Boolean(workspaceId && nodeId && classColumn && descriptionColumn);
+  const sql =
+    nodeId && classColumn && descriptionColumn
+      ? `SELECT ${sqlIdentifier(classColumn)}, ${sqlIdentifier(
+          descriptionColumn,
+        )} FROM ${sqlTable(nodeId)}`
+      : '';
   const queryKey =
-    canLoad && workspaceId && nodeId && classColumn && descriptionColumn
-      ? queryKeys.annotationClassDescriptions(workspaceId, nodeId, classColumn, descriptionColumn)
+    canLoad && workspaceId && nodeId
+      ? queryKeys.workspaceSqlDrain(workspaceId, [nodeId], sql, 500)
       : DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY;
 
   const query = useQuery({
@@ -59,9 +65,6 @@ export function useAnnotationClassDescriptions({
       if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
         throw new Error('Missing class-description selection');
       }
-      const sql = `SELECT ${sqlIdentifier(classColumn)}, ${sqlIdentifier(
-        descriptionColumn,
-      )} FROM ${sqlTable(nodeId)}`;
       const rows: Record<string, unknown>[] = [];
       let page = 1;
       let initialEtag: string | null | undefined;

@@ -20,6 +20,7 @@ import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
 import { useAnnotationNodePage, type AnnotationNodePageRow } from '../hooks/useAnnotationNodePage';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 
 const ANNOTATION_RESULT_PAGE_SIZE = 50;
 // Radix `Select` rejects an empty-string item value, so the "clear" option uses
@@ -40,8 +41,6 @@ interface AnnotationResultsPanelProps {
   nodeId: string;
   textColumn: string;
   annotationColumn: string;
-  /** New annotation columns have no data yet, so their cells start unselected. */
-  isNew: boolean;
   /** Class-description node supplying the dropdown options; null disables them. */
   classNodeId: string | null;
   classColumn: string | null;
@@ -62,8 +61,8 @@ interface AnnotationResultsPanelProps {
  * text column is plain; each annotation cell is a dropdown of class names plus a
  * leading "None" option that clears the cell back to an unset value. Resume
  * seeds each dropdown from the existing value; a new annotation starts blank.
- * Picking a class optimistically updates the dropdown and persists the cell to
- * the backend annotation column via PUT .../annotation-cell, reverting + toasting
+ * Picking a class optimistically updates the dropdown and persists the cell as
+ * a canonical set_cell Data Block edit, reverting + toasting
  * on failure so the displayed value never drifts from what was actually saved.
  */
 export function AnnotationResultsPanel({
@@ -71,13 +70,14 @@ export function AnnotationResultsPanel({
   nodeId,
   textColumn,
   annotationColumn,
-  isNew,
   classNodeId,
   classColumn,
   descriptionColumn,
 }: AnnotationResultsPanelProps) {
+  const { setCell } = useWorkspaceActions();
   // Per-row class overrides keyed by source row position; falls back to the source value.
   const [selections, setSelections] = useState<Record<number, string>>({});
+  const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
   const nodePage = useAnnotationNodePage({
     workspaceId,
     nodeId,
@@ -138,7 +138,7 @@ export function AnnotationResultsPanel({
               <TableBody>
                 {rows.map((row, index) => {
                   const rowPosition = pagination.pageIndex * pagination.pageSize + index;
-                  const seeded = isNew ? '' : cellText(row[annotationColumn]);
+                  const seeded = cellText(row[annotationColumn]);
                   const value = selections[rowPosition] ?? seeded;
                   return (
                     <TableRow key={rowPosition} className="align-top hover:bg-transparent">
@@ -158,14 +158,30 @@ export function AnnotationResultsPanel({
                               ...current,
                               [rowPosition]: resolved,
                             }));
-                            // New columns are created on Start before this panel
-                            // shows, so persistence runs in resume mode against an
-                            // existing column; skip the request in the unlikely
-                            // new-mode render to avoid a guaranteed 400.
-                            if (!isNew) {
-                              toast.info('Annotation changes apply to this view only.');
-                            }
+                            setSavingRows((current) => new Set(current).add(rowPosition));
+                            void setCell(nodeId, annotationColumn, rowPosition, resolved || null)
+                              .catch((error: unknown) => {
+                                setSelections((current) => {
+                                  const nextSelections = { ...current };
+                                  if (seeded) nextSelections[rowPosition] = seeded;
+                                  else Reflect.deleteProperty(nextSelections, rowPosition);
+                                  return nextSelections;
+                                });
+                                toast.error(
+                                  error instanceof Error
+                                    ? error.message
+                                    : 'Could not save the annotation.',
+                                );
+                              })
+                              .finally(() => {
+                                setSavingRows((current) => {
+                                  const nextSaving = new Set(current);
+                                  nextSaving.delete(rowPosition);
+                                  return nextSaving;
+                                });
+                              });
                           }}
+                          disabled={savingRows.has(rowPosition)}
                         >
                           <SelectTrigger
                             aria-label={`Class for row ${String(rowPosition + 1)}`}

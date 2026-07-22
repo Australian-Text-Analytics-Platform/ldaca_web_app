@@ -45,8 +45,15 @@ export function useAnnotationNodePage({
     page: pagination.pageIndex + 1,
     page_size: pagination.pageSize,
   });
+  const sql = `SELECT * FROM ${sqlTable(nodeId)}`;
   const query = useQuery({
-    queryKey: queryKeys.nodeData(workspaceId ?? '', nodeId, request),
+    queryKey: queryKeys.workspaceSql(
+      workspaceId ?? '',
+      [nodeId],
+      sql,
+      request.page,
+      request.page_size,
+    ),
     enabled: Boolean(workspaceId) && enabled,
     queryFn: async ({ signal }) => {
       if (!workspaceId) throw new Error('Missing workspace ID');
@@ -55,7 +62,7 @@ export function useAnnotationNodePage({
         body: {
           mode: 'query',
           node_ids: [nodeId],
-          sql: `SELECT * FROM ${sqlTable(nodeId)}`,
+          sql,
           page: request.page,
           page_size: request.page_size,
         },

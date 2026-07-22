@@ -15,9 +15,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import {
   normalizeClassDescriptionRows,
   useAnnotationClassDescriptions,
@@ -43,10 +43,9 @@ interface AnnotationClassDescriptionsEditorProps {
  *
  * Flow: fetch the selected two-column payload through
  * useAnnotationClassDescriptions, render the class names as compact badges, and
- * expose an Edit dialog with local draft rows. Add/blur/delete persist the full
- * normalized row set and invalidate the workspace node data cache so other
- * table views observe the rewritten node. The Edit trigger stays enabled after
- * annotation starts so reviewers can amend classes on the go.
+ * expose an Edit dialog with local draft rows. Save commits the complete row
+ * set through one Data Block edit and therefore creates exactly one Undo
+ * checkpoint. Closing or cancelling the dialog discards the draft.
  */
 export function AnnotationClassDescriptionsEditor({
   workspaceId,
@@ -54,9 +53,10 @@ export function AnnotationClassDescriptionsEditor({
   classColumn,
   descriptionColumn,
 }: AnnotationClassDescriptionsEditorProps) {
-  const queryClient = useQueryClient();
+  const { saveAnnotationClasses } = useWorkspaceActions();
   const [draftRows, setDraftRows] = useState<AnnotationClassDescriptionRow[] | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const classDescriptions = useAnnotationClassDescriptions({
     workspaceId,
     nodeId,
@@ -78,14 +78,6 @@ export function AnnotationClassDescriptionsEditor({
   const visibleClassChips = classChips.slice(0, CLASS_NAME_PREVIEW_LIMIT);
   const hiddenClassCount = classChips.length - visibleClassChips.length;
 
-  const persistRows = (rows: AnnotationClassDescriptionRow[]) => {
-    if (!classDescriptions.canLoad) return;
-    const normalized = normalizeClassDescriptionRows(rows);
-    setDraftRows(normalized);
-    queryClient.setQueryData(classDescriptions.queryKey, { rows: normalized });
-    toast.info('Class changes apply to this annotation draft only.');
-  };
-
   const updateDraftCell = (rowIndex: number, field: 'class' | 'description', value: string) => {
     setDraftRows((current) =>
       (current ?? editorRows).map((row, index) =>
@@ -94,26 +86,47 @@ export function AnnotationClassDescriptionsEditor({
     );
   };
 
-  const persistDraftCell = (rowIndex: number, field: 'class' | 'description', value: string) => {
-    const nextRows = editorRows.map((row, index) =>
-      index === rowIndex ? { ...row, [field]: value } : row,
-    );
-    setDraftRows(nextRows);
-    persistRows(nextRows);
-  };
-
   const handleAddClass = () => {
-    const nextRows = [...editorRows, { class: '', description: '' }];
-    setDraftRows(nextRows);
-    persistRows(nextRows);
+    setDraftRows([...editorRows, { class: '', description: '' }]);
   };
 
   // Delete the row at rowIndex and persist the remaining classes (the missing
   // delete affordance this card previously lacked).
   const handleDeleteClass = (rowIndex: number) => {
-    const nextRows = editorRows.filter((_, index) => index !== rowIndex);
-    setDraftRows(nextRows);
-    persistRows(nextRows);
+    setDraftRows(editorRows.filter((_, index) => index !== rowIndex));
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsEditOpen(open);
+    setDraftRows(open ? normalizeClassDescriptionRows(savedRows) : null);
+  };
+
+  const handleSave = async () => {
+    if (!nodeId || !classColumn || !descriptionColumn) return;
+    const normalized = normalizeClassDescriptionRows(editorRows).map((row) => ({
+      class: row.class.trim(),
+      description: row.description,
+    }));
+    if (normalized.some((row) => row.class.length === 0)) {
+      toast.error('Every annotation class needs a name.');
+      return;
+    }
+    const uniqueNames = new Set(normalized.map((row) => row.class.toLocaleLowerCase()));
+    if (uniqueNames.size !== normalized.length) {
+      toast.error('Annotation class names must be unique.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await saveAnnotationClasses(nodeId, classColumn, descriptionColumn, normalized);
+      setIsEditOpen(false);
+      setDraftRows(null);
+      toast.success('Annotation classes saved.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not save annotation classes.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!nodeId) {
@@ -136,7 +149,7 @@ export function AnnotationClassDescriptionsEditor({
     <div className="mt-5 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold">Classes</h3>
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <Dialog open={isEditOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button
               type="button"
@@ -180,9 +193,6 @@ export function AnnotationClassDescriptionsEditor({
                       onChange={(event) => {
                         updateDraftCell(index, 'class', event.target.value);
                       }}
-                      onBlur={(event) => {
-                        persistDraftCell(index, 'class', event.target.value);
-                      }}
                     />
                     <Textarea
                       aria-label={`Description ${String(index + 1)}`}
@@ -193,9 +203,6 @@ export function AnnotationClassDescriptionsEditor({
                       className="min-h-9 flex-1 resize-y"
                       onChange={(event) => {
                         updateDraftCell(index, 'description', event.target.value);
-                      }}
-                      onBlur={(event) => {
-                        persistDraftCell(index, 'description', event.target.value);
                       }}
                     />
                     <Button
@@ -219,17 +226,30 @@ export function AnnotationClassDescriptionsEditor({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={!classDescriptions.canLoad}
+                disabled={!classDescriptions.canLoad || editorRows.length >= 200 || isSaving}
                 onClick={handleAddClass}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                 Add class
               </Button>
-              <DialogClose asChild>
-                <Button type="button" size="sm">
-                  Done
+              <div className="flex items-center gap-2">
+                <DialogClose asChild>
+                  <Button type="button" size="sm" variant="outline" disabled={isSaving}>
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!classDescriptions.canLoad || isSaving}
+                  onClick={() => {
+                    void handleSave();
+                  }}
+                >
+                  {isSaving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                  Save
                 </Button>
-              </DialogClose>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -12,7 +12,7 @@ interface UseAnnotationTabSettingsArgs {
  * Parse a persisted tab-setting string as a provider-card model map.
  *
  * Used by: useAnnotationTabSettings when hydrating the AI provider dropdown.
- * The value lives in tabs.json as a string map because generic tab settings are
+ * The value lives in the backend Tab resource as a string map because generic tab settings are
  * Record<string,string>; malformed user-edited JSON is ignored with a warning so
  * the tab still opens and the user can save a fresh provider card.
  */
@@ -39,7 +39,7 @@ const parseStringMapSetting = (
  * Owns Annotation's tab-persisted mode and AI settings.
  *
  * Used by: AnnotationFeature so the feature body can focus on selector/run UI
- * while this hook handles tabs.json string hydration and write-through updates.
+ * while this hook handles Tab-resource string hydration and write-through updates.
  * Flow: seed local state from the active tab's string settings, expose setters
  * that mirror discrete user actions, and write each committed value back through
  * AnalysisTabsHost's tab-setting sink.
@@ -120,12 +120,6 @@ export function useAnnotationTabSettings({
     onTabSettingChange('aiReasoningEffort', effort);
   };
 
-  const [isPreviewing, setIsPreviewingState] = useState(() => tabSettings.aiPreviewOpen === 'true');
-  const setIsPreviewing = (open: boolean) => {
-    setIsPreviewingState(open);
-    onTabSettingChange('aiPreviewOpen', String(open));
-  };
-
   const [annotationTargets, setAnnotationTargets] = useState<Record<string, string>>(() =>
     parseStringMapSetting(
       tabSettings.annotationTargets,
@@ -136,7 +130,7 @@ export function useAnnotationTabSettings({
   const setAnnotationTarget = (nodeId: string, column: string) => {
     // A single browser event may persist multiple selector changes before React
     // rerenders. Read the latest committed map rather than the render snapshot
-    // so each call writes a complete tabs.json value to AnalysisTabsHost.
+    // so each call writes a complete Tab setting value to AnalysisTabsHost.
     const next = { ...annotationTargetsRef.current, [nodeId]: column };
     annotationTargetsRef.current = next;
     setAnnotationTargets(next);
@@ -160,8 +154,6 @@ export function useAnnotationTabSettings({
     setAiReasoningEnabled,
     aiReasoningEffort,
     setAiReasoningEffort,
-    isPreviewing,
-    setIsPreviewing,
     annotationTargets,
     setAnnotationTarget,
   };

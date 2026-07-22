@@ -67,9 +67,7 @@ export const nodeInfosQueryOptions = (args: NodeInfosQueryArgs) => {
 };
 
 /**
- * Invalidate the `nodeInfo` query (or every node-info query under a
- * workspace when `nodeId` is omitted). Mirrors the previous
- * `invalidateNodeInfo` API.
+ * Invalidate batched node-info queries under a Workspace.
  */
 /**
  * Used by: `workspaceMutationCache` and `usePersistNodeDocumentColumn` after
@@ -82,7 +80,7 @@ export const invalidateNodeInfoQuery = (
   nodeId?: string,
 ): void => {
   void queryClient.invalidateQueries({
-    /** Limits broad invalidation to single and batched node-info records under the requested workspace. */
+    /** Limits invalidation to batched node-info records containing the edited Data Block. */
     /** Called by: TanStack Query cache invalidation filtering. */
     predicate: (query) => {
       const key = query.queryKey;
@@ -94,10 +92,9 @@ export const invalidateNodeInfoQuery = (
       ) {
         return false;
       }
-      const singleNodeInfoKey = key[4] === 'info' && (!nodeId || key[3] === nodeId);
       const batchNodeInfoKey =
         key[3] === 'info' && key[4] === 'batch' && (!nodeId || key.slice(5).includes(nodeId));
-      return singleNodeInfoKey || batchNodeInfoKey;
+      return batchNodeInfoKey;
     },
   });
 };

@@ -16,7 +16,6 @@ describe('useAnnotationTabSettings', () => {
           aiTemperature: '0.7',
           aiReasoningEnabled: 'true',
           aiReasoningEffort: 'high',
-          aiPreviewOpen: 'true',
           annotationTargets: JSON.stringify({ 'source-node': 'annotation' }),
         },
       }),
@@ -30,7 +29,6 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.aiTemperature).toBe(0.7);
     expect(result.current.aiReasoningEnabled).toBe(true);
     expect(result.current.aiReasoningEffort).toBe('high');
-    expect(result.current.isPreviewing).toBe(true);
     expect(result.current.annotationTargets).toEqual({ 'source-node': 'annotation' });
   });
 
@@ -48,7 +46,6 @@ describe('useAnnotationTabSettings', () => {
       result.current.commitAiTemperature(0.3);
       result.current.setAiReasoningEnabled(true);
       result.current.setAiReasoningEffort('low');
-      result.current.setIsPreviewing(true);
       result.current.setAnnotationTarget('source-node', 'existing_annotation');
     });
 
@@ -62,7 +59,6 @@ describe('useAnnotationTabSettings', () => {
     expect(onTabSettingChange).toHaveBeenCalledWith('aiTemperature', '0.3');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEnabled', 'true');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEffort', 'low');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiPreviewOpen', 'true');
     expect(onTabSettingChange).toHaveBeenCalledWith(
       'annotationTargets',
       JSON.stringify({ 'source-node': 'existing_annotation' }),
