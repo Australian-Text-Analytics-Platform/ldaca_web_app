@@ -2,8 +2,8 @@ import { useCallback, useMemo } from 'react';
 import type { TokenFrequencyResponse } from '@/api';
 import {
   buildResponseDisplayNameHints,
-  computeAnalysisNodeIds,
   deriveNodeDisplayResults,
+  deriveResultDisplayNodeIds,
   normalizeNodeResults,
 } from '../tokenFrequencyAdapters';
 import { resolveTokenFrequencyDisplayName } from '../tokenFrequencyUtils';
@@ -25,8 +25,8 @@ interface UseTokenFrequencyResultModelParams {
  * Used by: TokenFrequencyFeature because the feature shell should wire task
  * lifecycle and panels while this hook keeps expensive result adapters,
  * display-name fallbacks, and export state in one place.
- * Flow: combine response/selection display names, derive stable analysis node
- * ids, normalize backend rows, apply stop-word/limit filters, and expose
+ * Flow: combine response/selection display names, project completed-result ids
+ * into tab-input order, normalize backend rows, apply stop-word/limit filters, and expose
  * download-dialog handlers for the rendered result sections.
  */
 export const useTokenFrequencyResultModel = ({
@@ -65,20 +65,22 @@ export const useTokenFrequencyResultModel = ({
     [displayNameMap, nodeIdToName],
   );
 
-  const analysisNodeIds = useMemo(
-    () => computeAnalysisNodeIds(undefined, lastCompareNodeIds, nodeColumnSelections),
+  const displayNodeIds = useMemo(
+    () => deriveResultDisplayNodeIds(lastCompareNodeIds, nodeColumnSelections),
     [lastCompareNodeIds, nodeColumnSelections],
   );
 
   const downloads = useTokenFrequencyDownloads({
     stopWords,
-    analysisNodeIds,
+    // Downloads encode Reference/Study semantics, so they consume the
+    // immutable comparison order rather than the card presentation order.
+    analysisNodeIds: lastCompareNodeIds,
     computeDisplayName,
   });
 
   const normalizedNodeResults = useMemo(
-    () => normalizeNodeResults(results?.data, analysisNodeIds, computeDisplayName),
-    [results, analysisNodeIds, computeDisplayName],
+    () => normalizeNodeResults(results?.data, displayNodeIds, computeDisplayName),
+    [results, displayNodeIds, computeDisplayName],
   );
 
   const nodeDisplayResults = useMemo(
@@ -88,7 +90,7 @@ export const useTokenFrequencyResultModel = ({
 
   return {
     computeDisplayName,
-    analysisNodeIds,
+    displayNodeIds,
     normalizedNodeResults,
     nodeDisplayResults,
     ...downloads,

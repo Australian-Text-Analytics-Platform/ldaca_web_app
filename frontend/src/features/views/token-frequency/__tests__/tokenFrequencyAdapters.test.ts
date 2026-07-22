@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { deriveNodeDisplayResults, type NormalizedNodeResult } from '../tokenFrequencyAdapters';
+import {
+  deriveNodeDisplayResults,
+  deriveResultDisplayNodeIds,
+  type NormalizedNodeResult,
+} from '../tokenFrequencyAdapters';
 
 /** Builds descending token-frequency rows for adapter boundary tests. */
 const buildRows = (tokens: string[]) =>
@@ -11,6 +15,30 @@ const makeNode = (rows: ReturnType<typeof buildRows>): NormalizedNodeResult => (
   displayName: 'Node 1',
   rows,
   metadata: {},
+});
+
+describe('deriveResultDisplayNodeIds', () => {
+  it('uses panel order for nodes that belong to the completed result', () => {
+    expect(
+      deriveResultDisplayNodeIds(['reference', 'study'], [
+        { nodeId: 'study' },
+        { nodeId: 'reference' },
+      ]),
+    ).toEqual(['study', 'reference']);
+  });
+
+  it('never introduces a live selection that is absent from the completed result', () => {
+    expect(
+      deriveResultDisplayNodeIds(['reference', 'study'], [{ nodeId: 'unrelated-node' }]),
+    ).toEqual(['reference', 'study']);
+  });
+
+  it('appends result nodes that are absent from the current panel', () => {
+    expect(deriveResultDisplayNodeIds(['reference', 'study'], [{ nodeId: 'study' }])).toEqual([
+      'study',
+      'reference',
+    ]);
+  });
 });
 
 describe('deriveNodeDisplayResults', () => {

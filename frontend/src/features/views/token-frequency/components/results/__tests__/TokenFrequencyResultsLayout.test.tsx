@@ -201,6 +201,28 @@ describe('Token frequency result layouts', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('Study Data Block');
   });
 
+  it('keeps comparison roles tied to result identity when panel order is reversed', () => {
+    const reference = buildNodeResult({
+      nodeId: 'reference-node',
+      displayName: 'Reference Data Block',
+    });
+    const study = buildNodeResult({ nodeId: 'study-node', displayName: 'Study Data Block' });
+
+    render(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[study, reference]}
+        nodeDisplayResults={[study, reference]}
+        lastCompareNodeIds={['reference-node', 'study-node']}
+        statistics={[buildStatistic()]}
+      />,
+    );
+
+    const colorScale = within(screen.getByLabelText('Reference to Study color scale'));
+    expect(colorScale.getByLabelText('Reference: Reference Data Block')).toBeInTheDocument();
+    expect(colorScale.getByLabelText('Study: Study Data Block')).toBeInTheDocument();
+  });
+
   it('keeps the token filter and compact corpus legend inside the statistics card', async () => {
     const user = userEvent.setup();
     const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });

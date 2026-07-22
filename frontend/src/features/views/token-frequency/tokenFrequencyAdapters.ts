@@ -99,32 +99,21 @@ export const buildResponseDisplayNameHints = (
   return mapping;
 };
 
-/** Resolves the node ordering that downstream adapters should use for result display. */
 /**
- * Used by: useTokenFrequencyResultModel because result display needs a stable node order before normalizing backend rows.
- * Flow: combine request node_ids, previous comparison ids, and selected node ids, then keep first nonempty occurrence of each id.
+ * Orders completed-result nodes by the current tab-input presentation order.
+ * Result membership remains authoritative: current inputs can reorder matching
+ * nodes but cannot introduce a node that did not produce the displayed result.
  */
-export const computeAnalysisNodeIds = (
-  paramsNodeIds: unknown,
-  lastCompareNodeIds: string[],
-  nodeColumnSelections: { nodeId: string }[],
+export const deriveResultDisplayNodeIds = (
+  resultNodeIds: readonly string[],
+  nodeColumnSelections: readonly { nodeId: string }[],
 ): string[] => {
-  const combined: (string | null | undefined)[] = [];
-  if (Array.isArray(paramsNodeIds)) {
-    combined.push(...(paramsNodeIds as string[]));
-  }
-  combined.push(...lastCompareNodeIds);
-  combined.push(...nodeColumnSelections.map((sel) => sel.nodeId));
-
-  const seen = new Set<string>();
-  const deduped: string[] = [];
-  combined.forEach((id) => {
-    if (isNonEmptyString(id) && !seen.has(id)) {
-      seen.add(id);
-      deduped.push(id);
-    }
-  });
-  return deduped;
+  const resultNodeIdSet = new Set(resultNodeIds);
+  const panelNodeIds = nodeColumnSelections
+    .map((selection) => selection.nodeId)
+    .filter((nodeId) => resultNodeIdSet.has(nodeId));
+  const panelNodeIdSet = new Set(panelNodeIds);
+  return [...panelNodeIds, ...resultNodeIds.filter((nodeId) => !panelNodeIdSet.has(nodeId))];
 };
 
 /** Normalizes backend result maps into stable per-node view models for panels and exports. */
@@ -135,7 +124,7 @@ export const computeAnalysisNodeIds = (
  */
 export const normalizeNodeResults = (
   data: unknown,
-  analysisNodeIds: string[],
+  displayNodeIds: string[],
   computeDisplayName: (nodeId: string, fallbackKey?: string) => string,
 ): NormalizedNodeResult[] => {
   if (!data || typeof data !== 'object') {
@@ -145,7 +134,7 @@ export const normalizeNodeResults = (
   const dataRecord = data as Record<string, unknown>;
   const entries = Object.entries(dataRecord);
   const usedKeys = new Set<string>();
-  const nodeIds = analysisNodeIds.length > 0 ? analysisNodeIds : entries.map(([key]) => key);
+  const nodeIds = displayNodeIds.length > 0 ? displayNodeIds : entries.map(([key]) => key);
 
   /** Finds an unmatched backend entry whose metadata identifies the requested node. */
   /**

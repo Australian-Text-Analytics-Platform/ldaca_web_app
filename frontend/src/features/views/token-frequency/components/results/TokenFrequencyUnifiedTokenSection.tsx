@@ -109,12 +109,14 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   }
 
   const isComparative = normalizedNodeResults.length === 2 && lastCompareNodeIds.length === 2;
-  const nodeAResult = nodeDisplayResults[0] ?? normalizedNodeResults[0] ?? null;
-  const nodeBResult = nodeDisplayResults[1] ?? normalizedNodeResults[1] ?? null;
-  const nodeAId = nodeAResult?.nodeId ?? lastCompareNodeIds[0] ?? '';
-  const nodeBId = nodeBResult?.nodeId ?? lastCompareNodeIds[1] ?? '';
-  const nodeAName = nodeAResult?.displayName ?? computeDisplayName(nodeAId, nodeAId);
-  const nodeBName = nodeBResult?.displayName ?? computeDisplayName(nodeBId, nodeBId);
+  // The gradient encodes backend comparison roles, not card position: node A
+  // remains Reference and node B remains Study even when cards follow a
+  // different tab-input display order.
+  const resultById = new Map(nodeDisplayResults.map((result) => [result.nodeId, result]));
+  const nodeAId = lastCompareNodeIds[0] ?? nodeDisplayResults[0]?.nodeId ?? '';
+  const nodeBId = lastCompareNodeIds[1] ?? nodeDisplayResults[1]?.nodeId ?? '';
+  const nodeAName = resultById.get(nodeAId)?.displayName ?? computeDisplayName(nodeAId, nodeAId);
+  const nodeBName = resultById.get(nodeBId)?.displayName ?? computeDisplayName(nodeBId, nodeBId);
   const nodeAColor = getColorForNode(nodeAId || nodeAName, 0);
   const nodeBColor = getColorForNode(nodeBId || nodeBName, 1);
 
