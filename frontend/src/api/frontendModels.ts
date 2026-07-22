@@ -11,12 +11,10 @@ import type {
   DataPortalRecord,
   DataPortalSearchRequest,
   FileResource,
-  QuotationAnalysisRequest,
   QuotationResult,
   ResultColumnMetadata,
   SampleCollection,
   SequentialResult,
-  Tab,
   TokenFrequencyAnalysisRequest,
   TokenFrequencyResult,
   TopicItem,
@@ -124,23 +122,6 @@ export interface SourceRowPagination {
   has_prev: boolean;
 }
 
-export interface AnalysisTabInput {
-  node_id: string;
-  column?: string | null;
-}
-
-/** Presentation-only tab state retained for existing tab-panel components. */
-export interface AnalysisTab {
-  tab_id: string;
-  task_id: string | null;
-  title: string;
-  input_sets: Record<string, AnalysisTabInput[]>;
-  settings: Record<string, string>;
-}
-export interface WorkspaceTabsState {
-  groups: Record<string, { tabs: AnalysisTab[]; active_tab_id: string | null }>;
-}
-
 export interface OniSearchRequest extends DataPortalSearchRequest {
   page?: number;
   page_size?: number;
@@ -159,14 +140,6 @@ export interface DetachNodeOption {
   available_columns: string[];
   disabled_columns?: string[];
 }
-export interface ColumnInfo {
-  name: string;
-  dtype: string;
-}
-export interface ColumnOperationsResponse {
-  operations: Record<string, { method: string; label: string }[]>;
-}
-
 export type PolarsExpressionContext =
   | 'filter'
   | 'group_by_agg'
@@ -180,14 +153,8 @@ export interface PolarsExpressionRequest {
   name?: string | null;
 }
 export type PolarsExpressionApplyResponse = WorkspaceNodeInfo;
-export type ReplaceRequest = Record<string, unknown>;
-export type ReplaceApplyResponse = WorkspaceNodeInfo;
-export type SliceRequest = Record<string, unknown>;
-export type FilterCondition = Record<string, unknown>;
-export type FilterRequest = Record<string, unknown>;
 export type TokenFrequencyRequest = TokenFrequencyAnalysisRequest;
 export type TopicModelingRequest = TopicModelingAnalysisRequest;
-export type QuotationRequest = QuotationAnalysisRequest;
 export type QuotationEngineConfig = QuotationEngineSelection;
 export type QuotationMetadata = ResultColumnMetadata;
 export type TopicModelingTopic = TopicItem;
@@ -242,5 +209,3 @@ export function toFileTree(resources: FileResource[]): FileTreeNodeResponse[] {
   }
   return roots;
 }
-
-export type GeneratedTab = Tab;

@@ -266,7 +266,7 @@
           },
           "classes": {
             "items": {
-              "$ref": "#/components/schemas/AnnotationClass-Output"
+              "$ref": "#/components/schemas/AnnotationClass"
             },
             "maxItems": 200,
             "minItems": 1,
@@ -382,7 +382,7 @@
           },
           "classes": {
             "items": {
-              "$ref": "#/components/schemas/ldaca_wordflow__domain__workspace__analysis__AnnotationClass"
+              "$ref": "#/components/schemas/AnnotationClass"
             },
             "maxItems": 200,
             "minItems": 1,
@@ -470,8 +470,9 @@
         "title": "AnnotationAnalysisSubmission",
         "type": "object"
       },
-      "AnnotationClass-Output": {
+      "AnnotationClass": {
         "additionalProperties": false,
+        "description": "One exact label and optional model-facing description.",
         "properties": {
           "description": {
             "default": "",
@@ -731,7 +732,7 @@
           },
           "classes": {
             "items": {
-              "$ref": "#/components/schemas/ldaca_wordflow__models__annotations__AnnotationClass"
+              "$ref": "#/components/schemas/AnnotationClass"
             },
             "maxItems": 200,
             "minItems": 1,
@@ -2109,6 +2110,17 @@
             "minItems": 1,
             "title": "Node Ids",
             "type": "array"
+          },
+          "node_tokenizer_models": {
+            "additionalProperties": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Node Tokenizer Models",
+            "type": "object"
           },
           "num_left_tokens": {
             "default": 10,
@@ -4343,6 +4355,18 @@
               }
             ],
             "title": "Name"
+          },
+          "tokenizer_model": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokenizer Model"
           }
         },
         "title": "NodeUpdateRequest",
@@ -6449,7 +6473,8 @@
         },
         "required": [
           "node_ids",
-          "node_columns"
+          "node_columns",
+          "node_tokenizer_models"
         ],
         "title": "TokenFrequencyAnalysisRequest",
         "type": "object"
@@ -7588,17 +7613,6 @@
             "title": "Contextual Hints Enabled",
             "type": "boolean"
           },
-          "default_tokenizer_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Tokenizer Model"
-          },
           "favorite_workspaces": {
             "items": {
               "type": "string"
@@ -7630,17 +7644,6 @@
             "default": true,
             "title": "Contextual Hints Enabled",
             "type": "boolean"
-          },
-          "default_tokenizer_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Tokenizer Model"
           },
           "favorite_workspaces": {
             "items": {
@@ -7825,12 +7828,17 @@
             "title": "Shape",
             "type": "array"
           },
-          "tokenizer_models": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "title": "Tokenizer Models",
-            "type": "object"
+          "tokenizer_model": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokenizer Model"
           }
         },
         "required": [
@@ -8173,51 +8181,6 @@
           "assignments"
         ],
         "title": "_TopicNodeArtifactResource",
-        "type": "object"
-      },
-      "ldaca_wordflow__domain__workspace__analysis__AnnotationClass": {
-        "additionalProperties": false,
-        "properties": {
-          "description": {
-            "default": "",
-            "maxLength": 2000,
-            "title": "Description",
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "AnnotationClass",
-        "type": "object"
-      },
-      "ldaca_wordflow__models__annotations__AnnotationClass": {
-        "additionalProperties": false,
-        "description": "One exact label and optional model-facing description.",
-        "properties": {
-          "description": {
-            "default": "",
-            "maxLength": 2000,
-            "title": "Description",
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "AnnotationClass",
         "type": "object"
       }
     },

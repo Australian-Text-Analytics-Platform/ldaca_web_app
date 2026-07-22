@@ -127,7 +127,7 @@ export type AnnotationAnalysisRequest = {
     /**
      * Classes
      */
-    classes: Array<AnnotationClassOutput>;
+    classes: Array<AnnotationClass>;
     /**
      * Instruction
      */
@@ -183,7 +183,7 @@ export type AnnotationAnalysisSubmission = {
     /**
      * Classes
      */
-    classes: Array<LdacaWordflowDomainWorkspaceAnalysisAnnotationClass>;
+    classes: Array<AnnotationClass>;
     /**
      * Instruction
      */
@@ -228,8 +228,10 @@ export type AnnotationAnalysisSubmission = {
 
 /**
  * AnnotationClass
+ *
+ * One exact label and optional model-facing description.
  */
-export type AnnotationClassOutput = {
+export type AnnotationClass = {
     /**
      * Description
      */
@@ -381,7 +383,7 @@ export type AnnotationPreviewRequest = {
     /**
      * Classes
      */
-    classes: Array<LdacaWordflowModelsAnnotationsAnnotationClass>;
+    classes: Array<AnnotationClass>;
     /**
      * Instruction
      */
@@ -985,6 +987,12 @@ export type ConcordanceAnalysisRequest = {
      * Node Ids
      */
     node_ids: Array<string>;
+    /**
+     * Node Tokenizer Models
+     */
+    node_tokenizer_models?: {
+        [key: string]: string;
+    };
     /**
      * Num Left Tokens
      */
@@ -2082,6 +2090,10 @@ export type NodeUpdateRequest = {
      * Name
      */
     name?: string | null;
+    /**
+     * Tokenizer Model
+     */
+    tokenizer_model?: string | null;
 };
 
 /**
@@ -3154,7 +3166,7 @@ export type TokenFrequencyAnalysisRequest = {
     /**
      * Node Tokenizer Models
      */
-    node_tokenizer_models?: {
+    node_tokenizer_models: {
         [key: string]: string;
     };
     /**
@@ -3693,10 +3705,6 @@ export type UserPreferences = {
      */
     contextual_hints_enabled?: boolean;
     /**
-     * Default Tokenizer Model
-     */
-    default_tokenizer_model?: string | null;
-    /**
      * Favorite Workspaces
      */
     favorite_workspaces?: Array<string>;
@@ -3720,10 +3728,6 @@ export type UserPreferencesPatch = {
      * Contextual Hints Enabled
      */
     contextual_hints_enabled?: boolean;
-    /**
-     * Default Tokenizer Model
-     */
-    default_tokenizer_model?: string | null;
     /**
      * Favorite Workspaces
      */
@@ -3822,11 +3826,9 @@ export type WorkspaceNodeInfo = {
         number | null
     ];
     /**
-     * Tokenizer Models
+     * Tokenizer Model
      */
-    tokenizer_models?: {
-        [key: string]: string;
-    };
+    tokenizer_model?: string | null;
 };
 
 /**
@@ -4022,36 +4024,6 @@ export type TopicNodeArtifactResource = {
 };
 
 /**
- * AnnotationClass
- */
-export type LdacaWordflowDomainWorkspaceAnalysisAnnotationClass = {
-    /**
-     * Description
-     */
-    description?: string;
-    /**
-     * Name
-     */
-    name: string;
-};
-
-/**
- * AnnotationClass
- *
- * One exact label and optional model-facing description.
- */
-export type LdacaWordflowModelsAnnotationsAnnotationClass = {
-    /**
-     * Description
-     */
-    description?: string;
-    /**
-     * Name
-     */
-    name: string;
-};
-
-/**
  * AnnotationAnalysisSubmission
  *
  * Annotation creation command with an optional request-only credential.
@@ -4068,7 +4040,7 @@ export type AnnotationAnalysisSubmissionWritable = {
     /**
      * Classes
      */
-    classes: Array<LdacaWordflowDomainWorkspaceAnalysisAnnotationClass>;
+    classes: Array<AnnotationClass>;
     /**
      * Instruction
      */
@@ -4128,7 +4100,7 @@ export type AnnotationPreviewRequestWritable = {
     /**
      * Classes
      */
-    classes: Array<LdacaWordflowModelsAnnotationsAnnotationClass>;
+    classes: Array<AnnotationClass>;
     /**
      * Instruction
      */
