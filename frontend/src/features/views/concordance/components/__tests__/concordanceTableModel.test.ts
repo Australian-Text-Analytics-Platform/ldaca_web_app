@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConcordanceNodeResult } from '@/api';
-import {
-  alignmentClassForColumn,
-  buildConcordanceTableModel,
-  dedupeColumns,
-} from '../concordanceTableModel';
+import { alignmentClassForColumn, buildConcordanceTableModel } from '../concordanceTableModel';
 
 const makeNodeData = (columns: string[] = ['CONC_left_context', 'CONC_matched_text', 'speaker']) =>
   ({
@@ -37,13 +33,6 @@ const makeNodeData = (columns: string[] = ['CONC_left_context', 'CONC_matched_te
   }) as ConcordanceNodeResult;
 
 describe('concordanceTableModel', () => {
-  it('deduplicates columns while preserving first occurrence order', () => {
-    expect(dedupeColumns(['CONC_matched_text', 'speaker', 'speaker'])).toEqual([
-      'CONC_matched_text',
-      'speaker',
-    ]);
-  });
-
   it('returns KWIC alignment classes for context and match columns', () => {
     expect(alignmentClassForColumn('CONC_left_context')).toBe('text-right');
     expect(alignmentClassForColumn('CONC_matched_text')).toBe('text-center');
@@ -54,7 +43,7 @@ describe('concordanceTableModel', () => {
     const model = buildConcordanceTableModel({
       nodeData: makeNodeData(),
       showMetadata: true,
-      selectedMetadataColumns: ['speaker', 'missing'],
+      selectedMetadataColumns: ['speaker', 'speaker', 'missing'],
     });
 
     expect(model.rows).toHaveLength(1);

@@ -39,9 +39,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
-    quotationSearch: vi.fn(),
     detachQuotation: vi.fn(),
-    materializeQuotation: vi.fn(),
   }),
 }));
 
@@ -99,14 +97,14 @@ vi.mock('../../common/rerunAnalysis', () => ({
 vi.mock('../hooks/useQuotationEngineSettings', () => ({
   useQuotationEngineSettings: () => ({
     engineConfig: { type: 'local' },
-    lastRemoteUrl: '',
+    lastRemoteEngineId: '',
     engineError: null,
-    resolvedEnginePayload: { type: 'local', isValid: true, normalizedUrl: null },
+    resolvedEnginePayload: { type: 'local' },
     engineReady: true,
     setTaskEngineConfig: vi.fn(),
-    updateRemoteUrl: vi.fn(),
+    updateRemoteEngineId: vi.fn(),
     hydrateEngineConfig: vi.fn(),
-    buildEngineRequest: vi.fn(),
+    buildEngineRequest: vi.fn(() => ({ type: 'local' })),
   }),
 }));
 
@@ -140,33 +138,19 @@ vi.mock('../hooks/useQuotationResultControls', () => ({
       nodeState: {},
       nodeDetaching: {},
       setNodeDetaching: vi.fn(),
-      nodeMaterializing: {},
-      setNodeMaterializing: vi.fn(),
-      materializeTaskIds: {},
-      setMaterializeTaskIds: vi.fn(),
-      materializedPaths: {},
-      materializeSummary: {},
       resultsByNode: {},
-      applyMaterializedRequest: vi.fn(),
-      resetAfterClear: vi.fn(),
     };
   },
 }));
 
 vi.mock('../hooks/useQuotationTaskFlow', () => ({
   useQuotationTaskFlow: () => ({
-    persistContextLengthPreference: vi.fn(() => Promise.resolve()),
     handleSearchAll: vi.fn(),
     handlePageChange: vi.fn(),
     handlePageSizeChange: vi.fn(),
     handleSort: vi.fn(),
     handleDetach: vi.fn(),
-    handleMaterialize: vi.fn(),
   }),
-}));
-
-vi.mock('../hooks/useQuotationMaterializeLifecycle', () => ({
-  useQuotationMaterializeLifecycle: vi.fn(),
 }));
 
 vi.mock('../hooks/useQuotationDetachDialog', () => ({

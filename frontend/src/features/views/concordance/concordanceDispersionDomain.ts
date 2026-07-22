@@ -273,7 +273,7 @@ export function formatBinIndicesAsRangeLabel(
  * the current page — the per-page batch size capped by the corpus.
  * ``page_size`` alone overstates on small corpora (estimator might pick
  * 100 when only 30 rows exist); ``total_source_rows`` alone conflates
- * "this batch" with "the whole corpus." Returns ``undefined`` when
+ * the current batch size with the total source-row count. Returns ``undefined`` when
  * neither value is reportable so callers can suppress the suffix.
  */
 /**

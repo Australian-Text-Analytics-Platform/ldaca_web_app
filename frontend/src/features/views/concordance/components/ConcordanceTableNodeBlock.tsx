@@ -15,6 +15,7 @@ import { batchProcessedCount } from '../concordanceDispersionDomain';
 import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import { ConcordancePlainHeader, ConcordanceRowsTable } from './ConcordanceRowsTable';
+import { CONCORDANCE_GENERATED_COLUMN_SET } from '../../common/generatedColumns';
 import {
   buildConcordanceTableModel,
   type ConcordanceGroupedRow,
@@ -91,9 +92,7 @@ export function ConcordanceTableNodeBlock(props: ConcordanceTableNodeBlockProps)
  * document yields zero or more KWIC hits and empty documents are dropped. The
  * TanStack instance is told `rowCount = total_source_rows` and
  * `pageSize = globalPageSize`, so the footer reflects "documents per batch" while
- * the body still renders the variable number of flattened hit rows. Once the
- * node is materialized each row is a single occurrence (`page_size == num_rows`),
- * so the footer label switches to "Occurrences per page".
+ * the body still renders the variable number of flattened hit rows.
  * Flow: derive display columns, build the server table, then render the coloured
  * KWIC rows and the shared pagination footer.
  */
@@ -233,12 +232,9 @@ function CombinedConcordanceTable({
  *
  * Like the combined view, pagination walks SOURCE documents: `rowCount` is the
  * backend's `total_source_rows` so the footer's page math reflects documents per
- * batch even though the body shows a variable number of hit rows. Once the node
- * is materialized each row is a single occurrence (`page_size == num_rows`), so
- * the footer label switches to "Occurrences per page".
- * Flow: derive display columns, build the server table, render sortable KWIC
- * rows, then render the shared footer with the Process / Add-to-Workspace
- * actions.
+ * batch even though the body shows a variable number of hit rows.
+ * Flow: derive display columns, build the server table, render generated KWIC
+ * headers plus sortable source metadata, then render the shared footer.
  */
 function PerNodeConcordanceTable({
   nodeKey,
@@ -376,22 +372,21 @@ function PerNodeConcordanceTable({
           rows={rows}
           tableColumns={tableColumns}
           searchWord={searchWord}
-          renderHeader={(header) => (
-            // Every displayed column is sortable: the backend's materialised
-            // path honours sort_by for any column in the parquet schema
-            // (including CONC_*). The non-materialised path silently drops
-            // CONC_* sorts because those columns are computed post-slice, but
-            // metadata-column sorts still apply.
-            <SortableHeader
-              key={header.id}
-              columnKey={header.column.id}
-              label={header.column.id}
-              paginationKey={paginationKey}
-              requestNodeId={requestNodeId}
-              nodePagination={nodePagination}
-              onSort={handleSort}
-            />
-          )}
+          renderHeader={(header) =>
+            CONCORDANCE_GENERATED_COLUMN_SET.has(header.column.id) ? (
+              <ConcordancePlainHeader key={header.id} header={header} />
+            ) : (
+              <SortableHeader
+                key={header.id}
+                columnKey={header.column.id}
+                label={header.column.id}
+                paginationKey={paginationKey}
+                requestNodeId={requestNodeId}
+                nodePagination={nodePagination}
+                onSort={handleSort}
+              />
+            )
+          }
           getRowClassName={(_row, index) =>
             `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
           }

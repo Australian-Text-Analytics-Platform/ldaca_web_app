@@ -83,7 +83,7 @@ export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
   const engineReady = resolvedEnginePayload.type === 'local' ? true : resolvedEnginePayload.isValid;
 
   /** Validates the current UI config and returns the backend request payload. */
-  // Called by: useQuotationTaskFlow before run, detach, and materialize requests because every backend action must use the same engine normalization rules.
+  // Called by: useQuotationTaskFlow before run and detach requests because every backend action must use the same engine normalization rules.
   const buildEngineRequest = (): QuotationEngineRequestPayload | null => {
     if (resolvedEnginePayload.type === 'local') {
       if (engineError !== null) setEngineError(null);

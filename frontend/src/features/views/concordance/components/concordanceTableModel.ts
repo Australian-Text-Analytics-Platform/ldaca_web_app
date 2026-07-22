@@ -25,18 +25,6 @@ export function alignmentClassForColumn(columnKey: string): string {
   return '';
 }
 
-/** Used by: concordance table display-column assembly to remove repeated concordance/metadata keys while preserving first occurrence order. */
-export const dedupeColumns = (cols: string[]): string[] => {
-  const seen = new Set<string>();
-  return cols.filter((col) => {
-    if (seen.has(col)) {
-      return false;
-    }
-    seen.add(col);
-    return true;
-  });
-};
-
 /**
  * Builds TanStack column defs for a concordance table.
  * Used by: buildConcordanceTableModel because combined and per-node tables
@@ -93,7 +81,7 @@ export function buildConcordanceTableModel({
         ...visibleMetadataColumns.filter((columnName) => allColumns.includes(columnName)),
       ]
     : concordanceColumns.filter((columnName) => allColumns.includes(columnName));
-  const displayColumns = dedupeColumns(rawDisplayColumns);
+  const displayColumns = Array.from(new Set(rawDisplayColumns));
   const tableColumns =
     fallbackToAllColumns && displayColumns.length === 0 ? allColumns : displayColumns;
 

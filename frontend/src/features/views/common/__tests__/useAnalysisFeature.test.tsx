@@ -17,6 +17,13 @@ const mocks = vi.hoisted(() => ({
     resultError: null as unknown,
     isLoading: false,
   },
+  sessionOptions: null as {
+    loadResult?: (
+      workspaceId: string,
+      analysisId: string,
+      query?: Readonly<Record<string, unknown>>,
+    ) => Promise<unknown>;
+  } | null,
   toastError: vi.fn(),
 }));
 
@@ -27,7 +34,10 @@ vi.mock('@/api', async (importOriginal) => ({
 }));
 
 vi.mock('../hooks/useAnalysisSession', () => ({
-  useAnalysisSession: () => mocks.session,
+  useAnalysisSession: (options: typeof mocks.sessionOptions) => {
+    mocks.sessionOptions = options;
+    return mocks.session;
+  },
 }));
 
 vi.mock('sonner', () => ({
@@ -85,6 +95,7 @@ describe('useAnalysisFeature', () => {
     mocks.session.lifecycleError = null;
     mocks.session.resultError = null;
     mocks.session.isLoading = false;
+    mocks.sessionOptions = null;
     mocks.cancelAnalysis.mockResolvedValue({ data: analysis({ state: 'cancelled' }) });
     mocks.clearTabAnalysis.mockResolvedValue({ data: undefined });
   });
@@ -105,6 +116,16 @@ describe('useAnalysisFeature', () => {
     });
     view.rerender();
     expect(config.onRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards the query-key projection to the Result loader', async () => {
+    const config = baseConfig();
+    renderHook(() => useAnalysisFeature(config), { wrapper: createWrapper() });
+    const projection = { page: 1, sort_by: 'text', descending: true };
+
+    await mocks.sessionOptions?.loadResult?.('workspace-1', 'analysis-1', projection);
+
+    expect(config.fetchResult).toHaveBeenCalledWith('analysis-1', projection);
   });
 
   it('derives failure state from Analysis without inventing a Result lifecycle', () => {

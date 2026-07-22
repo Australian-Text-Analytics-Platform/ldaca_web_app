@@ -53,7 +53,7 @@ export interface ServerPaginationFooterProps<TData> {
   pageSizeSummary?: React.ReactNode;
   /** Show an inline loading indicator next to the page controls. */
   loading?: boolean;
-  /** Trailing actions (e.g. Process / Detach / Add to Workspace buttons). */
+  /** Trailing actions such as Add to Workspace buttons. */
   children?: React.ReactNode;
   /** Tight workspace styling (native select, smaller paddings). */
   compact?: boolean;

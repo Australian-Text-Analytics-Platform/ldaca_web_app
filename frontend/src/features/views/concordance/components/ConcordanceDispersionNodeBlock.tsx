@@ -430,10 +430,8 @@ export function ConcordanceDispersionNodeBlock({
   const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
   const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
-  // Mirror the table block's fallback: prefer the per-node materialised
-  // summary when available, otherwise count from ``nodeData.data`` +
-  // pagination so separated dispersion view count lines still render before
-  // materialization completes.
+  // Mirror the table block by summarizing the current page groups together
+  // with the source documents considered for this page.
   const pageSizeSummary = (
     <GroupedResultsPageSizeSummary
       groups={nodeData.data}

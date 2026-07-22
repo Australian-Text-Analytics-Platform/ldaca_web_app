@@ -25,6 +25,8 @@ export interface QuotationNodeBlockProps {
   textCol: string;
   /** Ordered display columns (document column first, then metadata). */
   cols: string[];
+  /** Source metadata columns accepted by the snapshot sort contract. */
+  sortableColumns: string[];
   /** Quotation rows for the current page (rows without quotations already filtered out). */
   rows: QuotationResultRow[];
   /** Source-row pagination metadata returned by the backend. */
@@ -51,7 +53,7 @@ export interface QuotationNodeBlockProps {
   pageSizeSummary?: React.ReactNode;
   /** Hide the page-size selector when the view is read-only. */
   showPageSize?: boolean;
-  /** Trailing footer actions (e.g. Process All / Add to Workspace). */
+  /** Trailing footer actions such as Add to Workspace. */
   children?: React.ReactNode;
 }
 
@@ -72,10 +74,18 @@ export interface QuotationNodeBlockProps {
  * pagination back to the feature's page handlers, then render header/body via
  * flexRender and the shared pagination footer.
  */
-export function QuotationNodeBlock({
+export function QuotationNodeBlock({ ...props }: QuotationNodeBlockProps) {
+  // TanStack retains column-definition closures by column ID. Re-key when the
+  // source column hydrates or changes so the virtual document header always
+  // targets the current immutable Analysis column.
+  return <QuotationNodeBlockContent key={props.textCol} {...props} />;
+}
+
+function QuotationNodeBlockContent({
   nodeId,
   textCol,
   cols,
+  sortableColumns,
   rows,
   pagination,
   sortBy,
@@ -94,19 +104,25 @@ export function QuotationNodeBlock({
   const page = pagination?.page ?? 1;
   const pageSize = pagination?.page_size ?? 50;
   const rowCount = pagination?.total_source_rows ?? 0;
+  const sortableColumnSet = new Set(sortableColumns);
 
   const columns: ColumnDef<QuotationResultRow>[] = cols.map((columnName) => ({
     id: columnName,
     accessorFn: (row) =>
       columnName === QUOTATION_DOCUMENT_COLUMN ? row.text : row.raw[columnName],
     header: () => {
-      const active = sortBy === columnName;
+      const sourceSortColumn = columnName === QUOTATION_DOCUMENT_COLUMN ? textCol : columnName;
+      const sortable =
+        Boolean(sourceSortColumn) &&
+        (columnName === QUOTATION_DOCUMENT_COLUMN || sortableColumnSet.has(columnName));
+      if (!sortable) return <span>{columnName}</span>;
+      const active = sortBy === sourceSortColumn;
       return (
         <button
           type="button"
           className="flex items-center gap-1.5 select-none"
           onClick={() => {
-            onSort(nodeId, columnName);
+            onSort(nodeId, sourceSortColumn);
           }}
         >
           <span>{columnName}</span>

@@ -285,7 +285,8 @@ export function useQuotationTaskFlow({
    */
   const handleSort = async (nodeId: string, column: string) => {
     const sortableColumns = new Set(originalColumnsByNode[nodeId] ?? []);
-    if (!sortableColumns.has(column)) return;
+    const sourceColumn = activeSelections.find((selection) => selection.nodeId === nodeId)?.column;
+    if (column !== sourceColumn && !sortableColumns.has(column)) return;
     const st = nodeState[nodeId] ?? {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,

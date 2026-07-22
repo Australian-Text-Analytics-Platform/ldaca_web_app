@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { ConcordanceNodeResult } from '@/api';
 import {
   buildConcordanceDispersionTableModel,
-  dedupeColumns,
   getDispersionColumnStyle,
 } from '../concordanceDispersionTableModel';
 
@@ -37,20 +36,12 @@ const makeNodeData = (): ConcordanceNodeResult => ({
 });
 
 describe('concordanceDispersionTableModel', () => {
-  it('deduplicates columns while preserving first occurrence order', () => {
-    expect(dedupeColumns(['CONC_dispersion', 'speaker', 'speaker', 'year'])).toEqual([
-      'CONC_dispersion',
-      'speaker',
-      'year',
-    ]);
-  });
-
   it('builds rows, metadata columns, and fixed dispersion width for metadata view', () => {
     const model = buildConcordanceDispersionTableModel({
       nodeData: makeNodeData(),
       textColumn: 'text',
       showMetadata: true,
-      selectedMetadataColumns: ['speaker', 'not_in_columns'],
+      selectedMetadataColumns: ['speaker', 'speaker', 'not_in_columns'],
       resultsViewportWidth: 1000,
       proportionalDispersionBars: true,
     });

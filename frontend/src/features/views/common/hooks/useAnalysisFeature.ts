@@ -114,8 +114,8 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
     workspaceId: config.workspaceId,
     analysisId,
     resultQuery: config.resultQuery,
-    loadResult: async (_workspaceId, ownedAnalysisId) => {
-      return configRef.current.fetchResult(ownedAnalysisId, configRef.current.resultQuery);
+    loadResult: async (_workspaceId, ownedAnalysisId, projectionQuery) => {
+      return configRef.current.fetchResult(ownedAnalysisId, projectionQuery);
     },
   });
 

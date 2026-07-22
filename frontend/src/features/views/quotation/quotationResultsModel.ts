@@ -115,7 +115,7 @@ const normalizeSpan = (
 
 /**
  * Normalizes one raw backend row into the only row/span shape used by table,
- * detail, filtering, and materialization-facing UI code.
+ * detail, filtering, and detachment UI code.
  */
 export const normalizeQuotationRow = (
   raw: Record<string, unknown>,

@@ -117,8 +117,8 @@ export function getConcordanceSourceColor(
 
 /**
  * Resolves a rendered concordance result key back to a backend node id.
- * Used by: ConcordanceFeature, metadata-column derivation, and materialized
- * dispersion helpers because result blocks can be keyed by canonical node id,
+ * Used by: ConcordanceFeature and result projection helpers because result
+ * blocks can be keyed by canonical node id,
  * canonical node name, or a request-provided label-to-node map.
  */
 export function resolveConcordanceNodeIdForKey(
@@ -157,12 +157,6 @@ export function resolveConcordanceResultBlock<T extends ConcordanceNodeIdentity>
   return { node, nodeId: node.id, column };
 }
 
-/**
- * Resolves a rendered concordance result block to every source node id behind it.
- * Used by: ConcordanceFeature and materialized dispersion helpers so the
- * combined view can require/process all backing nodes while separated blocks
- * target only their own source node.
- */
 export interface CollectConcordanceMatchedTextsOptions {
   lowercaseMatches: boolean;
 }

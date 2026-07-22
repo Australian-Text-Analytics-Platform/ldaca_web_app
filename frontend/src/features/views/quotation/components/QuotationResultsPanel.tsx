@@ -168,6 +168,7 @@ export function QuotationResultsPanel({
               nodeId={nodeId}
               textCol={textCol}
               cols={cols}
+              sortableColumns={resultState?.metadata.metadata_columns ?? []}
               rows={rowsWithQuotes}
               pagination={resultState?.pagination}
               sortBy={resultState?.sorting.sort_by}

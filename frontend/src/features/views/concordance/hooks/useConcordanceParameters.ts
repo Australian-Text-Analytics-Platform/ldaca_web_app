@@ -72,7 +72,7 @@ export function useConcordanceParameters() {
    * Restores search controls and returns the node/column selections embedded in
    * a saved request.
    * Called by: ConcordanceFeature's `useAnalysisFeature` request hydration
-   * callback before it restores materialized caches.
+   * callback before it projects the saved Result.
    */
   const applyHydratedRequest = (request: Record<string, unknown>): ConcordanceInputSelection[] => {
     const nodeIds = Array.isArray(request.node_ids)

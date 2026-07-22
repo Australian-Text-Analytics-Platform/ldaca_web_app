@@ -10,18 +10,6 @@ import {
 const DISPERSION_COLUMN_WIDTH_RATIO = 0.85;
 const METADATA_COLUMN_MIN_WIDTH_PX = 200;
 
-/** Used by: dispersion table model assembly to prevent duplicate dispersion/metadata columns in rendered result blocks. */
-export const dedupeColumns = (cols: string[]): string[] => {
-  const seen = new Set<string>();
-  return cols.filter((col) => {
-    if (seen.has(col)) {
-      return false;
-    }
-    seen.add(col);
-    return true;
-  });
-};
-
 /**
  * When metadata columns are visible, lock the dispersion bar column to 85% of
  * the viewport so hit bars remain readable while metadata scrolls horizontally.
@@ -100,7 +88,7 @@ export function buildConcordanceDispersionTableModel({
         ...visibleMetadataColumns.filter((columnName) => nodeData.columns.includes(columnName)),
       ]
     : [CONCORDANCE_DISPERSION_COLUMN];
-  const displayColumns = dedupeColumns(rawDisplayColumns);
+  const displayColumns = Array.from(new Set(rawDisplayColumns));
 
   return {
     rows,

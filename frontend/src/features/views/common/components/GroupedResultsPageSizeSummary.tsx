@@ -3,10 +3,6 @@ interface GroupedResultsPageSizeSummaryProps<
 > {
   groups: Row[][];
   totalProcessed?: number;
-  /** Override the instance count computed from groups (e.g. materialized total). */
-  totalInstances?: number;
-  /** Override the document count computed from groups (e.g. materialized unique docs). */
-  totalDocuments?: number;
 }
 
 /** Called by: GroupedResultsPageSizeSummary when backend totals are unavailable. */
@@ -21,17 +17,15 @@ const countGroupedResultDocuments = (groups: Record<string, unknown>[][]): numbe
 
 /**
  * Supplies the shared page-size summary copy for grouped analysis result tables,
- * using materialized totals when available and group counts otherwise.
+ * using the current page's grouped instance and document counts.
  * Used by: concordance and quotation paginated grouped result tables.
  */
 export function GroupedResultsPageSizeSummary<Row extends Record<string, unknown>>({
   groups,
   totalProcessed,
-  totalInstances,
-  totalDocuments,
 }: GroupedResultsPageSizeSummaryProps<Row>) {
-  const instanceCount = totalInstances ?? countGroupedResultInstances(groups);
-  const documentCount = totalDocuments ?? countGroupedResultDocuments(groups);
+  const instanceCount = countGroupedResultInstances(groups);
+  const documentCount = countGroupedResultDocuments(groups);
 
   return (
     <>

@@ -4,17 +4,11 @@ import { useRowDetailDialog } from '../../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../../common/components/highlightText';
 import {
   CONCORDANCE_COLUMN_KEYS,
-  CONCORDANCE_CORE_COLUMNS,
-  CONCORDANCE_FREQ_COLUMNS,
+  CONCORDANCE_GENERATED_COLUMNS,
 } from '../../common/generatedColumns';
 import { toCellText } from '../concordanceTableDomain';
 
 type ConcordanceGroupedRow = Record<string, unknown>[];
-
-const GENERATED_CONCORDANCE_COLUMNS = new Set<string>([
-  ...CONCORDANCE_CORE_COLUMNS,
-  ...CONCORDANCE_FREQ_COLUMNS,
-]);
 
 interface ConcordanceDetailExtra {
   concordanceHits: Record<string, unknown>[];
@@ -147,10 +141,7 @@ export function useConcordanceRowDetail({
       record,
       textColumn: column,
       fullText,
-      excludeMetadataColumns: [
-        ...GENERATED_CONCORDANCE_COLUMNS,
-        CONCORDANCE_COLUMN_KEYS.dispersion,
-      ],
+      excludeMetadataColumns: [...CONCORDANCE_GENERATED_COLUMNS],
     });
   };
 

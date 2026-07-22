@@ -113,4 +113,53 @@ describe('useQuotationTaskFlow', () => {
     expect(resetResultQuery).toHaveBeenCalledOnce();
     expect(setResultQuery).not.toHaveBeenCalled();
   });
+
+  it('sorts by the selected source column before schema options finish hydrating', async () => {
+    const setResultQuery = vi.fn();
+    const { result } = renderHook(() =>
+      useQuotationTaskFlow({
+        state: {
+          currentWorkspaceId: 'workspace-1',
+          tabId: 'tab-1',
+          hasLoaded: true,
+          displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
+          activeSelections: [{ nodeId: 'node-1', column: 'text' }],
+          nodeState: {
+            'node-1': {
+              currentPage: 1,
+              pageSize: 100,
+              sortBy: undefined,
+              descending: false,
+            },
+          },
+          originalColumnsByNode: { 'node-1': [] },
+          buildEngineRequest: () => ({ type: 'local' }),
+        },
+        actions: {
+          setIsLoadingQuotations: vi.fn(),
+          setNodeDetaching: vi.fn(),
+          showErrorDialog: vi.fn(),
+          setResultQuery,
+          resetResultQuery: vi.fn(),
+          setLocalTaskId: vi.fn(),
+          runningRef: { current: false },
+          lastFetchedRef: { current: { taskId: 'analysis-1', state: 'succeeded' } },
+          onTaskIdAssigned: vi.fn(),
+        },
+        lock: {
+          resolveTaskId: vi.fn(async () => 'analysis-1'),
+          detachQuotation: vi.fn(),
+        },
+      }),
+    );
+
+    await act(async () => result.current.handleSort('node-1', 'text'));
+
+    expect(setResultQuery).toHaveBeenCalledWith({
+      page: 1,
+      page_size: 100,
+      sort_by: 'text',
+      descending: false,
+    });
+  });
 });

@@ -26,13 +26,21 @@ export const CONCORDANCE_COLUMN_KEYS = {
   extraction: 'CONC_extraction',
 } as const;
 
+export const CONCORDANCE_GENERATED_COLUMNS = [
+  ...CONCORDANCE_CORE_COLUMNS,
+  ...CONCORDANCE_FREQ_COLUMNS,
+  CONCORDANCE_DISPERSION_COLUMN,
+  CONCORDANCE_COLUMN_KEYS.extraction,
+] as const;
+
+export const CONCORDANCE_GENERATED_COLUMN_SET: ReadonlySet<string> = new Set(
+  CONCORDANCE_GENERATED_COLUMNS,
+);
+
 export const QUOTATION_COLUMN_KEYS = {
   // Canonical name for the per-quote-row raw source-document text.
-  // The backend emits a real `QUOTE_extraction` column in materialised
-  // parquets and (opt-in) in detach output; the live result table renders
-  // it as a virtual column that substitutes the user's text column at
-  // render time so the header stays consistent regardless of the source
-  // column's name.
+  // Detached output may include `QUOTE_extraction`; the live result table
+  // renders it as a virtual column backed by the selected source text column.
   document: 'QUOTE_extraction',
   speaker: 'QUOTE_speaker',
   speakerStartIdx: 'QUOTE_speaker_start_idx',
