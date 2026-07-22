@@ -13,6 +13,8 @@ Read only the sections relevant to the work at hand.
   semantics.
 - [Architecture decisions](adr/) explain accepted, hard-to-reverse trade-offs.
 - [Reference](reference/) contains exact APIs, settings, and package contracts.
+- [Persistence integrity](reference/persistence-integrity.md) records the
+  current persistence guarantees and the hardening boundaries that remain.
 - [Runbooks](runbooks/) contains operational and development procedures.
 - [Release records](releases/) are historical snapshots, not current
   architecture.
