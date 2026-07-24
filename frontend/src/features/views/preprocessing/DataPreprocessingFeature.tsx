@@ -42,9 +42,9 @@ type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggrega
 
 const EMPTY_PREPROCESSING_INPUTS: [] = [];
 
-const PolarsExpressionSubTab = lazy(() =>
-  import('./expression/PolarsExpressionSubTab').then((module) => ({
-    default: module.PolarsExpressionSubTab,
+const TypedExpressionSubTab = lazy(() =>
+  import('./expression/TypedExpressionSubTab').then((module) => ({
+    default: module.TypedExpressionSubTab,
   })),
 );
 
@@ -245,7 +245,7 @@ function DataPreprocessingFeature() {
             </TabsTrigger>
             <TabsTrigger value="expression">
               <Code2 className="mr-1.5 h-4 w-4" />
-              Polars Expression
+              Expression
             </TabsTrigger>
           </TabsList>
         </ScrollArea>
@@ -344,7 +344,7 @@ function DataPreprocessingFeature() {
 
         <TabsContent value="expression" className="space-y-4">
           <Suspense fallback={<PolarsExpressionFallback />}>
-            <PolarsExpressionSubTab
+            <TypedExpressionSubTab
               renderNodeInputsPanel={renderNodeInputsPanel}
               currentWorkspaceId={currentWorkspaceId}
               selectedNodes={selectedNodes}

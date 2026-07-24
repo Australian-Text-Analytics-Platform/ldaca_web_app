@@ -21,7 +21,6 @@
   "author": "Australian Text Analytics Platform",
   "license": "MIT",
   "dependencies": {
-    "@codemirror/lang-python": "^6.2.1",
     "@codemirror/view": "^6.43.1",
     "@dagrejs/dagre": "^3.0.0",
     "@mediapipe/tasks-text": "^0.10.35",

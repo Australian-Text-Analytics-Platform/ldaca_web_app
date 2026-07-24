@@ -5,12 +5,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import type { AggregateOperation } from '../hooks/aggregateExpressionModel';
 
 interface OperationPopoverProps {
   workspaceId: string | null;
   nodeId: string;
   column: string;
-  onSelect: (operation: string) => void;
+  onSelect: (operation: AggregateOperation) => void;
   disabled?: boolean;
   children: React.ReactNode;
 }
@@ -25,7 +26,7 @@ interface OperationPopoverProps {
  */
 export function OperationPopover({ onSelect, disabled, children }: OperationPopoverProps) {
   const [open, setOpen] = useState(false);
-  const operations: Record<string, { method: string; label: string }[]> = {
+  const operations: Record<string, { method: AggregateOperation; label: string }[]> = {
     '': [
       { method: 'count', label: 'Count' },
       { method: 'sum', label: 'Sum' },
@@ -37,7 +38,7 @@ export function OperationPopover({ onSelect, disabled, children }: OperationPopo
    * Applies the chosen operation to the parent token and closes the popover.
    * Called by each operation menu item's click handler.
    */
-  const handleSelect = (method: string) => {
+  const handleSelect = (method: AggregateOperation) => {
     onSelect(method);
     setOpen(false);
   };
@@ -65,7 +66,7 @@ export function OperationPopover({ onSelect, disabled, children }: OperationPopo
             {Object.entries(operations).map(([namespace, ops]) => {
               const label = namespaceLabel(namespace);
               const opButtons = ops.map((op) => {
-                const qualifiedMethod = namespace ? `${namespace}.${op.method}` : op.method;
+                const qualifiedMethod = op.method;
                 return (
                   <button
                     key={qualifiedMethod}

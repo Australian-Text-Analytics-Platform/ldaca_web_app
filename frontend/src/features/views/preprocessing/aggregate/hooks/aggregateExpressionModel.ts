@@ -1,4 +1,4 @@
-import type { PolarsExpressionRequest } from '@/api';
+import type { ExpressionItemInput, PolarsExpressionRequest } from '@/api';
 
 const SMART_CHAR_MAP: Record<string, string> = {
   '\u201C': '"',
@@ -12,8 +12,16 @@ const SMART_CHAR_MAP: Record<string, string> = {
 };
 
 export type AggregateBuilderToken =
-  | { id: string; kind: 'column'; column: string; dtype: string; operations: string[] }
+  | {
+      id: string;
+      kind: 'column';
+      column: string;
+      dtype: string;
+      operations: AggregateOperation[];
+    }
   | { id: string; kind: 'custom'; value: string };
+
+export type AggregateOperation = 'count' | 'mean' | 'sum';
 
 /**
  * Normalizes smart quotes before expressions reach the backend parser.
@@ -69,24 +77,63 @@ export function tokenToPolarsExpression(token: AggregateBuilderToken): string {
 export const tokensToPolarsExpression = (tokens: AggregateBuilderToken[]): string =>
   tokens.map(tokenToPolarsExpression).join(' + ');
 
+type ExpressionSpec = ExpressionItemInput['expression'];
+
+const customTokenValue = (value: string): string | number => {
+  if (!value.length) return '';
+  const trimmed = value.trim();
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (typeof parsed === 'string') return parsed;
+    } catch {
+      // Preserve malformed quoted input as literal text instead of executing it.
+    }
+  }
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    return trimmed.slice(1, -1);
+  }
+  return value;
+};
+
+const tokenExpression = (token: AggregateBuilderToken): ExpressionSpec => {
+  if (token.kind === 'custom') {
+    return { op: 'literal', value: customTokenValue(token.value) };
+  }
+
+  return token.operations.reduce<ExpressionSpec>(
+    (operand, operation) => ({ op: operation, operand }),
+    { op: 'column', name: token.column },
+  );
+};
+
+const aggregateExpression = (tokens: AggregateBuilderToken[]): ExpressionSpec => {
+  const [first, ...rest] = tokens;
+  if (!first) throw new Error('Add at least one column or literal');
+  return rest.reduce<ExpressionSpec>(
+    (left, token) => ({ op: 'add', left, right: tokenExpression(token) }),
+    tokenExpression(first),
+  );
+};
+
 /**
- * Builds the backend with_columns request from a committed expression and
- * optional output column alias.
- * Used by: aggregate preview and apply flows so both paths share one payload
- * shape and alias-escaping rule.
+ * Builds the backend with_columns request from the visual builder's typed
+ * tokens. Preview and apply therefore share the generated API contract and no
+ * executable Polars source crosses the HTTP boundary.
  */
 export function buildAggregateExpressionRequest(
-  expression: string,
+  tokens: AggregateBuilderToken[],
   columnName: string,
 ): PolarsExpressionRequest {
-  const expressionValue = expression.trim();
   const columnValue = columnName.trim();
-  let code = expressionValue;
-  if (columnValue.length > 0) {
-    code = `(${code}).alias("${escapeDoubleQuotedPolarsString(columnValue)}")`;
-  }
   return {
     context: 'with_columns',
-    expressions: [{ code }],
+    expressions: [
+      {
+        expression: aggregateExpression(tokens),
+        alias: columnValue || null,
+      },
+    ],
   };
 }

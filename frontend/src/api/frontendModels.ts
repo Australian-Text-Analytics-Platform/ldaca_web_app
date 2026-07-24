@@ -10,6 +10,7 @@ import type {
   ConcordanceResult,
   DataPortalRecord,
   DataPortalSearchRequest,
+  ExpressionNodeCreateRequest,
   FileResource,
   QuotationResult,
   ResultColumnMetadata,
@@ -140,18 +141,10 @@ export interface DetachNodeOption {
   available_columns: string[];
   disabled_columns?: string[];
 }
-export type PolarsExpressionContext =
-  | 'filter'
-  | 'group_by_agg'
-  | 'select'
-  | 'sort'
-  | 'with_columns';
-export interface PolarsExpressionRequest {
-  context: PolarsExpressionContext;
-  expressions: Record<string, unknown>[];
-  group_by?: Record<string, unknown>[];
-  name?: string | null;
-}
+export type PolarsExpressionRequest = Pick<
+  ExpressionNodeCreateRequest,
+  'context' | 'expressions' | 'group_by' | 'name'
+>;
 export type PolarsExpressionApplyResponse = WorkspaceNodeInfo;
 export type TokenFrequencyRequest = TokenFrequencyAnalysisRequest;
 export type TopicModelingRequest = TopicModelingAnalysisRequest;

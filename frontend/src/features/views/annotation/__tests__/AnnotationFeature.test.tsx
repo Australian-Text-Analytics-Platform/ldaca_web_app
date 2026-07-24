@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   createSqlDataBlock: vi.fn(),
+  polarsExpressionApply: vi.fn(),
   setInputSet: vi.fn(),
 }));
 
@@ -15,7 +16,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     createSqlDataBlock: mocks.createSqlDataBlock,
-    polarsExpressionApply: vi.fn(),
+    polarsExpressionApply: mocks.polarsExpressionApply,
   }),
 }));
 
@@ -65,6 +66,10 @@ vi.mock('../components/AnnotationClassDescriptionsEditor', () => ({
   AnnotationClassDescriptionsEditor: () => null,
 }));
 
+vi.mock('../components/AnnotationResultsPanel', () => ({
+  AnnotationResultsPanel: () => null,
+}));
+
 vi.mock('../hooks/useAnnotationClassDescriptions', () => ({
   useAnnotationClassDescriptions: () => ({ rows: [], query: {} }),
 }));
@@ -105,8 +110,10 @@ import AnnotationFeature from '../AnnotationFeature';
 describe('AnnotationFeature', () => {
   beforeEach(() => {
     mocks.createSqlDataBlock.mockReset();
+    mocks.polarsExpressionApply.mockReset();
     mocks.setInputSet.mockReset();
     mocks.createSqlDataBlock.mockResolvedValue({ id: 'class-node-1' });
+    mocks.polarsExpressionApply.mockResolvedValue(undefined);
   });
 
   it('creates and selects an empty class Data Block from the explicit action', async () => {
@@ -136,5 +143,46 @@ describe('AnnotationFeature', () => {
     expect(mocks.setInputSet).toHaveBeenCalledWith('classDescriptions', [
       { node_id: 'class-node-1', column: 'class' },
     ]);
+  });
+
+  it('starts manual annotation through the typed expression contract', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          taskId: null,
+          inputSets: {},
+          settings: {},
+          setTaskId: vi.fn(),
+          setInputSet: mocks.setInputSet,
+          setSetting: vi.fn(),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(mocks.polarsExpressionApply).toHaveBeenCalledWith(
+      'source-1',
+      {
+        context: 'with_columns',
+        expressions: [
+          {
+            expression: {
+              op: 'cast',
+              operand: { op: 'literal', value: null },
+              dtype: 'string',
+              strict: false,
+            },
+            alias: 'annotation',
+          },
+        ],
+        group_by: [],
+        name: null,
+      },
+      'update',
+    );
   });
 });

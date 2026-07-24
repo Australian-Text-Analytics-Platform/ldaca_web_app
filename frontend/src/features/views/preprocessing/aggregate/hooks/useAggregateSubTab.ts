@@ -6,6 +6,7 @@ import {
 } from './aggregateBuilderUiState';
 import {
   type AggregateBuilderToken,
+  type AggregateOperation,
   buildAggregateExpressionRequest,
   normalizeSmartCharacters,
   tokensToPolarsExpression,
@@ -64,7 +65,7 @@ interface BasicBuilderConfig {
   addCustomToken: (index?: number) => void;
   removeToken: (tokenId: string) => void;
   moveToken: (tokenId: string, index: number) => void;
-  addOperation: (tokenId: string, operation: string) => void;
+  addOperation: (tokenId: string, operation: AggregateOperation) => void;
   removeOperation: (tokenId: string, index: number) => void;
   startEditingCustom: (tokenId: string) => void;
   finishCustomEdit: (commit: boolean) => void;
@@ -172,6 +173,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   );
   const [committedExpression, setCommittedExpression] = useState('');
   const [committedColumnName, setCommittedColumnName] = useState('');
+  const [committedTokens, setCommittedTokens] = useState<AggregateBuilderToken[]>([]);
   const {
     dragActive: basicDragActive,
     dropIndicator,
@@ -182,6 +184,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
   const latestExpressionRef = useRef('');
   const latestColumnNameRef = useRef('new_column');
+  const latestTokensRef = useRef<AggregateBuilderToken[]>([]);
 
   const activeNodeId = limitedNodeId;
 
@@ -217,18 +220,16 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const applyBasicTokenUpdate = (
     updater: (prev: AggregateBuilderToken[]) => AggregateBuilderToken[],
   ) => {
-    setBasicTokens((prev) => {
-      const next = updater(prev);
-      if (next === prev) return prev;
-      const sameOrder =
-        next.length === prev.length && next.every((token, idx) => token === prev[idx]);
-      const nextExpression = tokensToPolarsExpression(next);
-      if (sameOrder && nextExpression === trimmedExpression) {
-        return prev;
-      }
-      setExpressionAndMarkDirty(nextExpression);
-      return sameOrder ? prev : next;
-    });
+    const previous = latestTokensRef.current;
+    const next = updater(previous);
+    if (next === previous) return;
+    const sameOrder =
+      next.length === previous.length && next.every((token, idx) => token === previous[idx]);
+    const nextExpression = tokensToPolarsExpression(next);
+    if (sameOrder && nextExpression === trimmedExpression) return;
+    latestTokensRef.current = next;
+    setExpressionAndMarkDirty(nextExpression);
+    if (!sameOrder) setBasicTokens(next);
   };
 
   /**
@@ -237,7 +238,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
    * Called by `handleApply`; the preview payload uses the same request builder.
    */
   const buildRequest = (): PolarsExpressionRequest =>
-    buildAggregateExpressionRequest(latestExpressionRef.current, latestColumnNameRef.current);
+    buildAggregateExpressionRequest(latestTokensRef.current, latestColumnNameRef.current);
 
   /**
    * Commits the current expression/name into the debounced preview payload.
@@ -246,6 +247,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const commitExpression = () => {
     setCommittedExpression(latestExpressionRef.current.trim());
     setCommittedColumnName(latestColumnNameRef.current.trim());
+    setCommittedTokens(latestTokensRef.current);
   };
 
   const commitTimeoutRef = useRef<number | null>(null);
@@ -278,7 +280,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const operationPayload: PolarsExpressionRequest | null = (() => {
     if (committedExpression.length === 0) return null;
-    return buildAggregateExpressionRequest(committedExpression, committedColumnName);
+    return buildAggregateExpressionRequest(committedTokens, committedColumnName);
   })();
 
   const {
@@ -382,7 +384,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
    * Appends a backend-advertised operation to a column token.
    * Returned as `basicBuilder.addOperation` for `OperationPopover` selections.
    */
-  const addOperation = (tokenId: string, operation: string) => {
+  const addOperation = (tokenId: string, operation: AggregateOperation) => {
     if (basicDisabled) return;
     applyBasicTokenUpdate((prev) =>
       prev.map((token) => {

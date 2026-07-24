@@ -9,22 +9,22 @@ import {
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { buildExpressionAutoNodeName } from '../../utils/autoNodeNames';
 import {
-  buildPolarsExpressionRequest,
-  createPolarsExpressionDraftState,
-  polarsExpressionDraftReducer,
+  buildTypedExpressionRequest,
+  createTypedExpressionDraftState,
+  typedExpressionDraftReducer,
   type ExpressionContextTab,
   type ExpressionListTarget,
-} from './polarsExpressionDraftState';
+} from './typedExpressionDraftState';
 import type { PreprocessingApplyMode } from '../../preprocessingApplyMode';
 
 export {
-  buildPolarsExpressionRequest,
+  buildTypedExpressionRequest,
   type ExpressionContextTab,
-  type ExpressionItem,
-  type SortExpressionItem,
-} from './polarsExpressionDraftState';
+  type ExpressionDraftItem,
+  type SortExpressionDraftItem,
+} from './typedExpressionDraftState';
 
-export interface PolarsExpressionSubTabProps {
+export interface TypedExpressionSubTabProps {
   currentWorkspaceId: string | null;
   applyMode: PreprocessingApplyMode;
   selectedNodes: WorkspaceNodeMetadata[];
@@ -42,14 +42,14 @@ export interface PolarsExpressionSubTabProps {
 const DEFAULT_PALETTE = ['#2563eb'];
 
 /**
- * Owns request-building and preview/apply state for the Polars expression tab.
+ * Owns request-building and preview/apply state for the typed expression tab.
  * The component consumes this hook to keep each context's editor state and
  * serialized backend request in one place.
- * Used by `PolarsExpressionSubTab` to own expression draft, preview, and apply state.
+ * Used by `TypedExpressionSubTab` to own expression draft, preview, and apply state.
  * Flow: manage expression item state per context, build request payloads, run preview/apply
  * APIs, and expose tab/editor actions to the component.
  */
-export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
+export function useTypedExpressionSubTab(props: TypedExpressionSubTabProps) {
   const {
     currentWorkspaceId,
     applyMode,
@@ -64,13 +64,13 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const nodeId = effectiveNode?.id ?? null;
 
   const [draftState, dispatchDraft] = useReducer(
-    polarsExpressionDraftReducer,
+    typedExpressionDraftReducer,
     undefined,
-    createPolarsExpressionDraftState,
+    createTypedExpressionDraftState,
   );
   const [newNodeName, setNewNodeName] = useState('');
   const [isApplying, setIsApplying] = useState(false);
-  const { activeContext, filterCode, withColumns, selectExpressions, sortItems, groupByState } =
+  const { activeContext, filterSource, withColumns, selectExpressions, sortItems, groupByState } =
     draftState;
 
   const newNodeNamePlaceholder = buildExpressionAutoNodeName({
@@ -89,7 +89,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   /**
    * Switches which expression context is visible. The reducer owns this with
    * the draft lists so request serialization always reads a single state shape.
-   * Called by: PolarsExpressionSubTab tab triggers.
+   * Called by: TypedExpressionSubTab tab triggers.
    */
   const setActiveContext = (context: ExpressionContextTab) => {
     dispatchDraft({ type: 'setActiveContext', context });
@@ -97,24 +97,24 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   /**
    * Updates the single filter expression draft.
-   * Called by: PolarsExpressionSubTab filter editor.
+   * Called by: TypedExpressionSubTab filter editor.
    */
-  const setFilterCode = (code: string) => {
-    dispatchDraft({ type: 'setFilterCode', code });
+  const setFilterSource = (source: string) => {
+    dispatchDraft({ type: 'setFilterSource', source });
   };
 
   /**
    * Updates one row in a list-backed expression context.
-   * Called by: PolarsExpressionSubTab list editors for With Columns, Select,
+   * Called by: TypedExpressionSubTab list editors for With Columns, Select,
    * and Group By aggregation rows.
    */
-  const updateExpressionCode = (target: ExpressionListTarget, id: string, code: string) => {
-    dispatchDraft({ type: 'updateExpressionCode', target, id, code });
+  const updateExpressionSource = (target: ExpressionListTarget, id: string, source: string) => {
+    dispatchDraft({ type: 'updateExpressionSource', target, id, source });
   };
 
   /**
    * Adds one empty row to a list-backed expression context.
-   * Called by: PolarsExpressionSubTab list-editor Add buttons.
+   * Called by: TypedExpressionSubTab list-editor Add buttons.
    */
   const addExpression = (target: ExpressionListTarget) => {
     dispatchDraft({ type: 'addExpression', target });
@@ -122,7 +122,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   /**
    * Removes one expression row by id.
-   * Called by: PolarsExpressionSubTab list-editor delete buttons.
+   * Called by: TypedExpressionSubTab list-editor delete buttons.
    */
   const removeExpression = (target: ExpressionListTarget, id: string) => {
     dispatchDraft({ type: 'removeExpression', target, id });
@@ -130,23 +130,23 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   /**
    * Updates the group-by key expression.
-   * Called by: PolarsExpressionSubTab group-by key editor.
+   * Called by: TypedExpressionSubTab group-by key editor.
    */
-  const setGroupByKeyCode = (code: string) => {
-    dispatchDraft({ type: 'setGroupByKeyCode', code });
+  const setGroupByKeySource = (source: string) => {
+    dispatchDraft({ type: 'setGroupByKeySource', source });
   };
 
   /**
    * Updates one sort expression row.
-   * Called by: PolarsExpressionSubTab sort CodeEditor rows.
+   * Called by: TypedExpressionSubTab sort editor rows.
    */
-  const updateSortCode = (id: string, code: string) => {
-    dispatchDraft({ type: 'updateSortCode', id, code });
+  const updateSortSource = (id: string, source: string) => {
+    dispatchDraft({ type: 'updateSortSource', id, source });
   };
 
   /**
    * Updates one sort direction checkbox.
-   * Called by: PolarsExpressionSubTab sort descending controls.
+   * Called by: TypedExpressionSubTab sort descending controls.
    */
   const updateSortDescending = (id: string, descending: boolean) => {
     dispatchDraft({ type: 'updateSortDescending', id, descending });
@@ -154,7 +154,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   /**
    * Adds an empty sort expression row.
-   * Called by: PolarsExpressionSubTab sort Add button.
+   * Called by: TypedExpressionSubTab sort Add button.
    */
   const addSortExpression = () => {
     dispatchDraft({ type: 'addSortExpression' });
@@ -162,7 +162,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   /**
    * Removes one sort expression row.
-   * Called by: PolarsExpressionSubTab sort row delete buttons.
+   * Called by: TypedExpressionSubTab sort row delete buttons.
    */
   const removeSortExpression = (id: string) => {
     dispatchDraft({ type: 'removeSortExpression', id });
@@ -171,7 +171,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   /**
    * Serializes the currently active context into a PolarsExpressionRequest for
    * preview and apply calls.
-   * Returned to `PolarsExpressionSubTab` for its Preview action.
+   * Returned to `TypedExpressionSubTab` for its Preview action.
    * Steps: build the request payload from committed expressions, call preview for the current
    * node/page, and adapt backend rows into preview state.
    */
@@ -180,7 +180,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     setSerializedRequest(null);
 
     try {
-      setSerializedRequest(buildPolarsExpressionRequest(draftState));
+      setSerializedRequest(buildTypedExpressionRequest(draftState));
     } catch (err) {
       setEvalError(err instanceof Error ? err.message : String(err));
     }
@@ -199,7 +199,7 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   /**
    * Applies the serialized expression to the selected node and refreshes schema
    * so downstream selectors can see new/changed columns.
-   * Returned to `PolarsExpressionSubTab` for its Apply action.
+   * Returned to `TypedExpressionSubTab` for its Apply action.
    */
   const applyExpression = async () => {
     if (!nodeId || !serializedRequest) return;
@@ -236,17 +236,17 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
     evalError,
     serializedRequest,
 
-    filterCode,
-    setFilterCode,
+    filterSource,
+    setFilterSource,
     withColumns,
     selectExpressions,
     sortItems,
     groupByState,
-    updateExpressionCode,
+    updateExpressionSource,
     addExpression,
     removeExpression,
-    setGroupByKeyCode,
-    updateSortCode,
+    setGroupByKeySource,
+    updateSortSource,
     updateSortDescending,
     addSortExpression,
     removeSortExpression,

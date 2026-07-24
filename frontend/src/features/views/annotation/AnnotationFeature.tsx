@@ -405,7 +405,15 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         {
           context: 'with_columns',
           expressions: [
-            { code: `pl.lit(None, dtype=pl.String).alias(${JSON.stringify(columnName)})` },
+            {
+              expression: {
+                op: 'cast',
+                operand: { op: 'literal', value: null },
+                dtype: 'string',
+                strict: false,
+              },
+              alias: columnName,
+            },
           ],
           group_by: [],
           name: null,

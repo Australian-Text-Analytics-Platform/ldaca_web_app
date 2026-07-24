@@ -1,8 +1,7 @@
 import CodeMirror from '@uiw/react-codemirror';
-import { python } from '@codemirror/lang-python';
 import { EditorView } from '@codemirror/view';
 
-const extensions = [python(), EditorView.lineWrapping];
+const extensions = [EditorView.lineWrapping];
 
 // Match the app's input styling (border, radius, font, focus ring)
 const baseTheme = EditorView.theme({
@@ -40,7 +39,7 @@ const baseTheme = EditorView.theme({
   },
 });
 
-interface CodeEditorProps {
+interface TypedExpressionEditorProps {
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
@@ -51,14 +50,12 @@ interface CodeEditorProps {
 }
 
 /**
- * Thin CodeMirror wrapper styled like the app inputs. Polars expression and
- * aggregate UIs use it for Python-expression editing without duplicating editor
- * setup details.
- * Rendered by `PolarsExpressionSubTab` for expression editing.
- * Flow: pass controlled value/events into CodeMirror, apply the shared Python extensions,
- * and mirror disabled/min-height styling from preprocessing forms.
+ * Thin CodeMirror wrapper for JSON-encoded typed expression items.
+ * The editor intentionally provides no executable-language extension because
+ * its content is parsed into the generated expression contract before preview
+ * or apply.
  */
-export function CodeEditor({
+export function TypedExpressionEditor({
   value,
   onChange,
   onBlur,
@@ -66,7 +63,7 @@ export function CodeEditor({
   disabled = false,
   minHeight = '3.5rem',
   className = '',
-}: CodeEditorProps) {
+}: TypedExpressionEditorProps) {
   return (
     <div className={className}>
       <CodeMirror

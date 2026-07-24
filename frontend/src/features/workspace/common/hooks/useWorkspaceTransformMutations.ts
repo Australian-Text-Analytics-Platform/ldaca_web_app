@@ -75,6 +75,8 @@ export const useWorkspaceTransformMutations = ({
   type NodeCreateBody = NonNullable<CreateNodeData['body']>;
   type NodeEditBody = NonNullable<EditNodeData['body']>;
   type NodePreviewBody = NonNullable<PreviewNodeCreationData['body']>;
+  type ExpressionNodeCreateBody = Extract<NodeCreateBody, { kind: 'expression' }>;
+  type ExpressionNodeEditBody = Extract<NodeEditBody, { kind: 'expression' }>;
   const asNodeCreateBody = (body: object) => body as NodeCreateBody;
   const asNodeEditBody = (body: object) => body as NodeEditBody;
   const asNodePreviewBody = (body: object) => body as NodePreviewBody;
@@ -103,15 +105,17 @@ export const useWorkspaceTransformMutations = ({
       connector: request.connector,
       name: request.name,
     });
-  const expressionBody = (nodeId: string, request: PolarsExpressionRequest) =>
-    asNodeCreateBody({
-      kind: 'expression',
-      source_node_id: nodeId,
-      context: request.context,
-      expressions: request.expressions,
-      group_by: request.group_by,
-      name: request.name,
-    });
+  const expressionBody = (
+    nodeId: string,
+    request: PolarsExpressionRequest,
+  ): ExpressionNodeCreateBody => ({
+    kind: 'expression',
+    source_node_id: nodeId,
+    context: request.context,
+    expressions: request.expressions,
+    group_by: request.group_by,
+    name: request.name,
+  });
   const filterEditBody = (request: FilterRequestPayload) =>
     asNodeEditBody({
       kind: 'filter',
@@ -130,13 +134,12 @@ export const useWorkspaceTransformMutations = ({
       match_limit: request.match_limit,
       connector: request.connector,
     });
-  const expressionEditBody = (request: PolarsExpressionRequest) =>
-    asNodeEditBody({
-      kind: 'expression',
-      context: request.context,
-      expressions: request.expressions,
-      group_by: request.group_by,
-    });
+  const expressionEditBody = (request: PolarsExpressionRequest): ExpressionNodeEditBody => ({
+    kind: 'expression',
+    context: request.context,
+    expressions: request.expressions,
+    group_by: request.group_by,
+  });
 
   const invalidateEditedNode = (nodeId: string) => {
     invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {

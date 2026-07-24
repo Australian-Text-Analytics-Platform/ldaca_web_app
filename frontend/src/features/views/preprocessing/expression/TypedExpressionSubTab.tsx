@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
-import { CodeEditor } from '@/features/views/preprocessing/expression/CodeEditor';
+import { TypedExpressionEditor } from './TypedExpressionEditor';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,11 +14,11 @@ import { PreviewTable } from '../components/PreviewTable';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import {
-  usePolarsExpressionSubTab,
-  type PolarsExpressionSubTabProps,
-} from './hooks/usePolarsExpressionSubTab';
+  useTypedExpressionSubTab,
+  type TypedExpressionSubTabProps,
+} from './hooks/useTypedExpressionSubTab';
 
-type PolarsExpressionSubTabComponentProps = PolarsExpressionSubTabProps & {
+type TypedExpressionSubTabComponentProps = TypedExpressionSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
 };
 
@@ -31,21 +31,20 @@ const CONTEXT_LABELS: Record<string, string> = {
 };
 
 /**
- * Shows context-specific expression examples next to each CodeEditor. The
- * Polars expression tab uses it to keep backend syntax hints near the active
- * context without hard-coding them into every tab panel.
- * Rendered by `PolarsExpressionSubTab` to switch among expression editors.
+ * Shows examples for the generated typed-expression contract.
+ * Rendered by `TypedExpressionSubTab` to switch among expression editors.
  */
 function CodeHint({ context }: { context: string }) {
   const hints: Record<string, string> = {
-    filter: 'A boolean Polars expression.\nExample: pl.col("age") > 18',
+    filter:
+      'One typed expression item as JSON.\nExample: {"expression":{"op":"gt","left":{"op":"column","name":"age"},"right":{"op":"literal","value":18}}}',
     with_columns:
-      'One or more expressions per box (comma-separated).\nAlias syntax: pl.col("price").mul(0.9).alias("discounted")\nAssignment syntax: discounted = pl.col("price").mul(0.9)',
+      'One typed expression item per box. Use alias for the output column.\nExample: {"expression":{"op":"multiply","left":{"op":"column","name":"price"},"right":{"op":"literal","value":0.9}},"alias":"discounted"}',
     select:
-      'Column references or expressions. Comma-separate multiple in one box.\nExample: pl.col("id"), pl.col("name")\nAssignment: full_name = pl.col("first") + pl.col("last")',
-    sort: 'Sort key expression(s). Set descending per item.\nExample: pl.col("date")',
+      'One typed expression item per selected output.\nExample: {"expression":{"op":"column","name":"id"}}',
+    sort: 'One typed expression item per sort key. Set descending separately.\nExample: {"expression":{"op":"column","name":"date"}}',
     group_by_agg:
-      'Grouping key and aggregation expressions.\nExample key: pl.col("category")\nAssignment: total = pl.col("sales").sum()',
+      'Use typed items for the grouping key and aggregations.\nExample aggregation: {"expression":{"op":"sum","operand":{"op":"column","name":"sales"}},"alias":"total"}',
   };
   return (
     <p className="rounded border border-border/40 bg-muted/50 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap">
@@ -55,19 +54,19 @@ function CodeHint({ context }: { context: string }) {
 }
 
 interface ExpressionListEditorProps {
-  items: { id: string; code: string }[];
+  items: { id: string; source: string }[];
   placeholder: string;
   addLabel: string;
   disabled: boolean;
   onBlur: () => void;
-  onCodeChange: (id: string, value: string) => void;
+  onSourceChange: (id: string, value: string) => void;
   onRemove: (id: string) => void;
   onAdd: () => void;
 }
 
 /**
  * Renders the repeated "one or more Polars expressions" editor pattern.
- * Rendered by: PolarsExpressionSubTab for With Columns, Select, and Group By
+ * Rendered by: TypedExpressionSubTab for With Columns, Select, and Group By
  * aggregation lists so those contexts share add/remove/editor chrome.
  */
 function ExpressionListEditor({
@@ -76,7 +75,7 @@ function ExpressionListEditor({
   addLabel,
   disabled,
   onBlur,
-  onCodeChange,
+  onSourceChange,
   onRemove,
   onAdd,
 }: ExpressionListEditorProps) {
@@ -84,11 +83,11 @@ function ExpressionListEditor({
     <>
       {items.map((item) => (
         <div key={item.id} className="flex gap-2">
-          <CodeEditor
+          <TypedExpressionEditor
             className="flex-1"
-            value={item.code}
+            value={item.source}
             onChange={(value) => {
-              onCodeChange(item.id, value);
+              onSourceChange(item.id, value);
             }}
             onBlur={onBlur}
             disabled={disabled}
@@ -116,13 +115,13 @@ function ExpressionListEditor({
 }
 
 /**
- * Renders the general Polars-expression preprocessing tab. It delegates request
- * serialization, preview, and apply behavior to `usePolarsExpressionSubTab`.
- * Rendered by `DataPreprocessingFeature`; it composes `CodeEditor` and `PreviewTable`.
+ * Renders the generated typed-expression preprocessing tab. It delegates request
+ * serialization, preview, and apply behavior to `useTypedExpressionSubTab`.
+ * Rendered by `DataPreprocessingFeature`; it composes the typed editor and `PreviewTable`.
  * Flow: manage expression tabs and shared context, render editors/preview table, evaluate
  * expressions for preview, and apply column/sort/group operations through hook actions.
  */
-export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentProps) {
+export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps) {
   const { applyMode, isLoading } = props;
   const { renderNodeInputsPanel } = props;
   const {
@@ -136,17 +135,17 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
     evalError,
     serializedRequest,
 
-    filterCode,
-    setFilterCode,
+    filterSource,
+    setFilterSource,
     withColumns,
     selectExpressions,
     sortItems,
     groupByState,
-    updateExpressionCode,
+    updateExpressionSource,
     addExpression,
     removeExpression,
-    setGroupByKeyCode,
-    updateSortCode,
+    setGroupByKeySource,
+    updateSortSource,
     updateSortDescending,
     addSortExpression,
     removeSortExpression,
@@ -154,7 +153,7 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
     evalExpressions,
     applyExpression,
     preview,
-  } = usePolarsExpressionSubTab(props);
+  } = useTypedExpressionSubTab(props);
 
   const hasNode = !!effectiveNode;
   const canEval = hasNode;
@@ -177,11 +176,11 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Code2 className="h-5 w-5" />
-                Polars Expression
+                Expression
                 <HelpIcon
                   targetKey="preprocessing.expression.tab"
-                  label="Polars Expression sub-tab overview"
-                  tooltip="Write Polars expressions in Python to transform data blocks."
+                  label="Expression sub-tab overview"
+                  tooltip="Build typed expressions that the backend validates before transforming data blocks."
                 />
               </CardTitle>
             </div>
@@ -211,14 +210,14 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
             {/* Filter */}
             <TabsContent value="filter" className="space-y-2">
               <CodeHint context="filter" />
-              <CodeEditor
-                value={filterCode}
-                onChange={setFilterCode}
+              <TypedExpressionEditor
+                value={filterSource}
+                onChange={setFilterSource}
                 onBlur={() => {
                   evalExpressions();
                 }}
                 disabled={!hasNode}
-                placeholder='pl.col("column_name") > 0'
+                placeholder='{"expression":{"op":"is_not_null","operand":{"op":"column","name":"column_name"}}}'
                 minHeight="5rem"
               />
             </TabsContent>
@@ -228,12 +227,12 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               <CodeHint context="with_columns" />
               <ExpressionListEditor
                 items={withColumns}
-                placeholder='b = pl.col("a").cast(pl.Utf8)'
+                placeholder='{"expression":{"op":"cast","operand":{"op":"column","name":"a"},"dtype":"string"},"alias":"b"}'
                 addLabel="Add expression"
                 disabled={!hasNode}
                 onBlur={evalExpressions}
-                onCodeChange={(id, value) => {
-                  updateExpressionCode('withColumns', id, value);
+                onSourceChange={(id, value) => {
+                  updateExpressionSource('withColumns', id, value);
                 }}
                 onRemove={(id) => {
                   removeExpression('withColumns', id);
@@ -249,12 +248,12 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               <CodeHint context="select" />
               <ExpressionListEditor
                 items={selectExpressions}
-                placeholder='pl.col("a"), pl.col("b")'
+                placeholder='{"expression":{"op":"column","name":"a"}}'
                 addLabel="Add expression"
                 disabled={!hasNode}
                 onBlur={evalExpressions}
-                onCodeChange={(id, value) => {
-                  updateExpressionCode('selectExpressions', id, value);
+                onSourceChange={(id, value) => {
+                  updateExpressionSource('selectExpressions', id, value);
                 }}
                 onRemove={(id) => {
                   removeExpression('selectExpressions', id);
@@ -270,17 +269,17 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               <CodeHint context="sort" />
               {sortItems.map((item) => (
                 <div key={item.id} className="flex items-start gap-2">
-                  <CodeEditor
+                  <TypedExpressionEditor
                     className="flex-1"
-                    value={item.code}
+                    value={item.source}
                     onChange={(val) => {
-                      updateSortCode(item.id, val);
+                      updateSortSource(item.id, val);
                     }}
                     onBlur={() => {
                       evalExpressions();
                     }}
                     disabled={!hasNode}
-                    placeholder='pl.col("date")'
+                    placeholder='{"expression":{"op":"column","name":"date"}}'
                   />
                   <div className="flex flex-col items-center gap-1 pt-2">
                     <Label
@@ -329,28 +328,28 @@ export function PolarsExpressionSubTab(props: PolarsExpressionSubTabComponentPro
               <CodeHint context="group_by_agg" />
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Grouping key expression</Label>
-                <CodeEditor
-                  value={groupByState.keyCode}
+                <TypedExpressionEditor
+                  value={groupByState.keySource}
                   onChange={(val) => {
-                    setGroupByKeyCode(val);
+                    setGroupByKeySource(val);
                   }}
                   onBlur={() => {
                     evalExpressions();
                   }}
                   disabled={!hasNode}
-                  placeholder='pl.col("category")'
+                  placeholder='{"expression":{"op":"column","name":"category"}}'
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Aggregation expressions</Label>
                 <ExpressionListEditor
                   items={groupByState.aggExpressions}
-                  placeholder='total = pl.col("value").sum()'
+                  placeholder='{"expression":{"op":"sum","operand":{"op":"column","name":"value"}},"alias":"total"}'
                   addLabel="Add aggregation"
                   disabled={!hasNode}
                   onBlur={evalExpressions}
-                  onCodeChange={(id, value) => {
-                    updateExpressionCode('groupByAgg', id, value);
+                  onSourceChange={(id, value) => {
+                    updateExpressionSource('groupByAgg', id, value);
                   }}
                   onRemove={(id) => {
                     removeExpression('groupByAgg', id);

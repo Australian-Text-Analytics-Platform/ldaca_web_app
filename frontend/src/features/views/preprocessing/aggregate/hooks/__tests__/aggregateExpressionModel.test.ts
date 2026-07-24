@@ -19,12 +19,10 @@ describe('aggregateExpressionModel', () => {
       kind: 'column',
       column: 'speaker"name',
       dtype: 'string',
-      operations: ['str.to_lowercase', 'fill_null'],
+      operations: ['sum'],
     };
 
-    expect(tokenToPolarsExpression(token)).toBe(
-      'pl.col("speaker\\"name").str.to_lowercase().fill_null()',
-    );
+    expect(tokenToPolarsExpression(token)).toBe('pl.col("speaker\\"name").sum()');
   });
 
   it('serializes custom tokens as quoted, numeric, or escaped literals', () => {
@@ -46,9 +44,18 @@ describe('aggregateExpressionModel', () => {
     ];
 
     expect(tokensToPolarsExpression(tokens)).toBe('pl.col("text") + pl.lit("-")');
-    expect(buildAggregateExpressionRequest('pl.col("text")', 'new"name')).toEqual({
+    expect(buildAggregateExpressionRequest(tokens, 'new"name')).toEqual({
       context: 'with_columns',
-      expressions: [{ code: '(pl.col("text")).alias("new\\"name")' }],
+      expressions: [
+        {
+          expression: {
+            op: 'add',
+            left: { op: 'column', name: 'text' },
+            right: { op: 'literal', value: '-' },
+          },
+          alias: 'new"name',
+        },
+      ],
     });
   });
 });

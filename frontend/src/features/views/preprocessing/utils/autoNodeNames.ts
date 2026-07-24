@@ -131,7 +131,7 @@ export const buildFilterAutoNodeName = ({
 
 /**
  * Builds the suggested output name shown by the Polars expression tab.
- * Used by `usePolarsExpressionSubTab` when deriving the default output-node name.
+ * Used by `useTypedExpressionSubTab` when deriving the default output-node name.
  */
 export const buildExpressionAutoNodeName = ({
   baseName,
