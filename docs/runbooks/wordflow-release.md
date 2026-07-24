@@ -45,9 +45,11 @@ metadata is sufficient.
 5. Run `pnpm check-versions` again from the final root commit.
 6. Create and push the exact root tag `v<semver>`.
 
-The root release workflow verifies tag/version identity, builds Windows MSI and
-macOS app/DMG assets, and attaches them to the GitHub release. Do not hand-edit
-version strings or reuse a published package version.
+The root release workflow verifies version consistency and requires the release
+tag to resolve to the checked-out commit. It then calls the shared desktop
+workflow for Windows MSI and macOS app/DMG assets and attaches Tauri's generated
+artifacts to the GitHub release. Do not hand-edit version strings, relabel the
+DMG, or reuse a published package version.
 
 ## Post-release
 

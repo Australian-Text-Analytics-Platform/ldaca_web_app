@@ -71,6 +71,9 @@ flowchart TB
   boundary.
 - A finite policy is read from SQLite for every status or admitted-write check;
   `NULL` is unlimited and performs no quota scan or accounting probe.
+- Finite quota accounting requires host filesystem allocation metrics. A
+  multi-user runtime fails readiness when the host cannot provide them, while
+  the unlimited single-user desktop profile never requests that capability.
 - Finite usage is a fresh filesystem-allocation scan of the principal's user
   area plus live and trashed Workspaces attributed by `access.json`. It uses
   allocated blocks with a one-allocation-unit floor for every regular file and
