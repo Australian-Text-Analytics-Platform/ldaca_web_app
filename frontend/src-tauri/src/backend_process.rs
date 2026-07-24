@@ -176,7 +176,7 @@ impl BackendProcess {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     fn from_child(child: Child) -> Self {
         Self {
             pid: child.id(),
