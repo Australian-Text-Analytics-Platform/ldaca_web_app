@@ -39,6 +39,13 @@ on:
 permissions:
   contents: read
 
+env:
+  # polars-source-utils/rust-toolchain.toml floats on the `nightly` channel;
+  # pin every backend-extension build to the nightly that Python polars 1.40
+  # is developed against (pola-rs/polars@py-1.40.0 rust-toolchain.toml) so a
+  # broken fresh nightly cannot take the build down.
+  BACKEND_EXTENSION_TOOLCHAIN: nightly-2026-04-01
+
 jobs:
   build:
     name: Build ${{ inputs.platform }}
@@ -48,6 +55,10 @@ jobs:
       PYTHONUTF8: ${{ inputs.platform == 'windows' && '1' || '' }}
       PYTHONIOENCODING: ${{ inputs.platform == 'windows' && 'utf-8' || '' }}
       TAURI_PROFILE: ${{ inputs.platform == 'windows' && inputs.debug && 'debug' || 'release' }}
+      # Stop macOS file ops (cp, ditto, tar) from creating AppleDouble (._*)
+      # metadata sidecars; those get sealed into the bundle's CodeResources
+      # but then stripped out of the notarization zip, breaking the seal.
+      COPYFILE_DISABLE: ${{ inputs.platform == 'macos' && '1' || '' }}
 
     steps:
       - name: Validate platform
@@ -89,8 +100,10 @@ jobs:
         with:
           node-version: 24
 
-      - name: Set up Rust nightly for backend extension builds
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Set up pinned Rust nightly for backend extension builds
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.BACKEND_EXTENSION_TOOLCHAIN }}
 
       - name: Set up stable Rust
         uses: dtolnay/rust-toolchain@stable
@@ -99,13 +112,19 @@ jobs:
         uses: astral-sh/setup-uv@v8.2.0
 
       - name: Install Node dependencies
+        shell: bash
         run: |
           corepack enable
           pnpm install --frozen-lockfile
 
       - name: Validate desktop supervisor and runtime contract
+        # bash gives fail-fast semantics on every runner; the pwsh default on
+        # Windows only propagates the LAST command's exit code, silently
+        # swallowing earlier test failures.
+        shell: bash
         working-directory: frontend
         run: |
+          set -Eeuo pipefail
           node --test ../scripts/prepare-backend-runtime.test.mjs
           node --test scripts/stage-backend-runtime.test-node.mjs
           cargo fmt --manifest-path src-tauri/Cargo.toml --check
@@ -114,6 +133,9 @@ jobs:
 
       - name: Prepare backend runtime
         working-directory: frontend
+        env:
+          # Overrides polars-source-utils' floating rust-toolchain.toml.
+          RUSTUP_TOOLCHAIN: ${{ env.BACKEND_EXTENSION_TOOLCHAIN }}
         run: pnpm prepare:backend-runtime
 
       - name: Build Windows desktop application
@@ -131,11 +153,210 @@ jobs:
             pnpm tauri build
           }
 
+      - name: Import Apple code-signing certificate
+        if: inputs.platform == 'macos'
+        uses: Apple-Actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
       - name: Build macOS desktop application
         if: inputs.platform == 'macos'
         shell: bash
         working-directory: frontend
-        run: pnpm tauri build --bundles app,dmg
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        # DMG is built manually after notarization; tauri's dmg bundle would
+        # be produced before the deep-sign/notarize pass below.
+        run: pnpm tauri build --bundles app
+
+      - name: Deep-sign embedded backend runtime + re-sign app
+        if: inputs.platform == 'macos'
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          runtime="$app_path/Contents/Resources/backend-runtime"
+          bundle_id="$(node -p "require('./src-tauri/tauri.conf.json').identifier")"
+
+          test -d "$runtime" || { echo "::error::backend-runtime missing inside .app"; exit 1; }
+
+          # Strip extended attributes AND AppleDouble (._*) sidecar files before
+          # signing. xattrs get sealed into the signature; ._* files get sealed
+          # too AND then stripped from the notarization zip by ditto, breaking
+          # the seal. Both surface as "signature of the binary is invalid".
+          xattr -cr "$app_path"
+          find "$app_path" -type f -name "._*" -delete
+
+          # Sign every Mach-O file inside the embedded runtime (executables, .dylib, .so).
+          # `file -b` identifies binary type; we skip non-Mach-O resources (json, py, etc).
+          signed_count=0
+          while IFS= read -r -d '' f; do
+            if file -b "$f" | grep -qE '^Mach-O'; then
+              codesign --force --options runtime --timestamp \
+                --sign "$APPLE_SIGNING_IDENTITY" "$f"
+              signed_count=$((signed_count + 1))
+            fi
+          done < <(find "$runtime" -type f -print0)
+          echo "Signed $signed_count Mach-O files inside backend-runtime/"
+
+          # Strip Tauri's pre-existing signature from the main binary first.
+          # codesign --force on the bundle only signs the outer wrapper; it
+          # does NOT re-sign an already-signed main executable. Without this,
+          # Tauri's original signature (signed before the bundle was complete,
+          # without bundle context) survives and the notary rejects it as
+          # "signature of the binary is invalid".
+          codesign --remove-signature "$app_path/Contents/MacOS/ldaca-wordflow"
+
+          # Now sign the bundle. With the main binary unsigned, codesign signs
+          # it in bundle context — proper Info.plist binding included.
+          codesign --force --options runtime --timestamp \
+            --identifier "$bundle_id" \
+            --entitlements src-tauri/entitlements.plist \
+            --sign "$APPLE_SIGNING_IDENTITY" "$app_path"
+
+          echo "::group::codesign -dvv on main binary"
+          codesign -dvv "$app_path/Contents/MacOS/ldaca-wordflow" 2>&1 || true
+          echo "::endgroup::"
+
+          echo "::group::codesign --verify --strict --deep on whole bundle"
+          codesign --verify --strict --deep --verbose=4 "$app_path"
+          echo "::endgroup::"
+
+      - name: Notarize .app and staple
+        if: inputs.platform == 'macos'
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -Eeuo pipefail
+          app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          zip_path="$(mktemp -d)/ldaca.zip"
+          ditto -c -k --keepParent "$app_path" "$zip_path"
+
+          echo "::group::notarytool submit (this can take several minutes)"
+          set +e
+          xcrun notarytool submit "$zip_path" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait 2>&1 | tee /tmp/notarize.log
+          submit_rc=${PIPESTATUS[0]}
+          set -e
+          echo "::endgroup::"
+
+          # notarytool exits 0 even when status is Invalid; parse it explicitly.
+          status=$(grep -E "^  status: " /tmp/notarize.log | tail -1 | awk '{print $2}')
+          sub_id=$(grep -E "^  id: " /tmp/notarize.log | head -1 | awk '{print $2}')
+
+          if [ "$status" != "Accepted" ] || [ $submit_rc -ne 0 ]; then
+            echo "::error::Notarization failed (status=$status, rc=$submit_rc, id=$sub_id)"
+            if [ -n "$sub_id" ]; then
+              echo "::group::notarytool log $sub_id"
+              xcrun notarytool log "$sub_id" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+              echo "::endgroup::"
+            fi
+            exit 1
+          fi
+
+          xcrun stapler staple "$app_path"
+          xcrun stapler validate "$app_path"
+
+      - name: Build DMG from notarized .app
+        if: inputs.platform == 'macos'
+        id: build-dmg
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          app_path="src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          dmg_dir="src-tauri/target/release/bundle/dmg"
+          mkdir -p "$dmg_dir"
+
+          stage_dir="$(mktemp -d)"
+          ditto "$app_path" "$stage_dir/LDaCA Wordflow.app"
+          ln -s /Applications "$stage_dir/Applications"
+
+          app_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          dmg_path="$dmg_dir/LDaCA Wordflow_${app_version}_aarch64.dmg"
+
+          hdiutil create -volname "LDaCA Wordflow" \
+            -srcfolder "$stage_dir" \
+            -ov -format UDZO \
+            "$dmg_path"
+
+          codesign --force --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" "$dmg_path"
+
+          echo "path=$dmg_path" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize DMG and staple
+        if: inputs.platform == 'macos'
+        shell: bash
+        working-directory: frontend
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          DMG_PATH: ${{ steps.build-dmg.outputs.path }}
+        run: |
+          set -Eeuo pipefail
+          echo "::group::notarytool submit DMG"
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          echo "::endgroup::"
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+
+      - name: Verify Developer ID signature + notarization
+        if: inputs.platform == 'macos'
+        shell: bash
+        working-directory: frontend
+        env:
+          EXPECTED_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -Eeuo pipefail
+          app_path="$PWD/src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+
+          echo "::group::codesign -dvv"
+          codesign -dvv "$app_path" 2>&1 | tee /tmp/codesign.out
+          echo "::endgroup::"
+
+          if ! grep -q "Authority=Developer ID Application" /tmp/codesign.out; then
+            echo "::error::App is not signed with Developer ID"
+            exit 1
+          fi
+          if ! grep -q "TeamIdentifier=$EXPECTED_TEAM_ID" /tmp/codesign.out; then
+            echo "::error::Team identifier mismatch"
+            exit 1
+          fi
+
+          echo "::group::spctl --assess"
+          spctl --assess --verbose=4 --type execute "$app_path" 2>&1 | tee /tmp/spctl.out || true
+          echo "::endgroup::"
+
+          if grep -q "source=Notarized Developer ID" /tmp/spctl.out; then
+            echo "App is Developer ID signed and notarized."
+          elif grep -q "source=Developer ID" /tmp/spctl.out; then
+            echo "::warning::Signed with Developer ID but NOT notarized — fresh Macs will still warn."
+          else
+            echo "::error::Gatekeeper rejected the bundle"
+            exit 1
+          fi
 
       - name: Validate bundled Windows backend runtime
         if: inputs.platform == 'windows'
@@ -184,3 +405,26 @@ jobs:
           path: frontend/src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 14
+
+      - name: Tar signed .app on failure (preserves _CodeSignature/CodeResources)
+        if: failure() && inputs.platform == 'macos'
+        shell: bash
+        working-directory: frontend
+        run: |
+          set -Eeuo pipefail
+          app_dir="src-tauri/target/release/bundle/macos"
+          if [ -d "$app_dir/LDaCA Wordflow.app" ]; then
+            tar -C "$app_dir" -czf /tmp/ldaca-wordflow-app.tgz "LDaCA Wordflow.app"
+            ls -la /tmp/ldaca-wordflow-app.tgz
+          else
+            echo "No .app to tar"
+          fi
+
+      - name: Upload signed .app tarball on failure (for offline inspection)
+        if: failure() && inputs.platform == 'macos'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ldaca-wordflow-app-failure
+          path: /tmp/ldaca-wordflow-app.tgz
+          if-no-files-found: warn
+          retention-days: 7

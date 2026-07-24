@@ -80,6 +80,9 @@ jobs:
           - name: macOS DMG
             platform: macos
     uses: ./.github/workflows/desktop-build.yml
+    # The macOS build signs and notarizes with the APPLE_* repo secrets;
+    # called workflows receive no secrets unless the caller forwards them.
+    secrets: inherit
     with:
       platform: ${{ matrix.platform }}
       debug: false
