@@ -134,7 +134,14 @@ jobs:
       - name: Prepare backend runtime
         working-directory: frontend
         env:
-          # Overrides polars-source-utils' floating rust-toolchain.toml.
+          # Bundle the published polars-text / polars-source-utils wheels
+          # instead of compiling the sibling Rust plugins (~30 min saved per
+          # platform). Same contract the backend repo's CI validates: local
+          # plugin changes must be published to PyPI before they reach a
+          # desktop build.
+          UV_NO_SOURCES: "1"
+          # Fallback only: if anything still compiles the extensions from
+          # source, override polars-source-utils' floating nightly channel.
           RUSTUP_TOOLCHAIN: ${{ env.BACKEND_EXTENSION_TOOLCHAIN }}
         run: pnpm prepare:backend-runtime
 

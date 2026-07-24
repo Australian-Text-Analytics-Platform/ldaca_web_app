@@ -264,17 +264,32 @@ def ensure_venv_libpython(
     print(f"[INFO] Copied {libpython_name} to {target}")
 
 
+def _published_sources_requested() -> bool:
+    return os.environ.get("UV_NO_SOURCES", "").strip().lower() not in ("", "0", "false")
+
+
 def sync_runtime_environment(
     *, runtime_python_dir: Path, managed_python_dir: Path
 ) -> None:
-    print("[INFO] Syncing backend runtime environment from backend/uv.lock")
     sync_env = create_uv_managed_python_env(managed_python_dir)
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_python_dir)
+    if _published_sources_requested():
+        # CI bundles the published polars-text / polars-source-utils wheels
+        # instead of compiling the sibling Rust plugins from source. The
+        # lockfile is resolved WITH the editable path sources, so it cannot
+        # constrain a --no-sources install; resolution follows
+        # backend/pyproject.toml version bounds instead (same contract the
+        # backend repo's own CI validates).
+        print("[INFO] Syncing backend runtime environment from published wheels")
+        source_args = ["--no-sources"]
+    else:
+        print("[INFO] Syncing backend runtime environment from backend/uv.lock")
+        source_args = ["--locked"]
     run(
         [
             "uv",
             "sync",
-            "--locked",
+            *source_args,
             "--no-dev",
             "--no-editable",
             "--link-mode",
