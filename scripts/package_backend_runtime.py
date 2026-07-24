@@ -274,7 +274,7 @@ def sync_runtime_environment(
         [
             "uv",
             "sync",
-            "--frozen",
+            "--locked",
             "--no-dev",
             "--no-editable",
             "--link-mode",
@@ -284,6 +284,19 @@ def sync_runtime_environment(
         cwd=BACKEND_PROJECT_ROOT,
         extra_env=sync_env,
     )
+
+
+def remove_macos_metadata_files(root: Path) -> int:
+    """Remove Finder metadata that cannot survive DMG installation intact."""
+    removed = 0
+    for pattern in ("._*", ".DS_Store"):
+        for path in root.rglob(pattern):
+            if path.is_file() or path.is_symlink():
+                path.unlink()
+                removed += 1
+    if removed:
+        print(f"[INFO] Removed {removed} macOS metadata files from packaged runtime")
+    return removed
 
 
 def write_runtime_manifest(
@@ -398,6 +411,7 @@ def main() -> None:
         runtime_python_dir=runtime_python_dir,
         managed_python_dir=managed_python_dir,
     )
+    remove_macos_metadata_files(output_dir)
 
     write_runtime_manifest(
         output_dir=output_dir,

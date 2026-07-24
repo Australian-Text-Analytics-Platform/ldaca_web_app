@@ -37,6 +37,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          fetch-depth: 0
           # backend/pyproject.toml lives in the backend submodule, so the
           # gate needs the submodule trees on disk before it can read all
           # six version sources. Default checkout omits submodules; the
@@ -49,27 +50,46 @@ jobs:
           EXPECTED_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.publish_release && inputs.release_tag || '' }}
         run: node scripts/check-versions.mjs --tag "$EXPECTED_RELEASE_TAG"
 
-  build-windows:
-    name: Build Windows MSI
-    needs: verify-versions
-    uses: ./.github/workflows/desktop-windows.yml
-    with:
-      debug: false
-      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+      - name: Require the release tag to identify the checked-out commit
+        if: github.event_name == 'push' || inputs.publish_release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+        run: |
+          set -Eeuo pipefail
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "release_tag is required when publishing a release" >&2
+            exit 1
+          fi
+          checked_out_sha="$(git rev-parse HEAD)"
+          release_sha="$(git rev-parse "${RELEASE_TAG}^{commit}")"
+          if [ "$checked_out_sha" != "$release_sha" ]; then
+            echo "Checked-out commit $checked_out_sha does not match $RELEASE_TAG ($release_sha)" >&2
+            exit 1
+          fi
 
-  build-macos:
-    name: Build macOS DMG
+  build-desktop:
+    name: Build ${{ matrix.name }}
     needs: verify-versions
-    uses: ./.github/workflows/desktop-macos.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows MSI
+            platform: windows
+          - name: macOS DMG
+            platform: macos
+    uses: ./.github/workflows/desktop-build.yml
     with:
+      platform: ${{ matrix.platform }}
+      debug: false
       ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
   publish-release:
     name: Publish Desktop Assets
     if: ${{ github.event_name == 'push' || inputs.publish_release }}
     needs:
-      - build-windows
-      - build-macos
+      - build-desktop
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}

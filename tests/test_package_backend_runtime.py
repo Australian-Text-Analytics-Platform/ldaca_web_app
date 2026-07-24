@@ -30,7 +30,7 @@ def test_create_uv_managed_python_env_sets_runtime_install_dir() -> None:
     assert env == {"UV_PYTHON_INSTALL_DIR": str(managed_install_dir)}
 
 
-def test_sync_runtime_environment_uses_frozen_packaged_sync(
+def test_sync_runtime_environment_uses_locked_source_aware_sync(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_package_backend_runtime_module()
@@ -56,7 +56,7 @@ def test_sync_runtime_environment_uses_frozen_packaged_sync(
             [
                 "uv",
                 "sync",
-                "--frozen",
+                "--locked",
                 "--no-dev",
                 "--no-editable",
                 "--link-mode",
@@ -70,6 +70,7 @@ def test_sync_runtime_environment_uses_frozen_packaged_sync(
             },
         )
     ]
+    assert "--no-sources" not in calls[0][0]
 
 
 def test_backend_runtime_lets_uv_venv_manage_python_install() -> None:
@@ -85,6 +86,23 @@ def test_backend_runtime_lets_uv_venv_manage_python_install() -> None:
     assert "UV_PYTHON_DOWNLOADS" not in script
     assert "UV_VENV_CLEAR" not in script
     assert "VIRTUAL_ENV" not in script
+
+
+def test_packaged_runtime_removes_macos_metadata_files(tmp_path: Path) -> None:
+    module = _load_package_backend_runtime_module()
+    runtime_root = tmp_path / "runtime"
+    nested = runtime_root / "python" / "site-packages" / "package"
+    nested.mkdir(parents=True)
+    (nested / "content.js").write_text("content", encoding="utf-8")
+    (nested / "._content.js").write_bytes(b"metadata")
+    (runtime_root / ".DS_Store").write_bytes(b"metadata")
+
+    removed = module.remove_macos_metadata_files(runtime_root)
+
+    assert removed == 2
+    assert (nested / "content.js").read_text(encoding="utf-8") == "content"
+    assert not (nested / "._content.js").exists()
+    assert not (runtime_root / ".DS_Store").exists()
 
 
 def test_runtime_manifest_owns_a_relative_relocatable_layout(
@@ -163,6 +181,9 @@ def test_frontend_desktop_dev_uses_packaged_runtime_path() -> None:
         "node ../scripts/prepare-backend-runtime.mjs"
     )
     assert scripts["desktop:dev"].startswith("pnpm prepare:backend-runtime")
+    assert scripts["desktop:build:mac"] == (
+        "pnpm prepare:backend-runtime && CI=true tauri build --bundles app,dmg"
+    )
     assert not any(name.startswith("package:backend-runtime") for name in scripts)
 
 

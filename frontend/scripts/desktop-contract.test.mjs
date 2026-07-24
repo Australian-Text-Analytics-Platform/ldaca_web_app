@@ -16,17 +16,15 @@ describe('desktop configuration contracts', () => {
     expect(packageJson.scripts['dev:tauri']).toBe('vite --host 0.0.0.0 --port 3001 --strictPort');
   });
 
-  it('makes both desktop workflows call the shared runtime preparation command', () => {
-    for (const workflowPath of [
-      '.github/workflows/desktop-macos.yml',
-      '.github/workflows/desktop-windows.yml',
-    ]) {
-      const workflow = read(workflowPath);
-      expect(workflow).toContain('pnpm prepare:backend-runtime');
-      expect(workflow).not.toContain('package_backend_runtime.py');
-      expect(workflow).not.toContain('pnpm stage:backend-runtime');
-      expect(workflow).not.toContain('build-notes');
-    }
+  it('makes both shared desktop build branches use runtime preparation', () => {
+    const workflow = read('.github/workflows/desktop-build.yml');
+
+    expect(workflow).toContain("inputs.platform == 'windows'");
+    expect(workflow).toContain("inputs.platform == 'macos'");
+    expect(workflow).toContain('pnpm prepare:backend-runtime');
+    expect(workflow).not.toContain('package_backend_runtime.py');
+    expect(workflow).not.toContain('pnpm stage:backend-runtime');
+    expect(workflow).not.toContain('build-notes');
   });
 
   it('keeps retired JavaScript permissions, plugins, and globals absent', () => {

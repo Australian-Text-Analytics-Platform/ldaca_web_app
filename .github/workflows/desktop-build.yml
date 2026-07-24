@@ -1,0 +1,186 @@
+name: Desktop Build
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: "Desktop platform to build"
+        required: true
+        type: string
+      ref:
+        description: "Git ref to build"
+        required: false
+        type: string
+        default: ""
+      debug:
+        description: "Build Windows with debug diagnostics enabled"
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Desktop platform to build"
+        required: true
+        type: choice
+        options:
+          - windows
+          - macos
+      ref:
+        description: "Optional Git ref to build (branch, tag, or SHA)"
+        required: false
+        type: string
+      debug:
+        description: "Build Windows with debug diagnostics enabled"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.platform }}
+    runs-on: ${{ inputs.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
+    env:
+      CI: "true"
+      PYTHONUTF8: ${{ inputs.platform == 'windows' && '1' || '' }}
+      PYTHONIOENCODING: ${{ inputs.platform == 'windows' && 'utf-8' || '' }}
+      TAURI_PROFILE: ${{ inputs.platform == 'windows' && inputs.debug && 'debug' || 'release' }}
+
+    steps:
+      - name: Validate platform
+        shell: bash
+        env:
+          DESKTOP_PLATFORM: ${{ inputs.platform }}
+        run: |
+          set -Eeuo pipefail
+          case "$DESKTOP_PLATFORM" in
+            windows|macos) ;;
+            *)
+              echo "Unsupported desktop platform: $DESKTOP_PLATFORM" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Enable Windows long paths
+        if: inputs.platform == 'windows'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          git config --global core.longpaths true
+          New-ItemProperty `
+            -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+            -Name "LongPathsEnabled" `
+            -Value 1 `
+            -PropertyType DWORD `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Set up Rust nightly for backend extension builds
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Set up stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install uv CLI
+        uses: astral-sh/setup-uv@v8.2.0
+
+      - name: Install Node dependencies
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Validate desktop supervisor and runtime contract
+        working-directory: frontend
+        run: |
+          node --test ../scripts/prepare-backend-runtime.test.mjs
+          node --test scripts/stage-backend-runtime.test-node.mjs
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          cargo test --manifest-path src-tauri/Cargo.toml --lib
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features --locked -- -D warnings
+
+      - name: Prepare backend runtime
+        working-directory: frontend
+        run: pnpm prepare:backend-runtime
+
+      - name: Build Windows desktop application
+        if: inputs.platform == 'windows'
+        shell: pwsh
+        working-directory: frontend
+        env:
+          TAURI_BUILD_FLAGS: ${{ inputs.debug && '--debug' || '' }}
+        run: |
+          Set-StrictMode -Version Latest
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          if ($env:TAURI_BUILD_FLAGS) {
+            pnpm tauri build $env:TAURI_BUILD_FLAGS
+          } else {
+            pnpm tauri build
+          }
+
+      - name: Build macOS desktop application
+        if: inputs.platform == 'macos'
+        shell: bash
+        working-directory: frontend
+        run: pnpm tauri build --bundles app,dmg
+
+      - name: Validate bundled Windows backend runtime
+        if: inputs.platform == 'windows'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $runtimeDir = "frontend\src-tauri\target\$env:TAURI_PROFILE\backend-runtime"
+          if (-not (Test-Path (Join-Path $runtimeDir "runtime-manifest.json"))) {
+            Write-Error "runtime-manifest.json missing from bundled runtime"
+            exit 1
+          }
+          $env:LDACA_TEST_RUNTIME_ROOT = (Resolve-Path $runtimeDir).Path
+          cargo test `
+            --manifest-path frontend/src-tauri/Cargo.toml `
+            packaged_runtime_matches_launcher_environment `
+            -- --ignored
+
+      - name: Validate bundled macOS backend runtime
+        if: inputs.platform == 'macos'
+        shell: bash
+        working-directory: frontend
+        run: |
+          set -Eeuo pipefail
+          app_path="$PWD/src-tauri/target/release/bundle/macos/LDaCA Wordflow.app"
+          runtime_path="$app_path/Contents/Resources/backend-runtime"
+          test -f "$runtime_path/runtime-manifest.json"
+          test -f "$runtime_path/python/lib/libpython3.14.dylib"
+          LDACA_TEST_RUNTIME_ROOT="$runtime_path" \
+            cargo test --manifest-path src-tauri/Cargo.toml \
+            packaged_runtime_matches_launcher_environment -- --ignored
+
+      - name: Upload Windows MSI
+        if: inputs.platform == 'windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ldaca-desktop-windows-msi${{ inputs.debug && '-debug' || '' }}
+          path: frontend/src-tauri/target/${{ inputs.debug && 'debug' || 'release' }}/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload macOS DMG
+        if: inputs.platform == 'macos'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ldaca-desktop-macos-apple-silicon
+          path: frontend/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14

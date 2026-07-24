@@ -59,16 +59,31 @@ def test_polars_text_maturin_workflows_pin_maturin_and_use_action_sccache() -> N
         assert "--locked" in text
 
 
-def test_desktop_workflows_use_sccache_for_rust_builds() -> None:
-    for workflow in [
-        REPO_ROOT / ".github" / "workflows" / "desktop-macos.yml",
-        REPO_ROOT / ".github" / "workflows" / "desktop-windows.yml",
-    ]:
-        text = _read(workflow)
-        assert "RUSTC_WRAPPER: sccache" in text
-        assert "SCCACHE_GHA_ENABLED" in text
-        assert "mozilla-actions/sccache-action" in text
-        assert "sccache --show-stats" in text
+def test_desktop_build_uses_one_source_aware_cache_simple_workflow() -> None:
+    workflows = REPO_ROOT / ".github" / "workflows"
+    desktop = _read(workflows / "desktop-build.yml")
+    release = _read(workflows / "release.yml")
+
+    assert not (workflows / "desktop-macos.yml").exists()
+    assert not (workflows / "desktop-windows.yml").exists()
+    assert "platform:" in desktop
+    assert "windows-latest" in desktop
+    assert "macos-latest" in desktop
+    assert "pnpm prepare:backend-runtime" in desktop
+    assert "pnpm tauri build --bundles app,dmg" in desktop
+    assert "bundle/dmg/*.dmg" in desktop
+    assert "Validate backend package" not in desktop
+    assert "uv run ruff" not in desktop
+    assert "uv run ty" not in desktop
+    assert "uv run pytest" not in desktop
+    assert "sccache" not in desktop.lower()
+    assert "actions/cache" not in desktop
+    assert "desktop-build.yml" in release
+    assert "matrix.platform" in release
+    assert "desktop-macos.yml" not in release
+    assert "desktop-windows.yml" not in release
+    assert '"${RELEASE_TAG}^{commit}"' in release
+    assert '"$checked_out_sha" != "$release_sha"' in release
 
 
 def test_stage_backend_runtime_windows_dll_copy_uses_manifest_python_home() -> None:
