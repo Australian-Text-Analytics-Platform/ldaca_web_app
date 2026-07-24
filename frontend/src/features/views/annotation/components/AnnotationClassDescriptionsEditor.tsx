@@ -146,7 +146,7 @@ export function AnnotationClassDescriptionsEditor({
   }
 
   return (
-    <div className="mt-5 space-y-3">
+    <div className="mt-3 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold">Classes</h3>
         <Dialog open={isEditOpen} onOpenChange={handleOpenChange}>

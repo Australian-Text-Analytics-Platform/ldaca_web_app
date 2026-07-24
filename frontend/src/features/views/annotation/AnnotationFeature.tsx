@@ -706,74 +706,85 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
               ) : undefined
             }
           >
-            <div>
-              <NodeInputsPanel
-                title="Selected Data Blocks"
-                resolvedNodes={sourceNodeInputs.resolvedNodes}
-                availableNodes={sourceNodeInputs.availableNodes}
-                graphSelectedIds={sourceNodeInputs.graphSelectedIds}
-                recentPresets={sourceNodeInputs.recentPresets}
-                canAddMore={sourceNodeInputs.canAddMore}
-                maxNodes={1}
-                onAddNodes={sourceNodeInputs.addNodes}
-                getAddRejection={sourceNodeInputs.getAddRejection}
-                onRemoveNode={sourceNodeInputs.removeNode}
-                onClear={sourceNodeInputs.clear}
-                onColumnChange={sourceNodeInputs.setColumn}
-                columnLabel="Text Column"
-                renderColumnAddon={renderAnnotationColumnPicker}
-                renderExtraNodeContent={renderNewAnnotationColumnInput}
-                disabled={controlsLocked}
-              />
-            </div>
-
-            <section
-              aria-label="Class Description Setup"
-              className="mt-5 rounded-lg border bg-background/60 p-4"
-            >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-base font-semibold">Class Descriptions</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!sourceNode || controlsLocked || isCreatingClassTable}
-                  onClick={() => {
-                    void handleCreateClassTable();
-                  }}
+            <div className="@container/annotation-selectors">
+              <div
+                data-testid="annotation-node-selector-grid"
+                className="grid gap-5 @min-[640px]/annotation-selectors:grid-cols-2"
+              >
+                <section
+                  aria-label="Main Data Block Setup"
+                  className="rounded-lg border bg-background/60 p-4"
                 >
-                  {isCreatingClassTable ? 'Creating...' : 'Create empty class Data Block'}
-                </Button>
+                  <h3 className="mb-3 text-base font-semibold">Annotation Data Block</h3>
+                  <NodeInputsPanel
+                    title="Selected Data Blocks"
+                    resolvedNodes={sourceNodeInputs.resolvedNodes}
+                    availableNodes={sourceNodeInputs.availableNodes}
+                    graphSelectedIds={sourceNodeInputs.graphSelectedIds}
+                    recentPresets={sourceNodeInputs.recentPresets}
+                    canAddMore={sourceNodeInputs.canAddMore}
+                    maxNodes={1}
+                    onAddNodes={sourceNodeInputs.addNodes}
+                    getAddRejection={sourceNodeInputs.getAddRejection}
+                    onRemoveNode={sourceNodeInputs.removeNode}
+                    onClear={sourceNodeInputs.clear}
+                    onColumnChange={sourceNodeInputs.setColumn}
+                    columnLabel="Text Column"
+                    renderColumnAddon={renderAnnotationColumnPicker}
+                    renderExtraNodeContent={renderNewAnnotationColumnInput}
+                    disabled={controlsLocked}
+                  />
+                </section>
+
+                <section
+                  aria-label="Class Description Setup"
+                  className="rounded-lg border bg-background/60 p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold">Class Descriptions</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!sourceNode || controlsLocked || isCreatingClassTable}
+                      onClick={() => {
+                        void handleCreateClassTable();
+                      }}
+                    >
+                      {isCreatingClassTable ? 'Creating...' : 'Create New'}
+                    </Button>
+                  </div>
+                  <div>
+                    <NodeInputsPanel
+                      title="Class Description Node"
+                      resolvedNodes={classNodeInputs.resolvedNodes}
+                      availableNodes={classNodeInputs.availableNodes}
+                      canAddMore={classNodeInputs.canAddMore}
+                      maxNodes={1}
+                      onAddNodes={classNodeInputs.addNodes}
+                      getAddRejection={classNodeInputs.getAddRejection}
+                      onRemoveNode={classNodeInputs.removeNode}
+                      onClear={classNodeInputs.clear}
+                      onColumnChange={classNodeInputs.setColumn}
+                      columnLabel="Class Column"
+                      disabled={controlsLocked}
+                      renderColumnAddon={renderDescriptionColumnPicker}
+                    />
+                  </div>
+                  <AnnotationClassDescriptionsEditor
+                    key={[
+                      classDescriptionNode?.id ?? 'none',
+                      classDescriptionClassColumn ?? 'none',
+                      classDescriptionDescriptionColumn ?? 'none',
+                    ].join(':')}
+                    workspaceId={currentWorkspaceId ?? null}
+                    nodeId={classDescriptionNode?.id ?? null}
+                    classColumn={classDescriptionClassColumn}
+                    descriptionColumn={classDescriptionDescriptionColumn}
+                  />
+                </section>
               </div>
-              <div>
-                <NodeInputsPanel
-                  title="Class Description Node"
-                  resolvedNodes={classNodeInputs.resolvedNodes}
-                  availableNodes={classNodeInputs.availableNodes}
-                  canAddMore={classNodeInputs.canAddMore}
-                  maxNodes={1}
-                  onAddNodes={classNodeInputs.addNodes}
-                  getAddRejection={classNodeInputs.getAddRejection}
-                  onRemoveNode={classNodeInputs.removeNode}
-                  onClear={classNodeInputs.clear}
-                  onColumnChange={classNodeInputs.setColumn}
-                  columnLabel="Class Column"
-                  disabled={controlsLocked}
-                  renderColumnAddon={renderDescriptionColumnPicker}
-                />
-              </div>
-              <AnnotationClassDescriptionsEditor
-                key={[
-                  classDescriptionNode?.id ?? 'none',
-                  classDescriptionClassColumn ?? 'none',
-                  classDescriptionDescriptionColumn ?? 'none',
-                ].join(':')}
-                workspaceId={currentWorkspaceId ?? null}
-                nodeId={classDescriptionNode?.id ?? null}
-                classColumn={classDescriptionClassColumn}
-                descriptionColumn={classDescriptionDescriptionColumn}
-              />
-            </section>
+            </div>
 
             <section
               aria-label="Annotation Mode"

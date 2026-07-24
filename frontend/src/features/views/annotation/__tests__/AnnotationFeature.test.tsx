@@ -133,7 +133,16 @@ describe('AnnotationFeature', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Create empty class Data Block' }));
+    expect(screen.getByTestId('annotation-node-selector-grid')).toHaveClass(
+      '@min-[640px]/annotation-selectors:grid-cols-2',
+    );
+    expect(screen.getByRole('heading', { name: 'Annotation Data Block', level: 3 })).toHaveClass(
+      'mb-3',
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Class Descriptions', level: 3 }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Create New' }));
 
     expect(mocks.createSqlDataBlock).toHaveBeenCalledWith(
       ['source-1'],

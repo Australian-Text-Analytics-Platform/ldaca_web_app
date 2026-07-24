@@ -1,20 +1,20 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { Bookmark, Plus, Search, Trash2, X } from 'lucide-react';
+import { Bookmark, OctagonX, Plus, Search, Trash2, X } from 'lucide-react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
-import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { NodeAddRejection, ResolvedNodeInput } from '../nodeInputs/nodeInputsCore';
 import type { ResolvedPreset } from '../nodeInputs/useTabNodeInputs';
-import { NodeColumnSelector } from './NodeColumnSelector';
-import { NodeSelectionList, type NodeSelectionRenderArgs } from './NodeSelectionList';
 import { VIZ_PALETTE } from '../vizPalette';
 import { NodeColorPicker } from './NodeColorPicker';
+import { NodeColumnSelector } from './NodeColumnSelector';
+import { NodeSelectionList, type NodeSelectionRenderArgs } from './NodeSelectionList';
 
 const CLEAR_COLUMN_VALUE = '__ldaca__clear__';
 
@@ -258,6 +258,7 @@ export function NodeInputsPanel({
   const count = originalCount ?? resolvedNodes.length;
   const countLabel = maxNodes != null ? `${String(count)}/${String(maxNodes)}` : String(count);
   const showInputRequestTarget = showAddControls && pendingInputRequest !== undefined;
+  const inputRequestTargetFilled = !canAddMore;
   const inputRequestTargetDisabled = disabled || !canAddMore;
   const statusVariantClass = {
     info: 'border-sky-500/50 bg-sky-100/60 text-sky-900',
@@ -266,16 +267,19 @@ export function NodeInputsPanel({
   }[statusVariant];
 
   return (
-    <div className={cn('relative flex flex-col gap-2', className)}>
-      <div className="flex items-center justify-between gap-2 px-3 pt-1.5">
-        <div className="flex items-center gap-2">
+    <div className={cn('@container/node-inputs relative flex flex-col gap-2', className)}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-3 pt-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <label className="block text-sm font-medium text-muted-foreground">
             {title} ({countLabel})
           </label>
           {headerAddon}
         </div>
         {showAddControls && (
-          <div className="flex items-center gap-1.5">
+          <div
+            data-testid="node-inputs-actions"
+            className="ml-auto flex flex-wrap items-center justify-end gap-1.5 @max-[430px]/node-inputs:ml-0 @max-[430px]/node-inputs:basis-full @max-[430px]/node-inputs:justify-start"
+          >
             {resolvedNodes.length > 0 && (
               <Button
                 type="button"
@@ -478,23 +482,40 @@ export function NodeInputsPanel({
         <div className="absolute inset-0 z-10 rounded-lg bg-background/75 p-1 backdrop-blur-[1px]">
           <button
             type="button"
-            aria-label={`Add to ${title}`}
+            aria-label={inputRequestTargetFilled ? `${title} is already filled` : `Add to ${title}`}
             disabled={inputRequestTargetDisabled}
             className={cn(
-              'flex h-full min-h-24 w-full items-center justify-start gap-5 rounded-lg border-2 border-dashed border-muted-foreground/35 bg-card/95 px-7 text-left transition-colors',
-              'hover:border-primary/70 hover:bg-card focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-              'disabled:cursor-not-allowed disabled:opacity-60',
+              'flex h-full min-h-24 w-full items-center justify-center gap-5 rounded-lg border-2 border-dashed border-muted-foreground/35 bg-card/95 px-7 text-left transition-colors',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed',
+              inputRequestTargetFilled
+                ? 'border-destructive/60 bg-destructive/5'
+                : 'hover:border-primary/70 hover:bg-card disabled:opacity-60',
             )}
             onClick={() => {
               handleAdd(pendingInputRequest.nodeIds);
               consumeInputRequest(pendingInputRequest.id);
             }}
           >
-            <Plus className="size-10 stroke-[1.7] text-muted-foreground" aria-hidden="true" />
+            {inputRequestTargetFilled ? (
+              <OctagonX
+                className="size-10 stroke-[1.7] text-destructive"
+                data-testid="filled-selector-stop-icon"
+                aria-hidden="true"
+              />
+            ) : (
+              <Plus className="size-10 stroke-[1.7] text-muted-foreground" aria-hidden="true" />
+            )}
             <span className="flex min-w-0 flex-col gap-1">
               <span className="truncate text-base font-semibold text-foreground">{title}</span>
-              <span className="text-xs text-muted-foreground">
-                Add selected node{pendingInputRequest.nodeIds.length === 1 ? '' : 's'} here
+              <span
+                className={cn(
+                  'text-xs',
+                  inputRequestTargetFilled ? 'text-destructive' : 'text-muted-foreground',
+                )}
+              >
+                {inputRequestTargetFilled
+                  ? 'This selector is already filled. Choose another selector.'
+                  : `Add selected node${pendingInputRequest.nodeIds.length === 1 ? '' : 's'} here`}
               </span>
             </span>
           </button>

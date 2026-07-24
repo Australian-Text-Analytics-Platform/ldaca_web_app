@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { NodeInputsPanel } from '../NodeInputsPanel';
-import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
@@ -86,6 +85,9 @@ describe('NodeInputsPanel', () => {
     );
 
     expect(screen.getByTestId('column-addon')).toBeInTheDocument();
+    expect(screen.getByTestId('node-inputs-actions')).toHaveClass(
+      '@max-[430px]/node-inputs:basis-full',
+    );
     expect(screen.getByTestId('node-inputs-column-addon')).toHaveClass('w-max');
     expect(screen.getByTestId('node-inputs-controls')).toHaveClass(
       'md:grid-cols-[minmax(0,1fr)_auto_auto]',
@@ -105,10 +107,37 @@ describe('NodeInputsPanel', () => {
 
     render(<NodeInputsPanel {...baseProps} title="Example Node" onAddNodes={onAddNodes} />);
 
-    await user.click(screen.getByRole('button', { name: 'Add to Example Node' }));
+    const target = screen.getByRole('button', { name: 'Add to Example Node' });
+    expect(target).toHaveClass('justify-center');
+    await user.click(target);
 
     expect(onAddNodes).toHaveBeenCalledWith(['node-a', 'node-b']);
     expect(consume).toHaveBeenCalledWith(4);
+  });
+
+  it('marks a filled pending-request target as unavailable and directs users elsewhere', () => {
+    const onAddNodes = vi.fn(() => []);
+    nodeInputRequestsStore({
+      requests: [{ id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
+    });
+
+    render(
+      <NodeInputsPanel
+        {...baseProps}
+        title="Example Node"
+        canAddMore={false}
+        onAddNodes={onAddNodes}
+      />,
+    );
+
+    const target = screen.getByRole('button', { name: 'Example Node is already filled' });
+    expect(target).toBeDisabled();
+    expect(target).toHaveClass('justify-center');
+    expect(
+      screen.getByText('This selector is already filled. Choose another selector.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('filled-selector-stop-icon')).toBeInTheDocument();
+    expect(onAddNodes).not.toHaveBeenCalled();
   });
 
   it('cancels a pending dashed add target without adding nodes', async () => {
