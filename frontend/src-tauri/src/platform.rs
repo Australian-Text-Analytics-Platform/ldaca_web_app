@@ -1,7 +1,9 @@
 use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(unix)]
+use std::time::Instant;
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt as UnixCommandExt;
@@ -60,6 +62,8 @@ pub(crate) fn terminate_process_tree(
 
     #[cfg(target_os = "windows")]
     {
+        // taskkill /T fells the whole tree at once; no grace window applies.
+        let _ = timeout;
         let status = Command::new("taskkill")
             .args(["/F", "/T", "/PID", &pid.to_string()])
             .creation_flags(CREATE_NO_WINDOW)

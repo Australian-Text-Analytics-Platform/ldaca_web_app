@@ -178,7 +178,10 @@ mod tests {
         ));
         let root = base.join("data");
         fs::create_dir_all(&root).expect("root");
-        let root = root.canonicalize().expect("canonical root");
+        // Match validate_data_root's canonical form: std::fs::canonicalize
+        // yields a \\?\-prefixed path on Windows, which the dunce-based
+        // validation would reject as an alias.
+        let root = dunce::canonicalize(&root).expect("canonical root");
         let config = base.join("config/backend.json");
 
         write_config(&config, &root).expect("write config");
