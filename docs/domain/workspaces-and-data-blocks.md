@@ -89,7 +89,7 @@ descendant retains the independent plan captured when that descendant was
 created.
 
 Column cast, rename, and delete are always edits. Filter, Find, Create, and
-Polars Expression may either create a Derived Data Block or update the selected
+Expression may either create a Derived Data Block or update the selected
 Data Block. Slice, random sample, shuffle, Join, and Stack always create
 Derived Data Blocks.
 

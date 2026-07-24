@@ -6,7 +6,7 @@
 
 ![Preprocessing screenshot](tutorials/assets/preprocessing.png)
 
-The Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab performs a specific type of transformation. Filter, Find, Create, and Polars Expression can either create a **new Data Block** or update the selected Data Block. Sample, Join, and Stack always create a new Derived Data Block. There are currently seven sub-tabs:
+The Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab performs a specific type of transformation. Filter, Find, Create, and Expression can either create a **new Data Block** or update the selected Data Block. Sample, Join, and Stack always create a new Derived Data Block. There are currently seven sub-tabs:
 
 | Sub-tab | What it does | Apply behavior |
 |---|---|---|
@@ -16,7 +16,7 @@ The Preprocessing tools transform and prepare raw text data blocks into analysis
 | Stack | Vertically concatenate two data blocks that share the same columns | Create only |
 | Find | Match text patterns with Regular Expressions, then remove, replace, or extract matches | Create or update |
 | Create | Build a new column by combining the contents of existing columns | Create or update |
-| Polars Expression | Write Python-style Polars expressions for advanced transformations | Create or update |
+| Expression | Compose validated typed expression items for advanced transformations | Create or update |
 
 The general workflow for any sub-tab is:
 
@@ -40,7 +40,7 @@ The preview pane shows the result of the current configuration in a paginated fo
 
 <h3 id="help-preprocessing-common-apply-button">Apply result as</h3>
 
-For Filter, Find, Create, and Polars Expression, **Create new Data Block** is selected by default. It preserves the source and records the new block's creation lineage. Choose **Update selected Data Block** only when you deliberately want to replace the selected block's current execution plan. The choice remains available for repeated applies in the same tool and source, but resets to Create when you change the tool or selected Data Block. It is not saved as a preference.
+For Filter, Find, Create, and Expression, **Create new Data Block** is selected by default. It preserves the source and records the new block's creation lineage. Choose **Update selected Data Block** only when you deliberately want to replace the selected block's current execution plan. The choice remains available for repeated applies in the same tool and source, but resets to Create when you change the tool or selected Data Block. It is not saved as a preference.
 
 Sample (including Slice, Random Sample, and Shuffle), Join, and Stack have no update mode and always create Derived Data Blocks.
 
@@ -241,9 +241,9 @@ Set a clear label for the new column so it is easy to find downstream. This is a
 2. Use the Basic builder to drag both columns into the expression with a space separator.
 3. Preview the combined column, choose create or update mode, then apply it.
 
-<h2 id="help-preprocessing-expression-section">Polars Expression</h2>
+<h2 id="help-preprocessing-expression-section">Expression</h2>
 
-The Polars Expression sub-tab gives advanced users direct access to the [Polars](https://docs.pola.rs/) expression language. Write Python-style expressions that are validated and executed server-side. Use it for transformations that go beyond what the graphical tools support.
+The Expression sub-tab accepts JSON expression items from Wordflow's generated typed-expression contract. Raw Python and executable Polars source are not accepted. Each item contains an `expression` object with an `op`; optional item fields such as `alias` and the separate Sort direction control shape the output.
 
 Five context modes are available:
 
@@ -255,12 +255,12 @@ Five context modes are available:
 | Sort | Sort by one or more expressions, with optional descending order |
 | Group By | Group by a key expression and apply aggregations |
 
-Each mode displays a syntax hint box with examples. Click **Preview** to validate and inspect results, choose create or update mode, then click **Create Data Block** or **Update Data Block**. The new-Data-Block name field is shown only in create mode.
+Each mode displays a typed JSON example. Click **Preview** to validate and inspect results, choose create or update mode, then click **Create Data Block** or **Update Data Block**. The new-Data-Block name field is shown only in create mode.
 
 **Practice exercise**
 
 1. Select a dataset and switch to the **Filter** context.
-2. Write a boolean expression such as `pl.col("word_count") > 100`.
+2. Enter `{"expression":{"op":"gt","left":{"op":"column","name":"word_count"},"right":{"op":"literal","value":100}}}`.
 3. Click **Preview** to inspect the filtered rows, then choose whether to create a Derived Data Block or update the selected Data Block.
 
 [← Back to tutorial index](./index.md)

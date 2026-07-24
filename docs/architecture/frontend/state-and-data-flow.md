@@ -161,7 +161,7 @@ canonical Result; only an explicit page, page-size, or sort change requests an
 alternate projection. Categorical values use infinite queries, and
 preprocessing previews use debounced, cancellable queries.
 
-Filter, Find, Create, and Polars Expression keep their create/update choice in
+Filter, Find, Create, and Expression keep their create/update choice in
 local component state. Create is the default, and changing the tool or selected
 Data Block resets the choice; it is not an account or device preference.
 Sample, Join, and Stack expose no update mode. Successful edits and history

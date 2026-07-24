@@ -6,7 +6,7 @@ status: accepted
 
 Wordflow supports identity-preserving Data Block Edits alongside Derived Data
 Block creation. Cast, column rename, and column delete are always edits.
-Filter, Find, Create, and Polars Expression default to creating a Derived Data
+Filter, Find, Create, and Expression default to creating a Derived Data
 Block but may explicitly update the selected Data Block. Sample, Join, and
 Stack remain creation-only.
 

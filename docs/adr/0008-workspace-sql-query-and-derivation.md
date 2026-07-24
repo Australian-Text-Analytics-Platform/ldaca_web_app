@@ -28,7 +28,7 @@ literals and rejects matching function calls. This protects the intended
 Workspace data boundary but is explicitly not a general SQL sandbox.
 
 Typed native operations remain the product contract for Filter, Find/Replace,
-Create, Polars Expression, Sample, Join, Stack, cast, rename, and delete.
+Create, Expression, Sample, Join, Stack, cast, rename, and delete.
 Those operations preserve semantics that SQL does not represent losslessly,
 including Topic Distribution filtering, regex transformations, categorical
-casts, plugins, and the full Polars expression surface.
+casts, plugins, and the validated typed-expression surface.

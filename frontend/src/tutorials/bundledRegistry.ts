@@ -251,7 +251,7 @@ const tutorial = {
   'preprocessing.expression.tab': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-expression-section',
-    label: 'Polars Expression sub-tab overview',
+    label: 'Expression sub-tab overview',
   },
   'analysis.token-frequency.tab': {
     file: 'tutorials/token-frequency.md',
