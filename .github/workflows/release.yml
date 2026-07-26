@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to build manually, e.g. dev"
+        description: "Optional Git ref override; defaults to the selected workflow branch"
         required: false
         type: string
-        default: "dev"
+        default: ""
       publish_release:
         description: "Publish artifacts to a GitHub release"
         required: false

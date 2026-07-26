@@ -27,6 +27,14 @@ describe('desktop configuration contracts', () => {
     expect(workflow).not.toContain('build-notes');
   });
 
+  it('builds the selected workflow branch unless a release ref is overridden', () => {
+    const workflow = read('.github/workflows/release.yml');
+
+    expect(workflow).toContain('default: ""');
+    expect(workflow).not.toContain('default: "dev"');
+    expect(workflow.match(/inputs\.ref \|\| github\.ref }}/g)).toHaveLength(2);
+  });
+
   it('keeps retired JavaScript permissions, plugins, and globals absent', () => {
     const capability = read('frontend/src-tauri/capabilities/default.json');
     const cargo = read('frontend/src-tauri/Cargo.toml');
