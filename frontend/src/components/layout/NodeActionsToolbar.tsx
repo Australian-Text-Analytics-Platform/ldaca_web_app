@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { NodeInputPointerPosition } from '@/stores/nodeInputRequestsStore';
 
 /** Minimal node shape the row toolbar needs. */
 interface NodeActionsToolbarNode {
@@ -30,7 +31,7 @@ export interface NodeActionsToolbarProps {
   node: NodeActionsToolbarNode;
   isPinned: boolean;
   onTogglePin: (nodeId: string) => void;
-  onAddToSelection: (nodeId: string) => void;
+  onAddToSelection: (nodeId: string, pointer?: NodeInputPointerPosition) => void;
   onRename: (nodeId: string, newName: string) => void;
   onClone: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
@@ -156,8 +157,11 @@ export function NodeActionsToolbar({
 
       <button
         type="button"
-        onClick={() => {
-          onAddToSelection(node.id);
+        onClick={(event) => {
+          onAddToSelection(
+            node.id,
+            event.detail > 0 ? { x: event.clientX, y: event.clientY } : undefined,
+          );
         }}
         className={iconButtonClass}
         title="Add to selection"

@@ -31,7 +31,10 @@ import WorkspaceNodeList from '@/components/layout/WorkspaceNodeList';
 import { NodeActionsToolbar, NodePinButton } from '@/components/layout/NodeActionsToolbar';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
+import {
+  type NodeInputPointerPosition,
+  useNodeInputRequestsStore,
+} from '@/stores/nodeInputRequestsStore';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import type { WorkspaceGraphNode } from '@/api';
@@ -162,8 +165,8 @@ function Sidebar() {
    * active analysis view, and stale closures can otherwise tag a click for the
    * previous tool so no mounted selector consumes it.
    */
-  const handleAddToSelection = (nodeId: string) => {
-    requestNodeInputAdd(currentWorkspaceId, useUIStore.getState().currentView, nodeId);
+  const handleAddToSelection = (nodeId: string, pointer?: NodeInputPointerPosition) => {
+    requestNodeInputAdd(currentWorkspaceId, useUIStore.getState().currentView, nodeId, pointer);
     if (currentWorkspaceId) markInteracted(currentWorkspaceId, [nodeId]);
   };
 

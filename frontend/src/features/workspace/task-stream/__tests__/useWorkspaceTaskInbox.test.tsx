@@ -9,6 +9,7 @@ import { analysisResponse } from '@/test/msw/fixtures';
 import { server } from '@/test/msw/server';
 import type { UserFileImport } from '@/api';
 import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
 import { useTaskResources, useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
 
@@ -57,6 +58,7 @@ describe('useWorkspaceTaskInbox', () => {
   beforeEach(() => {
     emitEvent = undefined;
     mocks.toastError.mockReset();
+    useFreshNodesStore.getState().reset();
   });
 
   it('refreshes the workspace analysis projection when the canonical SSE event arrives', async () => {
@@ -94,6 +96,119 @@ describe('useWorkspaceTaskInbox', () => {
           workspace_id: 'workspace-1',
         }),
       ]),
+    );
+  });
+
+  it('invalidates source Data Block pages after Annotation Run All succeeds', async () => {
+    const annotationRunAll = analysisResponse({
+      request: {
+        kind: 'annotation_run_all',
+        source: {
+          kind: 'annotation',
+          node_id: 'node-1',
+          text_column: 'text',
+          annotation_column: 'annotation.gemini',
+          class_node_id: 'classes-1',
+          class_column: 'class',
+          description_column: 'description',
+          classes: [{ name: 'label', description: '' }],
+          provider_configuration_id: 'provider-1',
+          provider: 'openrouter',
+          model: 'model-1',
+          instruction: 'Classify the text.',
+        },
+      },
+    });
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses/:analysis_id', () =>
+        HttpResponse.json(annotationRunAll),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const sourcePageKey = queryKeys.workspaceSql(
+      'workspace-1',
+      ['node-1'],
+      'SELECT * FROM "node-1"',
+      1,
+      10,
+    );
+    const unrelatedPageKey = queryKeys.workspaceSql(
+      'workspace-1',
+      ['node-2'],
+      'SELECT * FROM "node-2"',
+      1,
+      10,
+    );
+    queryClient.setQueryData(sourcePageKey, { rows: [{ 'annotation.gemini': null }] });
+    queryClient.setQueryData(unrelatedPageKey, { rows: [{ text: 'unchanged' }] });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    act(() => {
+      emitEvent?.({
+        type: 'resource_changed',
+        sequence: 2,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'analysis',
+        resource_id: 'analysis-1',
+        workspace_id: 'workspace-1',
+        state: 'succeeded',
+        progress: { fraction: 1, message: 'done' },
+        revision: 2,
+      });
+    });
+
+    await waitFor(() => expect(queryClient.getQueryState(sourcePageKey)?.isInvalidated).toBe(true));
+    expect(queryClient.getQueryState(unrelatedPageKey)?.isInvalidated).toBe(false);
+  });
+
+  it('marks only published Analysis outputs as newly created Data Blocks', async () => {
+    const publication = analysisResponse({
+      id: 'publication-1',
+      execution_scope: 'supporting',
+      output_node_ids: ['published-1'],
+      request: {
+        kind: 'concordance_result_publication',
+        sources: [
+          {
+            source_node_id: 'node-1',
+            selected_columns: ['text', 'CONC_matched_text'],
+            new_node_name: 'Published matches',
+          },
+        ],
+      },
+    });
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses/:analysis_id', () =>
+        HttpResponse.json(publication),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    act(() => {
+      emitEvent?.({
+        type: 'resource_changed',
+        sequence: 2,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'analysis',
+        resource_id: 'publication-1',
+        workspace_id: 'workspace-1',
+        state: 'succeeded',
+        progress: { fraction: 1, message: 'done' },
+        revision: 2,
+      });
+    });
+
+    await waitFor(() =>
+      expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('workspace-1')).toEqual(
+        new Set(['published-1']),
+      ),
     );
   });
 

@@ -8,25 +8,29 @@ import { immer } from 'zustand/middleware/immer';
  *
  * The React Flow graph is mounted outside individual analysis panels, so a
  * node's side "+" button cannot directly call the active tab's
- * ``useNodeInputs.addNodes``. Instead it queues an add request scoped by
- * workspace + active view. Single-selector views consume matching requests
- * directly through ``useTabNodeInputs``. Multi-selector views opt out of direct
- * consumption so each visible ``NodeInputsPanel`` can show the dashed "Add
- * here" target and let the user choose.
+ * ``useNodeInputs.addNodes``. Instead it holds a transient LIFO stack scoped by
+ * workspace + active view. Every visible ``NodeInputsPanel`` renders the same
+ * dashed placement target and consumes only the latest carried Data Block.
  *
  * This store is intentionally not persisted: button clicks are transient UI
  * intents, not canonical selection state.
  */
+export interface NodeInputPointerPosition {
+  x: number;
+  y: number;
+}
+
 interface NodeInputAddRequest {
   id: number;
   workspaceId: string;
   view: string;
-  nodeIds: string[];
+  nodeId: string;
+  pointer?: NodeInputPointerPosition;
 }
 
 interface NodeInputRequestsState {
   nextId: number;
-  requests: NodeInputAddRequest[];
+  pendingRequests: NodeInputAddRequest[];
 }
 
 interface NodeInputRequestsActions {
@@ -34,8 +38,10 @@ interface NodeInputRequestsActions {
     workspaceId: string | null | undefined,
     view: string | null | undefined,
     nodeId: string,
+    pointer?: NodeInputPointerPosition,
   ) => void;
   consume: (id: number) => void;
+  clear: () => void;
   prune: (workspaceId: string, nodeIds: readonly string[]) => void;
 }
 
@@ -45,26 +51,34 @@ export const useNodeInputRequestsStore = create<NodeInputRequestsStore>()(
   devtools(
     immer((set) => ({
       nextId: 1,
-      requests: [],
+      pendingRequests: [],
 
-      /** Queues a graph-button add intent for the currently active view. */
-      requestAdd: (workspaceId, view, nodeId) => {
+      /** Pushes a graph/sidebar add intent onto the carried LIFO stack. */
+      requestAdd: (workspaceId, view, nodeId, pointer) => {
         set((state) => {
           if (!workspaceId || !view || !nodeId) return;
-          state.requests.push({
+          state.pendingRequests.push({
             id: state.nextId,
             workspaceId,
             view,
-            nodeIds: [nodeId],
+            nodeId,
+            ...(pointer ? { pointer } : {}),
           });
           state.nextId += 1;
         });
       },
 
-      /** Removes a consumed request after the active view has handled it. */
+      /** Removes one request after placement or an explicit top-item discard. */
       consume: (id) => {
         set((state) => {
-          state.requests = state.requests.filter((request) => request.id !== id);
+          state.pendingRequests = state.pendingRequests.filter((request) => request.id !== id);
+        });
+      },
+
+      /** Discards the complete carried stack. */
+      clear: () => {
+        set((state) => {
+          state.pendingRequests = [];
         });
       },
 
@@ -72,10 +86,8 @@ export const useNodeInputRequestsStore = create<NodeInputRequestsStore>()(
       prune: (workspaceId, nodeIds) => {
         set((state) => {
           const valid = new Set(nodeIds);
-          state.requests = state.requests.filter(
-            (request) =>
-              request.workspaceId !== workspaceId ||
-              request.nodeIds.every((nodeId) => valid.has(nodeId)),
+          state.pendingRequests = state.pendingRequests.filter(
+            (request) => request.workspaceId !== workspaceId || valid.has(request.nodeId),
           );
         });
       },

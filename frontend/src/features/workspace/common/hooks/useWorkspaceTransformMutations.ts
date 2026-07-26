@@ -19,6 +19,7 @@ import type { FilterRequest as FilterRequestPayload } from '@/features/views/pre
 import type { SliceRequestPayload } from '@/features/views/preprocessing/slice/hooks/sliceFormModel';
 import type { ReplaceRequest } from '@/features/views/preprocessing/replace/hooks/replaceRequestModel';
 import type { PreprocessingApplyMode } from '@/features/views/preprocessing/preprocessingApplyMode';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import {
   invalidateNodeWorkspaceQueries,
   invalidateWorkspaceGraphQuery,
@@ -71,6 +72,11 @@ export const useWorkspaceTransformMutations = ({
       throw new Error('No workspace selected');
     }
     return currentWorkspaceId;
+  };
+  const markCreatedNode = (node: { id: string }) => {
+    if (currentWorkspaceId) {
+      useFreshNodesStore.getState().markCreated(currentWorkspaceId, [node.id]);
+    }
   };
   type NodeCreateBody = NonNullable<CreateNodeData['body']>;
   type NodeEditBody = NonNullable<EditNodeData['body']>;
@@ -170,13 +176,12 @@ export const useWorkspaceTransformMutations = ({
             path: { workspace_id: ensureWorkspaceSelected() },
             throwOnError: true,
           })
-      ).then(({ data }) => {
-        requireNode(data);
-      }),
-    onSuccess: (_response, variables) => {
+      ).then(({ data }) => requireNode(data)),
+    onSuccess: (response, variables) => {
       if (variables.mode === 'update') {
         invalidateEditedNode(variables.nodeId);
       } else {
+        markCreatedNode(response);
         invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       }
     },
@@ -205,10 +210,11 @@ export const useWorkspaceTransformMutations = ({
             throwOnError: true,
           })
       ).then(({ data }) => requireNode(data)),
-    onSuccess: (_response, variables) => {
+    onSuccess: (response, variables) => {
       if (variables.mode === 'update') {
         invalidateEditedNode(variables.nodeId);
       } else {
+        markCreatedNode(response);
         invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       }
     },
@@ -222,7 +228,8 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected() },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
-    onSuccess: () => {
+    onSuccess: (createdNode) => {
+      markCreatedNode(createdNode);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
     },
   });
@@ -312,10 +319,11 @@ export const useWorkspaceTransformMutations = ({
             throwOnError: true,
           })
       ).then(({ data }) => requireNode(data)),
-    onSuccess: (_response, variables) => {
+    onSuccess: (response, variables) => {
       if (variables.mode === 'update') {
         invalidateEditedNode(variables.nodeId);
       } else {
+        markCreatedNode(response);
         invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       }
     },
@@ -403,7 +411,8 @@ export const useWorkspaceTransformMutations = ({
         path: { workspace_id: ensureWorkspaceSelected() },
         body: { mode: 'create', node_ids: nodeIds, sql, name },
       }),
-    onSuccess: () => {
+    onSuccess: (createdNode) => {
+      markCreatedNode(createdNode);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
     },
   });

@@ -2,6 +2,7 @@ import React from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 
 const workspaceSdkMock = vi.hoisted(() => ({
   closeWorkspaceById: vi.fn(),
@@ -49,6 +50,7 @@ const buildArgs = (queryClient: QueryClient, currentWorkspaceId: string | null =
 describe('useWorkspaceNodeMutations', () => {
   beforeEach(() => {
     Object.values(workspaceSdkMock).forEach((mock) => mock.mockReset());
+    useFreshNodesStore.getState().reset();
   });
 
   it('creates a workspace through the canonical resource endpoint', async () => {
@@ -135,6 +137,9 @@ describe('useWorkspaceNodeMutations', () => {
       throwOnError: true,
     });
     expect(args.removeNode).toHaveBeenCalledWith('node-1');
+    expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('ws-1')).toEqual(
+      new Set(['node-copy']),
+    );
   });
 
   it('creates joins and concatenations as typed node resources', async () => {
@@ -184,6 +189,9 @@ describe('useWorkspaceNodeMutations', () => {
     });
     expect(args.replaceSelectedNodes).toHaveBeenNthCalledWith(1, ['joined-node'], 'joined-node');
     expect(args.replaceSelectedNodes).toHaveBeenNthCalledWith(2, ['concat-node'], 'concat-node');
+    expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('ws-1')).toEqual(
+      new Set(['joined-node', 'concat-node']),
+    );
   });
 
   it('previews node creation with the request workspace and cancellation signal', async () => {
@@ -295,6 +303,9 @@ describe('useWorkspaceNodeMutations', () => {
       path: { workspace_id: 'ws-1', node_id: 'node-1' },
       throwOnError: true,
     });
+    expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('ws-1')).toEqual(
+      new Set(['derived-node']),
+    );
   });
 
   it('runs Undo and Redo commands through the node history endpoints', async () => {

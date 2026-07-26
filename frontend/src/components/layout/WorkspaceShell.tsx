@@ -15,6 +15,7 @@ import { ViewRouteSync } from '@/components/layout/ViewRouteSync';
 import { ViewRouter } from '@/components/layout/ViewRouter';
 import { isTabbedMainView } from '@/features/views/viewRegistry';
 import { GuidanceProvider } from '@/features/guidance/GuidanceProvider';
+import { NodeInputPointerCarrier } from '@/components/layout/NodeInputPointerCarrier';
 
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 
@@ -58,6 +59,7 @@ function WorkspaceShellContent() {
             style={{ ['--sidebar-width' as string]: `${String(sidebarWidth)}px` }}
           >
             <DocumentModalHost />
+            <NodeInputPointerCarrier />
             <RefreshStatusBanner />
             <div className="flex h-dvh w-full overflow-hidden" ref={sidebarHostRef}>
               <ErrorBoundary>

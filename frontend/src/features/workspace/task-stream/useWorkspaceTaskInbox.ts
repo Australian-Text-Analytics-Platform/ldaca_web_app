@@ -14,8 +14,10 @@ import {
   listUserFileImports,
 } from '@/api';
 import type { UserFileImport, UserFileImportPage, WorkspaceResource } from '@/api';
+import { invalidateNodeWorkspaceQueries } from '@/features/workspace/common/hooks/workspaceMutationCache';
 import { workspaceAnalysesQueryOptions } from '@/features/workspace/common/hooks/workspaceAnalysesQuery';
 import { queryKeys } from '@/lib/queryKeys';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { analysisToTask, importToTask, sortTasks, type TaskItem } from './taskProjection';
 import {
   type BackendEvent,
@@ -24,6 +26,11 @@ import {
 } from './useWorkspaceTaskStreamClient';
 
 const IMPORT_PAGE_SIZE = 100;
+
+const publishesWorkspaceDataBlocks = (kind: string): boolean =>
+  kind === 'concordance_result_publication' ||
+  kind === 'quotation_result_publication' ||
+  kind === 'topic_modeling_detachment';
 
 const nextPage = (page: { page: number; total_pages: number }): number | undefined =>
   page.page < page.total_pages ? page.page + 1 : undefined;
@@ -163,6 +170,19 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
             void queryClient.invalidateQueries({
               queryKey: queryKeys.analysisResults(workspaceId, event.resource_id),
             });
+            if (data.request.kind === 'annotation_run_all') {
+              invalidateNodeWorkspaceQueries(
+                queryClient,
+                workspaceId,
+                data.request.source.node_id,
+                {
+                  includeData: true,
+                },
+              );
+            }
+            if (publishesWorkspaceDataBlocks(data.request.kind)) {
+              useFreshNodesStore.getState().markCreated(workspaceId, data.output_node_ids);
+            }
           }
         } catch (error) {
           console.warn('Could not refresh analysis activity', error);

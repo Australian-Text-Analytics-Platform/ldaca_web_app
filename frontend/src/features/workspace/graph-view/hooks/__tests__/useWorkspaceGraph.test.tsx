@@ -75,9 +75,10 @@ interface TestNodeData {
     canUndo: boolean;
     canRedo: boolean;
   };
+  isFresh: boolean;
   onUndo: (nodeId: string) => void;
   onRedo: (nodeId: string) => void;
-  onAddToSelection: (nodeId: string) => void;
+  onAddToSelection: (nodeId: string, pointer?: { x: number; y: number }) => void;
 }
 
 describe('useWorkspaceGraph', () => {
@@ -124,6 +125,19 @@ describe('useWorkspaceGraph', () => {
 
     expect((result.current.nodes[0]?.data as unknown as TestNodeData).node.color).toBe('#0000ff');
     expect(result.current.edges[0]?.label).toBe('second label');
+  });
+
+  it('shows no new marker for loaded nodes and shows one only after explicit creation', () => {
+    const { result, rerender } = renderHook(() => useWorkspaceGraph());
+
+    expect((result.current.nodes[0]?.data as unknown as TestNodeData).isFresh).toBe(false);
+
+    act(() => {
+      useFreshNodesStore.getState().markCreated('workspace-a', ['node-1']);
+    });
+    rerender();
+
+    expect((result.current.nodes[0]?.data as unknown as TestNodeData).isFresh).toBe(true);
   });
 
   it('projects history flags and routes graph history commands', () => {
@@ -270,12 +284,18 @@ describe('useWorkspaceGraph', () => {
       'workspace-b',
       expect.any(String),
       'node-1',
+      undefined,
     );
   });
 
   it('adds a Data Block to the active tool on double-click, mirroring the + button', () => {
     const { result } = renderHook(() => useWorkspaceGraph());
-    const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    const event = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      clientX: 320,
+      clientY: 180,
+    };
 
     act(() => {
       result.current.handleNodeDoubleClick(
@@ -290,6 +310,7 @@ describe('useWorkspaceGraph', () => {
       'workspace-a',
       expect.any(String),
       'node-1',
+      { x: 320, y: 180 },
     );
   });
 });

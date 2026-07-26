@@ -18,7 +18,10 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
-import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
+import {
+  type NodeInputPointerPosition,
+  useNodeInputRequestsStore,
+} from '@/stores/nodeInputRequestsStore';
 import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 import { projectWorkspaceGraphNodeCard, type WorkspaceGraphNodeCard } from '../graphNodeModel';
@@ -184,21 +187,18 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     void graphCommandsRef.current.redoNode(nodeId);
   }, []);
 
-  // "Fresh" = nodes that appeared mid-session (detach / join / stack /
-  // clone / etc. outputs) and haven't been interacted with yet. The
-  // graph marks them with a red "new" dot so the user can find them in
-  // a busy workspace. ``observeNodeIds`` is called from a useEffect
-  // below so the side-effect doesn't fire inside useMemo.
+  // "Fresh" = Data Blocks explicitly created by this frontend session and not
+  // yet interacted with. Graph refreshes only remove markers for deleted IDs;
+  // they never infer creation from query-cache timing.
   const freshIds = useFreshNodesStore(
     (state) =>
-      (currentWorkspaceId
-        ? state.freshnessByWorkspace.get(currentWorkspaceId)?.freshIds
-        : undefined) ?? EMPTY_FRESH_IDS,
+      (currentWorkspaceId ? state.freshIdsByWorkspace.get(currentWorkspaceId) : undefined) ??
+      EMPTY_FRESH_IDS,
   );
   // Zustand store actions are stable closures and never rely on `this`, so
   // selecting them directly is safe despite unbound-method.
   // eslint-disable-next-line @typescript-eslint/unbound-method
-  const observeNodeIds = useFreshNodesStore((state) => state.observeNodeIds);
+  const reconcileNodeIds = useFreshNodesStore((state) => state.reconcileNodeIds);
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const markInteracted = useFreshNodesStore((state) => state.markInteracted);
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
@@ -210,7 +210,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /**
    * Requests that the active view add this node to its owned input selection.
    * Called by: CustomNode's fixed-size side controls. The graph does not own
-   * analysis inputs, so this queues an intent consumed by useTabNodeInputs in
+   * analysis inputs, so this sets the pending intent consumed by useTabNodeInputs in
    * the currently mounted view instead of selecting/highlighting the graph node.
    *
    * The active view is read live from the store at click time rather than
@@ -225,11 +225,11 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
    * Reading ``getState()`` sidesteps that staleness entirely.
    */
   const handleAddToSelection = useCallback(
-    (nodeId: string) => {
+    (nodeId: string, pointer?: NodeInputPointerPosition) => {
       if (!nodeId) return;
       const activeView = useUIStore.getState().currentView;
       const workspaceId = currentWorkspaceIdRef.current;
-      requestNodeInputAdd(workspaceId, activeView, nodeId);
+      requestNodeInputAdd(workspaceId, activeView, nodeId, pointer);
       if (workspaceId) markInteracted(workspaceId, [nodeId]);
     },
     [requestNodeInputAdd, markInteracted],
@@ -239,8 +239,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     [workspaceGraph],
   );
   useEffect(() => {
-    if (currentWorkspaceId) observeNodeIds(currentWorkspaceId, currentGraphNodeIds);
-  }, [currentGraphNodeIds, currentWorkspaceId, observeNodeIds]);
+    if (currentWorkspaceId) reconcileNodeIds(currentWorkspaceId, currentGraphNodeIds);
+  }, [currentGraphNodeIds, currentWorkspaceId, reconcileNodeIds]);
 
   const initialNodes = useMemo(() => {
     if (!workspaceGraph?.nodes) {
@@ -446,7 +446,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     (event, node) => {
       event.preventDefault();
       event.stopPropagation();
-      if (node.id) handleAddToSelection(node.id);
+      if (node.id) {
+        handleAddToSelection(node.id, { x: event.clientX, y: event.clientY });
+      }
     },
     [handleAddToSelection],
   );

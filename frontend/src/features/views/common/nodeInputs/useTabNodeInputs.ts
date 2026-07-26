@@ -8,11 +8,8 @@ import {
   type WorkspaceNodeMetadata,
 } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
-import { useUIStore } from '@/stores';
 import { useAuthStore } from '@/stores/authStore';
-import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { recentSelectionsScopeKey, useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
-import { toast } from 'sonner';
 import {
   DEFAULT_TAB_INPUT_SET_ID,
   getTabInputSet,
@@ -41,8 +38,6 @@ export interface UseTabNodeInputsConfig {
   onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** Per-view constraints (allowed column types, max nodes, document-only). */
   constraints: NodeInputConstraints;
-  /** Whether graph/sidebar "+" requests should add directly to this selector. */
-  consumeNodeInputRequests?: boolean;
 }
 
 export interface UseTabNodeInputsResult extends UseNodeInputsResult {
@@ -73,11 +68,9 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
  * Flow: resolve the requested selector id from ``input_sets``, cap restored
  * state once at this named owner and persist that normalization, fetch metadata
  * only for the stable effective inputs, delegate those same inputs to
- * ``useNodeInputs``, then consume graph/sidebar "+" requests directly by
- * default and report structural add rejections with a toast. Multi-selector features pass
- * ``consumeNodeInputRequests: false`` on every participating selector so the
- * request stays pending and the visible ``NodeInputsPanel`` instances render
- * the dashed chooser instead.
+ * ``useNodeInputs``, and expose the same callbacks to ``NodeInputsPanel``. The
+ * panel owns explicit placement of carried graph/sidebar Data Blocks so every
+ * single- and multi-selector view follows one interaction contract.
  */
 export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInputsResult {
   const {
@@ -85,12 +78,10 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     tabInputSets,
     onTabInputSetChange,
     constraints,
-    consumeNodeInputRequests = true,
   } = config;
   const { nodes, currentWorkspaceId } = useWorkspaceData();
   const userId = useAuthStore((state) => state.session?.user?.id ?? '__anonymous__');
   const { selectedNodeIds } = useWorkspaceSelection();
-  const currentView = useUIStore((state) => state.currentView);
 
   const value = useMemo(
     () => getTabInputSet(tabInputSets ? { input_sets: tabInputSets } : undefined, selectorId),
@@ -160,9 +151,6 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
   const recentGroups = useRecentSelectionsStore(
     (s) => s.byScope[recentSelectionsScopeKey(userId, currentWorkspaceId)],
   );
-  const inputRequests = useNodeInputRequestsStore((s) => s.requests);
-  const consumeInputRequest = useNodeInputRequestsStore((s) => s.consume);
-
   const baseAddNodes = result.addNodes;
   const effectiveInputs = result.inputs;
   const addNodes = useCallback(
@@ -178,31 +166,6 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     },
     [baseAddNodes, effectiveInputs, recordRecent, userId, currentWorkspaceId],
   );
-
-  useEffect(() => {
-    if (!consumeNodeInputRequests) return;
-    const matching = inputRequests.filter(
-      (request) => request.workspaceId === currentWorkspaceId && request.view === currentView,
-    );
-    if (matching.length === 0) return;
-    matching.forEach((request) => {
-      const rejections = addNodes(request.nodeIds);
-      if (rejections.length === 1) {
-        const rejection = rejections[0];
-        if (rejection) toast.warning(`Couldn't add node: ${rejection.reason}`);
-      } else if (rejections.length > 1) {
-        toast.warning(`Couldn't add ${String(rejections.length)} nodes (already added or full).`);
-      }
-      consumeInputRequest(request.id);
-    });
-  }, [
-    inputRequests,
-    currentWorkspaceId,
-    currentView,
-    addNodes,
-    consumeInputRequest,
-    consumeNodeInputRequests,
-  ]);
 
   const nodeNameById = useMemo(() => {
     const map = new Map<string, string>();
