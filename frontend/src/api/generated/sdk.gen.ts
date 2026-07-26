@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape, urlSearchParamsBodySerializer } from './client';
 import { client } from './client.gen';
-import type { BackendEventsData, BackendEventsErrors, BackendEventsResponses, CancelAnalysisData, CancelAnalysisErrors, CancelAnalysisResponses, CancelUserFileImportData, CancelUserFileImportErrors, CancelUserFileImportResponses, CilogonCallbackData, CilogonCallbackErrors, CilogonLoginData, CilogonLoginErrors, ClearAnnotationProviderConfigurationsData, ClearAnnotationProviderConfigurationsErrors, ClearAnnotationProviderConfigurationsResponses, ClearProviderCredentialsData, ClearProviderCredentialsErrors, ClearProviderCredentialsResponses, ClearTabAnalysisData, ClearTabAnalysisErrors, ClearTabAnalysisResponses, CloseWorkspaceByIdData, CloseWorkspaceByIdErrors, CloseWorkspaceByIdResponses, CreateAnnotationProviderConfigurationData, CreateAnnotationProviderConfigurationErrors, CreateAnnotationProviderConfigurationResponses, CreateFolderData, CreateFolderErrors, CreateFolderResponses, CreateNodeData, CreateNodeErrors, CreateNodeResponses, CreateTabData, CreateTabErrors, CreateTabResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DeleteAnnotationProviderConfigurationData, DeleteAnnotationProviderConfigurationErrors, DeleteAnnotationProviderConfigurationResponses, DeleteFileData, DeleteFileErrors, DeleteFileResponses, DeleteNodeData, DeleteNodeErrors, DeleteNodeResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteTabData, DeleteTabErrors, DeleteTabResponses, DeleteUserFileImportData, DeleteUserFileImportErrors, DeleteUserFileImportResponses, DeleteWorkspaceByIdData, DeleteWorkspaceByIdErrors, DeleteWorkspaceByIdResponses, DownloadAnalysisArtifactData, DownloadAnalysisArtifactErrors, DownloadAnalysisArtifactResponses, DownloadAnalysisTableData, DownloadAnalysisTableErrors, DownloadAnalysisTableResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, EditNodeData, EditNodeErrors, EditNodeResponses, ExecuteWorkspaceSqlData, ExecuteWorkspaceSqlErrors, ExecuteWorkspaceSqlResponses, ExportWorkspaceArchiveData, ExportWorkspaceArchiveErrors, ExportWorkspaceArchiveResponses, GetAnalysisData, GetAnalysisErrors, GetAnalysisResponses, GetAnalysisResultData, GetAnalysisResultErrors, GetAnalysisResultResponses, GetAnalysisTableRowsData, GetAnalysisTableRowsErrors, GetAnalysisTableRowsResponses, GetAnalysisTableSchemaData, GetAnalysisTableSchemaErrors, GetAnalysisTableSchemaResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetNodeSchemaData, GetNodeSchemaErrors, GetNodeSchemaResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProviderCredentialsData, GetProviderCredentialsErrors, GetProviderCredentialsResponses, GetRawFileData, GetRawFileErrors, GetRawFileResponses, GetSessionData, GetSessionResponses, GetStorageData, GetStorageErrors, GetStorageResponses, GetTabAnalysisData, GetTabAnalysisErrors, GetTabAnalysisResponses, GetTabData, GetTabErrors, GetTabResponses, GetUserFileImportData, GetUserFileImportErrors, GetUserFileImportResponses, GetUserFileResourceData, GetUserFileResourceErrors, GetUserFileResourceResponses, GetWorkspaceByIdData, GetWorkspaceByIdErrors, GetWorkspaceByIdResponses, GoogleCallbackData, GoogleCallbackErrors, HealthCheckData, HealthCheckErrors, HealthCheckResponses, ImportWorkspaceArchiveData, ImportWorkspaceArchiveErrors, ImportWorkspaceArchiveResponses, ListAnalysesData, ListAnalysesErrors, ListAnalysesResponses, ListAnnotationModelsData, ListAnnotationModelsErrors, ListAnnotationModelsResponses, ListFeaturedDataPortalCollectionsData, ListFeaturedDataPortalCollectionsErrors, ListFeaturedDataPortalCollectionsResponses, ListFileWorksheetsData, ListFileWorksheetsErrors, ListFileWorksheetsResponses, ListNodesData, ListNodesErrors, ListNodesResponses, ListSampleCollectionsData, ListSampleCollectionsErrors, ListSampleCollectionsResponses, ListTabsData, ListTabsErrors, ListTabsResponses, ListTokenizerModelsData, ListTokenizerModelsErrors, ListTokenizerModelsResponses, ListUserFileImportsData, ListUserFileImportsErrors, ListUserFileImportsResponses, ListUserFilesData, ListUserFilesErrors, ListUserFilesResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, MoveFileData, MoveFileErrors, MoveFileResponses, OpenWorkspaceByIdData, OpenWorkspaceByIdErrors, OpenWorkspaceByIdResponses, PreviewAnnotationData, PreviewAnnotationErrors, PreviewAnnotationResponses, PreviewFileData, PreviewFileErrors, PreviewFileResponses, PreviewFileSchemaData, PreviewFileSchemaErrors, PreviewFileSchemaResponses, PreviewNodeCreationData, PreviewNodeCreationErrors, PreviewNodeCreationResponses, QueryAnalysisResultData, QueryAnalysisResultErrors, QueryAnalysisResultResponses, RedoNodeData, RedoNodeErrors, RedoNodeResponses, RenameAnnotationProviderConfigurationData, RenameAnnotationProviderConfigurationErrors, RenameAnnotationProviderConfigurationResponses, RenameTabData, RenameTabErrors, RenameTabResponses, ReorderWorkspaceNodesByIdData, ReorderWorkspaceNodesByIdErrors, ReorderWorkspaceNodesByIdResponses, SearchDataPortalData, SearchDataPortalErrors, SearchDataPortalResponses, SubmitChildAnalysisData, SubmitChildAnalysisErrors, SubmitChildAnalysisResponses, SubmitDataPortalImportData, SubmitDataPortalImportErrors, SubmitDataPortalImportResponses, SubmitSampleImportData, SubmitSampleImportErrors, SubmitSampleImportResponses, SubmitTabAnalysisData, SubmitTabAnalysisErrors, SubmitTabAnalysisResponses, UndoNodeData, UndoNodeErrors, UndoNodeResponses, UpdateDataPortalCredentialData, UpdateDataPortalCredentialErrors, UpdateDataPortalCredentialResponses, UpdateNodeData, UpdateNodeErrors, UpdateNodeResponses, UpdatePreferencesData, UpdatePreferencesErrors, UpdatePreferencesResponses, UpdateWorkspaceByIdData, UpdateWorkspaceByIdErrors, UpdateWorkspaceByIdResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
+import type { BackendEventsData, BackendEventsErrors, BackendEventsResponses, CancelAnalysisData, CancelAnalysisErrors, CancelAnalysisResponses, CancelUserFileImportData, CancelUserFileImportErrors, CancelUserFileImportResponses, CilogonCallbackData, CilogonCallbackErrors, CilogonLoginData, CilogonLoginErrors, ClearAnnotationProviderConfigurationsData, ClearAnnotationProviderConfigurationsErrors, ClearAnnotationProviderConfigurationsResponses, ClearProviderCredentialsData, ClearProviderCredentialsErrors, ClearProviderCredentialsResponses, ClearTabAnalysisData, ClearTabAnalysisErrors, ClearTabAnalysisResponses, CloseWorkspaceByIdData, CloseWorkspaceByIdErrors, CloseWorkspaceByIdResponses, CreateAnnotationProviderConfigurationData, CreateAnnotationProviderConfigurationErrors, CreateAnnotationProviderConfigurationResponses, CreateFolderData, CreateFolderErrors, CreateFolderResponses, CreateNodeData, CreateNodeErrors, CreateNodeResponses, CreateTabData, CreateTabErrors, CreateTabResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DeleteAnnotationProviderConfigurationData, DeleteAnnotationProviderConfigurationErrors, DeleteAnnotationProviderConfigurationResponses, DeleteFileData, DeleteFileErrors, DeleteFileResponses, DeleteNodeData, DeleteNodeErrors, DeleteNodeResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteTabData, DeleteTabErrors, DeleteTabResponses, DeleteUserFileImportData, DeleteUserFileImportErrors, DeleteUserFileImportResponses, DeleteWorkspaceByIdData, DeleteWorkspaceByIdErrors, DeleteWorkspaceByIdResponses, DownloadAnalysisArtifactData, DownloadAnalysisArtifactErrors, DownloadAnalysisArtifactResponses, DownloadAnalysisTableData, DownloadAnalysisTableErrors, DownloadAnalysisTableResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, EditNodeData, EditNodeErrors, EditNodeResponses, ExecuteWorkspaceSqlData, ExecuteWorkspaceSqlErrors, ExecuteWorkspaceSqlResponses, ExportWorkspaceArchiveData, ExportWorkspaceArchiveErrors, ExportWorkspaceArchiveResponses, GetAnalysisData, GetAnalysisErrors, GetAnalysisResponses, GetAnalysisResultData, GetAnalysisResultErrors, GetAnalysisResultResponses, GetAnalysisTableRowsData, GetAnalysisTableRowsErrors, GetAnalysisTableRowsResponses, GetAnalysisTableSchemaData, GetAnalysisTableSchemaErrors, GetAnalysisTableSchemaResponses, GetNodeData, GetNodeErrors, GetNodeResponses, GetNodeSchemaData, GetNodeSchemaErrors, GetNodeSchemaResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProviderCredentialsData, GetProviderCredentialsErrors, GetProviderCredentialsResponses, GetRawFileData, GetRawFileErrors, GetRawFileResponses, GetSessionData, GetSessionResponses, GetStorageData, GetStorageErrors, GetStorageResponses, GetTabData, GetTabErrors, GetTabResponses, GetUserFileImportData, GetUserFileImportErrors, GetUserFileImportResponses, GetUserFileResourceData, GetUserFileResourceErrors, GetUserFileResourceResponses, GetWorkspaceByIdData, GetWorkspaceByIdErrors, GetWorkspaceByIdResponses, GoogleCallbackData, GoogleCallbackErrors, HealthCheckData, HealthCheckErrors, HealthCheckResponses, ImportWorkspaceArchiveData, ImportWorkspaceArchiveErrors, ImportWorkspaceArchiveResponses, ListAnalysesData, ListAnalysesErrors, ListAnalysesResponses, ListAnnotationModelsData, ListAnnotationModelsErrors, ListAnnotationModelsResponses, ListFeaturedDataPortalCollectionsData, ListFeaturedDataPortalCollectionsErrors, ListFeaturedDataPortalCollectionsResponses, ListFileWorksheetsData, ListFileWorksheetsErrors, ListFileWorksheetsResponses, ListNodesData, ListNodesErrors, ListNodesResponses, ListSampleCollectionsData, ListSampleCollectionsErrors, ListSampleCollectionsResponses, ListTabAnalysesData, ListTabAnalysesErrors, ListTabAnalysesResponses, ListTabsData, ListTabsErrors, ListTabsResponses, ListTokenizerModelsData, ListTokenizerModelsErrors, ListTokenizerModelsResponses, ListUserFileImportsData, ListUserFileImportsErrors, ListUserFileImportsResponses, ListUserFilesData, ListUserFilesErrors, ListUserFilesResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, MoveFileData, MoveFileErrors, MoveFileResponses, OpenWorkspaceByIdData, OpenWorkspaceByIdErrors, OpenWorkspaceByIdResponses, PreviewFileData, PreviewFileErrors, PreviewFileResponses, PreviewFileSchemaData, PreviewFileSchemaErrors, PreviewFileSchemaResponses, PreviewNodeCreationData, PreviewNodeCreationErrors, PreviewNodeCreationResponses, QueryAnalysisResultData, QueryAnalysisResultErrors, QueryAnalysisResultResponses, RedoNodeData, RedoNodeErrors, RedoNodeResponses, RenameAnnotationProviderConfigurationData, RenameAnnotationProviderConfigurationErrors, RenameAnnotationProviderConfigurationResponses, ReorderWorkspaceNodesByIdData, ReorderWorkspaceNodesByIdErrors, ReorderWorkspaceNodesByIdResponses, SearchDataPortalData, SearchDataPortalErrors, SearchDataPortalResponses, SubmitDataPortalImportData, SubmitDataPortalImportErrors, SubmitDataPortalImportResponses, SubmitSampleImportData, SubmitSampleImportErrors, SubmitSampleImportResponses, SubmitTabAnalysisData, SubmitTabAnalysisErrors, SubmitTabAnalysisResponses, UndoNodeData, UndoNodeErrors, UndoNodeResponses, UpdateDataPortalCredentialData, UpdateDataPortalCredentialErrors, UpdateDataPortalCredentialResponses, UpdateNodeData, UpdateNodeErrors, UpdateNodeResponses, UpdatePreferencesData, UpdatePreferencesErrors, UpdatePreferencesResponses, UpdateTabData, UpdateTabErrors, UpdateTabResponses, UpdateWorkspaceByIdData, UpdateWorkspaceByIdErrors, UpdateWorkspaceByIdResponses, UploadFileData, UploadFileErrors, UploadFileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -757,25 +757,6 @@ export const cancelAnalysis = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Submit Child Analysis
- *
- * Create one recomputed child Analysis beneath a successful root.
- */
-export const submitChildAnalysis = <ThrowOnError extends boolean = false>(options: Options<SubmitChildAnalysisData, ThrowOnError>): RequestResult<SubmitChildAnalysisResponses, SubmitChildAnalysisErrors, ThrowOnError> => (options.client ?? client).post<SubmitChildAnalysisResponses, SubmitChildAnalysisErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'wordflow_session',
-            type: 'apiKey'
-        }],
-    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/children',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
  * Get Analysis Result
  *
  * Return the canonical first page of one successful Analysis Result.
@@ -991,25 +972,6 @@ export const updateNode = <ThrowOnError extends boolean = false>(options: Option
 });
 
 /**
- * Preview Annotation
- *
- * Classify one page without creating backend preview-session state.
- */
-export const previewAnnotation = <ThrowOnError extends boolean = false>(options: Options<PreviewAnnotationData, ThrowOnError>): RequestResult<PreviewAnnotationResponses, PreviewAnnotationErrors, ThrowOnError> => (options.client ?? client).post<PreviewAnnotationResponses, PreviewAnnotationErrors, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'wordflow_session',
-            type: 'apiKey'
-        }],
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/annotation-previews',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
  * Edit Node
  *
  * Apply one identity-preserving Data Block Edit.
@@ -1187,11 +1149,11 @@ export const getTab = <ThrowOnError extends boolean = false>(options: Options<Ge
 });
 
 /**
- * Rename Tab
+ * Update Tab
  *
- * Rename one Tab without changing its immutable function kind.
+ * Update one Tab without changing its immutable function kind.
  */
-export const renameTab = <ThrowOnError extends boolean = false>(options: Options<RenameTabData, ThrowOnError>): RequestResult<RenameTabResponses, RenameTabErrors, ThrowOnError> => (options.client ?? client).patch<RenameTabResponses, RenameTabErrors, ThrowOnError>({
+export const updateTab = <ThrowOnError extends boolean = false>(options: Options<UpdateTabData, ThrowOnError>): RequestResult<UpdateTabResponses, UpdateTabErrors, ThrowOnError> => (options.client ?? client).patch<UpdateTabResponses, UpdateTabErrors, ThrowOnError>({
     security: [{
             in: 'cookie',
             name: 'wordflow_session',
@@ -1208,7 +1170,7 @@ export const renameTab = <ThrowOnError extends boolean = false>(options: Options
 /**
  * Clear Tab Analysis
  *
- * Detach the current Analysis and make the Tab immediately reusable.
+ * Clear the Tab's complete Analysis forest.
  */
 export const clearTabAnalysis = <ThrowOnError extends boolean = false>(options: Options<ClearTabAnalysisData, ThrowOnError>): RequestResult<ClearTabAnalysisResponses, ClearTabAnalysisErrors, ThrowOnError> => (options.client ?? client).delete<ClearTabAnalysisResponses, ClearTabAnalysisErrors, ThrowOnError>({
     security: [{
@@ -1216,29 +1178,29 @@ export const clearTabAnalysis = <ThrowOnError extends boolean = false>(options: 
             name: 'wordflow_session',
             type: 'apiKey'
         }],
-    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis',
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses',
     ...options
 });
 
 /**
- * Get Tab Analysis
+ * List Tab Analyses
  *
- * Return the root Analysis currently assigned to one Tab.
+ * Return a Tab's complete Analysis forest in creation order.
  */
-export const getTabAnalysis = <ThrowOnError extends boolean = false>(options: Options<GetTabAnalysisData, ThrowOnError>): RequestResult<GetTabAnalysisResponses, GetTabAnalysisErrors, ThrowOnError> => (options.client ?? client).get<GetTabAnalysisResponses, GetTabAnalysisErrors, ThrowOnError>({
+export const listTabAnalyses = <ThrowOnError extends boolean = false>(options: Options<ListTabAnalysesData, ThrowOnError>): RequestResult<ListTabAnalysesResponses, ListTabAnalysesErrors, ThrowOnError> => (options.client ?? client).get<ListTabAnalysesResponses, ListTabAnalysesErrors, ThrowOnError>({
     security: [{
             in: 'cookie',
             name: 'wordflow_session',
             type: 'apiKey'
         }],
-    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis',
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses',
     ...options
 });
 
 /**
  * Submit Tab Analysis
  *
- * Create one queued Analysis and atomically assign it to an empty Tab.
+ * Create one complete immutable Analysis in a Tab-owned forest.
  */
 export const submitTabAnalysis = <ThrowOnError extends boolean = false>(options: Options<SubmitTabAnalysisData, ThrowOnError>): RequestResult<SubmitTabAnalysisResponses, SubmitTabAnalysisErrors, ThrowOnError> => (options.client ?? client).post<SubmitTabAnalysisResponses, SubmitTabAnalysisErrors, ThrowOnError>({
     security: [{
@@ -1246,7 +1208,7 @@ export const submitTabAnalysis = <ThrowOnError extends boolean = false>(options:
             name: 'wordflow_session',
             type: 'apiKey'
         }],
-    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis',
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses',
     ...options,
     headers: {
         'Content-Type': 'application/json',
