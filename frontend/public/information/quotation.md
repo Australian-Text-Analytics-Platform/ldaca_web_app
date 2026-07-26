@@ -19,17 +19,17 @@ working with another genre or English variety.
   operator; it does not accept an arbitrary service URL. Ask the operator for a
   valid ID and confirm that the service's data-handling policy is suitable.
 
-- What happens after I run it?
-  A successful Analysis keeps a durable initial Result and retained input
-  snapshot. Page and sort controls query that snapshot rather than the current
-  mutable Data Block. If you deliberately change the Data Block, text column,
-  or engine, use **Re-run** to create a replacement Analysis.
+- What do Preview, Run All, and Review do?
+  **Preview** creates a Preview Analysis and computes requested pages from its
+  retained input snapshot. **Run All** may be started directly and creates an
+  independent Run All Analysis with a complete immutable table Result.
+  **Review** reads that Result directly. **Add to Workspace** publishes selected
+  columns as a Derived Data Block only when you request it.
 
-- How do sorting and detachment work?
+- How does sorting work?
   The `QUOTE_extraction` header sorts by the selected source text column, and
   source metadata columns remain sortable. Generated quotation fields are
-  display-only. **Add to Workspace** creates a Derived Data Block from the
-  completed Analysis and its retained snapshot.
+  display-only.
 
 - Where can I read more?
   See the [open access article](https://doi.org/10.1515/cllt-2023-0104), the

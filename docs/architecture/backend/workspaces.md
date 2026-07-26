@@ -133,12 +133,12 @@ tracked in the
 [persistence-integrity reference](../../reference/persistence-integrity.md).
 Export omits `access.json`; import rejects an archive-supplied sidecar.
 
-Portable archive version 6 materializes Data Blocks and retained Analysis query
-inputs as Parquet, includes terminal live Analyses and declared Artifacts, and
-contains no serialized executable plans. Import reconstructs private lazy plans
-from those safe files, rebases their sources and Workspace identity after final
-publication, and strictly rejects older archive versions. Queued and running
-Analyses are omitted; their Tabs are exported empty.
+Portable archive format 9 materializes Data Blocks and retained Analysis query
+inputs as Parquet, includes terminal Analysis forests and declared Artifacts,
+and contains no serialized executable plans. Import reconstructs private lazy
+plans from those safe files, rebases their sources and Workspace identity after
+final publication, and strictly rejects older archive versions. Queued and
+running Analyses are omitted from each Tab's archived forest.
 
 ## Mutation And Deletion
 

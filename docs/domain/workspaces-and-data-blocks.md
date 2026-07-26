@@ -36,13 +36,13 @@ flowchart LR
     SOURCE --> SELECTED["Derived Data Block<br/>selected columns"]
     FILTERED --> JOINED["Derived Data Block<br/>joined"]
     SELECTED --> JOINED
-    JOINED --> DETACHED["Derived Data Block<br/>detached analysis output"]
+    JOINED --> PUBLISHED["Derived Data Block<br/>published Analysis Result"]
 
     WORKSPACE["Workspace"] -. "owns the ordered lineage graph" .-> SOURCE
     WORKSPACE -. "owns" .-> FILTERED
     WORKSPACE -. "owns" .-> SELECTED
     WORKSPACE -. "owns" .-> JOINED
-    WORKSPACE -. "owns" .-> DETACHED
+    WORKSPACE -. "owns" .-> PUBLISHED
 ```
 
 Backend domain code calls this object a `Node`, matching the public API. Product
@@ -93,12 +93,17 @@ Expression may either create a Derived Data Block or update the selected
 Data Block. Slice, random sample, shuffle, Join, and Stack always create
 Derived Data Blocks.
 
-Manual Annotation uses the same edit boundary. `set_cell` targets an existing
-string column and absolute row index with a string or null value. Each accepted
-cell change is one checkpoint; assigning the existing value is a no-op.
-`annotation_classes` replaces the submitted class and description rows in one
-checkpoint, validates at most 200 rows, and preserves every unselected column
-positionally by truncating or null-padding it to the submitted row count.
+Annotation uses the same edit boundary. Start new annotation immediately adds
+the named empty string column through an Expression edit and selects it; the
+manual results control does not defer or repeat column creation. AI preview
+predictions remain ephemeral, but a reviewer may select or create a separate
+empty string correction column and persist an explicit correction there.
+`set_cell` targets an existing string column and absolute row index with a
+string or null value. Each accepted manual label or AI-preview correction is
+one checkpoint; assigning the existing value is a no-op. `annotation_classes`
+replaces the submitted class and description rows in one checkpoint, validates
+at most 200 rows, and preserves every unselected column positionally by
+truncating or null-padding it to the submitted row count.
 
 Each resident Data Block owns independent Undo and Redo stacks containing at
 most 50 lazy plans. Assigning a successful new plan checkpoints the previous

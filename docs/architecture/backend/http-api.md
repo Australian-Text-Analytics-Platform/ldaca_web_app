@@ -37,14 +37,14 @@ flowchart LR
     WORKSPACES --> ANALYSES["analyses"]
 
     NODES --> SCHEMA["Arrow schema"]
-    NODES --> PREVIEWS["Arrow creation preview, JSON annotation preview"]
+    NODES --> PREVIEWS["Arrow creation preview"]
     NODES --> EDITS["identity-preserving edits, Undo, Redo"]
 
-    TABS --> CURRENT["current root Analysis"]
+    TABS --> FOREST["ordered Analysis forest"]
     ANALYSES --> RESULT["JSON Result control plane"]
     RESULT --> TABLES["Arrow Result tables"]
     RESULT --> ARTIFACTS["download Artifacts"]
-    ANALYSES --> CHILDREN["direct Child Analyses"]
+    ANALYSES --> SUB["optional Sub-Analyses"]
     ANALYSES --> CANCEL["cancel"]
 ```
 
@@ -72,7 +72,7 @@ denied. Personal multi-user secrets enter only through provider-operation
 request bodies and are resolved for that call without backend persistence or
 caching.
 
-Annotation model discovery, previews, and submissions carry the selected
+Annotation model discovery and Analysis submissions carry the selected
 configuration UUID, provider type, and optional normalized Custom base URL.
 Single-user mode verifies that snapshot against the stored configuration before
 resolving its secret. Multi-user mode uses the transient request key. Services

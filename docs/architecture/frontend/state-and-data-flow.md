@@ -9,6 +9,15 @@ interaction or device state such as the active view, selected and pinned Data
 Blocks, and scoped presentation preferences. Local component state owns form,
 pagination, dialog, and panel interaction.
 
+Query keys mirror server-resource ownership. Workspace summaries use the
+explicit `["workspaces", "list"]` collection key, while each Workspace detail
+subtree starts with `["workspaces", workspace_id]`; refreshing the collection
+therefore cannot refetch SQL pages, Results, or other detail resources. File
+lists and path-addressed file projections follow the same split. Global model
+and sample catalogues live outside Workspace keys. The shared key factory owns
+these hierarchies, and the TanStack Query ESLint rules enforce complete query
+function dependencies.
+
 ```mermaid
 flowchart TB
     BACKEND["Backend JSON resources and refresh events"] --> QUERY["TanStack Query<br/>server-state authority"]
@@ -52,28 +61,46 @@ configuration collection and its secrets by authenticated user ID under
 `wordflow-provider-credentials` version 2. Components receive only safe
 configuration metadata. A request facade reads the selected configuration's
 secret synchronously by UUID inside the final generated SDK call. Model-list
-queries are keyed by configuration UUID and a safe credential revision; secret
-values never enter query keys, mutation state, Tab state, hydrated requests,
-errors, or telemetry. Logout does not delete another account's browser
-partition, and browser storage events synchronize replacement and deletion
-across tabs. In single-user mode, the same facade projects the backend-owned
-collection and invokes its write-only CRUD operations without creating a
-browser credential entry.
+queries are keyed by configuration UUID, immutable safe locator metadata, and a
+safe credential revision; secret values never enter query keys, mutation state,
+Tab state, hydrated requests, errors, or telemetry. Logout does not delete
+another account's browser partition, and browser storage events synchronize
+replacement and deletion across tabs. In single-user mode, the same facade
+projects the backend-owned collection and invokes its write-only CRUD
+operations without creating a browser credential entry.
 
 Annotation Tab presentation state retains the selected configuration UUID,
-provider type, and a per-configuration model map. Fresh Tabs choose the first
-configured entry. If the selected entry disappears, the first remaining entry
-of the same provider type is chosen; otherwise the selection is cleared.
-Hydrating a historical Analysis first restores its exact safe request snapshot,
-so any fallback is visible to re-run change detection rather than rewriting the
-historical request.
+provider type, a per-configuration model map, and the selected AI Preview
+correction column per source Data Block. Fresh Tabs choose the first configured
+provider entry. If the selected entry disappears, the first remaining entry of
+the same provider type is chosen; otherwise the selection is cleared. Preview
+inference is a page query against a Preview-scoped Analysis and its pages use
+zero-lifetime Query entries. Labels are not written into the source.
+Choosing a correction is instead an explicit Workspace `set_cell`
+action against the selected correction column. Hydrating a historical Analysis
+first restores its exact safe request snapshot, so any provider fallback is
+visible to re-run change detection rather than rewriting the historical
+request.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts
 Arrow content for query mode and JSON for creation mode. SQL builders own
 identifier quoting, literal escaping, glob translation, and explicit null
 ordering. Query keys contain every declared Data Block ID so edit, history, and
-delete invalidation clears dependent SQL pages.
+delete invalidation clears dependent SQL pages, column-derived values, language
+detection, and preprocessing previews. Preprocessing preview keys retain the
+structured request, operation, ordered Data Block dependencies, and pagination;
+manual refresh refetches that same cache resource instead of minting an alias.
+
+The Workspace graph response is the sole cached owner of complete Data Block
+metadata. Selector hooks project document, tokenizer, shape, history, and color
+fields directly from that response and fetch only Arrow schemas separately.
+They do not issue a second per-selection node-info request.
+
+Path-addressed file resources share one subtree containing raw content,
+worksheet inventories, and preview pages. Replacing, deleting, or moving a path
+removes that subtree before the file list refreshes, so a reused filename cannot
+surface a previous file's cached preview.
 
 ## Workspace Composition
 
@@ -100,20 +127,43 @@ callback stale.
 
 ## Analysis Lifecycle
 
-One shared controller follows the durable ownership chain from active Tab to
-Analysis to Result. The Analysis query owns request and lifecycle state; the
-separate Result query is enabled only for success and contains output only.
-Selected Data Blocks and submitted parameters hydrate from the immutable
-Analysis request. Resource refresh events invalidate those query keys; the
-feature retains workflow controls because it knows the root/child Analysis
-relationship.
+One Query owner reads each active Tab's complete Analysis forest. It polls while
+any member is active and derives newest Preview, newest Run All, active
+Analyses, parent/descendant relationships, and historical hydration candidates.
+Features do not keep a second Analysis identifier or lifecycle cache.
 
-Every root Analysis uses the shared Tab submission envelope, including
-Quotation and AI Annotation. Only typed child detachment commands use the
-Workspace mutation facade. Features with immediate, background, or hybrid
-execution may present progress differently, but the Tab, Analysis, and Result
-resource chain is unchanged and callers never infer Result availability from
-response truthiness.
+Every submission uses the generic Tab Analysis collection operation with an
+execution scope, complete immutable request, optional parent, and explicit
+supersession targets. Preview and Run All are independent: either can be the
+first Analysis in a Tab. Supporting Analyses use the same resource and may
+appear at any depth.
+
+The separate Result query is enabled only for a successful Analysis and
+contains output only. Current inputs and controls hydrate first from the newest
+Preview request, or from a standalone Run All request's embedded source when no
+Preview exists. Historical values win over mutable Data Block preferences.
+Resource events invalidate the forest and exact Result keys.
+
+Preview, Run All, Stop, and Clear use shared lifecycle controls where those
+operations exist. Full-only functions render no Preview control. Preview
+replacement submits with explicit supersession and does not clear first.
+Active Run All locks the submitted parameter panel; a successful Run All does
+not. An Active Analysis Draft is client-only and is never written into Query
+data.
+
+Concordance and Quotation Review query immutable Analysis table pages. Run All
+therefore creates no graph node and Review does not depend on Workspace SQL.
+`CONC_dispersion` is derived by the existing frontend presentation from grouped
+physical occurrence rows. Review feeds those pages back through the normal
+Concordance model, preserving Table View, Dispersion View, metadata selection,
+sorting, paging, row detail, and separated/combined presentation.
+
+Two-source Concordance Run All appears as one thin Run All root with one
+Supporting Analysis per source. The forest projection keeps that relationship
+generic; Concordance interprets the group for progress and ordered Review.
+**Add to Workspace** opens the shared Result Publication dialog and submits one
+typed Supporting Analysis under the successful Run All parent. Only successful
+publication invalidates the Workspace graph.
 
 The active Tab is device-local presentation state, stored in localStorage by
 Workspace and analysis kind. Returning to an analysis view or reloading the
@@ -143,29 +193,33 @@ Hydration and deletion prune device-only references to missing Workspaces,
 Tabs, Data Blocks, file paths, presets, and preprocessing inputs. Pruning never
 creates or selects a backend resource.
 
-Action availability follows the Analysis attached to the Tab, not whether that
-Analysis produced a Result. An attached queued or running Analysis cannot be
-replaced. Failed and cancelled Analyses can be cleared or retried unchanged;
-successful Analyses can be re-run after the request changes. Re-run first clears
-the attached Analysis and submits the replacement only after that clear
-succeeds, preserving the one-root-Analysis-per-Tab invariant.
+Action availability follows the applicable Analysis scope, not Result
+truthiness. Direct Run All remains available before Preview. Successful
+replacement names the terminal predecessor it supersedes; failed or cancelled
+replacement preserves the old Analysis. Clear removes the complete Tab forest,
+while Stop targets the active Analysis and its descendants.
 
-Preprocessing preview identity includes every serialized input. Switching an
-input cancels the previous request and late responses cannot replace the new
-state.
+Preprocessing preview identity includes its operation, structured request,
+ordered Data Block dependencies, and pagination. Switching an input cancels the
+previous request and late responses cannot replace the new state.
 
 Result pages remain immutable Query data. Concordance and Quotation pagination
 changes the complete Result-projection query key rather than merging pages into
 component or Zustand state. Initial hydration reads the Analysis's stored
 canonical Result; only an explicit page, page-size, or sort change requests an
-alternate projection. Categorical values use infinite queries, and
+alternate projection. While a Preview page is processing, its table keeps the
+current headers and pagination mounted and replaces stale rows with an inline
+processing state. Quotation may use same-Analysis placeholder data only to
+retain that presentation shape; the requested page remains a distinct Query
+resource and the placeholder is not cached as its Result. Categorical values use infinite queries, and
 preprocessing previews use debounced, cancellable queries.
 
 Filter, Find, Create, and Expression keep their create/update choice in
 local component state. Create is the default, and changing the tool or selected
 Data Block resets the choice; it is not an account or device preference.
 Sample, Join, and Stack expose no update mode. Successful edits and history
-commands invalidate the graph, node metadata, row, and schema queries together.
+commands invalidate the graph, dependent row and preview data, and schema
+queries together.
 Data View and graph menus derive Undo/Redo disabled state only from the
 backend's `can_undo` and `can_redo` flags.
 
@@ -179,11 +233,11 @@ document column. No function writes a preference for a control it does not
 show.
 
 Each control uses its own partial Data Block `PATCH`. A successful mutation
-merges only that field into every matching node-info cache before invalidating
-the resource, so overlapping document and tokenizer writes cannot replay stale
-values over one another. A local explicit clear and a draft whose persistence
-failed remain authoritative for the current selector rather than falling back
-to refreshed Data Block metadata.
+merges only that field into the canonical Workspace graph cache before
+invalidating the resource, so overlapping document and tokenizer writes cannot
+replay stale values over one another. A local explicit clear and a draft whose
+persistence failed remain authoritative for the current selector rather than
+falling back to refreshed Data Block metadata.
 
 Analysis hydration has a stronger authority. Stored document-column and
 tokenizer-model mappings, plus Concordance search mode, come from the immutable

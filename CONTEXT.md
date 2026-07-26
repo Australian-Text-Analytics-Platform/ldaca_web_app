@@ -47,7 +47,7 @@ _Avoid_: uploaded node, root node
 
 **Derived Data Block**:
 A Data Block created from one or more parent Data Blocks by a transformation,
-including a child Analysis such as detachment.
+including a Supporting Analysis such as detachment.
 _Avoid_: child table, output node
 
 **Workspace SQL Query**:
@@ -64,23 +64,17 @@ or a durable audit trail.
 _Avoid_: derivation, lineage update, saved edit history
 
 **Tab**:
-A named Workspace-owned analysis slot with a fixed analysis kind and at most
-one current root Analysis. Draft parameters and presentation state are not
-part of the Tab.
-_Avoid_: frontend-only tab, analysis history
+A named Workspace-owned analysis slot with a fixed analysis kind and an ordered
+Analysis Forest. Kind-specific presentation settings may belong to the Tab;
+Active Analysis Drafts do not.
+_Avoid_: frontend-only tab, singleton analysis slot
 
 **Analysis**:
-A Workspace-owned lifecycle record for one typed text-analysis request. A root
-Analysis belongs to one Tab; a successful Analysis produces a queryable Result
-and may own Artifacts or atomically create zero or more Derived Data Blocks.
+A Workspace-owned lifecycle record for one immutable typed text-analysis
+request. Every Analysis belongs to one Tab and may optionally name a parent in
+that Tab. A successful Analysis may produce a queryable Result, own Artifacts,
+or atomically create zero or more Derived Data Blocks.
 _Avoid_: task, job, analysis endpoint
-
-**Child Analysis**:
-An independently observable Analysis directly owned by a successful root
-Analysis for a typed follow-up operation such as detachment. Children cannot
-own further children. A Topic Modeling detachment creates a topic-data and a
-topic-meanings Data Block for each selected source.
-_Avoid_: child task, sub-job, analysis operation
 
 **Result**:
 The output-only typed outcome of a successful Analysis. Lifecycle, immutable
@@ -88,6 +82,12 @@ request parameters, and ownership remain on the Analysis. A Result is distinct
 from any retained file that carries its large data and from browser-local
 presentation settings.
 _Avoid_: payload, artifact when referring to the typed outcome
+
+**Result Publication**:
+A Supporting Analysis that creates one or more Derived Data Blocks from
+user-selected columns of a successful parent Analysis Result. Computing a
+Result and publishing it to the Workspace are separate operations.
+_Avoid_: detach action, automatic Run All output
 
 **Topic Distribution**:
 The ordered per-document proportions for the outlier topic `-1` followed by
@@ -177,6 +177,53 @@ name. An Analysis retains the selected safe identity, type, and Custom base URL,
 but never the display name or credential.
 _Avoid_: provider type, credential slot, model preference
 
+**Analysis Execution Scope**:
+The declared role of an Analysis in a Tab: Preview, Run All, or Supporting.
+Scope describes intent and presentation; it does not create a separate
+lifecycle or resource type.
+_Avoid_: task mode, endpoint type
+
+**Analysis Forest**:
+The ordered collection of Analysis trees owned by one Tab. Any Analysis may
+reference one parent in the same Tab, and a Tab may own multiple independent
+roots.
+_Avoid_: current Analysis, singleton run
+
+**Analysis Group**:
+A thin coordinating Analysis whose Supporting descendants perform independent
+work that must be presented or published as one outcome. Two-source
+Concordance Run All is an Analysis Group.
+_Avoid_: batch task, combined worker
+
+**Sub-Analysis**:
+An Analysis with a `parent_analysis_id`. A Sub-Analysis has the same lifecycle,
+request, Result, cancellation, and persistence rules as any other Analysis and
+may itself own Sub-Analyses.
+_Avoid_: direct child task, operation
+
+**Active Analysis Draft**:
+Unsaved parameter and input changes for one open Tab. The draft exists only in
+the current client presentation session and is discarded when the user leaves
+that Tab. It is not an Analysis, Result, or synchronized preference.
+_Avoid_: cached Analysis, server draft
+
+**Review**:
+The post-Run-All view of durable output. Annotation Review reads the edited
+source Data Block; Concordance and Quotation Review read immutable Result
+tables without requiring a published Data Block.
+_Avoid_: preview result, detached output
+
+**Example Data Block**:
+An optional Annotation input whose nonblank text and label pairs are supplied
+as verbatim examples to Preview and Run All.
+_Avoid_: training data, cached prompt
+
+**User Correction Column**:
+A Tab-selected string column on the Annotation source Data Block. Explicit
+reviewer choices are written there as Data Block Edits; AI Preview predictions
+are never written automatically.
+_Avoid_: prediction column, hidden review state
+
 ## Relationships
 
 - A Workspace owns an ordered directed acyclic graph of Data Blocks.
@@ -198,9 +245,12 @@ _Avoid_: provider type, credential slot, model preference
 - Data Block provenance records creation lineage only. A Data Block Edit
   changes the selected Data Block's plan without changing its identity,
   parents, descendants, graph edges, or provenance.
-- A Tab may reference one root Analysis; clearing it permits a new root
-  Analysis without retaining the old one as public history.
-- A root Analysis may own direct Child Analyses and Artifacts.
+- A Tab owns one ordered Analysis Forest and may contain multiple roots.
+- An Analysis may own Sub-Analyses and Artifacts at arbitrary depth.
+- Preview, Run All, and Supporting are Analysis Execution Scopes, not separate
+  resource kinds or fixed parent-child positions.
+- A successful Analysis may explicitly supersede terminal Analyses in the same
+  Tab. Failure or cancellation preserves the predecessors.
 - A User File Import belongs to one user independently of every Workspace.
 - A hosted Session identifies a user; single-user mode always identifies the
   fixed Root User by the backend process.
@@ -210,5 +260,11 @@ _Avoid_: provider type, credential slot, model preference
   User File Import.
 - Hint Acknowledgment History is device-local and does not belong to User
   Preferences.
-- Manual Annotation is a sequence of Data Block Edits. AI Annotation preview is
-  side-effect-free, while AI Annotation Run is a durable Analysis.
+- Manual Annotation is a sequence of Data Block Edits. AI Annotation Preview
+  uses a Preview-scoped Analysis whose page queries never write predicted
+  labels. Explicit reviewer corrections are Data Block Edits. Annotation Run
+  All is an independent Run-All-scoped Analysis that edits the selected source
+  column in place.
+- Concordance and Quotation Run All retain immutable Result tables and do not
+  change the Data Block graph. A separate Result Publication may create Derived
+  Data Blocks from selected Result columns.

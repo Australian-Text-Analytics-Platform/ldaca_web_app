@@ -34,9 +34,10 @@ selector saves each model as that Data Block's Tokenizer Preference, separately
 from its Document Column Preference. When all selected Data Blocks have a saved
 model, a fresh selector starts in Tokens mode unless you explicitly choose Text.
 
-Running records the exact source columns, tokenizer mapping, and search mode in
-the immutable Analysis request. Reopening an existing Analysis uses those saved
-values even if the current Data Block preferences have since changed.
+Preview records the exact source columns, tokenizer mapping, and search mode in
+the immutable Analysis request. Reopening an existing Preview Analysis uses
+those saved values even if the current Data Block preferences have since
+changed.
 
 <h5 id="help-concordance-regex-toggle">Regular expressions</h5>
 
@@ -69,19 +70,18 @@ The footer reports the matches and matching documents found after processing
 the current source-document batch. An empty page does not mean later pages are
 empty.
 
-<h2 id="help-concordance-run">Step 5 — Run or re-run</h2>
+<h2 id="help-concordance-run">Step 5 — Preview</h2>
 
-Click **Run** to create the Analysis. After a run, change the parameters and
-click **Re-run** to replace the Tab's current Analysis with a new immutable
-request. Page navigation and sorting do not re-run the Analysis; they query the
-completed run's retained input snapshot.
+Click **Preview** to create a durable Preview Analysis. After changing a
+parameter, click **Update Preview** to replace it with a new immutable request.
+Each page navigation or sort request recomputes that page from the retained
+input snapshot. Preview pages are not retained or reused.
 
 <h2 id="help-concordance-results">Result panel</h2>
 
-The initial Result page is stored with the successful Analysis. Later pages,
-page sizes, and source-metadata sorts are projections over the same retained
-snapshot. They never read the current mutable Data Block, so editing a source
-after a run cannot silently change that historical Analysis.
+Preview pages, page sizes, and source-metadata sorts are fresh projections over
+the retained snapshot. They never read the current mutable Data Block, so
+editing a source cannot silently change that Preview Analysis.
 
 Generated `CONC_*` columns describe computed matches and are not sortable.
 Source metadata headers are sortable in separated per-Data-Block tables.
@@ -137,9 +137,8 @@ reinterpreted under new boundaries.
 <h4 id="help-concordance-bin-selection">Selecting bins</h4>
 
 Click a chart bin to select it; Shift-click another bin to extend the range.
-**Clear Selection** removes the filter. When you add dispersion output to the
-Workspace, selected bins and visible legend entries become explicit filters on
-the child Analysis.
+**Clear Selection** removes the filter. Selected bins affect the current
+Preview display only.
 
 <h4 id="help-concordance-download">Download the plot</h4>
 
@@ -170,32 +169,28 @@ In the combined dispersion summary, **Aggregate** pools both Data Blocks.
 **Split (solid/dashed)** draws one solid or dashed series per source so their
 current-page distributions can be compared.
 
-<h3 id="help-concordance-detach">Add to Workspace</h3>
+<h3 id="help-concordance-run-all">Run All and Review</h3>
 
-![Derived Concordance Data Blocks](tutorials/assets/concordance/detach_datablocks.png)
+**Run All** can be started before or after Preview. It submits one thin Run All
+group with one independent Supporting Analysis per selected source. Each child
+uses the Run All request's immutable snapshot and tokenizer mapping and retains
+one complete table Result. Run All does not add Data Blocks to the Workspace.
 
-**Add to Workspace** submits a direct Child Analysis of the completed
-Concordance Analysis. It uses the parent's immutable request and retained input
-snapshot, including its tokenizer mapping; it does not rerun against the
-current Data Block preference.
+After success, **Review** reads each immutable table Result and feeds its
+grouped occurrence rows through the normal Concordance presentation, so
+Table/Dispersion, Separated/Combined, metadata, chart, pagination, sorting, and
+row-detail controls remain available. `CONC_dispersion` is derived in the
+frontend and is never queried as a physical Result column.
 
-- Table output contains one row per hit and uses the `_conc` name suffix.
-- Dispersion output contains one row per source document, aggregates generated
-  match fields into lists, and uses `_conc_aggregated` plus a selected-bin range
-  when applicable.
-- Combined actions create one Derived Data Block per source.
-
-The dialog lets you choose optional source columns. Core generated fields are
-included by the child operation; `CONC_extraction` is selectable for per-hit
-output and included in aggregated dispersion output. Legend and bin filters are
-copied into the child request, so the Derived Data Block reflects those choices.
+Use **Add to Workspace** to create Derived Data Blocks after reviewing the
+Result. The document column is required. Metadata columns start unselected,
+analysis columns start selected, and you may change the output names before
+submitting one atomic Result Publication.
 
 <h3 id="help-concordance-clear-results">Clear results</h3>
 
-The Tab keeps its current Concordance Analysis and durable Result. **Clear
-Results** removes that Analysis and resets the Tab, including after failure or
-cancellation. **Re-run** first clears the current Analysis and then submits its
-replacement.
+The Tab keeps its complete Analysis forest. **Clear Results** removes that
+forest, including after failure or cancellation.
 
 <h2 id="help-concordance-troubleshooting">Troubleshooting</h2>
 
@@ -206,8 +201,8 @@ replacement.
 | Too many partial matches | Whole Word is off in Text mode | Enable **Whole Word** |
 | A regular expression fails | Invalid pattern syntax | Test the pattern on regexr.com |
 | A generated header does not sort | `CONC_*` values are computed after source paging | Sort by a displayed source metadata column |
-| Add to Workspace is disabled | No completed Result or no selectable output | Run the search and restore any hidden legend entries |
-| Results differ from the edited Data Block | You reopened a historical Analysis | Use **Re-run** to submit the current Data Block state |
+| Run All is disabled | Inputs are incomplete or another Run All is active | Complete the inputs or wait for the active Analysis |
+| Preview differs from the edited Data Block | You reopened a historical Preview Analysis | Use **Update Preview** to capture the current Data Block state |
 
 <h2 id="help-concordance-defaults">Quick-reference defaults</h2>
 
@@ -226,11 +221,11 @@ replacement.
 
 ## Practice exercise
 
-1. Select a Data Block and run a Text-mode Whole Word search.
-2. Compare two source-metadata sort orders without re-running.
+1. Select a Data Block and Preview a Text-mode Whole Word search.
+2. Compare two source-metadata sort orders.
 3. Switch to Dispersion, change the bin count, and select a bin range.
-4. Add the filtered dispersion output to the Workspace.
-5. Change the source Data Block, reopen the historical Analysis, and then use
-   **Re-run** to compare the new request deliberately.
+4. Run All and inspect the joined Review table.
+5. Change the source Data Block, reopen the historical Preview Analysis, and
+   then use **Update Preview** to compare the new request deliberately.
 
 [← Back to tutorial index](./index.md)

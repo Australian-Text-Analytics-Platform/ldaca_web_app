@@ -1,18 +1,20 @@
 # Analyses And User File Imports
 
-Wordflow has two durable kinds of background work, each owned by the resource
-whose behavior it represents. They share lifecycle vocabulary and event
-transport, but there is no generic Task resource, repository, API, or state
-machine.
+Wordflow has two durable kinds of background work. Analyses belong to a
+Workspace Tab. User File Imports belong directly to a user. They share
+lifecycle vocabulary and event transport, but there is no generic Task
+resource, repository, or API.
 
 ```mermaid
 flowchart LR
     WORKSPACE["Workspace"] --> TAB["Tab"]
-    TAB --> ROOT["Current root Analysis"]
+    TAB --> FOREST["Ordered Analysis forest"]
+    FOREST --> ROOT["Root Analysis"]
+    ROOT --> SUB["Optional Sub-Analysis"]
+    SUB --> DEEP["Optional deeper Sub-Analysis"]
     ROOT --> RESULT["Typed Result"]
-    ROOT --> ARTIFACT["Optional Artifact"]
-    ROOT --> CHILD["Optional direct Child Analysis"]
-    CHILD --> DERIVED["Optional Derived Data Block"]
+    RESULT --> PUBLICATION["Optional Result Publication"]
+    PUBLICATION --> OUTPUTS["Derived Data Blocks"]
 
     USER["User"] --> IMPORT["User File Import"]
     IMPORT --> FILES["Published User Files"]
@@ -20,89 +22,134 @@ flowchart LR
 
 ## Shared Lifecycle Meaning
 
-Analyses and User File Imports both use `queued`, `running`, `succeeded`,
-`failed`, and `cancelled`. Their own strict domain models validate transitions,
-timestamps, Failure, Progress, Result presence, and Revision.
+Analyses and User File Imports use `queued`, `running`, `succeeded`, `failed`,
+and `cancelled`. Their strict domain models validate transitions, timestamps,
+Failure, Progress, Result presence, and Revision.
 
 A cancellation request is not terminal cancellation. Queued work can cancel
-immediately; running work becomes `cancelled` only after its execution has
-stopped. If success and confirmed cancellation race, the first terminal state
-committed under the owning gate wins. A system interruption fails the resource
-with its specific interruption code and does not invent a user-cancellation
-timestamp.
+immediately; running work becomes `cancelled` only after execution has stopped.
+If success and confirmed cancellation race, the first terminal state committed
+under the owning gate wins. Intermediate Progress is an in-memory service
+overlay and SSE event. It does not rewrite the durable resource or advance its
+Revision.
 
-Intermediate Progress is a service-owned in-memory overlay and SSE event. It
-does not rewrite the durable resource or advance its Revision. Creation and a
-terminal transition persist Progress. A restart therefore loses intermediate
-Progress and fails any retained non-terminal resource as interrupted; work is
-never resumed or partially repaired.
+## Analysis Forest
 
-## Analysis
+Each Tab owns an ordered list of Analysis identities. Those records form a
+forest:
 
-An Analysis is portable Workspace content. A root Analysis is referenced by
-one Tab, and the Tab kind fixes which discriminated root request it accepts.
-The immutable request, lifecycle, safe Failure, terminal Result payload,
-Artifact references, and the ordered unique `output_node_ids` list persist in a
-strict per-Analysis record beneath the Workspace.
+- an Analysis with no `parent_analysis_id` is a root;
+- a Sub-Analysis names one parent in the same Tab;
+- parent links may have arbitrary depth and must remain acyclic;
+- every Analysis appears exactly once in its Tab's ordered collection.
 
-Execution snapshots are created only when the scheduler selects the Analysis.
-The owning Data Blocks are reserved while the Analysis is queued or running,
-and the selected worker receives immutable private inputs rather than a live
-Workspace. Concordance and Quotation retain that run input after success so
-later Result pages remain tied to the submitted request even if the current
-source Data Block is edited. The stored first Result page is the canonical
-default Result; alternate pages are side-effect-free projections over the
-retained input. If the retained input is unavailable, the query fails rather
-than silently recomputing from live Workspace state. Draft request parameters
-and all presentation preferences remain outside the backend resource.
+An Analysis declares one execution scope:
 
-An Annotation model-list, preview, or submission request identifies one
-Annotation Provider Configuration by UUID and repeats its safe provider type
-and optional normalized Custom base URL. Single-user execution verifies this
-snapshot against the stored configuration; multi-user execution may carry its
-browser-owned write-only Provider Credential to the request boundary. The
-service captures the key separately for immediate execution and retains only
-the safe UUID, type, and Custom base URL in the immutable Analysis request.
-Names and secrets therefore never enter persistence, hydration, retries, Tabs,
-Results, Artifacts, provenance, logs, or telemetry. Execution never falls back
-to a later mutable configuration.
+- `preview` answers page-oriented exploration without publishing a Data Block;
+- `run_all` processes the complete immutable input;
+- `supporting` performs work owned by another Analysis, such as one source of a
+  multi-source Concordance Run All.
 
-Annotation has two deliberately separate modes. Manual Annotation is not an
-Analysis: starting a manual column is an expression Data Block Edit, each label
-selection is a `set_cell` edit, and one class-description dialog Save is an
-`annotation_classes` edit. Its Undo and Redo behavior is therefore the selected
-Data Block's ordinary session history. A dedicated empty class-description
-Data Block may be created by a zero-row Workspace SQL projection.
+Scope does not change lifecycle semantics. Preview and Run All are independent
+roots unless a concrete workflow chooses a parent. A user may run Run All
+without first running Preview, and any Analysis kind may use a Supporting
+Sub-Analysis when orchestration requires it.
 
-AI Annotation preview is a side-effect-free query and creates no resource. AI
-Run submits the Tab's durable Annotation Analysis through the same root
-submission contract as every other analysis kind. Its immutable request,
-lifecycle, Result, and derived Data Block output hydrate from backend resources
-after reload; the frontend does not copy them into a feature store.
+The immutable request, execution scope, parent, explicit supersession targets,
+lifecycle, safe Failure, terminal Result, Artifact references, and ordered
+unique `output_node_ids` persist in each strict Analysis record. Draft
+parameters and presentation preferences remain client-only Tab state.
 
-A successful concordance, quotation, or Topic Modeling root may own any number
-of direct typed Child Analyses for supported detachment operations. A child is
-an ordinary Analysis with `parent_analysis_id`; it has the same lifecycle and
-event contract, cannot own a grandchild, and may atomically create one or more
-Derived Data Blocks through the Workspace mutation boundary. Non-publishing
-Analyses use an empty output list. Topic Modeling records each selected source's
-semantic pair while ordering the flat identities as topic data followed by
-topic meanings in source-request order.
+## Submission, Supersession, Cancellation, And Clearing
 
-`output_node_ids` is a strict current contract. Persisted records with the
-removed singular field or no output list are corrupt rather than migrated.
+Submission validates the complete request and commits the new Analysis as
+`queued` before runtime capacity is available. Input snapshotting occurs only
+when the scheduler selects it. Workers receive immutable private inputs rather
+than a live Workspace.
 
-Clearing a Tab immediately removes its root from the public resource graph and
-allows a new root submission. Queued work is cancelled without starting;
-running private execution finishes cancellation and cleanup without being able
-to mutate the cleared Tab.
+A new Analysis may name terminal Analyses in the same Tab through
+`supersedes_analysis_ids`. The predecessors remain readable while the
+replacement is queued or running. Successful completion removes them; failed
+or cancelled replacement preserves them. This is the only replacement
+mechanism. The client does not clear results before re-running.
 
-Closing and reopening a Workspace restores Tabs, terminal Analyses, immutable
-requests, stored Results, Artifacts, and retained query inputs from Workspace
-storage. Portable archive version 6 carries terminal live Analyses and safe
-materialized copies of their query inputs; import rebuilds private lazy input
-snapshots under the new Workspace identity. Browser-local active Tab and
-presentation settings are deliberately outside both storage forms.
+Cancelling an Analysis cascades to its active descendants. A thin group
+Analysis that has no scheduled worker is never signalled as though it owned a
+process. Clearing a Tab cancels active work and removes the complete forest.
+Deleting a Tab performs the same Analysis cleanup before removing the Tab.
+
+## Results And Immutable Inputs
+
+Successful Analyses store a strict kind-specific Result, edit a Data Block
+through an explicit in-place contract, or publish output Data Blocks atomically.
+Concordance and Quotation retain immutable Run All tables as Analysis-owned
+Artifacts. Their Review pages remain tied to the submitted request and Result
+rather than a current Workspace projection. Preview page queries are
+side-effect free and are not persisted as cached Result pages.
+
+Token Frequency and Concordance execute exclusively from the immutable request
+and input snapshot. Tokenizer mappings never fall back to mutable Data Block
+preferences. `native:plain_words_en` bypasses the token cache; other models use
+the per-user content-addressed cache.
+
+## Annotation
+
+Manual Annotation is not an Analysis. Creating an annotation column, choosing a
+label, and saving class descriptions are ordinary Data Block Edits.
+
+AI Annotation Preview is a Preview-scoped Analysis. Each requested page is
+fresh inference over the retained snapshot. Predictions are never written
+automatically. Reviewer corrections are explicit `set_cell` Data Block Edits
+to the Tab-selected correction column. Preview comparisons reuse the same
+confusion-matrix presentation as Review, but count only the fresh predictions
+and selected comparison-column values on the current Preview page.
+
+Annotation Run All is an independent Run-All-scoped Analysis. It processes the
+complete snapshot and writes the final selected annotation column in place,
+overlaying explicit correction values where the request includes them.
+
+Annotation Review shows the document and annotation columns by default, with
+other columns available through the metadata selector. **Compare To** accepts
+one or more other columns and renders a separate confusion matrix for each;
+matrix counts cover the complete current Data Block rather than only the
+visible Review page.
+
+## Concordance And Quotation
+
+Concordance and Quotation Preview use Preview-scoped Analyses. Each requested
+page is computed from the retained immutable snapshot.
+
+Quotation Run All is one Run-All-scoped Analysis with one complete immutable
+table Result. Concordance Run All is a thin Run-All-scoped Analysis Group with
+one Supporting Sub-Analysis and table Result per selected source. Supporting
+work executes independently, but the group succeeds only after every source
+Result is durable.
+
+Review reads the immutable Result tables directly. `CONC_dispersion` is
+derived by the frontend presentation from grouped physical occurrence rows and
+is never stored as a backend column.
+
+**Add to Workspace** submits a Result Publication Supporting Analysis under the
+successful Run All parent. Its immutable request selects one output name and a
+set of columns per source. The document column is mandatory, metadata columns
+default off, and analysis columns default on. The publication creates all
+requested Derived Data Blocks atomically; Run All itself never changes the
+Workspace graph.
+
+## Other Analysis Kinds
+
+Token Frequency, Trends, Topic Modeling, and other full-table functions submit
+Run-All-scoped Analyses directly. Topic Modeling detachment remains an ordinary
+Supporting Analysis and may publish multiple ordered output Data Blocks.
+
+## Persistence
+
+Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
+immutable requests, stored Results, Artifacts, and retained query inputs.
+Native Workspace schema 10 and portable archive format 9 accept only this
+forest representation. Older layouts are rejected without runtime migration.
+Browser-local active Tab selection and Active Analysis Drafts are outside both
+storage forms.
 
 ## User File Import
 
@@ -113,25 +160,16 @@ persisted request contains no provider credential.
 
 A Data Portal submission may carry a write-only token for the initial provider
 operation. The service resolves it before retaining the import and passes it
-only through the private execution context; restart recovery therefore never
-attempts to restore or expose a personal token.
+only through the private execution context.
 
-Sample collections come only from the canonical remote sample-data repository.
-The backend fetches its catalogue on demand, downloads the selected files
-directly into private staging, and publishes the complete collection under
-`files/sample_data/<collection-id>/`. The backend package carries no sample
-manifest, dataset copy, digest registry, or local-source fallback.
-
-User File Imports have their own service, fair runtime-only scheduler, capacity,
-execution handles, cancellation, persistence, and cleanup. They do not belong
-to a Workspace and cannot create or mutate an Analysis. A successful import
-records the public destination, file count, and bytes written; deleting a
-terminal import deletes only its history record, not the published User Files.
+User File Imports have their own service, scheduler, capacity, execution
+handles, cancellation, persistence, and cleanup. They do not belong to a
+Workspace and cannot create or mutate an Analysis. Deleting a terminal import
+deletes only its history record, not published User Files.
 
 ## Event Refresh
 
-Both resource types publish changes and live Progress through the single
-authenticated `/api/events` stream. Events identify the authoritative resource
-and its latest Revision where one was durably committed. They are refresh
-signals, not a second state store: reconnecting clients refetch resources, and
-slow subscribers receive `resync_required` rather than historical replay.
+Both resource types publish changes and live Progress through the authenticated
+`/api/events` stream. Events are refresh signals, not a second state store.
+Reconnects refetch resources, and slow subscribers receive `resync_required`
+rather than historical replay.

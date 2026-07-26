@@ -44,7 +44,7 @@ it reports `storage: browser`, returns `annotation_providers: null`, and still
 reports whether a deployment Data Portal token is available. Every credential
 write is single-user-only; multi-user attempts return `403 access_denied`.
 
-Annotation model, preview, and root Analysis submission bodies accept an
+Annotation model discovery and root Analysis submission bodies accept an
 immutable safe snapshot: `provider_configuration_id`, provider type, and an
 optional normalized Custom base URL. They also accept an optional write-only
 `api_key`. Single-user mode rejects request keys, verifies the snapshot against
@@ -125,8 +125,8 @@ closing target makes it the sole open resource. If opening fails after a sibling
 transition, the response reports the real error and subsequent collection reads
 expose the resulting backend state.
 
-Native Workspace snapshots use schema version 7 and portable archives use
-format version 6. Readers accept only those exact versions; import and open do
+Native Workspace snapshots use schema version 9 and portable archives use
+format version 8. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks
@@ -147,7 +147,6 @@ below require the Workspace to be open.
 | `POST /api/workspaces/{workspace_id}/nodes/{node_id}/redo` | `redo_node` | 200 | Restore the next plan from this open Workspace session |
 | `DELETE /api/workspaces/{workspace_id}/nodes/{node_id}` | `delete_node` | 204 | Delete while preserving graph integrity |
 | `GET /api/workspaces/{workspace_id}/nodes/{node_id}/schema` | `get_node_schema` | 200 Arrow | Authoritative zero-row Data Block schema stream |
-| `POST /api/workspaces/{workspace_id}/nodes/{node_id}/annotation-previews` | `preview_annotation` | 200 | Stateless bounded provider preview |
 
 `NodeEditRequest` accepts `cast`, `rename_column`, `delete_column`, `filter`,
 `replace`, `expression`, `set_cell`, or `annotation_classes`. `set_cell`
@@ -172,22 +171,21 @@ reset after load, clone, import, close/reopen, or backend restart.
 | `GET /api/workspaces/{workspace_id}/tabs` | `list_tabs` | 200 | Complete ordered Tab collection |
 | `POST /api/workspaces/{workspace_id}/tabs` | `create_tab` | 201 | Create one named fixed-kind Tab |
 | `GET /api/workspaces/{workspace_id}/tabs/{tab_id}` | `get_tab` | 200 | Read one Tab |
-| `PATCH /api/workspaces/{workspace_id}/tabs/{tab_id}` | `rename_tab` | 200 | Rename one Tab |
-| `DELETE /api/workspaces/{workspace_id}/tabs/{tab_id}` | `delete_tab` | 204 | Delete an empty Tab |
-| `GET /api/workspaces/{workspace_id}/tabs/{tab_id}/analysis` | `get_tab_analysis` | 200 | Read the Tab's current root Analysis |
-| `POST /api/workspaces/{workspace_id}/tabs/{tab_id}/analysis` | `submit_tab_analysis` | 201 | Create and queue the Tab's one root Analysis |
-| `DELETE /api/workspaces/{workspace_id}/tabs/{tab_id}/analysis` | `clear_tab_analysis` | 204 | Detach and privately clean the current Analysis tree |
+| `PATCH /api/workspaces/{workspace_id}/tabs/{tab_id}` | `update_tab` | 200 | Partially update one Tab's name or kind-specific presentation settings |
+| `DELETE /api/workspaces/{workspace_id}/tabs/{tab_id}` | `delete_tab` | 204 | Cancel and remove the Tab's Analysis forest, then delete the Tab |
+| `GET /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `list_tab_analyses` | 200 | Read the complete ordered Analysis forest |
+| `POST /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `submit_tab_analysis` | 201 | Create one scoped Analysis, optionally with a parent and supersession targets |
+| `DELETE /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `clear_tab_analysis` | 204 | Cancel and remove the complete Analysis forest |
 
 ## Analyses
 
 | Method and path | Operation ID | Success | Purpose |
 |---|---|---:|---|
-| `GET /api/workspaces/{workspace_id}/analyses` | `list_analyses` | 200 | Paginated live root and Child Analyses |
+| `GET /api/workspaces/{workspace_id}/analyses` | `list_analyses` | 200 | Paginated live Analyses across every Tab forest |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}` | `get_analysis` | 200 | Read one live valid Analysis |
-| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/children` | `submit_child_analysis` | 201 | Create a typed Concordance, Quotation, or Topic Modeling direct Child Analysis |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/cancel` | `cancel_analysis` | 200/202 | Cancel queued work or request running cancellation |
-| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result` | `get_analysis_result` | 200 | Stored canonical first Result projection |
-| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free alternate projection |
+| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result` | `get_analysis_result` | 200 | Stored canonical Result or durable Preview-ready marker |
+| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free page projection, including fresh Annotation, Concordance, and Quotation Preview work |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
@@ -198,6 +196,22 @@ The list is empty until a publishing Analysis succeeds. Existing single-output
 operations return one ID; Topic Modeling detachment returns topic-data then
 topic-meanings IDs for each source in request order. The removed singular field
 is not accepted.
+
+`AnalysisCreate` contains one discriminated Analysis request, one execution
+scope (`preview`, `run_all`, or `supporting`), an optional
+`parent_analysis_id`, and ordered unique `supersedes_analysis_ids`. Parents and
+supersession targets must belong to the same Tab. Parent links may have
+arbitrary depth. Superseded terminal records are removed only after the
+replacement succeeds. Cancelling an Analysis cascades to active descendants.
+
+Concordance and Quotation Run All Results expose complete immutable paged table
+descriptors. They do not create Data Blocks and therefore retain empty
+`output_node_ids`. A `concordance_result_publication` or
+`quotation_result_publication` Supporting Analysis must name the successful
+matching Run All parent. Its request selects the required document column plus
+optional metadata and analysis columns and one output name per source.
+Successful publication atomically creates the requested Derived Data Blocks;
+only the publication Result carries their output IDs.
 
 `TokenFrequencyAnalysisRequest.node_tokenizer_models` must contain exactly the
 selected Data Block IDs. `ConcordanceAnalysisRequest.node_tokenizer_models`
