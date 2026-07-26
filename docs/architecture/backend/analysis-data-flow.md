@@ -19,8 +19,11 @@ flowchart TB
 ```
 
 The service validates same-Tab ownership, acyclicity, request kind, parent
-compatibility, and supersession targets. It does not impose a one-root or
-direct-child limit.
+compatibility, and supersession targets. Generic Tabs have no one-root or
+direct-child limit. Annotation Tabs are linear: a new Preview or Run All
+atomically removes the previous terminal Analysis and becomes the Tab's sole
+root. Annotation rejects parents, Supporting scope, and explicit supersession
+targets.
 
 ## Submission And Execution
 
@@ -115,7 +118,8 @@ are immutable request data.
 Replacement is success-dependent. A submitted Analysis may name terminal
 Analyses in `supersedes_analysis_ids`; they remain readable during execution
 and are removed only when replacement succeeds. Failure and cancellation leave
-them untouched.
+them untouched. Annotation does not use this generic mechanism: every accepted
+root submission immediately replaces the prior Annotation Analysis.
 
 Cancelling an Analysis cascades through active descendants. Clearing a Tab
 cancels active work, removes the complete forest, query snapshots, Results, and

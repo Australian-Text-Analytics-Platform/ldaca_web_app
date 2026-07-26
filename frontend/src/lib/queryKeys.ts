@@ -105,6 +105,21 @@ export const queryKeys = {
       { mode: 'drain', nodeIds: [...nodeIds], sql, pageSize, projection },
     ] as const,
 
+  /** Full-table annotation comparison, maintained independently from ordinary SQL pages. */
+  annotationColumnComparison: (
+    workspaceId: string,
+    nodeIds: string[],
+    sql: string,
+    referenceColumn: string,
+    comparisonColumn: string,
+  ) =>
+    [
+      'workspaces',
+      workspaceId,
+      'annotation-column-comparisons',
+      { nodeIds: [...nodeIds], sql, referenceColumn, comparisonColumn },
+    ] as const,
+
   /** Authoritative Arrow schema for one data block. */
   nodeSchema: (workspaceId: string, nodeId: string) =>
     ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,

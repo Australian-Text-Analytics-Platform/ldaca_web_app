@@ -77,8 +77,16 @@ the collapsed **Advanced** section.
 
 **Run All** processes the complete Data Block and writes the final Annotation
 Column in place. Review uses the standard rows-per-page and numbered pagination
-controls. **Clear Results** also clears the selected correction-column draft so
-the next task starts without inheriting it.
+controls. Annotation keeps one current task: Run All replaces Preview, and a
+later Run All replaces the previous Run All. **Clear Results** also clears the
+selected correction-column draft so the next task starts without inheriting it.
+
+Manual Annotation also provides **Compare To**. Select one or more other label
+columns to see whole-Data-Block confusion matrices and Cohen's Kappa. The same
+comparison choices remain selected in Preview and Review for that Data Block,
+appear as read-only columns after any correction column in all three table
+modes, and each successfully saved manual label updates the displayed
+comparison.
 
 ## Recap
 

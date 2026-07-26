@@ -104,13 +104,11 @@ export const submitAnnotationRunAllWithProviderCredential = ({
   tabId,
   providerConfigurationId,
   source,
-  supersedesAnalysisIds = [],
 }: {
   workspaceId: string;
   tabId: string;
   providerConfigurationId: string;
   source: AnnotationAnalysisRequest;
-  supersedesAnalysisIds?: string[];
 }) => {
   const apiKey = annotationCredential(providerConfigurationId);
   const body: AnnotationRunAllSubmissionWritable & { kind: 'annotation_run_all' } = {
@@ -124,7 +122,7 @@ export const submitAnnotationRunAllWithProviderCredential = ({
     body: {
       execution_scope: 'run_all',
       request: body,
-      supersedes_analysis_ids: supersedesAnalysisIds,
+      supersedes_analysis_ids: [],
     },
     throwOnError: true,
   });

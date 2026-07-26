@@ -4,6 +4,40 @@ export interface ConfusionCount {
   count: number;
 }
 
+interface ReferenceComparisonEdit {
+  previousReference: string | null;
+  nextReference: string | null;
+  comparison: string | null;
+}
+
+/** Applies one persisted reference-cell edit to an aggregate confusion matrix. */
+export const applyReferenceComparisonEdit = (
+  rows: ConfusionCount[],
+  { previousReference, nextReference, comparison }: ReferenceComparisonEdit,
+): ConfusionCount[] => {
+  if (comparison === null || previousReference === nextReference) return rows;
+
+  const counts = new Map<string, ConfusionCount>(
+    rows.map((row) => [JSON.stringify([row.reference, row.comparison]), { ...row }] as const),
+  );
+  const adjust = (reference: string, delta: number) => {
+    const key = JSON.stringify([reference, comparison]);
+    const current = counts.get(key);
+    const count = (current?.count ?? 0) + delta;
+    if (count <= 0) counts.delete(key);
+    else counts.set(key, { reference, comparison, count });
+  };
+
+  if (previousReference !== null) adjust(previousReference, -1);
+  if (nextReference !== null) adjust(nextReference, 1);
+
+  return Array.from(counts.values()).sort(
+    (left, right) =>
+      left.reference.localeCompare(right.reference) ||
+      left.comparison.localeCompare(right.comparison),
+  );
+};
+
 /** Calculates chance-corrected agreement from confusion-matrix counts. */
 export const calculateCohensKappa = (rows: ConfusionCount[]): number | null => {
   const referenceTotals = new Map<string, number>();

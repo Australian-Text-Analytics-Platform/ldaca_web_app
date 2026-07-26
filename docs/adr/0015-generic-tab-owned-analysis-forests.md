@@ -73,3 +73,6 @@ route, or runtime migration.
 This ADR supersedes ADR 0014's privileged root Preview Session and direct-child
 Run All ownership. ADR 0010's separation of Analysis lifecycle from Result
 projection remains in force.
+
+ADR 0017 supersedes this decision only for Annotation Tabs, which use one
+linear immediately replaced Analysis root.

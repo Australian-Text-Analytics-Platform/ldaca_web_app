@@ -1,6 +1,6 @@
 import { useState, type ComponentProps } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { RunAllReviewTable } from '../RunAllReviewTable';
@@ -165,10 +165,11 @@ describe('RunAllReviewTable', () => {
         });
       }
       return Promise.resolve({
-        columns: ['text', 'annotation', 'reviewer_one', 'reviewer_two', 'record_id'],
+        columns: ['text', 'annotation', 'correction', 'reviewer_one', 'reviewer_two', 'record_id'],
         schema: [
           { name: 'text', kind: 'string' },
           { name: 'annotation', kind: 'string' },
+          { name: 'correction', kind: 'string' },
           { name: 'reviewer_one', kind: 'string' },
           { name: 'reviewer_two', kind: 'categorical' },
           { name: 'record_id', kind: 'integer' },
@@ -177,6 +178,7 @@ describe('RunAllReviewTable', () => {
           {
             text: 'Example',
             annotation: 'covid',
+            correction: 'job',
             reviewer_one: 'job',
             reviewer_two: 'other',
             record_id: 10,
@@ -196,7 +198,7 @@ describe('RunAllReviewTable', () => {
           nodeIds={['node-1']}
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
-          requiredColumns={['text', 'annotation']}
+          requiredColumns={['text', 'annotation', 'correction']}
           comparisonColumn="annotation"
           rowCount={32}
         />
@@ -213,6 +215,15 @@ describe('RunAllReviewTable', () => {
       await screen.findByRole('heading', { name: 'annotation vs reviewer_one' }),
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: 'annotation vs reviewer_two' })).toBeVisible();
+    const reviewTable = screen.getAllByRole('table')[0];
+    expect(
+      within(reviewTable)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['text', 'annotation', 'correction', 'reviewer_one', 'reviewer_two']);
+    expect(
+      within(reviewTable).getByRole('row', { name: 'Example covid job job other' }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('annotation covid, reviewer_one job: 2 rows')).toBeInTheDocument();
     expect(screen.getByLabelText('annotation job, reviewer_one covid: 0 rows')).toBeInTheDocument();
     expect(queryWorkspaceSqlTable).toHaveBeenCalledWith(

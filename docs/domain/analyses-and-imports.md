@@ -70,8 +70,10 @@ than a live Workspace.
 A new Analysis may name terminal Analyses in the same Tab through
 `supersedes_analysis_ids`. The predecessors remain readable while the
 replacement is queued or running. Successful completion removes them; failed
-or cancelled replacement preserves them. This is the only replacement
-mechanism. The client does not clear results before re-running.
+or cancelled replacement preserves them. Annotation is the deliberate linear
+exception: submitting a new Preview or Run All immediately removes the Tab's
+previous Analysis and creates one replacement root. Annotation never owns
+multiple live Analysis identities or Supporting Analyses.
 
 Cancelling an Analysis cascades to its active descendants. A thin group
 Analysis that has no scheduled worker is never signalled as though it owned a
@@ -95,7 +97,13 @@ the per-user content-addressed cache.
 ## Annotation
 
 Manual Annotation is not an Analysis. Creating an annotation column, choosing a
-label, and saving class descriptions are ordinary Data Block Edits.
+label, and saving class descriptions are ordinary Data Block Edits. Its
+**Compare To** selection is shared with Preview and Review for the same Data
+Block. The initial confusion matrices and Cohen's Kappa values cover the whole
+current Data Block. After a manual label is saved, the frontend adjusts the
+affected aggregate pairs and recalculates Kappa without rescanning the Data
+Block; failed saves do not change the comparison. Changes made through another
+surface are reconciled when the comparison resource next refetches.
 
 AI Annotation Preview is a Preview-scoped Analysis. Each requested page is
 fresh inference over the retained snapshot. Predictions are never written
@@ -106,18 +114,23 @@ renders the prediction and correction as separate columns with an intervening
 arrow. Preview comparisons reuse the same confusion-matrix presentation as
 Review, but count only the fresh predictions and selected comparison-column
 values on the current Preview page. Each matrix also reports Cohen's Kappa as
-chance-corrected intercoder reliability.
+chance-corrected intercoder reliability. Selected comparison columns also
+appear as read-only columns after the optional correction column in the Preview
+table.
 
 Annotation Run All is an independent Run-All-scoped Analysis. It processes the
 complete snapshot and writes the final selected annotation column in place,
 overlaying explicit correction values where the request includes them.
+Submitting it replaces the current Annotation Preview or Run All immediately;
+a later Run All likewise replaces the earlier Run All.
 
 Annotation Review shows the document and annotation columns by default, with
 other columns available through the metadata selector. Its shared table footer
 provides rows-per-page selection and direct numbered pagination. **Compare To**
 accepts one or more other columns and renders a separate confusion matrix for
-each; matrix counts and Cohen's Kappa cover the complete current Data Block
-rather than only the visible Review page.
+each. Those selections also appear as read-only table columns after the optional
+correction column in Manual and Run All Review. Matrix counts and Cohen's Kappa
+cover the complete current Data Block rather than only the visible Review page.
 
 ## Concordance And Quotation
 

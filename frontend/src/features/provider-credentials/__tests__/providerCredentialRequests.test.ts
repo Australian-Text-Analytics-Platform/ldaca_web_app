@@ -7,6 +7,7 @@ import {
   listFeaturedDataPortalCollectionsWithProviderCredential,
   queryAnnotationPreviewWithProviderCredential,
   searchDataPortalWithProviderCredential,
+  submitAnnotationRunAllWithProviderCredential,
   submitDataPortalImportWithProviderCredential,
   submitTabAnalysisWithProviderCredential,
 } from '../providerCredentialRequests';
@@ -88,6 +89,12 @@ describe('provider credential request boundary', () => {
       tabId: 'tab-1',
       request: analysisRequest,
     });
+    await submitAnnotationRunAllWithProviderCredential({
+      workspaceId: 'workspace-1',
+      tabId: 'tab-1',
+      providerConfigurationId: configuration.id,
+      source: analysisRequest,
+    });
     await listFeaturedDataPortalCollectionsWithProviderCredential();
     await searchDataPortalWithProviderCredential({ query: 'speech' });
     await submitDataPortalImportWithProviderCredential({ identifier: 'arcp://name,corpus' });
@@ -112,12 +119,27 @@ describe('provider credential request boundary', () => {
         },
       }),
     );
-    expect(sdk.submitTabAnalysis).toHaveBeenCalledWith(
+    expect(sdk.submitTabAnalysis).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         body: {
           execution_scope: 'preview',
           request: { ...analysisRequest, api_key: 'annotation-secret' },
           parent_analysis_id: null,
+          supersedes_analysis_ids: [],
+        },
+      }),
+    );
+    expect(sdk.submitTabAnalysis).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        body: {
+          execution_scope: 'run_all',
+          request: {
+            kind: 'annotation_run_all',
+            source: analysisRequest,
+            api_key: 'annotation-secret',
+          },
           supersedes_analysis_ids: [],
         },
       }),

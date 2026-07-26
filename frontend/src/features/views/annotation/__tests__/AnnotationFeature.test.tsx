@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   setSetting: vi.fn(),
   invalidateQueries: vi.fn(),
   clearResults: vi.fn(),
+  persistDocumentColumn: vi.fn(),
+  setSourceColumn: vi.fn(),
+  setExampleColumn: vi.fn(),
+  exampleSelected: false,
   sourceColumnNames: ['text'] as string[],
 }));
 
@@ -29,18 +33,26 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   }),
 }));
 
+vi.mock('@/features/views/common/hooks/usePersistNodeDocumentColumn', () => ({
+  usePersistNodeDocumentColumn: () => mocks.persistDocumentColumn,
+}));
+
 vi.mock('@/features/views/common/nodeInputs', async (importOriginal) => ({
   ...(await importOriginal()),
   useTabNodeInputs: ({ selectorId }: { selectorId: string }) => {
     const sourceSelected = selectorId === 'source';
+    const exampleSelected = selectorId === 'exampleNodes' && mocks.exampleSelected;
+    const selected = sourceSelected || exampleSelected;
+    const nodeId = sourceSelected ? 'source-1' : 'example-1';
     return {
-      inputs: sourceSelected ? [{ node_id: 'source-1', column: 'text' }] : [],
-      resolvedNodes: sourceSelected
+      inputs: selected ? [{ node_id: nodeId, column: 'text' }] : [],
+      resolvedNodes: selected
         ? [
             {
-              id: 'source-1',
-              name: 'Source',
+              id: nodeId,
+              name: sourceSelected ? 'Source' : 'Example',
               column: 'text',
+              node: { shape: [2380, 21] },
               columnOptions: mocks.sourceColumnNames.map((name) => ({ name })),
             },
           ]
@@ -53,7 +65,11 @@ vi.mock('@/features/views/common/nodeInputs', async (importOriginal) => ({
       getAddRejection: vi.fn(() => null),
       removeNode: vi.fn(),
       clear: vi.fn(),
-      setColumn: vi.fn(),
+      setColumn: sourceSelected
+        ? mocks.setSourceColumn
+        : exampleSelected
+          ? mocks.setExampleColumn
+          : vi.fn(),
     };
   },
 }));
@@ -63,6 +79,7 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
     title,
     resolvedNodes,
     renderColumnAddon,
+    onColumnChange,
   }: {
     title: string;
     resolvedNodes: {
@@ -79,11 +96,18 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
       column: string;
       columns: string[];
     }) => ReactNode;
+    onColumnChange: (nodeId: string, column: string) => void;
   }) => (
     <div>
       {title}
       {resolvedNodes.map((resolved, index) => (
         <div key={resolved.id}>
+          <button
+            type="button"
+            onClick={() => onColumnChange(resolved.id, 'body')}
+          >
+            Change {title} text column
+          </button>
           {renderColumnAddon?.({
             node: { id: resolved.id, name: resolved.name },
             nodeId: resolved.id,
@@ -175,10 +199,52 @@ describe('AnnotationFeature', () => {
     mocks.setSetting.mockReset();
     mocks.invalidateQueries.mockReset();
     mocks.clearResults.mockReset();
+    mocks.persistDocumentColumn.mockReset();
+    mocks.setSourceColumn.mockReset();
+    mocks.setExampleColumn.mockReset();
+    mocks.exampleSelected = false;
     mocks.sourceColumnNames = ['text'];
     mocks.createSqlDataBlock.mockResolvedValue({ id: 'class-node-1' });
     mocks.polarsExpressionApply.mockResolvedValue(undefined);
     mocks.clearResults.mockResolvedValue(undefined);
+  });
+
+  it('persists manual text-column choices for source and example Data Blocks', async () => {
+    const user = userEvent.setup();
+    mocks.exampleSelected = true;
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: { annotationMode: 'ai' },
+          correctionColumns: {},
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Change Selected Data Blocks text column' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    await user.click(screen.getByRole('button', { name: 'Change Example Node text column' }));
+
+    expect(mocks.setSourceColumn).toHaveBeenCalledWith('source-1', 'body');
+    expect(mocks.setExampleColumn).toHaveBeenCalledWith('example-1', 'body');
+    expect(mocks.persistDocumentColumn.mock.calls).toEqual([
+      ['source-1', 'body'],
+      ['example-1', 'body'],
+    ]);
   });
 
   it('creates and selects an empty class Data Block from the explicit action', async () => {
@@ -292,6 +358,36 @@ describe('AnnotationFeature', () => {
       'annotationTargets',
       JSON.stringify({ 'source-1': 'annotation' }),
     );
+  });
+
+  it('labels the active manual review action Clear', async () => {
+    const user = userEvent.setup();
+    mocks.sourceColumnNames = ['text', 'annotation'];
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: {
+            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
+          },
+          correctionColumns: {},
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Resume' }));
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
   });
 
   it('keeps the dialog open rather than overwriting an existing column', async () => {

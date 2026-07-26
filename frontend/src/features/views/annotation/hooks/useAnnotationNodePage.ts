@@ -10,6 +10,7 @@ export type AnnotationNodePageRow = Record<string, unknown>;
 interface UseAnnotationNodePageArgs {
   workspaceId: string | null;
   nodeId: string;
+  rowCount: number;
   pageSize: number;
   enabled?: boolean;
 }
@@ -26,6 +27,7 @@ interface UseAnnotationNodePageArgs {
 export function useAnnotationNodePage({
   workspaceId,
   nodeId,
+  rowCount,
   pageSize,
   enabled = true,
 }: UseAnnotationNodePageArgs) {
@@ -77,9 +79,6 @@ export function useAnnotationNodePage({
     setPagination,
     query,
     rows,
-    rowCount:
-      pagination.pageIndex * pagination.pageSize +
-      rows.length +
-      (query.data?.hasNext ? pagination.pageSize : 0),
+    rowCount,
   };
 }

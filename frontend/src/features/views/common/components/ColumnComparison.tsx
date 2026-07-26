@@ -35,7 +35,7 @@ interface ConfusionMatrixProps {
   isError: boolean;
 }
 
-/** Shared activity-grid presentation for Review and page-scoped Preview comparisons. */
+/** Shared activity-grid presentation for Manual, Review, and page-scoped Preview comparisons. */
 export function ConfusionMatrix({
   referenceColumn,
   comparisonColumn,
@@ -101,10 +101,16 @@ export function ConfusionMatrix({
                       {labels.map((label) => (
                         <th
                           key={label}
-                          className="max-w-24 truncate px-1 pb-1 text-center font-normal text-muted-foreground"
+                          scope="col"
+                          aria-label={`${displayLabel(label)} comparison column`}
+                          className="h-16 w-6 min-w-6 p-0 align-bottom font-normal text-muted-foreground"
                           title={displayLabel(label)}
                         >
-                          {displayLabel(label)}
+                          <span className="relative block h-16 w-6">
+                            <span className="absolute bottom-1 left-1/2 origin-bottom-left -rotate-45 whitespace-nowrap">
+                              {displayLabel(label)}
+                            </span>
+                          </span>
                         </th>
                       ))}
                     </tr>
@@ -113,6 +119,7 @@ export function ConfusionMatrix({
                     {labels.map((referenceLabel) => (
                       <tr key={referenceLabel}>
                         <th
+                          scope="row"
                           className="max-w-36 truncate pr-2 text-right font-normal text-muted-foreground"
                           title={displayLabel(referenceLabel)}
                         >

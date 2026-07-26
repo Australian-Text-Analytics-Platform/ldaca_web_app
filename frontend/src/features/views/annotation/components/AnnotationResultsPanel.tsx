@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { sqlTable } from '@/api';
 import {
   Select,
   SelectContent,
@@ -16,15 +19,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
+import {
+  ColumnComparisonDialog,
+  ConfusionMatrix,
+} from '@/features/views/common/components/ColumnComparison';
+import {
+  applyReferenceComparisonEdit,
+  type ConfusionCount,
+} from '@/features/views/common/columnComparisonModel';
+import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
 import { useAnnotationNodePage, type AnnotationNodePageRow } from '../hooks/useAnnotationNodePage';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { queryKeys } from '@/lib/queryKeys';
 
-const ANNOTATION_RESULT_PAGE_SIZE = 50;
+const ANNOTATION_RESULT_PAGE_SIZE = 10;
 // Radix `Select` rejects an empty-string item value, so the "clear" option uses
-// a sentinel that onValueChange maps back to '' (an unset/null annotation).
+// a sentinel that onValueChange maps back to an unset/null annotation.
 const NO_CLASS_VALUE = '__no_class__';
 type AnnotationResultRow = AnnotationNodePageRow;
 
@@ -39,12 +52,15 @@ const cellText = (value: unknown): string => {
 interface AnnotationResultsPanelProps {
   workspaceId: string | null;
   nodeId: string;
+  rowCount: number;
   textColumn: string;
   annotationColumn: string;
   /** Class-description node supplying the dropdown options; null disables them. */
   classNodeId: string | null;
   classColumn: string | null;
   descriptionColumn: string | null;
+  comparisonColumns: string[];
+  onComparisonColumnsChange: (columns: string[]) => void;
 }
 
 /**
@@ -56,34 +72,42 @@ interface AnnotationResultsPanelProps {
  * see the source text paired with the selected annotation column and assign a
  * class per row.
  *
- * Flow: fetch the current source-node page plus the class list, then render two
- * fixed-width columns with server pagination for the complete source node. The
- * text column is plain; each annotation cell is a dropdown of class names plus a
- * leading "None" option that clears the cell back to an unset value. Each
- * dropdown is seeded from the existing value. Picking a class optimistically
- * updates the dropdown and persists the cell as a canonical set_cell Data Block
- * edit, reverting + toasting on failure so the displayed value never drifts
- * from what was actually saved.
+ * Flow: fetch the current source-node page plus the class list, then render the
+ * document and editable annotation columns followed by the selected read-only
+ * comparison columns. The text column is plain; each annotation cell is a
+ * dropdown of class names plus a leading "None" option that clears the cell back
+ * to an unset value. Each
+ * dropdown is seeded from the existing value. Picking a class updates the
+ * dropdown and persists the cell as a canonical set_cell Data Block edit,
+ * reverting on failure. Full-table comparisons share the Tab's selected target
+ * columns and update their aggregate counts only after that edit succeeds.
  */
 export function AnnotationResultsPanel({
   workspaceId,
   nodeId,
+  rowCount,
   textColumn,
   annotationColumn,
   classNodeId,
   classColumn,
   descriptionColumn,
+  comparisonColumns,
+  onComparisonColumnsChange,
 }: AnnotationResultsPanelProps) {
   const { setCell } = useWorkspaceActions();
+  const queryClient = useQueryClient();
   // Per-row class overrides keyed by source row position; falls back to the source value.
-  const [selections, setSelections] = useState<Record<number, string>>({});
+  const [selections, setSelections] = useState<Record<number, string | null>>({});
   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [draftComparisonColumns, setDraftComparisonColumns] = useState<string[]>([]);
   const nodePage = useAnnotationNodePage({
     workspaceId,
     nodeId,
+    rowCount,
     pageSize: ANNOTATION_RESULT_PAGE_SIZE,
   });
-  const { pagination, setPagination, query: resultsQuery, rows, rowCount } = nodePage;
+  const { pagination, setPagination, query: resultsQuery, rows } = nodePage;
   const classDescriptions = useAnnotationClassDescriptions({
     workspaceId,
     nodeId: classNodeId,
@@ -91,10 +115,28 @@ export function AnnotationResultsPanel({
     descriptionColumn,
   });
 
-  const tableColumns: ColumnDef<AnnotationResultRow>[] = [
-    { id: textColumn, accessorFn: (row) => row[textColumn] },
-    { id: annotationColumn, accessorFn: (row) => row[annotationColumn] },
-  ];
+  const classOptions = classDescriptions.rows
+    .map((row) => cellText(row.class).trim())
+    .filter((name, index, all) => name.length > 0 && all.indexOf(name) === index);
+  const sourceSql = `SELECT * FROM ${sqlTable(nodeId)}`;
+  const comparableColumnSet = new Set(
+    resultsQuery.data?.schema
+      .filter((column) => column.kind === 'string' || column.kind === 'categorical')
+      .map((column) => column.name) ?? [],
+  );
+  const availableComparisonColumns =
+    resultsQuery.data?.columns.filter(
+      (column) =>
+        column !== textColumn && column !== annotationColumn && comparableColumnSet.has(column),
+    ) ?? [];
+  const activeComparisonColumns = comparisonColumns.filter((column) =>
+    availableComparisonColumns.includes(column),
+  );
+  const visibleColumns = [textColumn, annotationColumn, ...activeComparisonColumns];
+  const tableColumns: ColumnDef<AnnotationResultRow>[] = visibleColumns.map((column) => ({
+    id: column,
+    accessorFn: (row) => row[column],
+  }));
   const table = useServerTable({
     data: rows,
     columns: tableColumns,
@@ -103,16 +145,36 @@ export function AnnotationResultsPanel({
     pageSize: pagination.pageSize,
     onPaginationChange: setPagination,
   });
-  const classOptions = classDescriptions.rows
-    .map((row) => cellText(row.class).trim())
-    .filter((name, index, all) => name.length > 0 && all.indexOf(name) === index);
+  const comparisonQueries = useFullColumnComparisons({
+    workspaceId,
+    nodeIds: [nodeId],
+    sql: sourceSql,
+    referenceColumn: annotationColumn,
+    comparisonColumns: activeComparisonColumns,
+  });
 
   return (
     <section
       aria-label="Annotation Results"
       className="mt-5 rounded-lg border bg-background/60 p-4"
     >
-      <h3 className="mb-3 text-base font-semibold">Annotations</h3>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold">Annotations</h3>
+        {resultsQuery.data ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={availableComparisonColumns.length === 0}
+            onClick={() => {
+              setDraftComparisonColumns(activeComparisonColumns);
+              setCompareDialogOpen(true);
+            }}
+          >
+            Compare To
+          </Button>
+        ) : null}
+      </div>
       {resultsQuery.isLoading ? (
         <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
           Loading annotations...
@@ -128,18 +190,27 @@ export function AnnotationResultsPanel({
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="max-h-96 overflow-y-auto overflow-x-hidden">
-            <Table className="w-full table-fixed">
+            <Table className="w-full table-auto">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-1/2">{textColumn}</TableHead>
-                  <TableHead className="w-1/2">{annotationColumn}</TableHead>
+                  <TableHead>{textColumn}</TableHead>
+                  <TableHead className="w-px whitespace-nowrap">{annotationColumn}</TableHead>
+                  {activeComparisonColumns.map((column) => (
+                    <TableHead key={column} className="w-px whitespace-nowrap">
+                      {column}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row, index) => {
                   const rowPosition = pagination.pageIndex * pagination.pageSize + index;
-                  const seeded = cellText(row[annotationColumn]);
-                  const value = selections[rowPosition] ?? seeded;
+                  const seeded =
+                    row[annotationColumn] == null ? null : cellText(row[annotationColumn]);
+                  const hasSelection = Object.hasOwn(selections, rowPosition);
+                  const committedValue: string | null =
+                    (hasSelection ? selections[rowPosition] : seeded) ?? null;
+                  const value = committedValue ?? '';
                   return (
                     <TableRow key={rowPosition} className="align-top hover:bg-transparent">
                       <TableCell className="break-words whitespace-pre-wrap">
@@ -152,20 +223,68 @@ export function AnnotationResultsPanel({
                           // Radix shows the placeholder for '' as well as undefined.
                           value={value}
                           onValueChange={(next) => {
-                            // The sentinel clears the cell back to an unset value.
-                            const resolved = next === NO_CLASS_VALUE ? '' : next;
+                            const resolved = next === NO_CLASS_VALUE ? null : next;
+                            const previousOverride: string | null = selections[rowPosition] ?? null;
+                            const comparisonKeys = activeComparisonColumns.map((column) =>
+                              queryKeys.annotationColumnComparison(
+                                workspaceId ?? '',
+                                [nodeId],
+                                sourceSql,
+                                annotationColumn,
+                                column,
+                              ),
+                            );
+                            const comparisonValues = activeComparisonColumns.map((column) =>
+                              row[column] == null ? null : cellText(row[column]),
+                            );
                             setSelections((current) => ({
                               ...current,
                               [rowPosition]: resolved,
                             }));
                             setSavingRows((current) => new Set(current).add(rowPosition));
-                            void setCell(nodeId, annotationColumn, rowPosition, resolved || null)
+                            void Promise.all(
+                              comparisonKeys.map((queryKey) =>
+                                queryClient.cancelQueries({ queryKey, exact: true }),
+                              ),
+                            )
+                              .then(() => setCell(nodeId, annotationColumn, rowPosition, resolved))
+                              .then(() => {
+                                comparisonKeys.forEach((queryKey, comparisonIndex) => {
+                                  const current =
+                                    queryClient.getQueryData<ConfusionCount[]>(queryKey);
+                                  if (current) {
+                                    queryClient.setQueryData<ConfusionCount[]>(
+                                      queryKey,
+                                      applyReferenceComparisonEdit(current, {
+                                        previousReference: committedValue,
+                                        nextReference: resolved,
+                                        comparison: comparisonValues[comparisonIndex] ?? null,
+                                      }),
+                                    );
+                                  } else {
+                                    void queryClient.refetchQueries({
+                                      queryKey,
+                                      exact: true,
+                                      type: 'active',
+                                    });
+                                  }
+                                });
+                              })
                               .catch((error: unknown) => {
                                 setSelections((current) => {
                                   const nextSelections = { ...current };
-                                  if (seeded) nextSelections[rowPosition] = seeded;
+                                  if (hasSelection) nextSelections[rowPosition] = previousOverride;
                                   else Reflect.deleteProperty(nextSelections, rowPosition);
                                   return nextSelections;
+                                });
+                                comparisonKeys.forEach((queryKey) => {
+                                  if (!queryClient.getQueryData(queryKey)) {
+                                    void queryClient.refetchQueries({
+                                      queryKey,
+                                      exact: true,
+                                      type: 'active',
+                                    });
+                                  }
                                 });
                                 toast.error(
                                   error instanceof Error
@@ -201,6 +320,11 @@ export function AnnotationResultsPanel({
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      {activeComparisonColumns.map((column) => (
+                        <TableCell key={column} className="w-px whitespace-pre-wrap">
+                          {cellText(row[column]) || '—'}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   );
                 })}
@@ -216,6 +340,36 @@ export function AnnotationResultsPanel({
           />
         </div>
       )}
+      {activeComparisonColumns.length > 0 ? (
+        <div className="mt-4 space-y-4" aria-label="Annotation comparisons">
+          {activeComparisonColumns.map((targetColumn, index) => {
+            const comparisonQuery = comparisonQueries[index];
+            return (
+              <ConfusionMatrix
+                key={targetColumn}
+                referenceColumn={annotationColumn}
+                comparisonColumn={targetColumn}
+                rows={comparisonQuery?.data}
+                isLoading={comparisonQuery?.isLoading ?? true}
+                isError={comparisonQuery?.isError ?? false}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+      <ColumnComparisonDialog
+        open={compareDialogOpen}
+        referenceColumn={annotationColumn}
+        availableColumns={availableComparisonColumns}
+        selectedColumns={draftComparisonColumns}
+        scopeDescription="across the full Data Block"
+        onOpenChange={setCompareDialogOpen}
+        onSelectedColumnsChange={setDraftComparisonColumns}
+        onCompare={() => {
+          onComparisonColumnsChange(draftComparisonColumns);
+          setCompareDialogOpen(false);
+        }}
+      />
     </section>
   );
 }

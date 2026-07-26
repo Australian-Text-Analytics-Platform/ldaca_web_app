@@ -29,7 +29,13 @@ describe('useAnnotationNodePage', () => {
 
   it('uses one-based node row pagination and forwards the query abort signal', async () => {
     const { result } = renderHook(
-      () => useAnnotationNodePage({ workspaceId: 'workspace-1', nodeId: 'node-1', pageSize: 50 }),
+      () =>
+        useAnnotationNodePage({
+          workspaceId: 'workspace-1',
+          nodeId: 'node-1',
+          rowCount: 2380,
+          pageSize: 10,
+        }),
       { wrapper },
     );
     await waitFor(() => expect(result.current.rows).toEqual([{ text: 'one' }]));
@@ -40,10 +46,10 @@ describe('useAnnotationNodePage', () => {
         node_ids: ['node-1'],
         sql: 'SELECT * FROM "node-1"',
         page: 1,
-        page_size: 50,
+        page_size: 10,
       },
       signal: expect.any(AbortSignal),
     });
-    expect(result.current.rowCount).toBe(51);
+    expect(result.current.rowCount).toBe(2380);
   });
 });

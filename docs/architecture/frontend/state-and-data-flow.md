@@ -87,6 +87,15 @@ as the example pair. Hydrating a historical Analysis first restores its exact
 safe request snapshot, so any provider fallback is visible to re-run change
 detection rather than rewriting the historical request.
 
+Annotation comparison selections are presentation state keyed by source Data
+Block and are shared by Manual, Preview, and Review in the same Tab. Preview
+compares only its current page. Manual and Review use a dedicated full-table
+grouped-count Query resource keyed by Workspace, Data Block dependencies,
+source SQL, reference column, and target column. A successful Manual label edit
+applies its old and new count pairs to that resource after persistence; it does
+not invalidate and rescan the aggregate. A missing baseline is fetched once,
+and ordinary refetch-on-mount or focus reconciles edits made elsewhere.
+
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts
 Arrow content for query mode and JSON for creation mode. SQL builders own
@@ -141,7 +150,9 @@ Every submission uses the generic Tab Analysis collection operation with an
 execution scope, complete immutable request, optional parent, and explicit
 supersession targets. Preview and Run All are independent: either can be the
 first Analysis in a Tab. Supporting Analyses use the same resource and may
-appear at any depth.
+appear at any depth. Annotation uses that collection operation as a linear
+single-root workflow: it sends neither parent nor supersession identities, and
+the backend immediately replaces the Tab's prior Preview or Run All.
 
 The separate Result query is enabled only for a successful Analysis and
 contains output only. Current inputs and controls hydrate first from the newest
@@ -153,8 +164,9 @@ Preview, Run All, Stop, and Clear use shared lifecycle controls where those
 operations exist. Full-only functions render no Preview control. Preview
 replacement submits with explicit supersession and does not clear first.
 Active Run All locks the submitted parameter panel; a successful Run All does
-not. An Active Analysis Draft is client-only and is never written into Query
-data.
+not. Annotation replacement is the exception: each Preview or Run All becomes
+the Tab's sole Analysis immediately. An Active Analysis Draft is client-only
+and is never written into Query data.
 
 Concordance and Quotation Review query immutable Analysis table pages. Run All
 therefore creates no graph node and Review does not depend on Workspace SQL.

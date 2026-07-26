@@ -32,13 +32,23 @@ const preview = ({
 }) =>
   ({
     columns: { text: 'text', annotation: 'annotation' },
-    sourceColumns: ['text', 'annotation', 'review'],
+    sourceColumns: ['text', 'annotation', 'correction', 'review'],
     page: {
       rows: isLoading
         ? []
         : (rows ?? [
-            { text: 'First text', annotation: 'existing', review: 'replacement' },
-            { text: 'Second text', annotation: null, review: 'previous correction' },
+            {
+              text: 'First text',
+              annotation: 'existing',
+              correction: 'replacement',
+              review: 'replacement',
+            },
+            {
+              text: 'Second text',
+              annotation: null,
+              correction: null,
+              review: 'previous correction',
+            },
           ]),
       rowCount: isLoading ? 0 : 2,
       pagination: { pageIndex, pageSize: 20 },
@@ -184,6 +194,30 @@ describe('AnnotationAiPreviewPanel', () => {
         name: 'annotation (preview) replacement, review replacement: 1 rows',
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows selected comparison columns read-only after the correction column', async () => {
+    const user = userEvent.setup();
+    render(
+      <PreviewPanel
+        preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
+        correction={correction('correction')}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    await user.click(screen.getByRole('checkbox', { name: 'review' }));
+    await user.click(screen.getByRole('button', { name: 'Compare' }));
+
+    const previewTable = screen.getAllByRole('table')[0];
+    expect(
+      within(previewTable)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['text', 'annotation (preview)', '', 'Correction: correction', 'review']);
+    const firstRow = within(previewTable).getByRole('row', { name: /First text/ });
+    expect(within(firstRow).getByText('replacement', { selector: 'td:last-child' })).toBeVisible();
+    expect(within(firstRow).getAllByRole('combobox')).toHaveLength(1);
   });
 
   it('shows an original annotation changing to its preview prediction', () => {

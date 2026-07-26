@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { ColumnDef, PaginationState } from '@tanstack/react-table';
-import { queryWorkspaceSqlTable, sqlIdentifier } from '@/api';
+import { queryWorkspaceSqlTable } from '@/api';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -15,40 +15,20 @@ import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisT
 import {
   ColumnComparisonDialog,
   ConfusionMatrix,
-  type ConfusionCount,
 } from '@/features/views/common/components/ColumnComparison';
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
 import { queryKeys } from '@/lib/queryKeys';
 
 const DEFAULT_PAGE_SIZE = 10;
-const COMPARISON_PAGE_SIZE = 500;
-const REFERENCE_ALIAS = '__reference';
-const COMPARISON_ALIAS = '__comparison';
-const COUNT_ALIAS = '__count';
 
 const displayCell = (value: unknown): string => {
   if (value == null) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   return JSON.stringify(value);
-};
-
-const numericCount = (value: unknown): number => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'bigint') return Number(value);
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return 0;
-};
-
-const comparisonSql = (sql: string, referenceColumn: string, comparisonColumn: string): string => {
-  const reference = sqlIdentifier(referenceColumn);
-  const comparison = sqlIdentifier(comparisonColumn);
-  return `SELECT ${reference} AS ${sqlIdentifier(REFERENCE_ALIAS)}, ${comparison} AS ${sqlIdentifier(COMPARISON_ALIAS)}, COUNT(*) AS ${sqlIdentifier(COUNT_ALIAS)} FROM (${sql}) AS ${sqlIdentifier('__annotation_review_source')} WHERE ${reference} IS NOT NULL AND ${comparison} IS NOT NULL GROUP BY ${reference}, ${comparison} ORDER BY ${reference} ASC NULLS FIRST, ${comparison} ASC NULLS FIRST`;
 };
 
 interface RunAllReviewTableProps {
@@ -111,63 +91,26 @@ export function RunAllReviewTable({
       .filter((column) => column.kind === 'string' || column.kind === 'categorical')
       .map((column) => column.name) ?? [],
   );
-  const availableComparisonColumns = availableMetadataColumns.filter((column) =>
-    comparableColumnSet.has(column),
-  );
+  const comparisonExcludedColumns = new Set([requiredColumns[0], comparisonColumn]);
+  const availableComparisonColumns =
+    data?.columns.filter(
+      (column) => !comparisonExcludedColumns.has(column) && comparableColumnSet.has(column),
+    ) ?? [];
   const activeComparisonColumns = comparisonColumns.filter((column) =>
     availableComparisonColumns.includes(column),
   );
-  const comparisonQueries = useQueries({
-    queries: activeComparisonColumns.map((targetColumn) => {
-      const aggregateSql = comparisonSql(sql, comparisonColumn, targetColumn);
-      return {
-        queryKey: queryKeys.workspaceSqlDrain(
-          workspaceId,
-          nodeIds,
-          aggregateSql,
-          COMPARISON_PAGE_SIZE,
-          { referenceColumn: comparisonColumn, comparisonColumn: targetColumn },
-        ),
-        queryFn: async ({ signal }: { signal: AbortSignal }) => {
-          const rows: ConfusionCount[] = [];
-          let aggregatePage = 1;
-          let initialEtag: string | null | undefined;
-          let hasNext: boolean;
-          do {
-            const aggregate = await queryWorkspaceSqlTable({
-              path: { workspace_id: workspaceId },
-              body: {
-                mode: 'query',
-                node_ids: nodeIds,
-                sql: aggregateSql,
-                page: aggregatePage,
-                page_size: COMPARISON_PAGE_SIZE,
-              },
-              signal,
-            });
-            initialEtag ??= aggregate.etag;
-            if (initialEtag !== aggregate.etag) {
-              throw new Error('Workspace changed while loading the annotation comparison');
-            }
-            rows.push(
-              ...aggregate.rows.map((row) => ({
-                reference: displayCell(row[REFERENCE_ALIAS]),
-                comparison: displayCell(row[COMPARISON_ALIAS]),
-                count: numericCount(row[COUNT_ALIAS]),
-              })),
-            );
-            hasNext = aggregate.hasNext;
-            aggregatePage += 1;
-          } while (hasNext);
-          return rows;
-        },
-      };
-    }),
+  const comparisonQueries = useFullColumnComparisons({
+    workspaceId,
+    nodeIds,
+    sql,
+    referenceColumn: comparisonColumn,
+    comparisonColumns: activeComparisonColumns,
   });
   const visibleColumns = data
     ? Array.from(
         new Set([
           ...requiredColumns.filter((column) => data.columns.includes(column)),
+          ...activeComparisonColumns,
           ...availableMetadataColumns.filter((column) => selectedMetadataColumns.includes(column)),
         ]),
       )

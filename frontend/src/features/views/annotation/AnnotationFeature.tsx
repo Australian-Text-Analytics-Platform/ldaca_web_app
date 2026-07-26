@@ -44,6 +44,7 @@ import { getAnalysisOutputResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import AnalysisTaskBanner from '../common/components/AnalysisTaskBanner';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { acceptPlaceholderOnTab } from '../common/placeholderTabFill';
 import { getRerunActionState } from '../common/rerunActionState';
@@ -241,6 +242,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   const { currentWorkspaceId } = useWorkspaceData();
   const queryClient = useQueryClient();
   const { polarsExpressionApply, createSqlDataBlock } = useWorkspaceActions();
+  const persistDocumentColumn = usePersistNodeDocumentColumn({
+    workspaceId: currentWorkspaceId,
+  });
 
   // Manual results lock their source selectors while the editable table is open.
   // Column creation also locks them until the in-place schema edit settles.
@@ -252,6 +256,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     onTabInputSetChange,
     constraints: SOURCE_NODE_CONSTRAINTS,
   });
+  const handleSourceTextColumnChange = (nodeId: string, column: string) => {
+    sourceNodeInputs.setColumn(nodeId, column);
+    void persistDocumentColumn(nodeId, column);
+  };
   const annotationRunAll =
     latestRunAll?.request.kind === 'annotation_run_all' ? latestRunAll : null;
   const annotationRunAllSource =
@@ -272,6 +280,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     onTabInputSetChange,
     constraints: EXAMPLE_NODE_CONSTRAINTS,
   });
+  const handleExampleTextColumnChange = (nodeId: string, column: string) => {
+    exampleNodeInputs.setColumn(nodeId, column);
+    void persistDocumentColumn(nodeId, column);
+  };
 
   const renderAnnotationColumnPicker = ({ nodeId, columns }: NodeInputColumnAddonArgs) => {
     const value = annotationTargets[nodeId] ?? '';
@@ -608,9 +620,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         : null,
     controlAnalysisId: activeAnalysis?.id ?? null,
     tabAnalysisIds: analyses.map((analysis) => analysis.id),
-    retiredAnalysisIds: analyses.flatMap((analysis) =>
-      analysis.state === 'succeeded' ? analysis.supersedes_analysis_ids : [],
-    ),
     fetchResult: async (analysisId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       const result = await getAnalysisOutputResource(currentWorkspaceId, analysisId);
@@ -696,7 +705,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           tabId: host.tabId,
           request: currentAiRequest,
           executionScope: 'preview',
-          supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
         });
         return data;
       },
@@ -724,7 +732,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         tabId: host.tabId,
         providerConfigurationId: selectedAiProvider.id,
         source: currentAiRequest,
-        supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
       });
       refreshAnalyses();
       void queryClient.invalidateQueries({
@@ -803,7 +810,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     }
                   }}
                 >
-                  {hasRun ? 'Reset' : 'Resume'}
+                  {hasRun ? 'Clear' : 'Resume'}
                 </Button>
               ) : undefined
             }
@@ -830,7 +837,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     getAddRejection={sourceNodeInputs.getAddRejection}
                     onRemoveNode={sourceNodeInputs.removeNode}
                     onClear={sourceNodeInputs.clear}
-                    onColumnChange={sourceNodeInputs.setColumn}
+                    onColumnChange={handleSourceTextColumnChange}
                     columnLabel="Text Column"
                     renderColumnAddon={renderAnnotationColumnPicker}
                     disabled={controlsLocked}
@@ -952,7 +959,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                             getAddRejection={exampleNodeInputs.getAddRejection}
                             onRemoveNode={exampleNodeInputs.removeNode}
                             onClear={exampleNodeInputs.clear}
-                            onColumnChange={exampleNodeInputs.setColumn}
+                            onColumnChange={handleExampleTextColumnChange}
                             columnLabel="Text Column"
                             renderColumnAddon={renderExampleAnnotationColumnPicker}
                             disabled={controlsLocked}
@@ -1222,11 +1229,16 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           key={`${sourceNode.id}:${resolvedAnnotationColumn}`}
           workspaceId={currentWorkspaceId ?? null}
           nodeId={sourceNode.id}
+          rowCount={sourceNode.node.shape?.[0] ?? 0}
           textColumn={sourceNode.column}
           annotationColumn={resolvedAnnotationColumn}
           classNodeId={classDescriptionNode?.id ?? null}
           classColumn={classDescriptionClassColumn}
           descriptionColumn={classDescriptionDescriptionColumn}
+          comparisonColumns={annotationComparisonColumns[sourceNode.id] ?? []}
+          onComparisonColumnsChange={(columns) => {
+            setAnnotationComparisonColumns(sourceNode.id, columns);
+          }}
         />
       ) : null}
       {annotationMode === 'ai' &&
@@ -1243,6 +1255,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           requiredColumns={[
             annotationRunAllSource.text_column,
             annotationRunAllSource.annotation_column,
+            ...(annotationRunAllSource.correction_column
+              ? [annotationRunAllSource.correction_column]
+              : []),
           ]}
           comparisonColumn={annotationRunAllSource.annotation_column}
           comparisonColumns={annotationComparisonColumns[sourceNode.id] ?? []}

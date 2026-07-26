@@ -203,6 +203,9 @@ scope (`preview`, `run_all`, or `supporting`), an optional
 supersession targets must belong to the same Tab. Parent links may have
 arbitrary depth. Superseded terminal records are removed only after the
 replacement succeeds. Cancelling an Analysis cascades to active descendants.
+Annotation submissions are linear and must omit parents, Supporting scope, and
+supersession targets. Each accepted Annotation Preview or Run All immediately
+replaces the Tab's previous Analysis.
 
 Concordance and Quotation Run All Results expose complete immutable paged table
 descriptors. They do not create Data Blocks and therefore retain empty

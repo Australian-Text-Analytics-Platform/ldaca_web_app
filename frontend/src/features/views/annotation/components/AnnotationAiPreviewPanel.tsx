@@ -81,6 +81,9 @@ export function AnnotationAiPreviewPanel({
     secondaryColumnOptions.includes(column),
   );
   const correctionColumn = correction.column;
+  const displayedComparisonColumns = activeComparisonColumns.filter(
+    (column) => column !== correctionColumn,
+  );
   const previewColumn = `${columns.annotation} (preview)`;
   const comparisonRows = new Map<string, ConfusionCount[]>();
   activeComparisonColumns.forEach((targetColumn) => {
@@ -116,6 +119,10 @@ export function AnnotationAiPreviewPanel({
           },
         ]
       : []),
+    ...displayedComparisonColumns.map((column) => ({
+      id: column,
+      accessorFn: (row: AnnotationPreviewRow) => row[column],
+    })),
   ];
   const table = useServerTable({
     data: page.rows,
@@ -253,6 +260,11 @@ export function AnnotationAiPreviewPanel({
                     </TableHead>
                   </>
                 ) : null}
+                {displayedComparisonColumns.map((column) => (
+                  <TableHead key={column} className="w-px whitespace-nowrap">
+                    {column}
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -359,6 +371,11 @@ export function AnnotationAiPreviewPanel({
                           </TableCell>
                         </>
                       ) : null}
+                      {displayedComparisonColumns.map((column) => (
+                        <TableCell key={column} className="w-px whitespace-pre-wrap">
+                          {cellText(row[column]) || '—'}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   );
                 })
