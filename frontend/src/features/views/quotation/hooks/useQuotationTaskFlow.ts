@@ -1,10 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
-import type {
-  QuotationAnalysisRequest,
-  QuotationResultQuery,
-  QuotationDetachmentAnalysisRequest,
-  Analysis,
-} from '@/api';
+import type { QuotationAnalysisRequest, QuotationResultQuery, Analysis } from '@/api';
 import { submitTabAnalysis } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
@@ -48,41 +42,29 @@ interface QuotationState {
   nodeState: Record<string, NodePaginationState>;
   originalColumnsByNode: Record<string, string[]>;
   buildEngineRequest: () => QuotationEngineRequestPayload | null;
+  supersedesAnalysisIds: string[];
 }
 
 interface QuotationActions {
   setIsLoadingQuotations: (value: boolean) => void;
-  setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
   showErrorDialog: (message: string) => void;
   setResultQuery: (query: QuotationResultQuery) => void;
   resetResultQuery: () => void;
   setLocalTaskId: (id: string | null) => void;
   runningRef: { current: boolean };
-  lastFetchedRef: { current: { taskId: string | null; state: string | null } };
-  // Reports the run's assigned task id back to the owning tab. No-op when not
-  // tab-mounted.
-  onTaskIdAssigned: (taskId: string | null) => void;
-}
-
-interface QuotationLock {
-  resolveTaskId: () => Promise<string | null>;
-  detachQuotation: (
-    taskId: string,
-    request: Omit<QuotationDetachmentAnalysisRequest, 'kind'>,
-  ) => Promise<Analysis>;
+  onSubmitted: () => void;
 }
 
 interface Params {
   state: QuotationState;
   actions: QuotationActions;
-  lock: QuotationLock;
 }
 
 /** Bundles quotation task lifecycle handlers so the feature component stays render-focused. */
 /**
  * Used by: QuotationFeature.tsx, useQuotationTaskFlow.test.tsx.
  * Flow: run the initial search, page/sort persisted results, persist context
- * length, and dispatch detach requests for the locked source node.
+ * length, and dispatch Preview requests for the locked source node.
  */
 export function useQuotationTaskFlow({
   state: {
@@ -94,41 +76,18 @@ export function useQuotationTaskFlow({
     nodeState,
     originalColumnsByNode,
     buildEngineRequest,
+    supersedesAnalysisIds,
   },
   actions: {
     setIsLoadingQuotations,
-    setNodeDetaching,
     showErrorDialog,
     setResultQuery,
     resetResultQuery,
     setLocalTaskId,
     runningRef,
-    lastFetchedRef,
-    onTaskIdAssigned,
+    onSubmitted,
   },
-  lock: { resolveTaskId, detachQuotation },
 }: Params) {
-  // Builds deterministic output names for detach operations from display labels.
-  /**
-   * Called by other request and result handlers in `useQuotationTaskFlow`.
-   */
-  const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
-    const trimmed = nodeLabel.trim();
-    const base = trimmed.length > 0 ? trimmed : 'node';
-    const normalized = base.replace(/\s+/g, '_');
-    return `${normalized}${suffix}`;
-  };
-
-  // Resolves a node label from the active locked or live node list for generated output names.
-  /**
-   * Called by other request and result handlers in `useQuotationTaskFlow`.
-   */
-  const resolveNodeLabel = (nodeId: string): string => {
-    const match = displayedNodes.find((node) => node.id === nodeId);
-    if (!match) return nodeId;
-    return match.name.length > 0 ? match.name : match.id;
-  };
-
   // Locates the locked node and column that should receive stored-result updates.
   /**
    * Called by other request and result handlers in `useQuotationTaskFlow`.
@@ -150,7 +109,7 @@ export function useQuotationTaskFlow({
   /**
    * Called by other request and result handlers in `useQuotationTaskFlow`.
    * Flow: resolve the live node/column/page and engine, submit a quotation
-   * search, capture its task id, then apply context and result state.
+   * search, capture its Analysis identity, then apply context and result state.
    */
   const fetchQuotations = async (
     nodeId: string,
@@ -184,23 +143,27 @@ export function useQuotationTaskFlow({
     };
 
     const analysis = await runAnalysisTaskEnvelope<Analysis>({
-      lastFetchedRef,
       runningRef,
       setIsRunning: setIsLoadingQuotations,
       setLocalTaskId,
-      onTaskIdAssigned,
+      onSubmitted,
       resetBeforeRun: () => {
         resetResultQuery();
       },
       submit: async () => {
         const { data } = await submitTabAnalysis({
-          body: { kind: 'quotation', ...requestPayload },
+          body: {
+            execution_scope: 'preview',
+            request: { kind: 'quotation', ...requestPayload },
+            ...(supersedesAnalysisIds.length
+              ? { supersedes_analysis_ids: supersedesAnalysisIds }
+              : {}),
+          },
           path: { workspace_id: currentWorkspaceId, tab_id: tabId },
           throwOnError: true,
         });
         return data;
       },
-      onSuccess: () => undefined,
       onError: (error) => {
         console.error('Failed to fetch quotations', error);
         showErrorDialog(getErrorMessage(error));
@@ -310,39 +273,6 @@ export function useQuotationTaskFlow({
     });
   };
 
-  // Detaches quotation results into a workspace node, including optional source columns.
-  /**
-   * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
-   * Flow: find the active node column, send the canonical quotation-detachment
-   * request for the locked analysis, then clear node detaching state.
-   */
-  const handleDetach = async (nodeId: string, selectedColumns?: string[]) => {
-    const selection = activeSelections.find((s) => s.nodeId === nodeId);
-    if (!selection?.column) return;
-    setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
-    try {
-      const explicitSelectedColumns = selectedColumns ?? [];
-      if (explicitSelectedColumns.length === 0) {
-        showErrorDialog('Select at least one column to add to workspace.');
-        return;
-      }
-      const parentTaskId = await resolveTaskId();
-      if (!parentTaskId) {
-        showErrorDialog('No quotation task to detach.');
-        return;
-      }
-      await detachQuotation(parentTaskId, {
-        node_id: nodeId,
-        name: buildDetachNodeName(resolveNodeLabel(nodeId), '_quotation'),
-        selected_columns: explicitSelectedColumns,
-      });
-    } catch (e: unknown) {
-      showErrorDialog(getErrorMessage(e));
-    } finally {
-      setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));
-    }
-  };
-
   return {
     resolveLockedNodeContext,
     fetchQuotations,
@@ -351,6 +281,5 @@ export function useQuotationTaskFlow({
     handlePageChange,
     handlePageSizeChange,
     handleSort,
-    handleDetach,
   };
 }

@@ -21,24 +21,29 @@ interface AnalysisCardLayoutProps {
   tone?: 'default' | 'error';
   headerActions?: React.ReactNode;
   actions?: {
-    onRun: () => void | Promise<void>;
+    onPreview?: () => void | Promise<void>;
+    onRunAll: () => void | Promise<void>;
     onStop?: () => void | Promise<void>;
     onClear: () => void | Promise<void>;
-    runDisabled?: boolean;
-    runDisabledReason?: string;
+    previewDisabled?: boolean;
+    previewDisabledReason?: string;
+    runAllDisabled?: boolean;
+    runAllDisabledReason?: string;
     stopDisabled?: boolean;
     clearDisabled?: boolean;
-    isRunning?: boolean;
+    isPreviewing?: boolean;
+    isRunningAll?: boolean;
     isStopping?: boolean;
     isClearing?: boolean;
     hasResult?: boolean;
-    runLabel?: string;
-    runHelp?: HelpConfig<'tutorial'>;
+    previewLabel?: string;
+    runAllLabel?: string;
+    runAllHelp?: HelpConfig<'tutorial'>;
     stopHelp?: HelpConfig<'tutorial'>;
     clearHelp?: HelpConfig<'tutorial'>;
-    extraContent?: React.ReactNode;
   };
   children: React.ReactNode;
+  parametersLocked?: boolean;
   footer?: React.ReactNode;
   cardRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -56,13 +61,13 @@ export function AnalysisCardLayout({
   headerActions,
   actions,
   children,
+  parametersLocked = false,
   footer,
   cardRef,
 }: AnalysisCardLayoutProps) {
   const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-destructive/50');
-  const runLabel = actions
-    ? (actions.runLabel ?? (actions.isRunning ? 'Running' : actions.hasResult ? 'Re-run' : 'Run'))
-    : 'Run';
+  const previewLabel = actions?.previewLabel ?? 'Preview';
+  const runAllLabel = actions?.runAllLabel ?? 'Run All';
 
   return (
     <Card ref={cardRef} className={cardToneClassName}>
@@ -85,62 +90,59 @@ export function AnalysisCardLayout({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0">{children}</CardContent>
+      <fieldset disabled={parametersLocked} className="contents">
+        <CardContent className="pt-0">{children}</CardContent>
+      </fieldset>
 
       {actions ? (
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
+          {actions.onPreview ? (
+            <div className="flex items-center gap-2">
+              <DisabledReasonTooltip reason={actions.previewDisabledReason}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void actions.onPreview?.();
+                  }}
+                  disabled={actions.previewDisabled}
+                >
+                  {actions.isPreviewing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" />
+                  )}
+                  {previewLabel}
+                </Button>
+              </DisabledReasonTooltip>
+            </div>
+          ) : null}
+
           <div className="flex items-center gap-2">
-            <DisabledReasonTooltip reason={actions.runDisabledReason}>
+            <DisabledReasonTooltip reason={actions.runAllDisabledReason}>
               <Button
                 onClick={() => {
-                  void actions.onRun();
+                  void actions.onRunAll();
                 }}
-                disabled={actions.runDisabled}
+                disabled={actions.runAllDisabled}
                 className="w-full sm:w-auto"
               >
-                {actions.isRunning ? (
+                {actions.isRunningAll ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Play className="mr-2 h-4 w-4" />
                 )}
-                {runLabel}
+                {runAllLabel}
               </Button>
             </DisabledReasonTooltip>
-            {actions.runHelp ? (
+            {actions.runAllHelp ? (
               <HelpIcon
-                targetKey={actions.runHelp.targetKey}
-                label={actions.runHelp.label}
-                tooltip={actions.runHelp.tooltip}
+                targetKey={actions.runAllHelp.targetKey}
+                label={actions.runAllHelp.label}
+                tooltip={actions.runAllHelp.tooltip}
               />
             ) : null}
           </div>
-
-          {actions.onStop && actions.isRunning ? (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => {
-                  void actions.onStop?.();
-                }}
-                variant="outline"
-                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean OR: disabled when either flag is true
-                disabled={actions.stopDisabled || actions.isStopping}
-              >
-                {actions.isStopping ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Square className="mr-2 h-4 w-4" />
-                )}
-                Stop
-              </Button>
-              {actions.stopHelp ? (
-                <HelpIcon
-                  targetKey={actions.stopHelp.targetKey}
-                  label={actions.stopHelp.label}
-                  tooltip={actions.stopHelp.tooltip}
-                />
-              ) : null}
-            </div>
-          ) : null}
 
           <div className="flex items-center gap-2">
             <Button
@@ -166,7 +168,32 @@ export function AnalysisCardLayout({
             ) : null}
           </div>
 
-          {actions.extraContent}
+          {actions.onStop && (actions.isPreviewing || actions.isRunningAll) ? (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  void actions.onStop?.();
+                }}
+                variant="outline"
+                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean OR: disabled when either flag is true
+                disabled={actions.stopDisabled || actions.isStopping}
+              >
+                {actions.isStopping ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="mr-2 h-4 w-4" />
+                )}
+                Stop
+              </Button>
+              {actions.stopHelp ? (
+                <HelpIcon
+                  targetKey={actions.stopHelp.targetKey}
+                  label={actions.stopHelp.label}
+                  tooltip={actions.stopHelp.tooltip}
+                />
+              ) : null}
+            </div>
+          ) : null}
         </CardFooter>
       ) : null}
 

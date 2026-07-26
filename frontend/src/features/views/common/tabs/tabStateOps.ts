@@ -15,11 +15,11 @@ export type AnalysisTabInputSets = Record<string, AnalysisTabInput[]>;
 
 export interface AnalysisTab {
   tab_id: string;
-  task_id: string | null;
   title: string;
   kind: AnalysisKind;
   input_sets: AnalysisTabInputSets;
   settings: Record<string, string>;
+  annotation_correction_columns: Record<string, string>;
   created_at?: string;
   modified_at?: string;
   revision?: number;
@@ -30,11 +30,11 @@ export const DEFAULT_TAB_INPUT_SET_ID = 'source';
 export function tabFromResource(tab: Tab, local?: Partial<AnalysisTab>): AnalysisTab {
   return {
     tab_id: tab.id,
-    task_id: tab.analysis_id,
     title: local?.title ?? tab.name,
     kind: tab.kind,
     input_sets: local?.input_sets ?? { [DEFAULT_TAB_INPUT_SET_ID]: [] },
     settings: local?.settings ?? {},
+    annotation_correction_columns: tab.annotation_correction_columns ?? {},
     created_at: tab.created_at,
     modified_at: tab.modified_at,
     revision: tab.revision,

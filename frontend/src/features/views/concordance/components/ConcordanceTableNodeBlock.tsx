@@ -1,26 +1,23 @@
-import { Button } from '@/components/ui/button';
-import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceNodeResult as ConcordanceResultEntry, WorkspaceGraphNode } from '@/api';
+import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
+import { CONCORDANCE_PRESENTATION_COLUMN_SET } from '../../common/generatedColumns';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
-import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
-import { SortableHeader } from './SortableHeader';
 import { batchProcessedCount } from '../concordanceDispersionDomain';
 import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
+import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { ConcordancePlainHeader, ConcordanceRowsTable } from './ConcordanceRowsTable';
-import { CONCORDANCE_GENERATED_COLUMN_SET } from '../../common/generatedColumns';
 import {
   buildConcordanceTableModel,
   type ConcordanceGroupedRow,
   type ConcordanceRow,
 } from './concordanceTableModel';
+import { SortableHeader } from './SortableHeader';
 
 export interface ConcordanceTableNodeBlockProps {
   nodeKey: string;
@@ -40,7 +37,6 @@ export interface ConcordanceTableNodeBlockProps {
   selectedMetadataColumns: string[];
 
   // Workspace selection
-  selectedNodes: WorkspaceGraphNode[];
   panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
 
@@ -56,7 +52,6 @@ export interface ConcordanceTableNodeBlockProps {
   combinedPage: number;
   combinedLoading: boolean;
   nodeLoading: Record<string, boolean>;
-  nodeDetaching: Record<string, boolean>;
 
   // Handlers
   handleSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
@@ -68,7 +63,6 @@ export interface ConcordanceTableNodeBlockProps {
     groupedHits?: ConcordanceGroupedRow,
   ) => void;
   setCombinedPage: (page: number) => void;
-  openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
 }
 
 /**
@@ -102,7 +96,6 @@ function CombinedConcordanceTable({
   showMetadata,
   selectedMetadataColumns,
   effectiveNodeColumnSelections,
-  selectedNodes,
   panelSelectedNodes,
   sourceColorMap,
   defaultPalette,
@@ -112,7 +105,6 @@ function CombinedConcordanceTable({
   combinedLoading,
   handleRowClick,
   setCombinedPage,
-  openDetachDialog,
 }: ConcordanceTableNodeBlockProps) {
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
     nodeData,
@@ -137,9 +129,6 @@ function CombinedConcordanceTable({
     },
   });
 
-  const combinedNodeIds = takeMostRecent(selectedNodes, 2)
-    .map((n) => n.id)
-    .filter((id): id is string => Boolean(id));
   const combinedPageSizeSummary = (
     <GroupedResultsPageSizeSummary
       groups={nodeData.data}
@@ -168,31 +157,8 @@ function CombinedConcordanceTable({
     <div className="mb-6">
       <div className="flex items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
-        <div className="ml-auto flex items-center space-x-2">
+        <div className="ml-auto flex items-center">
           <span className="text-xs text-gray-500">Rows colored by source data block</span>
-          <Button
-            onClick={() => {
-              if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-              const nodes = combinedNodeIds
-                .map((nid) => {
-                  const col =
-                    effectiveNodeColumnSelections.find((s) => s.nodeId === nid)?.column ?? '';
-                  const sourceNode = panelSelectedNodes.find((node) => node.id === nid);
-                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
-                  const sourceLabel = sourceNode?.name || sourceNode?.id || nid;
-                  return { nodeId: nid, column: col, nodeLabel: sourceLabel };
-                })
-                .filter((n) => n.column);
-              openDetachDialog(nodes);
-            }}
-            disabled={combinedLoading || !searchWord.trim() || combinedNodeIds.length === 0}
-            size="sm"
-            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-            title="Create new data blocks with concordance results for both sources joined to their original tables"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Both to Workspace
-          </Button>
         </div>
       </div>
       <AnalysisTableFrame maxHeightClass="max-h-100" belowTable={combinedBelowTable}>
@@ -201,6 +167,7 @@ function CombinedConcordanceTable({
           rows={rows}
           tableColumns={tableColumns}
           searchWord={searchWord}
+          loading={combinedLoading}
           renderHeader={(header) => <ConcordancePlainHeader key={header.id} header={header} />}
           getRowClassName={() => 'cursor-pointer'}
           getRowStyle={(row) => {
@@ -248,15 +215,11 @@ function PerNodeConcordanceTable({
   globalPageSize,
   onPageSizeChange,
   nodeLoading,
-  nodeDetaching,
   handleSort,
   handlePageChange,
   handleRowClick,
-  openDetachDialog,
 }: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
-  const detachNodeId = actualNodeId;
-  const canDetach = Boolean(detachNodeId) && detachNodeId !== CONCORDANCE_COMBINED_NODE_KEY;
 
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
     nodeData,
@@ -287,9 +250,6 @@ function PerNodeConcordanceTable({
     },
   });
 
-  const detachingKey = detachNodeId;
-  const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
-
   const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
   const pageSizeSummary = (
     <GroupedResultsPageSizeSummary
@@ -311,36 +271,7 @@ function PerNodeConcordanceTable({
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
         showPageSize
-      >
-        <Button
-          onClick={() => {
-            if (detachNodeId) {
-              const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
-              const detachLabel = detachNode?.name || nodeKey;
-              openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
-            }
-          }}
-          disabled={
-            nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId
-          }
-          size="sm"
-          className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-          title="Create a new data block with concordance results joined to the original table"
-        >
-          {isDetaching ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Adding to Workspace...
-            </>
-          ) : (
-            <>
-              <Plus className="mr-2 h-4 w-4" />
-              Add to Workspace
-            </>
-          )}
-        </Button>
-      </ServerPaginationFooter>
+      />
     </>
   );
 
@@ -372,8 +303,9 @@ function PerNodeConcordanceTable({
           rows={rows}
           tableColumns={tableColumns}
           searchWord={searchWord}
+          loading={nodeIsLoading}
           renderHeader={(header) =>
-            CONCORDANCE_GENERATED_COLUMN_SET.has(header.column.id) ? (
+            CONCORDANCE_PRESENTATION_COLUMN_SET.has(header.column.id) ? (
               <ConcordancePlainHeader key={header.id} header={header} />
             ) : (
               <SortableHeader

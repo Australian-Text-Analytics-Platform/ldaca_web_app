@@ -13,8 +13,11 @@ const queuedQuotationAnalysis = (): Analysis => ({
   error: null,
   finished_at: null,
   id: 'analysis-1',
+  tab_id: 'tab-1',
   integrity: { status: 'valid' },
   parent_analysis_id: null,
+  execution_scope: 'preview',
+  supersedes_analysis_ids: [],
   progress: { fraction: null, message: null },
   request: {
     kind: 'quotation',
@@ -23,6 +26,7 @@ const queuedQuotationAnalysis = (): Analysis => ({
     engine: { type: 'local' },
   },
   revision: 1,
+  output_node_ids: [],
   started_at: null,
   state: 'queued',
 });
@@ -30,7 +34,7 @@ const queuedQuotationAnalysis = (): Analysis => ({
 describe('useQuotationTaskFlow', () => {
   it('submits the typed quotation request through the tab-owned analysis action', async () => {
     submitTabAnalysis.mockResolvedValueOnce({ data: queuedQuotationAnalysis() });
-    const onTaskIdAssigned = vi.fn();
+    const onSubmitted = vi.fn();
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
         state: {
@@ -42,36 +46,34 @@ describe('useQuotationTaskFlow', () => {
           nodeState: {},
           originalColumnsByNode: { 'node-1': ['text'] },
           buildEngineRequest: () => ({ type: 'local' }),
+          supersedesAnalysisIds: [],
         },
         actions: {
           setIsLoadingQuotations: vi.fn(),
-          setNodeDetaching: vi.fn(),
           showErrorDialog: vi.fn(),
           setResultQuery: vi.fn(),
           resetResultQuery: vi.fn(),
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
-          lastFetchedRef: { current: { taskId: null, state: null } },
-          onTaskIdAssigned,
-        },
-        lock: {
-          resolveTaskId: vi.fn(async () => null),
-          detachQuotation: vi.fn(),
+          onSubmitted,
         },
       }),
     );
     await act(async () => result.current.fetchQuotations('node-1'));
     expect(submitTabAnalysis).toHaveBeenCalledWith({
       body: {
-        kind: 'quotation',
-        node_id: 'node-1',
-        column: 'text',
-        engine: { type: 'local' },
+        execution_scope: 'preview',
+        request: {
+          kind: 'quotation',
+          node_id: 'node-1',
+          column: 'text',
+          engine: { type: 'local' },
+        },
       },
       path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
       throwOnError: true,
     });
-    expect(onTaskIdAssigned).toHaveBeenCalledWith('analysis-1');
+    expect(onSubmitted).toHaveBeenCalledOnce();
   });
 
   it('does not synthesize a Result while the submitted Analysis is queued', async () => {
@@ -89,21 +91,16 @@ describe('useQuotationTaskFlow', () => {
           nodeState: {},
           originalColumnsByNode: { 'node-1': ['text'] },
           buildEngineRequest: () => ({ type: 'local' }),
+          supersedesAnalysisIds: [],
         },
         actions: {
           setIsLoadingQuotations: vi.fn(),
-          setNodeDetaching: vi.fn(),
           showErrorDialog: vi.fn(),
           setResultQuery,
           resetResultQuery,
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
-          lastFetchedRef: { current: { taskId: null, state: null } },
-          onTaskIdAssigned: vi.fn(),
-        },
-        lock: {
-          resolveTaskId: vi.fn(async () => null),
-          detachQuotation: vi.fn(),
+          onSubmitted: vi.fn(),
         },
       }),
     );
@@ -134,21 +131,16 @@ describe('useQuotationTaskFlow', () => {
           },
           originalColumnsByNode: { 'node-1': [] },
           buildEngineRequest: () => ({ type: 'local' }),
+          supersedesAnalysisIds: [],
         },
         actions: {
           setIsLoadingQuotations: vi.fn(),
-          setNodeDetaching: vi.fn(),
           showErrorDialog: vi.fn(),
           setResultQuery,
           resetResultQuery: vi.fn(),
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
-          lastFetchedRef: { current: { taskId: 'analysis-1', state: 'succeeded' } },
-          onTaskIdAssigned: vi.fn(),
-        },
-        lock: {
-          resolveTaskId: vi.fn(async () => 'analysis-1'),
-          detachQuotation: vi.fn(),
+          onSubmitted: vi.fn(),
         },
       }),
     );

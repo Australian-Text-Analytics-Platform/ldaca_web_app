@@ -13,12 +13,12 @@ export interface TokenizerModelColumnSelection {
  */
 export const deriveTokenizerModelsByNode = (
   selections: TokenizerModelColumnSelection[],
-  nodeInfoCache: Record<string, WorkspaceNodeInfo>,
+  nodeInfoById: Record<string, WorkspaceNodeInfo>,
   liveTokenizerModelsByNode: Record<string, string>,
 ): Record<string, string> => {
   const fromNodes: Record<string, string> = {};
   for (const selection of selections) {
-    const node = nodeInfoCache[selection.nodeId];
+    const node = nodeInfoById[selection.nodeId];
     const stored = node?.tokenizer_model;
     if (stored) fromNodes[selection.nodeId] = stored;
   }

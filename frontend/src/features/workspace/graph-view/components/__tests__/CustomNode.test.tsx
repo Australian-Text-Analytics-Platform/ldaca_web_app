@@ -74,6 +74,37 @@ const nodeData = (
 });
 
 describe('CustomNode', () => {
+  it('starts pointer-carry placement from the node add button', async () => {
+    mockZoom = 1;
+    const user = userEvent.setup();
+    const data = nodeData();
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data,
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+
+    await user.hover(screen.getByTitle('Corpus'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add node to selection' }), {
+      clientX: 180,
+      clientY: 220,
+      detail: 1,
+    });
+
+    expect(data.onAddToSelection).toHaveBeenCalledWith('node-1', { x: 180, y: 220 });
+  });
+
   it('shows Undo and Redo from backend history flags without restoring Save', async () => {
     mockZoom = 1;
     const user = userEvent.setup();

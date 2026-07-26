@@ -2,9 +2,13 @@ import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Capture the options each call passes to usePreprocessingPreview so we can
-// assert on the signature + fetcher routing without firing real timers.
+// assert on the structured identity and fetcher routing without firing timers.
 interface CapturedOptions {
-  signature: string;
+  identity: {
+    workspaceId: string;
+    operation: string;
+    nodeIds: string[];
+  } | null;
   request: unknown;
   fetcher: (params: {
     request: { workspaceId: string; nodeId: string; payload: unknown };
@@ -47,40 +51,44 @@ describe('useNodePreviewWithRawFallback', () => {
     usePreprocessingPreviewMock.mockReturnValue({});
   });
 
-  describe('signature + request shape', () => {
-    it('builds a "<feature>-preview-disabled" signature with a null request when no node is selected', () => {
+  describe('identity + request shape', () => {
+    it('uses a null identity and request when no node is selected', () => {
       renderHook(() =>
         useNodePreviewWithRawFallback({
           workspaceId: 'workspace-1',
           nodeId: null,
           operationPayload: { regex: 'x' },
           operationFetch: vi.fn(),
-          signaturePrefix: 'replace',
+          operation: 'replace',
         }),
       );
 
       const opts = lastCapturedOptions();
-      expect(opts.signature).toBe('replace-preview-disabled');
+      expect(opts.identity).toBeNull();
       expect(opts.request).toBeNull();
     });
 
-    it('builds a "<workspaceId>::<nodeId>::raw" signature when a node is selected but no payload is configured', () => {
+    it('indexes a raw preview by operation, Workspace, and Data Block', () => {
       renderHook(() =>
         useNodePreviewWithRawFallback({
           workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: null,
           operationFetch: vi.fn(),
-          signaturePrefix: 'filter',
+          operation: 'filter',
         }),
       );
 
       const opts = lastCapturedOptions();
-      expect(opts.signature).toBe('workspace-1::node-1::raw');
+      expect(opts.identity).toEqual({
+        workspaceId: 'workspace-1',
+        operation: 'filter',
+        nodeIds: ['node-1'],
+      });
       expect(opts.request).toEqual({ workspaceId: 'workspace-1', nodeId: 'node-1', payload: null });
     });
 
-    it('JSON-stringifies the payload into the signature when a payload is present', () => {
+    it('keeps the operation payload structured in the request', () => {
       const payload = { conditions: [{ column: 'id', op: '>', value: 5 }] };
       renderHook(() =>
         useNodePreviewWithRawFallback({
@@ -88,29 +96,33 @@ describe('useNodePreviewWithRawFallback', () => {
           nodeId: 'node-1',
           operationPayload: payload,
           operationFetch: vi.fn(),
-          signaturePrefix: 'filter',
+          operation: 'filter',
         }),
       );
 
       const opts = lastCapturedOptions();
-      expect(opts.signature).toBe(`workspace-1::node-1::${JSON.stringify(payload)}`);
+      expect(opts.identity).toEqual({
+        workspaceId: 'workspace-1',
+        operation: 'filter',
+        nodeIds: ['node-1'],
+      });
       expect(opts.request).toEqual({ workspaceId: 'workspace-1', nodeId: 'node-1', payload });
     });
 
-    it('treats enabled=false the same as no node (disabled signature)', () => {
+    it('treats enabled=false the same as no node', () => {
       renderHook(() =>
         useNodePreviewWithRawFallback({
           workspaceId: 'workspace-1',
           nodeId: 'node-1',
           operationPayload: { foo: 'bar' },
           operationFetch: vi.fn(),
-          signaturePrefix: 'filter',
+          operation: 'filter',
           enabled: false,
         }),
       );
 
       const opts = lastCapturedOptions();
-      expect(opts.signature).toBe('filter-preview-disabled');
+      expect(opts.identity).toBeNull();
       expect(opts.request).toBeNull();
     });
   });
@@ -129,7 +141,7 @@ describe('useNodePreviewWithRawFallback', () => {
           nodeId: 'node-1',
           operationPayload: { conditions: [] },
           operationFetch,
-          signaturePrefix: 'filter',
+          operation: 'filter',
         }),
       );
 
@@ -172,7 +184,7 @@ describe('useNodePreviewWithRawFallback', () => {
           nodeId: 'node-1',
           operationPayload: null,
           operationFetch,
-          signaturePrefix: 'filter',
+          operation: 'filter',
         }),
       );
 
@@ -213,7 +225,7 @@ describe('useNodePreviewWithRawFallback', () => {
           nodeId: 'node-1',
           operationPayload: null,
           operationFetch: vi.fn(),
-          signaturePrefix: 'filter',
+          operation: 'filter',
           debounceMs: 50,
         }),
       );

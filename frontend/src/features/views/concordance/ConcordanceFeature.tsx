@@ -1,25 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
-import type { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse } from '@/api';
-import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { useQueries } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  type ConcordanceAnalysisRequest,
+  type ConcordanceAnalysisResponse,
+  type ConcordanceRunAllResult,
+  type ResultPublicationSource,
+} from '@/api';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
-import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
-import { getAnalysisResultResource } from '../common/analysisApi';
+import { getAnalysisOutputResource, getAnalysisResultResource } from '../common/analysisApi';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { getAnalysisActionLifecycle } from '../common/analysisActionLifecycle';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useConcordanceTaskFlow } from './hooks/useConcordanceTaskFlow';
 import { useConcordanceMetadataColumns } from './hooks/useConcordanceMetadataColumns';
 import { useConcordanceViewModeSwap } from './hooks/useConcordanceViewModeSwap';
-import { useConcordanceDetachDialogs } from './hooks/useConcordanceDetachDialogs';
 import { useConcordanceDispersionControls } from './hooks/useConcordanceDispersionControls';
 import { useConcordanceTokenizerMode } from './hooks/useConcordanceTokenizerMode';
 import { useConcordanceResultSession } from './hooks/useConcordanceResultSession';
@@ -30,13 +36,16 @@ import {
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
-import { DetachColumnsDialog } from '../common/components/DetachColumnsDialog';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { usePersistNodeTokenizerModel } from '../common/hooks/usePersistNodeTokenizerModel';
 import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
+import type { ConcordanceRunAllReviewSource } from './concordanceRunAllReview';
+import { queryKeys } from '@/lib/queryKeys';
+import { ResultPublicationDialog } from '../common/components/ResultPublicationDialog';
+import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
-/** Orchestrates the full concordance analysis UI, task lifecycle, and detach flows. */
+/** Orchestrates the full Concordance Preview and Run All lifecycle. */
 /**
  * Rendered by: the analysis feature registry when this panel is selected.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
@@ -47,19 +56,22 @@ import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
  */
 function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const {
-    taskId: tabTaskId,
-    setTaskId: onTabTaskChange,
+    latestPreview,
+    latestRunAll,
+    activeAnalysis,
+    analyses,
+    refreshAnalyses,
     inputSets: tabInputSets,
     setInputSet: onTabInputSetChange,
   } = host;
+  const tabTaskId = latestPreview?.id ?? null;
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
-  const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
   const {
-    detachConcordance,
-    detachConcordanceDispersion,
+    runConcordanceAll,
+    publishAnalysisResult,
     setNodeColor: persistNodeColor,
   } = useWorkspaceActions();
   const persistDocumentColumn = usePersistNodeDocumentColumn({
@@ -81,7 +93,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     canAddMore,
     graphSelectedIds,
     getColumnInfos,
-    nodeInfoCache,
+    nodeInfoById,
   } = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -107,6 +119,90 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   } as ReturnType<typeof useTabNodeInputs>;
   // Add-node-as-needed model has no lock; ids derive from the inputs.
   const activeNodeIds = inputResolvedNodes.map((r) => r.id);
+  const concordanceRunAll =
+    latestRunAll?.request.kind === 'concordance_run_all' ? latestRunAll : null;
+  const concordanceRunAllChildren = concordanceRunAll
+    ? analyses.filter(
+        (analysis) =>
+          analysis.execution_scope === 'supporting' &&
+          analysis.parent_analysis_id === concordanceRunAll.id &&
+          analysis.request.kind === 'concordance_run_all',
+      )
+    : [];
+  const runAllSourceIds =
+    concordanceRunAll?.request.kind === 'concordance_run_all'
+      ? concordanceRunAll.request.source.node_ids
+      : activeNodeIds;
+  const runAllForSource = (nodeId: string | undefined) =>
+    nodeId
+      ? (concordanceRunAllChildren.find(
+          (analysis) =>
+            analysis.request.kind === 'concordance_run_all' &&
+            analysis.request.source.node_ids[0] === nodeId,
+        ) ?? null)
+      : null;
+  const firstConcordanceRunAll = runAllForSource(runAllSourceIds[0]);
+  const secondConcordanceRunAll = runAllForSource(runAllSourceIds[1]);
+  const concordanceRunAllEntries = [
+    { sourceId: runAllSourceIds[0] ?? '', analysis: firstConcordanceRunAll },
+    {
+      sourceId: runAllSourceIds[1] ?? '',
+      analysis: runAllSourceIds[1] ? secondConcordanceRunAll : null,
+    },
+  ];
+  const runAllSourceAnalyses = concordanceRunAllEntries.flatMap(({ analysis }) =>
+    analysis?.state === 'succeeded' ? [analysis] : [],
+  );
+  const runAllResultQueries = useQueries({
+    queries: runAllSourceAnalyses.map((analysis) => ({
+      queryKey: currentWorkspaceId
+        ? queryKeys.analysisResult(currentWorkspaceId, analysis.id)
+        : queryKeys.inactiveAnalysisResult({ analysisId: analysis.id }),
+      enabled: Boolean(currentWorkspaceId) && concordanceRunAll?.state === 'succeeded',
+      queryFn: async (): Promise<ConcordanceRunAllResult> => {
+        if (!currentWorkspaceId) throw new Error('Run All Result is unavailable');
+        const result = await getAnalysisOutputResource(currentWorkspaceId, analysis.id);
+        if (result.kind !== 'concordance_run_all' || result.result_type !== 'source') {
+          throw new Error('Concordance Run All child Result is invalid');
+        }
+        return result;
+      },
+    })),
+  });
+  const concordanceReviewSources: ConcordanceRunAllReviewSource[] =
+    concordanceRunAll?.state === 'succeeded'
+      ? runAllSourceAnalyses.flatMap((analysis, index) => {
+          const result = runAllResultQueries[index]?.data;
+          return result?.result_type === 'source' && result.source
+            ? [{ analysisId: analysis.id, source: result.source }]
+            : [];
+        })
+      : [];
+  const runAllReviewError =
+    concordanceRunAll?.state === 'succeeded'
+      ? (runAllResultQueries.find((query) => query.error)?.error ??
+        (concordanceRunAllChildren.length < runAllSourceIds.length
+          ? new Error('Run All source Analyses are incomplete')
+          : null))
+      : null;
+  const publicationSources = concordanceReviewSources.map((review) => review.source);
+  const reviewNodes: WorkspaceNodeMetadata[] = concordanceReviewSources.map(({ source }) => ({
+    id: source.node_id,
+    name: source.node_name,
+    color: source.color,
+    document: source.document_column,
+    shape: [source.record_count, null],
+    tokenizerModel: null,
+  }));
+  const resultPanelNodes =
+    concordanceRunAll?.state === 'succeeded' ? reviewNodes : panelSelectedNodes;
+  const resultPanelColumnSelections =
+    concordanceRunAll?.state === 'succeeded'
+      ? concordanceReviewSources.map(({ source }) => ({
+          nodeId: source.node_id,
+          column: source.document_column,
+        }))
+      : nodeColumnSelections;
   const { nodeColorOverrides, setNodeColor, ensureNodeColors } = useNodeColorControls({
     nodeIds: activeNodeIds,
     nodes: panelSelectedNodes,
@@ -133,6 +229,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     currentParams: currentConcordanceParams,
   } = concordanceParameters;
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
+  const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
+  const [publicationDialogOpen, setPublicationDialogOpen] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
   const showMetadata = selectedMetadataColumns.length > 0;
@@ -177,17 +276,15 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     hydrateTokenizerState,
   } = useConcordanceTokenizerMode({
     effectiveNodeColumnSelections: nodeColumnSelections,
-    nodeInfoCache,
+    nodeInfoById,
   });
 
   const {
     request: serverRequest,
-    resolveTaskId,
     setLocalTaskId: setLocalConcordanceTaskId,
     isRunning: isSearching,
     setIsRunning: setIsSearching,
     runningRef,
-    lastFetchedRef,
     taskStatus: concordanceTaskStatus,
     banner: concordanceWaitingBanner,
     clearResults,
@@ -199,8 +296,21 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     taskType: ANALYSIS_TASK_TYPES.concordance,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    // The host's persisted task id wins task resolution over transient local state.
+    // The forest's newest Preview Analysis wins hydration over transient
+    // submission state.
     hydrationTaskId: tabTaskId,
+    requestHydration:
+      !latestPreview && concordanceRunAll?.request.kind === 'concordance_run_all'
+        ? {
+            analysisId: concordanceRunAll.id,
+            request: concordanceRunAll.request.source,
+          }
+        : null,
+    controlAnalysisId: activeAnalysis?.id ?? null,
+    tabAnalysisIds: analyses.map((analysis) => analysis.id),
+    retiredAnalysisIds: analyses.flatMap((analysis) =>
+      analysis.state === 'succeeded' ? analysis.supersedes_analysis_ids : [],
+    ),
     /** Fetches a completed concordance task result for polling and hydration. */
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
@@ -229,18 +339,18 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       // combined via the toggle (which re-pages both nodes on demand).
       setViewMode('separated');
     },
-    /** Clears result-specific state while preserving local controls when requested by handoff flows. */
-    onCleared: (_, options) => {
+    onCleared: () => {
       setCombinedPage(1);
-      if (options?.preserveLocalState) {
-        return;
-      }
-      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared. Preserve-local-state clears (handoff
-      // flows) intentionally keep the tab→task link. Inputs are intentionally
-      // left intact so the user keeps their curated selection after clearing.
-      onTabTaskChange(null);
+      // Refresh the cleared forest. Inputs remain intact so the user keeps the
+      // curated selection after clearing.
+      refreshAnalyses();
     },
+  });
+  const analysisActionLifecycle = getAnalysisActionLifecycle({
+    isPreviewing: isSearching,
+    isSubmittingRunAll,
+    runAllState: concordanceRunAll?.state ?? null,
+    hasActiveAnalysis: Boolean(activeAnalysis),
   });
 
   const {
@@ -248,8 +358,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     nodePagination,
     setNodePagination,
     nodeLoading,
-    nodeDetaching,
-    setNodeDetaching,
     globalPageSize,
     applyGlobalPageSize,
     combinedLoading,
@@ -260,17 +368,22 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     allMatchedTexts,
     matchedTextColorMap,
     resolveNodeIdForKey,
+    isReview,
+    reviewError,
+    handleReviewSort,
+    handleReviewPageChange,
   } = useConcordanceResultSession({
     workspaceId: currentWorkspaceId,
     analysisId: tabTaskId,
     baseResult,
     viewMode,
     combinedPage,
-    selectedNodes: panelSelectedNodes,
+    selectedNodes: resultPanelNodes,
     showDispersion,
     colourMatches,
     lowercaseMatches,
     nodeColorOverrides,
+    reviewSources: concordanceReviewSources,
   });
 
   useEffect(() => {
@@ -291,8 +404,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const { availableMetadataColumns, metadataColumnSections, metadataDisabledReason } =
     useConcordanceMetadataColumns({
       results,
-      panelSelectedNodes,
-      effectiveNodeColumnSelections: nodeColumnSelections,
+      panelSelectedNodes: resultPanelNodes,
+      effectiveNodeColumnSelections: resultPanelColumnSelections,
       getColumnInfos,
       viewMode,
       nodeColors,
@@ -321,58 +434,34 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     });
   }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
-  const {
-    handleSearch,
-    handleSort,
-    handlePageChange,
-    persistResultPreferences,
-    handleDetach,
-    handleDispersionDetach,
-  } = useConcordanceTaskFlow({
-    state: {
-      currentWorkspaceId,
-      tabId: host.tabId,
-      searchWord,
-      activeNodeIds,
-      effectiveNodeColumnSelections: nodeColumnSelections,
-      globalPageSize,
-      nodePagination,
-      viewMode,
-      combinedPage,
-      numLeftTokens,
-      numRightTokens,
-      regex,
-      wholeWord,
-      caseSensitive,
-      searchMode,
-      tokenizerModelsByNode: effectiveTokenizerModelsByNode,
-    },
-    actions: {
-      setNodePagination,
-      setIsSearching,
-      setLocalTaskId: setLocalConcordanceTaskId,
-      runningRef,
-      lastFetchedRef,
-      setNodeDetaching,
-      // Persist the run's assigned task id onto the active tab so reload
-      // rehydrates the same task. No-op when not tab-mounted.
-      onTaskIdAssigned: (taskId) => {
-        onTabTaskChange(taskId);
+  const { handleSearch, handleSort, handlePageChange, persistResultPreferences } =
+    useConcordanceTaskFlow({
+      state: {
+        currentWorkspaceId,
+        tabId: host.tabId,
+        searchWord,
+        activeNodeIds,
+        effectiveNodeColumnSelections: nodeColumnSelections,
+        globalPageSize,
+        nodePagination,
+        viewMode,
+        combinedPage,
+        numLeftTokens,
+        numRightTokens,
+        regex,
+        wholeWord,
+        caseSensitive,
+        searchMode,
+        tokenizerModelsByNode: effectiveTokenizerModelsByNode,
+        supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
       },
-    },
-    lock: {
-      resolveTaskId,
-      detachConcordance,
-      detachConcordanceDispersion,
-    },
-  });
-
-  const { openDetachDialog, openDispersionDetachDialog, detachDialog, dispersionDetachDialog } =
-    useConcordanceDetachDialogs({
-      workspaceId: currentWorkspaceId,
-      handleDetach,
-      handleDispersionDetach,
-      nodeDetaching,
+      actions: {
+        setNodePagination,
+        setIsSearching,
+        setLocalTaskId: setLocalConcordanceTaskId,
+        runningRef,
+        onSubmitted: refreshAnalyses,
+      },
     });
 
   // Single source of truth for page size across every concordance result table.
@@ -382,7 +471,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   // (resetting to page 1), then persist unless the panel is read-only.
   const handleGlobalPageSizeChange = (newSize: number) => {
     applyGlobalPageSize(newSize);
-    persistResultPreferences({ pageSize: newSize });
+    if (!isReview) persistResultPreferences({ pageSize: newSize });
   };
 
   // Run vs Re-run: with no locking, the primary button is gated purely by
@@ -425,7 +514,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     hasAttachedAnalysis: Boolean(tabTaskId),
     analysisState: concordanceTaskStatus.tasks[0]?.state ?? null,
     hasChanges,
-    isBusy: isSearching,
+    isBusy: analysisActionLifecycle.isPreviewing,
   });
 
   // Preserve results across transient graph refetches. Under the add-node-as-
@@ -487,12 +576,71 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
    */
   const handleRunOrUpdate = async () => {
     await ensureNodeColors();
-    await executeAnalysisRerun({
-      hasAttachedAnalysis: Boolean(tabTaskId),
-      clearResults: handleClearResults,
-      /** Starts the feature-specific concordance search after shared update checks pass. */
-      runFreshAnalysis: () => handleSearch(),
-    });
+    await handleSearch();
+  };
+
+  const handleRunAll = async () => {
+    const requestNodeIds = activeNodeIds.slice(0, 2);
+    const nodeColumns = Object.fromEntries(
+      nodeColumnSelections
+        .filter((selection) => requestNodeIds.includes(selection.nodeId) && selection.column)
+        .map((selection) => [selection.nodeId, selection.column]),
+    );
+    const nodeTokenizerModels = Object.fromEntries(
+      requestNodeIds.flatMap((nodeId) => {
+        const model = (effectiveTokenizerModelsByNode[nodeId] ?? '').trim();
+        return model ? [[nodeId, model]] : [];
+      }),
+    );
+    if (
+      !currentWorkspaceId ||
+      requestNodeIds.length === 0 ||
+      Object.keys(nodeColumns).length !== requestNodeIds.length ||
+      !searchWord.trim() ||
+      (searchMode === 'tokens' &&
+        Object.keys(nodeTokenizerModels).length !== requestNodeIds.length) ||
+      analysisActionLifecycle.isRunningAll
+    ) {
+      return;
+    }
+    const source: ConcordanceAnalysisRequest = {
+      node_ids: requestNodeIds,
+      node_columns: nodeColumns,
+      node_tokenizer_models: nodeTokenizerModels,
+      search_word: searchWord.trim(),
+      num_left_tokens: numLeftTokens,
+      num_right_tokens: numRightTokens,
+      regex,
+      whole_word: wholeWord,
+      case_sensitive: caseSensitive,
+      search_mode: searchMode,
+    };
+    setIsSubmittingRunAll(true);
+    try {
+      await runConcordanceAll(host.tabId, { source }, tabTaskId ? [tabTaskId] : []);
+      refreshAnalyses();
+    } finally {
+      setIsSubmittingRunAll(false);
+    }
+  };
+
+  const handlePublishResult = async (sources: ResultPublicationSource[]) => {
+    if (!concordanceRunAll) return;
+    setIsPublishing(true);
+    try {
+      await publishAnalysisResult(host.tabId, concordanceRunAll.id, {
+        kind: 'concordance_result_publication',
+        sources,
+      });
+      setPublicationDialogOpen(false);
+      toast.success('Adding Concordance Results to the Workspace.');
+    } catch (cause) {
+      toast.error('Could not add Concordance Results.', {
+        description: cause instanceof Error ? cause.message : String(cause),
+      });
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const { handleViewModeChange } = useConcordanceViewModeSwap({
@@ -539,10 +687,26 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             }}
           />
         )}
-        isSearching={isSearching}
-        actionState={actionState}
+        isSearching={analysisActionLifecycle.isPreviewing}
+        actionState={{
+          ...actionState,
+          clearDisabled:
+            analyses.length === 0 ||
+            analysisActionLifecycle.isPreviewing ||
+            analysisActionLifecycle.isRunningAll ||
+            Boolean(activeAnalysis),
+        }}
         handleRunOrUpdate={handleRunOrUpdate}
-        handleStopTask={stopTask}
+        handleRunAll={handleRunAll}
+        runAllDisabled={
+          analysisActionLifecycle.runAllDisabled ||
+          panelSelectedNodes.length === 0 ||
+          !searchWord.trim() ||
+          nodeColumnSelections.some((selection) => !selection.column)
+        }
+        isRunningAll={analysisActionLifecycle.isRunningAll}
+        parametersLocked={analysisActionLifecycle.parametersLocked}
+        handleStopTask={activeAnalysis ? stopTask : undefined}
         isStopping={isStopping}
         handleClearResults={handleClearResults}
       />
@@ -556,10 +720,45 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           className="mt-4"
         />
       )}
+      {concordanceRunAllEntries.map(({ sourceId, analysis }) =>
+        analysis && (analysis.state === 'queued' || analysis.state === 'running') ? (
+          <AnalysisTaskBanner
+            key={analysis.id}
+            analysisName={`Concordance Run All${sourceId ? ` — ${sourceId}` : ''}`}
+            status={analysis.state}
+            taskId={analysis.id}
+            message={analysis.progress.message ?? undefined}
+            className="mt-4"
+          />
+        ) : null,
+      )}
+      {runAllReviewError ? (
+        <p className="mt-4 text-sm text-destructive">
+          Could not load Review: {runAllReviewError.message}
+        </p>
+      ) : null}
+      {reviewError ? (
+        <p className="mt-4 text-sm text-destructive">
+          Could not load Review: {reviewError.message}
+        </p>
+      ) : null}
 
       {/* Results */}
-      {results && (
+      {results ? (
         <ConcordanceResultsPanel
+          title={isReview ? 'Review' : 'Search Results'}
+          headerAction={
+            isReview && publicationSources.length > 0 ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  setPublicationDialogOpen(true);
+                }}
+              >
+                Add to Workspace
+              </Button>
+            ) : null
+          }
           shell={{
             resultsRef,
             resultsViewportRef,
@@ -602,9 +801,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           }}
           sources={{
             searchWord,
-            selectedNodes,
-            panelSelectedNodes,
-            effectiveNodeColumnSelections: nodeColumnSelections,
+            panelSelectedNodes: resultPanelNodes,
+            effectiveNodeColumnSelections: resultPanelColumnSelections,
             labelToNodeId,
             sourceColorMap,
             defaultPalette,
@@ -617,19 +815,22 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             combinedPage,
             setCombinedPage,
             nodeLoading,
-            nodeDetaching,
           }}
           commands={{
-            handleSort,
-            handlePageChange,
+            handleSort: isReview
+              ? (columnKey, paginationKey) => {
+                  handleReviewSort(columnKey, paginationKey);
+                }
+              : handleSort,
+            handlePageChange: isReview
+              ? (newPage, paginationKey) => {
+                  handleReviewPageChange(newPage, paginationKey);
+                }
+              : handlePageChange,
             handleRowClick,
-            openDetachDialog: (nodes) => {
-              openDetachDialog(nodes);
-            },
-            onDispersionDetach: openDispersionDetachDialog,
           }}
         />
-      )}
+      ) : null}
 
       {analysisError && (
         <Card>
@@ -648,6 +849,19 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         payload={detailPayload}
         customization={concordanceCustomization}
       />
+      {publicationDialogOpen ? (
+        <ResultPublicationDialog
+          open
+          onOpenChange={setPublicationDialogOpen}
+          title="Add Concordance Results to Workspace"
+          nameSuffix="concordance"
+          sources={publicationSources}
+          isSubmitting={isPublishing}
+          onSubmit={(sources) => {
+            void handlePublishResult(sources);
+          }}
+        />
+      ) : null}
 
       {/* Loading State */}
       {isLoading.graph && (
@@ -656,20 +870,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           <p className="text-gray-600 mt-2">Loading workspace...</p>
         </div>
       )}
-
-      {/* Dispersion (per-document aggregated) detach column dialog */}
-      <DetachColumnsDialog
-        {...dispersionDetachDialog}
-        title="Add aggregated concordance to workspace"
-        description="The detached data block always includes the per-document extract, matched-text list, and L1/R1 contexts as list columns. Optionally include the document column and any source metadata columns. The document column is selected by default — uncheck to omit it."
-      />
-
-      {/* Detach column selection dialog */}
-      <DetachColumnsDialog
-        {...detachDialog}
-        title="Detach Concordance Results"
-        description="Select optional source columns to include alongside the concordance results. Required output columns stay checked automatically."
-      />
     </div>
   );
 }

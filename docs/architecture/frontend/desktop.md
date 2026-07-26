@@ -43,10 +43,19 @@ launches the backend with port zero and a private startup record, waits for
 ASGI lifespan readiness, validates process identity and package version,
 injects the assigned URL, and only then shows the window.
 
+The packaged backend runs with Python bytecode writes disabled. Python may use
+bytecode included before signing, but it must not add or update `__pycache__`
+content inside the sealed application bundle at runtime.
+
 The supervisor owns `starting`, `ready`, `restarting`, `failed`, and `stopped`
 states. It never holds its mutex over process or filesystem work. A closing app
 changes the lifecycle away from `restarting`, so a late candidate is shut down
 instead of installed.
+
+The main window remains hidden until backend readiness. If runtime resolution,
+Data Root configuration, or backend startup fails, Tauri schedules a native
+error dialog without blocking setup and exits after the user acknowledges it.
+This keeps startup failures visible even though the webview is not yet usable.
 
 ## Native Boundaries
 

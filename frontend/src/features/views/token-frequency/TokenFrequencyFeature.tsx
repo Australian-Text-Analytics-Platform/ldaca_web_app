@@ -14,7 +14,6 @@ import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
-import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
 import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest } from '../common/utils';
@@ -51,11 +50,18 @@ const UNIFIED_WORDCLOUD_HEIGHT = 340;
  */
 const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const {
-    taskId: tabTaskId,
-    setTaskId: onTabTaskChange,
+    latestRunAll,
+    activeAnalysis,
+    analyses,
+    refreshAnalyses,
     inputSets: tabInputSets,
     setInputSet: onTabInputSetChange,
   } = host;
+  const tabTaskId = latestRunAll?.id ?? null;
+  const runAllLocksParameters =
+    latestRunAll?.state === 'queued' ||
+    latestRunAll?.state === 'running' ||
+    latestRunAll?.state === 'succeeded';
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
   >({});
@@ -145,7 +151,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     setIsRunning,
     runningRef,
     taskStatus,
-    lastFetchedRef,
     clearResults,
     stopTask,
     setLocalTaskId,
@@ -154,9 +159,11 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     taskType: ANALYSIS_TASK_TYPES.tokenFrequencies,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    // Tab-driven deterministic hydration: the tab's persisted task id wins task
-    // resolution over transient local state.
+    // The forest's newest Run All Analysis wins hydration over transient
+    // submission state.
     hydrationTaskId: tabTaskId,
+    controlAnalysisId: activeAnalysis?.id ?? null,
+    tabAnalysisIds: analyses.map((analysis) => analysis.id),
     /** Fetches the latest task result so polling and hydration share one retrieval path. */
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
@@ -183,13 +190,9 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       setStopWords(normalizedStops.join(', '));
     },
     /** Clears local result and selection state when the feature reset action runs. */
-    onCleared: (_, options) => {
-      if (options?.preserveLocalState) {
-        return;
-      }
-      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange(null);
+    onCleared: () => {
+      // Refresh the canonical forest; curated inputs remain in the Tab draft.
+      refreshAnalyses();
       setLastCompareNodeIds([]);
       setStudyNodeId(null);
       resetPreferenceUiState();
@@ -203,10 +206,10 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     // then apply any live overrides the user has made in this session.
     return deriveTokenizerModelsByNode(
       effectiveNodeColumnSelections,
-      nodeInputs.nodeInfoCache,
+      nodeInputs.nodeInfoById,
       liveTokenizerModelsByNode,
     );
-  }, [effectiveNodeColumnSelections, nodeInputs.nodeInfoCache, liveTokenizerModelsByNode]);
+  }, [effectiveNodeColumnSelections, nodeInputs.nodeInfoById, liveTokenizerModelsByNode]);
 
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
@@ -297,12 +300,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       setLastCompareNodeIds,
       setAppliedStopSet,
       setStopWords,
-      lastFetchedRef,
-      // Persist the run's assigned task id onto the active tab so reload
-      // rehydrates the same task.
-      onTaskIdAssigned: (taskId) => {
-        onTabTaskChange(taskId);
-      },
+      onSubmitted: refreshAnalyses,
     },
     navigation: {
       setCurrentView,
@@ -312,11 +310,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
 
   const handleAnalyzeWithNodeColors = async () => {
     await ensureNodeColors();
-    await executeAnalysisRerun({
-      hasAttachedAnalysis: Boolean(tabTaskId),
-      clearResults,
-      runFreshAnalysis: handleAnalyze,
-    });
+    await handleAnalyze();
   };
 
   const {
@@ -432,6 +426,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
         nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
         actionState={actionState}
+        parametersLocked={runAllLocksParameters}
         isAnalyzing={isRunning}
         isStopping={isStopping}
         onAnalyze={() => {

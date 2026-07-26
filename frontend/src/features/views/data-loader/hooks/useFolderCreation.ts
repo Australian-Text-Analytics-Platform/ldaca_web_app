@@ -1,7 +1,7 @@
 import { useReducer } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFolder } from '@/api';
-import { invalidateFilesQuery } from './fileCache';
+import { invalidateFileListQuery } from './fileCache';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -130,7 +130,7 @@ export function useFolderCreation({ notify }: UseFolderCreationParams) {
         body: { parent_path: state.createFolderParentPath, name: trimmedName },
         throwOnError: true,
       });
-      await invalidateFilesQuery(queryClient);
+      await invalidateFileListQuery(queryClient);
       notify('success', `Folder "${trimmedName}" created.`);
       dispatch({ type: 'create-succeeded' });
     } catch (error) {

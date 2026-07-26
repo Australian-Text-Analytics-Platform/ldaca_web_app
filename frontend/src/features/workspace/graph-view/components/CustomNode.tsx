@@ -22,6 +22,7 @@ import type { WorkspaceGraphNodeCard } from '../graphNodeModel';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
 import { GREY, toBgColor } from '@/features/views/common/vizPalette';
+import type { NodeInputPointerPosition } from '@/stores/nodeInputRequestsStore';
 import { CUSTOM_NODE_TOOLBAR_BUTTON_CLASS, CustomNodeActionMenu } from './CustomNodeActionMenu';
 import { CustomNodeRenameForm } from './CustomNodeRenameForm';
 import {
@@ -43,7 +44,7 @@ interface CustomNodeData extends Record<string, unknown> {
   onUndo: (nodeId: string) => void;
   onRedo: (nodeId: string) => void;
   /** Requests that this node is added to the active view's node inputs. */
-  onAddToSelection: (nodeId: string) => void;
+  onAddToSelection: (nodeId: string, pointer?: NodeInputPointerPosition) => void;
 }
 
 const COMPACT_NODE_ZOOM_THRESHOLD = 0.6;
@@ -371,7 +372,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
    */
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onAddToSelection(node.id);
+    onAddToSelection(node.id, e.detail > 0 ? { x: e.clientX, y: e.clientY } : undefined);
   };
 
   /**

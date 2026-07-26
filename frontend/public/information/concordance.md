@@ -29,10 +29,14 @@ analysis without materializing a whole-corpus result in the browser.
   Generated `CONC_*` headers and combined-table headers are display-only because
   those values are produced after source paging.
 
-- What does Add to Workspace use?
-  It creates a Child Analysis from the completed Concordance request and its
-  retained snapshot, including the recorded search mode and tokenizer mapping.
-  Later changes to Data Block preferences do not alter that historical run.
+- What do Preview, Run All, and Review do?
+  **Preview** creates a Preview Analysis and computes only the page you request.
+  **Run All** may be started directly and creates one Run All group with one
+  Supporting Analysis and immutable table Result per source. **Review** reads
+  those Results directly and retains the same Table/Dispersion,
+  Separated/Combined, metadata, sorting, paging, and row-detail controls.
+  **Add to Workspace** lets you publish selected Result columns as Derived Data
+  Blocks after the computation succeeds.
 
 - Where can I get help?
   See the full Concordance tutorial in Help, or use the Feedback button in the

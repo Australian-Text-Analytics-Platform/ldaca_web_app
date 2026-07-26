@@ -10,6 +10,7 @@ export type AnnotationNodePageRow = Record<string, unknown>;
 interface UseAnnotationNodePageArgs {
   workspaceId: string | null;
   nodeId: string;
+  rowCount: number;
   pageSize: number;
   enabled?: boolean;
 }
@@ -17,16 +18,16 @@ interface UseAnnotationNodePageArgs {
 /**
  * Owns the canonical paginated source-node query used by Annotation tables.
  *
- * Used by: `AnnotationResultsPanel` for manual editing and
- * `useAnnotationAiPreviewSession` for page-aligned AI predictions. Flow: reset
- * to the first page when the source identity changes, key the request by the
- * exact generated page contract, and pass TanStack Query's abort signal into
- * the generated client so superseded page requests cannot complete as active
- * work after navigation or a source change.
+ * Used by: `AnnotationResultsPanel` for manual editing. Flow: reset to the first
+ * page when the source identity changes, key the request by the exact generated
+ * page contract, and pass TanStack Query's abort signal into the generated
+ * client so superseded page requests cannot complete as active work after
+ * navigation or a source change.
  */
 export function useAnnotationNodePage({
   workspaceId,
   nodeId,
+  rowCount,
   pageSize,
   enabled = true,
 }: UseAnnotationNodePageArgs) {
@@ -78,10 +79,6 @@ export function useAnnotationNodePage({
     setPagination,
     query,
     rows,
-    revision: query.data?.etag ?? '',
-    rowCount:
-      pagination.pageIndex * pagination.pageSize +
-      rows.length +
-      (query.data?.hasNext ? pagination.pageSize : 0),
+    rowCount,
   };
 }

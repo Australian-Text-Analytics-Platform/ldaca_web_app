@@ -3,12 +3,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  userPreferencesKey,
-  useUpdateUserPreferences,
-  useUserPreferences,
-} from '../useUserPreferences';
 import type { UserPreferences } from '@/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { useUpdateUserPreferences, useUserPreferences } from '../useUserPreferences';
 
 const fixture = vi.hoisted(() => ({
   userId: 'user-1' as string | null,
@@ -80,15 +77,15 @@ describe('user preferences hooks', () => {
       expect(view.result.current.preferences.favorite_workspaces).toEqual(['workspace-2']),
     );
 
-    expect(client.getQueryData(userPreferencesKey('user-1'))).toEqual(preferences());
-    expect(client.getQueryData(userPreferencesKey('user-2'))).toEqual(
+    expect(client.getQueryData(queryKeys.userPreferences('user-1'))).toEqual(preferences());
+    expect(client.getQueryData(queryKeys.userPreferences('user-2'))).toEqual(
       preferences({ favorite_workspaces: ['workspace-2'] }),
     );
   });
 
   it('optimistically updates and rolls back with a visible error', async () => {
     const { client, wrapper } = setupClient();
-    client.setQueryData(userPreferencesKey('user-1'), preferences());
+    client.setQueryData(queryKeys.userPreferences('user-1'), preferences());
     let rejectUpdate: ((error: Error) => void) | undefined;
     fixture.updatePreferences.mockReturnValue(
       new Promise((_resolve, reject) => {
@@ -102,7 +99,7 @@ describe('user preferences hooks', () => {
     });
     await waitFor(() =>
       expect(
-        client.getQueryData<UserPreferences>(userPreferencesKey('user-1'))
+        client.getQueryData<UserPreferences>(queryKeys.userPreferences('user-1'))
           ?.contextual_hints_enabled,
       ).toBe(false),
     );
@@ -112,7 +109,7 @@ describe('user preferences hooks', () => {
 
     await waitFor(() =>
       expect(
-        client.getQueryData<UserPreferences>(userPreferencesKey('user-1'))
+        client.getQueryData<UserPreferences>(queryKeys.userPreferences('user-1'))
           ?.contextual_hints_enabled,
       ).toBe(true),
     );

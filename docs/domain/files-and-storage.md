@@ -59,11 +59,12 @@ flowchart TB
   `access.json` ownership is checked before portable content is exposed.
 - Archive exports omit deployment ownership, and imports reject embedded
   ownership before generating a new sidecar for the importer.
-- Portable Workspace archive version 6 contains materialized Data Blocks,
-  terminal live Analyses, declared Artifacts, and materialized immutable query
-  inputs. It contains no serialized executable plans. Import assigns a fresh
-  Workspace identity, rebuilds and rebases the private lazy plans, and rejects
-  earlier archive versions rather than guessing at missing lifecycle content.
+- Portable Workspace archive format 10 contains materialized Data Blocks,
+  terminal Analysis forests, declared Artifacts, and materialized immutable
+  query inputs. It contains no serialized executable plans. Import assigns a
+  fresh Workspace identity, rebuilds and rebases the private lazy plans, and
+  rejects earlier archive versions rather than guessing at missing lifecycle
+  content.
 - One `QuotaService` owns total allocated-byte policy and usage snapshots for
   every principal. `StorageAdmissionService` applies that policy to Workspace,
   User File, import, Analysis, and response-snapshot writes. User Preferences

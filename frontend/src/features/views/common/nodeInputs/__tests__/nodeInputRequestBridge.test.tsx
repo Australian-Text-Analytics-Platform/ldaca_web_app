@@ -1,4 +1,5 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AnalysisTabInput } from '../../tabs/tabStateOps';
@@ -64,7 +65,7 @@ describe('node input request bridge', () => {
     vi.clearAllMocks();
     useNodeInputRequestsStore.setState({
       nextId: 1,
-      requests: [],
+      pendingRequests: [],
     });
     useRecentSelectionsStore.setState({ byWorkspace: {} });
     mocks.useWorkspaceData.mockReturnValue({
@@ -74,21 +75,23 @@ describe('node input request bridge', () => {
     mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({
       getColumnInfos: () => [{ name: 'text', dataType: 'string' }],
-      nodeInfoCache: {},
+      nodeInfoById: {},
     });
     mocks.useUIStore.mockImplementation((selector: (state: { currentView: string }) => unknown) =>
       selector({ currentView: 'filter' }),
     );
   });
 
-  it('consumes requests that were queued before the input panel target registered', async () => {
+  it('places an intent that was pending before the input panel target registered', async () => {
+    const user = userEvent.setup();
     const onInputSetChange = vi.fn();
     useNodeInputRequestsStore.setState({
       nextId: 2,
-      requests: [{ id: 1, workspaceId: 'workspace-1', view: 'filter', nodeIds: ['node-a'] }],
+      pendingRequests: [{ id: 1, workspaceId: 'workspace-1', view: 'filter', nodeId: 'node-a' }],
     });
 
     render(<RequestBridgeHarness onInputSetChange={onInputSetChange} />);
+    await user.click(screen.getByRole('button', { name: 'Add to Preprocessing Inputs' }));
 
     await waitFor(() => {
       expect(onInputSetChange).toHaveBeenCalledWith('source', [

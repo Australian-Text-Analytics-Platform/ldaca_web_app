@@ -80,7 +80,7 @@ export const useWorkspaceManagementMutations = ({
         });
       }
 
-      await queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceList, exact: true });
     },
   });
 
@@ -92,7 +92,7 @@ export const useWorkspaceManagementMutations = ({
         throwOnError: true,
       }).then(({ data }) => data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceList, exact: true });
     },
   });
 
@@ -150,7 +150,7 @@ export const useWorkspaceManagementMutations = ({
         createWorkspaceMutation.mutateAsync({ name, description }),
       deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
       saveWorkspace: async () => {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceList, exact: true });
       },
       renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
       updateWorkspaceDescription: (description: string) =>

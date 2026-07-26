@@ -8,8 +8,10 @@ import { queryKeys } from '@/lib/queryKeys';
 import { analysisResponse } from '@/test/msw/fixtures';
 import { server } from '@/test/msw/server';
 import type { UserFileImport } from '@/api';
+import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
-import { useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
+import { useTaskResources, useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
 
 let emitEvent: ((payload: unknown) => void) | undefined;
 const mocks = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -56,6 +58,7 @@ describe('useWorkspaceTaskInbox', () => {
   beforeEach(() => {
     emitEvent = undefined;
     mocks.toastError.mockReset();
+    useFreshNodesStore.getState().reset();
   });
 
   it('refreshes the workspace analysis projection when the canonical SSE event arrives', async () => {
@@ -96,6 +99,119 @@ describe('useWorkspaceTaskInbox', () => {
     );
   });
 
+  it('invalidates source Data Block pages after Annotation Run All succeeds', async () => {
+    const annotationRunAll = analysisResponse({
+      request: {
+        kind: 'annotation_run_all',
+        source: {
+          kind: 'annotation',
+          node_id: 'node-1',
+          text_column: 'text',
+          annotation_column: 'annotation.gemini',
+          class_node_id: 'classes-1',
+          class_column: 'class',
+          description_column: 'description',
+          classes: [{ name: 'label', description: '' }],
+          provider_configuration_id: 'provider-1',
+          provider: 'openrouter',
+          model: 'model-1',
+          instruction: 'Classify the text.',
+        },
+      },
+    });
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses/:analysis_id', () =>
+        HttpResponse.json(annotationRunAll),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const sourcePageKey = queryKeys.workspaceSql(
+      'workspace-1',
+      ['node-1'],
+      'SELECT * FROM "node-1"',
+      1,
+      10,
+    );
+    const unrelatedPageKey = queryKeys.workspaceSql(
+      'workspace-1',
+      ['node-2'],
+      'SELECT * FROM "node-2"',
+      1,
+      10,
+    );
+    queryClient.setQueryData(sourcePageKey, { rows: [{ 'annotation.gemini': null }] });
+    queryClient.setQueryData(unrelatedPageKey, { rows: [{ text: 'unchanged' }] });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    act(() => {
+      emitEvent?.({
+        type: 'resource_changed',
+        sequence: 2,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'analysis',
+        resource_id: 'analysis-1',
+        workspace_id: 'workspace-1',
+        state: 'succeeded',
+        progress: { fraction: 1, message: 'done' },
+        revision: 2,
+      });
+    });
+
+    await waitFor(() => expect(queryClient.getQueryState(sourcePageKey)?.isInvalidated).toBe(true));
+    expect(queryClient.getQueryState(unrelatedPageKey)?.isInvalidated).toBe(false);
+  });
+
+  it('marks only published Analysis outputs as newly created Data Blocks', async () => {
+    const publication = analysisResponse({
+      id: 'publication-1',
+      execution_scope: 'supporting',
+      output_node_ids: ['published-1'],
+      request: {
+        kind: 'concordance_result_publication',
+        sources: [
+          {
+            source_node_id: 'node-1',
+            selected_columns: ['text', 'CONC_matched_text'],
+            new_node_name: 'Published matches',
+          },
+        ],
+      },
+    });
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses/:analysis_id', () =>
+        HttpResponse.json(publication),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    act(() => {
+      emitEvent?.({
+        type: 'resource_changed',
+        sequence: 2,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'analysis',
+        resource_id: 'publication-1',
+        workspace_id: 'workspace-1',
+        state: 'succeeded',
+        progress: { fraction: 1, message: 'done' },
+        revision: 2,
+      });
+    });
+
+    await waitFor(() =>
+      expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('workspace-1')).toEqual(
+        new Set(['published-1']),
+      ),
+    );
+  });
+
   it('drains every analysis page when rebuilding the Task Inbox', async () => {
     const requestedPages: string[] = [];
     server.use(
@@ -124,6 +240,58 @@ describe('useWorkspaceTaskInbox', () => {
       );
     });
     expect(requestedPages).toEqual(['1', '2']);
+  });
+
+  it('shares one paginated Analysis collection with Run All review consumers', async () => {
+    const runAllAnalysis = analysisResponse({
+      id: 'run-all-1',
+      tab_id: 'tab-1',
+      execution_scope: 'run_all',
+      request: {
+        kind: 'concordance_run_all',
+        source: {
+          kind: 'concordance',
+          node_ids: ['node-1'],
+          node_columns: { 'node-1': 'text' },
+          node_tokenizer_models: {},
+          search_word: 'word',
+          num_left_tokens: 5,
+          num_right_tokens: 5,
+          regex: false,
+          whole_word: true,
+          case_sensitive: false,
+          search_mode: 'regex',
+        },
+        metadata_columns: [],
+        names: {},
+      },
+    });
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses', () =>
+        HttpResponse.json({
+          items: [runAllAnalysis],
+          page: 1,
+          page_size: 500,
+          total_items: 1,
+          total_pages: 1,
+        }),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const view = renderHook(
+      () => ({
+        resources: useTaskResources('workspace-1'),
+        latestRunAll: useTabAnalysisForest('workspace-1', 'tab-1').latestRunAll,
+      }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(view.result.current.resources.tasks).toHaveLength(1));
+    expect(view.result.current.latestRunAll?.id).toBe('run-all-1');
   });
 
   it('invalidates the shared Tab cache for Tab events', async () => {

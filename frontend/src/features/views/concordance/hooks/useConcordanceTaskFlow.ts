@@ -1,13 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
-import {
-  type ConcordanceAnalysisRequest,
-  type ConcordanceDetachmentAnalysisRequest,
-  type ConcordanceDispersionDetachmentAnalysisRequest,
-  type Analysis,
-} from '@/api';
-import { formatBinIndicesAsRangeLabel } from '../concordanceDispersionDomain';
+import { type ConcordanceAnalysisRequest, type Analysis } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { NodePaginationState } from '../../common/tasks/types';
@@ -32,6 +26,7 @@ interface ConcordanceState {
   /** Selected concordance engine. */
   searchMode: 'regex' | 'tokens';
   tokenizerModelsByNode: Record<string, string>;
+  supersedesAnalysisIds: string[];
 }
 
 interface ConcordanceActions {
@@ -39,39 +34,19 @@ interface ConcordanceActions {
   setIsSearching: (value: boolean) => void;
   setLocalTaskId: (id: string | null) => void;
   runningRef: { current: boolean };
-  lastFetchedRef: { current: { taskId: string | null; state: string | null } };
-  setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
-  /**
-   * Notifies AnalysisTabsHost of the task id assigned by a run (or null when
-   * none). The host persists it onto the tab record so the tab
-   * rehydrates the same task after reload. Optional for non-tabbed callers.
-   */
-  onTaskIdAssigned: (taskId: string | null) => void;
-}
-
-interface ConcordanceLock {
-  resolveTaskId: () => Promise<string | null>;
-  detachConcordance: (
-    taskId: string,
-    request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'>,
-  ) => Promise<Analysis>;
-  detachConcordanceDispersion: (
-    taskId: string,
-    request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'>,
-  ) => Promise<Analysis>;
+  onSubmitted: () => void;
 }
 
 interface Params {
   state: ConcordanceState;
   actions: ConcordanceActions;
-  lock: ConcordanceLock;
 }
 
-/** Centralizes concordance submit, pagination, sorting, and detach actions. */
+/** Centralizes Concordance Preview submission, pagination, and sorting. */
 /**
  * Used by: `ConcordanceFeature`; its feature test mocks this hook boundary.
  * Flow: submit concordance requests, update local page controls, and expose
- * child-analysis detach commands. TanStack Query owns every result page.
+ * Run All is submitted separately by the feature. TanStack Query owns every result page.
  */
 export function useConcordanceTaskFlow({
   state: {
@@ -90,35 +65,16 @@ export function useConcordanceTaskFlow({
     wholeWord,
     searchMode,
     tokenizerModelsByNode,
+    supersedesAnalysisIds,
     caseSensitive,
   },
-  actions: {
-    setNodePagination,
-    setIsSearching,
-    setLocalTaskId,
-    runningRef,
-    lastFetchedRef,
-    setNodeDetaching,
-    onTaskIdAssigned,
-  },
-  lock: { resolveTaskId, detachConcordance, detachConcordanceDispersion },
+  actions: { setNodePagination, setIsSearching, setLocalTaskId, runningRef, onSubmitted },
 }: Params) {
-  /** Builds stable derived node names for workspace outputs created by concordance actions. */
-  /**
-   * Called by per-hit and dispersion detach request builders.
-   */
-  const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
-    const trimmed = nodeLabel.trim();
-    const base = trimmed.length > 0 ? trimmed : 'node';
-    const normalized = base.replace(/\s+/g, '_');
-    return `${normalized}${suffix}`;
-  };
-
   /** Starts a fresh concordance analysis or targeted update while preserving the analysis lock. */
   /**
    * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
    * Flow: validate search text and node columns, reset relevant pagination,
-   * run the analysis, record the assigned task id, and publish result/error state.
+   * submit the Analysis, publish its identity, and publish result/error state.
    */
   const handleSearch = async () => {
     if (!currentWorkspaceId) return;
@@ -186,21 +142,24 @@ export function useConcordanceTaskFlow({
       node_tokenizer_models: nodeTokenizerModels,
     };
     await runAnalysisTaskEnvelope<Analysis>({
-      lastFetchedRef,
       runningRef,
       setIsRunning: setIsSearching,
       setLocalTaskId,
-      onTaskIdAssigned,
-      resetBeforeRun: () => undefined,
+      onSubmitted,
       submit: async () => {
         const { data } = await submitTabAnalysis({
-          body: { kind: 'concordance', ...request },
+          body: {
+            execution_scope: 'preview',
+            request: { kind: 'concordance', ...request },
+            ...(supersedesAnalysisIds.length
+              ? { supersedes_analysis_ids: supersedesAnalysisIds }
+              : {}),
+          },
           path: { workspace_id: currentWorkspaceId, tab_id: tabId },
           throwOnError: true,
         });
         return data;
       },
-      onSuccess: () => undefined,
       onError: (error) => {
         console.error('Error performing concordance search:', error);
       },
@@ -278,131 +237,10 @@ export function useConcordanceTaskFlow({
     );
   };
 
-  /** Requests a per-hit concordance workspace node for the selected source block. */
-  /**
-   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
-   * Flow: require workspace and search text, build a concordance detach request with context/window/search options and explicit columns/path, then clear node detaching state.
-   */
-  const handleDetach = async (
-    nodeId: string,
-    _column: string,
-    nodeLabel?: string,
-    selectedColumns?: string[],
-  ) => {
-    if (!currentWorkspaceId || !searchWord.trim()) return;
-
-    setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
-    try {
-      const explicitSelectedColumns = selectedColumns ?? [];
-      if (explicitSelectedColumns.length === 0) {
-        toast.error('Select at least one column to add to workspace.');
-        return;
-      }
-      const parentTaskId = await resolveTaskId();
-      if (!parentTaskId) {
-        toast.error('No concordance task to detach.');
-        return;
-      }
-      const resolvedNodeLabel = nodeLabel && nodeLabel.trim().length > 0 ? nodeLabel : nodeId;
-      const request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'> = {
-        node_id: nodeId,
-        name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
-        selected_columns: explicitSelectedColumns,
-      };
-      await detachConcordance(parentTaskId, request);
-    } catch (error) {
-      console.error('Error detaching concordance:', error);
-      toast.error(
-        `Error detaching concordance: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
-    } finally {
-      setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));
-    }
-  };
-
-  /** Requests a per-document aggregated workspace node from the dispersion view. */
-  /**
-   * Returned to `ConcordanceFeature` by `useConcordanceTaskFlow`.
-   * Flow: validate selected columns, resolve the parent task, translate active
-   * bin/legend filters into the detach request, and start the aggregate task.
-   */
-  const handleDispersionDetach = async (
-    nodeId: string,
-    _column: string,
-    options: {
-      nodeLabel?: string;
-      selectedBins?: ReadonlySet<number> | null;
-      binCount: number;
-      selectedColumns?: string[];
-      /**
-       * Legend-filter projection. Pass the visible-on-legend matched-text
-       * set (as displayed, i.e. already lowercased when
-       * `matchCaseInsensitive` is true) to restrict the aggregation. Pass
-       * `null`/omit for "all matches".
-       */
-      selectedMatchedTexts?: string[] | null;
-      matchCaseInsensitive?: boolean;
-    },
-  ) => {
-    if (!currentWorkspaceId || !searchWord.trim()) return;
-    setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
-    try {
-      const explicitSelectedColumns = options.selectedColumns ?? [];
-      if (explicitSelectedColumns.length === 0) {
-        toast.error('Select at least one column to add to workspace.');
-        return;
-      }
-      const resolvedLabel =
-        options.nodeLabel && options.nodeLabel.trim().length > 0 ? options.nodeLabel : nodeId;
-      const selectedBinsArr =
-        options.selectedBins && options.selectedBins.size > 0
-          ? Array.from(options.selectedBins).sort((a, b) => a - b)
-          : null;
-      const rangeLabel = selectedBinsArr
-        ? formatBinIndicesAsRangeLabel(selectedBinsArr, options.binCount)
-        : '';
-      // Naming convention (per design): `_conc_aggregated` differentiates from
-      // the per-hit `_conc` detach, and the range suffix carries the bin
-      // filter context for future reference (the workspace can otherwise lose
-      // track of which dispersion-detach was scoped to which bins).
-      const suffix = rangeLabel ? `_conc_aggregated_${rangeLabel}` : '_conc_aggregated';
-      const parentTaskId = await resolveTaskId();
-      if (!parentTaskId) {
-        toast.error('No concordance task to detach.');
-        return;
-      }
-      const request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'> = {
-        node_id: nodeId,
-        name: buildDetachNodeName(resolvedLabel, suffix),
-        selected_columns: explicitSelectedColumns,
-        ...(selectedBinsArr
-          ? { selected_bins: selectedBinsArr, total_bins: options.binCount }
-          : {}),
-        ...(options.selectedMatchedTexts != null
-          ? {
-              selected_matched_texts: options.selectedMatchedTexts,
-              match_case_insensitive: !!options.matchCaseInsensitive,
-            }
-          : {}),
-      };
-      await detachConcordanceDispersion(parentTaskId, request);
-      toast.success('Aggregated detach started.');
-    } catch (error) {
-      console.error('Error detaching aggregated concordance:', error);
-      toast.error(
-        `Error detaching aggregated concordance: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
-    } finally {
-      setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));
-    }
-  };
-
   return {
     handleSearch,
     handleSort,
     handlePageChange,
     persistResultPreferences,
-    handleDetach,
-    handleDispersionDetach,
   };
 }

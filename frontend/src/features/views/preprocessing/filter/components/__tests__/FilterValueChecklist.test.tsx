@@ -64,4 +64,31 @@ describe('FilterValueChecklist', () => {
     expect(scoped.getByText('beta')).toBeInTheDocument();
     expect(scoped.getByText('gamma')).toBeInTheDocument();
   });
+
+  it('shows each backend count immediately after its category', () => {
+    const countedOptions = [
+      { key: 'a', value: 'alpha', label: 'alpha', count: '1200' },
+      { key: 'b', value: 'beta', label: 'beta', count: '7' },
+    ];
+
+    render(
+      <FilterValueChecklist
+        idPrefix="cond-3"
+        options={countedOptions}
+        selectedKeys={new Set<string>()}
+        disabled={false}
+        loading={false}
+        error={null}
+        searchQuery=""
+        onSearchQueryChange={vi.fn()}
+        onToggleOption={vi.fn()}
+        onSelectAll={vi.fn()}
+        onClearAll={vi.fn()}
+        hasNext={false}
+      />,
+    );
+
+    expect(screen.getByText('(count: 1,200)')).toBeInTheDocument();
+    expect(screen.getByText('(count: 7)')).toBeInTheDocument();
+  });
 });

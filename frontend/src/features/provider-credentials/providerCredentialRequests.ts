@@ -1,7 +1,7 @@
 import {
   listAnnotationModels,
   listFeaturedDataPortalCollections,
-  previewAnnotation,
+  queryAnalysisResult,
   searchDataPortal,
   submitDataPortalImport,
   submitTabAnalysis,
@@ -9,7 +9,9 @@ import {
 import type {
   AnnotationAnalysisRequest,
   AnnotationProviderConfigurationResource,
-  AnnotationPreviewRequest,
+  AnnotationResultQueryWritable,
+  AnnotationRunAllSubmissionWritable,
+  AnalysisExecutionScope,
   ConcordanceAnalysisRequest,
   DataPortalImportSubmitRequest,
   DataPortalSearchRequest,
@@ -25,7 +27,7 @@ import {
   getBrowserDataPortalCredential,
 } from './providerCredentialsStore';
 
-export type SecretFreeRootAnalysisSubmission =
+export type SecretFreeAnalysisSubmission =
   | TokenFrequencyAnalysisRequest
   | TopicModelingAnalysisRequest
   | ConcordanceAnalysisRequest
@@ -50,7 +52,7 @@ const dataPortalCredential = (): string | undefined => {
 };
 
 export const listAnnotationModelsWithProviderCredential = (
-  configuration: AnnotationProviderConfigurationResource,
+  configuration: Pick<AnnotationProviderConfigurationResource, 'id' | 'provider' | 'base_url'>,
   signal?: AbortSignal,
 ) => {
   const apiKey = annotationCredential(configuration.id);
@@ -66,23 +68,62 @@ export const listAnnotationModelsWithProviderCredential = (
   });
 };
 
-export const previewAnnotationWithProviderCredential = ({
+export const queryAnnotationPreviewWithProviderCredential = ({
   workspaceId,
-  nodeId,
-  request,
+  analysisId,
+  providerConfigurationId,
+  page,
+  pageSize,
   signal,
 }: {
   workspaceId: string;
-  nodeId: string;
-  request: AnnotationPreviewRequest;
+  analysisId: string;
+  providerConfigurationId: string;
+  page: number;
+  pageSize: number;
   signal?: AbortSignal;
 }) => {
-  const apiKey = annotationCredential(request.provider_configuration_id);
-  return previewAnnotation({
+  const apiKey = annotationCredential(providerConfigurationId);
+  const body: AnnotationResultQueryWritable & { kind: 'annotation' } = {
+    kind: 'annotation',
+    page,
+    page_size: pageSize,
+    ...(apiKey ? { api_key: apiKey } : {}),
+  };
+  return queryAnalysisResult({
     headers: { 'x-client-timeout-ms': '120000' },
-    path: { workspace_id: workspaceId, node_id: nodeId },
-    body: apiKey ? { ...request, api_key: apiKey } : request,
+    path: { workspace_id: workspaceId, analysis_id: analysisId },
+    body,
     signal,
+    throwOnError: true,
+  });
+};
+
+export const submitAnnotationRunAllWithProviderCredential = ({
+  workspaceId,
+  tabId,
+  providerConfigurationId,
+  source,
+}: {
+  workspaceId: string;
+  tabId: string;
+  providerConfigurationId: string;
+  source: AnnotationAnalysisRequest;
+}) => {
+  const apiKey = annotationCredential(providerConfigurationId);
+  const body: AnnotationRunAllSubmissionWritable & { kind: 'annotation_run_all' } = {
+    kind: 'annotation_run_all',
+    source,
+    ...(apiKey ? { api_key: apiKey } : {}),
+  };
+  return submitTabAnalysis({
+    headers: { 'x-client-timeout-ms': '120000' },
+    path: { workspace_id: workspaceId, tab_id: tabId },
+    body: {
+      execution_scope: 'run_all',
+      request: body,
+      supersedes_analysis_ids: [],
+    },
     throwOnError: true,
   });
 };
@@ -91,18 +132,30 @@ export const submitTabAnalysisWithProviderCredential = ({
   workspaceId,
   tabId,
   request,
+  executionScope = 'preview',
+  parentAnalysisId,
+  supersedesAnalysisIds = [],
 }: {
   workspaceId: string;
   tabId: string;
-  request: SecretFreeRootAnalysisSubmission;
+  request: SecretFreeAnalysisSubmission;
+  executionScope?: AnalysisExecutionScope;
+  parentAnalysisId?: string | null;
+  supersedesAnalysisIds?: string[];
 }) => {
   const apiKey =
     request.kind === 'annotation'
       ? annotationCredential(request.provider_configuration_id)
       : undefined;
-  const body = request.kind === 'annotation' && apiKey ? { ...request, api_key: apiKey } : request;
+  const submittedRequest =
+    request.kind === 'annotation' && apiKey ? { ...request, api_key: apiKey } : request;
   return submitTabAnalysis({
-    body: body as SubmitTabAnalysisData['body'],
+    body: {
+      execution_scope: executionScope,
+      request: submittedRequest,
+      parent_analysis_id: parentAnalysisId ?? null,
+      supersedes_analysis_ids: supersedesAnalysisIds,
+    } as SubmitTabAnalysisData['body'],
     path: { workspace_id: workspaceId, tab_id: tabId },
     throwOnError: true,
   });

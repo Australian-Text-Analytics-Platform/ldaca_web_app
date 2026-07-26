@@ -27,7 +27,7 @@ export interface UseQuotationEngineSettingsResult {
  * Used by: QuotationFeature because engine selection is a product parameter
  * with UI memory (last remote URL), validation feedback, request normalization,
  * and hydration rules that should not leak into the generic quotation task
- * paging/detach flow.
+ * Preview and Run All flow.
  *
  * Flow: keep the active local/remote config and remembered remote endpoint
  * together, normalize saved or user-entered URLs, expose request-ready engine
@@ -83,7 +83,7 @@ export function useQuotationEngineSettings(): UseQuotationEngineSettingsResult {
   const engineReady = resolvedEnginePayload.type === 'local' ? true : resolvedEnginePayload.isValid;
 
   /** Validates the current UI config and returns the backend request payload. */
-  // Called by: useQuotationTaskFlow before run and detach requests because every backend action must use the same engine normalization rules.
+  // Called before Preview and Run All because every backend action must use the same engine normalization rules.
   const buildEngineRequest = (): QuotationEngineRequestPayload | null => {
     if (resolvedEnginePayload.type === 'local') {
       if (engineError !== null) setEngineError(null);

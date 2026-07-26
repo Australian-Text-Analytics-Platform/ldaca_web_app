@@ -11,11 +11,7 @@ const mocks = vi.hoisted(() => ({
   clearTabAnalysis: vi.fn(),
   session: {
     analysis: null as Analysis | null,
-    request: null as Analysis['request'] | null,
     result: null as unknown,
-    lifecycleError: null as string | null,
-    resultError: null as unknown,
-    isLoading: false,
   },
   sessionOptions: null as {
     loadResult?: (
@@ -46,7 +42,10 @@ vi.mock('sonner', () => ({
 
 const analysis = (overrides: Partial<Analysis> = {}): Analysis => ({
   id: 'analysis-1',
+  tab_id: 'tab-1',
   parent_analysis_id: null,
+  execution_scope: 'run_all',
+  supersedes_analysis_ids: [],
   state: 'succeeded',
   cancellation_requested_at: null,
   created_at: '2026-01-01T00:00:00Z',
@@ -56,6 +55,7 @@ const analysis = (overrides: Partial<Analysis> = {}): Analysis => ({
   progress: { fraction: 1, message: 'Complete' },
   error: null,
   integrity: { status: 'valid' },
+  output_node_ids: [],
   request: {
     kind: 'token_frequency',
     node_ids: ['node-1'],
@@ -79,6 +79,8 @@ const baseConfig = () => ({
   workspaceId: 'workspace-1',
   tabId: 'tab-1',
   hydrationTaskId: 'analysis-1',
+  controlAnalysisId: 'analysis-1',
+  tabAnalysisIds: ['analysis-1'],
   fetchResult: vi.fn(() => Promise.resolve({ rows: [] })),
   onRequest: vi.fn(),
   onCleared: vi.fn(),
@@ -90,11 +92,7 @@ describe('useAnalysisFeature', () => {
     mocks.clearTabAnalysis.mockReset();
     mocks.toastError.mockReset();
     mocks.session.analysis = null;
-    mocks.session.request = null;
     mocks.session.result = null;
-    mocks.session.lifecycleError = null;
-    mocks.session.resultError = null;
-    mocks.session.isLoading = false;
     mocks.sessionOptions = null;
     mocks.cancelAnalysis.mockResolvedValue({ data: analysis({ state: 'cancelled' }) });
     mocks.clearTabAnalysis.mockResolvedValue({ data: undefined });
@@ -104,7 +102,6 @@ describe('useAnalysisFeature', () => {
     const config = baseConfig();
     const resultResource = { rows: [{ token: 'word' }] };
     mocks.session.analysis = analysis();
-    mocks.session.request = mocks.session.analysis.request;
     mocks.session.result = resultResource;
 
     const view = renderHook(() => useAnalysisFeature(config), { wrapper: createWrapper() });
@@ -116,6 +113,24 @@ describe('useAnalysisFeature', () => {
     });
     view.rerender();
     expect(config.onRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('hydrates parameters from a standalone Run All source without loading it as Preview', async () => {
+    const request = analysis().request;
+    const config = {
+      ...baseConfig(),
+      hydrationTaskId: null,
+      requestHydration: { analysisId: 'run-all-1', request },
+    };
+
+    const view = renderHook(() => useAnalysisFeature(config), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(config.onRequest).toHaveBeenCalledWith(request);
+      expect(view.result.current.request).toBe(request);
+    });
+    expect(view.result.current.result).toBeNull();
+    expect(mocks.sessionOptions).toMatchObject({ analysisId: null });
   });
 
   it('forwards the query-key projection to the Result loader', async () => {
@@ -145,7 +160,7 @@ describe('useAnalysisFeature', () => {
     expect(result.current.taskStatus.failedTask?.task_id).toBe('analysis-1');
   });
 
-  it('clears the Tab-owned Analysis and forwards cleanup options', async () => {
+  it('clears the Tab-owned Analysis and reports the removed identities', async () => {
     const config = baseConfig();
     mocks.session.analysis = analysis();
     const { result } = renderHook(() => useAnalysisFeature(config), {
@@ -153,16 +168,14 @@ describe('useAnalysisFeature', () => {
     });
 
     await act(async () => {
-      expect(await result.current.clearResults({ preserveLocalState: true })).toBe(true);
+      expect(await result.current.clearResults()).toBe(true);
     });
 
     expect(mocks.clearTabAnalysis).toHaveBeenCalledWith({
       path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
       throwOnError: true,
     });
-    expect(config.onCleared).toHaveBeenCalledWith(['analysis-1'], {
-      preserveLocalState: true,
-    });
+    expect(config.onCleared).toHaveBeenCalledWith(['analysis-1']);
   });
 
   it('cancels exactly the Analysis owned by the Tab', async () => {
@@ -179,6 +192,45 @@ describe('useAnalysisFeature', () => {
     expect(mocks.cancelAnalysis).toHaveBeenCalledWith({
       path: { workspace_id: 'workspace-1', analysis_id: 'analysis-1' },
       throwOnError: true,
+    });
+  });
+
+  it('releases a locally submitted Preview after successful Run All supersedes it', async () => {
+    mocks.session.analysis = analysis({
+      execution_scope: 'preview',
+      state: 'running',
+    });
+    const initialConfig = {
+      ...baseConfig(),
+      tabAnalysisIds: ['analysis-1'],
+    };
+    const { result, rerender } = renderHook(
+      ({ config }: { config: ReturnType<typeof baseConfig> & { tabAnalysisIds: string[] } }) =>
+        useAnalysisFeature(config),
+      {
+        initialProps: { config: initialConfig },
+        wrapper: createWrapper(),
+      },
+    );
+
+    act(() => {
+      result.current.setLocalTaskId('analysis-1');
+      result.current.setIsRunning(true);
+    });
+    expect(result.current.isRunning).toBe(true);
+
+    rerender({
+      config: {
+        ...initialConfig,
+        hydrationTaskId: null,
+        tabAnalysisIds: ['run-all-1'],
+        retiredAnalysisIds: ['analysis-1'],
+      },
+    });
+
+    await waitFor(() => {
+      expect(result.current.request).toBeNull();
+      expect(result.current.isRunning).toBe(false);
     });
   });
 });

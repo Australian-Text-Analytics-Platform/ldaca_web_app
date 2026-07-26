@@ -75,16 +75,21 @@ export function useDetectedColumnLanguage({
   });
 
   const sampleText = collectDocumentColumnText(sampleQuery.data?.rows, column ?? '');
+  const sourceRevision = sampleQuery.data
+    ? (sampleQuery.data.etag ?? `fetched:${String(sampleQuery.dataUpdatedAt)}`)
+    : null;
 
+  // The sampled resource revision is the cache dependency. Keeping the text
+  // itself out of the key avoids retaining document content in query metadata.
+  // eslint-disable-next-line @tanstack/query/exhaustive-deps
   const detectionQuery = useQuery({
-    queryKey: [
-      'tokenizer-language-detection',
-      workspaceId,
-      nodeId,
-      column,
-      sampleText.slice(0, 512),
-    ],
-    enabled: enabled && sampleText.length > 0,
+    queryKey: queryKeys.detectedColumnLanguage(
+      workspaceId ?? '',
+      nodeId ?? '',
+      column ?? '',
+      sourceRevision ?? 'disabled',
+    ),
+    enabled: enabled && sampleText.length > 0 && sourceRevision !== null,
     staleTime: 5 * 60_000,
     retry: false,
     /** Called by: TanStack Query once sample text is available. */

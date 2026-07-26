@@ -319,7 +319,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     nodeId: selectedNodeId,
     operationPayload,
     operationFetch: slicePreview,
-    signaturePrefix: 'slice',
+    operation: 'slice',
     enabled: previewReady,
     debounceMs: PREVIEW_DEBOUNCE_MS,
   });

@@ -4,15 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ViewType } from '@/features/views/viewIds';
 import { useTokenFrequencyTaskFlow } from '../useTokenFrequencyTaskFlow';
 
-const {
-  createConcordanceTabMock,
-  deleteTabMock,
-  setConcordanceTabTaskMock,
-  submitTabAnalysisMock,
-} = vi.hoisted(() => ({
+const { createConcordanceTabMock, deleteTabMock, submitTabAnalysisMock } = vi.hoisted(() => ({
   createConcordanceTabMock: vi.fn(),
   deleteTabMock: vi.fn(),
-  setConcordanceTabTaskMock: vi.fn(),
   submitTabAnalysisMock: vi.fn(),
 }));
 
@@ -25,7 +19,6 @@ vi.mock('@/api', async (importOriginal) => ({
 vi.mock('@/features/views/common/tabs/useWorkspaceTabs', () => ({
   useWorkspaceTabs: () => ({
     createTab: createConcordanceTabMock,
-    setTabTask: setConcordanceTabTaskMock,
   }),
 }));
 
@@ -47,7 +40,7 @@ describe('useTokenFrequencyTaskFlow', () => {
   it('assigns the returned Analysis id without submitting the frontend Tab id in the body', async () => {
     const setLocalTaskId = vi.fn();
     const setIsRunning = vi.fn();
-    const onTaskIdAssigned = vi.fn();
+    const onSubmitted = vi.fn();
 
     const { result } = renderHook(() =>
       useTokenFrequencyTaskFlow({
@@ -68,8 +61,7 @@ describe('useTokenFrequencyTaskFlow', () => {
           setLastCompareNodeIds: vi.fn(),
           setAppliedStopSet: vi.fn(),
           setStopWords: vi.fn(),
-          lastFetchedRef: { current: { taskId: null, state: null } },
-          onTaskIdAssigned,
+          onSubmitted,
         },
         navigation: {
           setCurrentView: vi.fn(),
@@ -86,17 +78,20 @@ describe('useTokenFrequencyTaskFlow', () => {
       expect.objectContaining({
         path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
         body: expect.objectContaining({
-          kind: 'token_frequency',
-          node_ids: ['node-1'],
-          node_columns: { 'node-1': 'text' },
-          node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
-          stop_words: ['and', 'the'],
+          execution_scope: 'run_all',
+          request: expect.objectContaining({
+            kind: 'token_frequency',
+            node_ids: ['node-1'],
+            node_columns: { 'node-1': 'text' },
+            node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
+            stop_words: ['and', 'the'],
+          }),
         }),
       }),
     );
     expect(submitTabAnalysisMock.mock.calls[0]?.[0]?.body).not.toHaveProperty('tab_id');
     expect(setLocalTaskId).toHaveBeenCalledWith('analysis-1');
-    expect(onTaskIdAssigned).toHaveBeenCalledWith('analysis-1');
+    expect(onSubmitted).toHaveBeenCalledOnce();
   });
 
   const renderTwoNodeFlow = (setCurrentView: (view: ViewType) => void = vi.fn()) =>
@@ -128,8 +123,7 @@ describe('useTokenFrequencyTaskFlow', () => {
           setLastCompareNodeIds: vi.fn(),
           setAppliedStopSet: vi.fn(),
           setStopWords: vi.fn(),
-          lastFetchedRef: { current: { taskId: null, state: null } },
-          onTaskIdAssigned: vi.fn(),
+          onSubmitted: vi.fn(),
         },
         navigation: {
           setCurrentView,
@@ -138,43 +132,19 @@ describe('useTokenFrequencyTaskFlow', () => {
       }),
     );
 
-  it('creates and submits a durable Concordance Analysis scoped to the clicked Data Block', async () => {
+  it('creates a Concordance Analysis with every Data Block from the two-node comparison', async () => {
     const setCurrentView = vi.fn<(view: ViewType) => void>();
     const { result } = renderTwoNodeFlow(setCurrentView);
-
-    act(() => {
-      result.current.handleTokenClick('hello', 'node-2');
-    });
-
-    await waitFor(() => {
-      expect(submitTabAnalysisMock).toHaveBeenCalledWith({
-        body: expect.objectContaining({
-          kind: 'concordance',
-          node_ids: ['node-2'],
-          node_columns: { 'node-2': 'text' },
-          node_tokenizer_models: { 'node-2': 'lindera:jieba' },
-          search_word: 'hello',
-          search_mode: 'tokens',
-        }),
-        path: { workspace_id: 'workspace-1', tab_id: 'concordance-tab' },
-        throwOnError: true,
-      });
-    });
-    expect(setConcordanceTabTaskMock).toHaveBeenCalledWith('concordance-tab', 'analysis-1');
-    expect(setCurrentView).toHaveBeenCalledWith('concordance');
-  });
-
-  it('keeps both compared Data Blocks when the comparative result supplies no source id', async () => {
-    const { result } = renderTwoNodeFlow();
 
     act(() => {
       result.current.handleTokenClick('hello');
     });
 
     await waitFor(() => {
-      expect(submitTabAnalysisMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.objectContaining({
+      expect(submitTabAnalysisMock).toHaveBeenCalledWith({
+        body: expect.objectContaining({
+          execution_scope: 'preview',
+          request: expect.objectContaining({
             kind: 'concordance',
             node_ids: ['node-1', 'node-2'],
             node_columns: { 'node-1': 'text', 'node-2': 'text' },
@@ -182,10 +152,15 @@ describe('useTokenFrequencyTaskFlow', () => {
               'node-1': 'native:plain_words_en',
               'node-2': 'lindera:jieba',
             },
+            search_word: 'hello',
+            search_mode: 'tokens',
           }),
         }),
-      );
+        path: { workspace_id: 'workspace-1', tab_id: 'concordance-tab' },
+        throwOnError: true,
+      });
     });
+    expect(setCurrentView).toHaveBeenCalledWith('concordance');
   });
 
   it('does not submit or navigate until the destination Tab exists', async () => {
@@ -233,7 +208,6 @@ describe('useTokenFrequencyTaskFlow', () => {
         throwOnError: true,
       });
     });
-    expect(setConcordanceTabTaskMock).toHaveBeenCalledWith('concordance-tab', null);
     expect(setCurrentView).not.toHaveBeenCalled();
   });
 });

@@ -1,27 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Analysis } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
-import { getAnalysisOutputResource, getAnalysisResource } from '../analysisApi';
-
-export const analysisSessionKeys = {
-  analysis: queryKeys.analysis,
-  results: queryKeys.analysisResult,
-};
+import { getAnalysisResource } from '../analysisApi';
 
 interface UseAnalysisSessionOptions<TResult> {
   workspaceId: string | null;
   analysisId: string | null;
   resultQuery?: Readonly<Record<string, unknown>>;
-  loadResult?: (
+  loadResult: (
     workspaceId: string,
     analysisId: string,
     query?: Readonly<Record<string, unknown>>,
   ) => Promise<TResult>;
-}
-
-export interface HydrationState {
-  status: 'idle' | 'loading' | 'error';
-  error?: string;
 }
 
 /**
@@ -35,38 +25,48 @@ export function useAnalysisSession<TResult>({
   loadResult,
 }: UseAnalysisSessionOptions<TResult>) {
   const enabled = Boolean(workspaceId && analysisId);
+  const resultScope =
+    workspaceId && analysisId ? queryKeys.analysisResults(workspaceId, analysisId) : null;
   const analysisQuery = useQuery({
     queryKey:
       workspaceId && analysisId
-        ? analysisSessionKeys.analysis(workspaceId, analysisId)
-        : ['analysis-session', '__inactive__', 'analysis'],
+        ? queryKeys.analysis(workspaceId, analysisId)
+        : queryKeys.inactiveAnalysis,
     enabled,
     queryFn: async (): Promise<Analysis> => {
       if (!workspaceId || !analysisId) throw new Error('Analysis session is not active');
       return getAnalysisResource(workspaceId, analysisId);
     },
   });
+  // `loadResult` selects the transport/projection implementation; the immutable
+  // Analysis id plus `projectionQuery` already define the server resource.
   const resultResourceQuery = useQuery<TResult>({
     queryKey:
       workspaceId && analysisId
         ? queryKeys.analysisResult(workspaceId, analysisId, projectionQuery)
-        : ['analysis-session', '__inactive__', 'result'],
+        : queryKeys.inactiveAnalysisResult(projectionQuery),
     enabled: enabled && analysisQuery.data?.state === 'succeeded',
+    // A paginated observer may retain its last same-Analysis shape while the
+    // feature replaces stale rows with a processing body. Never bridge this
+    // placeholder across Analysis or Workspace ownership boundaries.
+    placeholderData: (previousData, previousQuery) => {
+      if (!projectionQuery || !resultScope || !previousQuery) return undefined;
+      const previousKey = previousQuery.queryKey;
+      const belongsToCurrentAnalysis = resultScope.every(
+        (segment, index) => previousKey[index] === segment,
+      );
+      return belongsToCurrentAnalysis ? previousData : undefined;
+    },
     queryFn: async (): Promise<TResult> => {
       if (!workspaceId || !analysisId) throw new Error('Analysis session is not active');
-      if (loadResult) return loadResult(workspaceId, analysisId, projectionQuery);
-      return (await getAnalysisOutputResource(workspaceId, analysisId)) as TResult;
+      return loadResult(workspaceId, analysisId, projectionQuery);
     },
   });
 
   return {
     analysis: analysisQuery.data ?? null,
-    request: analysisQuery.data?.request ?? null,
     result: resultResourceQuery.data ?? null,
-    lifecycleError: analysisQuery.data?.error?.message ?? null,
-    resultError: resultResourceQuery.error,
-    isAnalysisLoading: analysisQuery.isLoading,
-    isResultLoading: resultResourceQuery.isLoading,
-    isLoading: analysisQuery.isLoading || resultResourceQuery.isLoading,
+    isResultFetching: resultResourceQuery.isFetching,
+    isResultPlaceholderData: resultResourceQuery.isPlaceholderData,
   };
 }

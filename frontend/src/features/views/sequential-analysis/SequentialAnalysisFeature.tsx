@@ -9,7 +9,6 @@ import { arrowSchemaToKinds } from '@/features/workspace/common/hooks/useSchemaM
 import { fetchNodeSchema } from '@/lib/nodeSchema';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
-import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { analysisInputsFromRequest } from '../common/utils';
@@ -50,11 +49,18 @@ const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
  */
 const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const {
-    taskId: tabTaskId,
-    setTaskId: onTabTaskChange,
+    latestRunAll,
+    activeAnalysis,
+    analyses,
+    refreshAnalyses,
     inputSets: tabInputSets,
     setInputSet: onTabInputSetChange,
   } = host;
+  const tabTaskId = latestRunAll?.id ?? null;
+  const runAllLocksParameters =
+    latestRunAll?.state === 'queued' ||
+    latestRunAll?.state === 'running' ||
+    latestRunAll?.state === 'succeeded';
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -73,9 +79,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
   const sourceDocumentCount = (() => {
-    const firstShapeValue = activeNodeId
-      ? nodeInputs.nodeInfoCache[activeNodeId]?.shape?.[0]
-      : null;
+    const firstShapeValue = activeNodeId ? nodeInputs.nodeInfoById[activeNodeId]?.shape?.[0] : null;
     return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
       ? firstShapeValue
       : undefined;
@@ -137,7 +141,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     isStopping,
     setIsRunning: setIsAnalyzing,
     runningRef,
-    lastFetchedRef,
     banner: sequentialWaitingBanner,
     taskStatus,
     clearResults,
@@ -147,9 +150,11 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     taskType: ANALYSIS_TASK_TYPES.sequential,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    // Tab-driven deterministic hydration: the tab's persisted task id wins task
-    // resolution over transient local state.
+    // The forest's newest Run All Analysis wins hydration over transient
+    // submission state.
     hydrationTaskId: tabTaskId,
+    controlAnalysisId: activeAnalysis?.id ?? null,
+    tabAnalysisIds: analyses.map((analysis) => analysis.id),
     // Loads the latest sequential-analysis result for polling and task resumption.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
@@ -178,14 +183,10 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
       }
     },
     // Clears sequential-specific state after the shared lifecycle removes the task result.
-    onCleared: (_, options) => {
+    onCleared: () => {
       chartControls.resetAfterClear();
-      if (options?.preserveLocalState) {
-        return;
-      }
-      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange(null);
+      // Refresh the canonical forest; curated inputs remain in the Tab draft.
+      refreshAnalyses();
       setLockedSchema(null);
       sequentialParameters.resetAfterClear();
     },
@@ -297,31 +298,18 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         setChartType,
         setLocalTaskId,
         runningRef,
-        lastFetchedRef,
         setNodeColumnSelections: (selections) => {
           applyInputsFromSelections(selections);
         },
         setTimeColumn,
         lockCurrentSchema,
         clearResults,
-        // Persist the run's assigned task id onto the active tab so reload
-        // rehydrates the same task.
-        onTaskIdAssigned: (taskId) => {
-          onTabTaskChange(taskId);
-        },
+        onSubmitted: refreshAnalyses,
       },
     });
 
-  // Runs a fresh trends analysis or updates a locked task after parameter changes.
-  /**
-   * Passed to the analysis action button as its run/update handler.
-   */
   const handleRunOrUpdate = async () => {
-    await executeAnalysisRerun({
-      hasAttachedAnalysis: Boolean(tabTaskId),
-      clearResults,
-      runFreshAnalysis: handleAnalyze,
-    });
+    await handleAnalyze();
   };
 
   const chartModel = buildSequentialChartModel({
@@ -401,7 +389,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         }}
         actions={{
           // Routes the Run button through live sequential analysis.
-          onRun: () => {
+          onRunAll: () => {
             void handleRunOrUpdate();
           },
           // Stops the active sequential-analysis task from the shared layout action.
@@ -412,23 +400,28 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           onClear: () => {
             void handleClearResults();
           },
-          runDisabled: actionState.runDisabled || isLoading.operations || !activeTimeColumn,
-          runDisabledReason: (() => {
+          runAllDisabled:
+            runAllLocksParameters ||
+            actionState.runDisabled ||
+            isLoading.operations ||
+            !activeTimeColumn,
+          runAllDisabledReason: (() => {
             if (isAnalyzing || isLoading.operations) return undefined;
             if (actionState.runDisabledReason) return actionState.runDisabledReason;
             if (!activeTimeColumn) return 'Select a time column to run';
             return undefined;
           })(),
           clearDisabled: actionState.clearDisabled,
-          isRunning: isAnalyzing,
+          isRunningAll: isAnalyzing,
           isStopping,
           hasResult: Boolean(results),
-          runLabel: actionState.runLabel,
+          runAllLabel: actionState.runLabel,
           clearHelp: {
             targetKey: 'analysis.sequential-analysis.clear-results',
             label: 'Clear results',
           },
         }}
+        parametersLocked={runAllLocksParameters}
       >
         <SequentialAnalysisParameterPanel
           nodeInputs={nodeInputs}

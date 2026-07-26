@@ -299,7 +299,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     nodeId: activeNodeId,
     operationPayload,
     operationFetch: polarsExpressionPreview,
-    signaturePrefix: 'aggregate',
+    operation: 'aggregate',
     enabled: hasSelection,
     debounceMs: 100,
   });

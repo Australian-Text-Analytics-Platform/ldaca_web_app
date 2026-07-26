@@ -30,9 +30,6 @@ const createHarness = () => {
     nodes: [nodeInfo],
     edges: [],
   });
-  queryClient.setQueryData<WorkspaceNodeInfo[]>(queryKeys.nodeInfos('workspace-a', ['node-a']), [
-    nodeInfo,
-  ]);
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -89,13 +86,6 @@ describe('node preference persistence', () => {
       queryKeys.workspaceGraph('workspace-a'),
     );
     expect(graph?.nodes[0]).toMatchObject({
-      document: 'new-document',
-      tokenizer_model: 'new-tokenizer',
-    });
-    const cachedInfo = queryClient.getQueryData<WorkspaceNodeInfo[]>(
-      queryKeys.nodeInfos('workspace-a', ['node-a']),
-    );
-    expect(cachedInfo?.[0]).toMatchObject({
       document: 'new-document',
       tokenizer_model: 'new-tokenizer',
     });

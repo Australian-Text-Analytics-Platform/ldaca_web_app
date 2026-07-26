@@ -58,9 +58,7 @@ interface TokenFrequencyResultsPanelProps {
   getColorForNode: (nodeId: string, index?: number) => string;
 
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
-  // Optional second arg scopes the concordance handoff to a single data block;
-  // omitted by the unified cloud and statistics table (both-node handoff).
-  onTokenClick: (token: string, nodeId?: string) => void;
+  onTokenClick: (token: string) => void;
   onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
 
   unifiedCloudWidth: number;

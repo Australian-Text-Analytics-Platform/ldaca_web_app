@@ -22,9 +22,8 @@ interface TopicModelingActions {
   setIsRunning: (value: boolean) => void;
   runningRef: React.RefObject<boolean>;
   setError: (value: string | null) => void;
-  lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
   setLocalTaskId: (id: string | null) => void;
-  onTaskIdAssigned: (taskId: string | null) => void;
+  onSubmitted: () => void;
 }
 
 interface Params {
@@ -45,7 +44,7 @@ export function useTopicModelingTaskFlow({
     sampleFractions,
     minTopicSize,
   },
-  actions: { setIsRunning, runningRef, setError, lastFetchedRef, setLocalTaskId, onTaskIdAssigned },
+  actions: { setIsRunning, runningRef, setError, setLocalTaskId, onSubmitted },
 }: Params) {
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0 || runningRef.current) return;
@@ -72,17 +71,19 @@ export function useTopicModelingTaskFlow({
     };
 
     await runAnalysisTaskEnvelope<Analysis>({
-      lastFetchedRef,
       runningRef,
       setIsRunning,
       setLocalTaskId,
-      onTaskIdAssigned,
+      onSubmitted,
       resetBeforeRun: () => {
         setError(null);
       },
       submit: async () => {
         const { data } = await submitTabAnalysis({
-          body: { kind: 'topic_modeling', ...request },
+          body: {
+            execution_scope: 'run_all',
+            request: { kind: 'topic_modeling', ...request },
+          },
           path: { workspace_id: currentWorkspaceId, tab_id: tabId },
           throwOnError: true,
         });

@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { Loader2, Plus } from 'lucide-react';
-import type { ConcordanceNodeResult as ConcordanceResultEntry, WorkspaceGraphNode } from '@/api';
+import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
-import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
@@ -25,10 +21,12 @@ import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
 import { ConcordanceDispersionRowsTable } from './ConcordanceDispersionRowsTable';
 import { buildConcordanceDispersionTableModel } from './concordanceDispersionTableModel';
-import {
-  buildDispersionDetachActionState,
-  toggleHiddenMatchedText,
-} from './concordanceDispersionActions';
+const toggleHiddenMatchedText = (current: Set<string>, text: string): Set<string> => {
+  const next = new Set(current);
+  if (next.has(text)) next.delete(text);
+  else next.add(text);
+  return next;
+};
 
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
@@ -60,7 +58,6 @@ export interface ConcordanceDispersionNodeBlockProps {
   resultsViewportWidth: number;
 
   // Workspace selection
-  selectedNodes: WorkspaceGraphNode[];
   panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
 
@@ -76,7 +73,6 @@ export interface ConcordanceDispersionNodeBlockProps {
   combinedPage: number;
   combinedLoading: boolean;
   nodeLoading: Record<string, boolean>;
-  nodeDetaching: Record<string, boolean>;
 
   // Dispersion-specific state
   proportionalDispersionBars: boolean;
@@ -100,16 +96,6 @@ export interface ConcordanceDispersionNodeBlockProps {
   onClearBinSelection: (blockKey: string) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
-  onDispersionDetach: (
-    nodes: { nodeId: string; column: string; nodeLabel: string }[],
-    selectedBins: ReadonlySet<number> | null,
-    binCount: number,
-    options?: {
-      selectedMatchedTexts?: string[] | null;
-      matchCaseInsensitive?: boolean;
-    },
-  ) => Promise<void> | void;
-
   // Handlers
   handlePageChange: (newPage: number, paginationKey: string, requestNodeId: string) => void;
   handleRowClick: (
@@ -132,7 +118,6 @@ export function ConcordanceDispersionNodeBlock({
   showMetadata,
   selectedMetadataColumns,
   resultsViewportWidth,
-  selectedNodes,
   panelSelectedNodes,
   effectiveNodeColumnSelections,
   sourceColorMap,
@@ -143,7 +128,6 @@ export function ConcordanceDispersionNodeBlock({
   combinedPage,
   combinedLoading,
   nodeLoading,
-  nodeDetaching,
   proportionalDispersionBars,
   colourMatches,
   lowercaseMatches,
@@ -160,14 +144,11 @@ export function ConcordanceDispersionNodeBlock({
   onClearBinSelection,
   allMatchedTexts,
   matchedTextColorMap,
-  onDispersionDetach,
   handlePageChange,
   handleRowClick,
   setCombinedPage,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
-  const detachNodeId = actualNodeId;
-  const canDetach = Boolean(detachNodeId) && detachNodeId !== CONCORDANCE_COMBINED_NODE_KEY;
 
   // Per-matched-text totals + selection-scoped sub-totals, published up
   // from the active ``ConcordanceDispersionSummary`` so the standalone
@@ -216,9 +197,6 @@ export function ConcordanceDispersionNodeBlock({
         proportionalDispersionBars,
       });
 
-    const combinedNodeIds = takeMostRecent(selectedNodes, 2)
-      .map((n) => n.id)
-      .filter((id): id is string => Boolean(id));
     const combinedPageSizeSummary = (
       <GroupedResultsPageSizeSummary
         groups={nodeData.data}
@@ -247,67 +225,8 @@ export function ConcordanceDispersionNodeBlock({
       <div key={CONCORDANCE_COMBINED_NODE_KEY} className="mb-6">
         <div className="flex items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
-          <div className="ml-auto flex items-center space-x-2">
+          <div className="ml-auto flex items-center">
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
-            {(() => {
-              const combinedSelection =
-                (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
-                  | ReadonlySet<number>
-                  | undefined) ?? EMPTY_BIN_SELECTION;
-              const combinedHasSelection = combinedSelection.size > 0;
-              const detachAction = buildDispersionDetachActionState({
-                isBusy: combinedLoading,
-                hasSearchWord: Boolean(searchWord.trim()),
-                hasDetachTarget: combinedNodeIds.length > 0,
-                hasSelection: combinedHasSelection,
-                colourMatches,
-                allMatchedTexts,
-                hiddenMatchedTexts,
-                selectedBinsHint:
-                  'Add a per-document aggregation of the selected bin hits to the workspace',
-                allHitsHint: 'Add a per-document aggregation of all hits to the workspace',
-              });
-              return (
-                <DisabledReasonTooltip
-                  reason={detachAction.disabled ? detachAction.title : undefined}
-                >
-                  <Button
-                    onClick={() => {
-                      if (combinedNodeIds.length === 0 || !searchWord.trim()) return;
-                      const nodes = combinedNodeIds
-                        .map((nid) => {
-                          const col = effectiveNodeColumnSelections.find(
-                            (s) => s.nodeId === nid,
-                          )?.column;
-                          if (!col) return null;
-                          const sourceNode = panelSelectedNodes.find((node) => node.id === nid);
-                          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string name/id must fall back to the next identifier
-                          const label = sourceNode?.name || sourceNode?.id || nid;
-                          return { nodeId: nid, column: col, nodeLabel: label };
-                        })
-                        .filter(
-                          (n): n is { nodeId: string; column: string; nodeLabel: string } =>
-                            n !== null,
-                        );
-                      void onDispersionDetach(nodes, combinedSelection, binCount, {
-                        selectedMatchedTexts: detachAction.visibleMatchedTexts,
-                        matchCaseInsensitive: lowercaseMatches,
-                      });
-                    }}
-                    disabled={detachAction.disabled}
-                    size="sm"
-                    className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                    title={detachAction.disabled ? undefined : detachAction.title}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Workspace
-                    {combinedHasSelection
-                      ? ` (${String(combinedSelection.size)} bin${combinedSelection.size === 1 ? '' : 's'})`
-                      : ''}
-                  </Button>
-                </DisabledReasonTooltip>
-              );
-            })()}
           </div>
         </div>
         <AnalysisTableFrame maxHeightClass="max-h-100" belowTable={combinedBelowTable}>
@@ -426,9 +345,6 @@ export function ConcordanceDispersionNodeBlock({
 
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
 
-  const detachingKey = detachNodeId;
-  const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
-
   const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
   // Mirror the table block by summarizing the current page groups together
   // with the source documents considered for this page.
@@ -452,65 +368,7 @@ export function ConcordanceDispersionNodeBlock({
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
         showPageSize
-      >
-        {(() => {
-          const nodeSelection =
-            (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ?? EMPTY_BIN_SELECTION;
-          const nodeHasSelection = nodeSelection.size > 0;
-          const detachAction = buildDispersionDetachActionState({
-            isBusy: nodeIsLoading || isDetaching,
-            hasSearchWord: Boolean(searchWord.trim()),
-            hasDetachTarget: canDetach && Boolean(detachNodeId),
-            hasSelection: nodeHasSelection,
-            colourMatches,
-            allMatchedTexts,
-            hiddenMatchedTexts,
-            selectedBinsHint:
-              'Add a per-document aggregation of the selected bin hits to the workspace',
-            allHitsHint: 'Add a per-document aggregation of all hits to the workspace',
-          });
-          return (
-            <DisabledReasonTooltip reason={detachAction.disabled ? detachAction.title : undefined}>
-              <Button
-                onClick={() => {
-                  if (!detachNodeId) return;
-                  const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
-                  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string node name must fall back to the node key
-                  const label = detachNode?.name || nodeKey;
-                  void onDispersionDetach(
-                    [{ nodeId: detachNodeId, column, nodeLabel: label }],
-                    nodeSelection,
-                    binCount,
-                    {
-                      selectedMatchedTexts: detachAction.visibleMatchedTexts,
-                      matchCaseInsensitive: lowercaseMatches,
-                    },
-                  );
-                }}
-                disabled={detachAction.disabled}
-                size="sm"
-                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-                title={detachAction.disabled ? undefined : detachAction.title}
-              >
-                {isDetaching ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding to Workspace...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Workspace
-                    {nodeHasSelection
-                      ? ` (${String(nodeSelection.size)} bin${nodeSelection.size === 1 ? '' : 's'})`
-                      : ''}
-                  </>
-                )}
-              </Button>
-            </DisabledReasonTooltip>
-          );
-        })()}
-      </ServerPaginationFooter>
+      />
     </>
   );
 

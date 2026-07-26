@@ -8,6 +8,8 @@ import type { ConditionColumnOption } from '../../types';
 import {
   buildCategoricalOptionEntries,
   type CategoricalOptionEntry,
+  getCategoricalOptionKey,
+  toCategoricalPrimitive,
 } from '../utils/categoricalOptions';
 
 const CATEGORICAL_PAGE_SIZE = 500;
@@ -36,6 +38,7 @@ const optionSql = (
   searchQuery: string,
 ): string => {
   const value = sqlIdentifier('value');
+  const count = sqlIdentifier('count');
   const source =
     dataType === 'string-list'
       ? `SELECT UNNEST(${sqlIdentifier(column)}) AS ${value} FROM ${sqlTable(nodeId)}`
@@ -44,9 +47,16 @@ const optionSql = (
   const where = trimmedSearch
     ? ` WHERE CAST(${value} AS VARCHAR) ~* ${sqlString(sqlGlobPattern(trimmedSearch))}`
     : '';
-  return `SELECT DISTINCT ${value} FROM (${source}) AS ${sqlIdentifier(
+  return `SELECT ${value}, COUNT(*) AS ${count} FROM (${source}) AS ${sqlIdentifier(
     'values',
-  )}${where} ORDER BY ${value} ASC NULLS FIRST`;
+  )}${where} GROUP BY ${value} ORDER BY ${value} ASC NULLS FIRST`;
+};
+
+const categoricalCount = (value: unknown): string | undefined => {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) {
+    return String(value);
+  }
+  return typeof value === 'string' && /^\d+$/.test(value) ? value : undefined;
 };
 
 interface UseFilterCategoricalOptionQueryArgs {
@@ -137,11 +147,22 @@ export function useFilterCategoricalOptionQuery({
     : [];
   const pageOptions = pages.map((page) => {
     const rawValues = page.rows.map((row) => row.value);
+    const countsByKey = new Map(
+      page.rows.flatMap((row) => {
+        const count = categoricalCount(row.count);
+        return count === undefined
+          ? []
+          : [[getCategoricalOptionKey(toCategoricalPrimitive(row.value)), count] as const];
+      }),
+    );
     const hasNull =
       dataType === 'categorical' &&
       debouncedSearch.trim().length === 0 &&
       rawValues.some((value) => value === null);
-    return buildCategoricalOptionEntries(rawValues, hasNull);
+    return buildCategoricalOptionEntries(rawValues, hasNull).map((option) => ({
+      ...option,
+      count: countsByKey.get(option.key),
+    }));
   });
   const options = isTopicDistribution
     ? topicOptions

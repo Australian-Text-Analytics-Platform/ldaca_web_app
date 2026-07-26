@@ -210,65 +210,6 @@ export type ConcordanceDispersionChartMode = (typeof CONCORDANCE_DISPERSION_CHAR
  * bins into its display bucket, accumulate series totals, then fill gaps.
  */
 /**
- * Format a sparse set of selected bin indices as a comma-separated list of
- * percentage ranges, suitable for appending to a node name on dispersion
- * detach. Contiguous bins collapse into a single span.
- *
- * Examples:
- * - bins {0,1,2} of 10 → "0-30%"
- * - bins {0,3,4} of 10 → "0-10%,30-50%"
- * - bins {} → "" (empty selection means "all hits")
- *
- * Mirrors the boundary style used by `formatBinRange` in
- * `ConcordanceDispersionSummary.tsx` so labels stay consistent between the
- * chart's tooltip and the detached node name.
- */
-/**
- * Used by: useConcordanceTaskFlow.ts.
- * Flow: sort selected bin indices, collapse adjacent indices into spans, and
- * render each span as a percentage range.
- */
-export function formatBinIndicesAsRangeLabel(
-  binIndices: ReadonlySet<number> | readonly number[],
-  binCount: number,
-): string {
-  const arr = Array.from(binIndices);
-  if (arr.length === 0) return '';
-  const safeBinCount = Math.max(1, Math.floor(binCount));
-  const width = 100 / safeBinCount;
-  const sorted = [...arr].sort((a, b) => a - b);
-  const spans: [number, number][] = [];
-  const [firstBin] = sorted;
-  if (firstBin === undefined) return '';
-  let start = firstBin;
-  let end = firstBin;
-  for (let i = 1; i < sorted.length; i++) {
-    const current = sorted[i];
-    if (current === undefined) continue;
-    if (current === end + 1) {
-      end = current;
-    } else {
-      spans.push([start, end]);
-      start = current;
-      end = current;
-    }
-  }
-  spans.push([start, end]);
-
-  const parts = spans.map(([s, e]) => {
-    if (width >= 2) {
-      const lower = s === 0 ? 0 : Math.round(s * width) + 1;
-      const upper = Math.round((e + 1) * width);
-      return `${String(lower)}-${String(upper)}%`;
-    }
-    const lower = s * width;
-    const upper = (e + 1) * width;
-    return `${lower.toFixed(1)}-${upper.toFixed(1)}%`;
-  });
-  return parts.join(',');
-}
-
-/**
  * How many source documents the engine actually considered to produce
  * the current page — the per-page batch size capped by the corpus.
  * ``page_size`` alone overstates on small corpora (estimator might pick

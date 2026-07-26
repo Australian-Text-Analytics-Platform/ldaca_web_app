@@ -299,11 +299,6 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     } satisfies ConcatPreviewRequestPayload;
   })();
 
-  const concatPreviewSignature = (() => {
-    if (!concatPreviewRequest) return 'concat-preview-disabled';
-    return JSON.stringify(concatPreviewRequest);
-  })();
-
   /**
    * Adapts the workspace concat preview callback to the generic preprocessing
    * preview hook result shape.
@@ -347,7 +342,13 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     setPageSize: setConcatPreviewPageSize,
   } = usePreprocessingPreview<ConcatPreviewRequestPayload>({
     request: concatPreviewRequest,
-    signature: concatPreviewSignature,
+    identity: concatPreviewRequest
+      ? {
+          workspaceId: concatPreviewRequest.workspaceId,
+          operation: 'stack',
+          nodeIds: concatPreviewRequest.nodeIds,
+        }
+      : null,
     fetcher: concatPreviewFetcher,
   });
 

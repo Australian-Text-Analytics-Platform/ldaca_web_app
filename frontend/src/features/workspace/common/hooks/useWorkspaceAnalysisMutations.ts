@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
 import { type QueryClient, useMutation } from '@tanstack/react-query';
-import { submitChildAnalysis } from '@/api';
+import { submitTabAnalysis } from '@/api';
 import type {
-  ConcordanceDetachmentAnalysisRequest,
-  ConcordanceDispersionDetachmentAnalysisRequest,
-  QuotationDetachmentAnalysisRequest,
+  ConcordanceRunAllAnalysisRequest,
+  ConcordanceResultPublicationAnalysisRequest,
+  QuotationResultPublicationAnalysisRequest,
+  QuotationRunAllAnalysisRequest,
   TopicModelingDetachmentAnalysisRequest,
 } from '@/api';
+import { queryKeys } from '@/lib/queryKeys';
 import { invalidateWorkspaceGraphQuery } from './workspaceMutationCache';
 
 interface WorkspaceAnalysisMutationsParams {
@@ -14,151 +15,176 @@ interface WorkspaceAnalysisMutationsParams {
   queryClient: QueryClient;
 }
 
-/**
- * Owns text-analysis actions exposed through the workspace action facade.
- * Used by: useWorkspaceNodeMutations because analysis views need detached
- * result nodes without coupling the
- * main workspace mutation hook to each analysis endpoint.
- * Flow: build generated-SDK mutations, guard detach operations that need an
- * active workspace id, refresh graph state after detach, and return stable
- * action functions for WorkspaceProvider consumers.
- */
+type ResultPublicationRequest =
+  | ({ kind: 'concordance_result_publication' } & ConcordanceResultPublicationAnalysisRequest)
+  | ({ kind: 'quotation_result_publication' } & QuotationResultPublicationAnalysisRequest);
+
+/** Owns supporting and Run All Analysis commands exposed by Workspace actions. */
 export const useWorkspaceAnalysisMutations = ({
   currentWorkspaceId,
   queryClient,
 }: WorkspaceAnalysisMutationsParams) => {
   const ensureWorkspaceSelected = () => {
-    if (!currentWorkspaceId) {
-      throw new Error('No workspace selected');
-    }
+    if (!currentWorkspaceId) throw new Error('No workspace selected');
     return currentWorkspaceId;
   };
-  const detachConcordanceMutation = useMutation({
-    mutationKey: ['workspace', 'detach-concordance'],
+  const runConcordanceAllMutation = useMutation({
+    mutationKey: ['workspace', 'concordance-run-all'],
     mutationFn: ({
       workspaceId,
-      analysisId,
+      tabId,
       request,
+      supersedesAnalysisIds,
     }: {
       workspaceId: string;
-      analysisId: string;
-      request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'>;
+      tabId: string;
+      request: Omit<ConcordanceRunAllAnalysisRequest, 'kind'>;
+      supersedesAnalysisIds: string[];
     }) =>
-      submitChildAnalysis({
-        body: { kind: 'concordance_detachment', ...request },
-        path: { workspace_id: workspaceId, analysis_id: analysisId },
+      submitTabAnalysis({
+        body: {
+          execution_scope: 'run_all',
+          request: { kind: 'concordance_run_all', ...request },
+          supersedes_analysis_ids: supersedesAnalysisIds,
+        },
+        path: { workspace_id: workspaceId, tab_id: tabId },
         throwOnError: true,
       }).then(({ data }) => data),
     onSuccess: (_data, variables) => {
-      invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaceAnalyses(variables.workspaceId),
+      });
     },
   });
-
-  const detachConcordanceDispersionMutation = useMutation({
-    mutationKey: ['workspace', 'detach-concordance-dispersion'],
+  const runQuotationAllMutation = useMutation({
+    mutationKey: ['workspace', 'quotation-run-all'],
     mutationFn: ({
       workspaceId,
-      analysisId,
+      tabId,
       request,
+      supersedesAnalysisIds,
     }: {
       workspaceId: string;
-      analysisId: string;
-      request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'>;
+      tabId: string;
+      request: Omit<QuotationRunAllAnalysisRequest, 'kind'>;
+      supersedesAnalysisIds: string[];
     }) =>
-      submitChildAnalysis({
-        body: { kind: 'concordance_dispersion_detachment', ...request },
-        path: { workspace_id: workspaceId, analysis_id: analysisId },
+      submitTabAnalysis({
+        body: {
+          execution_scope: 'run_all',
+          request: { kind: 'quotation_run_all', ...request },
+          supersedes_analysis_ids: supersedesAnalysisIds,
+        },
+        path: { workspace_id: workspaceId, tab_id: tabId },
         throwOnError: true,
       }).then(({ data }) => data),
     onSuccess: (_data, variables) => {
-      invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaceAnalyses(variables.workspaceId),
+      });
     },
   });
-
   const detachTopicModelingMutation = useMutation({
     mutationKey: ['workspace', 'detach-topic-modeling'],
     mutationFn: ({
       workspaceId,
+      tabId,
       analysisId,
       request,
     }: {
       workspaceId: string;
+      tabId: string;
       analysisId: string;
       request: Omit<TopicModelingDetachmentAnalysisRequest, 'kind'>;
     }) =>
-      submitChildAnalysis({
-        body: { kind: 'topic_modeling_detachment', ...request },
-        path: { workspace_id: workspaceId, analysis_id: analysisId },
+      submitTabAnalysis({
+        body: {
+          execution_scope: 'supporting',
+          parent_analysis_id: analysisId,
+          request: { kind: 'topic_modeling_detachment', ...request },
+        },
+        path: { workspace_id: workspaceId, tab_id: tabId },
         throwOnError: true,
       }).then(({ data }) => data),
     onSuccess: (_data, variables) => {
       invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
     },
   });
-
-  const detachQuotationMutation = useMutation({
-    mutationKey: ['workspace', 'detach-quotation'],
+  const publishResultMutation = useMutation({
+    mutationKey: ['workspace', 'publish-analysis-result'],
     mutationFn: ({
       workspaceId,
+      tabId,
       analysisId,
       request,
     }: {
       workspaceId: string;
+      tabId: string;
       analysisId: string;
-      request: Omit<QuotationDetachmentAnalysisRequest, 'kind'>;
+      request: ResultPublicationRequest;
     }) =>
-      submitChildAnalysis({
-        body: { kind: 'quotation_detachment', ...request },
-        path: { workspace_id: workspaceId, analysis_id: analysisId },
+      submitTabAnalysis({
+        body: {
+          execution_scope: 'supporting',
+          parent_analysis_id: analysisId,
+          request,
+        },
+        path: { workspace_id: workspaceId, tab_id: tabId },
         throwOnError: true,
       }).then(({ data }) => data),
     onSuccess: (_data, variables) => {
-      invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaceAnalyses(variables.workspaceId),
+      });
     },
   });
 
-  const actions = useMemo(
-    () => ({
-      detachConcordance: (
-        analysisId: string,
-        request: Omit<ConcordanceDetachmentAnalysisRequest, 'kind'>,
+  return {
+    actions: {
+      runConcordanceAll: (
+        tabId: string,
+        request: Omit<ConcordanceRunAllAnalysisRequest, 'kind'>,
+        supersedesAnalysisIds: string[] = [],
       ) =>
-        detachConcordanceMutation.mutateAsync({
+        runConcordanceAllMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          analysisId,
+          tabId,
           request,
+          supersedesAnalysisIds,
         }),
-      detachConcordanceDispersion: (
-        analysisId: string,
-        request: Omit<ConcordanceDispersionDetachmentAnalysisRequest, 'kind'>,
+      runQuotationAll: (
+        tabId: string,
+        request: Omit<QuotationRunAllAnalysisRequest, 'kind'>,
+        supersedesAnalysisIds: string[] = [],
       ) =>
-        detachConcordanceDispersionMutation.mutateAsync({
+        runQuotationAllMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
-          analysisId,
+          tabId,
           request,
-        }),
-      detachQuotation: (
-        analysisId: string,
-        request: Omit<QuotationDetachmentAnalysisRequest, 'kind'>,
-      ) =>
-        detachQuotationMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          analysisId,
-          request,
+          supersedesAnalysisIds,
         }),
       detachTopicModeling: (
+        tabId: string,
         analysisId: string,
         request: Omit<TopicModelingDetachmentAnalysisRequest, 'kind'>,
       ) =>
         detachTopicModelingMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
+          tabId,
           analysisId,
           request,
         }),
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutation refs intentionally omitted; mutateAsync identities are stable
-    [currentWorkspaceId],
-  );
-
-  return { actions } as const;
+      publishAnalysisResult: (
+        tabId: string,
+        analysisId: string,
+        request: ResultPublicationRequest,
+      ) =>
+        publishResultMutation.mutateAsync({
+          workspaceId: ensureWorkspaceSelected(),
+          tabId,
+          analysisId,
+          request,
+        }),
+    },
+  } as const;
 };

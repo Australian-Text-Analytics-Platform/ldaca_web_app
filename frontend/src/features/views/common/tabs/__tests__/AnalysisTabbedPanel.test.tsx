@@ -7,10 +7,11 @@ import { AnalysisTabbedPanel } from '../AnalysisTabbedPanel';
 
 const baseTab: AnalysisTab = {
   tab_id: 'tab-1',
-  task_id: null,
+  kind: 'token_frequency',
   title: 'Analysis 1',
   input_sets: { source: [] },
   settings: {},
+  annotation_correction_columns: {},
 };
 
 // ChromeTabs uses pointer capture, which jsdom does not implement.
@@ -86,17 +87,19 @@ describe('AnalysisTabbedPanel', () => {
     const tabs: AnalysisTab[] = [
       {
         tab_id: 'tab-1',
-        task_id: null,
+        kind: 'token_frequency',
         title: 'Analysis 1',
         input_sets: { source: [] },
         settings: {},
+        annotation_correction_columns: {},
       },
       {
         tab_id: 'tab-2',
-        task_id: null,
+        kind: 'token_frequency',
         title: 'Analysis 2',
         input_sets: { source: [] },
         settings: {},
+        annotation_correction_columns: {},
       },
     ];
     const { onReorder } = renderPanel(tabs, { multiTabEnabled: true });

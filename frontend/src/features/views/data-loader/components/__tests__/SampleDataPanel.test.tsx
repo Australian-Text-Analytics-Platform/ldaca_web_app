@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryKeys } from '@/lib/queryKeys';
 import { server } from '@/test/msw/server';
 import { SampleDataPanel } from '../SampleDataPanel';
 
@@ -59,7 +60,7 @@ describe('SampleDataPanel cache policy', () => {
     );
   });
 
-  it('invalidates the file tree once after a sample import', async () => {
+  it('invalidates the file tree and sample catalogue after an import', async () => {
     const user = userEvent.setup();
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -79,7 +80,15 @@ describe('SampleDataPanel cache policy', () => {
     await waitFor(() => {
       expect(mocks.importRequest).toHaveBeenCalledTimes(1);
     });
-    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: queryKeys.fileList,
+      exact: true,
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: queryKeys.sampleCollections,
+      exact: true,
+    });
   });
 
   it('does not submit when the remote catalogue fails', async () => {

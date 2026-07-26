@@ -46,15 +46,15 @@ setting, not an extraction-engine parameter.
 - Range: 0–2000.
 - Use 0 to keep the display close to the extracted speaker, quote, and verb.
 
-<h2 id="help-quotation-run">Step 4 — Run or re-run</h2>
+<h2 id="help-quotation-run">Step 4 — Preview</h2>
 
-Click **Run** to create a Quotation Analysis. If the Data Block, text column,
-or engine changes afterward, click **Re-run** to replace the Tab's current
-Analysis with a new immutable request.
+Click **Preview** to create a durable Quotation Preview Analysis. If the Data
+Block, text column, or engine changes afterward, click **Update Preview** to
+replace it with a new immutable request.
 
-The successful Analysis keeps its initial Result page and retained input
-snapshot. Later page and sort requests use that snapshot, not the current
-mutable Data Block. Navigating away does not expire a successful Result.
+The successful Preview Analysis keeps its retained input snapshot. Each page and
+sort request recomputes a fresh projection from that snapshot, not the current
+mutable Data Block. Preview pages are not cached.
 
 <h2 id="help-quotation-results">Result panel</h2>
 
@@ -73,27 +73,26 @@ source fields and generated quotation fields to the table. The virtual
 column. Other source metadata headers remain sortable; generated quotation
 headers are display-only because they are produced after source paging.
 
-Changing the page, documents-per-batch value, or sort order creates another
-projection of the same completed Analysis. It does not submit a new run.
+Changing the page, documents-per-batch value, or sort order recomputes another
+projection of the same Preview Analysis. It does not mutate that Analysis.
 
-<h3 id="help-quotation-detach">Add to Workspace</h3>
+<h3 id="help-quotation-run-all">Run All and Review</h3>
 
-Click **Add to Workspace** to submit a direct Child Analysis that creates a
-Derived Data Block from the completed Quotation Analysis. The child reads the
-parent's immutable request and retained input snapshot, so later edits to the
-source Data Block cannot alter its meaning.
+Click **Run All** at any time to submit an independent Run All Analysis that
+retains a complete table Result from its own immutable snapshot. Later source
+edits do not alter that Analysis's meaning, and Run All does not add a Data
+Block to the Workspace. After success, **Review** reads the immutable Result as
+the final full table.
 
-Choose which optional source columns to copy. Generated quotation columns such
-as `QUOTE_speaker`, `QUOTE_quote`, `QUOTE_verb`, their offsets, and quote type
-are included by the operation. Select `QUOTE_extraction` when you also want the
-raw source document under that canonical output name.
+Use **Add to Workspace** to publish selected Result columns as a Derived Data
+Block. The document column is required, metadata columns start unselected, and
+analysis columns start selected.
 
 <h3 id="help-quotation-clear-results">Clear results</h3>
 
-The Tab retains its Quotation Analysis and durable Result across navigation and
-Workspace reopen. **Clear Results** removes the Analysis and resets the Tab,
-including after failure or cancellation. **Re-run** clears the current Analysis
-before submitting its replacement.
+The Tab retains its Analysis forest across navigation and Workspace reopen.
+**Clear Results** removes the complete forest, including after failure or
+cancellation.
 
 <h2 id="help-quotation-troubleshooting">Troubleshooting</h2>
 
@@ -103,7 +102,7 @@ before submitting its replacement.
 | No quotations are shown on one page | The current source-document batch has no extracted quote | Continue to the next page |
 | Precision is low | The text differs from the news style targeted by the rules | Review the disclaimer and validate a representative sample |
 | A generated header does not sort | Generated quote fields are computed after source paging | Sort by the document header or source metadata |
-| Results do not reflect a later Data Block edit | You are viewing the historical Analysis snapshot | Click **Re-run** to submit the changed source deliberately |
+| Preview does not reflect a later Data Block edit | You are viewing the historical Preview snapshot | Click **Update Preview** to capture the changed source deliberately |
 
 <h2 id="help-quotation-defaults">Quick-reference defaults</h2>
 
@@ -111,15 +110,15 @@ before submitting its replacement.
 |---|---|---|
 | Engine | Built-in | Remote requires an operator-configured engine ID |
 | Context length | 5 words per side | Display-only, range 0–2000 |
-| Result source | Immutable run snapshot | Page and sort changes do not re-run |
+| Preview source | Immutable Preview snapshot | Every page and sort request is recomputed |
 
 ## Practice exercise
 
-1. Select a news Data Block and run the built-in engine.
+1. Select a news Data Block and Preview with the built-in engine.
 2. Inspect highlighted speaker, quote, and verb spans in several rows.
-3. Change the display context length without re-running.
+3. Change the display context length.
 4. Sort by the virtual document header and a source metadata column.
-5. Add selected output columns to the Workspace and inspect the Derived Data
-   Block.
+5. Run All, inspect Review, and use **Add to Workspace** if you need a Derived
+   Data Block.
 
 [← Back to tutorial index](./index.md)

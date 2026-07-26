@@ -1,5 +1,3 @@
-import { useCallback, useReducer, type Dispatch, type SetStateAction } from 'react';
-
 import type { QuotationAnalysisResponse, QuotationMetadata } from '@/api';
 import type { NodePaginationState } from '../../common/tasks/types';
 import { normalizeQuotationRow, type QuotationResultRow } from '../quotationResultsModel';
@@ -27,13 +25,15 @@ export interface QuotationResultState {
 
 type QuotationHitRow = Record<string, unknown>;
 type QuotationGroupedRow = QuotationHitRow[];
-type BooleanMapUpdater = SetStateAction<Record<string, boolean>>;
 
 const buildQuotationResultState = (
   result: QuotationAnalysisResponse,
   column: string,
 ): QuotationResultState => {
   const groupedRows = result.data;
+  if (!groupedRows || !result.metadata || !result.pagination || !result.sorting) {
+    throw new Error('Quotation Result page is unavailable');
+  }
   return {
     groupedRows,
     rows: groupedRows.flatMap((group) => group).map((row) => normalizeQuotationRow(row, column)),
@@ -51,25 +51,12 @@ interface UseQuotationResultControlsOptions {
   column: string;
 }
 
-/** Projects immutable Query result data and owns only detach progress. */
+/** Projects one immutable Quotation Result page into the table model. */
 export function useQuotationResultControls({
   result,
   nodeId,
   column,
 }: UseQuotationResultControlsOptions) {
-  const [nodeDetaching, dispatch] = useReducer(
-    (state: Record<string, boolean>, updater: BooleanMapUpdater) =>
-      typeof updater === 'function' ? updater(state) : updater,
-    {},
-  );
-
-  const setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>> = useCallback(
-    (updater) => {
-      dispatch(updater);
-    },
-    [],
-  );
-
   const normalized = result && nodeId && column ? buildQuotationResultState(result, column) : null;
   const resultsByNode = normalized ? { [nodeId]: normalized } : {};
   const nodeState: Record<string, NodePaginationState> = normalized
@@ -83,5 +70,5 @@ export function useQuotationResultControls({
       }
     : {};
 
-  return { nodeState, nodeDetaching, setNodeDetaching, resultsByNode };
+  return { nodeState, resultsByNode };
 }

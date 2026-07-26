@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { queryKeys } from '@/lib/queryKeys';
 import type { AnnotationProviderConfigurationView } from '@/features/provider-credentials/providerCredentialsStore';
 import { canListModels } from '../aiProviders';
 
@@ -30,7 +31,6 @@ interface ModelDropdownOption {
 }
 
 interface ModelNameComboboxProps {
-  workspaceId: string | null;
   configuration: AnnotationProviderConfigurationView;
   value: string;
   onChange: (value: string) => void;
@@ -73,7 +73,6 @@ function modelMatchesQuery(option: ModelDropdownOption, query: string): boolean 
 }
 
 export function ModelNameCombobox({
-  workspaceId,
   configuration,
   value,
   onChange,
@@ -85,22 +84,23 @@ export function ModelNameCombobox({
   const anchorRef = useRef<HTMLDivElement>(null);
 
   const listingEnabled = canListModels(configuration);
+  const configurationId = configuration.id;
+  const credentialRevision = configuration.credentialRevision;
+  const provider = configuration.provider;
+  const baseUrl = configuration.base_url ?? null;
 
   // The request facade injects browser-owned multi-user credentials only at the
   // network boundary. Single-user credentials remain backend-owned.
   const modelsQuery = useQuery<ModelDropdownOption[]>({
-    queryKey: [
-      'annotation-ai-models',
-      configuration.id,
-      configuration.credentialRevision,
-      workspaceId ?? '',
-    ],
+    queryKey: queryKeys.annotationModelList(configurationId, credentialRevision, provider, baseUrl),
     queryFn: async ({ signal }) => {
-      if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await listAnnotationModelsWithProviderCredential(configuration, signal);
+      const { data } = await listAnnotationModelsWithProviderCredential(
+        { id: configurationId, provider, base_url: baseUrl },
+        signal,
+      );
       return data.models.map((modelId) => ({ id: modelId }));
     },
-    enabled: open && listingEnabled && Boolean(workspaceId),
+    enabled: open && listingEnabled,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });

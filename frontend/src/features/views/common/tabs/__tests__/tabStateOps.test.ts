@@ -6,7 +6,7 @@ const tab = {
   id: 'tab-1',
   name: 'Analysis',
   kind: 'concordance' as const,
-  analysis_id: 'analysis-1',
+  analysis_ids: ['analysis-1'],
   created_at: '2026-01-01T00:00:00Z',
   modified_at: '2026-01-01T00:00:00Z',
   revision: 2,
@@ -21,7 +21,6 @@ describe('tabStateOps', () => {
     });
     expect(projected).toMatchObject({
       tab_id: 'tab-1',
-      task_id: 'analysis-1',
       title: 'Local title',
       kind: 'concordance',
       settings: { mode: 'manual' },
@@ -38,7 +37,7 @@ describe('tabStateOps', () => {
 
   it('reorders known tabs and appends omitted tabs without changing identity', () => {
     const first = tabFromResource(tab);
-    const second = tabFromResource({ ...tab, id: 'tab-2', name: 'Second', analysis_id: null });
+    const second = tabFromResource({ ...tab, id: 'tab-2', name: 'Second', analysis_ids: [] });
     expect(reorderTabs([first, second], ['tab-2']).map((item) => item.tab_id)).toEqual([
       'tab-2',
       'tab-1',

@@ -7,6 +7,7 @@ export interface CategoricalOptionEntry {
   value: CategoricalPrimitive;
   label: string;
   isNull: boolean;
+  count?: string;
 }
 
 export const NULL_OPTION_KEY = '__LDACA_NULL__';

@@ -110,8 +110,7 @@ function WorkspaceNodeList({
 
   const freshIds = useFreshNodesStore(
     (state) =>
-      (workspaceId ? state.freshnessByWorkspace.get(workspaceId)?.freshIds : undefined) ??
-      EMPTY_FRESH_IDS,
+      (workspaceId ? state.freshIdsByWorkspace.get(workspaceId) : undefined) ?? EMPTY_FRESH_IDS,
   );
   const markInteracted = useFreshNodesStore(
     (state) =>

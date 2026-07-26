@@ -32,6 +32,9 @@
               }
             ]
           },
+          "execution_scope": {
+            "$ref": "#/components/schemas/AnalysisExecutionScope"
+          },
           "finished_at": {
             "anyOf": [
               {
@@ -128,22 +131,30 @@
               {
                 "discriminator": {
                   "mapping": {
-                    "concordance_detachment": "#/components/schemas/ConcordanceDetachmentAnalysisRequest",
-                    "concordance_dispersion_detachment": "#/components/schemas/ConcordanceDispersionDetachmentAnalysisRequest",
-                    "quotation_detachment": "#/components/schemas/QuotationDetachmentAnalysisRequest",
+                    "annotation_run_all": "#/components/schemas/AnnotationRunAllAnalysisRequest",
+                    "concordance_result_publication": "#/components/schemas/ConcordanceResultPublicationAnalysisRequest",
+                    "concordance_run_all": "#/components/schemas/ConcordanceRunAllAnalysisRequest",
+                    "quotation_result_publication": "#/components/schemas/QuotationResultPublicationAnalysisRequest",
+                    "quotation_run_all": "#/components/schemas/QuotationRunAllAnalysisRequest",
                     "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
                   },
                   "propertyName": "kind"
                 },
                 "oneOf": [
                   {
-                    "$ref": "#/components/schemas/ConcordanceDetachmentAnalysisRequest"
+                    "$ref": "#/components/schemas/ConcordanceRunAllAnalysisRequest"
                   },
                   {
-                    "$ref": "#/components/schemas/ConcordanceDispersionDetachmentAnalysisRequest"
+                    "$ref": "#/components/schemas/QuotationRunAllAnalysisRequest"
                   },
                   {
-                    "$ref": "#/components/schemas/QuotationDetachmentAnalysisRequest"
+                    "$ref": "#/components/schemas/ConcordanceResultPublicationAnalysisRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QuotationResultPublicationAnalysisRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AnnotationRunAllAnalysisRequest"
                   },
                   {
                     "$ref": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
@@ -172,11 +183,27 @@
           },
           "state": {
             "$ref": "#/components/schemas/BackgroundState"
+          },
+          "supersedes_analysis_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Supersedes Analysis Ids",
+            "type": "array"
+          },
+          "tab_id": {
+            "format": "uuid",
+            "title": "Tab Id",
+            "type": "string"
           }
         },
         "required": [
           "id",
+          "tab_id",
           "parent_analysis_id",
+          "execution_scope",
+          "supersedes_analysis_ids",
           "request",
           "state",
           "progress",
@@ -191,6 +218,108 @@
         ],
         "title": "Analysis",
         "type": "object"
+      },
+      "AnalysisCreate": {
+        "additionalProperties": false,
+        "description": "One complete immutable Analysis submission owned by a Tab.",
+        "properties": {
+          "execution_scope": {
+            "$ref": "#/components/schemas/AnalysisExecutionScope"
+          },
+          "parent_analysis_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Analysis Id"
+          },
+          "request": {
+            "discriminator": {
+              "mapping": {
+                "annotation": "#/components/schemas/AnnotationAnalysisSubmission",
+                "annotation_run_all": "#/components/schemas/AnnotationRunAllSubmission",
+                "concordance": "#/components/schemas/ConcordanceAnalysisRequest",
+                "concordance_result_publication": "#/components/schemas/ConcordanceResultPublicationAnalysisRequest",
+                "concordance_run_all": "#/components/schemas/ConcordanceRunAllAnalysisRequest",
+                "quotation": "#/components/schemas/QuotationAnalysisRequest",
+                "quotation_result_publication": "#/components/schemas/QuotationResultPublicationAnalysisRequest",
+                "quotation_run_all": "#/components/schemas/QuotationRunAllAnalysisRequest",
+                "sequential": "#/components/schemas/SequentialAnalysisRequest",
+                "token_frequency": "#/components/schemas/TokenFrequencyAnalysisRequest",
+                "topic_modeling": "#/components/schemas/TopicModelingAnalysisRequest",
+                "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TokenFrequencyAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/TopicModelingAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/ConcordanceAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/QuotationAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/SequentialAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationAnalysisSubmission"
+              },
+              {
+                "$ref": "#/components/schemas/ConcordanceRunAllAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/QuotationRunAllAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/ConcordanceResultPublicationAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/QuotationResultPublicationAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/AnnotationRunAllSubmission"
+              },
+              {
+                "$ref": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
+              }
+            ],
+            "title": "Request"
+          },
+          "supersedes_analysis_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Supersedes Analysis Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "execution_scope",
+          "request"
+        ],
+        "title": "AnalysisCreate",
+        "type": "object"
+      },
+      "AnalysisExecutionScope": {
+        "enum": [
+          "preview",
+          "run_all",
+          "supporting"
+        ],
+        "title": "AnalysisExecutionScope",
+        "type": "string"
       },
       "AnalysisKind": {
         "description": "Function identity fixed when a Workspace Tab is created.",
@@ -264,6 +393,17 @@
             "title": "Annotation Column",
             "type": "string"
           },
+          "class_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Class Column",
+            "type": "string"
+          },
+          "class_node_id": {
+            "format": "uuid",
+            "title": "Class Node Id",
+            "type": "string"
+          },
           "classes": {
             "items": {
               "$ref": "#/components/schemas/AnnotationClass"
@@ -272,6 +412,63 @@
             "minItems": 1,
             "title": "Classes",
             "type": "array"
+          },
+          "correction_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Column"
+          },
+          "description_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description Column",
+            "type": "string"
+          },
+          "example_annotation_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Annotation Column"
+          },
+          "example_node_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Node Id"
+          },
+          "example_text_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Text Column"
           },
           "instruction": {
             "maxLength": 20000,
@@ -294,12 +491,6 @@
           "node_id": {
             "format": "uuid",
             "title": "Node Id",
-            "type": "string"
-          },
-          "output_node_name": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Output Node Name",
             "type": "string"
           },
           "provider": {
@@ -365,10 +556,12 @@
           "node_id",
           "text_column",
           "annotation_column",
+          "class_node_id",
+          "class_column",
+          "description_column",
           "classes",
           "model",
-          "instruction",
-          "output_node_name"
+          "instruction"
         ],
         "title": "AnnotationAnalysisRequest",
         "type": "object"
@@ -399,6 +592,17 @@
             "title": "Api Key",
             "writeOnly": true
           },
+          "class_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Class Column",
+            "type": "string"
+          },
+          "class_node_id": {
+            "format": "uuid",
+            "title": "Class Node Id",
+            "type": "string"
+          },
           "classes": {
             "items": {
               "$ref": "#/components/schemas/AnnotationClass"
@@ -407,6 +611,63 @@
             "minItems": 1,
             "title": "Classes",
             "type": "array"
+          },
+          "correction_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Column"
+          },
+          "description_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description Column",
+            "type": "string"
+          },
+          "example_annotation_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Annotation Column"
+          },
+          "example_node_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Node Id"
+          },
+          "example_text_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Text Column"
           },
           "instruction": {
             "maxLength": 20000,
@@ -429,12 +690,6 @@
           "node_id": {
             "format": "uuid",
             "title": "Node Id",
-            "type": "string"
-          },
-          "output_node_name": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Output Node Name",
             "type": "string"
           },
           "provider": {
@@ -500,10 +755,12 @@
           "node_id",
           "text_column",
           "annotation_column",
+          "class_node_id",
+          "class_column",
+          "description_column",
           "classes",
           "model",
-          "instruction",
-          "output_node_name"
+          "instruction"
         ],
         "title": "AnnotationAnalysisSubmission",
         "type": "object"
@@ -739,7 +996,6 @@
       },
       "AnnotationPreviewLabel": {
         "additionalProperties": false,
-        "description": "A provider label paired with its stable zero-based source row index.",
         "properties": {
           "label": {
             "anyOf": [
@@ -763,176 +1019,6 @@
           "label"
         ],
         "title": "AnnotationPreviewLabel",
-        "type": "object"
-      },
-      "AnnotationPreviewRequest": {
-        "additionalProperties": false,
-        "description": "One stateless, one-based page preview with a request-only credential.",
-        "properties": {
-          "annotation_column": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Annotation Column",
-            "type": "string"
-          },
-          "api_key": {
-            "anyOf": [
-              {
-                "format": "password",
-                "maxLength": 4000,
-                "minLength": 1,
-                "type": "string",
-                "writeOnly": true
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Key",
-            "writeOnly": true
-          },
-          "classes": {
-            "items": {
-              "$ref": "#/components/schemas/AnnotationClass"
-            },
-            "maxItems": 200,
-            "minItems": 1,
-            "title": "Classes",
-            "type": "array"
-          },
-          "instruction": {
-            "maxLength": 20000,
-            "minLength": 1,
-            "title": "Instruction",
-            "type": "string"
-          },
-          "model": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Model",
-            "type": "string"
-          },
-          "page": {
-            "default": 1,
-            "minimum": 1.0,
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "default": 20,
-            "maximum": 200.0,
-            "minimum": 1.0,
-            "title": "Page Size",
-            "type": "integer"
-          },
-          "provider": {
-            "enum": [
-              "openai",
-              "openrouter",
-              "anthropic",
-              "google",
-              "custom"
-            ],
-            "title": "Provider",
-            "type": "string"
-          },
-          "provider_base_url": {
-            "anyOf": [
-              {
-                "maxLength": 2000,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider Base Url"
-          },
-          "provider_configuration_id": {
-            "format": "uuid",
-            "title": "Provider Configuration Id",
-            "type": "string"
-          },
-          "reasoning_effort": {
-            "default": "medium",
-            "enum": [
-              "low",
-              "medium",
-              "high"
-            ],
-            "title": "Reasoning Effort",
-            "type": "string"
-          },
-          "reasoning_enabled": {
-            "default": false,
-            "title": "Reasoning Enabled",
-            "type": "boolean"
-          },
-          "temperature": {
-            "default": 0.0,
-            "maximum": 2.0,
-            "minimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
-          },
-          "text_column": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Text Column",
-            "type": "string"
-          }
-        },
-        "required": [
-          "provider_configuration_id",
-          "provider",
-          "text_column",
-          "annotation_column",
-          "classes",
-          "model",
-          "instruction"
-        ],
-        "title": "AnnotationPreviewRequest",
-        "type": "object"
-      },
-      "AnnotationPreviewResource": {
-        "additionalProperties": false,
-        "description": "Direct stateless preview result for one source-node page.",
-        "properties": {
-          "labels": {
-            "items": {
-              "$ref": "#/components/schemas/AnnotationPreviewLabel"
-            },
-            "title": "Labels",
-            "type": "array"
-          },
-          "node_id": {
-            "title": "Node Id",
-            "type": "string"
-          },
-          "page": {
-            "minimum": 1.0,
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "minimum": 1.0,
-            "title": "Page Size",
-            "type": "integer"
-          },
-          "total_rows": {
-            "minimum": 0.0,
-            "title": "Total Rows",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "node_id",
-          "page",
-          "page_size",
-          "total_rows",
-          "labels"
-        ],
-        "title": "AnnotationPreviewResource",
         "type": "object"
       },
       "AnnotationProviderConfigurationCreate": {
@@ -1062,11 +1148,129 @@
       "AnnotationResult": {
         "additionalProperties": false,
         "properties": {
-          "annotation_column": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Annotation Column",
+          "kind": {
+            "const": "annotation",
+            "default": "annotation",
+            "title": "Kind",
             "type": "string"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationPreviewLabel"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Size"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationResultQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ready": {
+            "const": true,
+            "default": true,
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/JsonData-Output"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "total_rows": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Rows"
+          }
+        },
+        "title": "AnnotationResult",
+        "type": "object"
+      },
+      "AnnotationResultQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key",
+            "writeOnly": true
           },
           "kind": {
             "const": "annotation",
@@ -1074,21 +1278,71 @@
             "title": "Kind",
             "type": "string"
           },
-          "output_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Output Columns",
-            "type": "array"
+          "page": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
           },
-          "output_node_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Output Node Ids",
-            "type": "array"
+          "page_size": {
+            "default": 10,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          }
+        },
+        "title": "AnnotationResultQuery",
+        "type": "object"
+      },
+      "AnnotationRunAllAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "annotation_run_all",
+            "default": "annotation_run_all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AnnotationAnalysisRequest"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "AnnotationRunAllAnalysisRequest",
+        "type": "object"
+      },
+      "AnnotationRunAllResult": {
+        "additionalProperties": false,
+        "properties": {
+          "affected_node_id": {
+            "format": "uuid",
+            "title": "Affected Node Id",
+            "type": "string"
+          },
+          "annotated_count": {
+            "minimum": 0.0,
+            "title": "Annotated Count",
+            "type": "integer"
+          },
+          "annotation_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Annotation Column",
+            "type": "string"
+          },
+          "committed_workspace_revision": {
+            "minimum": 1.0,
+            "title": "Committed Workspace Revision",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "annotation_run_all",
+            "default": "annotation_run_all",
+            "title": "Kind",
+            "type": "string"
           },
           "record_count": {
             "minimum": 0.0,
@@ -1097,12 +1351,48 @@
           }
         },
         "required": [
-          "output_node_ids",
-          "output_columns",
+          "affected_node_id",
+          "annotation_column",
+          "committed_workspace_revision",
           "record_count",
-          "annotation_column"
+          "annotated_count"
         ],
-        "title": "AnnotationResult",
+        "title": "AnnotationRunAllResult",
+        "type": "object"
+      },
+      "AnnotationRunAllSubmission": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key",
+            "writeOnly": true
+          },
+          "kind": {
+            "const": "annotation_run_all",
+            "default": "annotation_run_all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AnnotationAnalysisRequest"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "AnnotationRunAllSubmission",
         "type": "object"
       },
       "ApiError": {
@@ -2373,243 +2663,6 @@
         "title": "ConcordanceAnalysisRequest",
         "type": "object"
       },
-      "ConcordanceDetachmentAnalysisRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_detachment",
-            "default": "concordance_detachment",
-            "title": "Kind",
-            "type": "string"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "node_id": {
-            "format": "uuid",
-            "title": "Node Id",
-            "type": "string"
-          },
-          "selected_columns": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Selected Columns",
-            "type": "array"
-          }
-        },
-        "required": [
-          "node_id",
-          "selected_columns"
-        ],
-        "title": "ConcordanceDetachmentAnalysisRequest",
-        "type": "object"
-      },
-      "ConcordanceDetachmentDerivation": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_detachment",
-            "default": "concordance_detachment",
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "title": "ConcordanceDetachmentDerivation",
-        "type": "object"
-      },
-      "ConcordanceDetachmentResult": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_detachment",
-            "default": "concordance_detachment",
-            "title": "Kind",
-            "type": "string"
-          },
-          "output_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Output Columns",
-            "type": "array"
-          },
-          "output_node_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Output Node Ids",
-            "type": "array"
-          },
-          "record_count": {
-            "minimum": 0.0,
-            "title": "Record Count",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "output_node_ids",
-          "output_columns",
-          "record_count"
-        ],
-        "title": "ConcordanceDetachmentResult",
-        "type": "object"
-      },
-      "ConcordanceDispersionDetachmentAnalysisRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_dispersion_detachment",
-            "default": "concordance_dispersion_detachment",
-            "title": "Kind",
-            "type": "string"
-          },
-          "match_case_insensitive": {
-            "default": false,
-            "title": "Match Case Insensitive",
-            "type": "boolean"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "node_id": {
-            "format": "uuid",
-            "title": "Node Id",
-            "type": "string"
-          },
-          "selected_bins": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selected Bins"
-          },
-          "selected_columns": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Selected Columns",
-            "type": "array"
-          },
-          "selected_matched_texts": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selected Matched Texts"
-          },
-          "total_bins": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Total Bins"
-          }
-        },
-        "required": [
-          "node_id",
-          "selected_columns"
-        ],
-        "title": "ConcordanceDispersionDetachmentAnalysisRequest",
-        "type": "object"
-      },
-      "ConcordanceDispersionDetachmentDerivation": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_dispersion_detachment",
-            "default": "concordance_dispersion_detachment",
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "title": "ConcordanceDispersionDetachmentDerivation",
-        "type": "object"
-      },
-      "ConcordanceDispersionDetachmentResult": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_dispersion_detachment",
-            "default": "concordance_dispersion_detachment",
-            "title": "Kind",
-            "type": "string"
-          },
-          "output_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Output Columns",
-            "type": "array"
-          },
-          "output_node_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Output Node Ids",
-            "type": "array"
-          },
-          "record_count": {
-            "minimum": 0.0,
-            "title": "Record Count",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "output_node_ids",
-          "output_columns",
-          "record_count"
-        ],
-        "title": "ConcordanceDispersionDetachmentResult",
-        "type": "object"
-      },
       "ConcordancePage": {
         "additionalProperties": false,
         "properties": {
@@ -2663,11 +2716,53 @@
             "type": "string"
           },
           "query": {
-            "$ref": "#/components/schemas/ConcordanceResultQuery"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConcordanceResultQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ready": {
+            "const": true,
+            "default": true,
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ConcordanceSourceResult"
+                },
+                "maxItems": 2,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          }
+        },
+        "title": "ConcordanceResult",
+        "type": "object"
+      },
+      "ConcordanceResultPublicationAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_result_publication",
+            "default": "concordance_result_publication",
+            "title": "Kind",
+            "type": "string"
           },
           "sources": {
             "items": {
-              "$ref": "#/components/schemas/ConcordanceSourceResult"
+              "$ref": "#/components/schemas/ResultPublicationSource"
             },
             "maxItems": 2,
             "minItems": 1,
@@ -2676,10 +2771,58 @@
           }
         },
         "required": [
-          "sources",
-          "query"
+          "sources"
         ],
-        "title": "ConcordanceResult",
+        "title": "ConcordanceResultPublicationAnalysisRequest",
+        "type": "object"
+      },
+      "ConcordanceResultPublicationDerivation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_result_publication",
+            "default": "concordance_result_publication",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "ConcordanceResultPublicationDerivation",
+        "type": "object"
+      },
+      "ConcordanceResultPublicationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_result_publication",
+            "default": "concordance_result_publication",
+            "title": "Kind",
+            "type": "string"
+          },
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/ResultPublicationOutput"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "output_node_ids",
+          "outputs"
+        ],
+        "title": "ConcordanceResultPublicationResult",
         "type": "object"
       },
       "ConcordanceResultQuery": {
@@ -2734,6 +2877,150 @@
           }
         },
         "title": "ConcordanceResultQuery",
+        "type": "object"
+      },
+      "ConcordanceRunAllAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_run_all",
+            "default": "concordance_run_all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ConcordanceAnalysisRequest"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "ConcordanceRunAllAnalysisRequest",
+        "type": "object"
+      },
+      "ConcordanceRunAllGroupSource": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Analysis Columns",
+            "type": "array"
+          },
+          "analysis_id": {
+            "format": "uuid",
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "document_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Document Column",
+            "type": "string"
+          },
+          "internal_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Internal Columns",
+            "type": "array"
+          },
+          "metadata_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metadata Columns",
+            "type": "array"
+          },
+          "node_id": {
+            "format": "uuid",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Node Name",
+            "type": "string"
+          },
+          "record_count": {
+            "minimum": 0.0,
+            "title": "Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_name",
+          "color",
+          "document_column",
+          "metadata_columns",
+          "analysis_columns",
+          "internal_columns",
+          "record_count",
+          "analysis_id"
+        ],
+        "title": "ConcordanceRunAllGroupSource",
+        "type": "object"
+      },
+      "ConcordanceRunAllResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_run_all",
+            "default": "concordance_run_all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "result_type": {
+            "enum": [
+              "source",
+              "group"
+            ],
+            "title": "Result Type",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunAllSourceTableResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ConcordanceRunAllGroupSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          }
+        },
+        "required": [
+          "result_type"
+        ],
+        "title": "ConcordanceRunAllResult",
         "type": "object"
       },
       "ConcordanceSourceResult": {
@@ -3273,12 +3560,11 @@
                 "cast": "#/components/schemas/CastDerivation",
                 "clone": "#/components/schemas/CloneDerivation",
                 "concat": "#/components/schemas/ConcatDerivation",
-                "concordance_detachment": "#/components/schemas/ConcordanceDetachmentDerivation",
-                "concordance_dispersion_detachment": "#/components/schemas/ConcordanceDispersionDetachmentDerivation",
+                "concordance_result_publication": "#/components/schemas/ConcordanceResultPublicationDerivation",
                 "expression": "#/components/schemas/ExpressionDerivation",
                 "filter": "#/components/schemas/FilterDerivation",
                 "join": "#/components/schemas/JoinDerivation",
-                "quotation_detachment": "#/components/schemas/QuotationDetachmentDerivation",
+                "quotation_result_publication": "#/components/schemas/QuotationResultPublicationDerivation",
                 "replace": "#/components/schemas/ReplaceDerivation",
                 "slice": "#/components/schemas/SliceDerivation",
                 "sql": "#/components/schemas/SqlDerivation",
@@ -3318,13 +3604,10 @@
                 "$ref": "#/components/schemas/AnnotationDerivation"
               },
               {
-                "$ref": "#/components/schemas/ConcordanceDetachmentDerivation"
+                "$ref": "#/components/schemas/ConcordanceResultPublicationDerivation"
               },
               {
-                "$ref": "#/components/schemas/ConcordanceDispersionDetachmentDerivation"
-              },
-              {
-                "$ref": "#/components/schemas/QuotationDetachmentDerivation"
+                "$ref": "#/components/schemas/QuotationResultPublicationDerivation"
               },
               {
                 "$ref": "#/components/schemas/TopicModelingDetachmentDerivation"
@@ -4780,102 +5063,6 @@
         "title": "QuotationAnalysisRequest",
         "type": "object"
       },
-      "QuotationDetachmentAnalysisRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "quotation_detachment",
-            "default": "quotation_detachment",
-            "title": "Kind",
-            "type": "string"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "node_id": {
-            "format": "uuid",
-            "title": "Node Id",
-            "type": "string"
-          },
-          "selected_columns": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Selected Columns",
-            "type": "array"
-          }
-        },
-        "required": [
-          "node_id",
-          "selected_columns"
-        ],
-        "title": "QuotationDetachmentAnalysisRequest",
-        "type": "object"
-      },
-      "QuotationDetachmentDerivation": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "quotation_detachment",
-            "default": "quotation_detachment",
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "title": "QuotationDetachmentDerivation",
-        "type": "object"
-      },
-      "QuotationDetachmentResult": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "quotation_detachment",
-            "default": "quotation_detachment",
-            "title": "Kind",
-            "type": "string"
-          },
-          "output_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Output Columns",
-            "type": "array"
-          },
-          "output_node_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Output Node Ids",
-            "type": "array"
-          },
-          "record_count": {
-            "minimum": 0.0,
-            "title": "Record Count",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "output_node_ids",
-          "output_columns",
-          "record_count"
-        ],
-        "title": "QuotationDetachmentResult",
-        "type": "object"
-      },
       "QuotationEngineSelection": {
         "additionalProperties": false,
         "properties": {
@@ -4911,24 +5098,38 @@
         "additionalProperties": false,
         "properties": {
           "columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Columns",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
           },
           "data": {
-            "items": {
-              "items": {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/JsonData-Output"
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "additionalProperties": {
+                      "$ref": "#/components/schemas/JsonData-Output"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
                 },
-                "type": "object"
+                "type": "array"
               },
-              "type": "array"
-            },
-            "title": "Data",
-            "type": "array"
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
           },
           "kind": {
             "const": "quotation",
@@ -4937,27 +5138,121 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/ResultColumnMetadata"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultColumnMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pagination": {
-            "$ref": "#/components/schemas/SourcePagePagination"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourcePagePagination"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "query": {
-            "$ref": "#/components/schemas/QuotationResultQuery"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuotationResultQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ready": {
+            "const": true,
+            "default": true,
+            "title": "Ready",
+            "type": "boolean"
           },
           "sorting": {
-            "$ref": "#/components/schemas/ResultSorting"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultSorting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "QuotationResult",
+        "type": "object"
+      },
+      "QuotationResultPublicationAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quotation_result_publication",
+            "default": "quotation_result_publication",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ResultPublicationSource"
           }
         },
         "required": [
-          "data",
-          "columns",
-          "metadata",
-          "pagination",
-          "sorting",
-          "query"
+          "source"
         ],
-        "title": "QuotationResult",
+        "title": "QuotationResultPublicationAnalysisRequest",
+        "type": "object"
+      },
+      "QuotationResultPublicationDerivation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quotation_result_publication",
+            "default": "quotation_result_publication",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "QuotationResultPublicationDerivation",
+        "type": "object"
+      },
+      "QuotationResultPublicationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quotation_result_publication",
+            "default": "quotation_result_publication",
+            "title": "Kind",
+            "type": "string"
+          },
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/ResultPublicationOutput"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "output_node_ids",
+          "outputs"
+        ],
+        "title": "QuotationResultPublicationResult",
         "type": "object"
       },
       "QuotationResultQuery": {
@@ -5000,6 +5295,44 @@
           }
         },
         "title": "QuotationResultQuery",
+        "type": "object"
+      },
+      "QuotationRunAllAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quotation_run_all",
+            "default": "quotation_run_all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/QuotationAnalysisRequest"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "QuotationRunAllAnalysisRequest",
+        "type": "object"
+      },
+      "QuotationRunAllResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quotation_run_all",
+            "default": "quotation_run_all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RunAllSourceTableResource"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "QuotationRunAllResult",
         "type": "object"
       },
       "RenameColumnNodeEditRequest": {
@@ -5364,6 +5697,74 @@
         "title": "ResultPagination",
         "type": "object"
       },
+      "ResultPublicationOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "output_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Output Columns",
+            "type": "array"
+          },
+          "output_node_id": {
+            "format": "uuid",
+            "title": "Output Node Id",
+            "type": "string"
+          },
+          "record_count": {
+            "minimum": 0.0,
+            "title": "Record Count",
+            "type": "integer"
+          },
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "output_node_id",
+          "output_columns",
+          "record_count"
+        ],
+        "title": "ResultPublicationOutput",
+        "type": "object"
+      },
+      "ResultPublicationSource": {
+        "additionalProperties": false,
+        "description": "One immutable selection for publishing a successful Analysis Result.",
+        "properties": {
+          "new_node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "New Node Name",
+            "type": "string"
+          },
+          "selected_columns": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Selected Columns",
+            "type": "array"
+          },
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "selected_columns",
+          "new_node_name"
+        ],
+        "title": "ResultPublicationSource",
+        "type": "object"
+      },
       "ResultSorting": {
         "additionalProperties": false,
         "properties": {
@@ -5577,6 +5978,81 @@
           "operand"
         ],
         "title": "RoundExpression",
+        "type": "object"
+      },
+      "RunAllSourceTableResource": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Analysis Columns",
+            "type": "array"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "document_column": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Document Column",
+            "type": "string"
+          },
+          "internal_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Internal Columns",
+            "type": "array"
+          },
+          "metadata_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metadata Columns",
+            "type": "array"
+          },
+          "node_id": {
+            "format": "uuid",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Node Name",
+            "type": "string"
+          },
+          "record_count": {
+            "minimum": 0.0,
+            "title": "Record Count",
+            "type": "integer"
+          },
+          "table": {
+            "$ref": "#/components/schemas/PagedTableResource"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_name",
+          "color",
+          "document_column",
+          "metadata_columns",
+          "analysis_columns",
+          "internal_columns",
+          "record_count",
+          "table"
+        ],
+        "title": "RunAllSourceTableResource",
         "type": "object"
       },
       "SampleCatalogueResource": {
@@ -6473,17 +6949,25 @@
         "additionalProperties": false,
         "description": "Complete strict public and persisted Tab representation.",
         "properties": {
-          "analysis_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Analysis Id"
+          "analysis_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Analysis Ids",
+            "type": "array"
+          },
+          "annotation_correction_columns": {
+            "additionalProperties": {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Annotation Correction Columns",
+            "type": "object"
           },
           "created_at": {
             "format": "date-time",
@@ -6519,7 +7003,6 @@
           "id",
           "kind",
           "name",
-          "analysis_id",
           "created_at",
           "modified_at",
           "revision"
@@ -6547,20 +7030,43 @@
         "title": "TabCreate",
         "type": "object"
       },
-      "TabRename": {
+      "TabUpdate": {
         "additionalProperties": false,
         "properties": {
+          "annotation_correction_columns": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "maxLength": 500,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "format": "uuid"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Correction Columns"
+          },
           "name": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
-        "required": [
-          "name"
-        ],
-        "title": "TabRename",
+        "title": "TabUpdate",
         "type": "object"
       },
       "TokenFrequencyAnalysisRequest": {
@@ -12453,158 +12959,6 @@
         ]
       }
     },
-    "/api/workspaces/{workspace_id}/analyses/{analysis_id}/children": {
-      "post": {
-        "description": "Create one recomputed child Analysis beneath a successful root.",
-        "operationId": "submit_child_analysis",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "workspace_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Workspace Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "analysis_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Analysis Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "discriminator": {
-                  "mapping": {
-                    "concordance_detachment": "#/components/schemas/ConcordanceDetachmentAnalysisRequest",
-                    "concordance_dispersion_detachment": "#/components/schemas/ConcordanceDispersionDetachmentAnalysisRequest",
-                    "quotation_detachment": "#/components/schemas/QuotationDetachmentAnalysisRequest",
-                    "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
-                  },
-                  "propertyName": "kind"
-                },
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/ConcordanceDetachmentAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConcordanceDispersionDetachmentAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/QuotationDetachmentAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Analysis"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Authentication required"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Origin, CSRF, or access check failed"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource not found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource state conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Request validation failed"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Stored resource is corrupt"
-          },
-          "507": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Storage capacity is exhausted"
-          }
-        },
-        "security": [
-          {
-            "WordflowSession": []
-          }
-        ],
-        "summary": "Submit Child Analysis",
-        "tags": [
-          "analyses"
-        ]
-      }
-    },
     "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result": {
       "get": {
         "description": "Return the canonical first page of one successful Analysis Result.",
@@ -12639,11 +12993,13 @@
                   "discriminator": {
                     "mapping": {
                       "annotation": "#/components/schemas/AnnotationResult",
+                      "annotation_run_all": "#/components/schemas/AnnotationRunAllResult",
                       "concordance": "#/components/schemas/ConcordanceResult",
-                      "concordance_detachment": "#/components/schemas/ConcordanceDetachmentResult",
-                      "concordance_dispersion_detachment": "#/components/schemas/ConcordanceDispersionDetachmentResult",
+                      "concordance_result_publication": "#/components/schemas/ConcordanceResultPublicationResult",
+                      "concordance_run_all": "#/components/schemas/ConcordanceRunAllResult",
                       "quotation": "#/components/schemas/QuotationResult",
-                      "quotation_detachment": "#/components/schemas/QuotationDetachmentResult",
+                      "quotation_result_publication": "#/components/schemas/QuotationResultPublicationResult",
+                      "quotation_run_all": "#/components/schemas/QuotationRunAllResult",
                       "sequential": "#/components/schemas/SequentialResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
                       "topic_modeling": "#/components/schemas/TopicModelingResult",
@@ -12671,16 +13027,22 @@
                       "$ref": "#/components/schemas/AnnotationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceDetachmentResult"
+                      "$ref": "#/components/schemas/ConcordanceRunAllResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceDispersionDetachmentResult"
+                      "$ref": "#/components/schemas/QuotationRunAllResult"
                     },
                     {
-                      "$ref": "#/components/schemas/QuotationDetachmentResult"
+                      "$ref": "#/components/schemas/AnnotationRunAllResult"
                     },
                     {
                       "$ref": "#/components/schemas/TopicModelingDetachmentResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConcordanceResultPublicationResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QuotationResultPublicationResult"
                     }
                   ],
                   "title": "Response Get Analysis Result"
@@ -12823,6 +13185,7 @@
               "schema": {
                 "discriminator": {
                   "mapping": {
+                    "annotation": "#/components/schemas/AnnotationResultQuery",
                     "concordance": "#/components/schemas/ConcordanceResultQuery",
                     "quotation": "#/components/schemas/QuotationResultQuery",
                     "topic_modeling": "#/components/schemas/TopicModelingResultQuery"
@@ -12838,6 +13201,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/QuotationResultQuery"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AnnotationResultQuery"
                   }
                 ],
                 "title": "Body"
@@ -12854,11 +13220,13 @@
                   "discriminator": {
                     "mapping": {
                       "annotation": "#/components/schemas/AnnotationResult",
+                      "annotation_run_all": "#/components/schemas/AnnotationRunAllResult",
                       "concordance": "#/components/schemas/ConcordanceResult",
-                      "concordance_detachment": "#/components/schemas/ConcordanceDetachmentResult",
-                      "concordance_dispersion_detachment": "#/components/schemas/ConcordanceDispersionDetachmentResult",
+                      "concordance_result_publication": "#/components/schemas/ConcordanceResultPublicationResult",
+                      "concordance_run_all": "#/components/schemas/ConcordanceRunAllResult",
                       "quotation": "#/components/schemas/QuotationResult",
-                      "quotation_detachment": "#/components/schemas/QuotationDetachmentResult",
+                      "quotation_result_publication": "#/components/schemas/QuotationResultPublicationResult",
+                      "quotation_run_all": "#/components/schemas/QuotationRunAllResult",
                       "sequential": "#/components/schemas/SequentialResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
                       "topic_modeling": "#/components/schemas/TopicModelingResult",
@@ -12886,16 +13254,22 @@
                       "$ref": "#/components/schemas/AnnotationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceDetachmentResult"
+                      "$ref": "#/components/schemas/ConcordanceRunAllResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceDispersionDetachmentResult"
+                      "$ref": "#/components/schemas/QuotationRunAllResult"
                     },
                     {
-                      "$ref": "#/components/schemas/QuotationDetachmentResult"
+                      "$ref": "#/components/schemas/AnnotationRunAllResult"
                     },
                     {
                       "$ref": "#/components/schemas/TopicModelingDetachmentResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConcordanceResultPublicationResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/QuotationResultPublicationResult"
                     }
                   ],
                   "title": "Response Query Analysis Result"
@@ -14444,134 +14818,6 @@
         ]
       }
     },
-    "/api/workspaces/{workspace_id}/nodes/{node_id}/annotation-previews": {
-      "post": {
-        "description": "Classify one page without creating backend preview-session state.",
-        "operationId": "preview_annotation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "workspace_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Workspace Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "node_id",
-            "required": true,
-            "schema": {
-              "title": "Node Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AnnotationPreviewRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AnnotationPreviewResource"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Invalid request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Authentication required"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Origin, CSRF, or access check failed"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource not found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource state conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Request validation failed"
-          },
-          "502": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Upstream provider unavailable"
-          }
-        },
-        "security": [
-          {
-            "WordflowSession": []
-          }
-        ],
-        "summary": "Preview Annotation",
-        "tags": [
-          "annotations"
-        ]
-      }
-    },
     "/api/workspaces/{workspace_id}/nodes/{node_id}/edits": {
       "post": {
         "description": "Apply one identity-preserving Data Block Edit.",
@@ -15821,8 +16067,8 @@
         ]
       },
       "patch": {
-        "description": "Rename one Tab without changing its immutable function kind.",
-        "operationId": "rename_tab",
+        "description": "Update one Tab without changing its immutable function kind.",
+        "operationId": "update_tab",
         "parameters": [
           {
             "in": "path",
@@ -15849,7 +16095,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TabRename"
+                "$ref": "#/components/schemas/TabUpdate"
               }
             }
           },
@@ -15942,15 +16188,15 @@
             "WordflowSession": []
           }
         ],
-        "summary": "Rename Tab",
+        "summary": "Update Tab",
         "tags": [
           "tabs"
         ]
       }
     },
-    "/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis": {
+    "/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses": {
       "delete": {
-        "description": "Detach the current Analysis and make the Tab immediately reusable.",
+        "description": "Clear the Tab's complete Analysis forest.",
         "operationId": "clear_tab_analysis",
         "parameters": [
           {
@@ -16060,8 +16306,8 @@
         ]
       },
       "get": {
-        "description": "Return the root Analysis currently assigned to one Tab.",
-        "operationId": "get_tab_analysis",
+        "description": "Return a Tab's complete Analysis forest in creation order.",
+        "operationId": "list_tab_analyses",
         "parameters": [
           {
             "in": "path",
@@ -16089,7 +16335,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Analysis"
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Analysis"
+                      },
+                      {
+                        "$ref": "#/components/schemas/CorruptAnalysis"
+                      }
+                    ]
+                  },
+                  "title": "Response List Tab Analyses",
+                  "type": "array"
                 }
               }
             },
@@ -16125,16 +16382,6 @@
             },
             "description": "Resource not found"
           },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource state conflict"
-          },
           "422": {
             "content": {
               "application/json": {
@@ -16161,13 +16408,13 @@
             "WordflowSession": []
           }
         ],
-        "summary": "Get Tab Analysis",
+        "summary": "List Tab Analyses",
         "tags": [
           "analyses"
         ]
       },
       "post": {
-        "description": "Create one queued Analysis and atomically assign it to an empty Tab.",
+        "description": "Create one complete immutable Analysis in a Tab-owned forest.",
         "operationId": "submit_tab_analysis",
         "parameters": [
           {
@@ -16195,38 +16442,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "discriminator": {
-                  "mapping": {
-                    "annotation": "#/components/schemas/AnnotationAnalysisSubmission",
-                    "concordance": "#/components/schemas/ConcordanceAnalysisRequest",
-                    "quotation": "#/components/schemas/QuotationAnalysisRequest",
-                    "sequential": "#/components/schemas/SequentialAnalysisRequest",
-                    "token_frequency": "#/components/schemas/TokenFrequencyAnalysisRequest",
-                    "topic_modeling": "#/components/schemas/TopicModelingAnalysisRequest"
-                  },
-                  "propertyName": "kind"
-                },
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/TokenFrequencyAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/TopicModelingAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ConcordanceAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/QuotationAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/SequentialAnalysisRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/AnnotationAnalysisSubmission"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/AnalysisCreate"
               }
             }
           },

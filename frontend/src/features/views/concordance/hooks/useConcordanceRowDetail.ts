@@ -4,7 +4,7 @@ import { useRowDetailDialog } from '../../common/components/useRowDetailDialog';
 import { highlightMatchInText } from '../../common/components/highlightText';
 import {
   CONCORDANCE_COLUMN_KEYS,
-  CONCORDANCE_GENERATED_COLUMNS,
+  CONCORDANCE_PRESENTATION_COLUMNS,
 } from '../../common/generatedColumns';
 import { toCellText } from '../concordanceTableDomain';
 
@@ -141,7 +141,7 @@ export function useConcordanceRowDetail({
       record,
       textColumn: column,
       fullText,
-      excludeMetadataColumns: [...CONCORDANCE_GENERATED_COLUMNS],
+      excludeMetadataColumns: [...CONCORDANCE_PRESENTATION_COLUMNS],
     });
   };
 

@@ -8,13 +8,13 @@ describe('deriveTokenizerModelsByNode', () => {
       { nodeId: 'node-b', column: 'body' },
       { nodeId: 'node-c', column: '' },
     ];
-    const nodeInfoCache = {
+    const nodeInfoById = {
       'node-a': { id: 'node-a', name: 'Node A', tokenizer_model: 'stored-a' },
       'node-b': { id: 'node-b', name: 'Node B', tokenizer_model: 'stored-b' },
       'node-c': { id: 'node-c', name: 'Node C', tokenizer_model: 'stored-c' },
     };
 
-    expect(deriveTokenizerModelsByNode(selections, nodeInfoCache, { 'node-b': 'live-b' })).toEqual({
+    expect(deriveTokenizerModelsByNode(selections, nodeInfoById, { 'node-b': 'live-b' })).toEqual({
       'node-a': 'stored-a',
       'node-b': 'live-b',
       'node-c': 'stored-c',

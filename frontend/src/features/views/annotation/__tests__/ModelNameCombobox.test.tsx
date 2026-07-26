@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelNameCombobox } from '../components/ModelNameCombobox';
 import type { AnnotationProviderConfigurationView } from '@/features/provider-credentials/providerCredentialsStore';
+import { queryKeys } from '@/lib/queryKeys';
 
 const listAnnotationModelsWithProviderCredential = vi.hoisted(() => vi.fn());
 vi.mock('@/features/provider-credentials/providerCredentialRequests', () => ({
@@ -28,7 +29,6 @@ const renderCombobox = (
   render(
     <QueryClientProvider client={queryClient}>
       <ModelNameCombobox
-        workspaceId="workspace-1"
         configuration={selectedConfiguration}
         value={value}
         onChange={onChange}
@@ -36,7 +36,7 @@ const renderCombobox = (
       />
     </QueryClientProvider>,
   );
-  return { onChange, onCommit };
+  return { onChange, onCommit, queryClient };
 };
 
 describe('ModelNameCombobox', () => {
@@ -48,12 +48,26 @@ describe('ModelNameCombobox', () => {
   });
 
   it('loads the generated provider model catalogue when opened', async () => {
-    renderCombobox();
+    const { queryClient } = renderCombobox();
     const input = screen.getByPlaceholderText('Search or type a model name');
     fireEvent.focus(input);
     await waitFor(() => expect(listAnnotationModelsWithProviderCredential).toHaveBeenCalled());
-    expect(listAnnotationModelsWithProviderCredential.mock.calls[0]?.[0]).toEqual(configuration);
+    expect(listAnnotationModelsWithProviderCredential.mock.calls[0]?.[0]).toEqual({
+      id: configuration.id,
+      provider: configuration.provider,
+      base_url: configuration.base_url,
+    });
     expect(await screen.findByRole('button', { name: 'openrouter/alpha' })).toBeInTheDocument();
+    expect(
+      queryClient.getQueryData(
+        queryKeys.annotationModelList(
+          configuration.id,
+          configuration.credentialRevision,
+          configuration.provider,
+          configuration.base_url,
+        ),
+      ),
+    ).toEqual([{ id: 'openrouter/alpha' }, { id: 'openrouter/beta' }]);
   });
 
   it('commits a selected model without persisting a credential in the browser', async () => {

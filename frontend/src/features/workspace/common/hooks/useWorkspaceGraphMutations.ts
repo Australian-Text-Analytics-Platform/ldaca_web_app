@@ -14,6 +14,7 @@ import type {
   WorkspaceNodeInfo as NodeInfoResponse,
 } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import {
   invalidateNodeWorkspaceQueries,
   invalidateWorkspaceGraphQuery,
@@ -60,6 +61,11 @@ export const useWorkspaceGraphMutations = ({
     }
     return currentWorkspaceId;
   };
+  const markCreatedNode = (node: NodeInfoResponse) => {
+    if (currentWorkspaceId) {
+      useFreshNodesStore.getState().markCreated(currentWorkspaceId, [node.id]);
+    }
+  };
   const renameNodeMutation = useMutation({
     mutationKey: ['workspace', 'rename-node'],
     mutationFn: ({ nodeId, newName }: { nodeId: string; newName: string }) =>
@@ -85,7 +91,8 @@ export const useWorkspaceGraphMutations = ({
       }).then(({ data }) => {
         return data;
       }),
-    onSuccess: () => {
+    onSuccess: (createdNode: NodeInfoResponse) => {
+      markCreatedNode(createdNode);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       invalidateWorkspaceSummaries(queryClient);
     },
@@ -102,9 +109,7 @@ export const useWorkspaceGraphMutations = ({
         return data;
       }),
     onSuccess: (_data, { nodeId }) => {
-      invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
-        includeNodeInfo: true,
-      });
+      invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId);
     },
   });
 
@@ -138,6 +143,7 @@ export const useWorkspaceGraphMutations = ({
         return data;
       }),
     onSuccess: (response: NodeInfoResponse) => {
+      markCreatedNode(response);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
       invalidateWorkspaceSummaries(queryClient);
       const changes = response.dtype_normalization;
@@ -193,6 +199,7 @@ export const useWorkspaceGraphMutations = ({
       clearSelection();
     },
     onSuccess: (createdNode: NodeInfoResponse) => {
+      markCreatedNode(createdNode);
       replaceSelectedNodes([createdNode.id], createdNode.id);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
     },
@@ -220,6 +227,7 @@ export const useWorkspaceGraphMutations = ({
       clearSelection();
     },
     onSuccess: (createdNode: NodeInfoResponse) => {
+      markCreatedNode(createdNode);
       replaceSelectedNodes([createdNode.id], createdNode.id);
       invalidateWorkspaceGraphQuery(queryClient, currentWorkspaceId);
     },

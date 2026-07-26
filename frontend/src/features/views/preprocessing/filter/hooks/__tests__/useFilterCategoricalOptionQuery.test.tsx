@@ -38,10 +38,14 @@ describe('useFilterCategoricalOptionQuery', () => {
     queryWorkspaceSqlTableMock.mockReset();
   });
 
-  it('loads one distinct SQL page, preserving null and primitive values', async () => {
+  it('loads one counted SQL page, preserving null and primitive values', async () => {
     queryWorkspaceSqlTableMock.mockResolvedValue({
-      rows: [{ value: null }, { value: 'Alice' }, { value: 'Bob' }],
-      columns: ['value'],
+      rows: [
+        { value: null, count: '2' },
+        { value: 'Alice', count: '5' },
+        { value: 'Bob', count: '3' },
+      ],
+      columns: ['value', 'count'],
       hasNext: false,
       etag: '"revision-1"',
     });
@@ -58,7 +62,7 @@ describe('useFilterCategoricalOptionQuery', () => {
           node_ids: ['node-1'],
           page: 1,
           page_size: 500,
-          sql: expect.stringContaining('SELECT DISTINCT "value"'),
+          sql: expect.stringMatching(/SELECT "value", COUNT\(\*\) AS "count"/),
         }),
       }),
     );
@@ -66,6 +70,11 @@ describe('useFilterCategoricalOptionQuery', () => {
       NULL_OPTION_KEY,
       'string::Alice',
       'string::Bob',
+    ]);
+    expect(view.result.current.options).toEqual([
+      expect.objectContaining({ key: NULL_OPTION_KEY, count: '2' }),
+      expect.objectContaining({ key: 'string::Alice', count: '5' }),
+      expect.objectContaining({ key: 'string::Bob', count: '3' }),
     ]);
   });
 

@@ -89,10 +89,8 @@ export interface NodeInputsPanelProps {
  * via toast), then render each resolved node as a removable card with its
  * column picker fed by the node's resolved ``columnOptions``; when a feature's
  * type filter leaves no options, the node stays selected and the picker renders
- * empty. Single-selector views consume graph/sidebar "+" requests directly in
- * ``useTabNodeInputs``; multi-selector views opt out there, leaving the pending
- * request for every visible panel with add controls to render as a dashed
- * choose-target overlay.
+ * empty. Graph/sidebar additions remain on the shared carried stack until the
+ * user clicks one visible panel's dashed placement target.
  */
 export function NodeInputsPanel({
   resolvedNodes,
@@ -129,10 +127,9 @@ export function NodeInputsPanel({
   const { currentWorkspaceId } = useWorkspaceData();
   const currentView = useUIStore((state) => state.currentView);
   const consumeInputRequest = useNodeInputRequestsStore((state) => state.consume);
-  const pendingInputRequest = useNodeInputRequestsStore((state) =>
-    state.requests.find(
-      (request) => request.workspaceId === currentWorkspaceId && request.view === currentView,
-    ),
+  const pendingRequests = useNodeInputRequestsStore((state) => state.pendingRequests);
+  const pendingInputRequest = pendingRequests.findLast(
+    (request) => request.workspaceId === currentWorkspaceId && request.view === currentView,
   );
   const nodes = resolvedNodes.map((r) => r.node);
   const nodeIds = resolvedNodes.map((r) => r.id);
@@ -143,7 +140,7 @@ export function NodeInputsPanel({
 
   /** Adds ids and reports any rejection reasons as a single toast. */
   const handleAdd = (ids: string[]) => {
-    if (!ids.length) return;
+    if (!ids.length) return false;
     const rejections = onAddNodes(ids);
     if (rejections.length === 1) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length===1 guarantees index 0 exists
@@ -151,6 +148,7 @@ export function NodeInputsPanel({
     } else if (rejections.length > 1) {
       toast.warning(`Couldn't add ${String(rejections.length)} nodes (already added or full).`);
     }
+    return rejections.length === 0;
   };
 
   /** Graph-selected ids that aren't already inputs — the "current selection" preset. */
@@ -492,8 +490,9 @@ export function NodeInputsPanel({
                 : 'hover:border-primary/70 hover:bg-card disabled:opacity-60',
             )}
             onClick={() => {
-              handleAdd(pendingInputRequest.nodeIds);
-              consumeInputRequest(pendingInputRequest.id);
+              if (handleAdd([pendingInputRequest.nodeId])) {
+                consumeInputRequest(pendingInputRequest.id);
+              }
             }}
           >
             {inputRequestTargetFilled ? (
@@ -515,20 +514,20 @@ export function NodeInputsPanel({
               >
                 {inputRequestTargetFilled
                   ? 'This selector is already filled. Choose another selector.'
-                  : `Add selected node${pendingInputRequest.nodeIds.length === 1 ? '' : 's'} here`}
+                  : 'Place the latest carried Data Block here'}
               </span>
             </span>
           </button>
           <button
             type="button"
-            aria-label="Cancel adding node"
+            aria-label="Discard latest carried Data Block"
             className="absolute right-3 top-3 inline-flex h-7 items-center gap-1 rounded-md bg-background/90 px-2 text-xs text-muted-foreground shadow-sm hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => {
               consumeInputRequest(pendingInputRequest.id);
             }}
           >
             <X className="size-3.5" aria-hidden="true" />
-            Cancel
+            Discard top
           </button>
         </div>
       ) : null}

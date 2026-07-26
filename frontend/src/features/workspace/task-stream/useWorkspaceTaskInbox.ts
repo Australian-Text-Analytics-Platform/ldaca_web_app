@@ -11,11 +11,13 @@ import {
   deleteUserFileImport,
   getAnalysis,
   getUserFileImport,
-  listAnalyses,
   listUserFileImports,
 } from '@/api';
-import type { AnalysisPage, UserFileImport, UserFileImportPage, WorkspaceResource } from '@/api';
+import type { UserFileImport, UserFileImportPage, WorkspaceResource } from '@/api';
+import { invalidateNodeWorkspaceQueries } from '@/features/workspace/common/hooks/workspaceMutationCache';
+import { workspaceAnalysesQueryOptions } from '@/features/workspace/common/hooks/workspaceAnalysesQuery';
 import { queryKeys } from '@/lib/queryKeys';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { analysisToTask, importToTask, sortTasks, type TaskItem } from './taskProjection';
 import {
   type BackendEvent,
@@ -23,29 +25,19 @@ import {
   type WorkspaceTaskStreamClientState,
 } from './useWorkspaceTaskStreamClient';
 
-const ANALYSIS_PAGE_SIZE = 500;
 const IMPORT_PAGE_SIZE = 100;
+
+const publishesWorkspaceDataBlocks = (kind: string): boolean =>
+  kind === 'concordance_result_publication' ||
+  kind === 'quotation_result_publication' ||
+  kind === 'topic_modeling_detachment';
 
 const nextPage = (page: { page: number; total_pages: number }): number | undefined =>
   page.page < page.total_pages ? page.page + 1 : undefined;
 
 /** Reads the complete Task Inbox projection directly from paginated backend resources. */
 export const useTaskResources = (workspaceId: string | null) => {
-  const analysesQuery = useInfiniteQuery({
-    queryKey: workspaceId ? queryKeys.workspaceAnalyses(workspaceId) : ['analyses', 'disabled'],
-    queryFn: async ({ pageParam }): Promise<AnalysisPage> => {
-      if (!workspaceId) throw new Error('Missing workspace ID');
-      const { data } = await listAnalyses({
-        path: { workspace_id: workspaceId },
-        query: { page: pageParam, page_size: ANALYSIS_PAGE_SIZE },
-        throwOnError: true,
-      });
-      return data;
-    },
-    initialPageParam: 1,
-    getNextPageParam: nextPage,
-    enabled: Boolean(workspaceId),
-  });
+  const analysesQuery = useInfiniteQuery(workspaceAnalysesQueryOptions(workspaceId));
 
   const importsQuery = useInfiniteQuery({
     queryKey: queryKeys.userFileImports,
@@ -178,6 +170,19 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
             void queryClient.invalidateQueries({
               queryKey: queryKeys.analysisResults(workspaceId, event.resource_id),
             });
+            if (data.request.kind === 'annotation_run_all') {
+              invalidateNodeWorkspaceQueries(
+                queryClient,
+                workspaceId,
+                data.request.source.node_id,
+                {
+                  includeData: true,
+                },
+              );
+            }
+            if (publishesWorkspaceDataBlocks(data.request.kind)) {
+              useFreshNodesStore.getState().markCreated(workspaceId, data.output_node_ids);
+            }
           }
         } catch (error) {
           console.warn('Could not refresh analysis activity', error);
@@ -194,7 +199,11 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
           queryClient.setQueryData(queryKeys.userFileImport(event.resource_id), data);
           void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
           if (data.state === 'succeeded') {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.files });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.fileList, exact: true });
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.sampleCollections,
+              exact: true,
+            });
           }
         } catch (error) {
           console.warn('Could not refresh user-file import activity', error);
@@ -226,7 +235,7 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
         case 'stream_ready':
         case 'resync_required':
           void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
-          void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceList, exact: true });
           if (workspaceId) {
             void queryClient.invalidateQueries({
               queryKey: queryKeys.workspaceAnalyses(workspaceId),
@@ -241,7 +250,10 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
             void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
           }
           if (event.resource_type === 'workspace') {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.workspaceList,
+              exact: true,
+            });
             if (workspaceId && event.workspace_id === workspaceId) {
               void queryClient.invalidateQueries({
                 queryKey: queryKeys.workspaceGraph(workspaceId),
@@ -258,11 +270,14 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
             void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
           }
           if (event.resource_type === 'workspace') {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.workspaceList,
+              exact: true,
+            });
           }
           break;
         case 'workspace_runtime_changed':
-          queryClient.setQueryData<WorkspaceResource[]>(queryKeys.workspaces, (previous) =>
+          queryClient.setQueryData<WorkspaceResource[]>(queryKeys.workspaceList, (previous) =>
             previous?.map((workspace) =>
               workspace.id === event.workspace_id
                 ? { ...workspace, runtime_state: event.runtime_state }

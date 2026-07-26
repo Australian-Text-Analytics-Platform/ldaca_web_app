@@ -9,10 +9,10 @@ describe('AnalysisCardLayout', () => {
       <AnalysisCardLayout
         title="Example Analysis"
         actions={{
-          onRun: vi.fn(),
+          onRunAll: vi.fn(),
           onStop: vi.fn(),
           onClear: vi.fn(),
-          isRunning: true,
+          isRunningAll: true,
           hasResult: true,
         }}
       >
@@ -29,10 +29,10 @@ describe('AnalysisCardLayout', () => {
       <AnalysisCardLayout
         title="Example Analysis"
         actions={{
-          onRun: vi.fn(),
+          onRunAll: vi.fn(),
           onStop: vi.fn(),
           onClear: vi.fn(),
-          isRunning: false,
+          isRunningAll: false,
           hasResult: true,
         }}
       >
@@ -42,5 +42,22 @@ describe('AnalysisCardLayout', () => {
 
     expect(screen.queryByRole('button', { name: /stop/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /clear results/i })).toBeInTheDocument();
+  });
+
+  it('omits Preview for analyses without a Preview contract', () => {
+    render(
+      <AnalysisCardLayout
+        title="Full-table Analysis"
+        actions={{
+          onRunAll: vi.fn(),
+          onClear: vi.fn(),
+        }}
+      >
+        <div>Parameters</div>
+      </AnalysisCardLayout>,
+    );
+
+    expect(screen.queryByRole('button', { name: /preview/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /run all/i })).toBeInTheDocument();
   });
 });

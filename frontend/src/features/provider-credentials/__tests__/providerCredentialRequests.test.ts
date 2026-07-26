@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AnnotationAnalysisRequest, AnnotationPreviewRequest, SessionResponse } from '@/api';
+import type { AnnotationAnalysisRequest, SessionResponse } from '@/api';
 import { useAuthStore } from '@/stores/authStore';
 import {
   listAnnotationModelsWithProviderCredential,
   listFeaturedDataPortalCollectionsWithProviderCredential,
-  previewAnnotationWithProviderCredential,
+  queryAnnotationPreviewWithProviderCredential,
   searchDataPortalWithProviderCredential,
+  submitAnnotationRunAllWithProviderCredential,
   submitDataPortalImportWithProviderCredential,
   submitTabAnalysisWithProviderCredential,
 } from '../providerCredentialRequests';
@@ -15,7 +16,7 @@ import { useProviderCredentialsStore } from '../providerCredentialsStore';
 const sdk = vi.hoisted(() => ({
   listAnnotationModels: vi.fn(),
   listFeaturedDataPortalCollections: vi.fn(),
-  previewAnnotation: vi.fn(),
+  queryAnalysisResult: vi.fn(),
   searchDataPortal: vi.fn(),
   submitDataPortalImport: vi.fn(),
   submitTabAnalysis: vi.fn(),
@@ -60,9 +61,14 @@ describe('provider credential request boundary', () => {
       apiKey: 'annotation-secret',
     });
     credentials.setDataPortalCredential('user-a', 'portal-secret');
-    const previewRequest: AnnotationPreviewRequest = {
+    const analysisRequest: AnnotationAnalysisRequest = {
+      kind: 'annotation',
+      node_id: '00000000-0000-0000-0000-000000000001',
       text_column: 'text',
       annotation_column: 'class',
+      class_node_id: '00000000-0000-0000-0000-000000000002',
+      class_column: 'class',
+      description_column: 'description',
       classes: [{ name: 'Relevant', description: '' }],
       provider_configuration_id: configuration.id,
       provider: configuration.provider,
@@ -70,23 +76,24 @@ describe('provider credential request boundary', () => {
       model: 'model',
       instruction: 'Classify',
     };
-    const analysisRequest: AnnotationAnalysisRequest = {
-      kind: 'annotation',
-      node_id: '00000000-0000-0000-0000-000000000001',
-      ...previewRequest,
-      output_node_name: 'Annotated',
-    };
-
     await listAnnotationModelsWithProviderCredential(configuration);
-    await previewAnnotationWithProviderCredential({
+    await queryAnnotationPreviewWithProviderCredential({
       workspaceId: 'workspace-1',
-      nodeId: 'node-1',
-      request: previewRequest,
+      analysisId: 'analysis-1',
+      providerConfigurationId: configuration.id,
+      page: 1,
+      pageSize: 20,
     });
     await submitTabAnalysisWithProviderCredential({
       workspaceId: 'workspace-1',
       tabId: 'tab-1',
       request: analysisRequest,
+    });
+    await submitAnnotationRunAllWithProviderCredential({
+      workspaceId: 'workspace-1',
+      tabId: 'tab-1',
+      providerConfigurationId: configuration.id,
+      source: analysisRequest,
     });
     await listFeaturedDataPortalCollectionsWithProviderCredential();
     await searchDataPortalWithProviderCredential({ query: 'speech' });
@@ -102,16 +109,44 @@ describe('provider credential request boundary', () => {
         },
       }),
     );
-    expect(sdk.previewAnnotation).toHaveBeenCalledWith(
-      expect.objectContaining({ body: { ...previewRequest, api_key: 'annotation-secret' } }),
+    expect(sdk.queryAnalysisResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          kind: 'annotation',
+          page: 1,
+          page_size: 20,
+          api_key: 'annotation-secret',
+        },
+      }),
     );
-    expect(sdk.submitTabAnalysis).toHaveBeenCalledWith(
-      expect.objectContaining({ body: { ...analysisRequest, api_key: 'annotation-secret' } }),
+    expect(sdk.submitTabAnalysis).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        body: {
+          execution_scope: 'preview',
+          request: { ...analysisRequest, api_key: 'annotation-secret' },
+          parent_analysis_id: null,
+          supersedes_analysis_ids: [],
+        },
+      }),
+    );
+    expect(sdk.submitTabAnalysis).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        body: {
+          execution_scope: 'run_all',
+          request: {
+            kind: 'annotation_run_all',
+            source: analysisRequest,
+            api_key: 'annotation-secret',
+          },
+          supersedes_analysis_ids: [],
+        },
+      }),
     );
     expect(sdk.listFeaturedDataPortalCollections).toHaveBeenCalledWith(
       expect.objectContaining({ body: { api_token: 'portal-secret' } }),
     );
-    expect(previewRequest).not.toHaveProperty('api_key');
     expect(analysisRequest).not.toHaveProperty('api_key');
   });
 

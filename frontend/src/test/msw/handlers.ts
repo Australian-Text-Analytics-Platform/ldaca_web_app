@@ -160,9 +160,6 @@ export const handlers = [
     () => new HttpResponse(null, { status: 204 }),
   ),
   http.get(apiPath('/workspaces/:workspace_id/nodes/:node_id/schema'), arrowSchemaResponse),
-  http.post(apiPath('/workspaces/:workspace_id/nodes/:node_id/annotation-previews'), () =>
-    HttpResponse.json({ labels: [] }),
-  ),
   http.get(apiPath('/workspaces/:workspace_id/tabs'), () => HttpResponse.json([])),
   http.post(apiPath('/workspaces/:workspace_id/tabs'), () =>
     HttpResponse.json(tabResponse(), { status: 201 }),
@@ -177,14 +174,12 @@ export const handlers = [
     apiPath('/workspaces/:workspace_id/tabs/:tab_id'),
     () => new HttpResponse(null, { status: 204 }),
   ),
-  http.get(apiPath('/workspaces/:workspace_id/tabs/:tab_id/analysis'), () =>
-    HttpResponse.json(null),
-  ),
-  http.post(apiPath('/workspaces/:workspace_id/tabs/:tab_id/analysis'), () =>
+  http.get(apiPath('/workspaces/:workspace_id/tabs/:tab_id/analyses'), () => HttpResponse.json([])),
+  http.post(apiPath('/workspaces/:workspace_id/tabs/:tab_id/analyses'), () =>
     HttpResponse.json(acceptedAnalysis(), { status: 201 }),
   ),
   http.delete(
-    apiPath('/workspaces/:workspace_id/tabs/:tab_id/analysis'),
+    apiPath('/workspaces/:workspace_id/tabs/:tab_id/analyses'),
     () => new HttpResponse(null, { status: 204 }),
   ),
   http.get(apiPath('/workspaces/:workspace_id/analyses'), () =>
@@ -201,9 +196,6 @@ export const handlers = [
   ),
   http.post(apiPath('/workspaces/:workspace_id/analyses/:analysis_id/cancel'), () =>
     HttpResponse.json(analysisResponse({ state: 'cancelled' })),
-  ),
-  http.post(apiPath('/workspaces/:workspace_id/analyses/:analysis_id/children'), () =>
-    HttpResponse.json(acceptedAnalysis(), { status: 201 }),
   ),
   http.get(apiPath('/workspaces/:workspace_id/analyses/:analysis_id/result'), () =>
     HttpResponse.json(emptyAnalysisResult),

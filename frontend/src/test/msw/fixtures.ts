@@ -44,7 +44,7 @@ export const tabResponse = (overrides: Partial<Tab> = {}): Tab => ({
   id: 'tab-1',
   name: 'Analysis',
   kind: 'token_frequency',
-  analysis_id: null,
+  analysis_ids: [],
   created_at: TEST_DATE,
   modified_at: TEST_DATE,
   revision: 1,
@@ -54,7 +54,10 @@ export const tabResponse = (overrides: Partial<Tab> = {}): Tab => ({
 /** Minimal canonical Analysis used by status and tab tests. */
 export const analysisResponse = (overrides: Partial<Analysis> = {}): Analysis => ({
   id: 'analysis-1',
+  tab_id: 'tab-1',
   parent_analysis_id: null,
+  execution_scope: 'run_all',
+  supersedes_analysis_ids: [],
   state: 'succeeded',
   cancellation_requested_at: null,
   created_at: TEST_DATE,
@@ -64,6 +67,7 @@ export const analysisResponse = (overrides: Partial<Analysis> = {}): Analysis =>
   progress: { fraction: 1, message: 'Complete' },
   error: null,
   integrity: { status: 'valid' },
+  output_node_ids: [],
   request: {
     kind: 'token_frequency',
     node_ids: ['node-1'],

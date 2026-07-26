@@ -82,7 +82,7 @@ const nodeInputsFixture = (
     graphSelectedIds: [],
     workspaceId: 'workspace-1',
     recentPresets: [],
-    nodeInfoCache: {},
+    nodeInfoById: {},
     getColumnInfos: vi.fn(() => []),
     getNodeInfo: vi.fn(() => undefined),
   };

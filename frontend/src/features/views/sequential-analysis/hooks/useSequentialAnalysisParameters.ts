@@ -418,7 +418,7 @@ export function useSequentialAnalysisParameters() {
   /**
    * Restores parameter controls from a submitted task request.
    * Called by: SequentialAnalysisFeature hydration after it fetches the stored
-   * request for a task id.
+   * request for an Analysis identity.
    */
   const applyHydratedRequest = useCallback(
     (request: Record<string, unknown>) => {

@@ -26,7 +26,7 @@ export const useWorkspaceQueries = ({
   selectedNodeIds,
 }: WorkspaceQueriesParams) => {
   const workspacesQuery = useQuery({
-    queryKey: queryKeys.workspaces,
+    queryKey: queryKeys.workspaceList,
     /**
      * Loads workspace summaries for selectors and launch screens.
      * Why: the list must wait for authenticated readiness and share one canonical cache key.
@@ -52,7 +52,7 @@ export const useWorkspaceQueries = ({
   const nodesQuery = useQuery({
     queryKey: currentWorkspaceId
       ? queryKeys.workspaceGraph(currentWorkspaceId)
-      : ['workspaces', 'graph'],
+      : queryKeys.inactiveWorkspaceGraph,
     /**
      * Fetches graph topology for the active workspace view.
      * Why: graph consumers need one cache entry gated by authenticated workspace identity.

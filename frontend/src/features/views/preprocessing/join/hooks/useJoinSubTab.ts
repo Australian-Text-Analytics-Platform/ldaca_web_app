@@ -321,11 +321,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     };
   })();
 
-  const joinPreviewSignature = (() => {
-    if (!joinPreviewRequest) return 'join-preview-disabled';
-    return JSON.stringify(joinPreviewRequest);
-  })();
-
   /**
    * Adapts the generated join preview endpoint to the shared preprocessing
    * preview hook result shape.
@@ -384,7 +379,13 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     setPageSize: setJoinPreviewPageSize,
   } = usePreprocessingPreview<JoinPreviewRequestPayload>({
     request: joinPreviewRequest,
-    signature: joinPreviewSignature,
+    identity: joinPreviewRequest
+      ? {
+          workspaceId: joinPreviewRequest.workspaceId,
+          operation: 'join',
+          nodeIds: [joinPreviewRequest.leftNodeId, joinPreviewRequest.rightNodeId],
+        }
+      : null,
     fetcher: joinPreviewFetcher,
   });
 

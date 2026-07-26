@@ -79,6 +79,7 @@ interface TokenFrequencyParameterPanelProps {
   hasIncompleteSelections: boolean;
   hasResults: boolean;
   runLabel?: string;
+  parametersLocked: boolean;
   studyNodeId: string | null;
   onStudyNodeChange: (nodeId: string) => void;
   nodeColors?: Record<string, string>;
@@ -105,6 +106,7 @@ export const TokenFrequencyParameterPanel = ({
   hasIncompleteSelections,
   hasResults,
   runLabel,
+  parametersLocked,
   studyNodeId,
   onStudyNodeChange,
   nodeColors,
@@ -157,21 +159,22 @@ export const TokenFrequencyParameterPanel = ({
           'Choose up to two data blocks and the text columns to analyze. After the run, use the results panel to adjust stop words and displayed token limits.',
       }}
       actions={{
-        onRun: onAnalyze,
+        onRunAll: onAnalyze,
         onStop,
         onClear: onClearResults,
-        runDisabled: actionState.runDisabled || hasIncompleteSelections,
-        runDisabledReason: hasIncompleteSelections
+        runAllDisabled: parametersLocked || actionState.runDisabled || hasIncompleteSelections,
+        runAllDisabledReason: hasIncompleteSelections
           ? 'Select a column for each data block'
           : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled,
-        isRunning: isAnalyzing,
+        isRunningAll: isAnalyzing,
         isStopping,
         hasResult: hasResults,
-        runLabel,
-        runHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
+        runAllLabel: runLabel,
+        runAllHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
         clearHelp: { targetKey: 'analysis.token-frequency.clear-results', label: 'Clear results' },
       }}
+      parametersLocked={parametersLocked}
     >
       <NodeInputsPanel
         resolvedNodes={nodeInputs.resolvedNodes}

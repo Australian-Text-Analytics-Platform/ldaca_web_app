@@ -62,6 +62,7 @@ interface Props {
   onClear: () => void | Promise<void>;
   hasMissingColumns: boolean;
   hasResult: boolean;
+  parametersLocked: boolean;
 }
 /**
  * Renders topic-modeling node inputs, sampling controls, run parameters, and shared actions.
@@ -100,6 +101,7 @@ export function TopicModelingParameterPanel({
   onClear,
   hasMissingColumns,
   hasResult,
+  parametersLocked,
 }: Props) {
   const [topicSizeDraft, setTopicSizeDraft] = useState<NumericInputDraft>(() => ({
     source: topicSizeValue,
@@ -207,20 +209,22 @@ export function TopicModelingParameterPanel({
         tooltip: 'Learn what topic modeling is and how it can help you.',
       }}
       actions={{
-        onRun,
+        onRunAll: onRun,
         onStop,
         onClear,
-        runDisabled: actionState.runDisabled || isRunning || hasMissingColumns,
-        runDisabledReason: hasMissingColumns
+        runAllDisabled:
+          parametersLocked || actionState.runDisabled || isRunning || hasMissingColumns,
+        runAllDisabledReason: hasMissingColumns
           ? 'Select a column for each data block'
           : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled || isClearing,
-        isRunning,
+        isRunningAll: isRunning,
         isStopping,
         isClearing,
         hasResult,
-        runLabel: actionState.runLabel,
+        runAllLabel: actionState.runLabel,
       }}
+      parametersLocked={parametersLocked}
     >
       <NodeInputsPanel
         resolvedNodes={nodeInputs.resolvedNodes}

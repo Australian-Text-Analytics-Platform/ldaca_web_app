@@ -19,6 +19,7 @@ export type Analysis = {
      */
     created_at: string;
     error: Failure | null;
+    execution_scope: AnalysisExecutionScope;
     /**
      * Finished At
      */
@@ -60,12 +61,16 @@ export type Analysis = {
     } & SequentialAnalysisRequest) | ({
         kind: 'annotation';
     } & AnnotationAnalysisRequest) | ({
-        kind: 'concordance_detachment';
-    } & ConcordanceDetachmentAnalysisRequest) | ({
-        kind: 'concordance_dispersion_detachment';
-    } & ConcordanceDispersionDetachmentAnalysisRequest) | ({
-        kind: 'quotation_detachment';
-    } & QuotationDetachmentAnalysisRequest) | ({
+        kind: 'concordance_run_all';
+    } & ConcordanceRunAllAnalysisRequest) | ({
+        kind: 'quotation_run_all';
+    } & QuotationRunAllAnalysisRequest) | ({
+        kind: 'concordance_result_publication';
+    } & ConcordanceResultPublicationAnalysisRequest) | ({
+        kind: 'quotation_result_publication';
+    } & QuotationResultPublicationAnalysisRequest) | ({
+        kind: 'annotation_run_all';
+    } & AnnotationRunAllAnalysisRequest) | ({
         kind: 'topic_modeling_detachment';
     } & TopicModelingDetachmentAnalysisRequest);
     /**
@@ -77,7 +82,65 @@ export type Analysis = {
      */
     started_at: string | null;
     state: BackgroundState;
+    /**
+     * Supersedes Analysis Ids
+     */
+    supersedes_analysis_ids: Array<string>;
+    /**
+     * Tab Id
+     */
+    tab_id: string;
 };
+
+/**
+ * AnalysisCreate
+ *
+ * One complete immutable Analysis submission owned by a Tab.
+ */
+export type AnalysisCreate = {
+    execution_scope: AnalysisExecutionScope;
+    /**
+     * Parent Analysis Id
+     */
+    parent_analysis_id?: string | null;
+    /**
+     * Request
+     */
+    request: ({
+        kind: 'token_frequency';
+    } & TokenFrequencyAnalysisRequest) | ({
+        kind: 'topic_modeling';
+    } & TopicModelingAnalysisRequest) | ({
+        kind: 'concordance';
+    } & ConcordanceAnalysisRequest) | ({
+        kind: 'quotation';
+    } & QuotationAnalysisRequest) | ({
+        kind: 'sequential';
+    } & SequentialAnalysisRequest) | ({
+        kind: 'annotation';
+    } & AnnotationAnalysisSubmission) | ({
+        kind: 'concordance_run_all';
+    } & ConcordanceRunAllAnalysisRequest) | ({
+        kind: 'quotation_run_all';
+    } & QuotationRunAllAnalysisRequest) | ({
+        kind: 'concordance_result_publication';
+    } & ConcordanceResultPublicationAnalysisRequest) | ({
+        kind: 'quotation_result_publication';
+    } & QuotationResultPublicationAnalysisRequest) | ({
+        kind: 'annotation_run_all';
+    } & AnnotationRunAllSubmission) | ({
+        kind: 'topic_modeling_detachment';
+    } & TopicModelingDetachmentAnalysisRequest);
+    /**
+     * Supersedes Analysis Ids
+     */
+    supersedes_analysis_ids?: Array<string>;
+};
+
+/**
+ * AnalysisExecutionScope
+ */
+export type AnalysisExecutionScope = 'preview' | 'run_all' | 'supporting';
 
 /**
  * AnalysisKind
@@ -125,9 +188,37 @@ export type AnnotationAnalysisRequest = {
      */
     annotation_column: string;
     /**
+     * Class Column
+     */
+    class_column: string;
+    /**
+     * Class Node Id
+     */
+    class_node_id: string;
+    /**
      * Classes
      */
     classes: Array<AnnotationClass>;
+    /**
+     * Correction Column
+     */
+    correction_column?: string | null;
+    /**
+     * Description Column
+     */
+    description_column: string;
+    /**
+     * Example Annotation Column
+     */
+    example_annotation_column?: string | null;
+    /**
+     * Example Node Id
+     */
+    example_node_id?: string | null;
+    /**
+     * Example Text Column
+     */
+    example_text_column?: string | null;
     /**
      * Instruction
      */
@@ -144,10 +235,6 @@ export type AnnotationAnalysisRequest = {
      * Node Id
      */
     node_id: string;
-    /**
-     * Output Node Name
-     */
-    output_node_name: string;
     /**
      * Provider
      */
@@ -189,9 +276,37 @@ export type AnnotationAnalysisSubmission = {
      */
     annotation_column: string;
     /**
+     * Class Column
+     */
+    class_column: string;
+    /**
+     * Class Node Id
+     */
+    class_node_id: string;
+    /**
      * Classes
      */
     classes: Array<AnnotationClass>;
+    /**
+     * Correction Column
+     */
+    correction_column?: string | null;
+    /**
+     * Description Column
+     */
+    description_column: string;
+    /**
+     * Example Annotation Column
+     */
+    example_annotation_column?: string | null;
+    /**
+     * Example Node Id
+     */
+    example_node_id?: string | null;
+    /**
+     * Example Text Column
+     */
+    example_text_column?: string | null;
     /**
      * Instruction
      */
@@ -208,10 +323,6 @@ export type AnnotationAnalysisSubmission = {
      * Node Id
      */
     node_id: string;
-    /**
-     * Output Node Name
-     */
-    output_node_name: string;
     /**
      * Provider
      */
@@ -366,8 +477,6 @@ export type AnnotationModelsResource = {
 
 /**
  * AnnotationPreviewLabel
- *
- * A provider label paired with its stable zero-based source row index.
  */
 export type AnnotationPreviewLabel = {
     /**
@@ -378,94 +487,6 @@ export type AnnotationPreviewLabel = {
      * Row Index
      */
     row_index: number;
-};
-
-/**
- * AnnotationPreviewRequest
- *
- * One stateless, one-based page preview with a request-only credential.
- */
-export type AnnotationPreviewRequest = {
-    /**
-     * Annotation Column
-     */
-    annotation_column: string;
-    /**
-     * Classes
-     */
-    classes: Array<AnnotationClass>;
-    /**
-     * Instruction
-     */
-    instruction: string;
-    /**
-     * Model
-     */
-    model: string;
-    /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Page Size
-     */
-    page_size?: number;
-    /**
-     * Provider
-     */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
-    /**
-     * Provider Base Url
-     */
-    provider_base_url?: string | null;
-    /**
-     * Provider Configuration Id
-     */
-    provider_configuration_id: string;
-    /**
-     * Reasoning Effort
-     */
-    reasoning_effort?: 'low' | 'medium' | 'high';
-    /**
-     * Reasoning Enabled
-     */
-    reasoning_enabled?: boolean;
-    /**
-     * Temperature
-     */
-    temperature?: number;
-    /**
-     * Text Column
-     */
-    text_column: string;
-};
-
-/**
- * AnnotationPreviewResource
- *
- * Direct stateless preview result for one source-node page.
- */
-export type AnnotationPreviewResource = {
-    /**
-     * Labels
-     */
-    labels: Array<AnnotationPreviewLabel>;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Page
-     */
-    page: number;
-    /**
-     * Page Size
-     */
-    page_size: number;
-    /**
-     * Total Rows
-     */
-    total_rows: number;
 };
 
 /**
@@ -535,25 +556,110 @@ export type AnnotationProviderConfigurationResource = {
  */
 export type AnnotationResult = {
     /**
-     * Annotation Column
+     * Kind
      */
-    annotation_column: string;
+    kind?: 'annotation';
+    /**
+     * Labels
+     */
+    labels?: Array<AnnotationPreviewLabel> | null;
+    /**
+     * Node Id
+     */
+    node_id?: string | null;
+    /**
+     * Page
+     */
+    page?: number | null;
+    /**
+     * Page Size
+     */
+    page_size?: number | null;
+    query?: AnnotationResultQuery | null;
+    /**
+     * Ready
+     */
+    ready?: true;
+    /**
+     * Rows
+     */
+    rows?: Array<{
+        [key: string]: JsonDataOutput;
+    }> | null;
+    /**
+     * Total Rows
+     */
+    total_rows?: number | null;
+};
+
+/**
+ * AnnotationResultQuery
+ */
+export type AnnotationResultQuery = {
     /**
      * Kind
      */
     kind?: 'annotation';
     /**
-     * Output Columns
+     * Page
      */
-    output_columns: Array<string>;
+    page?: number;
     /**
-     * Output Node Ids
+     * Page Size
      */
-    output_node_ids: Array<string>;
+    page_size?: number;
+};
+
+/**
+ * AnnotationRunAllAnalysisRequest
+ */
+export type AnnotationRunAllAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'annotation_run_all';
+    source: AnnotationAnalysisRequest;
+};
+
+/**
+ * AnnotationRunAllResult
+ */
+export type AnnotationRunAllResult = {
+    /**
+     * Affected Node Id
+     */
+    affected_node_id: string;
+    /**
+     * Annotated Count
+     */
+    annotated_count: number;
+    /**
+     * Annotation Column
+     */
+    annotation_column: string;
+    /**
+     * Committed Workspace Revision
+     */
+    committed_workspace_revision: number;
+    /**
+     * Kind
+     */
+    kind?: 'annotation_run_all';
     /**
      * Record Count
      */
     record_count: number;
+};
+
+/**
+ * AnnotationRunAllSubmission
+ */
+export type AnnotationRunAllSubmission = {
+    /**
+     * Kind
+     */
+    kind?: 'annotation_run_all';
+    source: AnnotationAnalysisRequest;
 };
 
 /**
@@ -1100,130 +1206,6 @@ export type ConcordanceAnalysisRequest = {
 };
 
 /**
- * ConcordanceDetachmentAnalysisRequest
- */
-export type ConcordanceDetachmentAnalysisRequest = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_detachment';
-    /**
-     * Name
-     */
-    name?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Selected Columns
-     */
-    selected_columns: Array<string>;
-};
-
-/**
- * ConcordanceDetachmentDerivation
- */
-export type ConcordanceDetachmentDerivation = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_detachment';
-};
-
-/**
- * ConcordanceDetachmentResult
- */
-export type ConcordanceDetachmentResult = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_detachment';
-    /**
-     * Output Columns
-     */
-    output_columns: Array<string>;
-    /**
-     * Output Node Ids
-     */
-    output_node_ids: Array<string>;
-    /**
-     * Record Count
-     */
-    record_count: number;
-};
-
-/**
- * ConcordanceDispersionDetachmentAnalysisRequest
- */
-export type ConcordanceDispersionDetachmentAnalysisRequest = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_dispersion_detachment';
-    /**
-     * Match Case Insensitive
-     */
-    match_case_insensitive?: boolean;
-    /**
-     * Name
-     */
-    name?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Selected Bins
-     */
-    selected_bins?: Array<number> | null;
-    /**
-     * Selected Columns
-     */
-    selected_columns: Array<string>;
-    /**
-     * Selected Matched Texts
-     */
-    selected_matched_texts?: Array<string> | null;
-    /**
-     * Total Bins
-     */
-    total_bins?: number | null;
-};
-
-/**
- * ConcordanceDispersionDetachmentDerivation
- */
-export type ConcordanceDispersionDetachmentDerivation = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_dispersion_detachment';
-};
-
-/**
- * ConcordanceDispersionDetachmentResult
- */
-export type ConcordanceDispersionDetachmentResult = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_dispersion_detachment';
-    /**
-     * Output Columns
-     */
-    output_columns: Array<string>;
-    /**
-     * Output Node Ids
-     */
-    output_node_ids: Array<string>;
-    /**
-     * Record Count
-     */
-    record_count: number;
-};
-
-/**
  * ConcordancePage
  */
 export type ConcordancePage = {
@@ -1250,11 +1232,57 @@ export type ConcordanceResult = {
      * Kind
      */
     kind?: 'concordance';
-    query: ConcordanceResultQuery;
+    query?: ConcordanceResultQuery | null;
+    /**
+     * Ready
+     */
+    ready?: true;
     /**
      * Sources
      */
-    sources: Array<ConcordanceSourceResult>;
+    sources?: Array<ConcordanceSourceResult> | null;
+};
+
+/**
+ * ConcordanceResultPublicationAnalysisRequest
+ */
+export type ConcordanceResultPublicationAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_result_publication';
+    /**
+     * Sources
+     */
+    sources: Array<ResultPublicationSource>;
+};
+
+/**
+ * ConcordanceResultPublicationDerivation
+ */
+export type ConcordanceResultPublicationDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_result_publication';
+};
+
+/**
+ * ConcordanceResultPublicationResult
+ */
+export type ConcordanceResultPublicationResult = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_result_publication';
+    /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
+     * Outputs
+     */
+    outputs: Array<ResultPublicationOutput>;
 };
 
 /**
@@ -1285,6 +1313,78 @@ export type ConcordanceResultQuery = {
      * Sort By
      */
     sort_by?: string | null;
+};
+
+/**
+ * ConcordanceRunAllAnalysisRequest
+ */
+export type ConcordanceRunAllAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_run_all';
+    source: ConcordanceAnalysisRequest;
+};
+
+/**
+ * ConcordanceRunAllGroupSource
+ */
+export type ConcordanceRunAllGroupSource = {
+    /**
+     * Analysis Columns
+     */
+    analysis_columns: Array<string>;
+    /**
+     * Analysis Id
+     */
+    analysis_id: string;
+    /**
+     * Color
+     */
+    color: string | null;
+    /**
+     * Document Column
+     */
+    document_column: string;
+    /**
+     * Internal Columns
+     */
+    internal_columns: Array<string>;
+    /**
+     * Metadata Columns
+     */
+    metadata_columns: Array<string>;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
+};
+
+/**
+ * ConcordanceRunAllResult
+ */
+export type ConcordanceRunAllResult = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_run_all';
+    /**
+     * Result Type
+     */
+    result_type: 'source' | 'group';
+    source?: RunAllSourceTableResource | null;
+    /**
+     * Sources
+     */
+    sources?: Array<ConcordanceRunAllGroupSource> | null;
 };
 
 /**
@@ -1608,12 +1708,10 @@ export type DerivationProvenance = {
     } & SqlDerivation) | ({
         kind: 'annotation';
     } & AnnotationDerivation) | ({
-        kind: 'concordance_detachment';
-    } & ConcordanceDetachmentDerivation) | ({
-        kind: 'concordance_dispersion_detachment';
-    } & ConcordanceDispersionDetachmentDerivation) | ({
-        kind: 'quotation_detachment';
-    } & QuotationDetachmentDerivation) | ({
+        kind: 'concordance_result_publication';
+    } & ConcordanceResultPublicationDerivation) | ({
+        kind: 'quotation_result_publication';
+    } & QuotationResultPublicationDerivation) | ({
         kind: 'topic_modeling_detachment';
     } & TopicModelingDetachmentDerivation);
     /**
@@ -2293,60 +2391,6 @@ export type QuotationAnalysisRequest = {
 };
 
 /**
- * QuotationDetachmentAnalysisRequest
- */
-export type QuotationDetachmentAnalysisRequest = {
-    /**
-     * Kind
-     */
-    kind?: 'quotation_detachment';
-    /**
-     * Name
-     */
-    name?: string | null;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Selected Columns
-     */
-    selected_columns: Array<string>;
-};
-
-/**
- * QuotationDetachmentDerivation
- */
-export type QuotationDetachmentDerivation = {
-    /**
-     * Kind
-     */
-    kind?: 'quotation_detachment';
-};
-
-/**
- * QuotationDetachmentResult
- */
-export type QuotationDetachmentResult = {
-    /**
-     * Kind
-     */
-    kind?: 'quotation_detachment';
-    /**
-     * Output Columns
-     */
-    output_columns: Array<string>;
-    /**
-     * Output Node Ids
-     */
-    output_node_ids: Array<string>;
-    /**
-     * Record Count
-     */
-    record_count: number;
-};
-
-/**
  * QuotationEngineSelection
  */
 export type QuotationEngineSelection = {
@@ -2369,21 +2413,64 @@ export type QuotationResult = {
     /**
      * Columns
      */
-    columns: Array<string>;
+    columns?: Array<string> | null;
     /**
      * Data
      */
-    data: Array<Array<{
+    data?: Array<Array<{
         [key: string]: JsonDataOutput;
-    }>>;
+    }>> | null;
     /**
      * Kind
      */
     kind?: 'quotation';
-    metadata: ResultColumnMetadata;
-    pagination: SourcePagePagination;
-    query: QuotationResultQuery;
-    sorting: ResultSorting;
+    metadata?: ResultColumnMetadata | null;
+    pagination?: SourcePagePagination | null;
+    query?: QuotationResultQuery | null;
+    /**
+     * Ready
+     */
+    ready?: true;
+    sorting?: ResultSorting | null;
+};
+
+/**
+ * QuotationResultPublicationAnalysisRequest
+ */
+export type QuotationResultPublicationAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_result_publication';
+    source: ResultPublicationSource;
+};
+
+/**
+ * QuotationResultPublicationDerivation
+ */
+export type QuotationResultPublicationDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_result_publication';
+};
+
+/**
+ * QuotationResultPublicationResult
+ */
+export type QuotationResultPublicationResult = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_result_publication';
+    /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
+     * Outputs
+     */
+    outputs: Array<ResultPublicationOutput>;
 };
 
 /**
@@ -2410,6 +2497,28 @@ export type QuotationResultQuery = {
      * Sort By
      */
     sort_by?: string | null;
+};
+
+/**
+ * QuotationRunAllAnalysisRequest
+ */
+export type QuotationRunAllAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_run_all';
+    source: QuotationAnalysisRequest;
+};
+
+/**
+ * QuotationRunAllResult
+ */
+export type QuotationRunAllResult = {
+    /**
+     * Kind
+     */
+    kind?: 'quotation_run_all';
+    source: RunAllSourceTableResource;
 };
 
 /**
@@ -2615,6 +2724,48 @@ export type ResultPagination = {
 };
 
 /**
+ * ResultPublicationOutput
+ */
+export type ResultPublicationOutput = {
+    /**
+     * Output Columns
+     */
+    output_columns: Array<string>;
+    /**
+     * Output Node Id
+     */
+    output_node_id: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
+ * ResultPublicationSource
+ *
+ * One immutable selection for publishing a successful Analysis Result.
+ */
+export type ResultPublicationSource = {
+    /**
+     * New Node Name
+     */
+    new_node_name: string;
+    /**
+     * Selected Columns
+     */
+    selected_columns: Array<string>;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
  * ResultSorting
  */
 export type ResultSorting = {
@@ -2694,6 +2845,45 @@ export type RoundExpressionOutput = {
     } & RoundExpressionOutput) | ({
         op: 'concat_string';
     } & ConcatStringExpressionOutput);
+};
+
+/**
+ * RunAllSourceTableResource
+ */
+export type RunAllSourceTableResource = {
+    /**
+     * Analysis Columns
+     */
+    analysis_columns: Array<string>;
+    /**
+     * Color
+     */
+    color: string | null;
+    /**
+     * Document Column
+     */
+    document_column: string;
+    /**
+     * Internal Columns
+     */
+    internal_columns: Array<string>;
+    /**
+     * Metadata Columns
+     */
+    metadata_columns: Array<string>;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
+    table: PagedTableResource;
 };
 
 /**
@@ -3165,9 +3355,15 @@ export type StringExpressionOutput = {
  */
 export type Tab = {
     /**
-     * Analysis Id
+     * Analysis Ids
      */
-    analysis_id: string | null;
+    analysis_ids?: Array<string>;
+    /**
+     * Annotation Correction Columns
+     */
+    annotation_correction_columns?: {
+        [key: string]: string;
+    };
     /**
      * Created At
      */
@@ -3203,13 +3399,19 @@ export type TabCreate = {
 };
 
 /**
- * TabRename
+ * TabUpdate
  */
-export type TabRename = {
+export type TabUpdate = {
+    /**
+     * Annotation Correction Columns
+     */
+    annotation_correction_columns?: {
+        [key: string]: string;
+    } | null;
     /**
      * Name
      */
-    name: string;
+    name?: string | null;
 };
 
 /**
@@ -4091,6 +4293,51 @@ export type TopicNodeArtifactResource = {
 };
 
 /**
+ * AnalysisCreate
+ *
+ * One complete immutable Analysis submission owned by a Tab.
+ */
+export type AnalysisCreateWritable = {
+    execution_scope: AnalysisExecutionScope;
+    /**
+     * Parent Analysis Id
+     */
+    parent_analysis_id?: string | null;
+    /**
+     * Request
+     */
+    request: ({
+        kind: 'token_frequency';
+    } & TokenFrequencyAnalysisRequest) | ({
+        kind: 'topic_modeling';
+    } & TopicModelingAnalysisRequest) | ({
+        kind: 'concordance';
+    } & ConcordanceAnalysisRequest) | ({
+        kind: 'quotation';
+    } & QuotationAnalysisRequest) | ({
+        kind: 'sequential';
+    } & SequentialAnalysisRequest) | ({
+        kind: 'annotation';
+    } & AnnotationAnalysisSubmissionWritable) | ({
+        kind: 'concordance_run_all';
+    } & ConcordanceRunAllAnalysisRequest) | ({
+        kind: 'quotation_run_all';
+    } & QuotationRunAllAnalysisRequest) | ({
+        kind: 'concordance_result_publication';
+    } & ConcordanceResultPublicationAnalysisRequest) | ({
+        kind: 'quotation_result_publication';
+    } & QuotationResultPublicationAnalysisRequest) | ({
+        kind: 'annotation_run_all';
+    } & AnnotationRunAllSubmissionWritable) | ({
+        kind: 'topic_modeling_detachment';
+    } & TopicModelingDetachmentAnalysisRequest);
+    /**
+     * Supersedes Analysis Ids
+     */
+    supersedes_analysis_ids?: Array<string>;
+};
+
+/**
  * AnnotationAnalysisSubmission
  *
  * Annotation creation command with an optional request-only credential.
@@ -4105,9 +4352,37 @@ export type AnnotationAnalysisSubmissionWritable = {
      */
     api_key?: string | null;
     /**
+     * Class Column
+     */
+    class_column: string;
+    /**
+     * Class Node Id
+     */
+    class_node_id: string;
+    /**
      * Classes
      */
     classes: Array<AnnotationClass>;
+    /**
+     * Correction Column
+     */
+    correction_column?: string | null;
+    /**
+     * Description Column
+     */
+    description_column: string;
+    /**
+     * Example Annotation Column
+     */
+    example_annotation_column?: string | null;
+    /**
+     * Example Node Id
+     */
+    example_node_id?: string | null;
+    /**
+     * Example Text Column
+     */
+    example_text_column?: string | null;
     /**
      * Instruction
      */
@@ -4124,10 +4399,6 @@ export type AnnotationAnalysisSubmissionWritable = {
      * Node Id
      */
     node_id: string;
-    /**
-     * Output Node Name
-     */
-    output_node_name: string;
     /**
      * Provider
      */
@@ -4183,70 +4454,6 @@ export type AnnotationModelsRequestWritable = {
 };
 
 /**
- * AnnotationPreviewRequest
- *
- * One stateless, one-based page preview with a request-only credential.
- */
-export type AnnotationPreviewRequestWritable = {
-    /**
-     * Annotation Column
-     */
-    annotation_column: string;
-    /**
-     * Api Key
-     */
-    api_key?: string | null;
-    /**
-     * Classes
-     */
-    classes: Array<AnnotationClass>;
-    /**
-     * Instruction
-     */
-    instruction: string;
-    /**
-     * Model
-     */
-    model: string;
-    /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Page Size
-     */
-    page_size?: number;
-    /**
-     * Provider
-     */
-    provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
-    /**
-     * Provider Base Url
-     */
-    provider_base_url?: string | null;
-    /**
-     * Provider Configuration Id
-     */
-    provider_configuration_id: string;
-    /**
-     * Reasoning Effort
-     */
-    reasoning_effort?: 'low' | 'medium' | 'high';
-    /**
-     * Reasoning Enabled
-     */
-    reasoning_enabled?: boolean;
-    /**
-     * Temperature
-     */
-    temperature?: number;
-    /**
-     * Text Column
-     */
-    text_column: string;
-};
-
-/**
  * AnnotationProviderConfigurationCreate
  *
  * Create command containing one write-only provider credential.
@@ -4268,6 +4475,84 @@ export type AnnotationProviderConfigurationCreateWritable = {
      * Provider
      */
     provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+};
+
+/**
+ * AnnotationResult
+ */
+export type AnnotationResultWritable = {
+    /**
+     * Kind
+     */
+    kind?: 'annotation';
+    /**
+     * Labels
+     */
+    labels?: Array<AnnotationPreviewLabel> | null;
+    /**
+     * Node Id
+     */
+    node_id?: string | null;
+    /**
+     * Page
+     */
+    page?: number | null;
+    /**
+     * Page Size
+     */
+    page_size?: number | null;
+    query?: AnnotationResultQueryWritable | null;
+    /**
+     * Ready
+     */
+    ready?: true;
+    /**
+     * Rows
+     */
+    rows?: Array<{
+        [key: string]: JsonDataOutputWritable;
+    }> | null;
+    /**
+     * Total Rows
+     */
+    total_rows?: number | null;
+};
+
+/**
+ * AnnotationResultQuery
+ */
+export type AnnotationResultQueryWritable = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'annotation';
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+};
+
+/**
+ * AnnotationRunAllSubmission
+ */
+export type AnnotationRunAllSubmissionWritable = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Kind
+     */
+    kind?: 'annotation_run_all';
+    source: AnnotationAnalysisRequest;
 };
 
 /**
@@ -6405,75 +6690,6 @@ export type CancelAnalysisResponses = {
 
 export type CancelAnalysisResponse = CancelAnalysisResponses[keyof CancelAnalysisResponses];
 
-export type SubmitChildAnalysisData = {
-    /**
-     * Body
-     */
-    body: ({
-        kind: 'concordance_detachment';
-    } & ConcordanceDetachmentAnalysisRequest) | ({
-        kind: 'concordance_dispersion_detachment';
-    } & ConcordanceDispersionDetachmentAnalysisRequest) | ({
-        kind: 'quotation_detachment';
-    } & QuotationDetachmentAnalysisRequest) | ({
-        kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentAnalysisRequest);
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Analysis Id
-         */
-        analysis_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/children';
-};
-
-export type SubmitChildAnalysisErrors = {
-    /**
-     * Authentication required
-     */
-    401: ApiError;
-    /**
-     * Origin, CSRF, or access check failed
-     */
-    403: ApiError;
-    /**
-     * Resource not found
-     */
-    404: ApiError;
-    /**
-     * Resource state conflict
-     */
-    409: ApiError;
-    /**
-     * Request validation failed
-     */
-    422: ApiError;
-    /**
-     * Stored resource is corrupt
-     */
-    500: ApiError;
-    /**
-     * Storage capacity is exhausted
-     */
-    507: ApiError;
-};
-
-export type SubmitChildAnalysisError = SubmitChildAnalysisErrors[keyof SubmitChildAnalysisErrors];
-
-export type SubmitChildAnalysisResponses = {
-    /**
-     * Successful Response
-     */
-    201: Analysis;
-};
-
-export type SubmitChildAnalysisResponse = SubmitChildAnalysisResponses[keyof SubmitChildAnalysisResponses];
-
 export type GetAnalysisResultData = {
     body?: never;
     path: {
@@ -6550,14 +6766,18 @@ export type GetAnalysisResultResponses = {
     } & SequentialResult) | ({
         kind: 'annotation';
     } & AnnotationResult) | ({
-        kind: 'concordance_detachment';
-    } & ConcordanceDetachmentResult) | ({
-        kind: 'concordance_dispersion_detachment';
-    } & ConcordanceDispersionDetachmentResult) | ({
-        kind: 'quotation_detachment';
-    } & QuotationDetachmentResult) | ({
+        kind: 'concordance_run_all';
+    } & ConcordanceRunAllResult) | ({
+        kind: 'quotation_run_all';
+    } & QuotationRunAllResult) | ({
+        kind: 'annotation_run_all';
+    } & AnnotationRunAllResult) | ({
         kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentResult);
+    } & TopicModelingDetachmentResult) | ({
+        kind: 'concordance_result_publication';
+    } & ConcordanceResultPublicationResult) | ({
+        kind: 'quotation_result_publication';
+    } & QuotationResultPublicationResult);
 };
 
 export type GetAnalysisResultResponse = GetAnalysisResultResponses[keyof GetAnalysisResultResponses];
@@ -6572,7 +6792,9 @@ export type QueryAnalysisResultData = {
         kind: 'concordance';
     } & ConcordanceResultQuery) | ({
         kind: 'quotation';
-    } & QuotationResultQuery);
+    } & QuotationResultQuery) | ({
+        kind: 'annotation';
+    } & AnnotationResultQueryWritable);
     path: {
         /**
          * Workspace Id
@@ -6651,14 +6873,18 @@ export type QueryAnalysisResultResponses = {
     } & SequentialResult) | ({
         kind: 'annotation';
     } & AnnotationResult) | ({
-        kind: 'concordance_detachment';
-    } & ConcordanceDetachmentResult) | ({
-        kind: 'concordance_dispersion_detachment';
-    } & ConcordanceDispersionDetachmentResult) | ({
-        kind: 'quotation_detachment';
-    } & QuotationDetachmentResult) | ({
+        kind: 'concordance_run_all';
+    } & ConcordanceRunAllResult) | ({
+        kind: 'quotation_run_all';
+    } & QuotationRunAllResult) | ({
+        kind: 'annotation_run_all';
+    } & AnnotationRunAllResult) | ({
         kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentResult);
+    } & TopicModelingDetachmentResult) | ({
+        kind: 'concordance_result_publication';
+    } & ConcordanceResultPublicationResult) | ({
+        kind: 'quotation_result_publication';
+    } & QuotationResultPublicationResult);
 };
 
 export type QueryAnalysisResultResponse = QueryAnalysisResultResponses[keyof QueryAnalysisResultResponses];
@@ -7341,64 +7567,6 @@ export type UpdateNodeResponses = {
 
 export type UpdateNodeResponse = UpdateNodeResponses[keyof UpdateNodeResponses];
 
-export type PreviewAnnotationData = {
-    body: AnnotationPreviewRequestWritable;
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Node Id
-         */
-        node_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/nodes/{node_id}/annotation-previews';
-};
-
-export type PreviewAnnotationErrors = {
-    /**
-     * Invalid request
-     */
-    400: ApiError;
-    /**
-     * Authentication required
-     */
-    401: ApiError;
-    /**
-     * Origin, CSRF, or access check failed
-     */
-    403: ApiError;
-    /**
-     * Resource not found
-     */
-    404: ApiError;
-    /**
-     * Resource state conflict
-     */
-    409: ApiError;
-    /**
-     * Request validation failed
-     */
-    422: ApiError;
-    /**
-     * Upstream provider unavailable
-     */
-    502: ApiError;
-};
-
-export type PreviewAnnotationError = PreviewAnnotationErrors[keyof PreviewAnnotationErrors];
-
-export type PreviewAnnotationResponses = {
-    /**
-     * Successful Response
-     */
-    200: AnnotationPreviewResource;
-};
-
-export type PreviewAnnotationResponse = PreviewAnnotationResponses[keyof PreviewAnnotationResponses];
-
 export type EditNodeData = {
     /**
      * Request
@@ -8013,8 +8181,8 @@ export type GetTabResponses = {
 
 export type GetTabResponse = GetTabResponses[keyof GetTabResponses];
 
-export type RenameTabData = {
-    body: TabRename;
+export type UpdateTabData = {
+    body: TabUpdate;
     path: {
         /**
          * Workspace Id
@@ -8029,7 +8197,7 @@ export type RenameTabData = {
     url: '/api/workspaces/{workspace_id}/tabs/{tab_id}';
 };
 
-export type RenameTabErrors = {
+export type UpdateTabErrors = {
     /**
      * Authentication required
      */
@@ -8060,16 +8228,16 @@ export type RenameTabErrors = {
     507: ApiError;
 };
 
-export type RenameTabError = RenameTabErrors[keyof RenameTabErrors];
+export type UpdateTabError = UpdateTabErrors[keyof UpdateTabErrors];
 
-export type RenameTabResponses = {
+export type UpdateTabResponses = {
     /**
      * Successful Response
      */
     200: Tab;
 };
 
-export type RenameTabResponse = RenameTabResponses[keyof RenameTabResponses];
+export type UpdateTabResponse = UpdateTabResponses[keyof UpdateTabResponses];
 
 export type ClearTabAnalysisData = {
     body?: never;
@@ -8084,7 +8252,7 @@ export type ClearTabAnalysisData = {
         tab_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis';
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses';
 };
 
 export type ClearTabAnalysisErrors = {
@@ -8129,7 +8297,7 @@ export type ClearTabAnalysisResponses = {
 
 export type ClearTabAnalysisResponse = ClearTabAnalysisResponses[keyof ClearTabAnalysisResponses];
 
-export type GetTabAnalysisData = {
+export type ListTabAnalysesData = {
     body?: never;
     path: {
         /**
@@ -8142,10 +8310,10 @@ export type GetTabAnalysisData = {
         tab_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis';
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses';
 };
 
-export type GetTabAnalysisErrors = {
+export type ListTabAnalysesErrors = {
     /**
      * Authentication required
      */
@@ -8159,10 +8327,6 @@ export type GetTabAnalysisErrors = {
      */
     404: ApiError;
     /**
-     * Resource state conflict
-     */
-    409: ApiError;
-    /**
      * Request validation failed
      */
     422: ApiError;
@@ -8172,34 +8336,21 @@ export type GetTabAnalysisErrors = {
     500: ApiError;
 };
 
-export type GetTabAnalysisError = GetTabAnalysisErrors[keyof GetTabAnalysisErrors];
+export type ListTabAnalysesError = ListTabAnalysesErrors[keyof ListTabAnalysesErrors];
 
-export type GetTabAnalysisResponses = {
+export type ListTabAnalysesResponses = {
     /**
+     * Response List Tab Analyses
+     *
      * Successful Response
      */
-    200: Analysis;
+    200: Array<Analysis | CorruptAnalysis>;
 };
 
-export type GetTabAnalysisResponse = GetTabAnalysisResponses[keyof GetTabAnalysisResponses];
+export type ListTabAnalysesResponse = ListTabAnalysesResponses[keyof ListTabAnalysesResponses];
 
 export type SubmitTabAnalysisData = {
-    /**
-     * Body
-     */
-    body: ({
-        kind: 'token_frequency';
-    } & TokenFrequencyAnalysisRequest) | ({
-        kind: 'topic_modeling';
-    } & TopicModelingAnalysisRequest) | ({
-        kind: 'concordance';
-    } & ConcordanceAnalysisRequest) | ({
-        kind: 'quotation';
-    } & QuotationAnalysisRequest) | ({
-        kind: 'sequential';
-    } & SequentialAnalysisRequest) | ({
-        kind: 'annotation';
-    } & AnnotationAnalysisSubmissionWritable);
+    body: AnalysisCreateWritable;
     path: {
         /**
          * Workspace Id
@@ -8211,7 +8362,7 @@ export type SubmitTabAnalysisData = {
         tab_id: string;
     };
     query?: never;
-    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analysis';
+    url: '/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses';
 };
 
 export type SubmitTabAnalysisErrors = {

@@ -7,7 +7,7 @@ deployment.
 
 ## Current Guarantees
 
-- Native Workspace schema 7 and portable archive format 6 are strict current
+- Native Workspace schema 11 and portable archive format 10 are strict current
   contracts. Older formats are rejected rather than guessed or migrated at
   runtime.
 - Workspace and User File data use private same-filesystem staging and atomic
@@ -15,7 +15,7 @@ deployment.
 - User File Import records are strict, size-bounded JSON files, and each
   individual record save is atomic.
 - Workspace list operations isolate corrupt Workspace entries, and Analysis
-  hydration can expose corrupt Tab-owned roots without making healthy sibling
+  hydration can expose corrupt Tab-owned records without making healthy sibling
   Analyses unreadable.
 - Central storage admission measures allocated bytes and reserves concurrent
   growth for Workspace, User File, import, Analysis, and response-snapshot
@@ -38,7 +38,7 @@ half-wired-component cleanup.
 | Data Block and Result integrity | Native [`WorkspaceStore`](../../backend/src/ldaca_wordflow/infrastructure/storage/workspace_store.py) does not fully reconcile a Data Block's display name and Document Column Preference with its loaded schema. [`AnalysisRecord`](../../backend/src/ldaca_wordflow/domain/workspace/analysis.py) and [`AnalysisResultService`](../../backend/src/ldaca_wordflow/services/analysis_results.py) validate stored Results and declared Artifacts at different times, rather than enforcing one persisted identity invariant. Validate both relationships at publication and strict load, isolating a bad Analysis or Data Block without hiding healthy siblings. |
 | SQLite schema validation | [`database.py`](../../backend/src/ldaca_wordflow/infrastructure/database.py) recognizes required indexes by uniqueness and columns without rejecting partial indexes, and recognizes the quota `CHECK` through normalized SQL text. Validate partial predicates and constraints semantically, including rollback-only behavior probes. |
 | Corrupt import isolation | [`UserFileImportStore`](../../backend/src/ldaca_wordflow/infrastructure/storage/user_file_import_store.py) marks an entire user's import history corrupt when one file is invalid. Because the bad record is not loaded, the public delete operation cannot repair it. Isolate corruption per record and make that exact record removable without parsing its body. |
-| Startup reconciliation | [`WorkspaceStore.reconcile`](../../backend/src/ldaca_wordflow/infrastructure/storage/workspace_store.py) can remove abandoned generations but is not wired into production startup. Hydration also skips some child Analysis records whose parents are missing. Run store reconciliation before serving and explicitly remove or isolate rootless children. |
+| Startup reconciliation | [`WorkspaceStore.reconcile`](../../backend/src/ldaca_wordflow/infrastructure/storage/workspace_store.py) can remove abandoned generations but is not wired into production startup. Hydration also skips some Analysis records whose parents are missing. Run store reconciliation before serving and explicitly remove or isolate parentless invalid records. |
 
 ## Verification Targets
 

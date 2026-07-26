@@ -4,8 +4,8 @@ import type { ArrowColumn, ColumnKind } from '@/lib/arrow/arrowTable';
 import { nodeSchemaQueryOptions } from '@/lib/nodeSchema';
 
 /**
- * Normalizes the generated node-info schema for sequential analysis.
- * Used by the hook's node-info query selector and SequentialAnalysisFeature
+ * Normalizes the authoritative Arrow schema for sequential analysis.
+ * Used by the hook's schema query selector and SequentialAnalysisFeature
  * when it hydrates a saved task schema.
  * Flow: read the generated `{ column: dtype }` map and normalize each dtype for
  * the handwritten column controls.
@@ -45,7 +45,7 @@ interface SchemaManagementConfig {
 /**
  * Used by SequentialAnalysisFeature to lock the run schema and by focused hook
  * tests that verify query, lock, and workspace-switch behavior.
- * Flow: subscribe to the canonical node-info query while unlocked, preserve locked schema during runs, then expose effective schema and column options.
+ * Flow: subscribe to the canonical node-schema query while unlocked, preserve locked schema during runs, then expose effective schema and column options.
  */
 export function useSchemaManagement(config: SchemaManagementConfig) {
   const { nodeId, isLocked, workspaceId } = config;
@@ -53,14 +53,14 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   const [currentSchema, setCurrentSchema] = useState<Record<string, ColumnKind>>({});
   const [lockedSchema, setLockedSchema] = useState<Record<string, ColumnKind> | null>(null);
 
-  // Fetch schema via the node-info query so schema readers share the same metadata cache.
+  // Fetch through the shared node-schema query so every schema reader observes one resource.
   const schemaQuery = useQuery({
     ...nodeSchemaQueryOptions({
       workspaceId: workspaceId ?? '',
       nodeId: nodeId ?? '',
     }),
     select: arrowSchemaToKinds,
-    /** Fetches schema through node info so cast/preprocessing invalidations refresh column types. */
+    /** Fetches Arrow schema so cast/preprocessing invalidations refresh column types. */
     /** Called by: TanStack Query inside useSchemaManagement. */
     enabled: !!nodeId && !isLocked && !!workspaceId,
     staleTime: 0,
@@ -81,7 +81,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   /** Schema seen by task builders: locked while a task is running, live otherwise. */
   const effectiveSchema = isLocked ? (lockedSchema ?? currentSchema) : currentSchema;
 
-  /** Column options for parameter panels, derived only from canonical node info. */
+  /** Column options for parameter panels, derived only from canonical Arrow schema. */
   const availableColumns = Object.entries(effectiveSchema).map(([name, jsType]) => ({
     name,
     dataType: jsType,

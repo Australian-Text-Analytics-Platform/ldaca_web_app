@@ -52,9 +52,10 @@ function nodeInputRequestsStore(
 ): NodeInputRequestsStore {
   const store: NodeInputRequestsStore = {
     nextId: 1,
-    requests: [],
+    pendingRequests: [],
     requestAdd: vi.fn(),
     consume: vi.fn(),
+    clear: vi.fn(),
     ...overrides,
   };
   mocks.useNodeInputRequestsStore.mockImplementation(
@@ -94,13 +95,14 @@ describe('NodeInputsPanel', () => {
     );
   });
 
-  it('renders a dashed add target for matching pending requests', async () => {
+  it('places and consumes only the latest matching carried Data Block', async () => {
     const user = userEvent.setup();
     const onAddNodes = vi.fn(() => []);
     const consume = vi.fn();
     nodeInputRequestsStore({
-      requests: [
-        { id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a', 'node-b'] },
+      pendingRequests: [
+        { id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeId: 'node-a' },
+        { id: 5, workspaceId: 'workspace-1', view: 'annotation', nodeId: 'node-b' },
       ],
       consume,
     });
@@ -111,14 +113,16 @@ describe('NodeInputsPanel', () => {
     expect(target).toHaveClass('justify-center');
     await user.click(target);
 
-    expect(onAddNodes).toHaveBeenCalledWith(['node-a', 'node-b']);
-    expect(consume).toHaveBeenCalledWith(4);
+    expect(onAddNodes).toHaveBeenCalledWith(['node-b']);
+    expect(consume).toHaveBeenCalledWith(5);
   });
 
   it('marks a filled pending-request target as unavailable and directs users elsewhere', () => {
     const onAddNodes = vi.fn(() => []);
     nodeInputRequestsStore({
-      requests: [{ id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
+      pendingRequests: [
+        { id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeId: 'node-a' },
+      ],
     });
 
     render(
@@ -140,20 +144,40 @@ describe('NodeInputsPanel', () => {
     expect(onAddNodes).not.toHaveBeenCalled();
   });
 
-  it('cancels a pending dashed add target without adding nodes', async () => {
+  it('discards the latest carried Data Block without adding it', async () => {
     const user = userEvent.setup();
     const onAddNodes = vi.fn(() => []);
     const consume = vi.fn();
     nodeInputRequestsStore({
-      requests: [{ id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
+      pendingRequests: [
+        { id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeId: 'node-a' },
+      ],
       consume,
     });
 
     render(<NodeInputsPanel {...baseProps} title="Example Node" onAddNodes={onAddNodes} />);
 
-    await user.click(screen.getByRole('button', { name: 'Cancel adding node' }));
+    await user.click(screen.getByRole('button', { name: 'Discard latest carried Data Block' }));
 
     expect(onAddNodes).not.toHaveBeenCalled();
     expect(consume).toHaveBeenCalledWith(4);
+  });
+
+  it('keeps the latest Data Block carried when placement is rejected', async () => {
+    const user = userEvent.setup();
+    const onAddNodes = vi.fn(() => [{ nodeId: 'node-a', reason: 'Already selected' }]);
+    const consume = vi.fn();
+    nodeInputRequestsStore({
+      pendingRequests: [
+        { id: 4, workspaceId: 'workspace-1', view: 'annotation', nodeId: 'node-a' },
+      ],
+      consume,
+    });
+
+    render(<NodeInputsPanel {...baseProps} title="Example Node" onAddNodes={onAddNodes} />);
+    await user.click(screen.getByRole('button', { name: 'Add to Example Node' }));
+
+    expect(onAddNodes).toHaveBeenCalledWith(['node-a']);
+    expect(consume).not.toHaveBeenCalled();
   });
 });

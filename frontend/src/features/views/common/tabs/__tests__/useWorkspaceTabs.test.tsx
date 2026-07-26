@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   listTabs: vi.fn(),
   createTab: vi.fn(),
   deleteTab: vi.fn(),
-  renameTab: vi.fn(),
+  updateTab: vi.fn(),
 }));
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -15,7 +15,7 @@ vi.mock('@/api', async (importOriginal) => ({
   listTabs: mocks.listTabs,
   createTab: mocks.createTab,
   deleteTab: mocks.deleteTab,
-  renameTab: mocks.renameTab,
+  updateTab: mocks.updateTab,
 }));
 
 import { useWorkspaceTabs } from '../useWorkspaceTabs';
@@ -30,14 +30,20 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 );
 
-const serverTab = (id = 'tab-1', kind: 'concordance' | 'quotation' = 'concordance') => ({
+const serverTab = (
+  id = 'tab-1',
+  kind: 'annotation' | 'concordance' | 'quotation' = 'concordance',
+) => ({
   id,
   name: id,
   kind,
-  analysis_id: null,
+  analysis_ids: [],
   created_at: '2026-01-01T00:00:00Z',
   modified_at: '2026-01-01T00:00:00Z',
   revision: 1,
+  input_sets: {},
+  settings: {},
+  annotation_correction_columns: {},
 });
 
 describe('useWorkspaceTabs', () => {
@@ -45,11 +51,11 @@ describe('useWorkspaceTabs', () => {
     mocks.listTabs.mockReset();
     mocks.createTab.mockReset();
     mocks.deleteTab.mockReset();
-    mocks.renameTab.mockReset();
+    mocks.updateTab.mockReset();
     mocks.listTabs.mockResolvedValue({ data: [serverTab()], error: undefined });
     mocks.createTab.mockResolvedValue({ data: serverTab('tab-2'), error: undefined });
     mocks.deleteTab.mockResolvedValue({ data: undefined, error: undefined });
-    mocks.renameTab.mockResolvedValue({ data: serverTab(), error: undefined });
+    mocks.updateTab.mockResolvedValue({ data: serverTab(), error: undefined });
     useAnalysisTabsPresentationStore.setState({ activeTabIds: {}, tabSettings: {} });
     localStorage.removeItem('ldaca-analysis-tab-presentation-v2');
   });
@@ -135,6 +141,29 @@ describe('useWorkspaceTabs', () => {
     });
   });
 
+  it('appends and opens a newly created tab when the server returns newest tabs first', async () => {
+    mocks.createTab.mockImplementation(async () => {
+      mocks.listTabs.mockResolvedValue({
+        data: [serverTab('tab-2'), serverTab('tab-1')],
+        error: undefined,
+      });
+      return { data: serverTab('tab-2'), error: undefined };
+    });
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.createTab('Second');
+    });
+
+    await waitFor(() => {
+      expect(result.current.tabs.map((tab) => tab.tab_id)).toEqual(['tab-1', 'tab-2']);
+      expect(result.current.activeTabId).toBe('tab-2');
+    });
+  });
+
   it('creates, renames, and deletes durable tabs through canonical endpoints', async () => {
     const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), {
       wrapper,
@@ -155,7 +184,7 @@ describe('useWorkspaceTabs', () => {
     );
     act(() => result.current.renameTab('tab-1', 'Renamed'));
     await waitFor(() =>
-      expect(mocks.renameTab).toHaveBeenCalledWith(
+      expect(mocks.updateTab).toHaveBeenCalledWith(
         expect.objectContaining({
           path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
           body: { name: 'Renamed' },
@@ -187,13 +216,66 @@ describe('useWorkspaceTabs', () => {
       { node_id: 'node-1', column: 'text' },
     ]);
     expect(view.result.current.tabs[0]?.settings).toEqual({ mode: 'manual' });
-    expect(mocks.renameTab).not.toHaveBeenCalled();
+    expect(mocks.updateTab).not.toHaveBeenCalled();
 
     view.unmount();
     view = renderHook(() => useWorkspaceTabs('workspace-1', 'concordance'), { wrapper });
     await waitFor(() => expect(view.result.current.tabs).toHaveLength(1));
     expect(view.result.current.tabs[0]?.input_sets.source).toEqual([]);
     expect(view.result.current.tabs[0]?.settings).toEqual({ mode: 'manual' });
+  });
+
+  it('persists and clears Annotation correction-column drafts on the Tab resource', async () => {
+    mocks.listTabs.mockResolvedValue({ data: [serverTab('tab-1', 'annotation')] });
+    mocks.updateTab.mockImplementation(({ body }) =>
+      Promise.resolve({
+        data: {
+          ...serverTab('tab-1', 'annotation'),
+          annotation_correction_columns: body.annotation_correction_columns ?? {},
+        },
+      }),
+    );
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'annotation'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+
+    act(() => {
+      result.current.setAnnotationCorrectionColumn('tab-1', 'node-1', 'review');
+    });
+    await waitFor(() => {
+      expect(mocks.updateTab).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { annotation_correction_columns: { 'node-1': 'review' } },
+        }),
+      );
+    });
+
+    act(() => {
+      result.current.clearAnnotationCorrectionColumns('tab-1');
+    });
+    await waitFor(() => {
+      expect(mocks.updateTab).toHaveBeenLastCalledWith(
+        expect.objectContaining({ body: { annotation_correction_columns: {} } }),
+      );
+    });
+  });
+
+  it('rolls back an Annotation correction-column draft when persistence fails', async () => {
+    mocks.listTabs.mockResolvedValue({ data: [serverTab('tab-1', 'annotation')] });
+    mocks.updateTab.mockRejectedValue(new Error('save failed'));
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'annotation'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+
+    await act(async () => {
+      await expect(
+        result.current.setAnnotationCorrectionColumn('tab-1', 'node-1', 'review'),
+      ).rejects.toThrow('save failed');
+    });
+
+    expect(result.current.tabs[0]?.annotation_correction_columns).toEqual({});
   });
 
   it('shares one all-tabs request between analysis kinds', async () => {

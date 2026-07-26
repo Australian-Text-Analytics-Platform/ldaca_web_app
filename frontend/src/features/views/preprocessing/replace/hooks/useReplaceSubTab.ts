@@ -110,7 +110,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     nodeId: activeNodeId,
     operationPayload,
     operationFetch: replaceTextPreview,
-    signaturePrefix: 'replace',
+    operation: 'replace',
     enabled: hasSelection,
   });
 

@@ -20,6 +20,9 @@ describe('useAnnotationTabSettings', () => {
           aiReasoningEnabled: 'true',
           aiReasoningEffort: 'high',
           annotationTargets: JSON.stringify({ 'source-node': 'annotation' }),
+          annotationComparisonColumns: JSON.stringify({
+            'source-node': ['reviewer_one', 'reviewer_two'],
+          }),
         },
       }),
     );
@@ -36,6 +39,9 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.aiReasoningEnabled).toBe(true);
     expect(result.current.aiReasoningEffort).toBe('high');
     expect(result.current.annotationTargets).toEqual({ 'source-node': 'annotation' });
+    expect(result.current.annotationComparisonColumns).toEqual({
+      'source-node': ['reviewer_one', 'reviewer_two'],
+    });
   });
 
   it('writes discrete setting changes through to the tab sink', () => {
@@ -59,6 +65,10 @@ describe('useAnnotationTabSettings', () => {
       result.current.setAiReasoningEnabled(true);
       result.current.setAiReasoningEffort('low');
       result.current.setAnnotationTarget('source-node', 'existing_annotation');
+      result.current.setAnnotationComparisonColumns('source-node', [
+        'reviewer_one',
+        'reviewer_two',
+      ]);
     });
 
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
@@ -78,6 +88,10 @@ describe('useAnnotationTabSettings', () => {
     expect(onTabSettingChange).toHaveBeenCalledWith(
       'annotationTargets',
       JSON.stringify({ 'source-node': 'existing_annotation' }),
+    );
+    expect(onTabSettingChange).toHaveBeenCalledWith(
+      'annotationComparisonColumns',
+      JSON.stringify({ 'source-node': ['reviewer_one', 'reviewer_two'] }),
     );
   });
 

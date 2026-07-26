@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AnnotationProviderConfigurationView } from '@/features/provider-credentials/providerCredentialsStore';
@@ -30,11 +31,10 @@ const configurations: AnnotationProviderConfigurationView[] = [
   },
 ];
 
-const renderSettings = (onProviderChange = vi.fn()) => {
+const renderSettings = (onProviderChange = vi.fn(), advanced?: ReactNode) => {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <AnnotationAiSettings
-        workspaceId="workspace-1"
         configurations={configurations}
         selectedConfigurationId={configurations[0]!.id}
         onProviderChange={onProviderChange}
@@ -42,6 +42,7 @@ const renderSettings = (onProviderChange = vi.fn()) => {
         onModelCommit={vi.fn()}
         providerModels={{ [configurations[1]!.id]: 'model-2' }}
         model=""
+        advanced={advanced}
       />
     </QueryClientProvider>,
   );
@@ -73,5 +74,14 @@ describe('AnnotationAiSettings', () => {
     await user.click(screen.getByRole('button', { name: 'Provider' }));
     await user.click(screen.getByRole('button', { name: 'Add Provider' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Add provider form');
+  });
+
+  it('keeps the unified Advanced settings collapsed by default', async () => {
+    const user = userEvent.setup();
+    renderSettings(vi.fn(), <div>Example, prompt, and inference settings</div>);
+
+    expect(screen.queryByText('Example, prompt, and inference settings')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    expect(screen.getByText('Example, prompt, and inference settings')).toBeInTheDocument();
   });
 });

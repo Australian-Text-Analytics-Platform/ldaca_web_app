@@ -63,6 +63,31 @@ hosted multi-user mode, configurations and secrets stay in this browser for the
 signed-in account, remain after logout, and must be entered again in another
 browser or device.
 
+## Step 7 — Preview and review AI Annotation
+
+**Question:** *How do I review and correct AI annotations?*
+
+**Answer:** In the Annotation parameter panel, choose an existing **User
+Correction Column** or add one. Preview shows source text, the fresh prediction,
+an arrow, and the correction column separately. Correction choices are written
+to that Data Block column immediately, while predictions remain an unwritten
+preview. **Use the correction column as the example** fills the optional Example
+Data Block controls; Example, Prompt, and inference controls are grouped under
+the collapsed **Advanced** section.
+
+**Run All** processes the complete Data Block and writes the final Annotation
+Column in place. Review uses the standard rows-per-page and numbered pagination
+controls. Annotation keeps one current task: Run All replaces Preview, and a
+later Run All replaces the previous Run All. **Clear Results** also clears the
+selected correction-column draft so the next task starts without inheriting it.
+
+Manual Annotation also provides **Compare To**. Select one or more other label
+columns to see whole-Data-Block confusion matrices and Cohen's Kappa. The same
+comparison choices remain selected in Preview and Review for that Data Block,
+appear as read-only columns after any correction column in all three table
+modes, and each successfully saved manual label updates the displayed
+comparison.
+
 ## Recap
 
 **Question:** *What should I read after the tour?*

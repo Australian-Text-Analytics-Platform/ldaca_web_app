@@ -29,7 +29,11 @@ export async function getAnalysisOutputResource(workspaceId: string, analysisId:
 export function projectConcordanceResult(
   concordance: ConcordanceResult,
 ): ConcordanceAnalysisResponse {
-  const entries = concordance.sources.map((source) => {
+  if (!concordance.sources) {
+    throw new Error('Concordance Result page is unavailable');
+  }
+  const sources = concordance.sources;
+  const entries = sources.map((source) => {
     const page = source.result;
     return [
       source.node_id,
@@ -44,11 +48,11 @@ export function projectConcordanceResult(
       },
     ] as const;
   });
-  const firstPage = concordance.sources[0]?.result;
+  const firstPage = sources[0]?.result;
   return {
     ...concordance,
     data: Object.fromEntries(entries),
-    combinable: concordance.sources.length === 2,
+    combinable: sources.length === 2,
     metadata: firstPage?.metadata ?? {
       metadata_columns: [],
       concordance_columns: [],
@@ -68,7 +72,28 @@ export async function getAnalysisResultResource<TResult>(
     throwOnError: true,
   });
   if (result.kind === 'concordance') {
-    return projectConcordanceResult(result) as TResult;
+    const page =
+      result.sources == null
+        ? (
+            await queryAnalysisResult({
+              path: { workspace_id: workspaceId, analysis_id: analysisId },
+              body: { kind: 'concordance' },
+              throwOnError: true,
+            })
+          ).data
+        : result;
+    if (page.kind !== 'concordance') {
+      throw new Error('Concordance query returned the wrong Result kind');
+    }
+    return projectConcordanceResult(page) as TResult;
+  }
+  if (result.kind === 'quotation' && result.data == null) {
+    const { data } = await queryAnalysisResult({
+      path: { workspace_id: workspaceId, analysis_id: analysisId },
+      body: { kind: 'quotation' },
+      throwOnError: true,
+    });
+    return data as TResult;
   }
   if (result.kind === 'token_frequency') {
     const tokenResult = result as TokenFrequencyResult;

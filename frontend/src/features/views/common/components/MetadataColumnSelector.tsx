@@ -54,7 +54,7 @@ interface MetadataColumnSelectorProps {
 /**
  * Renders the shared metadata-column dropdown used by analysis result tables to
  * choose which row metadata survives in visible and combined views.
- * Used by: concordance and quotation result tables.
+ * Used by: Annotation Review and Concordance/Quotation result tables.
  */
 export function MetadataColumnSelector({
   availableColumns,
