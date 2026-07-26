@@ -1,5 +1,5 @@
-import type { CSSProperties, ReactNode } from 'react';
 import { flexRender, type Header, type Table as TanStackTable } from '@tanstack/react-table';
+import type { CSSProperties, ReactNode } from 'react';
 import {
   Table,
   TableBody,
@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { PaginatedTableProcessingRow } from '@/features/views/common/components/PaginatedTableProcessingRow';
 import { alignmentClassForColumn, type ConcordanceRow } from './concordanceTableModel';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
   rows: ConcordanceRow[];
   tableColumns: string[];
   searchWord: string;
+  loading: boolean;
   renderHeader: (header: Header<ConcordanceRow, unknown>) => ReactNode;
   getRowClassName: (row: ConcordanceRow, index: number) => string;
   getRowStyle?: (row: ConcordanceRow, index: number) => CSSProperties | undefined;
@@ -34,6 +36,7 @@ export function ConcordanceRowsTable({
   rows,
   tableColumns,
   searchWord,
+  loading,
   renderHeader,
   getRowClassName,
   getRowStyle,
@@ -49,7 +52,9 @@ export function ConcordanceRowsTable({
         ))}
       </TableHeader>
       <TableBody>
-        {rows.length === 0 ? (
+        {loading ? (
+          <PaginatedTableProcessingRow columnCount={tableColumns.length} />
+        ) : rows.length === 0 ? (
           <TableRow>
             <TableCell
               className="h-24 text-center text-muted-foreground"

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
-import type { ConcordanceAnalysisResponse, WorkspaceGraphNode } from '@/api';
+import type { ConcordanceAnalysisResponse } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
@@ -74,7 +74,6 @@ interface ConcordanceResultsMetadata {
 
 interface ConcordanceResultsSources {
   searchWord: string;
-  selectedNodes: WorkspaceGraphNode[];
   panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   labelToNodeId: Record<string, string> | null;
@@ -91,7 +90,6 @@ interface ConcordanceResultsSession {
   combinedPage: number;
   setCombinedPage: Dispatch<SetStateAction<number>>;
   nodeLoading: Record<string, boolean>;
-  nodeDetaching: Record<string, boolean>;
 }
 
 interface ConcordanceResultsCommands {
@@ -103,25 +101,11 @@ interface ConcordanceResultsCommands {
     column: string,
     groupedHits?: ConcordanceGroupedRow,
   ) => void;
-  openDetachDialog: (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => void;
-  /**
-   * Open the per-document detach dialog. Parent gathers the source-node
-   * info(s) (one for per-node view, multiple for combined view) and the
-   * current bin selection; the dialog handles column picking and confirm
-   * dispatches the actual detach call(s).
-   */
-  onDispersionDetach: (
-    nodes: { nodeId: string; column: string; nodeLabel: string }[],
-    selectedBins: ReadonlySet<number> | null,
-    binCount: number,
-    options?: {
-      selectedMatchedTexts?: string[] | null;
-      matchCaseInsensitive?: boolean;
-    },
-  ) => Promise<void> | void;
 }
 
 export interface ConcordanceResultsPanelProps {
+  title?: string;
+  headerAction?: React.ReactNode;
   shell: ConcordanceResultsShell;
   display: ConcordanceResultsDisplay;
   metadata: ConcordanceResultsMetadata;
@@ -134,6 +118,8 @@ export interface ConcordanceResultsPanelProps {
  * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks.
  */
 export function ConcordanceResultsPanel({
+  title = 'Search Results',
+  headerAction,
   shell: {
     resultsRef,
     resultsViewportRef,
@@ -176,7 +162,6 @@ export function ConcordanceResultsPanel({
   },
   sources: {
     searchWord,
-    selectedNodes,
     panelSelectedNodes,
     effectiveNodeColumnSelections,
     labelToNodeId,
@@ -191,9 +176,8 @@ export function ConcordanceResultsPanel({
     combinedPage,
     setCombinedPage,
     nodeLoading,
-    nodeDetaching,
   },
-  commands: { handleSort, handlePageChange, handleRowClick, openDetachDialog, onDispersionDetach },
+  commands: { handleSort, handlePageChange, handleRowClick },
 }: ConcordanceResultsPanelProps) {
   const showDispersion = concordanceView === 'dispersion';
 
@@ -202,38 +186,41 @@ export function ConcordanceResultsPanel({
       <CardHeader className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <CardTitle className="flex items-center gap-2">
-            Search Results
+            {title}
             <HelpIcon
               targetKey="analysis.concordance.results"
               label="Concordance results"
               tooltip="Browse keyword-in-context hits, switch between separated/combined views, and adjust pagination."
             />
           </CardTitle>
-          {panelSelectedNodes.length > 1 && (
-            <Tabs
-              value={viewMode}
-              onValueChange={(mode) => {
-                handleViewModeChange(mode as 'separated' | 'combined');
-              }}
-              className="w-full md:w-auto"
-            >
-              <TabsList aria-label="Concordance view mode">
-                <TabsTrigger value="separated">Separated</TabsTrigger>
-                {results.combinable && (
-                  <TabsTrigger value="combined">
-                    {combinedLoading ? (
-                      <span className="flex items-center gap-1">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Combined
-                      </span>
-                    ) : (
-                      'Combined'
-                    )}
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </Tabs>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {panelSelectedNodes.length > 1 && (
+              <Tabs
+                value={viewMode}
+                onValueChange={(mode) => {
+                  handleViewModeChange(mode as 'separated' | 'combined');
+                }}
+                className="w-full md:w-auto"
+              >
+                <TabsList aria-label="Concordance view mode">
+                  <TabsTrigger value="separated">Separated</TabsTrigger>
+                  {results.combinable && (
+                    <TabsTrigger value="combined">
+                      {combinedLoading ? (
+                        <span className="flex items-center gap-1">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Combined
+                        </span>
+                      ) : (
+                        'Combined'
+                      )}
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+              </Tabs>
+            )}
+            {headerAction}
+          </div>
         </div>
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -378,7 +365,6 @@ export function ConcordanceResultsPanel({
                     searchWord,
                     showMetadata,
                     selectedMetadataColumns,
-                    selectedNodes,
                     panelSelectedNodes,
                     effectiveNodeColumnSelections,
                     sourceColorMap,
@@ -389,11 +375,9 @@ export function ConcordanceResultsPanel({
                     combinedPage,
                     combinedLoading,
                     nodeLoading,
-                    nodeDetaching,
                     handlePageChange,
                     handleRowClick,
                     setCombinedPage,
-                    openDetachDialog,
                   };
                   return concordanceView === 'dispersion' ? (
                     <ConcordanceDispersionNodeBlock
@@ -416,7 +400,6 @@ export function ConcordanceResultsPanel({
                       onClearBinSelection={onClearBinSelection}
                       allMatchedTexts={allMatchedTexts}
                       matchedTextColorMap={matchedTextColorMap}
-                      onDispersionDetach={onDispersionDetach}
                     />
                   ) : (
                     <ConcordanceTableNodeBlock

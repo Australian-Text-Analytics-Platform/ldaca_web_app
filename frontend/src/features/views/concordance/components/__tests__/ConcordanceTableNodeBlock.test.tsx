@@ -61,7 +61,6 @@ const buildProps = (handleSort: ConcordanceTableNodeBlockProps['handleSort']) =>
     combinedPage: 1,
     combinedLoading: false,
     nodeLoading: {},
-    nodeDetaching: {},
     handleSort,
     handlePageChange: vi.fn(),
     handleRowClick: vi.fn(),
@@ -84,5 +83,14 @@ describe('ConcordanceTableNodeBlock', () => {
 
     fireEvent.click(metadataHeader);
     expect(handleSort).toHaveBeenCalledWith('speaker', 'node-1', 'node-1');
+  });
+
+  it('keeps headers mounted and hides stale rows while a new page is processing', () => {
+    const props = buildProps(vi.fn());
+    render(<ConcordanceTableNodeBlock {...props} nodeLoading={{ 'node-1': true }} />);
+
+    expect(screen.getByRole('columnheader', { name: 'CONC_matched_text' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Processing preview page' })).toBeInTheDocument();
+    expect(screen.queryByText('alpha')).not.toBeInTheDocument();
   });
 });

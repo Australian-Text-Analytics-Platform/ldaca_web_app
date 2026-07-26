@@ -41,12 +41,6 @@ export function canListModels(
   return configuration.provider === 'custom' || configuration.has_api_key;
 }
 
-/** A class the model may assign, with an optional guiding description. */
-export interface AnnotationClassOption {
-  name: string;
-  description: string;
-}
-
 export function canAnnotate(
   configuration: AnnotationProviderConfigurationResource | null,
   model: string,

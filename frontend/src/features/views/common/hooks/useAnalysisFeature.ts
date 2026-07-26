@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { cancelAnalysis, clearTabAnalysis } from '@/api';
 import type { Analysis } from '@/api';
+import { cancelAnalysis, clearTabAnalysis } from '@/api';
 import type { TaskItem } from '@/features/workspace/task-stream/taskProjection';
 import { queryKeys } from '@/lib/queryKeys';
 import type {
@@ -10,47 +10,48 @@ import type {
   AnalysisTaskStatus,
   CanonicalAnalysisTaskType,
 } from '../tasks/types';
-import { useAnalysisSession, type HydrationState } from './useAnalysisSession';
-
-export interface ClearAnalysisUiOptions {
-  preserveLocalState?: boolean;
-}
+import { useAnalysisSession } from './useAnalysisSession';
 
 interface UseAnalysisFeatureConfig<TResult = unknown, TRequest = unknown> {
-  taskType: CanonicalAnalysisTaskType | (string & {});
+  taskType: CanonicalAnalysisTaskType;
   workspaceId: string | null;
   tabId: string;
   resultQuery?: Readonly<Record<string, unknown>>;
   fetchResult: (taskId: string, query?: Readonly<Record<string, unknown>>) => Promise<TResult>;
-  onRequest?: (request: TRequest) => void | Promise<void>;
-  onCleared: (clearedTaskIds: string[], options?: ClearAnalysisUiOptions) => void;
+  onRequest: (request: TRequest) => void | Promise<void>;
+  onCleared: (clearedTaskIds: string[]) => void;
   hydrationTaskId: string | null;
+  requestHydration?: { analysisId: string; request: TRequest } | null;
+  controlAnalysisId: string | null;
+  tabAnalysisIds: string[];
+  retiredAnalysisIds?: string[];
 }
 
 interface UseAnalysisFeatureReturn<TResult, TRequest> {
-  analysisId: string | null;
   request: TRequest | null;
   analysisState: Analysis['state'] | null;
   analysisError: string | null;
   result: TResult | null;
+  isResultFetching: boolean;
   setLocalTaskId: React.Dispatch<React.SetStateAction<string | null>>;
-  resolveTaskId: () => Promise<string | null>;
   isRunning: boolean;
   isStopping: boolean;
   setIsRunning: (running: boolean) => void;
   runningRef: React.RefObject<boolean>;
   taskStatus: AnalysisTaskStatus;
   banner: AnalysisTaskBannerState | null;
-  lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
-  hydrationState: HydrationState;
   stopTask: () => Promise<void>;
-  clearResults: (options?: ClearAnalysisUiOptions) => Promise<boolean>;
+  clearResults: () => Promise<boolean>;
 }
 
 const taskState = (analysis: Analysis): TaskItem['state'] =>
   analysis.state === 'succeeded' ? 'successful' : analysis.state;
 
-const analysisTask = (analysis: Analysis, workspaceId: string, taskType: string): TaskItem => ({
+const analysisTask = (
+  analysis: Analysis,
+  workspaceId: string,
+  taskType: CanonicalAnalysisTaskType,
+): TaskItem => ({
   resource_type: 'analysis',
   task_id: analysis.id,
   task_type: taskType,
@@ -104,12 +105,12 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
   const [localRunning, setLocalRunning] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const runningRef = useRef(false);
-  const lastFetchedRef = useRef<{ taskId: string | null; state: string | null }>({
-    taskId: null,
-    state: null,
-  });
   const appliedRequestIdRef = useRef<string | null>(null);
-  const analysisId = config.hydrationTaskId ?? localTaskId;
+  const localTaskWasRemoved =
+    localTaskId !== null &&
+    config.hydrationTaskId !== localTaskId &&
+    config.retiredAnalysisIds?.includes(localTaskId) === true;
+  const analysisId = config.hydrationTaskId ?? (localTaskWasRemoved ? null : localTaskId);
   const session = useAnalysisSession<TResult>({
     workspaceId: config.workspaceId,
     analysisId,
@@ -119,13 +120,16 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
     },
   });
 
-  const analysis = session.analysis;
-  const result = session.result;
+  const analysis = localTaskWasRemoved ? null : session.analysis;
+  const hydratedRequest =
+    (analysis?.request as TRequest | undefined) ?? config.requestHydration?.request ?? null;
+  const hydratedRequestId = analysis?.id ?? config.requestHydration?.analysisId ?? null;
+  const result = localTaskWasRemoved ? null : session.result;
   const lifecycleRunning = analysis?.state === 'queued' || analysis?.state === 'running';
-  const isRunning = analysis ? lifecycleRunning : localRunning;
+  const isRunning = localTaskWasRemoved ? false : analysis ? lifecycleRunning : localRunning;
 
-  // Stable identity is required by existing task-dispatch hooks that store this
-  // function alongside `runningRef` while a submission is in flight.
+  // Task-dispatch hooks keep this callback alongside `runningRef` while a
+  // submission is in flight, so its identity must stay stable.
   const setIsRunning = useCallback((running: boolean) => {
     runningRef.current = running;
     setLocalRunning(running);
@@ -141,19 +145,14 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
 
   useEffect(() => {
     appliedRequestIdRef.current = null;
-    lastFetchedRef.current = { taskId: null, state: null };
   }, [config.workspaceId, analysisId]);
 
   useEffect(() => {
-    if (!analysis || appliedRequestIdRef.current === analysis.id) return;
-    appliedRequestIdRef.current = analysis.id;
-    void configRef.current.onRequest?.(analysis.request as TRequest);
-  }, [analysis]);
-
-  useEffect(() => {
-    if (!analysisId || !result) return;
-    lastFetchedRef.current = { taskId: analysisId, state: 'successful' };
-  }, [analysisId, result]);
+    if (!hydratedRequest || !hydratedRequestId || appliedRequestIdRef.current === hydratedRequestId)
+      return;
+    appliedRequestIdRef.current = hydratedRequestId;
+    void configRef.current.onRequest(hydratedRequest);
+  }, [hydratedRequest, hydratedRequestId]);
 
   const task =
     analysis && config.workspaceId
@@ -167,20 +166,7 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
         message: taskStatus.bannerMessage,
       }
     : null;
-  const hydrationState: HydrationState = {
-    status: session.isLoading
-      ? 'loading'
-      : session.lifecycleError || session.resultError
-        ? 'error'
-        : 'idle',
-    error:
-      session.lifecycleError ??
-      (session.resultError instanceof Error ? session.resultError.message : undefined),
-  };
-
-  const resolveTaskId = () => Promise.resolve(analysisId);
-
-  const clearResults = async (options?: ClearAnalysisUiOptions): Promise<boolean> => {
+  const clearResults = async (): Promise<boolean> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return false;
     try {
@@ -188,10 +174,10 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
         path: { workspace_id: cfg.workspaceId, tab_id: cfg.tabId },
         throwOnError: true,
       });
-      const clearedIds = analysisId ? [analysisId] : [];
-      if (analysisId) {
+      const clearedIds = cfg.tabAnalysisIds;
+      for (const clearedId of clearedIds) {
         queryClient.removeQueries({
-          queryKey: queryKeys.analysisSession(cfg.workspaceId, analysisId),
+          queryKey: queryKeys.analysisSession(cfg.workspaceId, clearedId),
         });
       }
       void queryClient.invalidateQueries({
@@ -200,7 +186,7 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(cfg.workspaceId) });
       setLocalTaskId(null);
       setIsRunning(false);
-      cfg.onCleared(clearedIds, options);
+      cfg.onCleared(clearedIds);
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not clear the analysis.');
@@ -210,14 +196,15 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
 
   const stopTask = async (): Promise<void> => {
     const cfg = configRef.current;
-    if (!cfg.workspaceId || !analysisId) return;
+    const controlledAnalysisId = cfg.controlAnalysisId;
+    if (!cfg.workspaceId || !controlledAnalysisId) return;
     setIsStopping(true);
     try {
       const { data } = await cancelAnalysis({
-        path: { workspace_id: cfg.workspaceId, analysis_id: analysisId },
+        path: { workspace_id: cfg.workspaceId, analysis_id: controlledAnalysisId },
         throwOnError: true,
       });
-      queryClient.setQueryData(queryKeys.analysis(cfg.workspaceId, analysisId), data);
+      queryClient.setQueryData(queryKeys.analysis(cfg.workspaceId, controlledAnalysisId), data);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not stop the analysis.');
     } finally {
@@ -226,21 +213,18 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
   };
 
   return {
-    analysisId,
-    request: session.request as TRequest | null,
+    request: hydratedRequest,
     analysisState: analysis?.state ?? null,
     analysisError: analysis?.error?.message ?? null,
     result,
+    isResultFetching: session.isResultFetching,
     setLocalTaskId,
-    resolveTaskId,
     isRunning,
     isStopping,
     setIsRunning,
     runningRef,
     taskStatus,
     banner,
-    lastFetchedRef,
-    hydrationState,
     stopTask,
     clearResults,
   };

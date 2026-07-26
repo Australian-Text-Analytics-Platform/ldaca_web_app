@@ -21,7 +21,7 @@ const nodes = (...counts: number[]): WorkspaceNodeMetadata[] =>
 
 const nodeIds = (...counts: number[]) => counts.map((_, index) => `node-${String(index + 1)}`);
 
-const nodeInfoCache = (...counts: number[]): Record<string, WorkspaceNodeInfo> =>
+const nodeInfoById = (...counts: number[]): Record<string, WorkspaceNodeInfo> =>
   Object.fromEntries(
     counts.map((count, index) => {
       const id = `node-${String(index + 1)}`;
@@ -43,7 +43,7 @@ describe('useTopicModelingParameters', () => {
         panelSelectedNodes: nodes(8000, 80),
         panelNodeIds: nodeIds(8000, 80),
         panelNodeIdsKey: 'node-1|node-2',
-        nodeInfoCache: nodeInfoCache(8000, 80),
+        nodeInfoById: nodeInfoById(8000, 80),
       }),
     );
 
@@ -65,7 +65,7 @@ describe('useTopicModelingParameters', () => {
         panelSelectedNodes: nodes(8000),
         panelNodeIds: nodeIds(8000),
         panelNodeIdsKey: 'node-1',
-        nodeInfoCache: nodeInfoCache(8000),
+        nodeInfoById: nodeInfoById(8000),
       }),
     );
 
@@ -105,7 +105,7 @@ describe('useTopicModelingParameters', () => {
         panelSelectedNodes: nodes(10000, 5000),
         panelNodeIds: nodeIds(10000, 5000),
         panelNodeIdsKey: 'node-1|node-2',
-        nodeInfoCache: nodeInfoCache(10000, 5000),
+        nodeInfoById: nodeInfoById(10000, 5000),
       }),
     );
 
@@ -141,7 +141,7 @@ describe('useTopicModelingParameters', () => {
           panelSelectedNodes,
           panelNodeIds: panelNodeIdsKey ? panelNodeIdsKey.split('|') : [],
           panelNodeIdsKey,
-          nodeInfoCache: panelNodeIdsKey === 'node-1' ? nodeInfoCache(10000) : {},
+          nodeInfoById: panelNodeIdsKey === 'node-1' ? nodeInfoById(10000) : {},
         }),
       {
         initialProps: {

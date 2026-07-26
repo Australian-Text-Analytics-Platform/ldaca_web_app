@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
   useAuth: vi.fn(),
   useWorkspaceTabs: vi.fn(),
+  refreshAnalyses: vi.fn(),
   multiTabEnabled: false,
 }));
 
@@ -24,6 +25,19 @@ vi.mock('../useWorkspaceTabs', () => ({
   useWorkspaceTabs: mocks.useWorkspaceTabs,
 }));
 
+vi.mock('../../hooks/useTabAnalysisForest', () => ({
+  useTabAnalysisForest: () => ({
+    analyses: [],
+    previews: [],
+    runAll: [],
+    supporting: [],
+    latestPreview: null,
+    latestRunAll: null,
+    active: null,
+    refresh: mocks.refreshAnalyses,
+  }),
+}));
+
 vi.mock('@/features/preferences/useUserPreferences', () => ({
   useUserPreferences: () => ({
     preferences: { analysis_multi_tab_enabled: mocks.multiTabEnabled },
@@ -32,18 +46,20 @@ vi.mock('@/features/preferences/useUserPreferences', () => ({
 
 const tab: AnalysisTab = {
   tab_id: 'tab-1',
-  task_id: null,
   title: 'Analysis 1',
+  kind: 'concordance',
   input_sets: { source: [] },
   settings: {},
+  annotation_correction_columns: {},
 };
 
 const secondTab: AnalysisTab = {
   tab_id: 'tab-2',
-  task_id: 'task-2',
   title: 'Analysis 2',
+  kind: 'concordance',
   input_sets: { source: [] },
   settings: {},
+  annotation_correction_columns: {},
 };
 
 function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspaceTabsResult {
@@ -56,9 +72,9 @@ function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspac
     renameTab: vi.fn(),
     setActiveTab: vi.fn(),
     reorderTabs: vi.fn(),
-    setTabTask: vi.fn(),
     setTabInputSet: vi.fn(),
     setTabSetting: vi.fn(),
+    setAnnotationCorrectionColumn: vi.fn(),
     ...overrides,
   };
 }
@@ -68,7 +84,7 @@ function Feature() {
 }
 
 function FeatureWithTask({ host }: AnalysisTabFeatureProps) {
-  return <div>Active task {host.taskId ?? 'none'}</div>;
+  return <div>Active tab {host.tabId}</div>;
 }
 
 function FeatureCommands({ host }: AnalysisTabFeatureProps) {
@@ -79,10 +95,10 @@ function FeatureCommands({ host }: AnalysisTabFeatureProps) {
       <button
         type="button"
         onClick={() => {
-          host.setTaskId('task-next');
+          host.refreshAnalyses();
         }}
       >
-        Save task
+        Refresh analyses
       </button>
       <button
         type="button"
@@ -197,7 +213,7 @@ describe('AnalysisTabsHost', () => {
     expect(screen.getByRole('tablist', { name: /analysis tabs/i })).toBeInTheDocument();
     expect(screen.getAllByRole('tab')).toHaveLength(2);
     expect(screen.getByRole('button', { name: /new tab/i })).toBeInTheDocument();
-    expect(screen.getByText('Active task task-2')).toBeInTheDocument();
+    expect(screen.getByText('Active tab tab-2')).toBeInTheDocument();
   });
 
   it('renders and activates a tab targeted by a cross-view handoff', async () => {
@@ -218,21 +234,19 @@ describe('AnalysisTabsHost', () => {
       />,
     );
 
-    expect(screen.getByText('Active task task-2')).toBeInTheDocument();
+    expect(screen.getByText('Active tab tab-2')).toBeInTheDocument();
     await waitFor(() => {
       expect(setActiveTab).toHaveBeenCalledWith(secondTab.tab_id);
     });
   });
 
   it('binds required feature commands to the active persisted tab', () => {
-    const setTabTask = vi.fn();
     const setTabInputSet = vi.fn();
     const setTabSetting = vi.fn();
     mocks.useWorkspaceTabs.mockReturnValue(
       makeTabsResult({
         tabs: [{ ...tab, settings: { mode: 'manual' } }],
         activeTabId: tab.tab_id,
-        setTabTask,
         setTabInputSet,
         setTabSetting,
       }),
@@ -242,11 +256,11 @@ describe('AnalysisTabsHost', () => {
 
     expect(screen.getByText('Inputs 0')).toBeInTheDocument();
     expect(screen.getByText('Setting manual')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save task' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh analyses' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save input' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save setting' }));
 
-    expect(setTabTask).toHaveBeenCalledWith('tab-1', 'task-next');
+    expect(mocks.refreshAnalyses).toHaveBeenCalled();
     expect(setTabInputSet).toHaveBeenCalledWith('tab-1', 'source', [
       { node_id: 'node-next', column: 'text' },
     ]);

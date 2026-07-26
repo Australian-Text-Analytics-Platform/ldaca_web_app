@@ -9,7 +9,7 @@ type ConcordanceSearchMode = 'regex' | 'tokens';
 
 interface UseConcordanceTokenizerModeOptions {
   effectiveNodeColumnSelections: TokenizerModelColumnSelection[];
-  nodeInfoCache: Record<string, WorkspaceNodeInfo>;
+  nodeInfoById: Record<string, WorkspaceNodeInfo>;
 }
 
 interface UseConcordanceTokenizerModeResult {
@@ -34,7 +34,7 @@ interface UseConcordanceTokenizerModeResult {
  */
 export function useConcordanceTokenizerMode({
   effectiveNodeColumnSelections,
-  nodeInfoCache,
+  nodeInfoById,
 }: UseConcordanceTokenizerModeOptions): UseConcordanceTokenizerModeResult {
   const [searchMode, setSearchMode] = useState<ConcordanceSearchMode>('regex');
   const [searchModeUserSet, setSearchModeUserSet] = useState(false);
@@ -43,7 +43,7 @@ export function useConcordanceTokenizerMode({
 
   const effectiveTokenizerModelsByNode = deriveTokenizerModelsByNode(
     effectiveNodeColumnSelections,
-    nodeInfoCache,
+    nodeInfoById,
     tokenizerModelsByNode,
   );
 

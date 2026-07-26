@@ -48,6 +48,10 @@ export interface ConcordanceParameterPanelProps {
   isSearching: boolean;
   actionState: RerunActionState;
   handleRunOrUpdate: () => Promise<void>;
+  handleRunAll: () => Promise<void>;
+  runAllDisabled: boolean;
+  isRunningAll: boolean;
+  parametersLocked: boolean;
   handleStopTask?: () => Promise<void>;
   isStopping?: boolean;
   handleClearResults: () => Promise<boolean>;
@@ -81,6 +85,10 @@ export function ConcordanceParameterPanel({
   isSearching,
   actionState,
   handleRunOrUpdate,
+  handleRunAll,
+  runAllDisabled,
+  isRunningAll,
+  parametersLocked,
   handleStopTask,
   isStopping,
   handleClearResults,
@@ -106,183 +114,191 @@ export function ConcordanceParameterPanel({
         helpLabel="Concordance parameters"
         helpTooltip="Select data blocks, choose the search term, and set context options before running."
       />
-      <CardContent className="space-y-4 pt-0">
-        <NodeInputsPanel
-          resolvedNodes={nodeInputs.resolvedNodes}
-          availableNodes={nodeInputs.availableNodes}
-          graphSelectedIds={nodeInputs.graphSelectedIds}
-          recentPresets={nodeInputs.recentPresets}
-          canAddMore={nodeInputs.canAddMore}
-          maxNodes={2}
-          onAddNodes={nodeInputs.addNodes}
-          getAddRejection={nodeInputs.getAddRejection}
-          onRemoveNode={nodeInputs.removeNode}
-          onClear={nodeInputs.clear}
-          onColumnChange={handleColumnChange}
-          defaultPalette={defaultPalette}
-          nodeColors={nodeColors}
-          onNodeColorChange={onNodeColorChange}
-          renderColumnAddon={renderTokenizerModelSelector}
-        />
+      <fieldset disabled={parametersLocked} className="contents">
+        <CardContent className="space-y-4 pt-0">
+          <NodeInputsPanel
+            resolvedNodes={nodeInputs.resolvedNodes}
+            availableNodes={nodeInputs.availableNodes}
+            graphSelectedIds={nodeInputs.graphSelectedIds}
+            recentPresets={nodeInputs.recentPresets}
+            canAddMore={nodeInputs.canAddMore}
+            maxNodes={2}
+            onAddNodes={nodeInputs.addNodes}
+            getAddRejection={nodeInputs.getAddRejection}
+            onRemoveNode={nodeInputs.removeNode}
+            onClear={nodeInputs.clear}
+            onColumnChange={handleColumnChange}
+            defaultPalette={defaultPalette}
+            nodeColors={nodeColors}
+            onNodeColorChange={onNodeColorChange}
+            renderColumnAddon={renderTokenizerModelSelector}
+          />
 
-        <div className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="block text-sm font-medium text-foreground">
-                  Search word or phrase
-                </label>
-                <HelpIcon
-                  targetKey="analysis.concordance.search-term"
-                  label="Concordance search term"
-                />
-              </div>
-              <input
-                type="text"
-                value={searchWord}
-                onChange={(e) => {
-                  setSearchWord(e.target.value);
-                }}
-                placeholder={
-                  searchMode === 'tokens'
-                    ? 'One or more tokens, separated by space, comma, or |'
-                    : 'Enter word or phrase to search for'
-                }
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">
-                  Left context (tokens)
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="block text-sm font-medium text-foreground">
+                    Search word or phrase
+                  </label>
+                  <HelpIcon
+                    targetKey="analysis.concordance.search-term"
+                    label="Concordance search term"
+                  />
+                </div>
                 <input
-                  type="number"
-                  value={numLeftTokens}
+                  type="text"
+                  value={searchWord}
                   onChange={(e) => {
-                    setNumLeftTokens(parseInt(e.target.value) || 0);
+                    setSearchWord(e.target.value);
                   }}
-                  min="0"
-                  max="50"
+                  placeholder={
+                    searchMode === 'tokens'
+                      ? 'One or more tokens, separated by space, comma, or |'
+                      : 'Enter word or phrase to search for'
+                  }
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">
-                  Right context (tokens)
-                </label>
-                <input
-                  type="number"
-                  value={numRightTokens}
-                  onChange={(e) => {
-                    setNumRightTokens(parseInt(e.target.value) || 0);
-                  }}
-                  min="0"
-                  max="50"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-foreground">
+                    Left context (tokens)
+                  </label>
+                  <input
+                    type="number"
+                    value={numLeftTokens}
+                    onChange={(e) => {
+                      setNumLeftTokens(parseInt(e.target.value) || 0);
+                    }}
+                    min="0"
+                    max="50"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-foreground">
+                    Right context (tokens)
+                  </label>
+                  <input
+                    type="number"
+                    value={numRightTokens}
+                    onChange={(e) => {
+                      setNumRightTokens(parseInt(e.target.value) || 0);
+                    }}
+                    min="0"
+                    max="50"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            {/* Search mode picker. ``tokens`` is auto-selected when every selected
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              {/* Search mode picker. ``tokens`` is auto-selected when every selected
               Data Block has a tokenizer model. The regex / whole-word / case
               checkboxes only apply to text mode, so they're hidden entirely when
               tokens mode is active. */}
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-medium text-foreground">Search mode:</span>
-              <Tabs
-                value={searchMode}
-                onValueChange={(next) => {
-                  if (next === 'tokens' && !tokensModeAvailable) return;
-                  setSearchMode(next as 'regex' | 'tokens');
-                }}
-              >
-                <TabsList className="h-8">
-                  <TabsTrigger value="regex" className="text-xs">
-                    Text
-                  </TabsTrigger>
-                  <DisabledReasonTooltip
-                    reason={
-                      tokensModeAvailable
-                        ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                        : 'Tokens mode needs a tokenizer model for each selected data block.'
-                    }
-                  >
-                    <TabsTrigger value="tokens" disabled={!tokensModeAvailable} className="text-xs">
-                      Tokens
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium text-foreground">Search mode:</span>
+                <Tabs
+                  value={searchMode}
+                  onValueChange={(next) => {
+                    if (next === 'tokens' && !tokensModeAvailable) return;
+                    setSearchMode(next as 'regex' | 'tokens');
+                  }}
+                >
+                  <TabsList className="h-8">
+                    <TabsTrigger value="regex" className="text-xs">
+                      Text
                     </TabsTrigger>
-                  </DisabledReasonTooltip>
-                </TabsList>
-              </Tabs>
-              <HelpIcon
-                targetKey="analysis.concordance.search-mode"
-                label="Search mode (text vs tokens)"
-              />
-            </div>
+                    <DisabledReasonTooltip
+                      reason={
+                        tokensModeAvailable
+                          ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
+                          : 'Tokens mode needs a tokenizer model for each selected data block.'
+                      }
+                    >
+                      <TabsTrigger
+                        value="tokens"
+                        disabled={!tokensModeAvailable}
+                        className="text-xs"
+                      >
+                        Tokens
+                      </TabsTrigger>
+                    </DisabledReasonTooltip>
+                  </TabsList>
+                </Tabs>
+                <HelpIcon
+                  targetKey="analysis.concordance.search-mode"
+                  label="Search mode (text vs tokens)"
+                />
+              </div>
 
-            {searchMode === 'regex' && (
-              <>
-                <div className="flex items-center gap-2">
+              {searchMode === 'regex' && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={wholeWord}
+                        onChange={(e) => {
+                          setWholeWord(e.target.checked);
+                        }}
+                        disabled={regex}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-foreground">Whole word</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={regex}
+                        onChange={(e) => {
+                          const nextRegex = e.target.checked;
+                          setRegex(nextRegex);
+                          if (nextRegex) {
+                            setWholeWord(false);
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-foreground">Use regular expression</span>
+                    </label>
+                    <HelpIcon
+                      targetKey="analysis.concordance.regex-toggle"
+                      label="Regex mode toggle"
+                    />
+                  </div>
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={wholeWord}
+                      checked={caseSensitive}
                       onChange={(e) => {
-                        setWholeWord(e.target.checked);
-                      }}
-                      disabled={regex}
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm text-foreground">Whole word</span>
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={regex}
-                      onChange={(e) => {
-                        const nextRegex = e.target.checked;
-                        setRegex(nextRegex);
-                        if (nextRegex) {
-                          setWholeWord(false);
-                        }
+                        setCaseSensitive(e.target.checked);
                       }}
                       className="h-4 w-4"
                     />
-                    <span className="text-sm text-foreground">Use regular expression</span>
+                    <span className="text-sm text-foreground">Case sensitive</span>
                   </label>
-                  <HelpIcon
-                    targetKey="analysis.concordance.regex-toggle"
-                    label="Regex mode toggle"
-                  />
-                </div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={caseSensitive}
-                    onChange={(e) => {
-                      setCaseSensitive(e.target.checked);
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-foreground">Case sensitive</span>
-                </label>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </CardContent>
+        </CardContent>
+      </fieldset>
       <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
         <>
           <DisabledReasonTooltip reason={runDisabledReason}>
             <Button
+              variant="outline"
               onClick={() => {
                 void handleRunOrUpdate();
               }}
               disabled={
+                parametersLocked ||
                 actionState.runDisabled ||
                 !searchWord.trim() ||
                 effectiveNodeColumnSelections.some((sel) => !sel.column)
@@ -292,18 +308,47 @@ export function ConcordanceParameterPanel({
               {isSearching ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running...
+                  {actionState.runLabel === 'Re-run' ? 'Update Preview' : 'Preview'}
                 </>
               ) : (
                 <>
                   <Play className="mr-2 h-4 w-4" />
-                  {actionState.runLabel}
+                  {parametersLocked
+                    ? 'Preview'
+                    : actionState.runLabel === 'Re-run'
+                      ? 'Update Preview'
+                      : 'Preview'}
                 </>
               )}
             </Button>
           </DisabledReasonTooltip>
 
-          {handleStopTask && isSearching ? (
+          <Button
+            type="button"
+            disabled={runAllDisabled || isRunningAll}
+            onClick={() => {
+              void handleRunAll();
+            }}
+          >
+            {isRunningAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Run All
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                void handleClearResults();
+              }}
+              variant="destructive"
+              disabled={actionState.clearDisabled}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Results
+            </Button>
+            <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
+          </div>
+
+          {handleStopTask && (isSearching || isRunningAll) ? (
             <Button
               onClick={() => {
                 void handleStopTask();
@@ -319,20 +364,6 @@ export function ConcordanceParameterPanel({
               Stop
             </Button>
           ) : null}
-
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => {
-                void handleClearResults();
-              }}
-              variant="destructive"
-              disabled={actionState.clearDisabled}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear Results
-            </Button>
-            <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
-          </div>
         </>
       </CardFooter>
     </Card>

@@ -49,21 +49,21 @@ interface AnnotationResultsPanelProps {
 
 /**
  * Read-only text + editable-annotation result table shown below the Annotation
- * parameter panel once Start/Resume is pressed, mirroring how other analysis
+ * parameter panel once Resume is pressed, mirroring how other analysis
  * tabs surface a result table under their controls.
  *
  * Used by: AnnotationFeature after a run is triggered because reviewers want to
- * see the source text paired with the existing/new annotation column and assign
- * a class per row.
+ * see the source text paired with the selected annotation column and assign a
+ * class per row.
  *
  * Flow: fetch the current source-node page plus the class list, then render two
  * fixed-width columns with server pagination for the complete source node. The
  * text column is plain; each annotation cell is a dropdown of class names plus a
- * leading "None" option that clears the cell back to an unset value. Resume
- * seeds each dropdown from the existing value; a new annotation starts blank.
- * Picking a class optimistically updates the dropdown and persists the cell as
- * a canonical set_cell Data Block edit, reverting + toasting
- * on failure so the displayed value never drifts from what was actually saved.
+ * leading "None" option that clears the cell back to an unset value. Each
+ * dropdown is seeded from the existing value. Picking a class optimistically
+ * updates the dropdown and persists the cell as a canonical set_cell Data Block
+ * edit, reverting + toasting on failure so the displayed value never drifts
+ * from what was actually saved.
  */
 export function AnnotationResultsPanel({
   workspaceId,

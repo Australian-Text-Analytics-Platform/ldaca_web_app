@@ -54,8 +54,11 @@ export function useAnnotationClassDescriptions({
         )} FROM ${sqlTable(nodeId)}`
       : '';
   const queryKey =
-    canLoad && workspaceId && nodeId
-      ? queryKeys.workspaceSqlDrain(workspaceId, [nodeId], sql, 500)
+    canLoad && workspaceId && nodeId && classColumn && descriptionColumn
+      ? queryKeys.workspaceSqlDrain(workspaceId, [nodeId], sql, 500, {
+          classColumn,
+          descriptionColumn,
+        })
       : DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY;
 
   const query = useQuery({

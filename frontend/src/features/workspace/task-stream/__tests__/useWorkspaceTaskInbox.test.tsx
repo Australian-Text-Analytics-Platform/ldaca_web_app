@@ -8,8 +8,9 @@ import { queryKeys } from '@/lib/queryKeys';
 import { analysisResponse } from '@/test/msw/fixtures';
 import { server } from '@/test/msw/server';
 import type { UserFileImport } from '@/api';
+import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
 import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
-import { useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
+import { useTaskResources, useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
 
 let emitEvent: ((payload: unknown) => void) | undefined;
 const mocks = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -124,6 +125,58 @@ describe('useWorkspaceTaskInbox', () => {
       );
     });
     expect(requestedPages).toEqual(['1', '2']);
+  });
+
+  it('shares one paginated Analysis collection with Run All review consumers', async () => {
+    const runAllAnalysis = analysisResponse({
+      id: 'run-all-1',
+      tab_id: 'tab-1',
+      execution_scope: 'run_all',
+      request: {
+        kind: 'concordance_run_all',
+        source: {
+          kind: 'concordance',
+          node_ids: ['node-1'],
+          node_columns: { 'node-1': 'text' },
+          node_tokenizer_models: {},
+          search_word: 'word',
+          num_left_tokens: 5,
+          num_right_tokens: 5,
+          regex: false,
+          whole_word: true,
+          case_sensitive: false,
+          search_mode: 'regex',
+        },
+        metadata_columns: [],
+        names: {},
+      },
+    });
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses', () =>
+        HttpResponse.json({
+          items: [runAllAnalysis],
+          page: 1,
+          page_size: 500,
+          total_items: 1,
+          total_pages: 1,
+        }),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const view = renderHook(
+      () => ({
+        resources: useTaskResources('workspace-1'),
+        latestRunAll: useTabAnalysisForest('workspace-1', 'tab-1').latestRunAll,
+      }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(view.result.current.resources.tasks).toHaveLength(1));
+    expect(view.result.current.latestRunAll?.id).toBe('run-all-1');
   });
 
   it('invalidates the shared Tab cache for Tab events', async () => {

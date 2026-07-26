@@ -1,27 +1,28 @@
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import HelpIcon from '@/components/help/HelpIcon';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { GroupedResultsPageSizeSummary } from '@/features/views/common/components/GroupedResultsPageSizeSummary';
+import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
+import { PAGE_SIZE_OPTIONS_DEFAULT } from '@/features/views/common/constants';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
-import { GroupedResultsPageSizeSummary } from '@/features/views/common/components/GroupedResultsPageSizeSummary';
-import { PAGE_SIZE_OPTIONS_DEFAULT } from '@/features/views/common/constants';
-import { MAX_CONTEXT_LENGTH } from '../quotationTextClip';
+import type { QuotationResultState } from '../hooks/useQuotationResultControls';
 import {
   buildQuotationDisplayColumns,
   buildQuotationMetadataColumns,
   filterQuotationRowsWithQuotes,
-  resolveQuotationMetadataColumns,
   type QuotationResultRow,
+  resolveQuotationMetadataColumns,
 } from '../quotationResultsModel';
-import type { QuotationResultState } from '../hooks/useQuotationResultControls';
+import { MAX_CONTEXT_LENGTH } from '../quotationTextClip';
 import { type QuotationHoverState } from './QuotationHighlightedCell';
 import { QuotationNodeBlock } from './QuotationNodeBlock';
 
 interface QuotationResultsPanelProps {
+  title?: string;
+  headerAction?: React.ReactNode;
   displayedNodes: WorkspaceNodeMetadata[];
   activeSelections: NodeColumnSelection[];
   resultsByNode: Record<string, QuotationResultState>;
@@ -36,12 +37,11 @@ interface QuotationResultsPanelProps {
   onContextLengthKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   hoverState: QuotationHoverState | null;
   onHoverChange: (state: QuotationHoverState | null) => void;
-  nodeDetaching: Record<string, boolean>;
   onSort: (nodeId: string, columnName: string) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onRowClick: (row: QuotationResultRow) => void;
-  onOpenDetachDialog: (nodeId: string) => void;
+  isPageLoading: boolean;
 }
 
 /**
@@ -51,10 +51,12 @@ interface QuotationResultsPanelProps {
  * the feature shell can stay focused on lifecycle and request wiring.
  * Flow: derive available metadata columns from the active result, render shared
  * result controls, then render each selected node through QuotationNodeBlock
- * with pagination, sorting, and detach actions wired back to
+ * with pagination and sorting wired back to
  * the feature hooks.
  */
 export function QuotationResultsPanel({
+  title = 'Search Results',
+  headerAction,
   displayedNodes,
   activeSelections,
   resultsByNode,
@@ -69,12 +71,11 @@ export function QuotationResultsPanel({
   onContextLengthKeyDown,
   hoverState,
   onHoverChange,
-  nodeDetaching,
   onSort,
   onPageChange,
   onPageSizeChange,
   onRowClick,
-  onOpenDetachDialog,
+  isPageLoading,
 }: QuotationResultsPanelProps) {
   const metadataNodeId = displayedNodes[0]?.id ?? '';
   const quotationMetadataColumns = buildQuotationMetadataColumns(
@@ -89,15 +90,16 @@ export function QuotationResultsPanel({
   return (
     <Card>
       <CardHeader className="space-y-4">
-        <div className="space-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
-            Search Results
+            {title}
             <HelpIcon
               targetKey="analysis.quotation.results"
               label="Quotation results"
               tooltip="Review extracted quotations, toggle metadata, and adjust context length."
             />
           </CardTitle>
+          {headerAction}
         </div>
         <div className="space-y-2 text-sm">
           <div className="flex flex-wrap items-center gap-4">
@@ -188,29 +190,8 @@ export function QuotationResultsPanel({
                   totalProcessed={resultState?.pagination.page_size}
                 />
               }
-            >
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  onOpenDetachDialog(nodeId);
-                }}
-                disabled={Boolean(nodeDetaching[nodeId])}
-                className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
-              >
-                {nodeDetaching[nodeId] ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding to Workspace…
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Workspace
-                  </>
-                )}
-              </Button>
-            </QuotationNodeBlock>
+              loading={isPageLoading}
+            />
           );
         })}
       </CardContent>

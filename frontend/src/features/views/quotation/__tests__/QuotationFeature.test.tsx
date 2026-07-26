@@ -1,15 +1,7 @@
-import React from 'react';
 import { render } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const detachDialogMocks = vi.hoisted(() => ({
-  render: vi.fn(),
-  onOpenChange: vi.fn(),
-  toggleDetachColumn: vi.fn(),
-  selectAllDetachColumns: vi.fn(),
-  deselectAllDetachColumns: vi.fn(),
-  handleDetachConfirm: vi.fn(),
-}));
 
 const resultApiMocks = vi.hoisted(() => ({
   getAnalysisResult: vi.fn(),
@@ -30,7 +22,12 @@ const quotationHydrationMocks = vi.hoisted(() => ({
   } | null,
   request: null as Record<string, unknown> | null,
   result: null as Record<string, unknown> | null,
+  isResultFetching: false,
+  selectedNodes: [] as Record<string, unknown>[],
+  nodeColumnSelections: [] as Record<string, unknown>[],
+  resolvedNodes: [] as Record<string, unknown>[],
   latestResultControlsArgs: null as Record<string, unknown> | null,
+  latestResultsPanelProps: null as Record<string, unknown> | null,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
@@ -39,7 +36,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
-    detachQuotation: vi.fn(),
+    runQuotationAll: vi.fn(),
   }),
 }));
 
@@ -50,9 +47,9 @@ vi.mock('@/stores/uiStore', () => ({
 
 vi.mock('../../common/nodeInputs', () => ({
   useTabNodeInputs: () => ({
-    nodeColumnSelections: [],
-    selectedNodes: [],
-    resolvedNodes: [],
+    nodeColumnSelections: quotationHydrationMocks.nodeColumnSelections,
+    selectedNodes: quotationHydrationMocks.selectedNodes,
+    resolvedNodes: quotationHydrationMocks.resolvedNodes,
     availableNodes: [],
     graphSelectedIds: [],
     recentPresets: [],
@@ -69,29 +66,22 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
   useAnalysisFeature: (config: NonNullable<typeof quotationHydrationMocks.latestConfig>) => {
     quotationHydrationMocks.latestConfig = config;
     return {
-      analysisId: 'task-1',
       request: quotationHydrationMocks.request,
       analysisState: 'succeeded',
       analysisError: null,
       result: quotationHydrationMocks.result,
-      resolveTaskId: vi.fn(() => Promise.resolve('task-1')),
+      isResultFetching: quotationHydrationMocks.isResultFetching,
       setLocalTaskId: vi.fn(),
       isRunning: false,
       setIsRunning: vi.fn(),
       runningRef: { current: false },
-      lastFetchedRef: { current: { taskId: null, state: null } },
       banner: null,
       taskStatus: { tasks: [] },
-      hydrationState: { status: 'idle' },
       clearResults: vi.fn(() => Promise.resolve(true)),
       stopTask: vi.fn(() => Promise.resolve()),
       isStopping: false,
     };
   },
-}));
-
-vi.mock('../../common/rerunAnalysis', () => ({
-  executeAnalysisRerun: vi.fn(),
 }));
 
 vi.mock('../hooks/useQuotationEngineSettings', () => ({
@@ -136,8 +126,6 @@ vi.mock('../hooks/useQuotationResultControls', () => ({
     quotationHydrationMocks.latestResultControlsArgs = args;
     return {
       nodeState: {},
-      nodeDetaching: {},
-      setNodeDetaching: vi.fn(),
       resultsByNode: {},
     };
   },
@@ -149,32 +137,7 @@ vi.mock('../hooks/useQuotationTaskFlow', () => ({
     handlePageChange: vi.fn(),
     handlePageSizeChange: vi.fn(),
     handleSort: vi.fn(),
-    handleDetach: vi.fn(),
   }),
-}));
-
-vi.mock('../hooks/useQuotationDetachDialog', () => ({
-  useQuotationDetachDialog: () => ({
-    openDetachDialog: vi.fn(),
-    detachDialog: {
-      open: false,
-      isDetaching: false,
-      detachNodeOptions: [],
-      selectedDetachColumns: {},
-      onOpenChange: detachDialogMocks.onOpenChange,
-      toggleDetachColumn: detachDialogMocks.toggleDetachColumn,
-      selectAllDetachColumns: detachDialogMocks.selectAllDetachColumns,
-      deselectAllDetachColumns: detachDialogMocks.deselectAllDetachColumns,
-      handleDetachConfirm: detachDialogMocks.handleDetachConfirm,
-    },
-  }),
-}));
-
-vi.mock('../../common/components/DetachColumnsDialog', () => ({
-  DetachColumnsDialog: (props: Record<string, unknown>) => {
-    detachDialogMocks.render(props);
-    return null;
-  },
 }));
 
 vi.mock('../../common/components/AnalysisCardLayout', () => ({
@@ -202,7 +165,10 @@ vi.mock('../components/QuotationEngineSettingsFields', () => ({
 }));
 
 vi.mock('../components/QuotationResultsPanel', () => ({
-  QuotationResultsPanel: () => null,
+  QuotationResultsPanel: (props: Record<string, unknown>) => {
+    quotationHydrationMocks.latestResultsPanelProps = props;
+    return null;
+  },
 }));
 
 vi.mock('@/components/ui/alert-dialog', () => ({
@@ -217,52 +183,42 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 
 import QuotationFeature from '../QuotationFeature';
 
-describe('QuotationFeature detach dialog', () => {
+const renderFeature = (element: React.ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
+};
+
+describe('QuotationFeature Preview lifecycle', () => {
   beforeEach(() => {
     resultApiMocks.getAnalysisResult.mockReset();
     resultApiMocks.queryAnalysisResult.mockReset();
     quotationHydrationMocks.latestConfig = null;
     quotationHydrationMocks.request = null;
     quotationHydrationMocks.result = null;
+    quotationHydrationMocks.isResultFetching = false;
+    quotationHydrationMocks.selectedNodes = [];
+    quotationHydrationMocks.nodeColumnSelections = [];
+    quotationHydrationMocks.resolvedNodes = [];
     quotationHydrationMocks.latestResultControlsArgs = null;
-  });
-
-  it('owns quotation copy and forwards the hook-owned handlers', () => {
-    render(
-      <QuotationFeature
-        host={{
-          taskId: null,
-          inputSets: {},
-          settings: {},
-          setTaskId: vi.fn(),
-          setInputSet: vi.fn(),
-          setSetting: vi.fn(),
-        }}
-      />,
-    );
-
-    expect(detachDialogMocks.render).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Detach Quotation Results',
-        description:
-          'Select optional source columns to include alongside the quotation results. Required output columns stay checked automatically.',
-        onOpenChange: detachDialogMocks.onOpenChange,
-        toggleDetachColumn: detachDialogMocks.toggleDetachColumn,
-        selectAllDetachColumns: detachDialogMocks.selectAllDetachColumns,
-        deselectAllDetachColumns: detachDialogMocks.deselectAllDetachColumns,
-        handleDetachConfirm: detachDialogMocks.handleDetachConfirm,
-      }),
-    );
+    quotationHydrationMocks.latestResultsPanelProps = null;
   });
 
   it('passes the persisted Query-owned Result to quotation controls after hydration', async () => {
     const host = {
-      taskId: 'task-1',
+      tabId: 'tab-1',
+      analyses: [],
+      latestPreview: null,
+      latestRunAll: null,
+      activeAnalysis: null,
       inputSets: {},
       settings: {},
-      setTaskId: vi.fn(),
+      correctionColumns: {},
       setInputSet: vi.fn(),
       setSetting: vi.fn(),
+      setCorrectionColumn: vi.fn(),
+      refreshAnalyses: vi.fn(),
     };
     const persistedResult = {
       kind: 'quotation',
@@ -289,7 +245,7 @@ describe('QuotationFeature detach dialog', () => {
     };
     quotationHydrationMocks.result = persistedResult;
 
-    render(<QuotationFeature host={host} />);
+    renderFeature(<QuotationFeature host={host} />);
 
     await quotationHydrationMocks.latestConfig?.onRequest?.(quotationHydrationMocks.request);
 
@@ -309,15 +265,21 @@ describe('QuotationFeature detach dialog', () => {
     resultApiMocks.getAnalysisResult.mockResolvedValueOnce({ data: canonicalResult });
     resultApiMocks.queryAnalysisResult.mockResolvedValueOnce({ data: projectedResult });
 
-    render(
+    renderFeature(
       <QuotationFeature
         host={{
-          taskId: 'task-1',
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
           inputSets: {},
           settings: {},
-          setTaskId: vi.fn(),
+          correctionColumns: {},
           setInputSet: vi.fn(),
           setSetting: vi.fn(),
+          setCorrectionColumn: vi.fn(),
+          refreshAnalyses: vi.fn(),
         }}
       />,
     );
@@ -343,6 +305,36 @@ describe('QuotationFeature detach dialog', () => {
       body: { kind: 'quotation', ...projection },
       path: { workspace_id: 'workspace-1', analysis_id: 'task-1' },
       throwOnError: true,
+    });
+  });
+
+  it('keeps the Preview table shell mounted while the first page is processing', () => {
+    quotationHydrationMocks.isResultFetching = true;
+    quotationHydrationMocks.selectedNodes = [{ id: 'node-1', name: 'Documents' }];
+    quotationHydrationMocks.nodeColumnSelections = [{ nodeId: 'node-1', column: 'text' }];
+    quotationHydrationMocks.resolvedNodes = [{ id: 'node-1', columnOptions: [{ name: 'text' }] }];
+
+    renderFeature(
+      <QuotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: {},
+          correctionColumns: {},
+          setInputSet: vi.fn(),
+          setSetting: vi.fn(),
+          setCorrectionColumn: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(quotationHydrationMocks.latestResultsPanelProps).toMatchObject({
+      isPageLoading: true,
     });
   });
 });

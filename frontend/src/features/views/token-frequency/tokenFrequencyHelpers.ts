@@ -45,7 +45,8 @@ const dedupePreserveOrder = (ids: string[]): string[] => {
 /**
  * Used by: useTokenFrequencyTaskFlow.ts.
  * Flow: combine result, request, and live-selection ids in priority order,
- * resolve the matching selected node, then return its active text column.
+ * resolve the matching selected Data Blocks, then return each active text
+ * column in comparison order.
  */
 export function resolveTokenFrequencyNodeContext({
   lastCompareNodeIds = [],

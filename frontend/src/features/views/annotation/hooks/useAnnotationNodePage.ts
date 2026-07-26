@@ -17,12 +17,11 @@ interface UseAnnotationNodePageArgs {
 /**
  * Owns the canonical paginated source-node query used by Annotation tables.
  *
- * Used by: `AnnotationResultsPanel` for manual editing and
- * `useAnnotationAiPreviewSession` for page-aligned AI predictions. Flow: reset
- * to the first page when the source identity changes, key the request by the
- * exact generated page contract, and pass TanStack Query's abort signal into
- * the generated client so superseded page requests cannot complete as active
- * work after navigation or a source change.
+ * Used by: `AnnotationResultsPanel` for manual editing. Flow: reset to the first
+ * page when the source identity changes, key the request by the exact generated
+ * page contract, and pass TanStack Query's abort signal into the generated
+ * client so superseded page requests cannot complete as active work after
+ * navigation or a source change.
  */
 export function useAnnotationNodePage({
   workspaceId,
@@ -78,7 +77,6 @@ export function useAnnotationNodePage({
     setPagination,
     query,
     rows,
-    revision: query.data?.etag ?? '',
     rowCount:
       pagination.pageIndex * pagination.pageSize +
       rows.length +

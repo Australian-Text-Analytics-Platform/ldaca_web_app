@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Select,
@@ -47,7 +48,10 @@ function TokenizerModelSelector({
   disabledReason,
   className,
 }: TokenizerModelSelectorProps) {
+  const [open, setOpen] = useState(false);
   const canFetchSample = Boolean(workspaceId && nodeId && column);
+  const isDisabled = disabled || !column;
+  const reason = disabled ? disabledReason : !column ? 'Select a text column first' : undefined;
   const { detectedLanguage } = useDetectedColumnLanguage({
     workspaceId,
     nodeId,
@@ -57,7 +61,7 @@ function TokenizerModelSelector({
 
   const modelQuery = useQuery({
     queryKey: queryKeys.tokenizerModels,
-    enabled: false,
+    enabled: open && !isDisabled,
     staleTime: 10 * 60_000,
     /** Called by: TanStack Query when the selector opens and requests model inventory. */
     queryFn: async (): Promise<TokenizerModelInfo[]> => {
@@ -77,19 +81,16 @@ function TokenizerModelSelector({
   );
   const selectedModel = modelQuery.data?.find((option) => option.model === value);
   const selectValue = value && value.length > 0 ? value : TOKENIZER_MODEL_CLEAR_VALUE;
-  const isDisabled = disabled || !column;
-  const reason = disabled ? disabledReason : !column ? 'Select a text column first' : undefined;
 
   return (
     <div className={cn('space-y-1', className)}>
       <span className="block text-xs font-medium text-muted-foreground">Tokenizer Model</span>
       <DisabledReasonTooltip reason={isDisabled ? reason : undefined} className="w-full">
         <Select
+          open={open}
           value={selectValue}
-          onOpenChange={(open) => {
-            if (open && !modelQuery.data && !modelQuery.isFetching) {
-              void modelQuery.refetch();
-            }
+          onOpenChange={(nextOpen) => {
+            if (!isDisabled) setOpen(nextOpen);
           }}
           onValueChange={(nextValue) => {
             onChange(nextValue === TOKENIZER_MODEL_CLEAR_VALUE ? '' : nextValue, detectedLanguage);

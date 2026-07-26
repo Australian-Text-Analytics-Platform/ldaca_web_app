@@ -42,10 +42,7 @@ interface TokenFrequencyUnifiedTokenSectionProps {
   computeDisplayName: (nodeId: string, fallbackKey?: string) => string;
   getColorForNode: (nodeId: string, index?: number) => string;
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
-  // Token clicks here cover both compared nodes, so no per-node id is passed
-  // (the optional second arg is omitted) — see TokenFrequencySingleTokenSection
-  // for the per-node scoped variant.
-  onTokenClick: (token: string, nodeId?: string) => void;
+  onTokenClick: (token: string) => void;
   onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
   unifiedCloudWidth: number;
   unifiedCloudHeight: number;

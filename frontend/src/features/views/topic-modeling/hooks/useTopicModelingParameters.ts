@@ -25,7 +25,7 @@ interface UseTopicModelingParametersArgs {
   panelSelectedNodes: WorkspaceNodeMetadata[];
   panelNodeIds: string[];
   panelNodeIdsKey: string;
-  nodeInfoCache: Record<string, WorkspaceNodeInfo>;
+  nodeInfoById: Record<string, WorkspaceNodeInfo>;
 }
 
 export interface UseTopicModelingParametersResult {
@@ -75,7 +75,7 @@ export function useTopicModelingParameters({
   panelSelectedNodes,
   panelNodeIds,
   panelNodeIdsKey,
-  nodeInfoCache,
+  nodeInfoById,
 }: UseTopicModelingParametersArgs): UseTopicModelingParametersResult {
   const [parameterState, dispatchParameters] = useReducer(
     topicModelingParameterReducer,
@@ -98,7 +98,7 @@ export function useTopicModelingParameters({
 
   const nodeDocCounts = panelNodeIds
     .slice(0, 2)
-    .map((nodeId) => nodeDocumentCount(nodeInfoCache[nodeId]));
+    .map((nodeId) => nodeDocumentCount(nodeInfoById[nodeId]));
   const nodeDocCountsKey = nodeDocCounts.join('|');
   const defaultCorpusSamples = () => nodeDocCounts.map(defaultCorpusSample);
 
@@ -154,7 +154,8 @@ export function useTopicModelingParameters({
   };
 
   /** Restores saved request parameters when the analysis lifecycle hydrates a task. */
-  // Called by: TopicModelingFeature.onRequest because persisted tasks should reopen with the same run parameters the backend stored.
+  // Called by: TopicModelingFeature.onRequest so historical Analyses reopen
+  // with their immutable run parameters.
   const hydrateParameters = (request: Record<string, unknown>) => {
     if (Array.isArray(request.sample_fractions)) {
       const nodeCount = Math.max(request.sample_fractions.length, panelSelectedNodes.length);

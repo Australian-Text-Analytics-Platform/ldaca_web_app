@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
-
+import type { SourceRowPagination } from '@/api';
 import {
   Table,
   TableBody,
@@ -11,9 +11,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
+import { PaginatedTableProcessingRow } from '@/features/views/common/components/PaginatedTableProcessingRow';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
-import type { SourceRowPagination } from '@/api';
 import { QUOTATION_DOCUMENT_COLUMN } from '../../common/generatedColumns';
 import type { QuotationResultRow } from '../quotationResultsModel';
 import { QuotationHighlightedCell, type QuotationHoverState } from './QuotationHighlightedCell';
@@ -51,6 +51,8 @@ export interface QuotationNodeBlockProps {
   pageSizeOptions: number[];
   /** Summary rendered beside the page-size selector. */
   pageSizeSummary?: React.ReactNode;
+  /** Whether the requested preview page is still processing. */
+  loading: boolean;
   /** Hide the page-size selector when the view is read-only. */
   showPageSize?: boolean;
   /** Trailing footer actions such as Add to Workspace. */
@@ -98,6 +100,7 @@ function QuotationNodeBlockContent({
   onRowClick,
   pageSizeOptions,
   pageSizeSummary,
+  loading,
   showPageSize = true,
   children,
 }: QuotationNodeBlockProps) {
@@ -187,6 +190,7 @@ function QuotationNodeBlockContent({
             pageSizeLabel="Documents per batch"
             pageSizeOptions={pageSizeOptions}
             pageSizeSummary={pageSizeSummary}
+            loading={loading}
             showPageSize={showPageSize}
           >
             {children}
@@ -211,7 +215,9 @@ function QuotationNodeBlockContent({
             ))}
           </TableHeader>
           <TableBody>
-            {rows.length === 0 ? (
+            {loading ? (
+              <PaginatedTableProcessingRow columnCount={cols.length} />
+            ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell
                   className="h-24 text-center text-muted-foreground"

@@ -20,10 +20,10 @@ const makeNode = (rows: ReturnType<typeof buildRows>): NormalizedNodeResult => (
 describe('deriveResultDisplayNodeIds', () => {
   it('uses panel order for nodes that belong to the completed result', () => {
     expect(
-      deriveResultDisplayNodeIds(['reference', 'study'], [
-        { nodeId: 'study' },
-        { nodeId: 'reference' },
-      ]),
+      deriveResultDisplayNodeIds(
+        ['reference', 'study'],
+        [{ nodeId: 'study' }, { nodeId: 'reference' }],
+      ),
     ).toEqual(['study', 'reference']);
   });
 

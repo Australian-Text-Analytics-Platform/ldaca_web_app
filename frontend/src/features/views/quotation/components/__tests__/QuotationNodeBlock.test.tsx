@@ -46,6 +46,7 @@ describe('QuotationNodeBlock', () => {
         onPageSizeChange={vi.fn()}
         onRowClick={vi.fn()}
         pageSizeOptions={[20]}
+        loading={false}
       />
     );
     const { rerender } = render(nodeBlock(''));
@@ -63,5 +64,52 @@ describe('QuotationNodeBlock', () => {
     expect(
       screen.queryByRole('button', { name: QUOTATION_COLUMN_KEYS.quote }),
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps headers mounted and hides stale rows while a new page is processing', () => {
+    const row = normalizeQuotationRow(
+      {
+        text: 'Alice said hello.',
+        [QUOTATION_COLUMN_KEYS.quote]: 'hello',
+        [QUOTATION_COLUMN_KEYS.quoteStartIdx]: 11,
+        [QUOTATION_COLUMN_KEYS.quoteEndIdx]: 16,
+      },
+      'text',
+    );
+
+    render(
+      <QuotationNodeBlock
+        nodeId="node-1"
+        textCol="text"
+        cols={[QUOTATION_DOCUMENT_COLUMN]}
+        sortableColumns={['text']}
+        rows={[row]}
+        pagination={{
+          page: 1,
+          page_size: 20,
+          total_source_rows: 1,
+          total_source_pages: 1,
+          result_count: 1,
+          has_next: false,
+          has_prev: false,
+        }}
+        sortBy={null}
+        contextLength={10}
+        hoverState={null}
+        onHoverChange={vi.fn()}
+        onSort={vi.fn()}
+        onPageChange={vi.fn()}
+        onPageSizeChange={vi.fn()}
+        onRowClick={vi.fn()}
+        pageSizeOptions={[20]}
+        loading
+      />,
+    );
+
+    expect(
+      screen.getByRole('columnheader', { name: QUOTATION_DOCUMENT_COLUMN }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Processing preview page' })).toBeInTheDocument();
+    expect(screen.queryByText('Alice said hello.')).not.toBeInTheDocument();
   });
 });

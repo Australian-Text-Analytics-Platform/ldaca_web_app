@@ -12,9 +12,7 @@ import { toBgColor } from '@/features/views/common/vizPalette';
 interface TokenFrequencySingleTokenSectionProps {
   nodeDisplayResults: NodeResultView[];
   getColorForNode: (nodeId: string, index?: number) => string;
-  // ``nodeId`` identifies the per-node data block the clicked token belongs to,
-  // so the concordance handoff can scope to that single block.
-  onTokenClick: (token: string, nodeId?: string) => void;
+  onTokenClick: (token: string) => void;
   onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
@@ -57,13 +55,10 @@ const SINGLE_CLOUD_MAX_FONT_CEILING = 160;
 
 interface SingleNodeWordCloudProps {
   nodeKey: string;
-  // Data-block id forwarded to ``onTokenClick`` so a per-node cloud click
-  // scopes the concordance to this single block.
-  nodeId: string;
   words: { text: string; value: number }[];
   color: string;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
-  onTokenClick: (token: string, nodeId?: string) => void;
+  onTokenClick: (token: string) => void;
   onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
 }
 
@@ -75,7 +70,6 @@ interface SingleNodeWordCloudProps {
 const SingleNodeWordCloud = memo(
   ({
     nodeKey,
-    nodeId,
     words,
     color,
     registerWordCloudRef,
@@ -144,7 +138,7 @@ const SingleNodeWordCloud = memo(
                   fontFamily={word.font}
                   className="cursor-pointer transition-colors"
                   onClick={() => {
-                    if (word.text) onTokenClick(word.text, nodeId);
+                    if (word.text) onTokenClick(word.text);
                   }}
                   onContextMenu={(event) => {
                     event.preventDefault();
@@ -325,7 +319,6 @@ const TokenFrequencySingleTokenSectionInner = ({
               >
                 <SingleNodeWordCloud
                   nodeKey={nodeKey}
-                  nodeId={result.nodeId}
                   words={words}
                   color={color}
                   registerWordCloudRef={registerWordCloudRef}
@@ -362,7 +355,7 @@ const TokenFrequencySingleTokenSectionInner = ({
                         type="button"
                         className="group relative h-8 overflow-hidden rounded border text-left"
                         onClick={() => {
-                          onTokenClick(row.token, result.nodeId);
+                          onTokenClick(row.token);
                         }}
                         onContextMenu={(event) => {
                           event.preventDefault();
@@ -372,7 +365,10 @@ const TokenFrequencySingleTokenSectionInner = ({
                       >
                         <span
                           className="absolute inset-y-0 left-0 rounded bg-primary/20 group-hover:bg-primary/30"
-                          style={{ width: `${String(widthPct)}%`, backgroundColor: toBgColor(color) }}
+                          style={{
+                            width: `${String(widthPct)}%`,
+                            backgroundColor: toBgColor(color),
+                          }}
                         />
                         <span className="relative z-10 block truncate px-2 text-sm font-medium">
                           {row.token}

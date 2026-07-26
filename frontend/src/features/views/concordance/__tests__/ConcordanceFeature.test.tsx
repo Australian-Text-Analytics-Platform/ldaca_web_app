@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Analysis } from '@/api';
 
 /**
  * Wraps Concordance feature tests with a no-retry query client so failed
@@ -15,35 +16,34 @@ const renderWithClient = (ui: React.ReactElement) => {
 };
 
 const handleSearchMock = vi.fn();
+const queryWorkspaceSqlTableMock = vi.hoisted(() => vi.fn());
+const getAnalysisResultMock = vi.hoisted(() => vi.fn());
+const fetchArrowTablePageMock = vi.hoisted(() => vi.fn());
 const clearResultsMock = vi.fn(async () => {
   /* mock: resolves immediately */
 });
-const detachDialogMocks = vi.hoisted(() => ({
-  render: vi.fn(),
-  openTable: vi.fn(),
-  openDispersion: vi.fn(),
-  table: {
-    onOpenChange: vi.fn(),
-    toggleDetachColumn: vi.fn(),
-    selectAllDetachColumns: vi.fn(),
-    deselectAllDetachColumns: vi.fn(),
-    handleDetachConfirm: vi.fn(),
-  },
-  dispersion: {
-    onOpenChange: vi.fn(),
-    toggleDetachColumn: vi.fn(),
-    selectAllDetachColumns: vi.fn(),
-    deselectAllDetachColumns: vi.fn(),
-    handleDetachConfirm: vi.fn(),
-  },
-}));
 let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
-let mockHydrationState = { status: 'idle' as const };
 let mockInitialResult: Record<string, unknown> | null = null;
 let mockAnalysisState: 'successful' | null = null;
+let mockRunAllAnalysis: Record<string, unknown> | null = null;
+let mockIsPreviewRunning = false;
 let latestAnalysisFeatureConfig: {
   onRequest?: (request: unknown) => void | Promise<void>;
 } | null = null;
+
+vi.mock('@/api', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    getAnalysisResult: getAnalysisResultMock,
+    queryWorkspaceSqlTable: queryWorkspaceSqlTableMock,
+  };
+});
+
+vi.mock('@/lib/arrow/arrowTable', async (importOriginal) => ({
+  ...(await importOriginal()),
+  fetchArrowTablePage: fetchArrowTablePageMock,
+}));
 
 vi.mock('sonner', () => ({
   toast: {
@@ -81,7 +81,7 @@ vi.mock('../../common/nodeInputs', () => ({
     canAddMore: true,
     graphSelectedIds: [],
     workspaceId: 'ws-1',
-    nodeInfoCache: { 'node-1': { id: 'node-1', name: 'Node 1' } },
+    nodeInfoById: { 'node-1': { id: 'node-1', name: 'Node 1' } },
     getColumnInfos: vi.fn(() => [{ name: 'text', dataType: 'string' }]),
     getNodeInfo: vi.fn(() => ({ id: 'node-1', name: 'Node 1' })),
   }),
@@ -214,8 +214,8 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Stubs workspace mutations that are outside this feature-level test boundary. */
   useWorkspaceActions: () => ({
-    detachConcordance: vi.fn(),
-    detachConcordanceDispersion: vi.fn(),
+    runConcordanceAll: vi.fn(),
+    publishAnalysisResult: vi.fn(),
     setNodeColor: vi.fn(),
   }),
 }));
@@ -243,18 +243,6 @@ vi.mock('@/hooks/analysisTaskUtils', () => ({
   pruneTasksById: vi.fn((tasks) => tasks),
 }));
 
-vi.mock('../generatedColumns', () => ({
-  CONCORDANCE_COLUMN_KEYS: {
-    matchedText: 'CONC_MATCHED_TEXT',
-    startIdx: 'CONC_START_IDX',
-    endIdx: 'CONC_END_IDX',
-    leftToken: 'L1',
-    rightToken: 'R1',
-    dispersion: 'CONC_dispersion',
-  },
-  CONCORDANCE_CORE_COLUMNS: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
-}));
-
 vi.mock('../hooks/useConcordanceTaskFlow', () => ({
   /** Captures task-flow inputs while exposing controllable action mocks. */
   useConcordanceTaskFlow: (params: { state?: Record<string, unknown> }) => {
@@ -264,37 +252,7 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
       handleSort: vi.fn(),
       handlePageChange: vi.fn(),
       persistResultPreferences: vi.fn(),
-      handleDetach: vi.fn(),
-      handleDispersionDetach: vi.fn(),
     };
-  },
-}));
-
-vi.mock('../hooks/useConcordanceDetachDialogs', () => ({
-  useConcordanceDetachDialogs: () => ({
-    openDetachDialog: detachDialogMocks.openTable,
-    openDispersionDetachDialog: detachDialogMocks.openDispersion,
-    detachDialog: {
-      open: false,
-      isDetaching: false,
-      detachNodeOptions: [],
-      selectedDetachColumns: {},
-      ...detachDialogMocks.table,
-    },
-    dispersionDetachDialog: {
-      open: false,
-      isDetaching: false,
-      detachNodeOptions: [],
-      selectedDetachColumns: {},
-      ...detachDialogMocks.dispersion,
-    },
-  }),
-}));
-
-vi.mock('../../common/components/DetachColumnsDialog', () => ({
-  DetachColumnsDialog: (props: Record<string, unknown>) => {
-    detachDialogMocks.render(props);
-    return null;
   },
 }));
 
@@ -331,22 +289,18 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
           }
         : null;
     return {
-      analysisId: config.hydrationTaskId ?? null,
       request,
       analysisState: mockAnalysisState === 'successful' ? 'succeeded' : null,
       analysisError: null,
       result,
-      resolveTaskId: vi.fn(() => 'task-1'),
       setLocalTaskId: vi.fn(),
-      isRunning: false,
+      isRunning: mockIsPreviewRunning,
       setIsRunning: vi.fn(),
       runningRef: { current: false },
-      lastFetchedRef: { current: { taskId: null, state: null } },
       taskStatus: {
         tasks: mockAnalysisState ? [{ state: mockAnalysisState }] : [],
       },
       banner: null,
-      hydrationState: mockHydrationState,
       clearResults: clearResultsMock,
       stopTask: vi.fn(),
       isStopping: false,
@@ -365,41 +319,89 @@ vi.mock('../../common/hooks/useNodeColorControls', () => ({
   }),
 }));
 
-vi.mock('../../common/rerunAnalysis', () => ({
-  executeAnalysisRerun: vi.fn(
-    async ({
-      hasAttachedAnalysis,
-      clearResults,
-      runFreshAnalysis,
-    }: {
-      hasAttachedAnalysis: boolean;
-      clearResults: () => Promise<boolean>;
-      runFreshAnalysis: () => Promise<void>;
-    }) => {
-      if (hasAttachedAnalysis) {
-        const cleared = await clearResults();
-        if (!cleared) return;
-      }
-      await runFreshAnalysis();
-    },
-  ),
-}));
-
 import ConcordanceFeature from '../ConcordanceFeature';
 
 const renderConcordanceFeature = (taskId: string | null = null) => {
   const setInputSet = vi.fn();
+  const previewAnalysis: Analysis | null = taskId
+    ? {
+        cancellation_requested_at: null,
+        created_at: '2026-07-25T00:00:00Z',
+        error: null,
+        execution_scope: 'preview',
+        finished_at: '2026-07-25T00:00:01Z',
+        id: taskId,
+        integrity: { status: 'valid' },
+        output_node_ids: [],
+        parent_analysis_id: null,
+        progress: { fraction: 1, message: null },
+        request: {
+          kind: 'concordance',
+          node_ids: ['node-1'],
+          node_columns: { 'node-1': 'text' },
+          node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
+          search_word: 'old value',
+          num_left_tokens: 10,
+          num_right_tokens: 10,
+          regex: false,
+          whole_word: true,
+          case_sensitive: false,
+          search_mode: 'tokens',
+        },
+        revision: 1,
+        started_at: '2026-07-25T00:00:00Z',
+        state: 'succeeded',
+        supersedes_analysis_ids: [],
+        tab_id: 'tab-1',
+      }
+    : null;
+  const runAllRoot: Analysis | null = mockRunAllAnalysis
+    ? {
+        ...previewAnalysis!,
+        ...mockRunAllAnalysis,
+        created_at: '2026-07-25T00:01:00Z',
+        execution_scope: 'run_all',
+        id: 'run-all-root',
+        output_node_ids: [],
+        request: {
+          kind: 'concordance_run_all',
+          source: previewAnalysis!.request,
+        },
+        supersedes_analysis_ids: taskId ? [taskId] : [],
+      }
+    : null;
+  const runAllChild: Analysis | null =
+    runAllRoot && mockRunAllAnalysis
+      ? {
+          ...runAllRoot,
+          ...mockRunAllAnalysis,
+          execution_scope: 'supporting',
+          id: 'run-all-child',
+          parent_analysis_id: runAllRoot.id,
+          supersedes_analysis_ids: [],
+        }
+      : null;
+  const analyses = [previewAnalysis, runAllRoot, runAllChild].filter(
+    (analysis): analysis is Analysis => analysis !== null,
+  );
+  const activeAnalysis =
+    runAllRoot?.state === 'queued' || runAllRoot?.state === 'running' ? runAllRoot : null;
   return {
     ...renderWithClient(
       <ConcordanceFeature
         host={{
           tabId: 'tab-1',
-          taskId,
+          analyses,
+          latestPreview: previewAnalysis,
+          latestRunAll: runAllRoot,
+          activeAnalysis,
           inputSets: {},
           settings: {},
-          setTaskId: vi.fn(),
+          correctionColumns: {},
           setInputSet,
           setSetting: vi.fn(),
+          setCorrectionColumn: vi.fn(),
+          refreshAnalyses: vi.fn(),
         }}
       />,
     ),
@@ -412,12 +414,30 @@ describe('ConcordanceFeature', () => {
     handleSearchMock.mockClear();
     clearResultsMock.mockClear();
     latestTaskFlowParams = null;
-    mockHydrationState = { status: 'idle' };
     mockInitialResult = null;
     mockAnalysisState = null;
+    mockRunAllAnalysis = null;
+    mockIsPreviewRunning = false;
     latestAnalysisFeatureConfig = null;
-    detachDialogMocks.render.mockClear();
-
+    queryWorkspaceSqlTableMock.mockReset();
+    getAnalysisResultMock.mockReset();
+    fetchArrowTablePageMock.mockReset();
+    queryWorkspaceSqlTableMock.mockResolvedValue({
+      table: {},
+      columns: ['text'],
+      schema: [],
+      rows: [],
+      hasNext: false,
+      etag: 'default-etag',
+    });
+    fetchArrowTablePageMock.mockResolvedValue({
+      table: {},
+      columns: [],
+      schema: [],
+      rows: [],
+      hasNext: false,
+      etag: 'default-etag',
+    });
     clearResultsMock.mockResolvedValue(true);
   });
 
@@ -451,34 +471,7 @@ describe('ConcordanceFeature', () => {
     });
   });
 
-  it('owns table and dispersion detach copy and forwards each dialog handler set', () => {
-    const { unmount } = renderConcordanceFeature('analysis-1');
-
-    const calls = detachDialogMocks.render.mock.calls.map(([props]) => props);
-    const table = calls.find((props) => props.title === 'Detach Concordance Results');
-    const dispersion = calls.find(
-      (props) => props.title === 'Add aggregated concordance to workspace',
-    );
-
-    expect(table).toEqual(
-      expect.objectContaining({
-        description:
-          'Select optional source columns to include alongside the concordance results. Required output columns stay checked automatically.',
-        ...detachDialogMocks.table,
-      }),
-    );
-    expect(dispersion).toEqual(
-      expect.objectContaining({
-        description:
-          'The detached data block always includes the per-document extract, matched-text list, and L1/R1 contexts as list columns. Optionally include the document column and any source metadata columns. The document column is selected by default — uncheck to omit it.',
-        ...detachDialogMocks.dispersion,
-      }),
-    );
-
-    unmount();
-  });
-
-  it('clears previous results before rerunning when clicking Re-run', () => {
+  it('supersedes previous Preview without clearing the forest first', () => {
     mockAnalysisState = 'successful';
     const { unmount } = renderConcordanceFeature('analysis-1');
 
@@ -486,15 +479,15 @@ describe('ConcordanceFeature', () => {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /re-?run/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /update preview/i })[0]!);
 
     return waitFor(() => {
-      expect(clearResultsMock).toHaveBeenCalledTimes(1);
+      expect(clearResultsMock).not.toHaveBeenCalled();
       expect(handleSearchMock).toHaveBeenCalledTimes(1);
     }).finally(unmount);
   });
 
-  it('runs a fresh search when clicking Re-run after changing parameters', () => {
+  it('runs a fresh search when updating Preview after changing parameters', () => {
     mockAnalysisState = 'successful';
     const { unmount } = renderConcordanceFeature('analysis-1');
 
@@ -502,11 +495,118 @@ describe('ConcordanceFeature', () => {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /re-?run/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /update preview/i })[0]!);
 
     return waitFor(() => {
       expect(handleSearchMock).toHaveBeenCalledWith();
     }).finally(unmount);
+  });
+
+  it('shows Update Preview instead of stale Running after Run All succeeds', () => {
+    mockIsPreviewRunning = true;
+    mockRunAllAnalysis = {
+      state: 'succeeded',
+      output_node_ids: ['result-1'],
+      progress: { fraction: 1, message: 'Complete' },
+    };
+
+    const { unmount } = renderConcordanceFeature('analysis-1');
+
+    expect(screen.getByRole('button', { name: 'Update Preview' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Running...' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+
+    unmount();
+  });
+
+  it('attributes an active Run All lifecycle to Run All and its Stop action', () => {
+    mockRunAllAnalysis = {
+      state: 'running',
+      output_node_ids: [],
+      progress: { fraction: 0.5, message: 'Processing' },
+    };
+
+    const { unmount } = renderConcordanceFeature('analysis-1');
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Run All' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Clear Results' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Running...' })).not.toBeInTheDocument();
+
+    unmount();
+  });
+
+  it('loads Run All Review from the immutable Analysis table', async () => {
+    mockAnalysisState = 'successful';
+    mockInitialResult = {
+      state: 'successful',
+      message: 'ok',
+      data: {},
+    };
+    mockRunAllAnalysis = {
+      id: 'run-all-1',
+      state: 'succeeded',
+      output_node_ids: [],
+      progress: { message: null },
+    };
+    getAnalysisResultMock.mockResolvedValue({
+      data: {
+        kind: 'concordance_run_all',
+        result_type: 'source',
+        source: {
+          node_id: 'node-1',
+          node_name: 'Node 1',
+          document_column: 'text',
+          metadata_columns: [],
+          analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
+          internal_columns: ['__wordflow_source_row_id'],
+          record_count: 1,
+          table: {
+            table_id: 'concordance-run-all',
+            rows_url: '/analysis-rows',
+            schema_url: '/analysis-schema',
+          },
+        },
+      },
+    });
+    fetchArrowTablePageMock.mockResolvedValue({
+      table: {},
+      columns: ['__wordflow_source_row_id', 'text', 'CONC_matched_text', 'CONC_extraction'],
+      schema: [],
+      rows: [
+        {
+          __wordflow_source_row_id: 0,
+          text: 'Queensland example',
+          CONC_matched_text: 'Queensland',
+          CONC_extraction: 'Queensland example',
+        },
+      ],
+      hasNext: false,
+      etag: 'review-etag',
+    });
+
+    const { unmount } = renderConcordanceFeature('analysis-1');
+
+    await waitFor(() => {
+      expect(screen.getByText('Review')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Queensland')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Table View' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Dispersion View' })).toBeInTheDocument();
+    expect(
+      queryWorkspaceSqlTableMock.mock.calls.some(([options]) =>
+        String((options as { body?: { sql?: string } }).body?.sql).includes('LEFT JOIN'),
+      ),
+    ).toBe(false);
+    expect(fetchArrowTablePageMock).toHaveBeenCalledWith('/analysis-rows', {
+      page: 1,
+      pageSize: 20,
+      sortBy: null,
+      descending: false,
+    });
+
+    unmount();
   });
 
   it('defaults whole-word on and disables it when regex is enabled', () => {

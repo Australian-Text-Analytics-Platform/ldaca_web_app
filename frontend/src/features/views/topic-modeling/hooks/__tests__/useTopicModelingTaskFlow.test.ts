@@ -34,10 +34,8 @@ describe('useTopicModelingTaskFlow', () => {
         setIsRunning: vi.fn(),
         runningRef: { current: false },
         setError: vi.fn(),
-        setResultSafely: vi.fn(),
-        lastFetchedRef: { current: { taskId: null, state: null } },
         setLocalTaskId,
-        onTaskIdAssigned: vi.fn(),
+        onSubmitted: vi.fn(),
       },
     });
 
@@ -45,7 +43,10 @@ describe('useTopicModelingTaskFlow', () => {
     expect(submitTabAnalysis).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
-        body: expect.objectContaining({ kind: 'topic_modeling', node_ids: ['node-1'] }),
+        body: expect.objectContaining({
+          execution_scope: 'run_all',
+          request: expect.objectContaining({ kind: 'topic_modeling', node_ids: ['node-1'] }),
+        }),
       }),
     );
     expect(setLocalTaskId).toHaveBeenCalledWith('analysis-1');

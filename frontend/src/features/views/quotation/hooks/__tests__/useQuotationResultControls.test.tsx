@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import type { QuotationAnalysisResponse } from '@/api';
@@ -26,7 +26,7 @@ const response: QuotationAnalysisResponse = {
 };
 
 describe('useQuotationResultControls', () => {
-  it('normalizes a canonical quotation result and owns only transient detach state', () => {
+  it('normalizes a canonical quotation result', () => {
     const { result } = renderHook(() =>
       useQuotationResultControls({ result: response, nodeId: 'node-1', column: 'text' }),
     );
@@ -37,7 +37,5 @@ describe('useQuotationResultControls', () => {
       sortBy: 'text',
       descending: true,
     });
-    act(() => result.current.setNodeDetaching({ 'node-1': true }));
-    expect(result.current.nodeDetaching).toEqual({ 'node-1': true });
   });
 });

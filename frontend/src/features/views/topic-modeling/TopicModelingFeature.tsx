@@ -16,7 +16,6 @@ import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocu
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
-import { executeAnalysisRerun } from '../common/rerunAnalysis';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { analysisInputsFromRequest } from '../common/utils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
@@ -47,11 +46,18 @@ import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
  */
 function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const {
-    taskId: tabTaskId,
-    setTaskId: onTabTaskChange,
+    latestRunAll,
+    activeAnalysis,
+    analyses,
+    refreshAnalyses,
     inputSets: tabInputSets,
     setInputSet: onTabInputSetChange,
   } = host;
+  const tabTaskId = latestRunAll?.id ?? null;
+  const runAllLocksParameters =
+    latestRunAll?.state === 'queued' ||
+    latestRunAll?.state === 'running' ||
+    latestRunAll?.state === 'succeeded';
   const { currentWorkspaceId } = useWorkspaceData();
   const { setNodeColor: persistNodeColor, detachTopicModeling } = useWorkspaceActions();
   const nodeInputs = useTabNodeInputs({
@@ -99,7 +105,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     panelSelectedNodes,
     panelNodeIds,
     panelNodeIdsKey,
-    nodeInfoCache: nodeInputs.nodeInfoCache,
+    nodeInfoById: nodeInputs.nodeInfoById,
   });
   const {
     hoveredTopicId,
@@ -130,7 +136,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     setIsRunning,
     runningRef,
     taskStatus,
-    lastFetchedRef,
     clearResults,
     stopTask,
     setLocalTaskId,
@@ -141,9 +146,11 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     taskType: ANALYSIS_TASK_TYPES.topicModeling,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    // Tab-driven deterministic hydration: the tab's persisted task id wins task
-    // resolution over transient local state.
+    // The forest's newest Run All Analysis wins hydration over transient
+    // submission state.
     hydrationTaskId: tabTaskId,
+    controlAnalysisId: activeAnalysis?.id ?? null,
+    tabAnalysisIds: analyses.map((analysis) => analysis.id),
     // Called by useAnalysisFeature polling and hydration to load the owned task result.
     fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
@@ -156,14 +163,10 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       hydrateParameters(req);
     },
     // Called by useAnalysisFeature after shared result deletion completes.
-    onCleared: (_, options) => {
+    onCleared: () => {
       setError(null);
-      if (options?.preserveLocalState) {
-        return;
-      }
-      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange(null);
+      // Refresh the canonical forest; curated inputs remain in the Tab draft.
+      refreshAnalyses();
     },
   });
   const typedServerRequest = serverRequest as {
@@ -324,7 +327,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       .filter((nodeId) => detachSourceIds.has(nodeId));
     setIsDetaching(true);
     try {
-      await detachTopicModeling(tabTaskId, {
+      await detachTopicModeling(host.tabId, tabTaskId, {
         node_ids: nodeIds,
         selected_columns: Object.fromEntries(
           nodeIds.map((nodeId) => [nodeId, detachColumns[nodeId] ?? []]),
@@ -365,13 +368,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       setIsRunning,
       runningRef,
       setError,
-      lastFetchedRef,
       setLocalTaskId,
-      // Persist the run's assigned task id onto the active tab so reload
-      // rehydrates the same task.
-      onTaskIdAssigned: (taskId) => {
-        onTabTaskChange(taskId);
-      },
+      onSubmitted: refreshAnalyses,
     },
   });
 
@@ -426,17 +424,9 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     handleResetZoom,
   });
 
-  /**
-   * Runs a fresh topic-modeling task or replaces the prior result after parameter changes.
-   * Used by: TopicModelingParameterPanel's Run/Update action.
-   */
   const handleRunOrUpdate = async () => {
     await ensureNodeColors();
-    await executeAnalysisRerun({
-      hasAttachedAnalysis: Boolean(tabTaskId),
-      clearResults,
-      runFreshAnalysis: handleRun,
-    });
+    await handleRun();
   };
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- this is a truthiness OR: a falsy banner/result/error must fall through to the next, so ?? would short-circuit incorrectly
@@ -448,6 +438,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
         actionState={actionState}
+        parametersLocked={runAllLocksParameters}
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
         onCorpusSampleChange={updateCorpusSample}

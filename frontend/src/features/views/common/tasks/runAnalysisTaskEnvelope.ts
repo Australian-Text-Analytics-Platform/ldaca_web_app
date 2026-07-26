@@ -4,20 +4,14 @@ interface CurrentRef<T> {
   current: T;
 }
 
-interface AnalysisRunTaskMarker {
-  taskId: string | null;
-  state: string | null;
-}
-
 interface RunAnalysisTaskEnvelopeOptions<TAnalysis extends Analysis> {
-  lastFetchedRef: CurrentRef<AnalysisRunTaskMarker>;
   runningRef: CurrentRef<boolean>;
   setIsRunning: (value: boolean) => void;
   setLocalTaskId: (taskId: string | null) => void;
-  onTaskIdAssigned: (taskId: string | null) => void;
-  resetBeforeRun: () => void;
+  onSubmitted: () => void;
+  resetBeforeRun?: () => void;
   submit: () => Promise<TAnalysis>;
-  onSuccess: (analysis: TAnalysis, taskId: string | null) => void;
+  onSuccess?: (analysis: TAnalysis) => void;
   onError: (error: unknown) => void;
 }
 
@@ -34,14 +28,14 @@ const releaseRunning = (
  * a canonical Analysis resource.
  *
  * Used by: every tab-owned background-analysis submit flow. The workflows
- * share task marker reset, running-flag ownership, task-id handoff, and
+ * share running-flag ownership, transient task-id handoff, forest refresh, and
  * failed-run cleanup while keeping request and Result handling feature-specific.
  *
- * Flow: reset the last fetched marker, mark the run active, let the feature
- * clear its local result/error state, submit the API request, store/report the
- * returned Analysis id, then release the running flag only for rejected
- * terminal responses or thrown submit errors. Results are fetched separately
- * from the Analysis result endpoint after completion.
+ * Flow: mark the run active, let the feature clear local result/error state,
+ * submit the API request, store its transient Analysis id, refresh the canonical
+ * Tab forest, then release the running flag only for rejected terminal responses
+ * or thrown submit errors. Results are fetched separately from the Analysis
+ * result endpoint after completion.
  *
  * This interface intentionally accepts only the generated Analysis lifecycle
  * resource. Immediate-result workflows store their result directly. A hybrid
@@ -49,27 +43,25 @@ const releaseRunning = (
  * branch through this envelope.
  */
 export async function runAnalysisTaskEnvelope<TAnalysis extends Analysis>({
-  lastFetchedRef,
   runningRef,
   setIsRunning,
   setLocalTaskId,
-  onTaskIdAssigned,
+  onSubmitted,
   resetBeforeRun,
   submit,
   onSuccess,
   onError,
 }: RunAnalysisTaskEnvelopeOptions<TAnalysis>): Promise<TAnalysis | null> {
-  lastFetchedRef.current = { taskId: null, state: null };
   setIsRunning(true);
   runningRef.current = true;
-  resetBeforeRun();
+  resetBeforeRun?.();
 
   try {
     const response = await submit();
     const taskId = response.id;
     setLocalTaskId(taskId);
-    onTaskIdAssigned(taskId);
-    onSuccess(response, taskId);
+    onSubmitted();
+    onSuccess?.(response);
 
     if (response.state === 'failed' || response.state === 'cancelled') {
       releaseRunning(runningRef, setIsRunning);

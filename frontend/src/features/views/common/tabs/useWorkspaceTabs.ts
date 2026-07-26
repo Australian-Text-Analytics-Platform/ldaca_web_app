@@ -5,7 +5,7 @@ import {
   createTab as createServerTab,
   deleteTab as deleteServerTab,
   listTabs,
-  renameTab as renameServerTab,
+  updateTab as updateServerTab,
 } from '@/api';
 import type { AnalysisKind, Tab } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
@@ -33,9 +33,9 @@ export interface UseWorkspaceTabsResult {
   renameTab: (tabId: string, title: string) => void;
   setActiveTab: (tabId: string) => void;
   reorderTabs: (orderedTabIds: string[]) => void;
-  setTabTask: (tabId: string, analysisId: string | null) => void;
   setTabInputSet: (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => void;
   setTabSetting: (tabId: string, key: string, value: string) => void;
+  setAnnotationCorrectionColumn: (tabId: string, nodeId: string, column: string) => void;
 }
 
 interface LocalTabState {
@@ -197,8 +197,16 @@ export function useWorkspaceTabs(
     onSuccess: (tab) => {
       creatingRef.current = false;
       if (tab) {
+        const nextOrder = [
+          ...orderedTabs.map((item) => item.tab_id).filter((id) => id !== tab.id),
+          tab.id,
+        ];
+        queryClient.setQueryData<Tab[]>(queryKey, (current) => [
+          ...(current ?? []).filter((item) => item.id !== tab.id),
+          tab,
+        ]);
+        setOrderedIds(nextOrder);
         rememberActiveTab(userId, workspaceId, kind, tab.id);
-        setOrderedIds((current) => [...current.filter((id) => id !== tab.id), tab.id]);
       }
       invalidate();
     },
@@ -206,14 +214,15 @@ export function useWorkspaceTabs(
       creatingRef.current = false;
     },
   });
+  const { isPending: isCreating, mutateAsync: createServerTabAsync } = createMutation;
 
   const createTab = useCallback(
     async (title = `Analysis ${String(serverTabs.length + 1)}`): Promise<Tab | null> => {
-      if (!workspaceId || createMutation.isPending || creatingRef.current) return null;
+      if (!workspaceId || isCreating || creatingRef.current) return null;
       creatingRef.current = true;
-      return await createMutation.mutateAsync(title);
+      return await createServerTabAsync(title);
     },
-    [createMutation, serverTabs.length, workspaceId],
+    [createServerTabAsync, isCreating, serverTabs.length, workspaceId],
   );
 
   const closeMutation = useMutation({
@@ -240,18 +249,19 @@ export function useWorkspaceTabs(
       invalidate();
     },
   });
+  const { mutate: closeServerTab } = closeMutation;
 
   const closeTab = useCallback(
     (tabId: string) => {
-      if (workspaceId) closeMutation.mutate(tabId);
+      if (workspaceId) closeServerTab(tabId);
     },
-    [closeMutation, workspaceId],
+    [closeServerTab, workspaceId],
   );
 
   const renameMutation = useMutation({
     mutationFn: async ({ tabId, title }: { tabId: string; title: string }) => {
       if (!workspaceId) return;
-      await renameServerTab({
+      await updateServerTab({
         path: { workspace_id: workspaceId, tab_id: tabId },
         body: { name: title },
         throwOnError: true,
@@ -259,12 +269,13 @@ export function useWorkspaceTabs(
     },
     onSuccess: invalidate,
   });
+  const { mutate: renameServerTab } = renameMutation;
 
   const renameTab = useCallback(
     (tabId: string, title: string) => {
-      if (workspaceId) renameMutation.mutate({ tabId, title });
+      if (workspaceId) renameServerTab({ tabId, title });
     },
-    [renameMutation, workspaceId],
+    [renameServerTab, workspaceId],
   );
 
   const setActiveTab = useCallback(
@@ -283,15 +294,6 @@ export function useWorkspaceTabs(
   const reorder = useCallback((ids: string[]) => {
     setOrderedIds(ids);
   }, []);
-
-  const setTabTask = useCallback(
-    (_tabId: string, _analysisId: string | null) => {
-      // Tab.analysis_id is written by the backend submission/clear command.
-      // Refetch it instead of creating a competing client-side owner.
-      invalidate();
-    },
-    [invalidate],
-  );
 
   const setTabInputSet = useCallback(
     (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => {
@@ -317,6 +319,37 @@ export function useWorkspaceTabs(
     [rememberTabSetting, userId, workspaceId],
   );
 
+  const correctionColumnMutation = useMutation({
+    mutationFn: async ({ tabId, columns }: { tabId: string; columns: Record<string, string> }) => {
+      if (!workspaceId) return;
+      const { data } = await updateServerTab({
+        path: { workspace_id: workspaceId, tab_id: tabId },
+        body: { annotation_correction_columns: columns },
+        throwOnError: true,
+      });
+      return data;
+    },
+    onSuccess: (tab) => {
+      if (!tab) return;
+      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
+        current?.map((item) => (item.id === tab.id ? tab : item)),
+      );
+    },
+  });
+  const { mutate: saveCorrectionColumn } = correctionColumnMutation;
+
+  const setAnnotationCorrectionColumn = useCallback(
+    (tabId: string, nodeId: string, column: string) => {
+      const tab = serverTabs.find((item) => item.id === tabId);
+      if (!tab) return;
+      saveCorrectionColumn({
+        tabId,
+        columns: { ...tab.annotation_correction_columns, [nodeId]: column },
+      });
+    },
+    [saveCorrectionColumn, serverTabs],
+  );
+
   return {
     tabs: orderedTabs,
     activeTabId: resolvedActiveId,
@@ -326,8 +359,8 @@ export function useWorkspaceTabs(
     renameTab,
     setActiveTab,
     reorderTabs: reorder,
-    setTabTask,
     setTabInputSet,
     setTabSetting,
+    setAnnotationCorrectionColumn,
   };
 }

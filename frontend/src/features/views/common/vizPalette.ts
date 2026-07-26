@@ -81,16 +81,3 @@ export function pickRandomColor(used: Iterable<string> = []): string {
   const index = Math.floor(Math.random() * pool.length);
   return pool[index] ?? pool[0] ?? VIZ_PALETTE[0] ?? GREY;
 }
-
-/**
- * Build default ``nodeId → colour`` assignments by selected-node position.
- * Retained for legacy chart-series fallbacks; node colouring now defaults unset
- * blocks to {@link GREY} and allocates real colours via {@link pickRandomColor}.
- */
-export function vizColorMapForNodes(nodeIds: readonly string[]): Record<string, string> {
-  const map: Record<string, string> = {};
-  nodeIds.forEach((id, idx) => {
-    if (id) map[id] = VIZ_PALETTE[idx % VIZ_PALETTE.length] ?? '';
-  });
-  return map;
-}

@@ -3,11 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { runAnalysisTaskEnvelope } from '../runAnalysisTaskEnvelope';
 
 const baseOptions = () => ({
-  lastFetchedRef: { current: { taskId: 'old-task', state: 'successful' } },
   runningRef: { current: false },
   setIsRunning: vi.fn(),
   setLocalTaskId: vi.fn(),
-  onTaskIdAssigned: vi.fn(),
+  onSubmitted: vi.fn(),
   resetBeforeRun: vi.fn(),
   submit: vi.fn(),
   onSuccess: vi.fn(),
@@ -25,13 +24,12 @@ describe('runAnalysisTaskEnvelope', () => {
     const result = await runAnalysisTaskEnvelope(options);
 
     expect(result).toEqual({ id: 'task-1', state: 'running' });
-    expect(options.lastFetchedRef.current).toEqual({ taskId: null, state: null });
     expect(options.setIsRunning).toHaveBeenCalledWith(true);
     expect(options.runningRef.current).toBe(true);
     expect(options.resetBeforeRun).toHaveBeenCalledOnce();
     expect(options.setLocalTaskId).toHaveBeenCalledWith('task-1');
-    expect(options.onTaskIdAssigned).toHaveBeenCalledWith('task-1');
-    expect(options.onSuccess).toHaveBeenCalledWith({ id: 'task-1', state: 'running' }, 'task-1');
+    expect(options.onSubmitted).toHaveBeenCalledOnce();
+    expect(options.onSuccess).toHaveBeenCalledWith({ id: 'task-1', state: 'running' });
     expect(options.onError).not.toHaveBeenCalled();
   });
 

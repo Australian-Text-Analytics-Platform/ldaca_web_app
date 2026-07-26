@@ -90,8 +90,7 @@ export function AnnotationClassDescriptionsEditor({
     setDraftRows([...editorRows, { class: '', description: '' }]);
   };
 
-  // Delete the row at rowIndex and persist the remaining classes (the missing
-  // delete affordance this card previously lacked).
+  // Remove the row from the draft; Save persists the remaining classes.
   const handleDeleteClass = (rowIndex: number) => {
     setDraftRows(editorRows.filter((_, index) => index !== rowIndex));
   };

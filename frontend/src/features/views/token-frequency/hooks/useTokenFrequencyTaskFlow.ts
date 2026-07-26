@@ -28,10 +28,7 @@ interface AnalysisActions {
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
-  lastFetchedRef: React.RefObject<{ taskId: string | null; state: string | null }>;
-  // Reports the run's assigned task id back to the owning tab. No-op when not
-  // tab-mounted.
-  onTaskIdAssigned: (taskId: string | null) => void;
+  onSubmitted: () => void;
 }
 
 interface NavigationActions {
@@ -69,15 +66,14 @@ export const useTokenFrequencyTaskFlow = ({
     setLastCompareNodeIds,
     setAppliedStopSet,
     setStopWords,
-    lastFetchedRef,
-    onTaskIdAssigned,
+    onSubmitted,
   },
   navigation: { setCurrentView, applyStopSetFromText },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
   // concordance tab for every token click. The created tab id travels with the
   // handoff so only that destination tab can consume it.
-  const { createTab: createConcordanceTab, setTabTask: setConcordanceTabTask } = useWorkspaceTabs(
+  const { createTab: createConcordanceTab } = useWorkspaceTabs(
     currentWorkspaceId,
     ANALYSIS_TAB_GROUPS.concordance,
   );
@@ -86,7 +82,7 @@ export const useTokenFrequencyTaskFlow = ({
   /**
    * Returned to `TokenFrequencyFeature` by `useTokenFrequencyTaskFlow`.
    * Flow: validate columns/tokenizers, build the two-node request, run the
-   * workspace mutation, record its task id, and apply result/stop-word state.
+   * workspace mutation, record its Analysis identity, and apply result state.
    */
   const handleAnalyze = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) {
@@ -132,15 +128,16 @@ export const useTokenFrequencyTaskFlow = ({
     };
 
     await runAnalysisTaskEnvelope<Analysis>({
-      lastFetchedRef,
       runningRef,
       setIsRunning,
       setLocalTaskId,
-      onTaskIdAssigned,
-      resetBeforeRun: () => undefined,
+      onSubmitted,
       submit: async () => {
         const { data: response } = await submitTabAnalysis({
-          body: { kind: 'token_frequency', ...request },
+          body: {
+            execution_scope: 'run_all',
+            request: { kind: 'token_frequency', ...request },
+          },
           path: { workspace_id: currentWorkspaceId, tab_id: tabId },
           throwOnError: true,
         });
@@ -174,12 +171,7 @@ export const useTokenFrequencyTaskFlow = ({
   }, [stopWords]);
 
   const handleTokenClick = useCallback(
-    // ``sourceNodeId`` is supplied when the click originates from an
-    // individual per-node word cloud or frequency bar; it scopes the
-    // concordance handoff to that single data block. The unified word cloud
-    // and the comparative statistics table omit it, so the handoff keeps both
-    // compared nodes (the prior behaviour).
-    (token: string, sourceNodeId?: string) => {
+    (token: string) => {
       if (!currentWorkspaceId) return;
       const trimmedToken = token;
       const resolvedContext = resolveTokenFrequencyNodeContext({
@@ -212,23 +204,6 @@ export const useTokenFrequencyTaskFlow = ({
         resolvedNodeIds.includes(selection.nodeId),
       );
 
-      // Narrow to just the clicked node when a per-node source is given and we
-      // can resolve a column for it (so the concordance arrives ready to run).
-      // Fall back to the full comparison set if the node can't be resolved.
-      const scopedNodeId = sourceNodeId?.trim() ?? '';
-      const scopedSelection =
-        scopedNodeId.length > 0
-          ? (resolvedSelections.find((selection) => selection.nodeId === scopedNodeId) ??
-            effectiveNodeColumnSelections.find(
-              (selection) => selection.nodeId === scopedNodeId && selection.column,
-            ))
-          : undefined;
-
-      const uniqueNodeIds: string[] = scopedSelection ? [scopedNodeId] : resolvedNodeIds;
-      const effectiveSelections: NodeColumnSelection[] = scopedSelection
-        ? [scopedSelection]
-        : resolvedSelections;
-
       void (async () => {
         let createdTabId: string | null = null;
         try {
@@ -237,13 +212,16 @@ export const useTokenFrequencyTaskFlow = ({
           createdTabId = createdTab.id;
 
           const nodeColumns = Object.fromEntries(
-            effectiveSelections.map((selection) => [selection.nodeId, selection.column]),
+            resolvedSelections.map((selection) => [selection.nodeId, selection.column]),
           );
           const request: ConcordanceAnalysisRequest = {
-            node_ids: uniqueNodeIds,
+            node_ids: resolvedNodeIds,
             node_columns: nodeColumns,
             node_tokenizer_models: Object.fromEntries(
-              uniqueNodeIds.map((nodeId) => [nodeId, (tokenizerModelsByNode[nodeId] ?? '').trim()]),
+              resolvedNodeIds.map((nodeId) => [
+                nodeId,
+                (tokenizerModelsByNode[nodeId] ?? '').trim(),
+              ]),
             ),
             search_word: trimmedToken,
             num_left_tokens: 10,
@@ -253,12 +231,14 @@ export const useTokenFrequencyTaskFlow = ({
             case_sensitive: false,
             search_mode: 'tokens',
           };
-          const { data: analysis } = await submitTabAnalysis({
-            body: { kind: 'concordance', ...request },
+          await submitTabAnalysis({
+            body: {
+              execution_scope: 'preview',
+              request: { kind: 'concordance', ...request },
+            },
             path: { workspace_id: currentWorkspaceId, tab_id: createdTab.id },
             throwOnError: true,
           });
-          setConcordanceTabTask(createdTab.id, analysis.id);
           setCurrentView('concordance');
         } catch (error) {
           if (createdTabId) {
@@ -267,7 +247,6 @@ export const useTokenFrequencyTaskFlow = ({
                 path: { workspace_id: currentWorkspaceId, tab_id: createdTabId },
                 throwOnError: true,
               });
-              setConcordanceTabTask(createdTabId, null);
             } catch (cleanupError) {
               console.warn('Failed to remove empty Concordance tab:', cleanupError);
             }
@@ -283,7 +262,6 @@ export const useTokenFrequencyTaskFlow = ({
       panelNodeIds,
       currentWorkspaceId,
       createConcordanceTab,
-      setConcordanceTabTask,
       setCurrentView,
       tokenizerModelsByNode,
     ],

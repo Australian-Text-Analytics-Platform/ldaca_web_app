@@ -1,17 +1,16 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
-  getAnalysisResult,
-  queryAnalysisResult,
   type QuotationAnalysisRequest,
   type QuotationAnalysisResponse,
   type QuotationEngineConfig,
   type QuotationResultQuery,
+  type QuotationRunAllResult,
+  type ResultPublicationSource,
+  queryAnalysisResult,
 } from '@/api';
-
-import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
+import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,31 +20,37 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { analysisInputsFromRequest } from '../common/utils';
-import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
-import { executeAnalysisRerun } from '../common/rerunAnalysis';
+import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
+import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
+import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { getAnalysisOutputResource, getAnalysisResultResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
+import { RowDetailPanel } from '../common/components/RowDetailPanel';
+import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
 import { hasParameterDiff } from '../common/parameterComparison';
-
-import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
-import { useQuotationContextPreference } from './hooks/useQuotationContextPreference';
-import { useQuotationDetachDialog } from './hooks/useQuotationDetachDialog';
-import { useQuotationEngineSettings } from './hooks/useQuotationEngineSettings';
-import { DetachColumnsDialog } from '../common/components/DetachColumnsDialog';
-import { useQuotationResultControls } from './hooks/useQuotationResultControls';
-import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
+import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { getAnalysisActionLifecycle } from '../common/analysisActionLifecycle';
+import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
+import { analysisInputsFromRequest } from '../common/utils';
 import { QuotationEngineSettingsFields } from './components/QuotationEngineSettingsFields';
 import { type QuotationHoverState } from './components/QuotationHighlightedCell';
 import { QuotationResultsPanel } from './components/QuotationResultsPanel';
-import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
-import { RowDetailPanel } from '../common/components/RowDetailPanel';
-import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
-import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
+import { useQuotationContextPreference } from './hooks/useQuotationContextPreference';
+import { useQuotationEngineSettings } from './hooks/useQuotationEngineSettings';
+import { useQuotationResultControls } from './hooks/useQuotationResultControls';
+import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
+import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
+import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
+import { fetchArrowTablePage } from '@/lib/arrow/arrowTable';
+import { projectQuotationRunAllReviewPage } from './quotationRunAllReview';
+import { ResultPublicationDialog } from '../common/components/ResultPublicationDialog';
 
-/** Renders the quotation extraction workflow, including live runs and result detachment. */
+/** Renders the Quotation Preview and Run All workflow. */
 /**
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
@@ -62,13 +67,17 @@ import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/Analy
  */
 function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   const {
-    taskId: tabTaskId,
-    setTaskId: onTabTaskChange,
+    latestPreview,
+    latestRunAll,
+    activeAnalysis,
+    analyses,
+    refreshAnalyses,
     inputSets: tabInputSets,
     setInputSet: onTabInputSetChange,
   } = host;
+  const tabTaskId = latestPreview?.id ?? null;
   const { currentWorkspaceId } = useWorkspaceData();
-  const { detachQuotation } = useWorkspaceActions();
+  const { runQuotationAll, publishAnalysisResult } = useWorkspaceActions();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -81,6 +90,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   const nodeColumnSelections = nodeInputs.nodeColumnSelections;
   const setNodeColumnSelection = nodeInputs.setColumn;
   const displayedNodes = nodeInputs.selectedNodes.slice(0, 1);
+  const quotationRunAll = latestRunAll?.request.kind === 'quotation_run_all' ? latestRunAll : null;
   const activeSelections = nodeColumnSelections;
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
@@ -99,7 +109,16 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   } = useQuotationEngineSettings();
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   const [resultQuery, setResultQuery] = useState<QuotationResultQuery | null>(null);
+  const [runAllReviewQuery, setRunAllReviewQuery] = useState<QuotationResultQuery>({
+    page: 1,
+    page_size: 20,
+    sort_by: null,
+    descending: false,
+  });
   const [isClearing, setIsClearing] = useState(false);
+  const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
+  const [publicationDialogOpen, setPublicationDialogOpen] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
   const {
@@ -120,7 +139,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
 
   // Opens the shared error dialog with a fallback message for unexpected quotation failures.
   /**
-   * Passed to quotation task and detach flows for user-visible failures.
+   * Passed to quotation task flows for user-visible failures.
    * Flow: normalize an empty failure message, store it, and open the shared error dialog.
    */
   const showErrorDialog = (message: string) => {
@@ -130,36 +149,44 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
 
   const {
     request: serverRequest,
-    resolveTaskId,
     setLocalTaskId,
     isRunning: isLoadingQuotations,
     setIsRunning: setIsLoadingQuotations,
     runningRef,
-    lastFetchedRef,
     banner: quotationWaitingBanner,
     taskStatus,
+    analysisState,
     clearResults,
     stopTask,
     isStopping,
     result,
+    isResultFetching,
   } = useAnalysisFeature<QuotationAnalysisResponse, QuotationAnalysisRequest>({
     taskType: ANALYSIS_TASK_TYPES.quotation,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
-    // Tab-driven deterministic hydration: the tab's persisted task id wins task
-    // resolution over transient local state.
+    // The forest's newest Preview Analysis wins hydration over transient
+    // submission state.
     hydrationTaskId: tabTaskId,
+    requestHydration:
+      !latestPreview && quotationRunAll?.request.kind === 'quotation_run_all'
+        ? {
+            analysisId: quotationRunAll.id,
+            request: quotationRunAll.request.source,
+          }
+        : null,
+    controlAnalysisId: activeAnalysis?.id ?? null,
+    tabAnalysisIds: analyses.map((analysis) => analysis.id),
+    retiredAnalysisIds: analyses.flatMap((analysis) =>
+      analysis.state === 'succeeded' ? analysis.supersedes_analysis_ids : [],
+    ),
     resultQuery: resultQuery ?? undefined,
     // Initial hydration reads the stored canonical Result. Only an explicit
     // page or sort change requests an alternate immutable projection.
     fetchResult: async (taskId, rawQuery) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
       if (!rawQuery) {
-        const { data } = await getAnalysisResult({
-          path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
-          throwOnError: true,
-        });
-        return data as QuotationAnalysisResponse;
+        return getAnalysisResultResource<QuotationAnalysisResponse>(currentWorkspaceId, taskId);
       }
       const query = rawQuery as QuotationResultQuery;
       const { data } = await queryAnalysisResult({
@@ -182,17 +209,71 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       setSelectedMetadataColumns([]);
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
-    onCleared: (_, options) => {
+    onCleared: () => {
       setIsClearing(false);
       setResultQuery(null);
-      if (options?.preserveLocalState) {
-        return;
-      }
-      // Detach the cleared task from the owning tab so a reload doesn't rehydrate
-      // a task the user explicitly cleared. Inputs are intentionally preserved.
-      onTabTaskChange(null);
+      // Refresh the canonical forest; curated inputs remain in the Tab draft.
+      refreshAnalyses();
     },
   });
+  const analysisActionLifecycle = getAnalysisActionLifecycle({
+    isPreviewing: isLoadingQuotations,
+    isSubmittingRunAll,
+    runAllState: quotationRunAll?.state ?? null,
+    hasActiveAnalysis: Boolean(activeAnalysis),
+  });
+  const runAllResultQuery = useQuery({
+    queryKey:
+      currentWorkspaceId && quotationRunAll
+        ? queryKeys.analysisResult(currentWorkspaceId, quotationRunAll.id)
+        : queryKeys.inactiveAnalysisResult(),
+    enabled: Boolean(currentWorkspaceId) && quotationRunAll?.state === 'succeeded',
+    queryFn: async (): Promise<QuotationRunAllResult> => {
+      if (!currentWorkspaceId || !quotationRunAll) throw new Error('Run All Result is unavailable');
+      const value = await getAnalysisOutputResource(currentWorkspaceId, quotationRunAll.id);
+      if (value.kind !== 'quotation_run_all') {
+        throw new Error('Quotation Run All Result is invalid');
+      }
+      return value;
+    },
+  });
+  const runAllSource = runAllResultQuery.data?.source ?? null;
+  const runAllPageRequest = createNodeDataRequest({
+    page: runAllReviewQuery.page ?? 1,
+    page_size: runAllReviewQuery.page_size ?? 20,
+    sort_by: runAllReviewQuery.sort_by ?? null,
+    descending: runAllReviewQuery.descending ?? false,
+  });
+  const runAllTableQuery = useQuery({
+    queryKey:
+      currentWorkspaceId && quotationRunAll && runAllSource
+        ? queryKeys.analysisTablePage(
+            currentWorkspaceId,
+            quotationRunAll.id,
+            runAllSource.table.table_id,
+            runAllPageRequest,
+          )
+        : queryKeys.inactiveAnalysisResult({ ...runAllPageRequest }),
+    enabled: Boolean(runAllSource),
+    queryFn: async () => {
+      if (!runAllSource) throw new Error('Run All table is unavailable');
+      return fetchArrowTablePage(runAllSource.table.rows_url, {
+        page: runAllPageRequest.page,
+        pageSize: runAllPageRequest.page_size,
+        sortBy: runAllPageRequest.sort_by,
+        descending: runAllPageRequest.descending,
+      });
+    },
+  });
+  const runAllReviewResult =
+    runAllSource && runAllTableQuery.data
+      ? projectQuotationRunAllReviewPage(runAllSource, runAllTableQuery.data, {
+          page: runAllPageRequest.page,
+          page_size: runAllPageRequest.page_size,
+          sort_by: runAllPageRequest.sort_by,
+          descending: runAllPageRequest.descending,
+        })
+      : null;
 
   const resultNodeId =
     serverRequest && typeof serverRequest.node_id === 'string'
@@ -202,12 +283,14 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     serverRequest && typeof serverRequest.column === 'string'
       ? serverRequest.column
       : (activeSelections.find((selection) => selection.nodeId === resultNodeId)?.column ?? '');
-  const { nodeState, nodeDetaching, setNodeDetaching, resultsByNode } = useQuotationResultControls({
-    result,
-    nodeId: resultNodeId,
-    column: resultColumn,
+  const { nodeState, resultsByNode } = useQuotationResultControls({
+    result: runAllReviewResult ?? result,
+    nodeId: runAllSource?.node_id ?? resultNodeId,
+    column: runAllSource?.document_column ?? resultColumn,
   });
   const hasLoaded = Boolean(result);
+  const showPreviewTable =
+    displayedNodes.length > 0 && (hasLoaded || (analysisState === 'succeeded' && isResultFetching));
 
   const savedContextLength = Number(host.settings['quotation.contextLength']);
   const {
@@ -294,7 +377,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
 
   const [hoverState, setHoverState] = useState<QuotationHoverState | null>(null);
 
-  const { handleSearchAll, handlePageChange, handlePageSizeChange, handleSort, handleDetach } =
+  const { handleSearchAll, handlePageChange, handlePageSizeChange, handleSort } =
     useQuotationTaskFlow({
       state: {
         currentWorkspaceId,
@@ -305,10 +388,10 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         nodeState,
         originalColumnsByNode,
         buildEngineRequest,
+        supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
       },
       actions: {
         setIsLoadingQuotations,
-        setNodeDetaching,
         showErrorDialog,
         setResultQuery: (query) => {
           setResultQuery(query);
@@ -318,42 +401,71 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         },
         setLocalTaskId,
         runningRef,
-        lastFetchedRef,
-        // Persist the run's assigned task id onto the active tab so reload
-        // rehydrates the same task.
-        onTaskIdAssigned: (taskId) => {
-          onTabTaskChange(taskId);
-        },
-      },
-      lock: {
-        resolveTaskId,
-        detachQuotation,
+        onSubmitted: refreshAnalyses,
       },
     });
-
-  const { openDetachDialog, detachDialog } = useQuotationDetachDialog({
-    activeSelections,
-    originalColumnsByNode,
-    handleDetach,
-    nodeDetaching,
-  });
 
   // Runs a fresh quotation analysis or updates a locked task depending on parameter changes.
   /**
    * Passed to the analysis action button as its run/update handler.
    */
   const handleRunOrUpdate = async () => {
-    await executeAnalysisRerun({
-      hasAttachedAnalysis: Boolean(tabTaskId),
-      clearResults,
-      runFreshAnalysis: handleSearchAll,
-    });
+    await handleSearchAll();
+  };
+
+  const handleRunAll = async () => {
+    const node = displayedNodes[0];
+    const column = node
+      ? activeSelections.find((selection) => selection.nodeId === node.id)?.column
+      : null;
+    const engine = buildEngineRequest();
+    if (!node || !column || !engine || analysisActionLifecycle.isRunningAll) return;
+    const source: QuotationAnalysisRequest = {
+      node_id: node.id,
+      column,
+      engine,
+    };
+    setIsSubmittingRunAll(true);
+    try {
+      await runQuotationAll(host.tabId, { source }, tabTaskId ? [tabTaskId] : []);
+      refreshAnalyses();
+    } catch (error) {
+      showErrorDialog(
+        error instanceof Error ? error.message : 'Could not start Quotation Run All.',
+      );
+    } finally {
+      setIsSubmittingRunAll(false);
+    }
+  };
+
+  const handlePublishResult = async (sources: ResultPublicationSource[]) => {
+    const source = sources[0];
+    if (!quotationRunAll || !source || sources.length !== 1) return;
+    setIsPublishing(true);
+    try {
+      await publishAnalysisResult(host.tabId, quotationRunAll.id, {
+        kind: 'quotation_result_publication',
+        source,
+      });
+      setPublicationDialogOpen(false);
+      toast.success('Adding Quotation Results to the Workspace.');
+    } catch (cause) {
+      toast.error('Could not add Quotation Results.', {
+        description: cause instanceof Error ? cause.message : String(cause),
+      });
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   /**
    * Passed to quotation result blocks as the page-change callback.
    */
   const effHandlePageChange = (newPage: number) => {
+    if (runAllSource) {
+      setRunAllReviewQuery((current) => ({ ...current, page: newPage }));
+      return;
+    }
     handlePageChange(newPage);
   };
 
@@ -362,6 +474,10 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
    * Passed to quotation result blocks as the page-size callback.
    */
   const effHandlePageSizeChange = (newSize: number) => {
+    if (runAllSource) {
+      setRunAllReviewQuery((current) => ({ ...current, page: 1, page_size: newSize }));
+      return;
+    }
     handlePageSizeChange(newSize);
   };
 
@@ -370,6 +486,15 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
    * Passed to quotation result blocks as the column-sort callback.
    */
   const effHandleSort = (nodeId: string, columnName: string) => {
+    if (runAllSource) {
+      setRunAllReviewQuery((current) => ({
+        ...current,
+        page: 1,
+        sort_by: columnName,
+        descending: current.sort_by === columnName ? !current.descending : false,
+      }));
+      return;
+    }
     void handleSort(nodeId, columnName);
   };
 
@@ -390,13 +515,16 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
           }}
           actions={{
             // Routes the Run button through live quotation execution.
-            onRun: () => {
+            onPreview: () => {
               void handleRunOrUpdate();
             },
+            onRunAll: handleRunAll,
             // Stops the active quotation task from the shared layout action.
-            onStop: () => {
-              void stopTask();
-            },
+            onStop: activeAnalysis
+              ? () => {
+                  void stopTask();
+                }
+              : undefined,
             // Clears live quotation state and backend results from the shared layout action.
             onClear: async () => {
               if (!currentWorkspaceId) return;
@@ -404,25 +532,40 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
               await clearResults();
               setIsClearing(false);
             },
-            runDisabled: actionState.runDisabled || !canRunQuotation,
-            runDisabledReason: (() => {
+            previewDisabled:
+              analysisActionLifecycle.previewDisabled ||
+              actionState.runDisabled ||
+              !canRunQuotation,
+            previewDisabledReason: (() => {
               if (isLoadingQuotations) return undefined;
               if (actionState.runDisabledReason) return actionState.runDisabledReason;
               if (hasIncompleteSelections) return 'Select a column for each data block';
               if (!engineReady) return 'Configure the remote engine before running';
               return undefined;
             })(),
-            clearDisabled: actionState.clearDisabled || isClearing,
-            isRunning: isLoadingQuotations,
+            runAllDisabled: !canRunQuotation || analysisActionLifecycle.runAllDisabled,
+            clearDisabled:
+              analyses.length === 0 ||
+              analysisActionLifecycle.isPreviewing ||
+              analysisActionLifecycle.isRunningAll ||
+              Boolean(activeAnalysis) ||
+              isClearing,
+            isPreviewing: analysisActionLifecycle.isPreviewing,
+            isRunningAll: analysisActionLifecycle.isRunningAll,
             isStopping,
             isClearing,
             hasResult: hasLoaded,
-            runLabel: actionState.runLabel,
+            previewLabel: analysisActionLifecycle.parametersLocked
+              ? 'Preview'
+              : actionState.runLabel === 'Re-run'
+                ? 'Update Preview'
+                : 'Preview',
             clearHelp: {
               targetKey: 'analysis.quotation.clear-results',
               label: 'Clear results',
             },
           }}
+          parametersLocked={analysisActionLifecycle.parametersLocked}
         >
           <NodeInputsPanel
             resolvedNodes={nodeInputs.resolvedNodes}
@@ -456,10 +599,50 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
           />
         )}
 
-        {hasLoaded && displayedNodes.length > 0 && (
+        {quotationRunAll &&
+        (quotationRunAll.state === 'queued' || quotationRunAll.state === 'running') ? (
+          <AnalysisTaskBanner
+            analysisName="Quotation Run All"
+            status={quotationRunAll.state}
+            taskId={quotationRunAll.id}
+            message={quotationRunAll.progress.message ?? undefined}
+          />
+        ) : null}
+
+        {runAllReviewResult || showPreviewTable ? (
           <QuotationResultsPanel
-            displayedNodes={displayedNodes}
-            activeSelections={activeSelections}
+            title={runAllReviewResult ? 'Review' : 'Search Results'}
+            headerAction={
+              runAllSource ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setPublicationDialogOpen(true);
+                  }}
+                >
+                  Add to Workspace
+                </Button>
+              ) : null
+            }
+            displayedNodes={
+              runAllSource
+                ? [
+                    {
+                      id: runAllSource.node_id,
+                      name: runAllSource.node_name,
+                      color: runAllSource.color,
+                      document: runAllSource.document_column,
+                      shape: [null, null],
+                      tokenizerModel: null,
+                    },
+                  ]
+                : displayedNodes
+            }
+            activeSelections={
+              runAllSource
+                ? [{ nodeId: runAllSource.node_id, column: runAllSource.document_column }]
+                : activeSelections
+            }
             resultsByNode={resultsByNode}
             selectedMetadataColumns={selectedMetadataColumns}
             onSelectedMetadataColumnsChange={setSelectedMetadataColumns}
@@ -472,17 +655,27 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
             onContextLengthKeyDown={handleContextLengthKeyDown}
             hoverState={hoverState}
             onHoverChange={setHoverState}
-            nodeDetaching={nodeDetaching}
             onSort={effHandleSort}
             onPageChange={effHandlePageChange}
             onPageSizeChange={effHandlePageSizeChange}
             onRowClick={handleQuotationRowClick}
-            onOpenDetachDialog={(nodeId) => {
-              openDetachDialog(nodeId);
-            }}
+            isPageLoading={runAllSource ? runAllTableQuery.isFetching : isResultFetching}
           />
-        )}
+        ) : null}
       </div>
+      {publicationDialogOpen && runAllSource ? (
+        <ResultPublicationDialog
+          open
+          onOpenChange={setPublicationDialogOpen}
+          title="Add Quotation Results to Workspace"
+          nameSuffix="quotation"
+          sources={[runAllSource]}
+          isSubmitting={isPublishing}
+          onSubmit={(sources) => {
+            void handlePublishResult(sources);
+          }}
+        />
+      ) : null}
 
       <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
         <AlertDialogContent>
@@ -503,20 +696,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <DetachColumnsDialog
-        open={detachDialog.open}
-        onOpenChange={detachDialog.onOpenChange}
-        isDetaching={detachDialog.isDetaching}
-        title="Detach Quotation Results"
-        description="Select optional source columns to include alongside the quotation results. Required output columns stay checked automatically."
-        detachNodeOptions={detachDialog.detachNodeOptions}
-        selectedDetachColumns={detachDialog.selectedDetachColumns}
-        toggleDetachColumn={detachDialog.toggleDetachColumn}
-        selectAllDetachColumns={detachDialog.selectAllDetachColumns}
-        deselectAllDetachColumns={detachDialog.deselectAllDetachColumns}
-        handleDetachConfirm={detachDialog.handleDetachConfirm}
-      />
 
       <RowDetailPanel
         open={detailOpen}

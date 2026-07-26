@@ -18,7 +18,7 @@ describe('useSequentialAnalysisTaskFlow', () => {
       },
     });
     const setIsAnalyzing = vi.fn();
-    const onTaskIdAssigned = vi.fn();
+    const onSubmitted = vi.fn();
 
     const { result } = renderHook(() =>
       useSequentialAnalysisTaskFlow({
@@ -43,19 +43,18 @@ describe('useSequentialAnalysisTaskFlow', () => {
           setChartType: vi.fn(),
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
-          lastFetchedRef: { current: { taskId: null, state: null } },
           setNodeColumnSelections: vi.fn(),
           setTimeColumn: vi.fn(),
           lockCurrentSchema: vi.fn(),
           clearResults: vi.fn(async () => true),
-          onTaskIdAssigned,
+          onSubmitted,
         },
       }),
     );
 
     await act(async () => result.current.handleAnalyze());
 
-    expect(onTaskIdAssigned).toHaveBeenCalledWith('analysis-1');
+    expect(onSubmitted).toHaveBeenCalledOnce();
     expect(setIsAnalyzing).toHaveBeenCalledTimes(1);
     expect(setIsAnalyzing).toHaveBeenCalledWith(true);
   });

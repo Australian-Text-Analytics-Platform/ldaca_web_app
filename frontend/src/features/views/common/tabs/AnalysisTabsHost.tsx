@@ -20,8 +20,10 @@
  * ownership or persisted state.
  */
 import { useEffect, useRef, type ComponentType } from 'react';
+import type { Analysis } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useUserPreferences } from '@/features/preferences/useUserPreferences';
+import { useTabAnalysisForest } from '../hooks/useTabAnalysisForest';
 import { AnalysisTabbedPanel } from './AnalysisTabbedPanel';
 import type { AnalysisTabInput, AnalysisTabInputSets } from './tabStateOps';
 import { useWorkspaceTabs } from './useWorkspaceTabs';
@@ -33,12 +35,17 @@ import { useWorkspaceTabs } from './useWorkspaceTabs';
  */
 interface AnalysisFeatureHost {
   tabId: string;
-  taskId: string | null;
+  analyses: Analysis[];
+  latestPreview: Analysis | null;
+  latestRunAll: Analysis | null;
+  activeAnalysis: Analysis | null;
   inputSets: AnalysisTabInputSets;
   settings: Record<string, string>;
-  setTaskId: (taskId: string | null) => void;
+  correctionColumns: Record<string, string>;
   setInputSet: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   setSetting: (key: string, value: string) => void;
+  setCorrectionColumn: (nodeId: string, column: string) => void;
+  refreshAnalyses: () => void;
 }
 
 export interface AnalysisTabFeatureProps {
@@ -79,9 +86,9 @@ export function AnalysisTabsHost({
     renameTab,
     setActiveTab,
     reorderTabs,
-    setTabTask,
     setTabInputSet,
     setTabSetting,
+    setAnnotationCorrectionColumn,
   } = useWorkspaceTabs(currentWorkspaceId, tabGroup);
 
   // Requirement: entering an empty analysis view presents one ready tab, but
@@ -120,6 +127,10 @@ export function AnalysisTabsHost({
     : null;
   const effectiveActiveTabId = preferredTab?.tab_id ?? activeTabId;
   const activeTab = preferredTab ?? tabs.find((tab) => tab.tab_id === activeTabId) ?? null;
+  const analysisForest = useTabAnalysisForest(
+    activeTab ? (currentWorkspaceId ?? null) : null,
+    activeTab?.tab_id ?? '__inactive__',
+  );
 
   return (
     <AnalysisTabbedPanel
@@ -135,23 +146,30 @@ export function AnalysisTabsHost({
       multiTabEnabled={showTabChrome}
     >
       {activeTab ? (
-        // key forces a fresh mount per tab so each tab hydrates its own task
-        // (via tabTaskId) and keeps independent local panel state.
+        // Key forces a fresh mount per Tab so transient drafts are discarded
+        // when the user leaves it. Durable Analyses hydrate from Query state.
         <Feature
           key={activeTab.tab_id}
           host={{
             tabId: activeTab.tab_id,
-            taskId: activeTab.task_id ?? null,
+            analyses: analysisForest.analyses,
+            latestPreview: analysisForest.latestPreview,
+            latestRunAll: analysisForest.latestRunAll,
+            activeAnalysis: analysisForest.active,
             inputSets: activeTab.input_sets,
             settings: activeTab.settings,
-            setTaskId: (taskId) => {
-              setTabTask(activeTab.tab_id, taskId);
-            },
+            correctionColumns: activeTab.annotation_correction_columns,
             setInputSet: (selectorId, inputs) => {
               setTabInputSet(activeTab.tab_id, selectorId, inputs);
             },
             setSetting: (key, value) => {
               setTabSetting(activeTab.tab_id, key, value);
+            },
+            setCorrectionColumn: (nodeId, column) => {
+              setAnnotationCorrectionColumn(activeTab.tab_id, nodeId, column);
+            },
+            refreshAnalyses: () => {
+              analysisForest.refresh();
             },
           }}
         />

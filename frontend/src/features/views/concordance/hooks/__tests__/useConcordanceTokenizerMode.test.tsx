@@ -15,7 +15,7 @@ describe('useConcordanceTokenizerMode', () => {
       ({ liveModel }: { liveModel?: string }) =>
         useConcordanceTokenizerMode({
           effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-          nodeInfoCache: {
+          nodeInfoById: {
             'node-a': {
               id: 'node-a',
               name: 'Node A',
@@ -40,7 +40,7 @@ describe('useConcordanceTokenizerMode', () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-        nodeInfoCache: {
+        nodeInfoById: {
           'node-a': {
             id: 'node-a',
             name: 'Node A',
@@ -65,7 +65,7 @@ describe('useConcordanceTokenizerMode', () => {
       ({ hasModel }: { hasModel: boolean }) =>
         useConcordanceTokenizerMode({
           effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-          nodeInfoCache: {
+          nodeInfoById: {
             'node-a': {
               id: 'node-a',
               name: 'Node A',
@@ -89,7 +89,7 @@ describe('useConcordanceTokenizerMode', () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-        nodeInfoCache: { 'node-a': { id: 'node-a', name: 'Node A' } },
+        nodeInfoById: { 'node-a': { id: 'node-a', name: 'Node A' } },
       }),
     );
 
@@ -116,7 +116,7 @@ describe('useConcordanceTokenizerMode', () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-        nodeInfoCache: {
+        nodeInfoById: {
           'node-a': { id: 'node-a', name: 'Node A', tokenizer_model: 'current-model' },
         },
       }),
@@ -146,7 +146,7 @@ describe('useConcordanceTokenizerMode', () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
-        nodeInfoCache: {
+        nodeInfoById: {
           'node-a': { id: 'node-a', name: 'Node A', tokenizer_model: null },
         },
       }),

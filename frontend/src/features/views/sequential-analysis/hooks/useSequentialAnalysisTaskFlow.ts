@@ -30,14 +30,11 @@ interface SequentialAnalysisActions {
   setChartType: (value: ChartTypeOption) => void;
   setLocalTaskId: (value: string | null) => void;
   runningRef: { current: boolean };
-  lastFetchedRef: { current: { taskId: string | null; state: string | null } };
   setNodeColumnSelections: (selections: { nodeId: string; column: string }[]) => void;
   setTimeColumn: (value: string) => void;
   lockCurrentSchema: (schema?: Record<string, ColumnKind>) => void;
   clearResults: () => Promise<boolean>;
-  // Reports the run's assigned task id back to the owning tab. No-op when not
-  // tab-mounted.
-  onTaskIdAssigned: (taskId: string | null) => void;
+  onSubmitted: () => void;
 }
 
 interface Params {
@@ -75,12 +72,11 @@ export function useSequentialAnalysisTaskFlow({
     setChartType,
     setLocalTaskId,
     runningRef,
-    lastFetchedRef,
     setNodeColumnSelections,
     setTimeColumn,
     lockCurrentSchema,
     clearResults,
-    onTaskIdAssigned,
+    onSubmitted,
   },
 }: Params) {
   // Validates current parameters, submits the analysis request, and locks the selected node.
@@ -152,15 +148,16 @@ export function useSequentialAnalysisTaskFlow({
     };
 
     await runAnalysisTaskEnvelope<Analysis>({
-      lastFetchedRef,
       runningRef,
       setIsRunning: setIsAnalyzing,
       setLocalTaskId,
-      onTaskIdAssigned,
-      resetBeforeRun: () => undefined,
+      onSubmitted,
       submit: async () => {
         const { data } = await submitTabAnalysis({
-          body: { kind: 'sequential', ...request },
+          body: {
+            execution_scope: 'run_all',
+            request: { kind: 'sequential', ...request },
+          },
           path: { workspace_id: currentWorkspaceId, tab_id: tabId },
           throwOnError: true,
         });
