@@ -413,6 +413,19 @@
             "title": "Classes",
             "type": "array"
           },
+          "correction_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Column"
+          },
           "description_column": {
             "maxLength": 500,
             "minLength": 1,
@@ -598,6 +611,19 @@
             "minItems": 1,
             "title": "Classes",
             "type": "array"
+          },
+          "correction_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Column"
           },
           "description_column": {
             "maxLength": 500,
@@ -1272,19 +1298,6 @@
       "AnnotationRunAllAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
-          "correction_column": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Correction Column"
-          },
           "kind": {
             "const": "annotation_run_all",
             "default": "annotation_run_all",
@@ -1365,19 +1378,6 @@
             ],
             "title": "Api Key",
             "writeOnly": true
-          },
-          "correction_column": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Correction Column"
           },
           "kind": {
             "const": "annotation_run_all",

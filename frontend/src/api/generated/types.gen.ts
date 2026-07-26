@@ -200,6 +200,10 @@ export type AnnotationAnalysisRequest = {
      */
     classes: Array<AnnotationClass>;
     /**
+     * Correction Column
+     */
+    correction_column?: string | null;
+    /**
      * Description Column
      */
     description_column: string;
@@ -283,6 +287,10 @@ export type AnnotationAnalysisSubmission = {
      * Classes
      */
     classes: Array<AnnotationClass>;
+    /**
+     * Correction Column
+     */
+    correction_column?: string | null;
     /**
      * Description Column
      */
@@ -607,10 +615,6 @@ export type AnnotationResultQuery = {
  */
 export type AnnotationRunAllAnalysisRequest = {
     /**
-     * Correction Column
-     */
-    correction_column?: string | null;
-    /**
      * Kind
      */
     kind?: 'annotation_run_all';
@@ -651,10 +655,6 @@ export type AnnotationRunAllResult = {
  * AnnotationRunAllSubmission
  */
 export type AnnotationRunAllSubmission = {
-    /**
-     * Correction Column
-     */
-    correction_column?: string | null;
     /**
      * Kind
      */
@@ -4364,6 +4364,10 @@ export type AnnotationAnalysisSubmissionWritable = {
      */
     classes: Array<AnnotationClass>;
     /**
+     * Correction Column
+     */
+    correction_column?: string | null;
+    /**
      * Description Column
      */
     description_column: string;
@@ -4544,10 +4548,6 @@ export type AnnotationRunAllSubmissionWritable = {
      * Api Key
      */
     api_key?: string | null;
-    /**
-     * Correction Column
-     */
-    correction_column?: string | null;
     /**
      * Kind
      */
