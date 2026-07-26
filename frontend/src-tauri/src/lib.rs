@@ -13,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use backend_process::{BackendProcess, ReadyBackend};
 use runtime::BackendRuntime;
 use tauri::{Manager, State};
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 /// Tauri-owned application state for the local backend lifecycle.
 ///
@@ -115,16 +115,15 @@ fn take_backend_process(state: &BackendState) -> Option<BackendProcess> {
         })
 }
 
-fn show_startup_error(app: &tauri::AppHandle) {
+fn show_startup_error(app: &tauri::AppHandle, detail: &str) {
     let handle = app.clone();
-    let dialog = std::thread::spawn(move || {
-        handle
-            .dialog()
-            .message("The local Wordflow backend could not start. Please restart the application.")
-            .title("Wordflow startup failed")
-            .blocking_show();
-    });
-    let _ = dialog.join();
+    app.dialog()
+        .message(format!(
+            "The local Wordflow backend could not start.\n\n{detail}\n\nClose any other Wordflow backend using this Data Root, then reopen the application."
+        ))
+        .kind(MessageDialogKind::Error)
+        .title("Wordflow startup failed")
+        .show(move |_| handle.exit(1));
 }
 
 fn launch_backend(
@@ -353,8 +352,8 @@ pub fn run() {
                 Ok(layout) => layout,
                 Err(error) => {
                     eprintln!("Backend runtime resolution failed: {error}");
-                    show_startup_error(app.handle());
-                    return Err(error);
+                    show_startup_error(app.handle(), &error.to_string());
+                    return Ok(());
                 }
             };
             let config_path = data_root_config_path(app.handle())?;
@@ -362,8 +361,8 @@ pub fn run() {
                 Ok(root) => root,
                 Err(error) => {
                     eprintln!("Data-root configuration failed: {error}");
-                    show_startup_error(app.handle());
-                    return Err(error.into());
+                    show_startup_error(app.handle(), &error.to_string());
+                    return Ok(());
                 }
             };
             let startup_file = startup_file(app.handle())?;
@@ -386,8 +385,8 @@ pub fn run() {
                             message: error.to_string(),
                         };
                     }
-                    show_startup_error(app.handle());
-                    return Err(error.into());
+                    show_startup_error(app.handle(), &error.to_string());
+                    return Ok(());
                 }
             };
             let _ = std::fs::remove_file(&startup_file);

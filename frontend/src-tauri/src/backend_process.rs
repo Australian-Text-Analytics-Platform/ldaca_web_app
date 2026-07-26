@@ -209,6 +209,7 @@ fn runtime_command(runtime: &BackendRuntime) -> Command {
         .env("LDACA_PARENT_PID", std::process::id().to_string())
         .env("PYTHONHOME", &runtime.python_home)
         .env("PYTHONPATH", &runtime.site_packages)
+        .env("PYTHONDONTWRITEBYTECODE", "1")
         .env("PYTHONNOUSERSITE", "1")
         .env("SERVER_HOST", BACKEND_HOST)
         .env("TRUSTED_HOSTS", format!(r#"["{BACKEND_HOST}"]"#))
@@ -333,6 +334,23 @@ mod tests {
 #[cfg(test)]
 mod packaged_runtime_test {
     use super::*;
+
+    #[test]
+    fn launcher_disables_bytecode_writes_inside_the_packaged_runtime() {
+        let runtime = BackendRuntime {
+            root: "runtime".into(),
+            python: "runtime/python".into(),
+            python_home: "runtime/python-home".into(),
+            site_packages: "runtime/site-packages".into(),
+        };
+        let command = runtime_command(&runtime);
+        let value = command
+            .get_envs()
+            .find_map(|(key, value)| (key == "PYTHONDONTWRITEBYTECODE").then_some(value))
+            .flatten();
+
+        assert_eq!(value, Some(std::ffi::OsStr::new("1")));
+    }
 
     /// Exercise the production manifest resolver and command environment.
     ///
