@@ -73,6 +73,7 @@ describe('useAnnotationAiPreview', () => {
     const { result } = renderHook(() => useAnnotationAiPreview(args), { wrapper });
 
     await waitFor(() => expect(result.current.page.rows[0]?.review).toBe('greeting'));
+    expect(result.current.sourceColumns).toEqual(['text', 'label', 'review']);
     expect(queryWorkspaceSqlTable).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { workspace_id: 'workspace-1' },

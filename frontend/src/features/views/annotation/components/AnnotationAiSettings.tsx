@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { AnnotationProviderConfigurationView } from '@/features/provider-credentials/providerCredentialsStore';
@@ -19,6 +20,7 @@ interface AnnotationAiSettingsProps {
   model: string;
   disabled?: boolean;
   children?: ReactNode;
+  advanced?: ReactNode;
 }
 
 /** Named provider-configuration and model selection for Annotation requests. */
@@ -32,6 +34,7 @@ export function AnnotationAiSettings({
   model,
   disabled,
   children,
+  advanced,
 }: AnnotationAiSettingsProps) {
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -129,6 +132,18 @@ export function AnnotationAiSettings({
       />
 
       {children}
+
+      {advanced ? (
+        <Collapsible defaultOpen={false} className="rounded-lg border bg-background/60">
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-hidden [&[data-state=open]>svg]:rotate-180">
+            Advanced
+            <ChevronDown className="size-4 transition-transform duration-200" aria-hidden="true" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-4 border-t px-3 py-3">{advanced}</div>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
     </div>
   );
 }

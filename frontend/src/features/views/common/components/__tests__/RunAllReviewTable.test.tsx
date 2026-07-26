@@ -1,3 +1,4 @@
+import { useState, type ComponentProps } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,6 +10,22 @@ vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
   queryWorkspaceSqlTable,
 }));
+
+function ReviewTable(
+  props: Omit<
+    ComponentProps<typeof RunAllReviewTable>,
+    'comparisonColumns' | 'onComparisonColumnsChange'
+  >,
+) {
+  const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
+  return (
+    <RunAllReviewTable
+      {...props}
+      comparisonColumns={comparisonColumns}
+      onComparisonColumnsChange={setComparisonColumns}
+    />
+  );
+}
 
 describe('RunAllReviewTable', () => {
   it('renders Review rows in the shared analysis table frame', async () => {
@@ -26,19 +43,64 @@ describe('RunAllReviewTable', () => {
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <RunAllReviewTable
+        <ReviewTable
           workspaceId="workspace-1"
           nodeIds={['node-1']}
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation']}
           comparisonColumn="annotation"
+          rowCount={32}
         />
       </QueryClientProvider>,
     );
 
     expect(await screen.findByText('Example')).toBeInTheDocument();
     expect(screen.getByTestId('analysis-table-scroll-area')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rows per page')).toHaveTextContent('10');
+    expect(screen.getByRole('link', { name: '2' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '4' })).toBeInTheDocument();
+  });
+
+  it('loads the selected Review page through the shared numbered pagination', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockImplementation(({ body }) =>
+      Promise.resolve({
+        columns: ['text', 'annotation'],
+        schema: [
+          { name: 'text', kind: 'string' },
+          { name: 'annotation', kind: 'string' },
+        ],
+        rows: [{ text: `Page ${String(body.page)}`, annotation: 'label' }],
+        hasNext: body.page < 4,
+      }),
+    );
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ReviewTable
+          workspaceId="workspace-1"
+          nodeIds={['node-1']}
+          sql={'SELECT * FROM "node-1"'}
+          title="Annotation"
+          requiredColumns={['text', 'annotation']}
+          comparisonColumn="annotation"
+          rowCount={32}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Page 1')).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: '2' }));
+
+    expect(await screen.findByText('Page 2')).toBeInTheDocument();
+    expect(queryWorkspaceSqlTable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({ page: 2, page_size: 10 }),
+      }),
+    );
   });
 
   it('shows only required columns until metadata is selected', async () => {
@@ -58,13 +120,14 @@ describe('RunAllReviewTable', () => {
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <RunAllReviewTable
+        <ReviewTable
           workspaceId="workspace-1"
           nodeIds={['node-1']}
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation']}
           comparisonColumn="annotation"
+          rowCount={32}
         />
       </QueryClientProvider>,
     );
@@ -128,13 +191,14 @@ describe('RunAllReviewTable', () => {
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <RunAllReviewTable
+        <ReviewTable
           workspaceId="workspace-1"
           nodeIds={['node-1']}
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation']}
           comparisonColumn="annotation"
+          rowCount={32}
         />
       </QueryClientProvider>,
     );

@@ -35,7 +35,12 @@ export interface UseWorkspaceTabsResult {
   reorderTabs: (orderedTabIds: string[]) => void;
   setTabInputSet: (tabId: string, selectorId: string, inputs: AnalysisTabInput[]) => void;
   setTabSetting: (tabId: string, key: string, value: string) => void;
-  setAnnotationCorrectionColumn: (tabId: string, nodeId: string, column: string) => void;
+  setAnnotationCorrectionColumn: (
+    tabId: string,
+    nodeId: string,
+    column: string | null,
+  ) => Promise<void>;
+  clearAnnotationCorrectionColumns: (tabId: string) => Promise<void>;
 }
 
 interface LocalTabState {
@@ -77,7 +82,8 @@ function mergeServerTabs(
 }
 
 /**
- * Server tabs are authoritative for identity, names, and analysis ownership.
+ * Server tabs are authoritative for identity, names, analysis ownership, and
+ * Annotation correction-column drafts.
  * Active selection is device-local and keyed by Workspace and analysis kind.
  * Ordering, input selections, and settings stay in memory so drafts do not
  * become a second persistence format.
@@ -329,6 +335,19 @@ export function useWorkspaceTabs(
       });
       return data;
     },
+    onMutate: async ({ tabId, columns }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<Tab[]>(queryKey);
+      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
+        current?.map((tab) =>
+          tab.id === tabId ? { ...tab, annotation_correction_columns: columns } : tab,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+    },
     onSuccess: (tab) => {
       if (!tab) return;
       queryClient.setQueryData<Tab[]>(queryKey, (current) =>
@@ -336,18 +355,28 @@ export function useWorkspaceTabs(
       );
     },
   });
-  const { mutate: saveCorrectionColumn } = correctionColumnMutation;
+  const { mutateAsync: saveCorrectionColumn } = correctionColumnMutation;
 
   const setAnnotationCorrectionColumn = useCallback(
-    (tabId: string, nodeId: string, column: string) => {
+    async (tabId: string, nodeId: string, column: string | null) => {
       const tab = serverTabs.find((item) => item.id === tabId);
       if (!tab) return;
-      saveCorrectionColumn({
+      const columns = { ...tab.annotation_correction_columns };
+      if (column) columns[nodeId] = column;
+      else Reflect.deleteProperty(columns, nodeId);
+      await saveCorrectionColumn({
         tabId,
-        columns: { ...tab.annotation_correction_columns, [nodeId]: column },
+        columns,
       });
     },
     [saveCorrectionColumn, serverTabs],
+  );
+
+  const clearAnnotationCorrectionColumns = useCallback(
+    async (tabId: string) => {
+      await saveCorrectionColumn({ tabId, columns: {} });
+    },
+    [saveCorrectionColumn],
   );
 
   return {
@@ -362,5 +391,6 @@ export function useWorkspaceTabs(
     setTabInputSet,
     setTabSetting,
     setAnnotationCorrectionColumn,
+    clearAnnotationCorrectionColumns,
   };
 }

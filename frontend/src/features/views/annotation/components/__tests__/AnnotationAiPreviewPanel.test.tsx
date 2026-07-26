@@ -1,18 +1,16 @@
+import { useState } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AnnotationAiPreview } from '../../hooks/useAnnotationAiPreview';
 import { AnnotationAiPreviewPanel } from '../AnnotationAiPreviewPanel';
 
 const mocks = vi.hoisted(() => ({
-  polarsExpressionApply: vi.fn(),
   setCell: vi.fn(),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
-    polarsExpressionApply: mocks.polarsExpressionApply,
     setCell: mocks.setCell,
   }),
 }));
@@ -34,6 +32,7 @@ const preview = ({
 }) =>
   ({
     columns: { text: 'text', annotation: 'annotation' },
+    sourceColumns: ['text', 'annotation', 'review'],
     page: {
       rows: isLoading
         ? []
@@ -68,30 +67,25 @@ const preview = ({
     },
   }) as unknown as AnnotationAiPreview;
 
-const emptyCorrection = () => ({
+const correction = (column: string | null = null) => ({
   nodeId: 'node-1',
-  availableColumns: ['text', 'annotation', 'review'],
-  column: null,
+  column,
   classOptions: ['replacement', 'new value'],
-  onColumnChange: vi.fn(),
 });
 
-function PreviewHarness({
-  initialCorrectionColumn = null,
+function PreviewPanel({
+  preview: previewValue,
+  correction: correctionValue,
 }: {
-  initialCorrectionColumn?: string | null;
+  preview: AnnotationAiPreview;
+  correction: ReturnType<typeof correction>;
 }) {
-  const [correctionColumn, setCorrectionColumn] = useState(initialCorrectionColumn);
+  const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
   return (
     <AnnotationAiPreviewPanel
-      preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
-      correction={{
-        nodeId: 'node-1',
-        availableColumns: ['text', 'annotation', 'review'],
-        column: correctionColumn,
-        classOptions: ['replacement', 'new value'],
-        onColumnChange: setCorrectionColumn,
-      }}
+      preview={previewValue}
+      comparison={{ columns: comparisonColumns, onColumnsChange: setComparisonColumns }}
+      correction={correctionValue}
     />
   );
 }
@@ -102,17 +96,15 @@ describe('AnnotationAiPreviewPanel', () => {
     window.HTMLElement.prototype.setPointerCapture = vi.fn();
     window.HTMLElement.prototype.releasePointerCapture = vi.fn();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    mocks.polarsExpressionApply.mockReset();
     mocks.setCell.mockReset();
-    mocks.polarsExpressionApply.mockResolvedValue(undefined);
     mocks.setCell.mockResolvedValue(undefined);
   });
 
   it('uses the target column name and shows progress inside every pending cell', () => {
     render(
-      <AnnotationAiPreviewPanel
+      <PreviewPanel
         preview={preview({ labels: [null, null], isFetching: true })}
-        correction={emptyCorrection()}
+        correction={correction()}
       />,
     );
 
@@ -124,9 +116,9 @@ describe('AnnotationAiPreviewPanel', () => {
 
   it('keeps the table framework mounted while the requested page is processing', () => {
     render(
-      <AnnotationAiPreviewPanel
+      <PreviewPanel
         preview={preview({ labels: [], isFetching: true, isLoading: true })}
-        correction={emptyCorrection()}
+        correction={correction()}
       />,
     );
 
@@ -139,9 +131,9 @@ describe('AnnotationAiPreviewPanel', () => {
 
   it('uses the shared analysis table frame', () => {
     render(
-      <AnnotationAiPreviewPanel
+      <PreviewPanel
         preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
-        correction={emptyCorrection()}
+        correction={correction()}
       />,
     );
 
@@ -151,9 +143,9 @@ describe('AnnotationAiPreviewPanel', () => {
   it('compares preview predictions with selected columns on the current page only', async () => {
     const user = userEvent.setup();
     const { rerender } = render(
-      <AnnotationAiPreviewPanel
+      <PreviewPanel
         preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
-        correction={emptyCorrection()}
+        correction={correction()}
       />,
     );
 
@@ -171,14 +163,14 @@ describe('AnnotationAiPreviewPanel', () => {
     ).toBeInTheDocument();
 
     rerender(
-      <AnnotationAiPreviewPanel
+      <PreviewPanel
         preview={preview({
           labels: ['new value'],
           isFetching: false,
           pageIndex: 1,
           rows: [{ text: 'Third text', annotation: null, review: 'replacement' }],
         })}
-        correction={emptyCorrection()}
+        correction={correction()}
       />,
     );
 
@@ -196,9 +188,9 @@ describe('AnnotationAiPreviewPanel', () => {
 
   it('shows an original annotation changing to its preview prediction', () => {
     render(
-      <AnnotationAiPreviewPanel
+      <PreviewPanel
         preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
-        correction={emptyCorrection()}
+        correction={correction()}
       />,
     );
 
@@ -210,24 +202,31 @@ describe('AnnotationAiPreviewPanel', () => {
   });
 
   it('always shows a persisted correction even when it equals the preview prediction', () => {
-    render(<PreviewHarness initialCorrectionColumn="review" />);
+    render(
+      <PreviewPanel
+        preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
+        correction={correction('review')}
+      />,
+    );
 
     const firstRow = screen.getByRole('row', { name: /First text/ });
     expect(within(firstRow).getByRole('img', { name: 'corrected to' })).toBeInTheDocument();
     expect(within(firstRow).getAllByText('replacement')).toHaveLength(2);
+    expect(screen.getByRole('columnheader', { name: 'annotation (preview)' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Correction: review' })).toBeInTheDocument();
   });
 
   it('refreshes only the visible preview page from the lower-right action', async () => {
     const user = userEvent.setup();
     const refetch = vi.fn().mockResolvedValue(undefined);
     render(
-      <AnnotationAiPreviewPanel
+      <PreviewPanel
         preview={preview({
           labels: ['replacement', 'new value'],
           isFetching: false,
           refetch,
         })}
-        correction={emptyCorrection()}
+        correction={correction()}
       />,
     );
 
@@ -236,27 +235,15 @@ describe('AnnotationAiPreviewPanel', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('asks for a correction column, then writes a selected correction into that cell', async () => {
+  it('writes a selected correction from its separate correction column', async () => {
     const user = userEvent.setup();
-    render(<PreviewHarness />);
+    render(
+      <PreviewPanel
+        preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
+        correction={correction('review')}
+      />,
+    );
 
-    const prediction = screen.getByRole('button', { name: 'Correct prediction for row 1' });
-    expect(prediction).toHaveTextContent('replacement');
-    await user.click(prediction);
-
-    expect(
-      screen.getByRole('heading', { name: 'Select user correction column' }),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole('combobox', { name: 'User Correction Column' }));
-    expect(screen.queryByRole('option', { name: 'text' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'annotation' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('option', { name: 'review' }));
-
-    expect(
-      screen.getByRole('columnheader', {
-        name: 'annotation (preview) changes to Correction: review',
-      }),
-    ).toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: 'Correct prediction for row 1' }));
     await user.click(screen.getByRole('option', { name: 'new value' }));
 
@@ -266,51 +253,6 @@ describe('AnnotationAiPreviewPanel', () => {
     const firstRow = screen.getByRole('row', { name: /First text/ });
     expect(within(firstRow).getByText('replacement')).toBeInTheDocument();
     expect(within(firstRow).getByText('new value')).toBeInTheDocument();
-  });
-
-  it('creates and auto-selects a new correction column from the setup dialog', async () => {
-    const user = userEvent.setup();
-    render(<PreviewHarness />);
-
-    await user.click(screen.getByRole('button', { name: 'Correct prediction for row 1' }));
-    await user.click(screen.getByRole('combobox', { name: 'User Correction Column' }));
-    await user.click(screen.getByRole('option', { name: 'Add new column' }));
-
-    expect(screen.getByRole('heading', { name: 'Create correction column' })).toBeInTheDocument();
-    const columnName = screen.getByRole('textbox', { name: 'Correction column name' });
-    expect(columnName).toHaveAttribute('placeholder', 'annotation.correction');
-    await user.click(columnName);
-    await user.tab();
-    expect(columnName).toHaveValue('annotation.correction');
-    expect(columnName).toHaveFocus();
-    await user.click(screen.getByRole('button', { name: 'Create' }));
-
-    await waitFor(() => {
-      expect(mocks.polarsExpressionApply).toHaveBeenCalledWith(
-        'node-1',
-        {
-          context: 'with_columns',
-          expressions: [
-            {
-              expression: {
-                op: 'cast',
-                operand: { op: 'literal', value: null },
-                dtype: 'string',
-                strict: false,
-              },
-              alias: 'annotation.correction',
-            },
-          ],
-          group_by: [],
-          name: null,
-        },
-        'update',
-      );
-    });
-    expect(
-      screen.getByRole('columnheader', {
-        name: 'annotation (preview) changes to Correction: annotation.correction',
-      }),
-    ).toBeInTheDocument();
+    expect(within(firstRow).getByRole('img', { name: 'corrected to' })).toBeInTheDocument();
   });
 });

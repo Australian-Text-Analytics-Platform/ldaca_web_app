@@ -30,7 +30,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 );
 
-const serverTab = (id = 'tab-1', kind: 'concordance' | 'quotation' = 'concordance') => ({
+const serverTab = (
+  id = 'tab-1',
+  kind: 'annotation' | 'concordance' | 'quotation' = 'concordance',
+) => ({
   id,
   name: id,
   kind,
@@ -38,6 +41,9 @@ const serverTab = (id = 'tab-1', kind: 'concordance' | 'quotation' = 'concordanc
   created_at: '2026-01-01T00:00:00Z',
   modified_at: '2026-01-01T00:00:00Z',
   revision: 1,
+  input_sets: {},
+  settings: {},
+  annotation_correction_columns: {},
 });
 
 describe('useWorkspaceTabs', () => {
@@ -217,6 +223,59 @@ describe('useWorkspaceTabs', () => {
     await waitFor(() => expect(view.result.current.tabs).toHaveLength(1));
     expect(view.result.current.tabs[0]?.input_sets.source).toEqual([]);
     expect(view.result.current.tabs[0]?.settings).toEqual({ mode: 'manual' });
+  });
+
+  it('persists and clears Annotation correction-column drafts on the Tab resource', async () => {
+    mocks.listTabs.mockResolvedValue({ data: [serverTab('tab-1', 'annotation')] });
+    mocks.updateTab.mockImplementation(({ body }) =>
+      Promise.resolve({
+        data: {
+          ...serverTab('tab-1', 'annotation'),
+          annotation_correction_columns: body.annotation_correction_columns ?? {},
+        },
+      }),
+    );
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'annotation'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+
+    act(() => {
+      result.current.setAnnotationCorrectionColumn('tab-1', 'node-1', 'review');
+    });
+    await waitFor(() => {
+      expect(mocks.updateTab).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: { annotation_correction_columns: { 'node-1': 'review' } },
+        }),
+      );
+    });
+
+    act(() => {
+      result.current.clearAnnotationCorrectionColumns('tab-1');
+    });
+    await waitFor(() => {
+      expect(mocks.updateTab).toHaveBeenLastCalledWith(
+        expect.objectContaining({ body: { annotation_correction_columns: {} } }),
+      );
+    });
+  });
+
+  it('rolls back an Annotation correction-column draft when persistence fails', async () => {
+    mocks.listTabs.mockResolvedValue({ data: [serverTab('tab-1', 'annotation')] });
+    mocks.updateTab.mockRejectedValue(new Error('save failed'));
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'annotation'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+
+    await act(async () => {
+      await expect(
+        result.current.setAnnotationCorrectionColumn('tab-1', 'node-1', 'review'),
+      ).rejects.toThrow('save failed');
+    });
+
+    expect(result.current.tabs[0]?.annotation_correction_columns).toEqual({});
   });
 
   it('shares one all-tabs request between analysis kinds', async () => {

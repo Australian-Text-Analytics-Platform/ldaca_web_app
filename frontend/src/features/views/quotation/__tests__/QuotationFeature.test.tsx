@@ -218,6 +218,7 @@ describe('QuotationFeature Preview lifecycle', () => {
       setInputSet: vi.fn(),
       setSetting: vi.fn(),
       setCorrectionColumn: vi.fn(),
+      clearCorrectionColumns: vi.fn(),
       refreshAnalyses: vi.fn(),
     };
     const persistedResult = {
@@ -279,6 +280,7 @@ describe('QuotationFeature Preview lifecycle', () => {
           setInputSet: vi.fn(),
           setSetting: vi.fn(),
           setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
           refreshAnalyses: vi.fn(),
         }}
       />,
@@ -328,6 +330,7 @@ describe('QuotationFeature Preview lifecycle', () => {
           setInputSet: vi.fn(),
           setSetting: vi.fn(),
           setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
           refreshAnalyses: vi.fn(),
         }}
       />,

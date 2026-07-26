@@ -104,21 +104,18 @@ export const submitAnnotationRunAllWithProviderCredential = ({
   tabId,
   providerConfigurationId,
   source,
-  correctionColumn,
   supersedesAnalysisIds = [],
 }: {
   workspaceId: string;
   tabId: string;
   providerConfigurationId: string;
   source: AnnotationAnalysisRequest;
-  correctionColumn?: string | null;
   supersedesAnalysisIds?: string[];
 }) => {
   const apiKey = annotationCredential(providerConfigurationId);
   const body: AnnotationRunAllSubmissionWritable & { kind: 'annotation_run_all' } = {
     kind: 'annotation_run_all',
     source,
-    correction_column: correctionColumn ?? null,
     ...(apiKey ? { api_key: apiKey } : {}),
   };
   return submitTabAnalysis({

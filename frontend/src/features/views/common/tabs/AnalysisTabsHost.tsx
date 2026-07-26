@@ -44,7 +44,8 @@ interface AnalysisFeatureHost {
   correctionColumns: Record<string, string>;
   setInputSet: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   setSetting: (key: string, value: string) => void;
-  setCorrectionColumn: (nodeId: string, column: string) => void;
+  setCorrectionColumn: (nodeId: string, column: string | null) => Promise<void>;
+  clearCorrectionColumns: () => Promise<void>;
   refreshAnalyses: () => void;
 }
 
@@ -89,6 +90,7 @@ export function AnalysisTabsHost({
     setTabInputSet,
     setTabSetting,
     setAnnotationCorrectionColumn,
+    clearAnnotationCorrectionColumns,
   } = useWorkspaceTabs(currentWorkspaceId, tabGroup);
 
   // Requirement: entering an empty analysis view presents one ready tab, but
@@ -166,7 +168,10 @@ export function AnalysisTabsHost({
               setTabSetting(activeTab.tab_id, key, value);
             },
             setCorrectionColumn: (nodeId, column) => {
-              setAnnotationCorrectionColumn(activeTab.tab_id, nodeId, column);
+              return setAnnotationCorrectionColumn(activeTab.tab_id, nodeId, column);
+            },
+            clearCorrectionColumns: () => {
+              return clearAnnotationCorrectionColumns(activeTab.tab_id);
             },
             refreshAnalyses: () => {
               analysisForest.refresh();

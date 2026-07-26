@@ -75,6 +75,7 @@ function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspac
     setTabInputSet: vi.fn(),
     setTabSetting: vi.fn(),
     setAnnotationCorrectionColumn: vi.fn(),
+    clearAnnotationCorrectionColumns: vi.fn(),
     ...overrides,
   };
 }

@@ -9,12 +9,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  calculateCohensKappa,
+  type ConfusionCount,
+} from '@/features/views/common/columnComparisonModel';
 
-export interface ConfusionCount {
-  reference: string;
-  comparison: string;
-  count: number;
-}
+export type { ConfusionCount } from '@/features/views/common/columnComparisonModel';
 
 const displayLabel = (value: string): string => (value === '' ? '(blank)' : value);
 
@@ -71,6 +71,7 @@ export function ConfusionMatrix({
     rows.map((row) => [JSON.stringify([row.reference, row.comparison]), row.count]),
   );
   const maximum = rows.reduce((current, row) => Math.max(current, row.count), 0);
+  const cohensKappa = calculateCohensKappa(rows);
 
   return (
     <section className="rounded-lg border bg-card p-4">
@@ -86,70 +87,86 @@ export function ConfusionMatrix({
           <p className="mt-2 text-xs text-muted-foreground">
             Rows: {referenceColumn} · Columns: {comparisonColumn}
           </p>
-          <div className="mt-3 overflow-x-auto pb-1">
-            <table className="border-separate border-spacing-1 text-xs">
-              <thead>
-                <tr>
-                  <th className="max-w-36 pr-2 text-right align-bottom font-normal text-muted-foreground">
-                    <span className="sr-only">
-                      {referenceColumn} rows and {comparisonColumn} columns
-                    </span>
-                  </th>
-                  {labels.map((label) => (
-                    <th
-                      key={label}
-                      className="max-w-24 truncate px-1 pb-1 text-center font-normal text-muted-foreground"
-                      title={displayLabel(label)}
-                    >
-                      {displayLabel(label)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {labels.map((referenceLabel) => (
-                  <tr key={referenceLabel}>
-                    <th
-                      className="max-w-36 truncate pr-2 text-right font-normal text-muted-foreground"
-                      title={displayLabel(referenceLabel)}
-                    >
-                      {displayLabel(referenceLabel)}
-                    </th>
-                    {labels.map((comparisonLabel) => {
-                      const count =
-                        countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ?? 0;
-                      const description = `${referenceColumn} ${displayLabel(referenceLabel)}, ${comparisonColumn} ${displayLabel(comparisonLabel)}: ${String(count)} rows`;
-                      return (
-                        <td key={comparisonLabel} className="p-0.5">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span
-                                role="img"
-                                tabIndex={0}
-                                aria-label={description}
-                                className={`block size-5 cursor-default rounded-sm outline-hidden ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${cellIntensityClass(count, maximum)}`}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent side="top">{description}</TooltipContent>
-                          </Tooltip>
-                        </td>
-                      );
-                    })}
-                  </tr>
+          <div className="mt-3 flex flex-wrap items-start gap-6">
+            <div aria-label="Confusion matrix" className="w-fit max-w-full">
+              <div className="overflow-x-auto pb-1">
+                <table className="border-separate border-spacing-1 text-xs">
+                  <thead>
+                    <tr>
+                      <th className="max-w-36 pr-2 text-right align-bottom font-normal text-muted-foreground">
+                        <span className="sr-only">
+                          {referenceColumn} rows and {comparisonColumn} columns
+                        </span>
+                      </th>
+                      {labels.map((label) => (
+                        <th
+                          key={label}
+                          className="max-w-24 truncate px-1 pb-1 text-center font-normal text-muted-foreground"
+                          title={displayLabel(label)}
+                        >
+                          {displayLabel(label)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labels.map((referenceLabel) => (
+                      <tr key={referenceLabel}>
+                        <th
+                          className="max-w-36 truncate pr-2 text-right font-normal text-muted-foreground"
+                          title={displayLabel(referenceLabel)}
+                        >
+                          {displayLabel(referenceLabel)}
+                        </th>
+                        {labels.map((comparisonLabel) => {
+                          const count =
+                            countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ?? 0;
+                          const description = `${referenceColumn} ${displayLabel(referenceLabel)}, ${comparisonColumn} ${displayLabel(comparisonLabel)}: ${String(count)} rows`;
+                          return (
+                            <td key={comparisonLabel} className="p-0.5">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    role="img"
+                                    tabIndex={0}
+                                    aria-label={description}
+                                    className={`block size-5 cursor-default rounded-sm outline-hidden ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${cellIntensityClass(count, maximum)}`}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top">{description}</TooltipContent>
+                              </Tooltip>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div
+                aria-label="Confusion matrix count scale"
+                className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"
+              >
+                <span>Lower count</span>
+                {[0, 1, 2, 3, 4].map((level) => (
+                  <span
+                    key={level}
+                    aria-hidden="true"
+                    className={`size-3 rounded-sm ${cellIntensityClass(level, 4)}`}
+                  />
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-2 flex items-center justify-end gap-1 text-xs text-muted-foreground">
-            <span>Lower count</span>
-            {[0, 1, 2, 3, 4].map((level) => (
-              <span
-                key={level}
-                aria-hidden="true"
-                className={`size-3 rounded-sm ${cellIntensityClass(level, 4)}`}
-              />
-            ))}
-            <span>Higher count</span>
+                <span>Higher count</span>
+              </div>
+            </div>
+            <div aria-label="Intercoder reliability" className="space-y-2">
+              <h5 className="text-sm font-medium">Intercoder reliability</h5>
+              <dl className="min-w-36 rounded-md border bg-muted/30 px-4 py-3">
+                <dt className="text-xs text-muted-foreground">Cohen’s Kappa</dt>
+                <dd className="mt-1 text-2xl font-semibold tabular-nums">
+                  {cohensKappa == null ? 'Not available' : cohensKappa.toFixed(3)}
+                </dd>
+              </dl>
+            </div>
           </div>
         </TooltipProvider>
       )}

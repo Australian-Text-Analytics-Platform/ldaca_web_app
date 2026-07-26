@@ -49,23 +49,11 @@ beforeEach(() => {
 });
 
 describe('AnnotationInferenceSettings', () => {
-  it('is collapsed by default so the temperature control is hidden', () => {
-    render(<Harness />);
-    // The section header is always visible, but the body stays collapsed until
-    // the user opens it (Radix unmounts closed content in jsdom).
-    expect(screen.getByText('Model Configuration')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Temperature')).not.toBeInTheDocument();
-  });
-
-  it('reveals temperature and the reasoning toggle when expanded', async () => {
-    const user = userEvent.setup();
+  it('renders temperature and reasoning controls for the shared Advanced section', () => {
     render(<Harness initialTemperature={0.5} />);
-
-    await user.click(screen.getByText('Model Configuration'));
 
     expect(screen.getByLabelText('Temperature')).toHaveValue(0.5);
     expect(screen.getByRole('switch', { name: 'Toggle reasoning' })).not.toBeChecked();
-    // Thinking effort stays hidden while reasoning is off.
     expect(screen.queryByLabelText('Thinking effort')).not.toBeInTheDocument();
   });
 
@@ -73,7 +61,6 @@ describe('AnnotationInferenceSettings', () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    await user.click(screen.getByText('Model Configuration'));
     expect(screen.queryByLabelText('Thinking effort')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('switch', { name: 'Toggle reasoning' }));
@@ -88,7 +75,6 @@ describe('AnnotationInferenceSettings', () => {
     const onTemperatureCommit = vi.fn();
     render(<Harness onTemperatureCommit={onTemperatureCommit} />);
 
-    await user.click(screen.getByText('Model Configuration'));
     const input = screen.getByLabelText('Temperature');
     await user.clear(input);
     await user.type(input, '9');
@@ -102,22 +88,15 @@ describe('AnnotationInferenceSettings', () => {
     const user = userEvent.setup();
     render(<Harness initialReasoning />);
 
-    await user.click(screen.getByText('Model Configuration'));
     await user.click(screen.getByLabelText('Thinking effort'));
     await user.click(await screen.findByRole('option', { name: 'high' }));
 
     expect(screen.getByLabelText('Thinking effort')).toHaveTextContent('high');
   });
 
-  it('stays expandable when locked but renders every control read-only', async () => {
-    const user = userEvent.setup();
+  it('renders every control read-only when the Advanced section is locked', () => {
     render(<Harness initialTemperature={0.5} initialReasoning disabled />);
 
-    // Locking the parameter panel no longer blocks the disclosure — the user can
-    // still open it to inspect the settings a run is using…
-    await user.click(screen.getByText('Model Configuration'));
-
-    // …but every inner control is disabled so the locked values can't be edited.
     expect(screen.getByLabelText('Temperature')).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'Toggle reasoning' })).toBeDisabled();
     expect(screen.getByLabelText('Thinking effort')).toBeDisabled();

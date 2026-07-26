@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   setInputSet: vi.fn(),
   setSetting: vi.fn(),
   invalidateQueries: vi.fn(),
+  clearResults: vi.fn(),
+  sourceColumnNames: ['text'] as string[],
 }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
@@ -39,7 +41,7 @@ vi.mock('@/features/views/common/nodeInputs', async (importOriginal) => ({
               id: 'source-1',
               name: 'Source',
               column: 'text',
-              columnOptions: [{ name: 'text' }],
+              columnOptions: mocks.sourceColumnNames.map((name) => ({ name })),
             },
           ]
         : [],
@@ -97,10 +99,28 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
 }));
 
 vi.mock('@/features/views/common/components/AnalysisCardLayout', () => ({
-  AnalysisCardLayout: ({ children, footer }: { children: ReactNode; footer?: ReactNode }) => (
+  AnalysisCardLayout: ({
+    children,
+    footer,
+    actions,
+  }: {
+    children: ReactNode;
+    footer?: ReactNode;
+    actions?: { onClear: () => void | Promise<void> };
+  }) => (
     <div>
       {children}
       {footer}
+      {actions ? (
+        <button
+          type="button"
+          onClick={() => {
+            void actions.onClear();
+          }}
+        >
+          Clear Results
+        </button>
+      ) : null}
     </div>
   ),
 }));
@@ -132,7 +152,7 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
     runningRef: { current: false },
     taskStatus: { tasks: [] },
     banner: null,
-    clearResults: vi.fn(),
+    clearResults: mocks.clearResults,
     stopTask: vi.fn(),
   }),
 }));
@@ -154,8 +174,11 @@ describe('AnnotationFeature', () => {
     mocks.setInputSet.mockReset();
     mocks.setSetting.mockReset();
     mocks.invalidateQueries.mockReset();
+    mocks.clearResults.mockReset();
+    mocks.sourceColumnNames = ['text'];
     mocks.createSqlDataBlock.mockResolvedValue({ id: 'class-node-1' });
     mocks.polarsExpressionApply.mockResolvedValue(undefined);
+    mocks.clearResults.mockResolvedValue(undefined);
   });
 
   it('creates and selects an empty class Data Block from the explicit action', async () => {
@@ -175,6 +198,7 @@ describe('AnnotationFeature', () => {
           setInputSet: mocks.setInputSet,
           setSetting: vi.fn(),
           setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
           refreshAnalyses: vi.fn(),
         }}
       />,
@@ -220,6 +244,7 @@ describe('AnnotationFeature', () => {
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
           setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
           refreshAnalyses: vi.fn(),
         }}
       />,
@@ -288,6 +313,7 @@ describe('AnnotationFeature', () => {
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
           setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
           refreshAnalyses: vi.fn(),
         }}
       />,
@@ -302,5 +328,102 @@ describe('AnnotationFeature', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(mocks.polarsExpressionApply).not.toHaveBeenCalled();
     expect(mocks.setSetting).not.toHaveBeenCalled();
+  });
+
+  it('owns correction-column creation and example reuse in the parameter panel', async () => {
+    const user = userEvent.setup();
+    const setCorrectionColumn = vi.fn();
+    mocks.sourceColumnNames = ['text', 'annotation', 'review'];
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: {
+            annotationMode: 'ai',
+            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
+          },
+          correctionColumns: { 'source-1': 'review' },
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn,
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('combobox', { name: 'User Correction Column' })).toHaveTextContent(
+      'review',
+    );
+    expect(screen.queryByText('Example Node')).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Use the correction column as the example' }),
+    );
+    expect(mocks.setInputSet).toHaveBeenCalledWith('exampleNodes', [
+      { node_id: 'source-1', column: 'text' },
+    ]);
+
+    await user.click(screen.getByRole('combobox', { name: 'User Correction Column' }));
+    await user.click(screen.getByRole('option', { name: 'Add new column' }));
+    const columnName = screen.getByRole('textbox', { name: 'Correction column name' });
+    expect(columnName).toHaveAttribute('placeholder', 'annotation.correction');
+    await user.click(columnName);
+    await user.tab();
+    expect(columnName).toHaveValue('annotation.correction');
+    expect(columnName).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(setCorrectionColumn).toHaveBeenCalledWith('source-1', 'annotation.correction');
+    });
+    expect(mocks.polarsExpressionApply).toHaveBeenCalledWith(
+      'source-1',
+      expect.objectContaining({
+        expressions: [expect.objectContaining({ alias: 'annotation.correction' })],
+      }),
+      'update',
+    );
+  });
+
+  it('clears the persisted correction-column draft with the task results', async () => {
+    const user = userEvent.setup();
+    const clearCorrectionColumns = vi.fn();
+    mocks.sourceColumnNames = ['text', 'annotation', 'review'];
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: {
+            annotationMode: 'ai',
+            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
+          },
+          correctionColumns: { 'source-1': 'review' },
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns,
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Clear Results' }));
+
+    await waitFor(() => {
+      expect(mocks.clearResults).toHaveBeenCalledTimes(1);
+      expect(clearCorrectionColumns).toHaveBeenCalledTimes(1);
+    });
   });
 });

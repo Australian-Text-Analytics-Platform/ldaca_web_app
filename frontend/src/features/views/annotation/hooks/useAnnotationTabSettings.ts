@@ -35,6 +35,27 @@ const parseStringMapSetting = (
   }
 };
 
+const parseStringArrayMapSetting = (
+  value: string | undefined,
+  warning: string,
+): Record<string, string[]> => {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const values: Record<string, string[]> = {};
+    for (const [key, columns] of Object.entries(parsed)) {
+      if (Array.isArray(columns) && columns.every((column) => typeof column === 'string')) {
+        values[key] = Array.from(new Set(columns));
+      }
+    }
+    return values;
+  } catch (error) {
+    console.warn(warning, error);
+    return {};
+  }
+};
+
 /**
  * Owns Annotation's tab-persisted mode and AI settings.
  *
@@ -155,6 +176,25 @@ export function useAnnotationTabSettings({
     onTabSettingChange('annotationTargets', JSON.stringify(next));
   };
 
+  const [annotationComparisonColumns, setAnnotationComparisonColumnsState] = useState<
+    Record<string, string[]>
+  >(() =>
+    parseStringArrayMapSetting(
+      tabSettings.annotationComparisonColumns,
+      '[annotation] Ignoring malformed comparison-column setting:',
+    ),
+  );
+  const annotationComparisonColumnsRef = useRef(annotationComparisonColumns);
+  const setAnnotationComparisonColumns = (nodeId: string, columns: string[]) => {
+    const next = { ...annotationComparisonColumnsRef.current };
+    const uniqueColumns = Array.from(new Set(columns));
+    if (uniqueColumns.length > 0) next[nodeId] = uniqueColumns;
+    else Reflect.deleteProperty(next, nodeId);
+    annotationComparisonColumnsRef.current = next;
+    setAnnotationComparisonColumnsState(next);
+    onTabSettingChange('annotationComparisonColumns', JSON.stringify(next));
+  };
+
   return {
     annotationMode,
     setAnnotationMode,
@@ -177,5 +217,7 @@ export function useAnnotationTabSettings({
     setAiReasoningEffort,
     annotationTargets,
     setAnnotationTarget,
+    annotationComparisonColumns,
+    setAnnotationComparisonColumns,
   };
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
+import type { ColumnDef, PaginationState } from '@tanstack/react-table';
 import { queryWorkspaceSqlTable, sqlIdentifier } from '@/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,9 +18,11 @@ import {
   type ConfusionCount,
 } from '@/features/views/common/components/ColumnComparison';
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
+import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
+import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { queryKeys } from '@/lib/queryKeys';
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 10;
 const COMPARISON_PAGE_SIZE = 500;
 const REFERENCE_ALIAS = '__reference';
 const COMPARISON_ALIAS = '__comparison';
@@ -55,6 +58,9 @@ interface RunAllReviewTableProps {
   title: string;
   requiredColumns: string[];
   comparisonColumn: string;
+  comparisonColumns: string[];
+  onComparisonColumnsChange: (columns: string[]) => void;
+  rowCount: number;
 }
 
 /** Renders a current Data Block projection for the durable Review phase. */
@@ -65,18 +71,35 @@ export function RunAllReviewTable({
   title,
   requiredColumns,
   comparisonColumn,
+  comparisonColumns,
+  onComparisonColumnsChange,
+  rowCount,
 }: RunAllReviewTableProps) {
-  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   const [compareDialogOpen, setCompareDialogOpen] = useState(false);
   const [draftComparisonColumns, setDraftComparisonColumns] = useState<string[]>([]);
-  const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
   const query = useQuery({
-    queryKey: queryKeys.workspaceSql(workspaceId, nodeIds, sql, page, PAGE_SIZE),
+    queryKey: queryKeys.workspaceSql(
+      workspaceId,
+      nodeIds,
+      sql,
+      pagination.pageIndex + 1,
+      pagination.pageSize,
+    ),
     queryFn: () =>
       queryWorkspaceSqlTable({
         path: { workspace_id: workspaceId },
-        body: { mode: 'query', node_ids: nodeIds, sql, page, page_size: PAGE_SIZE },
+        body: {
+          mode: 'query',
+          node_ids: nodeIds,
+          sql,
+          page: pagination.pageIndex + 1,
+          page_size: pagination.pageSize,
+        },
       }),
   });
   const data = query.data;
@@ -149,6 +172,18 @@ export function RunAllReviewTable({
         ]),
       )
     : [];
+  const tableColumns: ColumnDef<Record<string, unknown>>[] = visibleColumns.map((column) => ({
+    id: column,
+    accessorFn: (row) => row[column],
+  }));
+  const table = useServerTable({
+    data: data?.rows ?? [],
+    columns: tableColumns,
+    rowCount,
+    pageIndex: pagination.pageIndex,
+    pageSize: pagination.pageSize,
+    onPaginationChange: setPagination,
+  });
 
   return (
     <section aria-label={`${title} Review`} className="rounded-lg border bg-background/60 p-4">
@@ -184,31 +219,13 @@ export function RunAllReviewTable({
         <AnalysisTableFrame
           maxHeightClass="max-h-96"
           belowTable={
-            <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page === 1 || query.isFetching}
-                onClick={() => {
-                  setPage((current) => Math.max(1, current - 1));
-                }}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">Page {page}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!data.hasNext || query.isFetching}
-                onClick={() => {
-                  setPage((current) => current + 1);
-                }}
-              >
-                Next
-              </Button>
-            </div>
+            <ServerPaginationFooter
+              table={table}
+              pageIndex={pagination.pageIndex}
+              pageSize={pagination.pageSize}
+              rowCount={rowCount}
+              loading={query.isFetching}
+            />
           }
         >
           <Table disableContainer>
@@ -221,7 +238,7 @@ export function RunAllReviewTable({
             </TableHeader>
             <TableBody>
               {data.rows.map((row, rowIndex) => (
-                <TableRow key={`${String(page)}:${String(rowIndex)}`}>
+                <TableRow key={`${String(pagination.pageIndex)}:${String(rowIndex)}`}>
                   {visibleColumns.map((column) => (
                     <TableCell key={column} className="max-w-96 whitespace-pre-wrap">
                       {displayCell(row[column])}
@@ -259,7 +276,7 @@ export function RunAllReviewTable({
         onOpenChange={setCompareDialogOpen}
         onSelectedColumnsChange={setDraftComparisonColumns}
         onCompare={() => {
-          setComparisonColumns(draftComparisonColumns);
+          onComparisonColumnsChange(draftComparisonColumns);
           setCompareDialogOpen(false);
         }}
       />

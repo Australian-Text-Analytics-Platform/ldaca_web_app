@@ -401,6 +401,7 @@ const renderConcordanceFeature = (taskId: string | null = null) => {
           setInputSet,
           setSetting: vi.fn(),
           setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
           refreshAnalyses: vi.fn(),
         }}
       />,

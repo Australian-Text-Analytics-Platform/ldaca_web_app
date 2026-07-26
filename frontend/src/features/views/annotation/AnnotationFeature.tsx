@@ -80,6 +80,8 @@ const EXAMPLE_NODE_CONSTRAINTS: NodeInputConstraints = {
   maxNodes: 1,
 };
 const CREATE_ANNOTATION_COLUMN_ACTION = '__create_annotation_column__';
+const CREATE_CORRECTION_COLUMN_ACTION = '__create_correction_column__';
+const NO_CORRECTION_COLUMN_ACTION = '__no_correction_column__';
 const DEFAULT_ANNOTATION_COLUMN_NAME = 'annotation';
 interface ColumnPickerProps {
   label: string;
@@ -168,8 +170,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   } | null>(null);
   const [newAnnotationColumnName, setNewAnnotationColumnName] = useState('');
   const [annotationColumnError, setAnnotationColumnError] = useState<string | null>(null);
+  const [isCorrectionColumnDialogOpen, setIsCorrectionColumnDialogOpen] = useState(false);
+  const [newCorrectionColumnName, setNewCorrectionColumnName] = useState('');
+  const [correctionColumnError, setCorrectionColumnError] = useState<string | null>(null);
   const [hasRun, setHasRun] = useState(false);
   const [isCreatingAnnotationColumn, setIsCreatingAnnotationColumn] = useState(false);
+  const [isCreatingCorrectionColumn, setIsCreatingCorrectionColumn] = useState(false);
   const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
   const [isCreatingClassTable, setIsCreatingClassTable] = useState(false);
   // Tab-persisted AI settings live in their own hook so this feature body can
@@ -197,6 +203,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAiReasoningEffort,
     annotationTargets,
     setAnnotationTarget,
+    annotationComparisonColumns,
+    setAnnotationComparisonColumns,
   } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
   const providerCredentials = useProviderCredentials();
   const selectedAiProvider =
@@ -236,18 +244,13 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
 
   // Manual results lock their source selectors while the editable table is open.
   // Column creation also locks them until the in-place schema edit settles.
-  const isLocked = hasRun || isCreatingAnnotationColumn;
+  const isLocked = hasRun || isCreatingAnnotationColumn || isCreatingCorrectionColumn;
 
-  // Annotation has multiple valid selector targets in the same feature panel.
-  // Graph/sidebar "+" requests stay pending so each visible NodeInputsPanel can
-  // offer its own dashed chooser target instead of the source selector claiming
-  // the request directly.
   const sourceNodeInputs = useTabNodeInputs({
     selectorId: DEFAULT_TAB_INPUT_SET_ID,
     tabInputSets,
     onTabInputSetChange,
     constraints: SOURCE_NODE_CONSTRAINTS,
-    consumeNodeInputRequests: false,
   });
   const annotationRunAll =
     latestRunAll?.request.kind === 'annotation_run_all' ? latestRunAll : null;
@@ -260,7 +263,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: CLASS_DESCRIPTION_NODE_CONSTRAINTS,
-    consumeNodeInputRequests: false,
   });
   // Optional few-shot example node, surfaced only in AI mode. Persists in its own
   // input set so it round-trips with the rest of the tab state.
@@ -269,7 +271,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: EXAMPLE_NODE_CONSTRAINTS,
-    consumeNodeInputRequests: false,
   });
 
   const renderAnnotationColumnPicker = ({ nodeId, columns }: NodeInputColumnAddonArgs) => {
@@ -373,6 +374,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     storedAiCorrectionColumn !== resolvedAnnotationColumn
       ? storedAiCorrectionColumn
       : null;
+  const correctionColumnOptions = sourceColumns.filter(
+    (column) => column !== sourceNode?.column && column !== resolvedAnnotationColumn,
+  );
+  const defaultCorrectionColumnName = `${resolvedAnnotationColumn || DEFAULT_ANNOTATION_COLUMN_NAME}.correction`;
 
   // AI-mode preview wiring. Resolve the selected named provider configuration
   // and prompt (user text or the grayed default). The
@@ -440,6 +445,61 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     }
   };
 
+  const handleCreateCorrectionColumn = async () => {
+    if (!sourceNode || !currentWorkspaceId) return;
+    const columnName = newCorrectionColumnName.trim() || defaultCorrectionColumnName;
+    if (sourceColumns.includes(columnName)) {
+      setCorrectionColumnError(`A column named "${columnName}" already exists.`);
+      return;
+    }
+    setCorrectionColumnError(null);
+    setIsCreatingCorrectionColumn(true);
+    try {
+      await polarsExpressionApply(
+        sourceNode.id,
+        {
+          context: 'with_columns',
+          expressions: [
+            {
+              expression: {
+                op: 'cast',
+                operand: { op: 'literal', value: null },
+                dtype: 'string',
+                strict: false,
+              },
+              alias: columnName,
+            },
+          ],
+          group_by: [],
+          name: null,
+        },
+        'update',
+      );
+      await host.setCorrectionColumn(sourceNode.id, columnName);
+      setIsCorrectionColumnDialogOpen(false);
+      setNewCorrectionColumnName('');
+    } catch (error) {
+      console.warn('[annotation] Failed to create correction column:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Could not create the correction column.',
+      );
+    } finally {
+      setIsCreatingCorrectionColumn(false);
+    }
+  };
+
+  const useCorrectionColumnAsExample = () => {
+    if (!sourceNode || !aiCorrectionColumn) return;
+    onTabInputSetChange(
+      EXAMPLE_NODE_SELECTOR_ID,
+      nodeInputsFromSelections([{ nodeId: sourceNode.id, column: sourceNode.column }]),
+    );
+    setExampleAnnotationColumns((current) => ({
+      ...current,
+      [sourceNode.id]: aiCorrectionColumn,
+    }));
+  };
+
   const handleCreateClassTable = async () => {
     if (!sourceNode || !currentWorkspaceId) return;
     setIsCreatingClassTable(true);
@@ -499,6 +559,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           node_id: sourceNode.id,
           text_column: sourceNode.column,
           annotation_column: resolvedAnnotationColumn,
+          correction_column: aiCorrectionColumn,
           class_node_id: classDescriptionNode.id,
           class_column: classDescriptionClassColumn,
           description_column: classDescriptionDescriptionColumn,
@@ -565,6 +626,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         nodeInputsFromSelections([{ nodeId: request.node_id, column: request.text_column }]),
       );
       setAnnotationTarget(request.node_id, request.annotation_column);
+      void host.setCorrectionColumn(request.node_id, request.correction_column ?? null);
       onTabInputSetChange(
         CLASS_DESCRIPTION_SELECTOR_ID,
         nodeInputsFromSelections([{ nodeId: request.class_node_id, column: request.class_column }]),
@@ -662,7 +724,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         tabId: host.tabId,
         providerConfigurationId: selectedAiProvider.id,
         source: currentAiRequest,
-        correctionColumn: host.correctionColumns[sourceNode.id] ?? null,
         supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
       });
       refreshAnalyses();
@@ -682,9 +743,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     workspaceId: currentWorkspaceId ?? null,
     analysisId: aiResult ? tabTaskId : null,
     providerConfigurationId: serverAiRequest?.provider_configuration_id ?? null,
-    nodeId: sourceNode?.id ?? '',
-    textColumn: sourceNode?.column ?? '',
-    annotationColumn: resolvedAnnotationColumn,
+    nodeId: serverAiRequest?.node_id ?? '',
+    textColumn: serverAiRequest?.text_column ?? '',
+    annotationColumn: serverAiRequest?.annotation_column ?? '',
     enabled: Boolean(aiResult),
   });
 
@@ -703,11 +764,13 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     onStop: activeAnalysis ? stopAiTask : undefined,
                     onClear: async () => {
                       await clearAiResults();
+                      await host.clearCorrectionColumns();
                     },
                     previewDisabled:
                       analysisActionLifecycle.previewDisabled ||
                       aiActionState.runDisabled ||
                       isCreatingAnnotationColumn ||
+                      isCreatingCorrectionColumn ||
                       analysisActionLifecycle.isPreviewing,
                     runAllDisabled: !currentAiRequest || analysisActionLifecycle.runAllDisabled,
                     clearDisabled:
@@ -872,54 +935,123 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     providerModels={aiProviderModels}
                     model={aiModel}
                     disabled={controlsLocked}
+                    advanced={
+                      <>
+                        <div className="space-y-2">
+                          <Label className="block text-xs font-medium text-muted-foreground">
+                            Example Data Block
+                            <span className="ml-1 font-normal">(optional)</span>
+                          </Label>
+                          <NodeInputsPanel
+                            title="Example Node"
+                            resolvedNodes={exampleNodeInputs.resolvedNodes}
+                            availableNodes={exampleNodeInputs.availableNodes}
+                            canAddMore={exampleNodeInputs.canAddMore}
+                            maxNodes={1}
+                            onAddNodes={exampleNodeInputs.addNodes}
+                            getAddRejection={exampleNodeInputs.getAddRejection}
+                            onRemoveNode={exampleNodeInputs.removeNode}
+                            onClear={exampleNodeInputs.clear}
+                            onColumnChange={exampleNodeInputs.setColumn}
+                            columnLabel="Text Column"
+                            renderColumnAddon={renderExampleAnnotationColumnPicker}
+                            disabled={controlsLocked}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="annotation-ai-prompt"
+                            className="block text-xs font-medium text-muted-foreground"
+                          >
+                            Prompt
+                            <span className="ml-1 font-normal">(optional)</span>
+                          </Label>
+                          <AnnotationPromptInput
+                            id="annotation-ai-prompt"
+                            value={aiPrompt}
+                            onChange={setAiPrompt}
+                            onCommit={commitAiPrompt}
+                            defaultPrompt={DEFAULT_ANNOTATION_PROMPT}
+                            disabled={controlsLocked}
+                          />
+                        </div>
+                        <AnnotationInferenceSettings
+                          temperature={aiTemperature}
+                          onTemperatureCommit={commitAiTemperature}
+                          reasoningEnabled={aiReasoningEnabled}
+                          onReasoningEnabledChange={setAiReasoningEnabled}
+                          reasoningEffort={aiReasoningEffort}
+                          onReasoningEffortChange={setAiReasoningEffort}
+                          disabled={controlsLocked}
+                        />
+                      </>
+                    }
                   >
                     <div className="space-y-2">
-                      <Label className="block text-xs font-medium text-muted-foreground">
-                        Example Data Block
-                        <span className="ml-1 font-normal">(optional)</span>
-                      </Label>
-                      <NodeInputsPanel
-                        title="Example Node"
-                        resolvedNodes={exampleNodeInputs.resolvedNodes}
-                        availableNodes={exampleNodeInputs.availableNodes}
-                        canAddMore={exampleNodeInputs.canAddMore}
-                        maxNodes={1}
-                        onAddNodes={exampleNodeInputs.addNodes}
-                        getAddRejection={exampleNodeInputs.getAddRejection}
-                        onRemoveNode={exampleNodeInputs.removeNode}
-                        onClear={exampleNodeInputs.clear}
-                        onColumnChange={exampleNodeInputs.setColumn}
-                        columnLabel="Text Column"
-                        renderColumnAddon={renderExampleAnnotationColumnPicker}
-                        disabled={controlsLocked}
-                      />
-                    </div>
-                    <div className="space-y-2">
                       <Label
-                        htmlFor="annotation-ai-prompt"
-                        className="block text-xs font-medium text-muted-foreground"
+                        htmlFor="annotation-ai-correction-column"
+                        className="block text-sm font-medium"
                       >
-                        Prompt
-                        <span className="ml-1 font-normal">(optional)</span>
+                        User Correction Column
                       </Label>
-                      <AnnotationPromptInput
-                        id="annotation-ai-prompt"
-                        value={aiPrompt}
-                        onChange={setAiPrompt}
-                        onCommit={commitAiPrompt}
-                        defaultPrompt={DEFAULT_ANNOTATION_PROMPT}
-                        disabled={controlsLocked}
-                      />
+                      <Select
+                        value={aiCorrectionColumn ?? NO_CORRECTION_COLUMN_ACTION}
+                        disabled={controlsLocked || !sourceNode || !selectedAnnotationColumnExists}
+                        onValueChange={(next) => {
+                          if (!sourceNode) return;
+                          if (next === CREATE_CORRECTION_COLUMN_ACTION) {
+                            setNewCorrectionColumnName('');
+                            setCorrectionColumnError(null);
+                            setIsCorrectionColumnDialogOpen(true);
+                            return;
+                          }
+                          void host
+                            .setCorrectionColumn(
+                              sourceNode.id,
+                              next === NO_CORRECTION_COLUMN_ACTION ? null : next,
+                            )
+                            .catch((error: unknown) => {
+                              toast.error(
+                                error instanceof Error
+                                  ? error.message
+                                  : 'Could not save the correction column.',
+                              );
+                            });
+                        }}
+                      >
+                        <SelectTrigger
+                          id="annotation-ai-correction-column"
+                          aria-label="User Correction Column"
+                          className="w-full"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value={CREATE_CORRECTION_COLUMN_ACTION}>
+                              Add new column
+                            </SelectItem>
+                            <SelectItem value={NO_CORRECTION_COLUMN_ACTION}>
+                              No correction column
+                            </SelectItem>
+                            {correctionColumnOptions.map((column) => (
+                              <SelectItem key={column} value={column}>
+                                {column}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!sourceNode || !aiCorrectionColumn || controlsLocked}
+                        onClick={useCorrectionColumnAsExample}
+                      >
+                        Use the correction column as the example
+                      </Button>
                     </div>
-                    <AnnotationInferenceSettings
-                      temperature={aiTemperature}
-                      onTemperatureCommit={commitAiTemperature}
-                      reasoningEnabled={aiReasoningEnabled}
-                      onReasoningEnabledChange={setAiReasoningEnabled}
-                      reasoningEffort={aiReasoningEffort}
-                      onReasoningEffortChange={setAiReasoningEffort}
-                      disabled={controlsLocked}
-                    />
                   </AnnotationAiSettings>
                 </div>
               ) : null}
@@ -997,6 +1129,76 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           </form>
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={isCorrectionColumnDialogOpen}
+        onOpenChange={(open) => {
+          if (open || isCreatingCorrectionColumn) return;
+          setIsCorrectionColumnDialogOpen(false);
+          setNewCorrectionColumnName('');
+          setCorrectionColumnError(null);
+        }}
+      >
+        <DialogContent>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleCreateCorrectionColumn();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Create correction column</DialogTitle>
+              <DialogDescription>
+                Add an empty string column to this Data Block and select it for user corrections.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="annotation-correction-column-name">Column name</Label>
+              <Input
+                id="annotation-correction-column-name"
+                aria-label="Correction column name"
+                value={newCorrectionColumnName}
+                placeholder={defaultCorrectionColumnName}
+                maxLength={500}
+                disabled={isCreatingCorrectionColumn}
+                onChange={(event) => {
+                  setNewCorrectionColumnName(event.target.value);
+                  setCorrectionColumnError(null);
+                }}
+                onKeyDown={(event) => {
+                  acceptPlaceholderOnTab({
+                    event,
+                    value: newCorrectionColumnName,
+                    setValue: setNewCorrectionColumnName,
+                  });
+                }}
+              />
+              {correctionColumnError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {correctionColumnError}
+                </p>
+              ) : null}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isCreatingCorrectionColumn}
+                onClick={() => {
+                  setIsCorrectionColumnDialogOpen(false);
+                  setNewCorrectionColumnName('');
+                  setCorrectionColumnError(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreatingCorrectionColumn}>
+                {isCreatingCorrectionColumn ? 'Creating...' : 'Create'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {annotationMode === 'ai' && aiBanner ? (
         <AnalysisTaskBanner
           analysisName="Annotation"
@@ -1036,24 +1238,31 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           workspaceId={currentWorkspaceId}
           nodeIds={[sourceNode.id]}
           sql={`SELECT * FROM ${sqlTable(sourceNode.id)}`}
+          rowCount={sourceNode.node.shape?.[0] ?? 0}
           title="Annotation"
           requiredColumns={[
             annotationRunAllSource.text_column,
             annotationRunAllSource.annotation_column,
           ]}
           comparisonColumn={annotationRunAllSource.annotation_column}
+          comparisonColumns={annotationComparisonColumns[sourceNode.id] ?? []}
+          onComparisonColumnsChange={(columns) => {
+            setAnnotationComparisonColumns(sourceNode.id, columns);
+          }}
         />
-      ) : annotationMode === 'ai' && aiResult && sourceNode ? (
+      ) : annotationMode === 'ai' && aiResult && serverAiRequest ? (
         <AnnotationAiPreviewPanel
           preview={aiPreview}
-          correction={{
-            nodeId: sourceNode.id,
-            availableColumns: sourceColumns,
-            column: aiCorrectionColumn,
-            classOptions: aiClasses.map((item) => item.name),
-            onColumnChange: (column) => {
-              host.setCorrectionColumn(sourceNode.id, column);
+          comparison={{
+            columns: annotationComparisonColumns[serverAiRequest.node_id] ?? [],
+            onColumnsChange: (columns) => {
+              setAnnotationComparisonColumns(serverAiRequest.node_id, columns);
             },
+          }}
+          correction={{
+            nodeId: serverAiRequest.node_id,
+            column: serverAiRequest.correction_column ?? null,
+            classOptions: serverAiRequest.classes.map((item) => item.name),
           }}
         />
       ) : null}
