@@ -6,7 +6,7 @@ import {
   createFileBrowserCitationState,
   fileBrowserCitationReducer,
 } from './fileBrowserCitationState';
-import { invalidateFilesQuery } from './fileCache';
+import { refreshMovedFileQueries } from './fileCache';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -59,7 +59,7 @@ export function useFileBrowserActions({ refreshFiles, notify }: UseFileBrowserAc
         body: { source_path: sourcePath, target_directory_path: targetDirectoryPath },
         throwOnError: true,
       });
-      await invalidateFilesQuery(queryClient);
+      await refreshMovedFileQueries(queryClient, sourcePath, targetDirectoryPath);
       notify('success', `Moved ${String(sourcePath.split('/').at(-1))}.`);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to move file.');

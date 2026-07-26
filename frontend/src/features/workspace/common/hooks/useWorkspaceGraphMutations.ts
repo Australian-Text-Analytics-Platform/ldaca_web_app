@@ -102,9 +102,7 @@ export const useWorkspaceGraphMutations = ({
         return data;
       }),
     onSuccess: (_data, { nodeId }) => {
-      invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
-        includeNodeInfo: true,
-      });
+      invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId);
     },
   });
 

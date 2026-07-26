@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { queryKeys } from '@/lib/queryKeys';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { invalidateFilesQuery } from '../hooks/fileCache';
+import { invalidateFileListQuery } from '../hooks/fileCache';
 
 const TOOL_LABELS: Record<string, string> = {
   concordance: 'Concordance',
@@ -82,7 +83,7 @@ interface ReadmeViewerProps {
  */
 function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['sample-readme', path],
+    queryKey: queryKeys.fileRaw(path ?? ''),
     queryFn: async () => {
       const { data } = await getRawFile({
         parseAs: 'text',
@@ -142,10 +143,10 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
 
 /**
  * Opens the sample-content import workflow from Data Loader. It manages local
- * dataset selection and owns the file-query invalidation after import.
+ * dataset selection and owns the file/catalogue invalidation after import.
  * Rendered by: DataLoaderFeature module.
  * Flow: request available sample categories, render the dataset dialog, then
- * import selected collections and invalidate the shared file query once.
+ * import selected collections and refresh both affected resource lists.
  */
 export function SampleDataPanel() {
   const queryClient = useQueryClient();
@@ -155,7 +156,7 @@ export function SampleDataPanel() {
   const [viewingReadme, setViewingReadme] = useState<{ path: string; name: string } | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['sample-collections'],
+    queryKey: queryKeys.sampleCollections,
     queryFn: async () => {
       const { data } = await listSampleCollections({ throwOnError: true });
       return data;
@@ -183,11 +184,11 @@ export function SampleDataPanel() {
   };
 
   /**
-   * Imports selected sample datasets and invalidates the shared file browser
-   * once the backend reports the import has started or completed.
+   * Imports selected sample datasets and invalidates the file browser plus
+   * sample catalogue once the backend reports the import has started.
    * Attached to the sample-data dialog's Import button.
    * Steps: collect selected IDs, show import progress, call the backend,
-   * invalidate files, then reset dialog state.
+   * invalidate both resource lists, then reset dialog state.
    */
   const handleImport = async () => {
     const selectedIds = catalogue
@@ -206,7 +207,13 @@ export function SampleDataPanel() {
       }
       toast.dismiss(loadingToastId);
       toast.success('Sample data import started.');
-      await invalidateFilesQuery(queryClient);
+      await Promise.all([
+        invalidateFileListQuery(queryClient),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sampleCollections,
+          exact: true,
+        }),
+      ]);
       setOpen(false);
     } catch (err) {
       toast.dismiss(loadingToastId);

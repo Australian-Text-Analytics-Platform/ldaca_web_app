@@ -39,12 +39,8 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
   operationPayload: P | null;
   /** Operation-specific preview endpoint (e.g. generated `filterPreview`). */
   operationFetch: OperationPreviewFetcher<P>;
-  /**
-   * String prefix used when building the cache signature (e.g. `'replace'`).
-   * Disambiguates between sub-tabs that might happen to JSON-stringify to
-   * the same shape.
-   */
-  signaturePrefix: string;
+  /** Operation name stored in the structured preview identity. */
+  operation: string;
   /** When false (e.g. no node selected), the hook stays idle. */
   enabled?: boolean;
   /** Optional override for the debounce delay (default 600ms). */
@@ -55,9 +51,6 @@ export interface UseNodePreviewWithRawFallbackOptions<P> {
  * Standardises the "operation preview, with raw-data fallback when the
  * payload is incomplete" pattern that every preprocessing sub-tab implements.
  *
- * Replaces ~5 hand-rolled copies of: request shape with `payload: null`,
- * a manual signature builder with `disabled`/`::raw`/`::<json>` branches,
- * and a fetcher that branches on `payload === null` to call node-data.
  * Used by Filter, Aggregate, Expression, Replace, and Slice hooks that can
  * preview either an operation or the raw selected node.
  * Flow: call preprocessing preview first, fall back to raw node preview when no request is
@@ -71,7 +64,7 @@ export const useNodePreviewWithRawFallback = <P>(
     nodeId,
     operationPayload,
     operationFetch,
-    signaturePrefix,
+    operation,
     enabled = true,
     debounceMs,
   } = opts;
@@ -79,20 +72,15 @@ export const useNodePreviewWithRawFallback = <P>(
   const request: PreviewRequest<P> | null =
     enabled && workspaceId && nodeId ? { workspaceId, nodeId, payload: operationPayload } : null;
 
-  let signature = `${signaturePrefix}-preview-disabled`;
-  if (request?.payload) {
-    try {
-      signature = `${request.workspaceId}::${request.nodeId}::${JSON.stringify(request.payload)}`;
-    } catch {
-      signature = `${request.workspaceId}::${request.nodeId}::unserialisable`;
-    }
-  } else if (request) {
-    signature = `${request.workspaceId}::${request.nodeId}::raw`;
-  }
-
   return usePreprocessingPreview<PreviewRequest<P>>({
     request,
-    signature,
+    identity: request
+      ? {
+          workspaceId: request.workspaceId,
+          operation,
+          nodeIds: [request.nodeId],
+        }
+      : null,
     debounceMs,
     // Routes complete operation payloads to the operation preview endpoint and
     // incomplete ones to raw node data so users always have rows to inspect.

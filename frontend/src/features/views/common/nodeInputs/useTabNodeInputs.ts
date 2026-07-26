@@ -52,11 +52,11 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
   workspaceId: string | null;
   /** Recently-used node groups, resolved against live nodes, for "Add preset". */
   recentPresets: ResolvedPreset[];
-  /** Node-info responses for the currently selected input nodes. */
-  nodeInfoCache: Record<string, WorkspaceNodeInfo>;
+  /** Complete graph metadata for the currently selected input nodes, keyed by id. */
+  nodeInfoById: Record<string, WorkspaceNodeInfo>;
   /** Returns cached typed columns for a selected input node, with snapshot fallback. */
   getColumnInfos: (node: WorkspaceNodeMetadata | null | undefined) => ColumnInfo[];
-  /** Returns cached node-info metadata for a selected input node when loaded. */
+  /** Returns complete graph metadata for a selected input node when loaded. */
   getNodeInfo: (node: WorkspaceNodeMetadata | null | undefined) => WorkspaceNodeInfo | undefined;
 }
 
@@ -68,7 +68,7 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
  * Used by: the tabbed analysis-style ``*Feature`` components because each needs
  * the same plumbing (tab value/onChange + live nodes + column infos + graph
  * focus) to drive {@link NodeInputsPanel} and build run requests. Keeping it
- * here makes each feature's migration a thin call instead of repeated wiring.
+ * here keeps each feature's binding a thin call instead of repeated wiring.
  *
  * Flow: resolve the requested selector id from ``input_sets``, cap restored
  * state once at this named owner and persist that normalization, fetch metadata
@@ -139,15 +139,12 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     return nodes.filter((node) => ids.has(node.id));
   }, [nodes, effectiveValue]);
 
-  const { getColumnInfos, getNodeInfo, nodeInfoCache } = useNodeColumnInfos({
+  const { getColumnInfos, getNodeInfo, nodeInfoById } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
     nodes: selectedGraphNodes,
   });
 
-  const allNodes = useMemo(
-    () => nodes.map((node) => projectWorkspaceNodeMetadata(node, nodeInfoCache[node.id])),
-    [nodeInfoCache, nodes],
-  );
+  const allNodes = useMemo(() => nodes.map(projectWorkspaceNodeMetadata), [nodes]);
 
   const result = useNodeInputs({
     value: effectiveValue,
@@ -241,7 +238,7 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     graphSelectedIds: selectedNodeIds,
     workspaceId: currentWorkspaceId ?? null,
     recentPresets,
-    nodeInfoCache,
+    nodeInfoById,
     getColumnInfos,
     getNodeInfo,
   };

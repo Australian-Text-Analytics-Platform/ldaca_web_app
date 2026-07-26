@@ -10,7 +10,6 @@ import { AddAnnotationProviderDialog } from './AddAnnotationProviderDialog';
 import { ModelNameCombobox } from './ModelNameCombobox';
 
 interface AnnotationAiSettingsProps {
-  workspaceId: string | null;
   configurations: AnnotationProviderConfigurationView[];
   selectedConfigurationId: string | null;
   onProviderChange: (configuration: AnnotationProviderConfigurationView, model: string) => void;
@@ -24,7 +23,6 @@ interface AnnotationAiSettingsProps {
 
 /** Named provider-configuration and model selection for Annotation requests. */
 export function AnnotationAiSettings({
-  workspaceId,
   configurations,
   selectedConfigurationId,
   onProviderChange,
@@ -110,7 +108,6 @@ export function AnnotationAiSettings({
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="annotation-ai-model">Model</Label>
           <ModelNameCombobox
-            workspaceId={workspaceId}
             id="annotation-ai-model"
             configuration={selected}
             value={selectedModel}

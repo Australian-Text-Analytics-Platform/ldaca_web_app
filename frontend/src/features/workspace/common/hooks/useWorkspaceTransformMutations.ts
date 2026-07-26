@@ -143,7 +143,6 @@ export const useWorkspaceTransformMutations = ({
 
   const invalidateEditedNode = (nodeId: string) => {
     invalidateNodeWorkspaceQueries(queryClient, currentWorkspaceId, nodeId, {
-      includeNodeInfo: true,
       includeData: true,
       includeSchema: true,
     });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { hashKey, useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import type { PreviewPagination, PreviewRow } from '../types';
 
 interface PreviewFetcherResult<Row = PreviewRow> {
@@ -11,10 +12,14 @@ interface PreviewFetcherResult<Row = PreviewRow> {
 export interface UsePreprocessingPreviewOptions<RequestPayload, Row = PreviewRow> {
   /** The fully prepared request payload required by the preview endpoint. */
   request: RequestPayload | null;
+  /** Stable resource identity used for targeted invalidation. */
+  identity: {
+    workspaceId: string;
+    operation: string;
+    nodeIds: readonly string[];
+  } | null;
   /** Whether previews should be attempted. Defaults to `true`. */
   enabled?: boolean;
-  /** Optional operation prefix; the complete serialized request is always appended. */
-  signature?: string;
   /** Debounce delay (ms) before firing the preview request. Defaults to 600ms. */
   debounceMs?: number;
   /** Initial page number (1-indexed). Defaults to 1. */
@@ -53,7 +58,7 @@ const DEFAULT_PAGE_SIZE = 10;
  * and error state behave consistently across tabs.
  * Used directly by Join and Concat, and by `useNodePreviewWithRawFallback` for
  * operation previews in the remaining preprocessing tabs.
- * Flow: debounce request signatures, bind pagination to the active signature,
+ * Flow: debounce structured request identities, bind pagination to the active request,
  * and let TanStack Query own cancellation, errors, and immutable results.
  */
 export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
@@ -61,45 +66,40 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
 ): UsePreprocessingPreviewResult<Row> => {
   const {
     request,
+    identity,
     enabled = true,
-    signature,
     debounceMs = DEFAULT_DEBOUNCE_MS,
     initialPage = 1,
     initialPageSize = DEFAULT_PAGE_SIZE,
     fetcher,
   } = options;
 
-  const ready = Boolean(enabled && request);
-  const derivedSignature = (() => {
-    if (!ready || !request) return 'disabled';
-    try {
-      const requestSignature = JSON.stringify(request);
-      return signature ? `${signature}::${requestSignature}` : requestSignature;
-    } catch {
-      return signature
-        ? `${signature}::preview-signature-unserializable`
-        : 'preview-signature-unserializable';
-    }
-  })();
+  const ready = Boolean(enabled && request && identity);
+  const requestIdentity =
+    ready && request && identity ? hashKey([identity, request]) : 'preprocessing-preview-disabled';
 
   const [paginationState, setPaginationState] = useState({
-    signature: derivedSignature,
+    requestIdentity,
     page: initialPage,
     pageSize: initialPageSize,
   });
-  const page = paginationState.signature === derivedSignature ? paginationState.page : initialPage;
+  const page =
+    paginationState.requestIdentity === requestIdentity ? paginationState.page : initialPage;
   const pageSize =
-    paginationState.signature === derivedSignature ? paginationState.pageSize : initialPageSize;
-  const [debouncedSignature, setDebouncedSignature] = useState('disabled');
-  const [refreshKey, setRefreshKey] = useState(0);
+    paginationState.requestIdentity === requestIdentity
+      ? paginationState.pageSize
+      : initialPageSize;
+  const [debouncedRequestIdentity, setDebouncedRequestIdentity] = useState(
+    'preprocessing-preview-disabled',
+  );
 
   /**
-   * Stores pagination with the active request signature to avoid stale pages.
+   * Stores pagination with the active request identity to avoid stale pages.
    * Called by the public `setPage` action below.
    */
   const setPaginationDraft = (nextPage: number, nextPageSize: number) => {
     setPaginationState({
-      signature: derivedSignature,
+      requestIdentity,
       page: nextPage,
       pageSize: nextPageSize,
     });
@@ -121,16 +121,28 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
       return;
     }
     const timeoutId = window.setTimeout(() => {
-      setDebouncedSignature(derivedSignature);
+      setDebouncedRequestIdentity(requestIdentity);
     }, debounceMs);
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [debounceMs, derivedSignature, ready]);
+  }, [debounceMs, requestIdentity, ready]);
+
+  const queryKey =
+    request && identity
+      ? queryKeys.preprocessingPreview(
+          identity.workspaceId,
+          identity.operation,
+          identity.nodeIds,
+          request,
+          page,
+          pageSize,
+        )
+      : queryKeys.preprocessingPreviewDisabled;
 
   const previewQuery = useQuery({
-    queryKey: ['preprocessing-preview', derivedSignature, page, pageSize, refreshKey],
-    enabled: ready && debouncedSignature === derivedSignature,
+    queryKey,
+    enabled: ready && debouncedRequestIdentity === requestIdentity,
     retry: false,
     queryFn: async ({ signal }): Promise<PreviewFetcherResult<Row>> => {
       if (!request) throw new Error('Preview request is unavailable');
@@ -147,11 +159,11 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
   };
 
   /**
-   * Forces a refetch without changing the current request or pagination.
+   * Refetches the current resource without creating a cache alias.
    * Returned to feature hooks as the manual `refresh` action.
    */
   const refresh = () => {
-    setRefreshKey((current) => current + 1);
+    void previewQuery.refetch();
   };
 
   const response = ready ? previewQuery.data : undefined;
@@ -161,7 +173,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     data: response?.data ?? [],
     columns: response?.columns ?? [],
     pagination: response?.pagination ?? null,
-    loading: ready && (debouncedSignature !== derivedSignature || previewQuery.isFetching),
+    loading: ready && (debouncedRequestIdentity !== requestIdentity || previewQuery.isFetching),
     error:
       ready && queryError
         ? queryError instanceof Error

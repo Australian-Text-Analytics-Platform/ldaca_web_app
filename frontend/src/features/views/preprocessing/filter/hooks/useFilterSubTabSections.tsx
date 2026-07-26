@@ -232,7 +232,7 @@ export const useFilterSubTabSections = (
     nodeId: selectedNodeId,
     operationPayload,
     operationFetch: filterPreview,
-    signaturePrefix: 'filter',
+    operation: 'filter',
     enabled: previewReady,
   });
 

@@ -24,7 +24,7 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
 
   const isExcel = Boolean(filename && /\.(xlsx?|xlsb)$/i.test(filename));
   const worksheetsQuery = useQuery({
-    queryKey: ['file-worksheets', filename],
+    queryKey: queryKeys.fileWorksheets(filename ?? ''),
     queryFn: async () => {
       if (!filename) throw new Error('No filename provided');
       const { data } = await listFileWorksheets({

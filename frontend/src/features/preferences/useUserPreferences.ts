@@ -8,8 +8,7 @@ import {
   type UserPreferencesPatch,
 } from '@/api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-
-export const userPreferencesKey = (userId: string | null) => ['user-preferences', userId] as const;
+import { queryKeys } from '@/lib/queryKeys';
 
 const DEFAULT_PREFERENCES: Required<UserPreferences> = {
   hidden_views: [],
@@ -21,13 +20,18 @@ const DEFAULT_PREFERENCES: Required<UserPreferences> = {
 export function useUserPreferences() {
   const userId = useAuth().user?.id ?? null;
   const query = useQuery({
-    queryKey: userPreferencesKey(userId),
+    queryKey: queryKeys.userPreferences(userId),
     queryFn: async () => (await getPreferences({ throwOnError: true })).data,
     enabled: userId !== null,
   });
 
   return {
-    ...query,
+    data: query.data,
+    error: query.error,
+    isError: query.isError,
+    isLoading: query.isLoading,
+    isSuccess: query.isSuccess,
+    refetch: query.refetch,
     preferences: query.data ?? DEFAULT_PREFERENCES,
     userId,
   };
@@ -36,7 +40,7 @@ export function useUserPreferences() {
 export function useUpdateUserPreferences() {
   const queryClient = useQueryClient();
   const userId = useAuth().user?.id ?? null;
-  const queryKey = userPreferencesKey(userId);
+  const queryKey = queryKeys.userPreferences(userId);
 
   return useMutation({
     mutationFn: async (patch: UserPreferencesPatch) =>

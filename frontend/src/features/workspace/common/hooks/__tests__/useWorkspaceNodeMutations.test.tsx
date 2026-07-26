@@ -14,7 +14,6 @@ const workspaceSdkMock = vi.hoisted(() => ({
   previewNodeCreationTable: vi.fn(),
   reorderWorkspaceNodesById: vi.fn(),
   redoNode: vi.fn(),
-  submitChildAnalysis: vi.fn(),
   submitTabAnalysis: vi.fn(),
   updateNode: vi.fn(),
   updateWorkspaceById: vi.fn(),
@@ -329,58 +328,120 @@ describe('useWorkspaceNodeMutations', () => {
     expect(invalidateQueries.mock.calls.some(([options]) => 'predicate' in options)).toBe(true);
   });
 
-  it('submits child analysis resources under their parent analysis', async () => {
+  it('submits a tab-owned Concordance Run All group', async () => {
     const queryClient = createTestClient();
-    workspaceSdkMock.submitChildAnalysis.mockResolvedValue({ data: { id: 'child-1' } });
+    workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'run-all-1' } });
     const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
       wrapper: wrapWithClient(queryClient),
     });
 
     await act(async () => {
-      await result.current.actions.detachConcordance('analysis-1', {
-        node_id: 'node-1',
-        selected_columns: ['text'],
+      await result.current.actions.runConcordanceAll('tab-1', {
+        source: {
+          kind: 'concordance',
+          node_ids: ['node-1'],
+          node_columns: { 'node-1': 'text' },
+          node_tokenizer_models: {},
+          search_word: 'word',
+          num_left_tokens: 5,
+          num_right_tokens: 5,
+          regex: false,
+          whole_word: true,
+          case_sensitive: false,
+          search_mode: 'regex',
+        },
       });
     });
 
-    expect(workspaceSdkMock.submitChildAnalysis).toHaveBeenCalledWith({
+    expect(workspaceSdkMock.submitTabAnalysis).toHaveBeenCalledWith({
       body: {
-        kind: 'concordance_detachment',
-        node_id: 'node-1',
-        selected_columns: ['text'],
+        execution_scope: 'run_all',
+        request: expect.objectContaining({
+          kind: 'concordance_run_all',
+          source: expect.objectContaining({ node_ids: ['node-1'] }),
+        }),
+        supersedes_analysis_ids: [],
       },
-      path: { workspace_id: 'ws-1', analysis_id: 'analysis-1' },
+      path: { workspace_id: 'ws-1', tab_id: 'tab-1' },
       throwOnError: true,
+    });
+  });
+
+  it('submits Result Publication without treating queue admission as graph publication', async () => {
+    const queryClient = createTestClient();
+    workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'publication-1' } });
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
+      wrapper: wrapWithClient(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.actions.publishAnalysisResult('tab-1', 'run-all-1', {
+        kind: 'concordance_result_publication',
+        sources: [
+          {
+            source_node_id: 'node-1',
+            selected_columns: ['text', 'CONC_matched_text'],
+            new_node_name: 'Matches',
+          },
+        ],
+      });
+    });
+
+    expect(workspaceSdkMock.submitTabAnalysis).toHaveBeenCalledWith({
+      body: {
+        execution_scope: 'supporting',
+        parent_analysis_id: 'run-all-1',
+        request: {
+          kind: 'concordance_result_publication',
+          sources: [
+            {
+              source_node_id: 'node-1',
+              selected_columns: ['text', 'CONC_matched_text'],
+              new_node_name: 'Matches',
+            },
+          ],
+        },
+      },
+      path: { workspace_id: 'ws-1', tab_id: 'tab-1' },
+      throwOnError: true,
+    });
+    expect(invalidateQueries).not.toHaveBeenCalledWith({
+      queryKey: ['workspaces', 'ws-1', 'graph'],
     });
   });
 
   it('submits Topic Modeling detachment as one typed multi-source child', async () => {
     const queryClient = createTestClient();
-    workspaceSdkMock.submitChildAnalysis.mockResolvedValue({ data: { id: 'child-topics' } });
+    workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'child-topics' } });
     const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
       wrapper: wrapWithClient(queryClient),
     });
 
     await act(async () => {
-      await result.current.actions.detachTopicModeling('analysis-1', {
+      await result.current.actions.detachTopicModeling('tab-1', 'analysis-1', {
         node_ids: ['node-1', 'node-2'],
-        selected_columns: { 'node-1': ['text'], 'node-2': ['text'] },
+        metadata_columns: { 'node-1': ['text'], 'node-2': ['text'] },
         new_node_names: { 'node-1': 'First topics', 'node-2': 'Second topics' },
         topic_ids: [1, 3],
         topic_meanings_override: [{ topic_id: 1, words: ['word'] }],
       });
     });
 
-    expect(workspaceSdkMock.submitChildAnalysis).toHaveBeenCalledWith({
+    expect(workspaceSdkMock.submitTabAnalysis).toHaveBeenCalledWith({
       body: {
-        kind: 'topic_modeling_detachment',
-        node_ids: ['node-1', 'node-2'],
-        selected_columns: { 'node-1': ['text'], 'node-2': ['text'] },
-        new_node_names: { 'node-1': 'First topics', 'node-2': 'Second topics' },
-        topic_ids: [1, 3],
-        topic_meanings_override: [{ topic_id: 1, words: ['word'] }],
+        execution_scope: 'supporting',
+        parent_analysis_id: 'analysis-1',
+        request: {
+          kind: 'topic_modeling_detachment',
+          node_ids: ['node-1', 'node-2'],
+          metadata_columns: { 'node-1': ['text'], 'node-2': ['text'] },
+          new_node_names: { 'node-1': 'First topics', 'node-2': 'Second topics' },
+          topic_ids: [1, 3],
+          topic_meanings_override: [{ topic_id: 1, words: ['word'] }],
+        },
       },
-      path: { workspace_id: 'ws-1', analysis_id: 'analysis-1' },
+      path: { workspace_id: 'ws-1', tab_id: 'tab-1' },
       throwOnError: true,
     });
   });

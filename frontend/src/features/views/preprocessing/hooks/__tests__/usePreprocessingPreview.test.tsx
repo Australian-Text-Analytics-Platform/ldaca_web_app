@@ -45,7 +45,11 @@ describe('usePreprocessingPreview', () => {
       () =>
         usePreprocessingPreview({
           request: { nodeId: 'node-1' },
-          signature: 'node-1::preview',
+          identity: {
+            workspaceId: 'workspace-1',
+            operation: 'filter',
+            nodeIds: ['node-1'],
+          },
           debounceMs: 25,
           fetcher,
         }),
@@ -87,7 +91,11 @@ describe('usePreprocessingPreview', () => {
       ({ fetcher }) =>
         usePreprocessingPreview<{ nodeId: string }>({
           request: { nodeId: 'node-1' },
-          signature: 'node-1::preview',
+          identity: {
+            workspaceId: 'workspace-1',
+            operation: 'filter',
+            nodeIds: ['node-1'],
+          },
           debounceMs: 25,
           fetcher,
         }),
@@ -116,7 +124,11 @@ describe('usePreprocessingPreview', () => {
       () =>
         usePreprocessingPreview({
           request: { nodeId: 'node-1' },
-          signature: 'node-1::preview',
+          identity: {
+            workspaceId: 'workspace-1',
+            operation: 'filter',
+            nodeIds: ['node-1'],
+          },
           debounceMs: 25,
           fetcher,
         }),
@@ -143,6 +155,52 @@ describe('usePreprocessingPreview', () => {
     });
   });
 
+  it('refreshes the current preview without creating a second cache identity', async () => {
+    vi.useFakeTimers();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const fetcher = vi.fn().mockResolvedValue({
+      data: [{ token: 'hello' }],
+      columns: ['token'],
+      pagination: pagination(1),
+    });
+
+    const { result } = renderHook(
+      () =>
+        usePreprocessingPreview({
+          request: { nodeId: 'node-1' },
+          identity: {
+            workspaceId: 'workspace-1',
+            operation: 'filter',
+            nodeIds: ['node-1'],
+          },
+          debounceMs: 0,
+          fetcher,
+        }),
+      { wrapper },
+    );
+
+    await flushPreviewTimer(0);
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+    const keyBeforeRefresh = queryClient.getQueryCache().getAll()[0]?.queryKey;
+
+    act(() => {
+      result.current.refresh();
+    });
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    });
+
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
+    expect(queryClient.getQueryCache().getAll()[0]?.queryKey).toEqual(keyBeforeRefresh);
+  });
+
   it('clears loaded data when the preview is disabled', async () => {
     vi.useFakeTimers();
     interface HookProps {
@@ -160,7 +218,13 @@ describe('usePreprocessingPreview', () => {
       ({ request }: HookProps) =>
         usePreprocessingPreview<{ nodeId: string }>({
           request,
-          signature: request ? 'node-1::preview' : undefined,
+          identity: request
+            ? {
+                workspaceId: 'workspace-1',
+                operation: 'filter',
+                nodeIds: ['node-1'],
+              }
+            : null,
           debounceMs: 25,
           fetcher,
         }),
@@ -209,7 +273,11 @@ describe('usePreprocessingPreview', () => {
       ({ workspaceId }) =>
         usePreprocessingPreview({
           request: { workspaceId, nodeId: 'node-1' },
-          signature: 'node-1::preview',
+          identity: {
+            workspaceId,
+            operation: 'filter',
+            nodeIds: ['node-1'],
+          },
           debounceMs: 0,
           fetcher,
         }),

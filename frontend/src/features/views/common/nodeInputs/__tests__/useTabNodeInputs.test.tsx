@@ -93,7 +93,7 @@ describe('useTabNodeInputs', () => {
     mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({
       getColumnInfos: () => [{ name: 'text', dataType: 'string' }],
-      nodeInfoCache: {},
+      nodeInfoById: {},
     });
     mocks.useUIStore.mockImplementation((selector: (state: { currentView: string }) => unknown) =>
       selector({ currentView: 'annotation' }),
@@ -158,7 +158,7 @@ describe('useTabNodeInputs', () => {
     });
     mocks.useNodeColumnInfos.mockReturnValue({
       getColumnInfos: () => [],
-      nodeInfoCache: {},
+      nodeInfoById: {},
     });
     nodeInputRequestsStore({
       requests: [{ id: 11, workspaceId: 'workspace-1', view: 'annotation', nodeIds: ['node-a'] }],
@@ -180,10 +180,21 @@ describe('useTabNodeInputs', () => {
   it('hydrates an add-before-metadata input into a usable document selection', () => {
     const onTabInputSetChange = vi.fn();
     let metadataHydrated = false;
-    mocks.useWorkspaceData.mockReturnValue({
+    mocks.useWorkspaceData.mockImplementation(() => ({
       currentWorkspaceId: 'workspace-1',
-      nodes: [{ id: 'node-a', name: 'Node A' }],
-    });
+      nodes: [
+        metadataHydrated
+          ? {
+              id: 'node-a',
+              name: 'Node A',
+              color: null,
+              document: 'document',
+              shape: [null, null],
+              tokenizer_model: 'native:plain_words_en',
+            }
+          : { id: 'node-a', name: 'Node A' },
+      ],
+    }));
     mocks.useNodeColumnInfos.mockImplementation(() => {
       const nodeInfo = metadataHydrated
         ? {
@@ -202,7 +213,7 @@ describe('useTabNodeInputs', () => {
               ]
             : [],
         getNodeInfo: () => nodeInfo,
-        nodeInfoCache: nodeInfo ? { 'node-a': nodeInfo } : {},
+        nodeInfoById: nodeInfo ? { 'node-a': nodeInfo } : {},
       };
     });
     const consume = vi.fn();

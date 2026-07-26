@@ -4,7 +4,7 @@ import { deleteFile, downloadFile, listUserFiles, uploadFile } from '@/api';
 import { saveBlob } from '@/lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '@/lib/queryKeys';
-import { invalidateFilesQuery } from './fileCache';
+import { refreshFilePathQuery } from './fileCache';
 import { toFileTree } from '@/api/frontendModels';
 
 interface UseFilesProps {
@@ -23,7 +23,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   const queryClient = useQueryClient();
 
   const filesQuery = useQuery<FileTreeNode[]>({
-    queryKey: queryKeys.files,
+    queryKey: queryKeys.fileList,
     /**
      * Fetches the user-visible file tree for data-loader consumers.
      * Called by: TanStack Query while the Data Loader's files query is enabled.
@@ -48,7 +48,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
         query: { path: uploadPath(file) },
         throwOnError: true,
       }),
-    onSuccess: () => invalidateFilesQuery(queryClient),
+    onSuccess: (_response, file) => refreshFilePathQuery(queryClient, uploadPath(file)),
   });
 
   const deleteMutation = useMutation({
@@ -59,13 +59,13 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
         query: { path: filename },
         throwOnError: true,
       }),
-    onSuccess: () => invalidateFilesQuery(queryClient),
+    onSuccess: (_response, filename) => refreshFilePathQuery(queryClient, filename),
   });
 
   /**
    * Runs only the explicit user-requested file-list refresh command. Used by:
    * Data Loader's Refresh button; mutation owners invalidate through
-   * `invalidateFilesQuery` instead of calling this command.
+   * file mutation cache helpers instead of calling this command.
    */
   const refreshFiles = async () => (await filesQuery.refetch()).data ?? null;
 

@@ -40,6 +40,6 @@ export const invalidateNodeSchemaQuery = (
   void queryClient.invalidateQueries({
     queryKey: nodeId
       ? queryKeys.nodeSchema(workspaceId, nodeId)
-      : ['workspaces', workspaceId, 'nodes'],
+      : queryKeys.workspaceNodes(workspaceId),
   });
 };

@@ -162,7 +162,7 @@ export function useDataLoaderWorkspaceActions({
     setRefreshingWorkspaces(true);
     try {
       await queryClient.refetchQueries({
-        queryKey: queryKeys.workspaces,
+        queryKey: queryKeys.workspaceList,
         exact: true,
       });
       notify('success', 'Workspace list refreshed.');
@@ -187,7 +187,7 @@ export function useDataLoaderWorkspaceActions({
         query: { filename: file.name },
         throwOnError: true,
       });
-      await queryClient.refetchQueries({ queryKey: queryKeys.workspaces, exact: true });
+      await queryClient.refetchQueries({ queryKey: queryKeys.workspaceList, exact: true });
       notify('success', `Workspace ZIP "${file.name}" uploaded.`);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to upload workspace ZIP.');

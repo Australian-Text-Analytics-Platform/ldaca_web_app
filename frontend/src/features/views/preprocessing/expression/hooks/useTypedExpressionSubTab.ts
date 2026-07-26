@@ -192,7 +192,7 @@ export function useTypedExpressionSubTab(props: TypedExpressionSubTabProps) {
     nodeId,
     operationPayload: serializedRequest,
     operationFetch: polarsExpressionPreview,
-    signaturePrefix: 'expression',
+    operation: 'expression',
     enabled: Boolean(nodeId && serializedRequest),
   });
 

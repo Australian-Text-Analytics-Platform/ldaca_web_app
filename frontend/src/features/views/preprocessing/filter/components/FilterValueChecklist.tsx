@@ -11,7 +11,10 @@ export interface FilterChecklistOption {
   value: FilterChecklistValue;
   label: string;
   isNull?: boolean;
+  count?: string;
 }
+
+const formatCount = (count: string): string => BigInt(count).toLocaleString();
 
 interface FilterValueChecklistProps {
   idPrefix: string;
@@ -144,11 +147,16 @@ export function FilterValueChecklist({
                     id={`${idPrefix}-${option.key}`}
                   />
                   <span
-                    className={`flex-1 truncate ${option.isNull ? 'font-medium' : ''}`}
+                    className={`min-w-0 truncate ${option.isNull ? 'font-medium' : ''}`}
                     title={option.isNull ? 'Null (no value)' : option.label}
                   >
                     {option.isNull ? 'Null (no value)' : option.label}
                   </span>
+                  {option.count !== undefined ? (
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      (count: {formatCount(option.count)})
+                    </span>
+                  ) : null}
                 </label>
               );
             })

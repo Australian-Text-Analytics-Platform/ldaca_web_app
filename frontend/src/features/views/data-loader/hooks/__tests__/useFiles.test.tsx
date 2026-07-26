@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFiles } from '../useFiles';
+import { queryKeys } from '@/lib/queryKeys';
 
 const mocks = vi.hoisted(() => ({
   deleteFile: vi.fn(),
@@ -38,6 +39,8 @@ describe('useFiles cache policy', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
+    const replacedPreviewKey = queryKeys.filePreview('a.csv', 1, 20, null);
+    queryClient.setQueryData(replacedPreviewKey, { rows: [{ stale: true }] });
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useFiles(), {
       wrapper: makeWrapper(queryClient),
@@ -54,6 +57,7 @@ describe('useFiles cache policy', () => {
     });
 
     expect(invalidateQueries).toHaveBeenCalledTimes(2);
+    expect(queryClient.getQueryData(replacedPreviewKey)).toBeUndefined();
     expect(result.current).not.toHaveProperty('refetchFiles');
     expect(result.current).toHaveProperty('refreshFiles');
 

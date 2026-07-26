@@ -21,9 +21,7 @@ import {
   useBrowserProviderCredentialPresence,
   useProviderCredentialsStore,
 } from './providerCredentialsStore';
-
-const PROVIDER_CREDENTIALS_QUERY_KEY = ['provider-credentials'] as const;
-const ANNOTATION_MODELS_QUERY_KEY = ['annotation-ai-models'] as const;
+import { queryKeys } from '@/lib/queryKeys';
 
 const configurationView = (
   configuration: AnnotationProviderConfigurationResource,
@@ -53,14 +51,14 @@ export const useProviderCredentials = () => {
   const queryClient = useQueryClient();
   const localPresence = useBrowserProviderCredentialPresence(user?.id);
   const statusQuery = useQuery({
-    queryKey: PROVIDER_CREDENTIALS_QUERY_KEY,
+    queryKey: queryKeys.providerCredentials,
     queryFn: async () => (await getProviderCredentials({ throwOnError: true })).data,
     enabled: isAuthenticated,
   });
 
   const updateBackendDataPortalCredential = async (patch: DataPortalCredentialPatchWritable) => {
     const { data } = await updateDataPortalCredential({ body: patch, throwOnError: true });
-    queryClient.setQueryData(PROVIDER_CREDENTIALS_QUERY_KEY, data);
+    queryClient.setQueryData(queryKeys.providerCredentials, data);
     return data;
   };
 
@@ -75,7 +73,7 @@ export const useProviderCredentials = () => {
     ) => AnnotationProviderConfigurationResource[],
   ) => {
     queryClient.setQueryData<ProviderCredentialSummary>(
-      PROVIDER_CREDENTIALS_QUERY_KEY,
+      queryKeys.providerCredentials,
       (current) => {
         if (!current || current.annotation_providers === null) return current;
         return { ...current, annotation_providers: transform(current.annotation_providers) };
@@ -143,7 +141,9 @@ export const useProviderCredentials = () => {
         configurations.filter((configuration) => configuration.id !== configurationId),
       );
     }
-    queryClient.removeQueries({ queryKey: [...ANNOTATION_MODELS_QUERY_KEY, configurationId] });
+    queryClient.removeQueries({
+      queryKey: queryKeys.annotationModelsForConfiguration(configurationId),
+    });
   };
 
   const clearAnnotationProviders = async () => {
@@ -153,7 +153,7 @@ export const useProviderCredentials = () => {
       await clearAnnotationProviderConfigurations({ throwOnError: true });
       setBackendConfigurations(() => []);
     }
-    queryClient.removeQueries({ queryKey: ANNOTATION_MODELS_QUERY_KEY });
+    queryClient.removeQueries({ queryKey: queryKeys.annotationModels });
   };
 
   const saveDataPortalCredential = async (value: string) => {

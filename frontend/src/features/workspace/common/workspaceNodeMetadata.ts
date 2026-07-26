@@ -15,25 +15,19 @@ export interface WorkspaceNodeMetadata {
 }
 
 /**
- * Projects lightweight graph state plus optional full node-info metadata into
- * the one handwritten workspace-node model used by feature code.
+ * Projects the complete graph resource into the one handwritten workspace-node
+ * model used by feature code.
  *
- * Used by: `useTabNodeInputs`, after its batched node-info request resolves.
- * Graph state owns current identity and action availability; node info owns
- * document preference, shape, and tokenizer metadata. Arrow schema is fetched
- * independently through the node-schema query. This
- * keeps a stale hydrated node-info response from masking a newer graph rename.
+ * Used by: `useTabNodeInputs`, after the Workspace graph query resolves.
+ * Arrow schema is fetched independently through the node-schema query.
  */
 export const projectWorkspaceNodeMetadata = (
   graphNode: WorkspaceNodeInfo,
-  nodeInfo?: WorkspaceNodeInfo,
 ): WorkspaceNodeMetadata => ({
   id: graphNode.id,
   name: graphNode.name,
-  color: nodeInfo?.color ?? graphNode.color ?? null,
-  document: nodeInfo?.document ?? graphNode.document ?? null,
-  shape: nodeInfo?.shape,
-  tokenizerModel: nodeInfo
-    ? (nodeInfo.tokenizer_model ?? null)
-    : (graphNode.tokenizer_model ?? null),
+  color: graphNode.color ?? null,
+  document: graphNode.document ?? null,
+  shape: graphNode.shape,
+  tokenizerModel: graphNode.tokenizer_model ?? null,
 });

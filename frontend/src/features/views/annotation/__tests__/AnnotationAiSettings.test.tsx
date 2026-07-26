@@ -34,7 +34,6 @@ const renderSettings = (onProviderChange = vi.fn()) => {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <AnnotationAiSettings
-        workspaceId="workspace-1"
         configurations={configurations}
         selectedConfigurationId={configurations[0]!.id}
         onProviderChange={onProviderChange}

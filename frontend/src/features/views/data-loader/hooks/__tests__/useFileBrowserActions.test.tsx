@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFileBrowserActions } from '../useFileBrowserActions';
+import { queryKeys } from '@/lib/queryKeys';
 
 const mocks = vi.hoisted(() => ({ moveFile: vi.fn() }));
 
@@ -20,6 +21,10 @@ describe('useFileBrowserActions cache policy', () => {
 
   it('invalidates once after a move while manual refresh remains explicit', async () => {
     const queryClient = new QueryClient();
+    const sourcePreview = queryKeys.filePreview('source.csv', 1, 20, null);
+    const targetPreview = queryKeys.filePreview('target/source.csv', 1, 20, null);
+    queryClient.setQueryData(sourcePreview, { rows: [{ stale: 'source' }] });
+    queryClient.setQueryData(targetPreview, { rows: [{ stale: 'target' }] });
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
     const refreshFiles = vi.fn().mockResolvedValue([]);
     const notify = vi.fn();
@@ -35,6 +40,8 @@ describe('useFileBrowserActions cache policy', () => {
     });
 
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(sourcePreview)).toBeUndefined();
+    expect(queryClient.getQueryData(targetPreview)).toBeUndefined();
     expect(refreshFiles).not.toHaveBeenCalled();
 
     invalidateQueries.mockClear();

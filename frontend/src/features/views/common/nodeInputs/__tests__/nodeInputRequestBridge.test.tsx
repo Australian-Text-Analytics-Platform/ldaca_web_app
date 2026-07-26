@@ -74,7 +74,7 @@ describe('node input request bridge', () => {
     mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({
       getColumnInfos: () => [{ name: 'text', dataType: 'string' }],
-      nodeInfoCache: {},
+      nodeInfoById: {},
     });
     mocks.useUIStore.mockImplementation((selector: (state: { currentView: string }) => unknown) =>
       selector({ currentView: 'filter' }),
