@@ -100,19 +100,24 @@ label, and saving class descriptions are ordinary Data Block Edits.
 AI Annotation Preview is a Preview-scoped Analysis. Each requested page is
 fresh inference over the retained snapshot. Predictions are never written
 automatically. Reviewer corrections are explicit `set_cell` Data Block Edits
-to the Tab-selected correction column. Preview comparisons reuse the same
-confusion-matrix presentation as Review, but count only the fresh predictions
-and selected comparison-column values on the current Preview page.
+to the correction column captured by the immutable request. The editable
+selection is stored on the Tab until **Clear Results** removes it. Preview
+renders the prediction and correction as separate columns with an intervening
+arrow. Preview comparisons reuse the same confusion-matrix presentation as
+Review, but count only the fresh predictions and selected comparison-column
+values on the current Preview page. Each matrix also reports Cohen's Kappa as
+chance-corrected intercoder reliability.
 
 Annotation Run All is an independent Run-All-scoped Analysis. It processes the
 complete snapshot and writes the final selected annotation column in place,
 overlaying explicit correction values where the request includes them.
 
 Annotation Review shows the document and annotation columns by default, with
-other columns available through the metadata selector. **Compare To** accepts
-one or more other columns and renders a separate confusion matrix for each;
-matrix counts cover the complete current Data Block rather than only the
-visible Review page.
+other columns available through the metadata selector. Its shared table footer
+provides rows-per-page selection and direct numbered pagination. **Compare To**
+accepts one or more other columns and renders a separate confusion matrix for
+each; matrix counts and Cohen's Kappa cover the complete current Data Block
+rather than only the visible Review page.
 
 ## Concordance And Quotation
 
@@ -146,7 +151,7 @@ Supporting Analysis and may publish multiple ordered output Data Blocks.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 10 and portable archive format 9 accept only this
+Native Workspace schema 11 and portable archive format 10 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

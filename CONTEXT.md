@@ -219,9 +219,11 @@ as verbatim examples to Preview and Run All.
 _Avoid_: training data, cached prompt
 
 **User Correction Column**:
-A Tab-selected string column on the Annotation source Data Block. Explicit
-reviewer choices are written there as Data Block Edits; AI Preview predictions
-are never written automatically.
+A string column selected in an Annotation Tab's parameter panel. The Tab keeps
+the editable draft, each submitted Analysis captures the exact column, and
+**Clear Results** removes the Tab draft. Explicit reviewer choices are written
+there as Data Block Edits; AI Preview predictions are never written
+automatically.
 _Avoid_: prediction column, hidden review state
 
 ## Relationships

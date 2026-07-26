@@ -77,10 +77,15 @@ the same provider type is chosen; otherwise the selection is cleared. Preview
 inference is a page query against a Preview-scoped Analysis and its pages use
 zero-lifetime Query entries. Labels are not written into the source.
 Choosing a correction is instead an explicit Workspace `set_cell`
-action against the selected correction column. Hydrating a historical Analysis
-first restores its exact safe request snapshot, so any provider fallback is
-visible to re-run change detection rather than rewriting the historical
-request.
+action against the selected correction column. The parameter panel owns column
+selection and creation, and captures the exact selection in every Preview or
+Run All request. **Clear Results** clears both the Analysis forest and this Tab
+draft so a new task does not inherit the prior correction column. Example Data
+Block, prompt, and inference settings share one collapsed **Advanced** section;
+the correction column can seed the source Data Block and its correction column
+as the example pair. Hydrating a historical Analysis first restores its exact
+safe request snapshot, so any provider fallback is visible to re-run change
+detection rather than rewriting the historical request.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts

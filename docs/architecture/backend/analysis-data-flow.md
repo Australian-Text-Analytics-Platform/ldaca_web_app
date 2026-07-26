@@ -119,7 +119,9 @@ them untouched.
 
 Cancelling an Analysis cascades through active descendants. Clearing a Tab
 cancels active work, removes the complete forest, query snapshots, Results, and
-Analysis-owned Artifacts, and leaves Tab presentation state intact.
+Analysis-owned Artifacts, and leaves generic Tab presentation state intact.
+The Annotation client additionally clears its persisted correction-column
+draft when the user invokes **Clear Results**.
 
 ## Result Projection, Tables, And Artifacts
 
@@ -167,7 +169,7 @@ enter Workspaces, Tabs, Results, provenance, logs, query keys, or telemetry.
 ## Persistence
 
 Terminal Analysis forests, Results, Artifacts, and queryable snapshots persist
-with the Workspace. Native schema 10 and portable archive format 9 validate
+with the Workspace. Native schema 11 and portable archive format 10 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

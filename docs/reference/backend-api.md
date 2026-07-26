@@ -125,8 +125,8 @@ closing target makes it the sole open resource. If opening fails after a sibling
 transition, the response reports the real error and subsequent collection reads
 expose the resulting backend state.
 
-Native Workspace snapshots use schema version 9 and portable archives use
-format version 8. Readers accept only those exact versions; import and open do
+Native Workspace snapshots use schema version 11 and portable archives use
+format version 10. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks
