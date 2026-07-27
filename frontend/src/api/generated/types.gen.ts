@@ -228,6 +228,10 @@ export type AnnotationAnalysisRequest = {
      */
     kind?: 'annotation';
     /**
+     * Max Retries Per Batch
+     */
+    max_retries_per_batch?: number;
+    /**
      * Model
      */
     model: string;
@@ -315,6 +319,10 @@ export type AnnotationAnalysisSubmission = {
      * Kind
      */
     kind?: 'annotation';
+    /**
+     * Max Retries Per Batch
+     */
+    max_retries_per_batch?: number;
     /**
      * Model
      */
@@ -615,9 +623,17 @@ export type AnnotationResultQuery = {
  */
 export type AnnotationRunAllAnalysisRequest = {
     /**
+     * Batch Size
+     */
+    batch_size?: number;
+    /**
      * Kind
      */
     kind?: 'annotation_run_all';
+    /**
+     * Processing Mode
+     */
+    processing_mode?: 'reprocess_all' | 'fill_missing';
     source: AnnotationAnalysisRequest;
 };
 
@@ -638,9 +654,21 @@ export type AnnotationRunAllResult = {
      */
     annotation_column: string;
     /**
+     * Attempted Count
+     */
+    attempted_count: number;
+    /**
      * Committed Workspace Revision
      */
     committed_workspace_revision: number;
+    /**
+     * Failed Batch Count
+     */
+    failed_batch_count: number;
+    /**
+     * Failed Row Count
+     */
+    failed_row_count: number;
     /**
      * Kind
      */
@@ -656,9 +684,17 @@ export type AnnotationRunAllResult = {
  */
 export type AnnotationRunAllSubmission = {
     /**
+     * Batch Size
+     */
+    batch_size?: number;
+    /**
      * Kind
      */
     kind?: 'annotation_run_all';
+    /**
+     * Processing Mode
+     */
+    processing_mode?: 'reprocess_all' | 'fill_missing';
     source: AnnotationAnalysisRequest;
 };
 
@@ -4392,6 +4428,10 @@ export type AnnotationAnalysisSubmissionWritable = {
      */
     kind?: 'annotation';
     /**
+     * Max Retries Per Batch
+     */
+    max_retries_per_batch?: number;
+    /**
      * Model
      */
     model: string;
@@ -4549,9 +4589,17 @@ export type AnnotationRunAllSubmissionWritable = {
      */
     api_key?: string | null;
     /**
+     * Batch Size
+     */
+    batch_size?: number;
+    /**
      * Kind
      */
     kind?: 'annotation_run_all';
+    /**
+     * Processing Mode
+     */
+    processing_mode?: 'reprocess_all' | 'fill_missing';
     source: AnnotationAnalysisRequest;
 };
 
