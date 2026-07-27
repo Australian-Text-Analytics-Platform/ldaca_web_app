@@ -80,21 +80,36 @@ Choosing a correction is instead an explicit Workspace `set_cell`
 action against the selected correction column. The parameter panel owns column
 selection and creation, and captures the exact selection in every Preview or
 Run All request. **Clear Results** clears both the Analysis forest and this Tab
-draft so a new task does not inherit the prior correction column. Example Data
-Block, prompt, and inference settings share one collapsed **Advanced** section;
+draft so a new task does not inherit the prior correction column. The Example
+Data Block selector stays in the main parameter panel. The collapsed
+**Advanced** row summarizes Provider and Model; its expanded content keeps those
+controls side by side with prompt and inference settings below. The Run All
+processing mode, batch size, and per-batch retry limit are captured in the
+immutable Analysis request. Reprocessing every row is the default; users
+can instead fill only blank annotations. Batch size defaults to 20 rows and is
+bounded to 100 rows, while two retries provide at most three attempts per batch;
 the correction column can seed the source Data Block and its correction column
 as the example pair. Hydrating a historical Analysis first restores its exact
 safe request snapshot, so any provider fallback is visible to re-run change
 detection rather than rewriting the historical request.
 
-Annotation comparison selections are presentation state keyed by source Data
-Block and are shared by Manual, Preview, and Review in the same Tab. Preview
-compares only its current page. Manual and Review use a dedicated full-table
-grouped-count Query resource keyed by Workspace, Data Block dependencies,
-source SQL, reference column, and target column. A successful Manual label edit
-applies its old and new count pairs to that resource after persistence; it does
-not invalidate and rescan the aggregate. A missing baseline is fetched once,
-and ordinary refetch-on-mount or focus reconciles edits made elsewhere.
+Annotation comparison columns, reliability metric, and metadata selections are
+presentation state keyed by source Data Block and are shared by Manual, Preview,
+and Review in the same Tab. Comparison choices are restricted to string and
+categorical schema columns. Cohen's Kappa is the default metric; Percent
+Agreement and nominal Krippendorff's Alpha use the same grouped counts.
+Correction-column visibility is keyed by source Data Block and correction
+column; a missing hidden override means the correction is shown. Hiding it
+changes only the Preview and Review table projection, not the request selection
+or stored correction values. Preview compares only its current page. Manual and
+Review use a dedicated full-table grouped-count Query resource keyed by
+Workspace, Data Block dependencies, source SQL, reference column, and target
+column. Compared columns project that resource as the selected reliability
+value beside the table header and a plain count matrix on hover or focus; no
+separate comparison card owns state. A successful Manual label edit applies its
+old and new count pairs to that resource after persistence; it does not
+invalidate and rescan the aggregate. A missing baseline is fetched once, and
+ordinary refetch-on-mount or focus reconciles edits made elsewhere.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts
@@ -163,6 +178,9 @@ Resource events invalidate the forest and exact Result keys.
 Preview, Run All, Stop, and Clear use shared lifecycle controls where those
 operations exist. Full-only functions render no Preview control. Preview
 replacement submits with explicit supersession and does not clear first.
+Every disabled lifecycle action exposes its current disabled reason through the
+shared action tooltip on pointer hover or keyboard focus; features supply
+domain-specific reasons while the shared renderer owns the interaction.
 Active Run All locks the submitted parameter panel; a successful Run All does
 not. Annotation replacement is the exception: each Preview or Run All becomes
 the Tab's sole Analysis immediately. An Active Analysis Draft is client-only
