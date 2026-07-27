@@ -96,13 +96,32 @@ export function ConcordanceParameterPanel({
 }: ConcordanceParameterPanelProps) {
   const effectiveNodeColumnSelections: NodeColumnSelection[] = nodeInputs.nodeColumnSelections;
   const runDisabledReason = (() => {
-    if (isSearching) return undefined;
+    if (isSearching) return 'Preview is already running';
+    if (parametersLocked) return 'Wait for Run All to finish';
     if (actionState.runDisabledReason) return actionState.runDisabledReason;
     if (!searchWord.trim()) return 'Enter a search word first';
     if (effectiveNodeColumnSelections.some((sel) => !sel.column))
       return 'Select a column for each data block';
     return undefined;
   })();
+  const runAllActionDisabled = runAllDisabled || isRunningAll;
+  const runAllDisabledReason = runAllActionDisabled
+    ? isRunningAll
+      ? 'Run All is already running'
+      : isSearching
+        ? 'Wait for Preview to finish'
+        : !searchWord.trim()
+          ? 'Enter a search word first'
+          : effectiveNodeColumnSelections.some((selection) => !selection.column)
+            ? 'Select a column for each data block'
+            : 'Wait for the current analysis to finish'
+    : undefined;
+  const clearDisabledReason = actionState.clearDisabled
+    ? isSearching || isRunningAll
+      ? 'Stop the running analysis before clearing results'
+      : (actionState.clearDisabledReason ?? 'There are no results to clear')
+    : undefined;
+  const stopDisabledReason = isStopping ? 'A stop request is already in progress' : undefined;
   return (
     <Card>
       <AnalysisFeatureHeader
@@ -323,46 +342,52 @@ export function ConcordanceParameterPanel({
             </Button>
           </DisabledReasonTooltip>
 
-          <Button
-            type="button"
-            disabled={runAllDisabled || isRunningAll}
-            onClick={() => {
-              void handleRunAll();
-            }}
-          >
-            {isRunningAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Run All
-          </Button>
+          <DisabledReasonTooltip reason={runAllDisabledReason}>
+            <Button
+              type="button"
+              disabled={runAllActionDisabled}
+              onClick={() => {
+                void handleRunAll();
+              }}
+            >
+              {isRunningAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Run All
+            </Button>
+          </DisabledReasonTooltip>
 
           <div className="flex items-center gap-2">
-            <Button
-              onClick={() => {
-                void handleClearResults();
-              }}
-              variant="destructive"
-              disabled={actionState.clearDisabled}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear Results
-            </Button>
+            <DisabledReasonTooltip reason={clearDisabledReason}>
+              <Button
+                onClick={() => {
+                  void handleClearResults();
+                }}
+                variant="destructive"
+                disabled={actionState.clearDisabled}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Clear Results
+              </Button>
+            </DisabledReasonTooltip>
             <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
           </div>
 
           {handleStopTask && (isSearching || isRunningAll) ? (
-            <Button
-              onClick={() => {
-                void handleStopTask();
-              }}
-              variant="outline"
-              disabled={isStopping}
-            >
-              {isStopping ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Square className="mr-2 h-4 w-4" />
-              )}
-              Stop
-            </Button>
+            <DisabledReasonTooltip reason={stopDisabledReason}>
+              <Button
+                onClick={() => {
+                  void handleStopTask();
+                }}
+                variant="outline"
+                disabled={isStopping}
+              >
+                {isStopping ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="mr-2 h-4 w-4" />
+                )}
+                Stop
+              </Button>
+            </DisabledReasonTooltip>
           ) : null}
         </>
       </CardFooter>

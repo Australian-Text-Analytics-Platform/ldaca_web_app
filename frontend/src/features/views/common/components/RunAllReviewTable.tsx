@@ -1,8 +1,7 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ColumnDef, PaginationState } from '@tanstack/react-table';
+import { useState } from 'react';
 import { queryWorkspaceSqlTable } from '@/api';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -13,13 +12,15 @@ import {
 } from '@/components/ui/table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import {
-  ColumnComparisonDialog,
-  ConfusionMatrix,
+  ColumnComparisonHeader,
+  ColumnComparisonSelector,
 } from '@/features/views/common/components/ColumnComparison';
+import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
+import { CorrectionColumnVisibilityButton } from '@/features/views/common/components/CorrectionColumnVisibilityButton';
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
-import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
+import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { queryKeys } from '@/lib/queryKeys';
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -40,6 +41,15 @@ interface RunAllReviewTableProps {
   comparisonColumn: string;
   comparisonColumns: string[];
   onComparisonColumnsChange: (columns: string[]) => void;
+  reliabilityMetric: IntercoderReliabilityMetric;
+  onReliabilityMetricChange: (metric: IntercoderReliabilityMetric) => void;
+  metadataColumns: string[];
+  onMetadataColumnsChange: (columns: string[]) => void;
+  correction?: {
+    column: string;
+    visible: boolean;
+    onVisibleChange: (visible: boolean) => void;
+  };
   rowCount: number;
 }
 
@@ -53,15 +63,17 @@ export function RunAllReviewTable({
   comparisonColumn,
   comparisonColumns,
   onComparisonColumnsChange,
+  reliabilityMetric,
+  onReliabilityMetricChange,
+  metadataColumns,
+  onMetadataColumnsChange,
+  correction,
   rowCount,
 }: RunAllReviewTableProps) {
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: DEFAULT_PAGE_SIZE,
   });
-  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
-  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
-  const [draftComparisonColumns, setDraftComparisonColumns] = useState<string[]>([]);
   const query = useQuery({
     queryKey: queryKeys.workspaceSql(
       workspaceId,
@@ -99,6 +111,15 @@ export function RunAllReviewTable({
   const activeComparisonColumns = comparisonColumns.filter((column) =>
     availableComparisonColumns.includes(column),
   );
+  const activeMetadataColumns = metadataColumns.filter((column) =>
+    availableMetadataColumns.includes(column),
+  );
+  const visibleRequiredColumns = requiredColumns.filter(
+    (column) => column !== correction?.column || correction.visible,
+  );
+  const displayedComparisonColumns = activeComparisonColumns.filter(
+    (column) => column !== correction?.column || correction.visible,
+  );
   const comparisonQueries = useFullColumnComparisons({
     workspaceId,
     nodeIds,
@@ -106,12 +127,15 @@ export function RunAllReviewTable({
     referenceColumn: comparisonColumn,
     comparisonColumns: activeComparisonColumns,
   });
+  const comparisonQueryByColumn = new Map(
+    activeComparisonColumns.map((column, index) => [column, comparisonQueries[index]]),
+  );
   const visibleColumns = data
     ? Array.from(
         new Set([
-          ...requiredColumns.filter((column) => data.columns.includes(column)),
-          ...activeComparisonColumns,
-          ...availableMetadataColumns.filter((column) => selectedMetadataColumns.includes(column)),
+          ...visibleRequiredColumns.filter((column) => data.columns.includes(column)),
+          ...displayedComparisonColumns,
+          ...activeMetadataColumns,
         ]),
       )
     : [];
@@ -134,22 +158,23 @@ export function RunAllReviewTable({
         <h3 className="text-base font-semibold">{title} Review</h3>
         {data ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={availableComparisonColumns.length === 0}
-              onClick={() => {
-                setDraftComparisonColumns(activeComparisonColumns);
-                setCompareDialogOpen(true);
-              }}
-            >
-              Compare To
-            </Button>
+            <ColumnComparisonSelector
+              availableColumns={availableComparisonColumns}
+              selectedColumns={activeComparisonColumns}
+              onSelectedColumnsChange={onComparisonColumnsChange}
+              metric={reliabilityMetric}
+              onMetricChange={onReliabilityMetricChange}
+            />
+            {correction ? (
+              <CorrectionColumnVisibilityButton
+                visible={correction.visible}
+                onVisibleChange={correction.onVisibleChange}
+              />
+            ) : null}
             <MetadataColumnSelector
               availableColumns={availableMetadataColumns}
-              selectedColumns={selectedMetadataColumns}
-              onSelectedColumnsChange={setSelectedMetadataColumns}
+              selectedColumns={activeMetadataColumns}
+              onSelectedColumnsChange={onMetadataColumnsChange}
             />
           </div>
         ) : null}
@@ -175,7 +200,20 @@ export function RunAllReviewTable({
             <TableHeader>
               <TableRow>
                 {visibleColumns.map((column) => (
-                  <TableHead key={column}>{column}</TableHead>
+                  <TableHead key={column}>
+                    {activeComparisonColumns.includes(column) ? (
+                      <ColumnComparisonHeader
+                        metric={reliabilityMetric}
+                        referenceColumn={comparisonColumn}
+                        comparisonColumn={column}
+                        rows={comparisonQueryByColumn.get(column)?.data}
+                        isLoading={comparisonQueryByColumn.get(column)?.isLoading ?? true}
+                        isError={comparisonQueryByColumn.get(column)?.isError ?? false}
+                      />
+                    ) : (
+                      column
+                    )}
+                  </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
@@ -193,36 +231,6 @@ export function RunAllReviewTable({
           </Table>
         </AnalysisTableFrame>
       )}
-      {activeComparisonColumns.length > 0 ? (
-        <div className="mt-4 space-y-4" aria-label="Annotation comparisons">
-          {activeComparisonColumns.map((targetColumn, index) => {
-            const comparisonQuery = comparisonQueries[index];
-            return (
-              <ConfusionMatrix
-                key={targetColumn}
-                referenceColumn={comparisonColumn}
-                comparisonColumn={targetColumn}
-                rows={comparisonQuery?.data}
-                isLoading={comparisonQuery?.isLoading ?? true}
-                isError={comparisonQuery?.isError ?? false}
-              />
-            );
-          })}
-        </div>
-      ) : null}
-      <ColumnComparisonDialog
-        open={compareDialogOpen}
-        referenceColumn={comparisonColumn}
-        availableColumns={availableComparisonColumns}
-        selectedColumns={draftComparisonColumns}
-        scopeDescription="across the full Data Block"
-        onOpenChange={setCompareDialogOpen}
-        onSelectedColumnsChange={setDraftComparisonColumns}
-        onCompare={() => {
-          onComparisonColumnsChange(draftComparisonColumns);
-          setCompareDialogOpen(false);
-        }}
-      />
     </section>
   );
 }

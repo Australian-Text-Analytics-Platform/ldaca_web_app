@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import type { Analysis, AnnotationAnalysisRequest, AnnotationResult } from '@/api';
 import { sqlIdentifier, sqlTable } from '@/api';
 import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
 import { useProviderCredentials } from '@/features/provider-credentials/useProviderCredentials';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { RunAllReviewTable } from '@/features/views/common/components/RunAllReviewTable';
+import { DEFAULT_INTERCODER_RELIABILITY_METRIC } from '@/features/views/common/columnComparisonModel';
 import type { NodeInputColumnAddonArgs } from '@/features/views/common/components/NodeInputsPanel';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
@@ -198,6 +200,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     commitAiPrompt,
     aiTemperature,
     commitAiTemperature,
+    aiMaxRetriesPerBatch,
+    commitAiMaxRetriesPerBatch,
+    aiBatchSize,
+    commitAiBatchSize,
+    aiProcessingMode,
+    setAiProcessingMode,
     aiReasoningEnabled,
     setAiReasoningEnabled,
     aiReasoningEffort,
@@ -206,6 +214,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAnnotationTarget,
     annotationComparisonColumns,
     setAnnotationComparisonColumns,
+    annotationReliabilityMetrics,
+    setAnnotationReliabilityMetric,
+    annotationMetadataColumns,
+    setAnnotationMetadataColumns,
+    annotationHiddenCorrectionColumns,
+    setAnnotationCorrectionVisible,
   } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
   const providerCredentials = useProviderCredentials();
   const selectedAiProvider =
@@ -255,6 +269,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: SOURCE_NODE_CONSTRAINTS,
+    deferNodeInputPlacement: true,
   });
   const handleSourceTextColumnChange = (nodeId: string, column: string) => {
     sourceNodeInputs.setColumn(nodeId, column);
@@ -271,6 +286,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: CLASS_DESCRIPTION_NODE_CONSTRAINTS,
+    deferNodeInputPlacement: true,
   });
   // Optional few-shot example node, surfaced only in AI mode. Persists in its own
   // input set so it round-trips with the rest of the tab state.
@@ -279,6 +295,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: EXAMPLE_NODE_CONSTRAINTS,
+    deferNodeInputPlacement: true,
   });
   const handleExampleTextColumnChange = (nodeId: string, column: string) => {
     exampleNodeInputs.setColumn(nodeId, column);
@@ -589,6 +606,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           model: aiModel,
           instruction: resolvedSystemPrompt,
           temperature: aiTemperature,
+          max_retries_per_batch: aiMaxRetriesPerBatch,
           reasoning_enabled: aiReasoningEnabled,
           reasoning_effort: normalizedReasoningEffort,
         }
@@ -671,11 +689,18 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       setAiPrompt(request.instruction);
       commitAiPrompt(request.instruction);
       commitAiTemperature(request.temperature ?? 0);
+      commitAiMaxRetriesPerBatch(request.max_retries_per_batch ?? 2);
+      if (!latestPreview && annotationRunAll?.request.kind === 'annotation_run_all') {
+        commitAiBatchSize(annotationRunAll.request.batch_size ?? 20);
+        setAiProcessingMode(annotationRunAll.request.processing_mode ?? 'reprocess_all');
+      }
       setAiReasoningEnabled(request.reasoning_enabled ?? false);
       setAiReasoningEffort(request.reasoning_effort ?? 'medium');
     },
     onCleared: refreshAnalyses,
   });
+  const previewCorrectionColumn = serverAiRequest?.correction_column ?? null;
+  const reviewCorrectionColumn = annotationRunAllSource?.correction_column ?? null;
   const aiActionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: Boolean(currentAiRequest),
@@ -732,6 +757,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         tabId: host.tabId,
         providerConfigurationId: selectedAiProvider.id,
         source: currentAiRequest,
+        batchSize: aiBatchSize,
+        processingMode: aiProcessingMode,
       });
       refreshAnalyses();
       void queryClient.invalidateQueries({
@@ -779,12 +806,19 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                       isCreatingAnnotationColumn ||
                       isCreatingCorrectionColumn ||
                       analysisActionLifecycle.isPreviewing,
+                    previewDisabledReason:
+                      isCreatingAnnotationColumn || isCreatingCorrectionColumn
+                        ? 'Wait for the column to finish creating'
+                        : aiActionState.runDisabledReason,
                     runAllDisabled: !currentAiRequest || analysisActionLifecycle.runAllDisabled,
+                    runAllDisabledReason: aiActionState.runDisabledReason,
                     clearDisabled:
                       analyses.length === 0 ||
                       analysisActionLifecycle.isPreviewing ||
                       analysisActionLifecycle.isRunningAll ||
                       Boolean(activeAnalysis),
+                    clearDisabledReason:
+                      analyses.length === 0 ? 'There are no results to clear' : undefined,
                     isPreviewing: analysisActionLifecycle.isPreviewing,
                     isRunningAll: analysisActionLifecycle.isRunningAll,
                     isStopping: isAiStopping,
@@ -799,19 +833,27 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
             }
             footer={
               annotationMode === 'manual' ? (
-                <Button
-                  type="button"
-                  disabled={!sourceNode || !selectedAnnotationColumnExists}
-                  onClick={() => {
-                    if (hasRun) {
-                      setHasRun(false);
-                    } else {
-                      setHasRun(true);
-                    }
-                  }}
+                <DisabledReasonTooltip
+                  reason={
+                    !sourceNode || !selectedAnnotationColumnExists
+                      ? 'Select an Annotation Data Block and annotation column first'
+                      : undefined
+                  }
                 >
-                  {hasRun ? 'Clear' : 'Resume'}
-                </Button>
+                  <Button
+                    type="button"
+                    disabled={!sourceNode || !selectedAnnotationColumnExists}
+                    onClick={() => {
+                      if (hasRun) {
+                        setHasRun(false);
+                      } else {
+                        setHasRun(true);
+                      }
+                    }}
+                  >
+                    {hasRun ? 'Clear' : 'Resume'}
+                  </Button>
+                </DisabledReasonTooltip>
               ) : undefined
             }
           >
@@ -945,27 +987,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     advanced={
                       <>
                         <div className="space-y-2">
-                          <Label className="block text-xs font-medium text-muted-foreground">
-                            Example Data Block
-                            <span className="ml-1 font-normal">(optional)</span>
-                          </Label>
-                          <NodeInputsPanel
-                            title="Example Node"
-                            resolvedNodes={exampleNodeInputs.resolvedNodes}
-                            availableNodes={exampleNodeInputs.availableNodes}
-                            canAddMore={exampleNodeInputs.canAddMore}
-                            maxNodes={1}
-                            onAddNodes={exampleNodeInputs.addNodes}
-                            getAddRejection={exampleNodeInputs.getAddRejection}
-                            onRemoveNode={exampleNodeInputs.removeNode}
-                            onClear={exampleNodeInputs.clear}
-                            onColumnChange={handleExampleTextColumnChange}
-                            columnLabel="Text Column"
-                            renderColumnAddon={renderExampleAnnotationColumnPicker}
-                            disabled={controlsLocked}
-                          />
-                        </div>
-                        <div className="space-y-2">
                           <Label
                             htmlFor="annotation-ai-prompt"
                             className="block text-xs font-medium text-muted-foreground"
@@ -985,6 +1006,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                         <AnnotationInferenceSettings
                           temperature={aiTemperature}
                           onTemperatureCommit={commitAiTemperature}
+                          maxRetriesPerBatch={aiMaxRetriesPerBatch}
+                          onMaxRetriesPerBatchCommit={commitAiMaxRetriesPerBatch}
+                          batchSize={aiBatchSize}
+                          onBatchSizeCommit={commitAiBatchSize}
+                          processingMode={aiProcessingMode}
+                          onProcessingModeChange={setAiProcessingMode}
                           reasoningEnabled={aiReasoningEnabled}
                           onReasoningEnabledChange={setAiReasoningEnabled}
                           reasoningEffort={aiReasoningEffort}
@@ -1058,6 +1085,27 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                       >
                         Use the correction column as the example
                       </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="block text-xs font-medium text-muted-foreground">
+                        Example Data Block
+                        <span className="ml-1 font-normal">(optional)</span>
+                      </Label>
+                      <NodeInputsPanel
+                        title="Example Node"
+                        resolvedNodes={exampleNodeInputs.resolvedNodes}
+                        availableNodes={exampleNodeInputs.availableNodes}
+                        canAddMore={exampleNodeInputs.canAddMore}
+                        maxNodes={1}
+                        onAddNodes={exampleNodeInputs.addNodes}
+                        getAddRejection={exampleNodeInputs.getAddRejection}
+                        onRemoveNode={exampleNodeInputs.removeNode}
+                        onClear={exampleNodeInputs.clear}
+                        onColumnChange={handleExampleTextColumnChange}
+                        columnLabel="Text Column"
+                        renderColumnAddon={renderExampleAnnotationColumnPicker}
+                        disabled={controlsLocked}
+                      />
                     </div>
                   </AnnotationAiSettings>
                 </div>
@@ -1239,6 +1287,16 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           onComparisonColumnsChange={(columns) => {
             setAnnotationComparisonColumns(sourceNode.id, columns);
           }}
+          reliabilityMetric={
+            annotationReliabilityMetrics[sourceNode.id] ?? DEFAULT_INTERCODER_RELIABILITY_METRIC
+          }
+          onReliabilityMetricChange={(metric) => {
+            setAnnotationReliabilityMetric(sourceNode.id, metric);
+          }}
+          metadataColumns={annotationMetadataColumns[sourceNode.id] ?? []}
+          onMetadataColumnsChange={(columns) => {
+            setAnnotationMetadataColumns(sourceNode.id, columns);
+          }}
         />
       ) : null}
       {annotationMode === 'ai' &&
@@ -1255,15 +1313,36 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           requiredColumns={[
             annotationRunAllSource.text_column,
             annotationRunAllSource.annotation_column,
-            ...(annotationRunAllSource.correction_column
-              ? [annotationRunAllSource.correction_column]
-              : []),
+            ...(reviewCorrectionColumn ? [reviewCorrectionColumn] : []),
           ]}
           comparisonColumn={annotationRunAllSource.annotation_column}
           comparisonColumns={annotationComparisonColumns[sourceNode.id] ?? []}
           onComparisonColumnsChange={(columns) => {
             setAnnotationComparisonColumns(sourceNode.id, columns);
           }}
+          reliabilityMetric={
+            annotationReliabilityMetrics[sourceNode.id] ?? DEFAULT_INTERCODER_RELIABILITY_METRIC
+          }
+          onReliabilityMetricChange={(metric) => {
+            setAnnotationReliabilityMetric(sourceNode.id, metric);
+          }}
+          metadataColumns={annotationMetadataColumns[sourceNode.id] ?? []}
+          onMetadataColumnsChange={(columns) => {
+            setAnnotationMetadataColumns(sourceNode.id, columns);
+          }}
+          correction={
+            reviewCorrectionColumn
+              ? {
+                  column: reviewCorrectionColumn,
+                  visible: !(annotationHiddenCorrectionColumns[sourceNode.id] ?? []).includes(
+                    reviewCorrectionColumn,
+                  ),
+                  onVisibleChange: (visible) => {
+                    setAnnotationCorrectionVisible(sourceNode.id, reviewCorrectionColumn, visible);
+                  },
+                }
+              : undefined
+          }
         />
       ) : annotationMode === 'ai' && aiResult && serverAiRequest ? (
         <AnnotationAiPreviewPanel
@@ -1273,11 +1352,36 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
             onColumnsChange: (columns) => {
               setAnnotationComparisonColumns(serverAiRequest.node_id, columns);
             },
+            metric:
+              annotationReliabilityMetrics[serverAiRequest.node_id] ??
+              DEFAULT_INTERCODER_RELIABILITY_METRIC,
+            onMetricChange: (metric) => {
+              setAnnotationReliabilityMetric(serverAiRequest.node_id, metric);
+            },
+          }}
+          metadata={{
+            columns: annotationMetadataColumns[serverAiRequest.node_id] ?? [],
+            onColumnsChange: (columns) => {
+              setAnnotationMetadataColumns(serverAiRequest.node_id, columns);
+            },
           }}
           correction={{
             nodeId: serverAiRequest.node_id,
-            column: serverAiRequest.correction_column ?? null,
+            column: previewCorrectionColumn,
             classOptions: serverAiRequest.classes.map((item) => item.name),
+            visible:
+              !previewCorrectionColumn ||
+              !(annotationHiddenCorrectionColumns[serverAiRequest.node_id] ?? []).includes(
+                previewCorrectionColumn,
+              ),
+            onVisibleChange: (visible) => {
+              if (!previewCorrectionColumn) return;
+              setAnnotationCorrectionVisible(
+                serverAiRequest.node_id,
+                previewCorrectionColumn,
+                visible,
+              );
+            },
           }}
         />
       ) : null}

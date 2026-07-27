@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
+import type { ColumnDef } from '@tanstack/react-table';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { sqlTable } from '@/api';
 import {
@@ -18,22 +18,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
-import {
-  ColumnComparisonDialog,
-  ConfusionMatrix,
-} from '@/features/views/common/components/ColumnComparison';
 import {
   applyReferenceComparisonEdit,
   type ConfusionCount,
+  type IntercoderReliabilityMetric,
 } from '@/features/views/common/columnComparisonModel';
+import {
+  ColumnComparisonHeader,
+  ColumnComparisonSelector,
+} from '@/features/views/common/components/ColumnComparison';
+import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
+import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
-import type { ColumnDef } from '@tanstack/react-table';
-import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
-import { useAnnotationNodePage, type AnnotationNodePageRow } from '../hooks/useAnnotationNodePage';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { queryKeys } from '@/lib/queryKeys';
+import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
+import { type AnnotationNodePageRow, useAnnotationNodePage } from '../hooks/useAnnotationNodePage';
 
 const ANNOTATION_RESULT_PAGE_SIZE = 10;
 // Radix `Select` rejects an empty-string item value, so the "clear" option uses
@@ -61,6 +62,10 @@ interface AnnotationResultsPanelProps {
   descriptionColumn: string | null;
   comparisonColumns: string[];
   onComparisonColumnsChange: (columns: string[]) => void;
+  reliabilityMetric: IntercoderReliabilityMetric;
+  onReliabilityMetricChange: (metric: IntercoderReliabilityMetric) => void;
+  metadataColumns: string[];
+  onMetadataColumnsChange: (columns: string[]) => void;
 }
 
 /**
@@ -74,9 +79,9 @@ interface AnnotationResultsPanelProps {
  *
  * Flow: fetch the current source-node page plus the class list, then render the
  * document and editable annotation columns followed by the selected read-only
- * comparison columns. The text column is plain; each annotation cell is a
- * dropdown of class names plus a leading "None" option that clears the cell back
- * to an unset value. Each
+ * comparison and metadata columns. The text column is plain; each annotation
+ * cell is a dropdown of class names plus a leading "None" option that clears
+ * the cell back to an unset value. Each
  * dropdown is seeded from the existing value. Picking a class updates the
  * dropdown and persists the cell as a canonical set_cell Data Block edit,
  * reverting on failure. Full-table comparisons share the Tab's selected target
@@ -93,14 +98,16 @@ export function AnnotationResultsPanel({
   descriptionColumn,
   comparisonColumns,
   onComparisonColumnsChange,
+  reliabilityMetric,
+  onReliabilityMetricChange,
+  metadataColumns,
+  onMetadataColumnsChange,
 }: AnnotationResultsPanelProps) {
   const { setCell } = useWorkspaceActions();
   const queryClient = useQueryClient();
   // Per-row class overrides keyed by source row position; falls back to the source value.
   const [selections, setSelections] = useState<Record<number, string | null>>({});
   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
-  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
-  const [draftComparisonColumns, setDraftComparisonColumns] = useState<string[]>([]);
   const nodePage = useAnnotationNodePage({
     workspaceId,
     nodeId,
@@ -129,10 +136,20 @@ export function AnnotationResultsPanel({
       (column) =>
         column !== textColumn && column !== annotationColumn && comparableColumnSet.has(column),
     ) ?? [];
+  const availableMetadataColumns =
+    resultsQuery.data?.columns.filter(
+      (column) => column !== textColumn && column !== annotationColumn,
+    ) ?? [];
   const activeComparisonColumns = comparisonColumns.filter((column) =>
     availableComparisonColumns.includes(column),
   );
-  const visibleColumns = [textColumn, annotationColumn, ...activeComparisonColumns];
+  const activeMetadataColumns = metadataColumns.filter((column) =>
+    availableMetadataColumns.includes(column),
+  );
+  const visibleSupplementalColumns = Array.from(
+    new Set([...activeComparisonColumns, ...activeMetadataColumns]),
+  );
+  const visibleColumns = [textColumn, annotationColumn, ...visibleSupplementalColumns];
   const tableColumns: ColumnDef<AnnotationResultRow>[] = visibleColumns.map((column) => ({
     id: column,
     accessorFn: (row) => row[column],
@@ -152,6 +169,9 @@ export function AnnotationResultsPanel({
     referenceColumn: annotationColumn,
     comparisonColumns: activeComparisonColumns,
   });
+  const comparisonQueryByColumn = new Map(
+    activeComparisonColumns.map((column, index) => [column, comparisonQueries[index]]),
+  );
 
   return (
     <section
@@ -161,18 +181,20 @@ export function AnnotationResultsPanel({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-base font-semibold">Annotations</h3>
         {resultsQuery.data ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={availableComparisonColumns.length === 0}
-            onClick={() => {
-              setDraftComparisonColumns(activeComparisonColumns);
-              setCompareDialogOpen(true);
-            }}
-          >
-            Compare To
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <ColumnComparisonSelector
+              availableColumns={availableComparisonColumns}
+              selectedColumns={activeComparisonColumns}
+              onSelectedColumnsChange={onComparisonColumnsChange}
+              metric={reliabilityMetric}
+              onMetricChange={onReliabilityMetricChange}
+            />
+            <MetadataColumnSelector
+              availableColumns={availableMetadataColumns}
+              selectedColumns={activeMetadataColumns}
+              onSelectedColumnsChange={onMetadataColumnsChange}
+            />
+          </div>
         ) : null}
       </div>
       {resultsQuery.isLoading ? (
@@ -195,9 +217,20 @@ export function AnnotationResultsPanel({
                 <TableRow>
                   <TableHead>{textColumn}</TableHead>
                   <TableHead className="w-px whitespace-nowrap">{annotationColumn}</TableHead>
-                  {activeComparisonColumns.map((column) => (
+                  {visibleSupplementalColumns.map((column) => (
                     <TableHead key={column} className="w-px whitespace-nowrap">
-                      {column}
+                      {activeComparisonColumns.includes(column) ? (
+                        <ColumnComparisonHeader
+                          metric={reliabilityMetric}
+                          referenceColumn={annotationColumn}
+                          comparisonColumn={column}
+                          rows={comparisonQueryByColumn.get(column)?.data}
+                          isLoading={comparisonQueryByColumn.get(column)?.isLoading ?? true}
+                          isError={comparisonQueryByColumn.get(column)?.isError ?? false}
+                        />
+                      ) : (
+                        column
+                      )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -320,7 +353,7 @@ export function AnnotationResultsPanel({
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      {activeComparisonColumns.map((column) => (
+                      {visibleSupplementalColumns.map((column) => (
                         <TableCell key={column} className="w-px whitespace-pre-wrap">
                           {cellText(row[column]) || '—'}
                         </TableCell>
@@ -340,36 +373,6 @@ export function AnnotationResultsPanel({
           />
         </div>
       )}
-      {activeComparisonColumns.length > 0 ? (
-        <div className="mt-4 space-y-4" aria-label="Annotation comparisons">
-          {activeComparisonColumns.map((targetColumn, index) => {
-            const comparisonQuery = comparisonQueries[index];
-            return (
-              <ConfusionMatrix
-                key={targetColumn}
-                referenceColumn={annotationColumn}
-                comparisonColumn={targetColumn}
-                rows={comparisonQuery?.data}
-                isLoading={comparisonQuery?.isLoading ?? true}
-                isError={comparisonQuery?.isError ?? false}
-              />
-            );
-          })}
-        </div>
-      ) : null}
-      <ColumnComparisonDialog
-        open={compareDialogOpen}
-        referenceColumn={annotationColumn}
-        availableColumns={availableComparisonColumns}
-        selectedColumns={draftComparisonColumns}
-        scopeDescription="across the full Data Block"
-        onOpenChange={setCompareDialogOpen}
-        onSelectedColumnsChange={setDraftComparisonColumns}
-        onCompare={() => {
-          onComparisonColumnsChange(draftComparisonColumns);
-          setCompareDialogOpen(false);
-        }}
-      />
     </section>
   );
 }

@@ -1,9 +1,9 @@
 /**
  * Prompt editor for the Annotation tab's AI mode.
  *
- * Rendered by: AnnotationFeature, in the AnnotationAiSettings `children` slot
- * directly under the Example Data Block. It backs the instruction prompt that
- * is sent to the provider alongside the text + class descriptions.
+ * Rendered by: AnnotationFeature, in the AnnotationAiSettings Advanced content
+ * below the provider/model row. It backs the instruction prompt that is sent
+ * to the provider alongside the text + class descriptions.
  *
  * Ghost-default UX (what the user asked for): while the field is empty the
  * default prompt shows grayed as the textarea placeholder. From there the user
@@ -15,7 +15,7 @@
  * Tab is only intercepted while the field is empty; once it holds content, Tab
  * resumes normal focus traversal so keyboard navigation isn't trapped.
  */
-import { useRef, type KeyboardEvent } from 'react';
+import { type KeyboardEvent, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 
 /**
@@ -23,10 +23,9 @@ import { Textarea } from '@/components/ui/textarea';
  * pass it in as the ghost/placeholder text and tests can assert against it.
  */
 export const DEFAULT_ANNOTATION_PROMPT =
-  'You are an expert text annotator. You will be given a text and a list of ' +
-  'candidate classes, each with a short description. Read the text carefully ' +
-  'and assign the single class that best fits its meaning. Respond with only ' +
-  'the chosen class label and nothing else.';
+  'You are an expert text annotator. You will be given one or more texts and a list of ' +
+  'candidate classes, each with a short description. Read each text carefully and assign ' +
+  'exactly one class that best fits its meaning.';
 
 interface AnnotationPromptInputProps {
   value: string;

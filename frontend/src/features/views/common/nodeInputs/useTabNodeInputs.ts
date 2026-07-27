@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import type { WorkspaceNodeInfo } from '@/api';
+import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
-import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import {
   projectWorkspaceNodeMetadata,
   type WorkspaceNodeMetadata,
 } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import { useUIStore } from '@/stores';
 import { useAuthStore } from '@/stores/authStore';
+import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { recentSelectionsScopeKey, useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
 import {
-  DEFAULT_TAB_INPUT_SET_ID,
-  getTabInputSet,
   type AnalysisTabInput,
   type AnalysisTabInputSets,
+  DEFAULT_TAB_INPUT_SET_ID,
+  getTabInputSet,
 } from '../tabs/tabStateOps';
 import type { NodeAddRejection, NodeInputConstraints } from './nodeInputsCore';
 import { type UseNodeInputsResult, useNodeInputs } from './useNodeInputs';
@@ -38,6 +41,8 @@ export interface UseTabNodeInputsConfig {
   onTabInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   /** Per-view constraints (allowed column types, max nodes, document-only). */
   constraints: NodeInputConstraints;
+  /** Keep graph/sidebar add requests on the pointer when this view has multiple placement areas. */
+  deferNodeInputPlacement?: boolean;
 }
 
 export interface UseTabNodeInputsResult extends UseNodeInputsResult {
@@ -68,9 +73,9 @@ export interface UseTabNodeInputsResult extends UseNodeInputsResult {
  * Flow: resolve the requested selector id from ``input_sets``, cap restored
  * state once at this named owner and persist that normalization, fetch metadata
  * only for the stable effective inputs, delegate those same inputs to
- * ``useNodeInputs``, and expose the same callbacks to ``NodeInputsPanel``. The
- * panel owns explicit placement of carried graph/sidebar Data Blocks so every
- * single- and multi-selector view follows one interaction contract.
+ * ``useNodeInputs``, and expose the same callbacks to ``NodeInputsPanel``.
+ * Single-selector views consume matching graph/sidebar requests immediately;
+ * multi-selector views defer placement so the user can choose a target panel.
  */
 export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInputsResult {
   const {
@@ -78,10 +83,14 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     tabInputSets,
     onTabInputSetChange,
     constraints,
+    deferNodeInputPlacement = false,
   } = config;
   const { nodes, currentWorkspaceId } = useWorkspaceData();
+  const currentView = useUIStore((state) => state.currentView);
   const userId = useAuthStore((state) => state.session?.user?.id ?? '__anonymous__');
   const { selectedNodeIds } = useWorkspaceSelection();
+  const pendingInputRequests = useNodeInputRequestsStore((state) => state.pendingRequests);
+  const consumeInputRequest = useNodeInputRequestsStore((state) => state.consume);
 
   const value = useMemo(
     () => getTabInputSet(tabInputSets ? { input_sets: tabInputSets } : undefined, selectorId),
@@ -166,6 +175,40 @@ export function useTabNodeInputs(config: UseTabNodeInputsConfig): UseTabNodeInpu
     },
     [baseAddNodes, effectiveInputs, recordRecent, userId, currentWorkspaceId],
   );
+
+  // A stable addNodes identity is required here: this effect should respond to
+  // new carried requests, not replay unchanged requests after unrelated renders.
+  useEffect(() => {
+    if (deferNodeInputPlacement || !currentWorkspaceId) return;
+    const pendingIds = new Set(
+      useNodeInputRequestsStore.getState().pendingRequests.map((request) => request.id),
+    );
+    const matchingRequests = pendingInputRequests.filter(
+      (request) =>
+        pendingIds.has(request.id) &&
+        request.workspaceId === currentWorkspaceId &&
+        request.view === currentView,
+    );
+    if (matchingRequests.length === 0) return;
+
+    const rejections = addNodes(matchingRequests.map((request) => request.nodeId));
+    if (rejections.length === 1) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length===1 guarantees index 0 exists
+      toast.warning(`Couldn't add node: ${rejections[0]!.reason}`);
+    } else if (rejections.length > 1) {
+      toast.warning(`Couldn't add ${String(rejections.length)} nodes (already added or full).`);
+    }
+    matchingRequests.forEach((request) => {
+      consumeInputRequest(request.id);
+    });
+  }, [
+    addNodes,
+    consumeInputRequest,
+    currentView,
+    currentWorkspaceId,
+    deferNodeInputPlacement,
+    pendingInputRequests,
+  ]);
 
   const nodeNameById = useMemo(() => {
     const map = new Map<string, string>();

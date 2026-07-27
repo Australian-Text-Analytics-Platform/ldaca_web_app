@@ -17,6 +17,15 @@ interface AnnotationInferenceSettingsProps {
   temperature: number;
   /** Persist the clamped temperature (called on blur). */
   onTemperatureCommit: (value: number) => void;
+  /** Maximum automatic retries after the initial request for each batch. */
+  maxRetriesPerBatch: number;
+  onMaxRetriesPerBatchCommit: (value: number) => void;
+  /** Rows sent in each Run All provider request. */
+  batchSize: number;
+  onBatchSizeCommit: (value: number) => void;
+  /** Whether Run All replaces every label or only fills blank annotations. */
+  processingMode: 'reprocess_all' | 'fill_missing';
+  onProcessingModeChange: (value: 'reprocess_all' | 'fill_missing') => void;
   /** Whether reasoning/thinking is requested; hides the effort control when off. */
   reasoningEnabled: boolean;
   onReasoningEnabledChange: (enabled: boolean) => void;
@@ -29,6 +38,12 @@ interface AnnotationInferenceSettingsProps {
 export function AnnotationInferenceSettings({
   temperature,
   onTemperatureCommit,
+  maxRetriesPerBatch,
+  onMaxRetriesPerBatchCommit,
+  batchSize,
+  onBatchSizeCommit,
+  processingMode,
+  onProcessingModeChange,
   reasoningEnabled,
   onReasoningEnabledChange,
   reasoningEffort,
@@ -57,6 +72,90 @@ export function AnnotationInferenceSettings({
         />
         <p className="text-xs text-muted-foreground">
           0 is deterministic; higher values add randomness (max 2).
+        </p>
+      </div>
+
+      <fieldset className="space-y-1.5">
+        <legend className="text-sm font-medium">Run All processing</legend>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <Label className="flex cursor-pointer items-center gap-2 font-normal">
+            <input
+              type="radio"
+              name="annotation-ai-processing-mode"
+              value="reprocess_all"
+              checked={processingMode === 'reprocess_all'}
+              disabled={disabled}
+              className="size-4 accent-primary"
+              onChange={() => {
+                onProcessingModeChange('reprocess_all');
+              }}
+            />
+            Reprocess all rows
+          </Label>
+          <Label className="flex cursor-pointer items-center gap-2 font-normal">
+            <input
+              type="radio"
+              name="annotation-ai-processing-mode"
+              value="fill_missing"
+              checked={processingMode === 'fill_missing'}
+              disabled={disabled}
+              className="size-4 accent-primary"
+              onChange={() => {
+                onProcessingModeChange('fill_missing');
+              }}
+            />
+            Fill missing only
+          </Label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Reprocess replaces the annotation column; fill missing preserves existing labels.
+        </p>
+      </fieldset>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="annotation-ai-batch-size">Batch size</Label>
+        <Input
+          key={`annotation-ai-batch-size-${String(batchSize)}`}
+          id="annotation-ai-batch-size"
+          type="number"
+          min={1}
+          max={100}
+          step={1}
+          defaultValue={String(batchSize)}
+          disabled={disabled}
+          className="w-28"
+          onBlur={(event) => {
+            const parsed = Number(event.target.value);
+            const safe = Number.isFinite(parsed) ? Math.trunc(parsed) : 20;
+            onBatchSizeCommit(Math.min(100, Math.max(1, safe)));
+          }}
+        />
+        <p className="text-xs text-muted-foreground">
+          Rows sent in each Run All LLM request (default 20, max 100).
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="annotation-ai-max-retries-per-batch">Max retries per batch</Label>
+        <Input
+          key={`annotation-ai-max-retries-per-batch-${String(maxRetriesPerBatch)}`}
+          id="annotation-ai-max-retries-per-batch"
+          type="number"
+          min={0}
+          max={10}
+          step={1}
+          defaultValue={String(maxRetriesPerBatch)}
+          disabled={disabled}
+          className="w-28"
+          onBlur={(event) => {
+            const parsed = Number(event.target.value);
+            const safe = Number.isFinite(parsed) ? Math.trunc(parsed) : 2;
+            onMaxRetriesPerBatchCommit(Math.min(10, Math.max(0, safe)));
+          }}
+        />
+        <p className="text-xs text-muted-foreground">
+          Retry each failed LLM batch up to this many times (default 2; 3 tries total). 0 disables
+          retries.
         </p>
       </div>
 

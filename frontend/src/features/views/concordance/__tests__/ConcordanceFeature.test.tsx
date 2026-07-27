@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Analysis } from '@/api';
@@ -520,7 +521,8 @@ describe('ConcordanceFeature', () => {
     unmount();
   });
 
-  it('attributes an active Run All lifecycle to Run All and its Stop action', () => {
+  it('attributes an active Run All lifecycle to Run All and explains disabled actions', async () => {
+    const user = userEvent.setup();
     mockRunAllAnalysis = {
       state: 'running',
       output_node_ids: [],
@@ -534,6 +536,10 @@ describe('ConcordanceFeature', () => {
     expect(screen.getByRole('button', { name: 'Clear Results' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Running...' })).not.toBeInTheDocument();
+
+    const previewButton = screen.getByRole('button', { name: 'Preview' });
+    await user.hover(previewButton);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Wait for Run All to finish');
 
     unmount();
   });

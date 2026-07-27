@@ -102,10 +102,7 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
       {title}
       {resolvedNodes.map((resolved, index) => (
         <div key={resolved.id}>
-          <button
-            type="button"
-            onClick={() => onColumnChange(resolved.id, 'body')}
-          >
+          <button type="button" onClick={() => onColumnChange(resolved.id, 'body')}>
             Change {title} text column
           </button>
           {renderColumnAddon?.({
@@ -236,7 +233,7 @@ describe('AnnotationFeature', () => {
     await user.click(
       screen.getByRole('button', { name: 'Change Selected Data Blocks text column' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    expect(screen.getByText('Example Data Block')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Change Example Node text column' }));
 
     expect(mocks.setSourceColumn).toHaveBeenCalledWith('source-1', 'body');
@@ -454,10 +451,13 @@ describe('AnnotationFeature', () => {
       />,
     );
 
-    expect(screen.getByRole('combobox', { name: 'User Correction Column' })).toHaveTextContent(
-      'review',
-    );
-    expect(screen.queryByText('Example Node')).not.toBeInTheDocument();
+    const correctionColumn = screen.getByRole('combobox', { name: 'User Correction Column' });
+    const exampleDataBlock = screen.getByText('Example Data Block');
+    expect(correctionColumn).toHaveTextContent('review');
+    expect(
+      correctionColumn.compareDocumentPosition(exampleDataBlock) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(screen.getByText('Example Node')).toBeVisible();
     await user.click(
       screen.getByRole('button', { name: 'Use the correction column as the example' }),
     );

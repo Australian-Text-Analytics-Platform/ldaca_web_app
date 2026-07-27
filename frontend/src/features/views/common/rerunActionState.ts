@@ -27,6 +27,7 @@ export interface RerunActionState {
   clearDisabled: boolean;
   runLabel: 'Run' | 'Re-run';
   runDisabledReason: string | undefined;
+  clearDisabledReason: string | undefined;
 }
 
 /**
@@ -58,6 +59,11 @@ export const getRerunActionState = ({
     (hasAttachedAnalysis && !hasChanges && !canRetryUnchanged);
 
   const clearDisabled = !hasWorkspace || !hasAttachedAnalysis;
+  const clearDisabledReason = !hasWorkspace
+    ? 'Open a workspace first'
+    : !hasAttachedAnalysis
+      ? 'There are no results to clear'
+      : undefined;
 
   const runDisabledReason: string | undefined = (() => {
     if (isBusy) return undefined;
@@ -71,7 +77,7 @@ export const getRerunActionState = ({
     return undefined;
   })();
 
-  return { runDisabled, clearDisabled, runLabel, runDisabledReason };
+  return { runDisabled, clearDisabled, runLabel, runDisabledReason, clearDisabledReason };
 };
 
 /** A request's node selection, normalized for order-independent comparison. */

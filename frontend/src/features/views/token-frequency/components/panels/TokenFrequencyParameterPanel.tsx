@@ -70,6 +70,7 @@ interface TokenFrequencyParameterPanelProps {
     clearDisabled: boolean;
     runLabel: string;
     runDisabledReason?: string;
+    clearDisabledReason?: string;
   };
   isAnalyzing: boolean;
   onAnalyze: () => void;
@@ -167,6 +168,7 @@ export const TokenFrequencyParameterPanel = ({
           ? 'Select a column for each data block'
           : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled,
+        clearDisabledReason: actionState.clearDisabledReason,
         isRunningAll: isAnalyzing,
         isStopping,
         hasResult: hasResults,

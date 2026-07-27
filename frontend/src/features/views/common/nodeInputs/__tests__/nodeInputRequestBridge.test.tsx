@@ -1,11 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import type { AnalysisTabInput } from '../../tabs/tabStateOps';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
+import type { AnalysisTabInput } from '../../tabs/tabStateOps';
 import { useTabNodeInputs } from '../useTabNodeInputs';
 
 const mocks = vi.hoisted(() => ({
@@ -33,13 +33,16 @@ vi.mock('@/stores', () => ({
 
 function RequestBridgeHarness({
   onInputSetChange,
+  deferNodeInputPlacement = false,
 }: {
   onInputSetChange: (selectorId: string, inputs: AnalysisTabInput[]) => void;
+  deferNodeInputPlacement?: boolean;
 }) {
   const nodeInputs = useTabNodeInputs({
     tabInputSets: { source: [] },
     onTabInputSetChange: onInputSetChange,
     constraints: { maxNodes: 1 },
+    deferNodeInputPlacement,
   });
 
   return (
@@ -82,7 +85,30 @@ describe('node input request bridge', () => {
     );
   });
 
-  it('places an intent that was pending before the input panel target registered', async () => {
+  it('adds a matching request directly when this is the only placement area', async () => {
+    const onInputSetChange = vi.fn();
+    useNodeInputRequestsStore.setState({
+      nextId: 2,
+      pendingRequests: [{ id: 1, workspaceId: 'workspace-1', view: 'filter', nodeId: 'node-a' }],
+    });
+
+    render(
+      <StrictMode>
+        <RequestBridgeHarness onInputSetChange={onInputSetChange} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(onInputSetChange).toHaveBeenCalledWith('source', [
+        { node_id: 'node-a', column: 'text' },
+      ]);
+    });
+    expect(useNodeInputRequestsStore.getState().pendingRequests).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Add to Preprocessing Inputs' })).toBeNull();
+    expect(onInputSetChange).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a request carried when a multi-area view defers placement', async () => {
     const user = userEvent.setup();
     const onInputSetChange = vi.fn();
     useNodeInputRequestsStore.setState({
@@ -90,7 +116,9 @@ describe('node input request bridge', () => {
       pendingRequests: [{ id: 1, workspaceId: 'workspace-1', view: 'filter', nodeId: 'node-a' }],
     });
 
-    render(<RequestBridgeHarness onInputSetChange={onInputSetChange} />);
+    render(<RequestBridgeHarness onInputSetChange={onInputSetChange} deferNodeInputPlacement />);
+
+    expect(onInputSetChange).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Add to Preprocessing Inputs' }));
 
     await waitFor(() => {
@@ -98,5 +126,6 @@ describe('node input request bridge', () => {
         { node_id: 'node-a', column: 'text' },
       ]);
     });
+    expect(useNodeInputRequestsStore.getState().pendingRequests).toEqual([]);
   });
 });

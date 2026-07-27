@@ -412,6 +412,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
             return undefined;
           })(),
           clearDisabled: actionState.clearDisabled,
+          clearDisabledReason: actionState.clearDisabledReason,
           isRunningAll: isAnalyzing,
           isStopping,
           hasResult: Boolean(results),

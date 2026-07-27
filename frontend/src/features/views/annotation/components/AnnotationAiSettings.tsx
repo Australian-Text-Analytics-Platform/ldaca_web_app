@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -36,92 +36,169 @@ export function AnnotationAiSettings({
   children,
   advanced,
 }: AnnotationAiSettingsProps) {
-  const [open, setOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const selected =
     configurations.find((configuration) => configuration.id === selectedConfigurationId) ?? null;
   const selectedModel = selected ? model : '';
+  const selectedProviderSummary = selected
+    ? `${selected.name} ${providerConfigurationSecondaryText(selected)}`
+    : 'No provider selected';
+  const selectedModelSummary = selectedModel || 'No model selected';
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="annotation-ai-provider">Provider</Label>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              id="annotation-ai-provider"
-              type="button"
-              variant="outline"
-              disabled={disabled}
-              className="h-auto w-full justify-between px-3 py-2 text-left"
-            >
-              {selected ? (
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate font-medium">{selected.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {providerConfigurationSecondaryText(selected)}
-                  </span>
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Select a provider</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2">
-            <div className="flex flex-col gap-1">
-              {configurations.length === 0 ? (
-                <p className="px-2 py-2 text-sm text-muted-foreground">No providers configured</p>
-              ) : (
-                configurations.map((configuration) => (
-                  <button
-                    key={configuration.id}
-                    type="button"
-                    className="rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => {
-                      onProviderChange(configuration, providerModels[configuration.id] ?? '');
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="block truncate text-sm font-medium">{configuration.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {providerConfigurationSecondaryText(configuration)}
-                    </span>
-                  </button>
-                ))
-              )}
-              <div className="mt-1 border-t pt-1">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => {
-                    setOpen(false);
-                    setAddOpen(true);
-                  }}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  Add Provider
-                </button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
+      {children}
 
-      {selected ? (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="annotation-ai-model">Model</Label>
-          <ModelNameCombobox
-            id="annotation-ai-model"
-            configuration={selected}
-            value={selectedModel}
-            onChange={onModelChange}
-            onCommit={(next) => {
-              onModelCommit(selected.id, next);
-            }}
-            disabled={disabled}
-          />
-        </div>
-      ) : null}
+      <Collapsible
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+        className="relative rounded-lg border bg-background/60"
+      >
+        <CollapsibleTrigger
+          aria-label="Advanced settings"
+          title={advancedOpen ? 'Collapse advanced settings' : 'Expand advanced settings'}
+          className="group grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-300 ease-out hover:bg-muted/30 focus-visible:outline-hidden data-[state=closed]:w-full data-[state=open]:absolute data-[state=open]:top-2 data-[state=open]:right-2 data-[state=open]:z-10 data-[state=open]:size-7 data-[state=open]:grid-cols-1 data-[state=open]:gap-0 data-[state=open]:p-0 motion-reduce:transition-none"
+        >
+          {advancedOpen ? null : (
+            <>
+              <span
+                className="flex min-w-0 items-baseline gap-2 text-left"
+                title={selectedProviderSummary}
+              >
+                {selected ? (
+                  <>
+                    <span className="truncate font-medium">{selected.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {providerConfigurationSecondaryText(selected)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="truncate font-medium">No provider selected</span>
+                )}
+              </span>
+              <span
+                className="truncate text-left text-muted-foreground"
+                title={selectedModelSummary}
+              >
+                {selectedModelSummary}
+              </span>
+            </>
+          )}
+          <span className="inline-flex size-7 items-center justify-center rounded-md border bg-background group-data-[state=open]:border-0 group-data-[state=open]:bg-transparent">
+            <ChevronDown
+              className="size-4 transition-transform duration-300 group-data-[state=open]:rotate-180 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </span>
+        </CollapsibleTrigger>
+        <CollapsibleContent
+          forceMount
+          inert={!advancedOpen}
+          aria-hidden={!advancedOpen}
+          className="grid overflow-hidden opacity-0 transition-[grid-template-rows,opacity] duration-300 ease-out data-[state=closed]:grid-rows-[0fr] data-[state=open]:grid-rows-[1fr] data-[state=open]:opacity-100 motion-reduce:transition-none"
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="space-y-4 px-3 py-3">
+              <div
+                className="grid grid-cols-2 items-end gap-3"
+                data-testid="annotation-ai-provider-model-controls"
+              >
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <Label htmlFor="annotation-ai-provider">Provider</Label>
+                  <Popover open={providerOpen} onOpenChange={setProviderOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="annotation-ai-provider"
+                        type="button"
+                        variant="outline"
+                        disabled={disabled}
+                        className="h-10 w-full justify-start px-3 text-left"
+                      >
+                        {selected ? (
+                          <span className="flex min-w-0 items-baseline gap-2">
+                            <span className="truncate font-medium">{selected.name}</span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              {providerConfigurationSecondaryText(selected)}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Select a provider</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      className="w-[var(--radix-popover-trigger-width)] p-2"
+                    >
+                      <div className="flex flex-col gap-1">
+                        {configurations.length === 0 ? (
+                          <p className="px-2 py-2 text-sm text-muted-foreground">
+                            No providers configured
+                          </p>
+                        ) : (
+                          configurations.map((configuration) => (
+                            <button
+                              key={configuration.id}
+                              type="button"
+                              className="flex min-w-0 items-baseline gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground"
+                              onClick={() => {
+                                onProviderChange(
+                                  configuration,
+                                  providerModels[configuration.id] ?? '',
+                                );
+                                setProviderOpen(false);
+                              }}
+                            >
+                              <span className="truncate text-sm font-medium">
+                                {configuration.name}
+                              </span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {providerConfigurationSecondaryText(configuration)}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                        <div className="mt-1 border-t pt-1">
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                            onClick={() => {
+                              setProviderOpen(false);
+                              setAddOpen(true);
+                            }}
+                          >
+                            <Plus className="size-4" aria-hidden="true" />
+                            Add Provider
+                          </button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {selected ? (
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="annotation-ai-model">Model</Label>
+                    <ModelNameCombobox
+                      id="annotation-ai-model"
+                      configuration={selected}
+                      value={selectedModel}
+                      onChange={onModelChange}
+                      onCommit={(next) => {
+                        onModelCommit(selected.id, next);
+                      }}
+                      disabled={disabled}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              {advanced}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <AddAnnotationProviderDialog
         open={addOpen}
@@ -130,20 +207,6 @@ export function AnnotationAiSettings({
           onProviderChange(configuration, providerModels[configuration.id] ?? '');
         }}
       />
-
-      {children}
-
-      {advanced ? (
-        <Collapsible defaultOpen={false} className="rounded-lg border bg-background/60">
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-hidden [&[data-state=open]>svg]:rotate-180">
-            Advanced
-            <ChevronDown className="size-4 transition-transform duration-200" aria-hidden="true" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="space-y-4 border-t px-3 py-3">{advanced}</div>
-          </CollapsibleContent>
-        </Collapsible>
-      ) : null}
     </div>
   );
 }

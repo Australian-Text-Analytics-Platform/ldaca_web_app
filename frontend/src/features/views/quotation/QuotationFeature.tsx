@@ -550,6 +550,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
               analysisActionLifecycle.isRunningAll ||
               Boolean(activeAnalysis) ||
               isClearing,
+            clearDisabledReason: actionState.clearDisabledReason,
             isPreviewing: analysisActionLifecycle.isPreviewing,
             isRunningAll: analysisActionLifecycle.isRunningAll,
             isStopping,

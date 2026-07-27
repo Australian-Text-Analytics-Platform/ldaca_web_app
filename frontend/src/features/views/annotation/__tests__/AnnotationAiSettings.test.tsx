@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -41,7 +41,7 @@ const renderSettings = (onProviderChange = vi.fn(), advanced?: ReactNode) => {
         onModelChange={vi.fn()}
         onModelCommit={vi.fn()}
         providerModels={{ [configurations[1]!.id]: 'model-2' }}
-        model=""
+        model="model-1"
         advanced={advanced}
       />
     </QueryClientProvider>,
@@ -53,8 +53,14 @@ describe('AnnotationAiSettings', () => {
   it('renders configured instances only and keeps Add Provider at the bottom', async () => {
     const user = userEvent.setup();
     renderSettings();
-    expect(screen.getByText('OpenRouter personal')).toBeInTheDocument();
+    const advancedSummary = screen.getByRole('button', { name: 'Advanced settings' });
+    expect(within(advancedSummary).getByText('OpenRouter personal')).toHaveClass('font-medium');
+    expect(within(advancedSummary).getByText('OpenRouter')).toHaveClass(
+      'text-xs',
+      'text-muted-foreground',
+    );
 
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
     await user.click(screen.getByRole('button', { name: 'Provider' }));
     const rows = screen.getAllByRole('button');
     expect(screen.getByText('OpenRouter org')).toBeInTheDocument();
@@ -67,6 +73,7 @@ describe('AnnotationAiSettings', () => {
     const user = userEvent.setup();
     const onProviderChange = vi.fn();
     renderSettings(onProviderChange);
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
     await user.click(screen.getByRole('button', { name: 'Provider' }));
     await user.click(screen.getByRole('button', { name: /OpenRouter org/ }));
     expect(onProviderChange).toHaveBeenCalledWith(configurations[1], 'model-2');
@@ -76,12 +83,38 @@ describe('AnnotationAiSettings', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Add provider form');
   });
 
-  it('keeps the unified Advanced settings collapsed by default', async () => {
+  it('summarizes provider and model on one line while Advanced is collapsed', async () => {
     const user = userEvent.setup();
     renderSettings(vi.fn(), <div>Example, prompt, and inference settings</div>);
 
-    expect(screen.queryByText('Example, prompt, and inference settings')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Advanced' }));
+    const advancedSummary = screen.getByRole('button', { name: 'Advanced settings' });
+    expect(within(advancedSummary).getByText('OpenRouter personal')).toHaveClass('font-medium');
+    expect(within(advancedSummary).getByText('OpenRouter')).toHaveClass(
+      'text-xs',
+      'text-muted-foreground',
+    );
+    expect(screen.getByText('model-1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Provider' })).not.toBeInTheDocument();
+    await user.click(advancedSummary);
+
+    const expandedTrigger = screen.getByRole('button', { name: 'Advanced settings' });
+    expect(expandedTrigger).toHaveAttribute('aria-expanded', 'true');
+    expect(within(expandedTrigger).queryByText('OpenRouter personal')).not.toBeInTheDocument();
     expect(screen.getByText('Example, prompt, and inference settings')).toBeInTheDocument();
+    expect(screen.getByTestId('annotation-ai-provider-model-controls')).toHaveClass('grid-cols-2');
+  });
+
+  it('returns to the compact summary from the expanded collapse control', async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
+
+    expect(screen.getByRole('button', { name: 'Advanced settings' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.queryByRole('button', { name: 'Provider' })).not.toBeInTheDocument();
   });
 });
