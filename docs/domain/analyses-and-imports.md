@@ -99,11 +99,17 @@ the per-user content-addressed cache.
 Manual Annotation is not an Analysis. Creating an annotation column, choosing a
 label, and saving class descriptions are ordinary Data Block Edits. Its
 **Compare To** selection is shared with Preview and Review for the same Data
-Block. The initial confusion matrices and Cohen's Kappa values cover the whole
-current Data Block. After a manual label is saved, the frontend adjusts the
-affected aggregate pairs and recalculates Kappa without rescanning the Data
-Block; failed saves do not change the comparison. Changes made through another
-surface are reconciled when the comparison resource next refetches.
+Block. Each selected comparison column is projected into the table with its
+selected reliability score in the header and exact confusion-matrix counts
+available on hover or focus. Only string and categorical columns are comparison
+targets. Percent Agreement, Cohen's Kappa, and nominal Krippendorff's Alpha are
+available; Cohen's Kappa is the default. The metric choice is presentation
+state keyed by source Data Block and shared across all three modes. The initial
+counts and score cover the whole current Data Block. After a manual label is
+saved, the frontend adjusts the affected aggregate pairs and recalculates the
+selected score without rescanning the Data Block; failed saves do not change
+the comparison. Changes made through another surface are reconciled when the
+comparison resource next refetches.
 
 AI Annotation Preview is a Preview-scoped Analysis. Each requested page is
 fresh inference over the retained snapshot. Predictions are never written
@@ -111,26 +117,39 @@ automatically. Reviewer corrections are explicit `set_cell` Data Block Edits
 to the correction column captured by the immutable request. The editable
 selection is stored on the Tab until **Clear Results** removes it. Preview
 renders the prediction and correction as separate columns with an intervening
-arrow. Preview comparisons reuse the same confusion-matrix presentation as
+arrow. A configured correction column is visible by default; hiding it changes
+only the table projection and leaves the correction-column selection and values
+untouched. Preview comparisons reuse the same header-level presentation as
 Review, but count only the fresh predictions and selected comparison-column
-values on the current Preview page. Each matrix also reports Cohen's Kappa as
-chance-corrected intercoder reliability. Selected comparison columns also
-appear as read-only columns after the optional correction column in the Preview
-table.
+values on the current Preview page. Selected comparison columns appear as
+read-only columns after the optional correction column. Their headers show
+the selected reliability measure with its conventional `%`, `κ`, or `α` sign
+and expose the exact current-page confusion-matrix counts on hover or focus.
 
 Annotation Run All is an independent Run-All-scoped Analysis. It processes the
-complete snapshot and writes the final selected annotation column in place,
-overlaying explicit correction values where the request includes them.
+complete snapshot and writes the selected annotation column in place. The
+correction column never changes Run All predictions. **Reprocess all rows**
+replaces the annotation column and is the default; **Fill missing only** sends
+only blank annotation rows and preserves every existing label. A provider batch
+accepts only a complete row-aligned JSON label array. Invalid responses are
+retried, then recursively split so a degenerate large reply does not discard
+otherwise valid rows. A terminal provider batch contributes null labels while
+successful batches are still published, keeping every output row aligned.
+The durable Result records attempted rows, failed terminal batches, and failed
+rows so partial completion remains explicit after publication.
 Submitting it replaces the current Annotation Preview or Run All immediately;
 a later Run All likewise replaces the earlier Run All.
 
-Annotation Review shows the document and annotation columns by default, with
-other columns available through the metadata selector. Its shared table footer
-provides rows-per-page selection and direct numbered pagination. **Compare To**
-accepts one or more other columns and renders a separate confusion matrix for
-each. Those selections also appear as read-only table columns after the optional
-correction column in Manual and Run All Review. Matrix counts and Cohen's Kappa
-cover the complete current Data Block rather than only the visible Review page.
+Annotation Review shows the document, annotation, and configured correction
+columns by default, with other columns available through the metadata selector.
+The correction visibility control changes only the table projection. Its shared
+table footer provides rows-per-page selection and direct numbered pagination.
+**Compare To** accepts one or more other columns and adds them as read-only
+table columns after the optional correction column in Manual and Run All
+Review. Each selected column header shows the selected reliability score and
+exposes its exact confusion-matrix counts on hover or focus. The metric is
+shared with Manual and Preview. Its counts and score cover the complete current
+Data Block rather than only the visible Review page.
 
 ## Concordance And Quotation
 
@@ -164,7 +183,7 @@ Supporting Analysis and may publish multiple ordered output Data Blocks.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 11 and portable archive format 10 accept only this
+Native Workspace schema 12 and portable archive format 11 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

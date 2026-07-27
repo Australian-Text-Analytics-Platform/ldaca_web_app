@@ -73,7 +73,24 @@ request.
 Run All Analyses process the complete snapshot. Concordance and Quotation store
 complete immutable table Results. Annotation is the explicit in-place
 exception and edits its selected Data Block through the Workspace mutation
-boundary.
+boundary. The Run All request owns its batch size and processing mode while its
+source request owns shared inference settings. Run All groups rows into batches
+of 20 by default, with a maximum configurable size of 100. One batch loop owns
+all provider attempts; native SDK retries are disabled, so the default two
+retries mean at most three calls for that batch. Each call has a 4,096-token
+answer allowance, plus the requested reasoning budget when reasoning is
+enabled. A successful response must be one JSON object containing exactly one
+known class name or null per input row. Truncated, malformed, wrong-cardinality,
+and unknown-label responses consume the same retry allowance. Context-limit
+failures split immediately, while an invalid response splits after its retries
+are exhausted. Each terminal batch reports its completed row count. Other
+exhausted provider failures become row-aligned null labels, so the worker can
+publish all successful batches instead of discarding the column; its durable
+Result retains attempted-row, failed-batch, and failed-row counts. Cancellation
+and failures outside provider inference still do not publish. Run All either
+reprocesses every row or fills only blank annotations and never overlays
+correction-column values. Preview processes exactly the requested page and has
+no batch-size or processing-mode fields.
 
 Supporting Analyses are ordinary Analyses with a parent. They use the same
 scheduler, cancellation, Result, persistence, and Artifact contracts and may
@@ -173,7 +190,9 @@ enter Workspaces, Tabs, Results, provenance, logs, query keys, or telemetry.
 ## Persistence
 
 Terminal Analysis forests, Results, Artifacts, and queryable snapshots persist
-with the Workspace. Native schema 11 and portable archive format 10 validate
+with the Workspace. Annotation query snapshots materialize only the source and
+optional Example Data Block because the validated class list is already part of
+the immutable request. Native schema 12 and portable archive format 11 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

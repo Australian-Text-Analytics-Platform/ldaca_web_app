@@ -72,21 +72,44 @@ Correction Column** or add one. Preview shows source text, the fresh prediction,
 an arrow, and the correction column separately. Correction choices are written
 to that Data Block column immediately, while predictions remain an unwritten
 preview. **Use the correction column as the example** fills the optional Example
-Data Block controls; Example, Prompt, and inference controls are grouped under
-the collapsed **Advanced** section.
+Data Block controls in the main parameter panel. The collapsed **Advanced** row
+summarizes the selected provider and model; expanding it presents those two
+controls side by side, followed by Prompt and inference controls. **Batch
+size** controls how many rows each Run All LLM request contains (20 by default,
+up to 100). **Max retries per
+batch** defaults to two retries—three attempts in total—and `0` disables
+retries. Each attempt has a bounded answer size and is accepted only when the
+provider returns one valid label per requested row; invalid large-batch replies
+are retried and then split into smaller batches. **Run All processing** defaults
+to **Reprocess all rows**; choose **Fill
+missing only** to preserve existing labels and send only blank annotation rows.
+Preview always processes its requested page, so its page size rather than the
+Run All batch-size or processing-mode setting determines the request.
 
 **Run All** processes the complete Data Block and writes the final Annotation
-Column in place. Review uses the standard rows-per-page and numbered pagination
-controls. Annotation keeps one current task: Run All replaces Preview, and a
-later Run All replaces the previous Run All. **Clear Results** also clears the
-selected correction-column draft so the next task starts without inheriting it.
+Column in place without applying the correction column. Exhausted batches leave
+their target rows blank while successful batches are still written; progress
+updates as each batch finishes. Review uses the standard rows-per-page and
+numbered pagination controls. Annotation keeps one current task: Run All
+replaces Preview, and a later Run All replaces the previous Run All. **Clear
+Results** also clears the selected correction-column draft so the next task
+starts without inheriting it.
 
 Manual Annotation also provides **Compare To**. Select one or more other label
-columns to see whole-Data-Block confusion matrices and Cohen's Kappa. The same
-comparison choices remain selected in Preview and Review for that Data Block,
-appear as read-only columns after any correction column in all three table
-modes, and each successfully saved manual label updates the displayed
-comparison.
+columns to add them as read-only table columns. Non-string columns are omitted
+from this checklist; string and categorical columns remain eligible. At the top, choose
+**Percent Agreement**, **Cohen's Kappa** (the default), or **Krippendorff's
+Alpha**. Each compared column header shows the selected score with `%`, `κ`, or
+`α`; hover or focus the score to inspect the exact confusion-matrix counts.
+Preview scores use only the current page, while Manual and Review scores use
+the whole Data Block. The same comparison columns and reliability choice remain
+selected in all three modes, and each successfully saved Manual label updates
+its scores and counts immediately. **Show metadata** is available beside
+**Compare To** in Manual, Preview, and Review; its per-Data-Block checklist
+selection also remains the same across all three modes. Preview and Review show
+a configured correction column by default. Use **Hide correction** or **Show
+correction** to change only its table visibility; the selected correction
+column and its stored values are left unchanged.
 
 ## Recap
 

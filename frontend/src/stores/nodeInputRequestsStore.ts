@@ -9,8 +9,9 @@ import { immer } from 'zustand/middleware/immer';
  * The React Flow graph is mounted outside individual analysis panels, so a
  * node's side "+" button cannot directly call the active tab's
  * ``useNodeInputs.addNodes``. Instead it holds a transient LIFO stack scoped by
- * workspace + active view. Every visible ``NodeInputsPanel`` renders the same
- * dashed placement target and consumes only the latest carried Data Block.
+ * workspace + active view. A single-selector owner consumes matching requests
+ * immediately; multi-selector views expose the stack through each visible
+ * ``NodeInputsPanel`` and consume the latest carried Data Block on placement.
  *
  * This store is intentionally not persisted: button clicks are transient UI
  * intents, not canonical selection state.

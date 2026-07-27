@@ -1,11 +1,14 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import {
   applyReferenceComparisonEdit,
-  calculateCohensKappa,
   type ConfusionCount,
+  calculateCohensKappa,
+  calculateKrippendorffsAlpha,
+  calculatePercentAgreement,
 } from '@/features/views/common/columnComparisonModel';
-import { ConfusionMatrix } from '../ColumnComparison';
+import { ColumnComparisonHeader, ColumnComparisonSelector } from '../ColumnComparison';
 
 const rows: ConfusionCount[] = [
   { reference: 'covid', comparison: 'covid', count: 3 },
@@ -16,7 +19,9 @@ const rows: ConfusionCount[] = [
 
 describe('ColumnComparison', () => {
   it('calculates chance-corrected intercoder agreement from matrix counts', () => {
+    expect(calculatePercentAgreement(rows)).toBe(0.75);
     expect(calculateCohensKappa(rows)).toBe(0.5);
+    expect(calculateKrippendorffsAlpha(rows)).toBe(0.53125);
     expect(
       calculateCohensKappa([
         { reference: 'covid', comparison: 'covid', count: 2 },
@@ -57,9 +62,12 @@ describe('ColumnComparison', () => {
     ).toBe(rows);
   });
 
-  it('labels Cohen’s Kappa as intercoder reliability and keeps the legend below its grid', () => {
+  it('shows Cohen’s Kappa beside the column and plain matrix counts on hover', async () => {
+    const user = userEvent.setup();
     render(
-      <ConfusionMatrix
+      <ColumnComparisonHeader
+        label="review"
+        metric="cohens_kappa"
         referenceColumn="annotation"
         comparisonColumn="review"
         rows={rows}
@@ -68,23 +76,39 @@ describe('ColumnComparison', () => {
       />,
     );
 
-    const matrix = screen.getByLabelText('Confusion matrix');
-    const reliability = screen.getByLabelText('Intercoder reliability');
+    const score = screen.getByRole('button', {
+      name: 'Cohen’s Kappa 0.500 for annotation versus review',
+    });
+    expect(screen.getByText('review')).toBeVisible();
+    expect(score).toBeVisible();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
 
-    expect(within(matrix).getByRole('table')).toBeInTheDocument();
-    expect(within(matrix).getByLabelText('Confusion matrix count scale')).toHaveTextContent(
-      'Lower countHigher count',
-    );
+    await user.hover(score);
+
+    const [matrix] = await screen.findAllByRole('table', {
+      name: 'annotation versus review confusion matrix',
+    });
+    expect(matrix).toBeDefined();
+    if (!matrix) throw new Error('Expected a confusion matrix in the reliability tooltip.');
+    const matrixRows = within(matrix).getAllByRole('row');
+
     expect(
-      within(reliability).getByRole('heading', { name: 'Intercoder reliability' }),
-    ).toBeVisible();
-    expect(reliability).toHaveTextContent('Cohen’s Kappa');
-    expect(reliability).toHaveTextContent('0.500');
+      within(matrixRows[1])
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['3', '1']);
+    expect(
+      within(matrixRows[2])
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['1', '3']);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('tilts column labels while keeping every matrix column at a fixed width', () => {
-    render(
-      <ConfusionMatrix
+  it('formats the selected reliability metric with its conventional sign', () => {
+    const { rerender } = render(
+      <ColumnComparisonHeader
+        metric="percent_agreement"
         referenceColumn="annotation"
         comparisonColumn="review"
         rows={rows}
@@ -93,15 +117,54 @@ describe('ColumnComparison', () => {
       />,
     );
 
-    const matrix = screen.getByLabelText('Confusion matrix');
-    const columnHeader = within(matrix).getByRole('columnheader', {
-      name: 'covid comparison column',
-    });
-    const tiltedLabel = within(matrix).getByText('covid', {
-      selector: 'thead span.-rotate-45',
-    });
+    expect(
+      screen.getByRole('button', {
+        name: 'Percent Agreement 75.0% for annotation versus review',
+      }),
+    ).toHaveTextContent('75.0%');
 
-    expect(columnHeader).toHaveClass('w-6', 'min-w-6');
-    expect(tiltedLabel).toHaveClass('-rotate-45', 'whitespace-nowrap');
+    rerender(
+      <ColumnComparisonHeader
+        metric="krippendorffs_alpha"
+        referenceColumn="annotation"
+        comparisonColumn="review"
+        rows={rows}
+        isLoading={false}
+        isError={false}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Krippendorff’s Alpha 0.531 for annotation versus review',
+      }),
+    ).toHaveTextContent('α 0.531');
+  });
+
+  it('offers all reliability metrics above the comparison checklist', async () => {
+    const user = userEvent.setup();
+    const onMetricChange = vi.fn();
+    render(
+      <ColumnComparisonSelector
+        availableColumns={['review']}
+        selectedColumns={[]}
+        onSelectedColumnsChange={vi.fn()}
+        metric="cohens_kappa"
+        onMetricChange={onMetricChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+
+    const reliabilityOptions = screen.getAllByRole('menuitemradio');
+    expect(reliabilityOptions.map((option) => option.textContent)).toEqual([
+      'Percent Agreement',
+      'Cohen’s Kappa',
+      'Krippendorff’s Alpha',
+    ]);
+    expect(screen.getByRole('menuitemcheckbox', { name: 'review' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('menuitemradio', { name: 'Krippendorff’s Alpha' }));
+    expect(onMetricChange).toHaveBeenCalledWith('krippendorffs_alpha');
   });
 });

@@ -1,7 +1,12 @@
 import { useRef, useState } from 'react';
+import {
+  type IntercoderReliabilityMetric,
+  isIntercoderReliabilityMetric,
+} from '@/features/views/common/columnComparisonModel';
 import type { AnnotationProviderType } from '../aiProviders';
 
 export type AnnotationMode = 'manual' | 'ai';
+export type AnnotationProcessingMode = 'reprocess_all' | 'fill_missing';
 
 interface UseAnnotationTabSettingsArgs {
   tabSettings: Record<string, string>;
@@ -54,6 +59,20 @@ const parseStringArrayMapSetting = (
     console.warn(warning, error);
     return {};
   }
+};
+
+const parseReliabilityMetricMapSetting = (
+  value: string | undefined,
+): Record<string, IntercoderReliabilityMetric> => {
+  const values = parseStringMapSetting(
+    value,
+    '[annotation] Ignoring malformed reliability-metric setting:',
+  );
+  return Object.fromEntries(
+    Object.entries(values).filter((entry): entry is [string, IntercoderReliabilityMetric] =>
+      isIntercoderReliabilityMetric(entry[1]),
+    ),
+  );
 };
 
 /**
@@ -143,6 +162,32 @@ export function useAnnotationTabSettings({
     onTabSettingChange('aiTemperature', String(value));
   };
 
+  const [aiMaxRetriesPerBatch, setAiMaxRetriesPerBatchState] = useState<number>(() => {
+    const parsed = Number(tabSettings.aiMaxRetriesPerBatch);
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 10 ? parsed : 2;
+  });
+  const commitAiMaxRetriesPerBatch = (value: number) => {
+    setAiMaxRetriesPerBatchState(value);
+    onTabSettingChange('aiMaxRetriesPerBatch', String(value));
+  };
+
+  const [aiBatchSize, setAiBatchSizeState] = useState<number>(() => {
+    const parsed = Number(tabSettings.aiBatchSize);
+    return Number.isInteger(parsed) && parsed >= 1 && parsed <= 100 ? parsed : 20;
+  });
+  const commitAiBatchSize = (value: number) => {
+    setAiBatchSizeState(value);
+    onTabSettingChange('aiBatchSize', String(value));
+  };
+
+  const [aiProcessingMode, setAiProcessingModeState] = useState<AnnotationProcessingMode>(() =>
+    tabSettings.aiProcessingMode === 'fill_missing' ? 'fill_missing' : 'reprocess_all',
+  );
+  const setAiProcessingMode = (value: AnnotationProcessingMode) => {
+    setAiProcessingModeState(value);
+    onTabSettingChange('aiProcessingMode', value);
+  };
+
   const [aiReasoningEnabled, setAiReasoningEnabledState] = useState<boolean>(
     () => tabSettings.aiReasoningEnabled === 'true',
   );
@@ -195,6 +240,62 @@ export function useAnnotationTabSettings({
     onTabSettingChange('annotationComparisonColumns', JSON.stringify(next));
   };
 
+  const [annotationReliabilityMetrics, setAnnotationReliabilityMetricsState] = useState<
+    Record<string, IntercoderReliabilityMetric>
+  >(() => parseReliabilityMetricMapSetting(tabSettings.annotationReliabilityMetrics));
+  const annotationReliabilityMetricsRef = useRef(annotationReliabilityMetrics);
+  const setAnnotationReliabilityMetric = (nodeId: string, metric: IntercoderReliabilityMetric) => {
+    const next = { ...annotationReliabilityMetricsRef.current, [nodeId]: metric };
+    annotationReliabilityMetricsRef.current = next;
+    setAnnotationReliabilityMetricsState(next);
+    onTabSettingChange('annotationReliabilityMetrics', JSON.stringify(next));
+  };
+
+  const [annotationMetadataColumns, setAnnotationMetadataColumnsState] = useState<
+    Record<string, string[]>
+  >(() =>
+    parseStringArrayMapSetting(
+      tabSettings.annotationMetadataColumns,
+      '[annotation] Ignoring malformed metadata-column setting:',
+    ),
+  );
+  const annotationMetadataColumnsRef = useRef(annotationMetadataColumns);
+  const setAnnotationMetadataColumns = (nodeId: string, columns: string[]) => {
+    const next = { ...annotationMetadataColumnsRef.current };
+    const uniqueColumns = Array.from(new Set(columns));
+    if (uniqueColumns.length > 0) next[nodeId] = uniqueColumns;
+    else Reflect.deleteProperty(next, nodeId);
+    annotationMetadataColumnsRef.current = next;
+    setAnnotationMetadataColumnsState(next);
+    onTabSettingChange('annotationMetadataColumns', JSON.stringify(next));
+  };
+
+  const [annotationHiddenCorrectionColumns, setAnnotationHiddenCorrectionColumnsState] = useState<
+    Record<string, string[]>
+  >(() =>
+    parseStringArrayMapSetting(
+      tabSettings.annotationHiddenCorrectionColumns,
+      '[annotation] Ignoring malformed hidden-correction-column setting:',
+    ),
+  );
+  const annotationHiddenCorrectionColumnsRef = useRef(annotationHiddenCorrectionColumns);
+  const setAnnotationCorrectionVisible = (
+    nodeId: string,
+    correctionColumn: string,
+    visible: boolean,
+  ) => {
+    const hiddenColumns = annotationHiddenCorrectionColumnsRef.current[nodeId] ?? [];
+    const nextHiddenColumns = visible
+      ? hiddenColumns.filter((column) => column !== correctionColumn)
+      : Array.from(new Set([...hiddenColumns, correctionColumn]));
+    const next = { ...annotationHiddenCorrectionColumnsRef.current };
+    if (nextHiddenColumns.length > 0) next[nodeId] = nextHiddenColumns;
+    else Reflect.deleteProperty(next, nodeId);
+    annotationHiddenCorrectionColumnsRef.current = next;
+    setAnnotationHiddenCorrectionColumnsState(next);
+    onTabSettingChange('annotationHiddenCorrectionColumns', JSON.stringify(next));
+  };
+
   return {
     annotationMode,
     setAnnotationMode,
@@ -211,6 +312,12 @@ export function useAnnotationTabSettings({
     commitAiPrompt,
     aiTemperature,
     commitAiTemperature,
+    aiMaxRetriesPerBatch,
+    commitAiMaxRetriesPerBatch,
+    aiBatchSize,
+    commitAiBatchSize,
+    aiProcessingMode,
+    setAiProcessingMode,
     aiReasoningEnabled,
     setAiReasoningEnabled,
     aiReasoningEffort,
@@ -219,5 +326,11 @@ export function useAnnotationTabSettings({
     setAnnotationTarget,
     annotationComparisonColumns,
     setAnnotationComparisonColumns,
+    annotationReliabilityMetrics,
+    setAnnotationReliabilityMetric,
+    annotationMetadataColumns,
+    setAnnotationMetadataColumns,
+    annotationHiddenCorrectionColumns,
+    setAnnotationCorrectionVisible,
   };
 }

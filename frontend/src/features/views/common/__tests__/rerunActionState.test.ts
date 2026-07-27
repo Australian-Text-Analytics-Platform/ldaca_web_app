@@ -16,6 +16,19 @@ describe('getRerunActionState', () => {
       runLabel: 'Run',
       runDisabled: false,
       clearDisabled: true,
+      clearDisabledReason: 'There are no results to clear',
+    });
+  });
+
+  it('explains that Clear requires an open workspace', () => {
+    expect(
+      getRerunActionState({
+        ...baseInput,
+        hasWorkspace: false,
+      }),
+    ).toMatchObject({
+      clearDisabled: true,
+      clearDisabledReason: 'Open a workspace first',
     });
   });
 

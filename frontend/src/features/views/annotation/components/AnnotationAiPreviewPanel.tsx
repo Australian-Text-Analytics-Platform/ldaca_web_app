@@ -20,10 +20,13 @@ import {
 } from '@/components/ui/table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import {
-  ColumnComparisonDialog,
-  ConfusionMatrix,
+  ColumnComparisonHeader,
+  ColumnComparisonSelector,
   type ConfusionCount,
 } from '@/features/views/common/components/ColumnComparison';
+import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
+import { CorrectionColumnVisibilityButton } from '@/features/views/common/components/CorrectionColumnVisibilityButton';
+import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { PaginatedTableProcessingRow } from '@/features/views/common/components/PaginatedTableProcessingRow';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
@@ -45,11 +48,19 @@ interface AnnotationAiPreviewPanelProps {
   comparison: {
     columns: string[];
     onColumnsChange: (columns: string[]) => void;
+    metric: IntercoderReliabilityMetric;
+    onMetricChange: (metric: IntercoderReliabilityMetric) => void;
+  };
+  metadata: {
+    columns: string[];
+    onColumnsChange: (columns: string[]) => void;
   };
   correction: {
     nodeId: string;
     column: string | null;
     classOptions: string[];
+    visible: boolean;
+    onVisibleChange: (visible: boolean) => void;
   };
 }
 
@@ -66,24 +77,33 @@ interface AnnotationAiPreviewPanelProps {
 export function AnnotationAiPreviewPanel({
   preview,
   comparison,
+  metadata,
   correction,
 }: AnnotationAiPreviewPanelProps) {
   const { page, predictions, columns } = preview;
   const { setCell } = useWorkspaceActions();
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
-  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
-  const [draftComparisonColumns, setDraftComparisonColumns] = useState<string[]>([]);
   const secondaryColumnOptions = preview.sourceColumns.filter(
     (column) => column !== columns.text && column !== columns.annotation,
   );
+  const comparisonColumnOptions = preview.sourceComparableColumns.filter(
+    (column) => column !== columns.text && column !== columns.annotation,
+  );
   const activeComparisonColumns = comparison.columns.filter((column) =>
-    secondaryColumnOptions.includes(column),
+    comparisonColumnOptions.includes(column),
   );
   const correctionColumn = correction.column;
-  const displayedComparisonColumns = activeComparisonColumns.filter(
+  const showCorrectionColumn = Boolean(correctionColumn && correction.visible);
+  const availableMetadataColumns = secondaryColumnOptions.filter(
     (column) => column !== correctionColumn,
   );
+  const activeMetadataColumns = metadata.columns.filter((column) =>
+    availableMetadataColumns.includes(column),
+  );
+  const displayedSupplementalColumns = Array.from(
+    new Set([...activeComparisonColumns, ...activeMetadataColumns]),
+  ).filter((column) => column !== correctionColumn);
   const previewColumn = `${columns.annotation} (preview)`;
   const comparisonRows = new Map<string, ConfusionCount[]>();
   activeComparisonColumns.forEach((targetColumn) => {
@@ -110,7 +130,7 @@ export function AnnotationAiPreviewPanel({
   const tableColumns: ColumnDef<AnnotationPreviewRow>[] = [
     { id: columns.text, accessorFn: (row) => row[columns.text] },
     { id: 'annotation_preview', accessorFn: (row) => row[columns.annotation] },
-    ...(correctionColumn
+    ...(showCorrectionColumn && correctionColumn
       ? [
           { id: 'correction_arrow', accessorFn: () => null },
           {
@@ -119,7 +139,7 @@ export function AnnotationAiPreviewPanel({
           },
         ]
       : []),
-    ...displayedComparisonColumns.map((column) => ({
+    ...displayedSupplementalColumns.map((column) => ({
       id: column,
       accessorFn: (row: AnnotationPreviewRow) => row[column],
     })),
@@ -168,249 +188,251 @@ export function AnnotationAiPreviewPanel({
       });
   };
 
+  const comparisonLoading = predictions.query.isFetching || preview.comparison.query.isFetching;
+  const comparisonError = predictions.query.isError || preview.comparison.query.isError;
+
   return (
-    <>
-      <section
-        aria-label="AI Annotation Preview"
-        className="mt-5 rounded-lg border bg-background/60 p-4"
-      >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold">AI Preview</h3>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={
-              secondaryColumnOptions.length === 0 ||
-              predictions.query.isFetching ||
-              preview.comparison.query.isFetching
-            }
-            onClick={() => {
-              setDraftComparisonColumns(activeComparisonColumns);
-              setCompareDialogOpen(true);
-            }}
-          >
-            Compare To
-          </Button>
+    <section
+      aria-label="AI Annotation Preview"
+      className="mt-5 rounded-lg border bg-background/60 p-4"
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold">AI Preview</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <ColumnComparisonSelector
+            availableColumns={comparisonColumnOptions}
+            selectedColumns={activeComparisonColumns}
+            onSelectedColumnsChange={comparison.onColumnsChange}
+            metric={comparison.metric}
+            onMetricChange={comparison.onMetricChange}
+            disabled={predictions.query.isFetching || preview.comparison.query.isFetching}
+          />
+          {correctionColumn ? (
+            <CorrectionColumnVisibilityButton
+              visible={correction.visible}
+              onVisibleChange={correction.onVisibleChange}
+            />
+          ) : null}
+          <MetadataColumnSelector
+            availableColumns={availableMetadataColumns}
+            selectedColumns={activeMetadataColumns}
+            onSelectedColumnsChange={metadata.onColumnsChange}
+          />
         </div>
-        <AnalysisTableFrame
-          maxHeightClass="max-h-96"
-          contentClassName="min-w-full"
-          belowTable={
-            <>
-              {predictions.query.isError ? (
-                <div className="flex items-center justify-between gap-3 border-t border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
-                  <span>
-                    {predictions.query.error instanceof Error
-                      ? predictions.query.error.message
-                      : 'AI annotation failed.'}
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      void predictions.query.refetch();
-                    }}
-                  >
-                    Retry
-                  </Button>
-                </div>
-              ) : null}
-              <ServerPaginationFooter
-                table={table}
-                pageIndex={page.pagination.pageIndex}
-                pageSize={page.pagination.pageSize}
-                rowCount={page.rowCount}
-                loading={page.query.isFetching}
-              >
+      </div>
+      <AnalysisTableFrame
+        maxHeightClass="max-h-96"
+        contentClassName="min-w-full"
+        belowTable={
+          <>
+            {predictions.query.isError ? (
+              <div className="flex items-center justify-between gap-3 border-t border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+                <span>
+                  {predictions.query.error instanceof Error
+                    ? predictions.query.error.message
+                    : 'AI annotation failed.'}
+                </span>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={predictions.query.isFetching}
                   onClick={() => {
                     void predictions.query.refetch();
                   }}
                 >
-                  <RefreshCw
-                    aria-hidden="true"
-                    className={predictions.query.isFetching ? 'animate-spin' : undefined}
-                  />
-                  Refresh page
+                  Retry
                 </Button>
-              </ServerPaginationFooter>
-            </>
-          }
-        >
-          <Table className="w-full table-auto" disableContainer>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{columns.text}</TableHead>
-                <TableHead className="w-px whitespace-nowrap">
-                  {columns.annotation} (preview)
-                </TableHead>
-                {correction.column ? (
-                  <>
-                    <TableHead className="w-8 px-1 text-center" aria-label="changes to">
-                      <ArrowRight aria-hidden="true" className="mx-auto size-4" />
-                    </TableHead>
-                    <TableHead className="w-px whitespace-nowrap">
-                      Correction: {correction.column}
-                    </TableHead>
-                  </>
-                ) : null}
-                {displayedComparisonColumns.map((column) => (
-                  <TableHead key={column} className="w-px whitespace-nowrap">
-                    {column}
+              </div>
+            ) : null}
+            <ServerPaginationFooter
+              table={table}
+              pageIndex={page.pagination.pageIndex}
+              pageSize={page.pagination.pageSize}
+              rowCount={page.rowCount}
+              loading={page.query.isFetching}
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={predictions.query.isFetching}
+                onClick={() => {
+                  void predictions.query.refetch();
+                }}
+              >
+                <RefreshCw
+                  aria-hidden="true"
+                  className={predictions.query.isFetching ? 'animate-spin' : undefined}
+                />
+                Refresh page
+              </Button>
+            </ServerPaginationFooter>
+          </>
+        }
+      >
+        <Table className="w-full table-auto" disableContainer>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{columns.text}</TableHead>
+              <TableHead className="w-px whitespace-nowrap">
+                {columns.annotation} (preview)
+              </TableHead>
+              {showCorrectionColumn ? (
+                <>
+                  <TableHead className="w-8 px-1 text-center" aria-label="changes to">
+                    <ArrowRight aria-hidden="true" className="mx-auto size-4" />
                   </TableHead>
-                ))}
+                  <TableHead className="w-px whitespace-nowrap">
+                    {correction.column && activeComparisonColumns.includes(correction.column) ? (
+                      <ColumnComparisonHeader
+                        label={`Correction: ${correction.column}`}
+                        metric={comparison.metric}
+                        referenceColumn={previewColumn}
+                        comparisonColumn={correction.column}
+                        rows={comparisonRows.get(correction.column)}
+                        isLoading={comparisonLoading}
+                        isError={comparisonError}
+                      />
+                    ) : (
+                      <>Correction: {correction.column}</>
+                    )}
+                  </TableHead>
+                </>
+              ) : null}
+              {displayedSupplementalColumns.map((column) => (
+                <TableHead key={column} className="w-px whitespace-nowrap">
+                  {activeComparisonColumns.includes(column) ? (
+                    <ColumnComparisonHeader
+                      metric={comparison.metric}
+                      referenceColumn={previewColumn}
+                      comparisonColumn={column}
+                      rows={comparisonRows.get(column)}
+                      isLoading={comparisonLoading}
+                      isError={comparisonError}
+                    />
+                  ) : (
+                    column
+                  )}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {page.query.isLoading ? (
+              <PaginatedTableProcessingRow columnCount={tableColumns.length} />
+            ) : page.query.isError ? (
+              <TableRow>
+                <TableCell
+                  className="h-24 text-center text-destructive"
+                  colSpan={tableColumns.length}
+                >
+                  Could not load annotations.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {page.query.isLoading ? (
-                <PaginatedTableProcessingRow columnCount={tableColumns.length} />
-              ) : page.query.isError ? (
-                <TableRow>
-                  <TableCell
-                    className="h-24 text-center text-destructive"
-                    colSpan={tableColumns.length}
-                  >
-                    Could not load annotations.
-                  </TableCell>
-                </TableRow>
-              ) : page.rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    className="h-24 text-center text-muted-foreground"
-                    colSpan={tableColumns.length}
-                  >
-                    No rows to annotate.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                page.rows.map((row, index) => {
-                  const rowPosition = page.pagination.pageIndex * page.pagination.pageSize + index;
-                  const value = predictions.labels[index] ?? '';
-                  const existing = cellText(row[columns.annotation]).trim();
-                  const seededCorrection = correction.column
-                    ? cellText(row[correction.column]).trim()
-                    : '';
-                  const selectionKey = correction.column
-                    ? `${correction.column}:${String(rowPosition)}`
-                    : '';
-                  const correctionValue = selections[selectionKey] ?? seededCorrection;
-                  return (
-                    <TableRow key={rowPosition} className="align-top hover:bg-transparent">
-                      <TableCell className="break-words whitespace-pre-wrap">
-                        {cellText(row[columns.text])}
-                      </TableCell>
-                      <TableCell className="w-px whitespace-nowrap">
-                        {predictions.query.isFetching ? (
-                          <span role="status" aria-label="Predicting annotation">
-                            <Loader2
-                              aria-hidden="true"
-                              className="size-4 animate-spin text-muted-foreground"
-                            />
-                          </span>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            {existing ? (
-                              <>
-                                <span className="shrink-0 text-sm text-muted-foreground">
-                                  {existing}
-                                </span>
-                                <ArrowRight
-                                  role="img"
-                                  aria-label="changes to"
-                                  className="size-4 shrink-0 text-muted-foreground"
-                                />
-                              </>
-                            ) : null}
-                            <span className="text-sm">{value || '—'}</span>
-                          </div>
-                        )}
-                      </TableCell>
-                      {correction.column ? (
-                        <>
-                          <TableCell className="w-8 px-1 text-center">
-                            <ArrowRight
-                              role="img"
-                              aria-label="corrected to"
-                              className="mx-auto size-4 text-muted-foreground"
-                            />
-                          </TableCell>
-                          <TableCell className="w-px">
-                            <Select
-                              value={correctionValue || NO_CORRECTION_VALUE}
-                              disabled={savingRows.has(selectionKey)}
-                              onValueChange={(next) => {
-                                saveCorrection({ rowPosition, previous: correctionValue, next });
-                              }}
-                            >
-                              <SelectTrigger
-                                aria-label={`Correct prediction for row ${String(rowPosition + 1)}`}
-                                className="h-8 min-w-28 text-sm"
-                              >
-                                <SelectValue placeholder="None" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem
-                                  value={NO_CORRECTION_VALUE}
-                                  className="text-muted-foreground"
-                                >
-                                  None
-                                </SelectItem>
-                                {correction.classOptions.map((name) => (
-                                  <SelectItem key={name} value={name}>
-                                    {name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        </>
-                      ) : null}
-                      {displayedComparisonColumns.map((column) => (
-                        <TableCell key={column} className="w-px whitespace-pre-wrap">
-                          {cellText(row[column]) || '—'}
+            ) : page.rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  className="h-24 text-center text-muted-foreground"
+                  colSpan={tableColumns.length}
+                >
+                  No rows to annotate.
+                </TableCell>
+              </TableRow>
+            ) : (
+              page.rows.map((row, index) => {
+                const rowPosition = page.pagination.pageIndex * page.pagination.pageSize + index;
+                const value = predictions.labels[index] ?? '';
+                const existing = cellText(row[columns.annotation]).trim();
+                const seededCorrection = correction.column
+                  ? cellText(row[correction.column]).trim()
+                  : '';
+                const selectionKey = correction.column
+                  ? `${correction.column}:${String(rowPosition)}`
+                  : '';
+                const correctionValue = selections[selectionKey] ?? seededCorrection;
+                return (
+                  <TableRow key={rowPosition} className="align-top hover:bg-transparent">
+                    <TableCell className="break-words whitespace-pre-wrap">
+                      {cellText(row[columns.text])}
+                    </TableCell>
+                    <TableCell className="w-px whitespace-nowrap">
+                      {predictions.query.isFetching ? (
+                        <span role="status" aria-label="Predicting annotation">
+                          <Loader2
+                            aria-hidden="true"
+                            className="size-4 animate-spin text-muted-foreground"
+                          />
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {existing ? (
+                            <>
+                              <span className="shrink-0 text-sm text-muted-foreground">
+                                {existing}
+                              </span>
+                              <ArrowRight
+                                role="img"
+                                aria-label="changes to"
+                                className="size-4 shrink-0 text-muted-foreground"
+                              />
+                            </>
+                          ) : null}
+                          <span className="text-sm">{value || '—'}</span>
+                        </div>
+                      )}
+                    </TableCell>
+                    {showCorrectionColumn ? (
+                      <>
+                        <TableCell className="w-8 px-1 text-center">
+                          <ArrowRight
+                            role="img"
+                            aria-label="corrected to"
+                            className="mx-auto size-4 text-muted-foreground"
+                          />
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </AnalysisTableFrame>
-        {activeComparisonColumns.length > 0 ? (
-          <div className="mt-4 space-y-4" aria-label="Preview annotation comparisons">
-            {activeComparisonColumns.map((targetColumn) => (
-              <ConfusionMatrix
-                key={targetColumn}
-                referenceColumn={previewColumn}
-                comparisonColumn={targetColumn}
-                rows={comparisonRows.get(targetColumn)}
-                isLoading={predictions.query.isFetching || preview.comparison.query.isFetching}
-                isError={predictions.query.isError || preview.comparison.query.isError}
-              />
-            ))}
-          </div>
-        ) : null}
-      </section>
-      <ColumnComparisonDialog
-        open={compareDialogOpen}
-        referenceColumn={previewColumn}
-        availableColumns={secondaryColumnOptions}
-        selectedColumns={draftComparisonColumns}
-        scopeDescription="on the current Preview page"
-        onOpenChange={setCompareDialogOpen}
-        onSelectedColumnsChange={setDraftComparisonColumns}
-        onCompare={() => {
-          comparison.onColumnsChange(draftComparisonColumns);
-          setCompareDialogOpen(false);
-        }}
-      />
-    </>
+                        <TableCell className="w-px">
+                          <Select
+                            value={correctionValue || NO_CORRECTION_VALUE}
+                            disabled={savingRows.has(selectionKey)}
+                            onValueChange={(next) => {
+                              saveCorrection({ rowPosition, previous: correctionValue, next });
+                            }}
+                          >
+                            <SelectTrigger
+                              aria-label={`Correct prediction for row ${String(rowPosition + 1)}`}
+                              className="h-8 min-w-28 text-sm"
+                            >
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem
+                                value={NO_CORRECTION_VALUE}
+                                className="text-muted-foreground"
+                              >
+                                None
+                              </SelectItem>
+                              {correction.classOptions.map((name) => (
+                                <SelectItem key={name} value={name}>
+                                  {name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </>
+                    ) : null}
+                    {displayedSupplementalColumns.map((column) => (
+                      <TableCell key={column} className="w-px whitespace-pre-wrap">
+                        {cellText(row[column]) || '—'}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </AnalysisTableFrame>
+    </section>
   );
 }

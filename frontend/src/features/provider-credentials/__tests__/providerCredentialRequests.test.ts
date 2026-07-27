@@ -94,6 +94,8 @@ describe('provider credential request boundary', () => {
       tabId: 'tab-1',
       providerConfigurationId: configuration.id,
       source: analysisRequest,
+      batchSize: 20,
+      processingMode: 'reprocess_all',
     });
     await listFeaturedDataPortalCollectionsWithProviderCredential();
     await searchDataPortalWithProviderCredential({ query: 'speech' });
@@ -138,6 +140,8 @@ describe('provider credential request boundary', () => {
           request: {
             kind: 'annotation_run_all',
             source: analysisRequest,
+            batch_size: 20,
+            processing_mode: 'reprocess_all',
             api_key: 'annotation-secret',
           },
           supersedes_analysis_ids: [],

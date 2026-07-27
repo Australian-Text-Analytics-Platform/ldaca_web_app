@@ -30,7 +30,9 @@ interface AnalysisCardLayoutProps {
     runAllDisabled?: boolean;
     runAllDisabledReason?: string;
     stopDisabled?: boolean;
+    stopDisabledReason?: string;
     clearDisabled?: boolean;
+    clearDisabledReason?: string;
     isPreviewing?: boolean;
     isRunningAll?: boolean;
     isStopping?: boolean;
@@ -68,6 +70,33 @@ export function AnalysisCardLayout({
   const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-destructive/50');
   const previewLabel = actions?.previewLabel ?? 'Preview';
   const runAllLabel = actions?.runAllLabel ?? 'Run All';
+  const previewDisabledReason = actions?.previewDisabled
+    ? actions.isPreviewing
+      ? 'Preview is already running'
+      : actions.isRunningAll
+        ? 'Wait for Run All to finish'
+        : (actions.previewDisabledReason ?? 'Complete the required parameters before previewing')
+    : undefined;
+  const runAllDisabledReason = actions?.runAllDisabled
+    ? actions.isRunningAll
+      ? 'Run All is already running'
+      : actions.isPreviewing
+        ? 'Wait for Preview to finish'
+        : (actions.runAllDisabledReason ?? 'Complete the required parameters before running')
+    : undefined;
+  const clearDisabledReason = actions?.clearDisabled
+    ? actions.isClearing
+      ? 'Results are being cleared'
+      : actions.isPreviewing || actions.isRunningAll
+        ? 'Stop the running analysis before clearing results'
+        : (actions.clearDisabledReason ?? 'There are no results to clear')
+    : undefined;
+  const stopDisabled = Boolean(actions?.stopDisabled) || Boolean(actions?.isStopping);
+  const stopDisabledReason = stopDisabled
+    ? actions?.isStopping
+      ? 'A stop request is already in progress'
+      : (actions?.stopDisabledReason ?? 'This task cannot be stopped right now')
+    : undefined;
 
   return (
     <Card ref={cardRef} className={cardToneClassName}>
@@ -98,7 +127,7 @@ export function AnalysisCardLayout({
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
           {actions.onPreview ? (
             <div className="flex items-center gap-2">
-              <DisabledReasonTooltip reason={actions.previewDisabledReason}>
+              <DisabledReasonTooltip reason={previewDisabledReason}>
                 <Button
                   type="button"
                   variant="outline"
@@ -119,7 +148,7 @@ export function AnalysisCardLayout({
           ) : null}
 
           <div className="flex items-center gap-2">
-            <DisabledReasonTooltip reason={actions.runAllDisabledReason}>
+            <DisabledReasonTooltip reason={runAllDisabledReason}>
               <Button
                 onClick={() => {
                   void actions.onRunAll();
@@ -145,20 +174,22 @@ export function AnalysisCardLayout({
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              onClick={() => {
-                void actions.onClear();
-              }}
-              variant="destructive"
-              disabled={actions.clearDisabled}
-            >
-              {actions.isClearing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              Clear Results
-            </Button>
+            <DisabledReasonTooltip reason={clearDisabledReason}>
+              <Button
+                onClick={() => {
+                  void actions.onClear();
+                }}
+                variant="destructive"
+                disabled={actions.clearDisabled}
+              >
+                {actions.isClearing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Clear Results
+              </Button>
+            </DisabledReasonTooltip>
             {actions.clearHelp ? (
               <HelpIcon
                 targetKey={actions.clearHelp.targetKey}
@@ -170,21 +201,22 @@ export function AnalysisCardLayout({
 
           {actions.onStop && (actions.isPreviewing || actions.isRunningAll) ? (
             <div className="flex items-center gap-2">
-              <Button
-                onClick={() => {
-                  void actions.onStop?.();
-                }}
-                variant="outline"
-                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- boolean OR: disabled when either flag is true
-                disabled={actions.stopDisabled || actions.isStopping}
-              >
-                {actions.isStopping ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Square className="mr-2 h-4 w-4" />
-                )}
-                Stop
-              </Button>
+              <DisabledReasonTooltip reason={stopDisabledReason}>
+                <Button
+                  onClick={() => {
+                    void actions.onStop?.();
+                  }}
+                  variant="outline"
+                  disabled={stopDisabled}
+                >
+                  {actions.isStopping ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Square className="mr-2 h-4 w-4" />
+                  )}
+                  Stop
+                </Button>
+              </DisabledReasonTooltip>
               {actions.stopHelp ? (
                 <HelpIcon
                   targetKey={actions.stopHelp.targetKey}

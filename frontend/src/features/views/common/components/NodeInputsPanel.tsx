@@ -89,8 +89,9 @@ export interface NodeInputsPanelProps {
  * via toast), then render each resolved node as a removable card with its
  * column picker fed by the node's resolved ``columnOptions``; when a feature's
  * type filter leaves no options, the node stays selected and the picker renders
- * empty. Graph/sidebar additions remain on the shared carried stack until the
- * user clicks one visible panel's dashed placement target.
+ * empty. Single-selector views consume graph/sidebar additions immediately;
+ * in multi-selector views each panel renders a dashed placement target for the
+ * shared carried stack.
  */
 export function NodeInputsPanel({
   resolvedNodes,

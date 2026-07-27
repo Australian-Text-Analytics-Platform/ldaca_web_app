@@ -17,11 +17,23 @@ describe('useAnnotationTabSettings', () => {
           }),
           aiPrompt: 'Classify stance.',
           aiTemperature: '0.7',
+          aiMaxRetriesPerBatch: '4',
+          aiBatchSize: '17',
+          aiProcessingMode: 'fill_missing',
           aiReasoningEnabled: 'true',
           aiReasoningEffort: 'high',
           annotationTargets: JSON.stringify({ 'source-node': 'annotation' }),
           annotationComparisonColumns: JSON.stringify({
             'source-node': ['reviewer_one', 'reviewer_two'],
+          }),
+          annotationReliabilityMetrics: JSON.stringify({
+            'source-node': 'krippendorffs_alpha',
+          }),
+          annotationMetadataColumns: JSON.stringify({
+            'source-node': ['username', 'created_at'],
+          }),
+          annotationHiddenCorrectionColumns: JSON.stringify({
+            'source-node': ['annotation.correction'],
           }),
         },
       }),
@@ -36,11 +48,23 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.aiModel).toBe('gpt-4o');
     expect(result.current.aiPrompt).toBe('Classify stance.');
     expect(result.current.aiTemperature).toBe(0.7);
+    expect(result.current.aiMaxRetriesPerBatch).toBe(4);
+    expect(result.current.aiBatchSize).toBe(17);
+    expect(result.current.aiProcessingMode).toBe('fill_missing');
     expect(result.current.aiReasoningEnabled).toBe(true);
     expect(result.current.aiReasoningEffort).toBe('high');
     expect(result.current.annotationTargets).toEqual({ 'source-node': 'annotation' });
     expect(result.current.annotationComparisonColumns).toEqual({
       'source-node': ['reviewer_one', 'reviewer_two'],
+    });
+    expect(result.current.annotationReliabilityMetrics).toEqual({
+      'source-node': 'krippendorffs_alpha',
+    });
+    expect(result.current.annotationMetadataColumns).toEqual({
+      'source-node': ['username', 'created_at'],
+    });
+    expect(result.current.annotationHiddenCorrectionColumns).toEqual({
+      'source-node': ['annotation.correction'],
     });
   });
 
@@ -62,6 +86,9 @@ describe('useAnnotationTabSettings', () => {
       });
       result.current.commitAiPrompt('Use concise labels.');
       result.current.commitAiTemperature(0.3);
+      result.current.commitAiMaxRetriesPerBatch(2);
+      result.current.commitAiBatchSize(25);
+      result.current.setAiProcessingMode('fill_missing');
       result.current.setAiReasoningEnabled(true);
       result.current.setAiReasoningEffort('low');
       result.current.setAnnotationTarget('source-node', 'existing_annotation');
@@ -69,6 +96,9 @@ describe('useAnnotationTabSettings', () => {
         'reviewer_one',
         'reviewer_two',
       ]);
+      result.current.setAnnotationReliabilityMetric('source-node', 'percent_agreement');
+      result.current.setAnnotationMetadataColumns('source-node', ['username', 'created_at']);
+      result.current.setAnnotationCorrectionVisible('source-node', 'annotation.correction', false);
     });
 
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
@@ -83,6 +113,9 @@ describe('useAnnotationTabSettings', () => {
     );
     expect(onTabSettingChange).toHaveBeenCalledWith('aiPrompt', 'Use concise labels.');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiTemperature', '0.3');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiMaxRetriesPerBatch', '2');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiBatchSize', '25');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiProcessingMode', 'fill_missing');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEnabled', 'true');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEffort', 'low');
     expect(onTabSettingChange).toHaveBeenCalledWith(
@@ -93,6 +126,40 @@ describe('useAnnotationTabSettings', () => {
       'annotationComparisonColumns',
       JSON.stringify({ 'source-node': ['reviewer_one', 'reviewer_two'] }),
     );
+    expect(onTabSettingChange).toHaveBeenCalledWith(
+      'annotationReliabilityMetrics',
+      JSON.stringify({ 'source-node': 'percent_agreement' }),
+    );
+    expect(onTabSettingChange).toHaveBeenCalledWith(
+      'annotationMetadataColumns',
+      JSON.stringify({ 'source-node': ['username', 'created_at'] }),
+    );
+    expect(onTabSettingChange).toHaveBeenCalledWith(
+      'annotationHiddenCorrectionColumns',
+      JSON.stringify({ 'source-node': ['annotation.correction'] }),
+    );
+  });
+
+  it('shows correction columns by default and removes their hidden override when shown', () => {
+    const onTabSettingChange = vi.fn();
+    const { result } = renderHook(() =>
+      useAnnotationTabSettings({ tabSettings: {}, onTabSettingChange }),
+    );
+
+    expect(result.current.annotationHiddenCorrectionColumns).toEqual({});
+
+    act(() => {
+      result.current.setAnnotationCorrectionVisible('source-node', 'annotation.correction', false);
+    });
+    expect(result.current.annotationHiddenCorrectionColumns).toEqual({
+      'source-node': ['annotation.correction'],
+    });
+
+    act(() => {
+      result.current.setAnnotationCorrectionVisible('source-node', 'annotation.correction', true);
+    });
+    expect(result.current.annotationHiddenCorrectionColumns).toEqual({});
+    expect(onTabSettingChange).toHaveBeenLastCalledWith('annotationHiddenCorrectionColumns', '{}');
   });
 
   it('retains every target when two selectors persist before React rerenders', () => {

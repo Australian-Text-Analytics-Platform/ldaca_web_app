@@ -130,6 +130,10 @@ export function useAnnotationAiPreview({
   return {
     columns: { text: textColumn, annotation: annotationColumn },
     sourceColumns: sourcePageQuery.data?.columns ?? [],
+    sourceComparableColumns:
+      sourcePageQuery.data?.schema
+        .filter((column) => column.kind === 'string' || column.kind === 'categorical')
+        .map((column) => column.name) ?? [],
     page: {
       rows,
       // Keep the selected page represented in the footer while its fresh

@@ -1,7 +1,8 @@
-import { useState } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
 import type { AnnotationAiPreview } from '../../hooks/useAnnotationAiPreview';
 import { AnnotationAiPreviewPanel } from '../AnnotationAiPreviewPanel';
 
@@ -32,7 +33,8 @@ const preview = ({
 }) =>
   ({
     columns: { text: 'text', annotation: 'annotation' },
-    sourceColumns: ['text', 'annotation', 'correction', 'review'],
+    sourceColumns: ['text', 'annotation', 'correction', 'review', 'tweet_id'],
+    sourceComparableColumns: ['text', 'annotation', 'correction', 'review'],
     page: {
       rows: isLoading
         ? []
@@ -91,11 +93,24 @@ function PreviewPanel({
   correction: ReturnType<typeof correction>;
 }) {
   const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
+  const [metric, setMetric] = useState<IntercoderReliabilityMetric>('cohens_kappa');
+  const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
+  const [correctionVisible, setCorrectionVisible] = useState(true);
   return (
     <AnnotationAiPreviewPanel
       preview={previewValue}
-      comparison={{ columns: comparisonColumns, onColumnsChange: setComparisonColumns }}
-      correction={correctionValue}
+      comparison={{
+        columns: comparisonColumns,
+        onColumnsChange: setComparisonColumns,
+        metric,
+        onMetricChange: setMetric,
+      }}
+      metadata={{ columns: metadataColumns, onColumnsChange: setMetadataColumns }}
+      correction={{
+        ...correctionValue,
+        visible: correctionVisible,
+        onVisibleChange: setCorrectionVisible,
+      }}
     />
   );
 }
@@ -160,17 +175,17 @@ describe('AnnotationAiPreviewPanel', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Compare To' }));
-    await user.click(screen.getByRole('checkbox', { name: 'review' }));
-    await user.click(screen.getByRole('button', { name: 'Compare' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
+    await user.keyboard('{Escape}');
 
     expect(
-      screen.getByRole('heading', { name: 'annotation (preview) vs review' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('img', {
-        name: 'annotation (preview) replacement, review replacement: 1 rows',
+      await screen.findByRole('button', {
+        name: 'Cohen’s Kappa 0.333 for annotation (preview) versus review',
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'annotation (preview) vs review' }),
+    ).not.toBeInTheDocument();
 
     rerender(
       <PreviewPanel
@@ -185,15 +200,32 @@ describe('AnnotationAiPreviewPanel', () => {
     );
 
     expect(
-      screen.getByRole('img', {
-        name: 'annotation (preview) new value, review replacement: 1 rows',
+      screen.getByRole('button', {
+        name: 'Cohen’s Kappa 0.000 for annotation (preview) versus review',
       }),
     ).toBeInTheDocument();
+  });
+
+  it('offers only label columns and applies the selected reliability metric', async () => {
+    const user = userEvent.setup();
+    render(
+      <PreviewPanel
+        preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
+        correction={correction()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'tweet_id' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitemradio', { name: 'Krippendorff’s Alpha' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
+    await user.keyboard('{Escape}');
+
     expect(
-      screen.queryByRole('img', {
-        name: 'annotation (preview) replacement, review replacement: 1 rows',
+      screen.getByRole('button', {
+        name: 'Krippendorff’s Alpha 0.400 for annotation (preview) versus review',
       }),
-    ).not.toBeInTheDocument();
+    ).toHaveTextContent('α 0.400');
   });
 
   it('shows selected comparison columns read-only after the correction column', async () => {
@@ -206,18 +238,47 @@ describe('AnnotationAiPreviewPanel', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Compare To' }));
-    await user.click(screen.getByRole('checkbox', { name: 'review' }));
-    await user.click(screen.getByRole('button', { name: 'Compare' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
+    await user.keyboard('{Escape}');
+
+    const previewTable = screen.getAllByRole('table')[0];
+    const headers = within(previewTable).getAllByRole('columnheader');
+    expect(headers).toHaveLength(5);
+    expect(headers.slice(0, 4).map((header) => header.textContent)).toEqual([
+      'text',
+      'annotation (preview)',
+      '',
+      'Correction: correction',
+    ]);
+    expect(within(headers[4]).getByText('review')).toBeInTheDocument();
+    expect(within(headers[4]).getByRole('button', { name: /Cohen’s Kappa/ })).toBeInTheDocument();
+    const firstRow = within(previewTable).getByRole('row', { name: /First text/ });
+    expect(within(firstRow).getByText('replacement', { selector: 'td:last-child' })).toBeVisible();
+    expect(within(firstRow).getAllByRole('combobox')).toHaveLength(1);
+  });
+
+  it('shows selected source metadata beside the preview columns', async () => {
+    const user = userEvent.setup();
+    render(
+      <PreviewPanel
+        preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
+        correction={correction()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Show metadata' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
+    await user.keyboard('{Escape}');
 
     const previewTable = screen.getAllByRole('table')[0];
     expect(
       within(previewTable)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(['text', 'annotation (preview)', '', 'Correction: correction', 'review']);
-    const firstRow = within(previewTable).getByRole('row', { name: /First text/ });
-    expect(within(firstRow).getByText('replacement', { selector: 'td:last-child' })).toBeVisible();
-    expect(within(firstRow).getAllByRole('combobox')).toHaveLength(1);
+    ).toEqual(['text', 'annotation (preview)', 'review']);
+    expect(within(previewTable).getByRole('row', { name: /First text/ })).toHaveTextContent(
+      'replacement',
+    );
   });
 
   it('shows an original annotation changing to its preview prediction', () => {
@@ -247,6 +308,27 @@ describe('AnnotationAiPreviewPanel', () => {
     expect(within(firstRow).getByRole('img', { name: 'corrected to' })).toBeInTheDocument();
     expect(within(firstRow).getAllByText('replacement')).toHaveLength(2);
     expect(screen.getByRole('columnheader', { name: 'annotation (preview)' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Correction: review' })).toBeInTheDocument();
+  });
+
+  it('shows the correction column by default and can hide and restore it', async () => {
+    const user = userEvent.setup();
+    render(
+      <PreviewPanel
+        preview={preview({ labels: ['replacement', 'new value'], isFetching: false })}
+        correction={correction('review')}
+      />,
+    );
+
+    expect(screen.getByRole('columnheader', { name: 'Correction: review' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hide correction' }));
+
+    expect(
+      screen.queryByRole('columnheader', { name: 'Correction: review' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show correction' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show correction' }));
     expect(screen.getByRole('columnheader', { name: 'Correction: review' })).toBeInTheDocument();
   });
 

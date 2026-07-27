@@ -5,6 +5,7 @@ import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisC
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 import { Button } from '@/components/ui/button';
+import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Plus } from 'lucide-react';
 
 interface Props {
@@ -139,10 +140,18 @@ export function TopicModelingResultsPanel({
               controlRowSlot={
                 <div className="flex w-full items-center justify-between gap-3">
                   <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
-                  <Button size="sm" onClick={onAddToWorkspace} disabled={isAddingToWorkspace}>
-                    <Plus className="mr-1 h-4 w-4" />
-                    Add to Workspace
-                  </Button>
+                  <DisabledReasonTooltip
+                    reason={
+                      isAddingToWorkspace
+                        ? 'A Data Block is being added to the workspace'
+                        : undefined
+                    }
+                  >
+                    <Button size="sm" onClick={onAddToWorkspace} disabled={isAddingToWorkspace}>
+                      <Plus className="mr-1 h-4 w-4" />
+                      Add to Workspace
+                    </Button>
+                  </DisabledReasonTooltip>
                 </div>
               }
             />

@@ -46,7 +46,9 @@ export function DisabledReasonTooltip({
     <TooltipProvider delayDuration={delayDuration} skipDelayDuration={0}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className={wrapperClass}>{children}</span>
+          <span className={wrapperClass} tabIndex={0}>
+            {children}
+          </span>
         </TooltipTrigger>
         <TooltipContent side={side}>{reason}</TooltipContent>
       </Tooltip>

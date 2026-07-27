@@ -31,6 +31,7 @@ interface Props {
     clearDisabled: boolean;
     runLabel: string;
     runDisabledReason?: string;
+    clearDisabledReason?: string;
   };
   corpusSamples: CorpusSample[];
   nodeDocCounts: number[];
@@ -218,6 +219,7 @@ export function TopicModelingParameterPanel({
           ? 'Select a column for each data block'
           : actionState.runDisabledReason,
         clearDisabled: actionState.clearDisabled || isClearing,
+        clearDisabledReason: actionState.clearDisabledReason,
         isRunningAll: isRunning,
         isStopping,
         isClearing,

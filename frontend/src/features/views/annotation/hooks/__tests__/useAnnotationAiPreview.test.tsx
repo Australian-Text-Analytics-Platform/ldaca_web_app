@@ -48,8 +48,14 @@ describe('useAnnotationAiPreview', () => {
     });
     queryWorkspaceSqlTable.mockReset();
     queryWorkspaceSqlTable.mockResolvedValue({
-      rows: [{ text: 'hello', label: null, review: 'greeting' }],
-      columns: ['text', 'label', 'review'],
+      rows: [{ text: 'hello', label: null, review: 'greeting', tweet_id: 1 }],
+      columns: ['text', 'label', 'review', 'tweet_id'],
+      schema: [
+        { name: 'text', kind: 'string' },
+        { name: 'label', kind: 'string' },
+        { name: 'review', kind: 'categorical' },
+        { name: 'tweet_id', kind: 'integer' },
+      ],
       hasNext: false,
     });
   });
@@ -73,7 +79,8 @@ describe('useAnnotationAiPreview', () => {
     const { result } = renderHook(() => useAnnotationAiPreview(args), { wrapper });
 
     await waitFor(() => expect(result.current.page.rows[0]?.review).toBe('greeting'));
-    expect(result.current.sourceColumns).toEqual(['text', 'label', 'review']);
+    expect(result.current.sourceColumns).toEqual(['text', 'label', 'review', 'tweet_id']);
+    expect(result.current.sourceComparableColumns).toEqual(['text', 'label', 'review']);
     expect(queryWorkspaceSqlTable).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { workspace_id: 'workspace-1' },
@@ -119,7 +126,7 @@ describe('useAnnotationAiPreview', () => {
     });
     await waitFor(() =>
       expect(result.current.page.rows).toEqual([
-        { text: 'second page', label: null, review: 'greeting' },
+        { text: 'second page', label: null, review: 'greeting', tweet_id: 1 },
       ]),
     );
   });

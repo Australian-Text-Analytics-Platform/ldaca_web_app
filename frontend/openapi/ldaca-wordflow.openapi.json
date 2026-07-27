@@ -482,6 +482,13 @@
             "title": "Kind",
             "type": "string"
           },
+          "max_retries_per_batch": {
+            "default": 2,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Retries Per Batch",
+            "type": "integer"
+          },
           "model": {
             "maxLength": 500,
             "minLength": 1,
@@ -680,6 +687,13 @@
             "default": "annotation",
             "title": "Kind",
             "type": "string"
+          },
+          "max_retries_per_batch": {
+            "default": 2,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Retries Per Batch",
+            "type": "integer"
           },
           "model": {
             "maxLength": 500,
@@ -1298,10 +1312,26 @@
       "AnnotationRunAllAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
+          "batch_size": {
+            "default": 20,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Batch Size",
+            "type": "integer"
+          },
           "kind": {
             "const": "annotation_run_all",
             "default": "annotation_run_all",
             "title": "Kind",
+            "type": "string"
+          },
+          "processing_mode": {
+            "default": "reprocess_all",
+            "enum": [
+              "reprocess_all",
+              "fill_missing"
+            ],
+            "title": "Processing Mode",
             "type": "string"
           },
           "source": {
@@ -1333,9 +1363,24 @@
             "title": "Annotation Column",
             "type": "string"
           },
+          "attempted_count": {
+            "minimum": 0.0,
+            "title": "Attempted Count",
+            "type": "integer"
+          },
           "committed_workspace_revision": {
             "minimum": 1.0,
             "title": "Committed Workspace Revision",
+            "type": "integer"
+          },
+          "failed_batch_count": {
+            "minimum": 0.0,
+            "title": "Failed Batch Count",
+            "type": "integer"
+          },
+          "failed_row_count": {
+            "minimum": 0.0,
+            "title": "Failed Row Count",
             "type": "integer"
           },
           "kind": {
@@ -1351,10 +1396,13 @@
           }
         },
         "required": [
+          "record_count",
+          "attempted_count",
+          "failed_batch_count",
+          "failed_row_count",
           "affected_node_id",
           "annotation_column",
           "committed_workspace_revision",
-          "record_count",
           "annotated_count"
         ],
         "title": "AnnotationRunAllResult",
@@ -1379,10 +1427,26 @@
             "title": "Api Key",
             "writeOnly": true
           },
+          "batch_size": {
+            "default": 20,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Batch Size",
+            "type": "integer"
+          },
           "kind": {
             "const": "annotation_run_all",
             "default": "annotation_run_all",
             "title": "Kind",
+            "type": "string"
+          },
+          "processing_mode": {
+            "default": "reprocess_all",
+            "enum": [
+              "reprocess_all",
+              "fill_missing"
+            ],
+            "title": "Processing Mode",
             "type": "string"
           },
           "source": {
