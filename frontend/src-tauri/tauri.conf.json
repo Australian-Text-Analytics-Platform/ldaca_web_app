@@ -1,6 +1,6 @@
 {
   "productName": "LDaCA Wordflow",
-  "version": "0.7.0",
+  "version": "0.6.9",
   "identifier": "au.edu.ldaca.text-analytics",
   "build": {
     "beforeDevCommand": "pnpm dev:tauri",
