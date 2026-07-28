@@ -20,7 +20,6 @@ sequenceDiagram
     participant Backend as FastAPI child process
     participant Webview
 
-    App->>App: reap stale process state
     App->>Config: load configured Data Root
     App->>Runtime: validate runtime-manifest.json
     App->>Backend: launch with port zero and private startup record
@@ -39,10 +38,15 @@ sequenceDiagram
     App-->>Webview: allow window close
 ```
 
-At startup, Tauri reaps stale process state, loads the desktop Data Root,
-launches the backend with port zero and a private startup record, waits for
+At startup, Tauri loads the desktop Data Root, launches the backend with port
+zero and a private startup record, waits for
 ASGI lifespan readiness, validates process identity and package version,
 injects the assigned URL, and only then shows the window.
+
+Each desktop process owns only its own backend child. The backend parent
+watchdog exits if that desktop process disappears, so multiple desktop
+instances can run against the same Data Root without a shared PID record or
+cross-instance process cleanup.
 
 The packaged backend runs with Python bytecode writes disabled. Python may use
 bytecode included before signing, but it must not add or update `__pycache__`

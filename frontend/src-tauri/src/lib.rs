@@ -283,7 +283,6 @@ async fn set_data_root(
     match outcome {
         SwitchOutcome::Ready { process, ready } => {
             let url = ready.url;
-            platform::write_pidfile(process.pid());
             supervisor.data_root = Some(candidate);
             supervisor.lifecycle = BackendLifecycle::Ready {
                 url: url.clone(),
@@ -297,7 +296,6 @@ async fn set_data_root(
             error,
         } => {
             eprintln!("Data-root restart rolled back: {error}");
-            platform::write_pidfile(process.pid());
             supervisor.lifecycle = BackendLifecycle::Ready {
                 url: ready.url,
                 process,
@@ -320,8 +318,6 @@ async fn set_data_root(
 /// behavior, and native downloads live in focused modules; this function owns
 /// Tauri wiring and the ordering between those domains.
 pub fn run() {
-    platform::reap_stale_backend();
-
     let state = BackendState {
         supervisor: Mutex::new(BackendSupervisor {
             lifecycle: BackendLifecycle::Starting,
@@ -374,7 +370,6 @@ pub fn run() {
             let mut process =
                 BackendProcess::spawn(&layout, &startup_file, configured_data_root.as_deref())?;
             let pid = process.pid();
-            platform::write_pidfile(pid);
             let ready = match process.wait_until_ready(&startup_file) {
                 Ok(ready) => ready,
                 Err(error) => {
@@ -398,7 +393,6 @@ pub fn run() {
                 ready.url
             )) {
                 let _ = process.shutdown();
-                platform::delete_pidfile();
                 return Err(error.into());
             }
             let state: State<'_, BackendState> = app.state();
@@ -406,7 +400,6 @@ pub fn run() {
                 Ok(supervisor) => supervisor,
                 Err(_) => {
                     let _ = process.shutdown();
-                    platform::delete_pidfile();
                     return Err(boxed_error("Backend lifecycle lock is poisoned"));
                 }
             };
@@ -422,7 +415,6 @@ pub fn run() {
                 if let Some(mut process) = take_backend_process(&state) {
                     let _ = process.shutdown();
                 }
-                platform::delete_pidfile();
                 return Err(error.into());
             }
             println!("Backend ready at {} (pid {pid})", ready.url);
@@ -444,7 +436,6 @@ pub fn run() {
                             eprintln!("Backend shutdown failed: {error}");
                         }
                     }
-                    platform::delete_pidfile();
                     if let Err(error) = window.close() {
                         eprintln!("Failed to close desktop window: {error}");
                     }
@@ -464,7 +455,6 @@ pub fn run() {
                         }
                     }
                 }
-                platform::delete_pidfile();
             }
         }),
         Err(error) => eprintln!("Error while building Tauri application: {error}"),
