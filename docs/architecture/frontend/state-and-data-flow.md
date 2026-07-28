@@ -186,12 +186,18 @@ not. Annotation replacement is the exception: each Preview or Run All becomes
 the Tab's sole Analysis immediately. An Active Analysis Draft is client-only
 and is never written into Query data.
 
-Concordance and Quotation Review query immutable Analysis table pages. Run All
-therefore creates no graph node and Review does not depend on Workspace SQL.
-`CONC_dispersion` is derived by the existing frontend presentation from grouped
-physical occurrence rows. Review feeds those pages back through the normal
-Concordance model, preserving Table View, Dispersion View, metadata selection,
-sorting, paging, row detail, and separated/combined presentation.
+Concordance and Quotation Review query explicit document or match projections
+of immutable Analysis tables. Run All therefore creates no graph node and
+Review does not depend on Workspace SQL. Concordance Table View always pages by
+matches. Dispersion View and Quotation Review can page by documents or matches;
+changing the unit resets that Result table to page one. `CONC_dispersion`
+remains frontend presentation state rather than a stored column.
+
+Concordance Review fetches whole-Result density only while Dispersion View is
+active. Its TanStack Query key is Workspace, child Analysis, and table identity,
+excluding page, sort, and row unit. The frontend reaggregates the backend's 100
+fixed bins into the selected display resolution, so changing a Review table
+page never changes the density chart.
 
 Two-source Concordance Run All appears as one thin Run All root with one
 Supporting Analysis per source. The forest projection keeps that relationship
@@ -239,7 +245,7 @@ ordered Data Block dependencies, and pagination. Switching an input cancels the
 previous request and late responses cannot replace the new state.
 
 Result pages remain immutable Query data. Concordance and Quotation pagination
-changes the complete Result-projection query key rather than merging pages into
+keys include the explicit row unit and complete Result-projection request rather than merging pages into
 component or Zustand state. Initial hydration reads the Analysis's stored
 canonical Result; only an explicit page, page-size, or sort change requests an
 alternate projection. While a Preview page is processing, its table keeps the

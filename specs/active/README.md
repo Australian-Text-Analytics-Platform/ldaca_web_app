@@ -7,4 +7,4 @@ issue backlogs here.
 
 ## Current implementation work
 
-No substantial changes are active.
+No substantial change is currently active.

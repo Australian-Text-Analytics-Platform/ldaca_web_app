@@ -112,8 +112,9 @@ The **Help** and **Feedback** buttons at the very bottom of the left sidebar pro
 - **Feedback** opens a form where you can report bugs, request features, or ask questions. Your feedback goes directly to the developer team. Please do not include any confidential information.
 <span id="help-ui-hint-system"></span>
 - A **Contextual Hint** may appear after a successful action when a feature has
-  a short next-step message. Choose **Got it** to acknowledge that version. It
-  will not appear again on this device unless its guidance is updated.
+  a short next-step message. Choose **Got it** or press **Enter** to acknowledge
+  that version. It will not appear again on this device unless its guidance is
+  updated.
 - Contextual Hints can be disabled under **Settings → Guidance**. The same page
   can reset acknowledgment history for the current user. This release includes
   the guidance framework but does not ship automatic Contextual Hints.

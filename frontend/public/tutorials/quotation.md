@@ -81,8 +81,11 @@ projection of the same Preview Analysis. It does not mutate that Analysis.
 Click **Run All** at any time to submit an independent Run All Analysis that
 retains a complete table Result from its own immutable snapshot. Later source
 edits do not alter that Analysis's meaning, and Run All does not add a Data
-Block to the Workspace. After success, **Review** reads the immutable Result as
-the final full table.
+Block to the Workspace. After success, **Review** reads the immutable Result.
+**Page by Documents** shows the highlighted reading view, while **Page by
+Matches** shows one raw extract per row with scalar `QUOTE_*` fields. Changing
+the paging unit returns to page 1. Review does not show the Preview page
+summary.
 
 Use **Add to Workspace** to publish selected Result columns as a Derived Data
 Block. The document column is required, metadata columns start unselected, and

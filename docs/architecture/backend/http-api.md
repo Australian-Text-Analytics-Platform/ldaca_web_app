@@ -39,10 +39,13 @@ flowchart LR
     NODES --> SCHEMA["Arrow schema"]
     NODES --> PREVIEWS["Arrow creation preview"]
     NODES --> EDITS["identity-preserving edits, Undo, Redo"]
+    NODES --> EXPORTS["bounded file or ZIP export"]
 
     TABS --> FOREST["ordered Analysis forest"]
     ANALYSES --> RESULT["JSON Result control plane"]
     RESULT --> TABLES["Arrow Result tables"]
+    TABLES --> PROJECTIONS["document and match projections"]
+    RESULT --> DENSITY["whole-Result Concordance density"]
     RESULT --> ARTIFACTS["download Artifacts"]
     ANALYSES --> SUB["optional Sub-Analyses"]
     ANALYSES --> CANCEL["cancel"]
@@ -85,11 +88,16 @@ operational controls for this trusted-user SSRF boundary.
 ## Control And Table Data Planes
 
 JSON is the control plane for resources, lifecycle, queries, errors, and small
-semantic summaries. Tabular payloads cross the HTTP boundary only as Arrow IPC
-streams with media type `application/vnd.apache.arrow.stream`:
+semantic summaries. Interactive table and query payloads cross the HTTP
+boundary only as Arrow IPC streams with media type
+`application/vnd.apache.arrow.stream`:
 
 - a complete immutable Result table has one URL and one self-contained stream;
 - an open-ended table has independent schema and row-page URLs;
+- a nested Concordance or Quotation Run All table has explicit document and
+  match schema/page URLs; its row unit is part of the resource identity;
+- whole-Result Concordance density is a small JSON semantic summary and does
+  not vary with page, sort, or row unit;
 - each page is a complete stream and uses `X-Wordflow-Has-Next` for one-row
   lookahead pagination, without an expensive total-count query;
 - a schema response is a zero-row stream, so schema and row decoding use one
@@ -102,6 +110,13 @@ streams with media type `application/vnd.apache.arrow.stream`:
   `org.ldaca.wordflow.topic_distribution.v1` over a
   `fixed-size-list[N+1]<struct<topic_id: int64, proportion: float64>>` storage
   type, ordered as outlier `-1` followed by real topics `0..N-1`.
+
+Explicit Data Block downloads are response-lifetime artifacts rather than an
+interactive table transport. A requested stable Workspace view is materialized
+as CSV, JSON, NDJSON, Parquet, or Arrow IPC file. A single Data Block returns
+that file directly; multiple Data Blocks are written into one bounded ZIP on
+the backend. These export files do not become Workspace persistence or a query
+cache.
 
 Data Blocks remain Parquet-backed internally. Parquet and serialized plans
 retain extension schema identity; Arrow IPC exposes that same identity rather

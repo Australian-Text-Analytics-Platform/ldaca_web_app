@@ -59,9 +59,9 @@ distinct.
 **Left context** and **Right context** control how many tokens appear around a
 match. Both default to 10 and accept values from 0 to 50.
 
-<h3 id="help-concordance-batch-size">Step 4 — Choose documents per batch</h3>
+<h3 id="help-concordance-batch-size">Step 4 — Choose documents per page</h3>
 
-Concordance Results are page-based. **Documents per batch** controls how many
+Concordance Preview is document-paged. **Documents per page** controls how many
 source documents the current page evaluates: 10, 20, 50, 100, 200, 400, or
 800. A page can contain fewer visible rows because documents without a match
 are omitted, while a document with several matches contributes several rows.
@@ -176,11 +176,15 @@ group with one independent Supporting Analysis per selected source. Each child
 uses the Run All request's immutable snapshot and tokenizer mapping and retains
 one complete table Result. Run All does not add Data Blocks to the Workspace.
 
-After success, **Review** reads each immutable table Result and feeds its
-grouped occurrence rows through the normal Concordance presentation, so
-Table/Dispersion, Separated/Combined, metadata, chart, pagination, sorting, and
-row-detail controls remain available. `CONC_dispersion` is derived in the
-frontend and is never queried as a physical Result column.
+After success, **Review** reads each immutable Result through explicit match and
+document projections. Table View always shows **Matches per page**. Dispersion
+View can page by **Matches** or **Documents**; for two sources the selected page
+size applies per source. Changing the paging unit returns to page 1. Review has
+no page-local Found summary.
+
+The Review density chart always summarizes the complete immutable Result, not
+the visible page. `CONC_dispersion` remains a frontend presentation field and
+is never stored or queried as a physical Result column.
 
 Use **Add to Workspace** to create Derived Data Blocks after reviewing the
 Result. The document column is required. Metadata columns start unselected,
@@ -213,7 +217,7 @@ forest, including after failure or cancellation.
 | Whole Word | Off | Text mode only |
 | Regular expression | Off | Text mode only |
 | Case Sensitive | Off | Text mode only |
-| Documents per batch | 20 | Controls source rows evaluated per Result page |
+| Documents per page | 20 | Controls source documents evaluated per Preview page |
 | View | Table | Dispersion summarizes the current page |
 | Bin No. | 20 | 4, 5, 10, 20, 25, 50, or 100 |
 | Chart type | Line | Line, Bar, or Area |

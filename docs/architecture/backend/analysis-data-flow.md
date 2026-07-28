@@ -167,6 +167,17 @@ projection inputs. A missing retained snapshot fails clearly rather than
 falling back to a mutable Data Block. Topic Distribution remains a named Arrow
 extension through storage, transport, and detachment.
 
+Concordance and Quotation Run All retain one row per matching source document.
+The row carries source metadata, an internal stable source-row ID, and a nested
+list of Concordance Matches or quotation extracts. Explicit document and match
+projection resources expose deterministic Arrow pages without changing the
+stored Result. Result Publication explodes the same nested artifact and emits
+one flat row per match or extract.
+
+Concordance density is a separate side-effect-free projection over the complete
+immutable child Result. It returns exact-match series in 100 fixed relative
+position bins and is independent of Review table page, sort, and row unit.
+
 ## Tokenization
 
 Token Frequency requests map every selected Data Block to one tokenizer.
@@ -192,7 +203,7 @@ enter Workspaces, Tabs, Results, provenance, logs, query keys, or telemetry.
 Terminal Analysis forests, Results, Artifacts, and queryable snapshots persist
 with the Workspace. Annotation query snapshots materialize only the source and
 optional Example Data Block because the validated class list is already part of
-the immutable request. Native schema 12 and portable archive format 11 validate
+the immutable request. Native schema 13 and portable archive format 12 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

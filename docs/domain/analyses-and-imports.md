@@ -156,15 +156,17 @@ Data Block rather than only the visible Review page.
 Concordance and Quotation Preview use Preview-scoped Analyses. Each requested
 page is computed from the retained immutable snapshot.
 
-Quotation Run All is one Run-All-scoped Analysis with one complete immutable
-table Result. Concordance Run All is a thin Run-All-scoped Analysis Group with
-one Supporting Sub-Analysis and table Result per selected source. Supporting
-work executes independently, but the group succeeds only after every source
-Result is durable.
+Quotation Run All is one Run-All-scoped Analysis with one immutable nested
+document Result. Concordance Run All is a thin Run-All-scoped Analysis Group
+with one Supporting Sub-Analysis and nested document Result per selected
+source. Supporting work executes independently, but the group succeeds only
+after every source Result is durable.
 
-Review reads the immutable Result tables directly. `CONC_dispersion` is
-derived by the frontend presentation from grouped physical occurrence rows and
-is never stored as a backend column.
+Review reads explicit document or match projections of those Results. A
+matching document is one stored row and owns a nested list of Concordance
+Matches or quotation extracts. `CONC_dispersion` is derived by the frontend and
+is never stored as a backend column. Result Publication flattens the nested
+Result to one row per match or extract.
 
 **Add to Workspace** submits a Result Publication Supporting Analysis under the
 successful Run All parent. Its immutable request selects one output name and a
@@ -183,7 +185,7 @@ Supporting Analysis and may publish multiple ordered output Data Blocks.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 12 and portable archive format 11 accept only this
+Native Workspace schema 13 and portable archive format 12 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

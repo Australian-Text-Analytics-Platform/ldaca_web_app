@@ -89,6 +89,13 @@ user-selected columns of a successful parent Analysis Result. Computing a
 Result and publishing it to the Workspace are separate operations.
 _Avoid_: detach action, automatic Run All output
 
+**Concordance Match**:
+One matched span in one source document, identified by its exact matched text
+and character offsets. A matching document may contain multiple Concordance
+Matches; Review may page either unit, while Result Publication always emits
+one row per Concordance Match.
+_Avoid_: document hit, dispersion row, cached line
+
 **Topic Distribution**:
 The ordered per-document proportions for the outlier topic `-1` followed by
 every real topic in ascending ID order. Every entry is present, absent

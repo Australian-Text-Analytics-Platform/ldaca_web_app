@@ -125,8 +125,8 @@ closing target makes it the sole open resource. If opening fails after a sibling
 transition, the response reports the real error and subsequent collection reads
 expose the resulting backend state.
 
-Native Workspace snapshots use schema version 12 and portable archives use
-format version 11. Readers accept only those exact versions; import and open do
+Native Workspace snapshots use schema version 13 and portable archives use
+format version 12. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks
@@ -137,6 +137,7 @@ below require the Workspace to be open.
 | Method and path | Operation ID | Success | Purpose |
 |---|---|---:|---|
 | `GET /api/workspaces/{workspace_id}/nodes` | `list_nodes` | 200 | Complete ordered Data Block collection |
+| `POST /api/workspaces/{workspace_id}/nodes/exports` | `export_data_blocks` | 200 file / ZIP | Export an ordered Data Block selection in one requested format |
 | `POST /api/workspaces/{workspace_id}/nodes` | `create_node` | 201 | Create a source or typed derived Data Block |
 | `POST /api/workspaces/{workspace_id}/nodes/previews` | `preview_node_creation` | 200 Arrow | Side-effect-free derived Data Block row page |
 | `PUT /api/workspaces/{workspace_id}/nodes/order` | `reorder_workspace_nodes_by_id` | 200 | Persist the complete Data Block order |
@@ -147,6 +148,13 @@ below require the Workspace to be open.
 | `POST /api/workspaces/{workspace_id}/nodes/{node_id}/redo` | `redo_node` | 200 | Restore the next plan from this open Workspace session |
 | `DELETE /api/workspaces/{workspace_id}/nodes/{node_id}` | `delete_node` | 204 | Delete while preserving graph integrity |
 | `GET /api/workspaces/{workspace_id}/nodes/{node_id}/schema` | `get_node_schema` | 200 Arrow | Authoritative zero-row Data Block schema stream |
+
+`DataBlockExportRequest` requires one or more unique Data Block UUIDs in export
+order and accepts `csv`, `json`, `ndjson`, `parquet`, or `ipc`. There is no
+arbitrary selection-count maximum. One Data Block returns its file directly;
+multiple Data Blocks return one backend-built ZIP with one file per Data Block.
+Export operates on a stable Workspace view and is bounded by response-snapshot
+storage admission.
 
 `NodeEditRequest` accepts `cast`, `rename_column`, `delete_column`, `filter`,
 `replace`, `expression`, `set_cell`, or `annotation_classes`. `set_cell`
@@ -189,6 +197,9 @@ reset after load, clone, import, close/reopen, or backend restart.
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
+| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows` | `get_analysis_table_projection_rows` | 200 Arrow | Deterministic document or match page from a nested Run All Result |
+| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/schema` | `get_analysis_table_projection_schema` | 200 Arrow | Zero-row schema for a document or match projection |
+| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/density` | `get_concordance_table_density` | 200 JSON | Whole-Result Concordance density in 100 fixed bins |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/artifacts/{artifact_name}` | `download_analysis_artifact` | 200 | Download a declared Analysis Artifact snapshot |
 
 Every valid Analysis resource includes required ordered `output_node_ids`.
@@ -207,8 +218,11 @@ Annotation submissions are linear and must omit parents, Supporting scope, and
 supersession targets. Each accepted Annotation Preview or Run All immediately
 replaces the Tab's previous Analysis.
 
-Concordance and Quotation Run All Results expose complete immutable paged table
-descriptors. They do not create Data Blocks and therefore retain empty
+Concordance and Quotation Run All Results expose immutable projected-table
+descriptors with document and match row resources. Their stored artifacts have
+one row per matching document and a nested analysis list; each descriptor also
+reports explicit document and match counts. Concordance descriptors expose a
+whole-Result density resource. They do not create Data Blocks and therefore retain empty
 `output_node_ids`. A `concordance_result_publication` or
 `quotation_result_publication` Supporting Analysis must name the successful
 matching Run All parent. Its request selects the required document column plus

@@ -18,7 +18,7 @@ analysis without materializing a whole-corpus result in the browser.
   requires a tokenizer for every selected Data Block.
 
 - How are Results paged?
-  **Documents per batch** controls how many source documents are evaluated for
+  **Documents per page** controls how many source documents are evaluated for
   the current page. Documents without a match are omitted, while one document
   can produce several rows. Page, page-size, and source-metadata sort changes
   are projections of the same completed Analysis and retained input snapshot;
@@ -33,8 +33,10 @@ analysis without materializing a whole-corpus result in the browser.
   **Preview** creates a Preview Analysis and computes only the page you request.
   **Run All** may be started directly and creates one Run All group with one
   Supporting Analysis and immutable table Result per source. **Review** reads
-  those Results directly and retains the same Table/Dispersion,
-  Separated/Combined, metadata, sorting, paging, and row-detail controls.
+  those Results directly. Table View pages by matches; Dispersion View can page
+  by matches or documents. Its density chart covers the complete Result rather
+  than the visible page. Separated/Combined, metadata, sorting, and row-detail
+  controls remain available.
   **Add to Workspace** lets you publish selected Result columns as Derived Data
   Blocks after the computation succeeds.
 

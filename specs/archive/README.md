@@ -7,6 +7,9 @@ current system documentation.
 
 ## Completed changes
 
+- [Document-level Concordance and Quotation Results](19-document-level-analysis-results/spec.md)
+  ([issue #19](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/19)),
+  completed 2026-07-28.
 - [Multi-instance Annotation provider configurations](15-annotation-provider-configurations/spec.md)
   ([issue #15](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/15)),
   completed 2026-07-23.
