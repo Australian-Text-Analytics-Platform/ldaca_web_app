@@ -119,7 +119,7 @@ fn show_startup_error(app: &tauri::AppHandle, detail: &str) {
     let handle = app.clone();
     app.dialog()
         .message(format!(
-            "The local Wordflow backend could not start.\n\n{detail}\n\nClose any other Wordflow backend using this Data Root, then reopen the application."
+            "The local Wordflow backend could not start.\n\n{detail}\n\nResolve the reported startup error, then reopen the application."
         ))
         .kind(MessageDialogKind::Error)
         .title("Wordflow startup failed")

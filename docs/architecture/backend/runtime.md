@@ -38,12 +38,12 @@ development or hosted production.
 ## Lifespan Ownership
 
 `runtime_context` uses `AsyncExitStack` and yields typed `LifespanState`. Startup
-initializes and locks storage, initializes SQLite, creates the task group and
+initializes storage and SQLite, creates the task group and
 I/O limiter, verifies hosted filesystem-allocation accounting, constructs
 services, reconciles Workspaces, Analyses, User File Imports, response snapshots,
 and transient storage, starts both private schedulers, then starts bounded
 maintenance. A distinct resource stack owns provider clients, Workspace open
-state, the event hub, and the Data Root lock. The runtime task-group owner is
+state and the event hub. The runtime task-group owner is
 registered above that stack so no application task can outlive a dependency.
 
 Requests retrieve the runtime from `request.state`. There is no settings or
@@ -62,7 +62,7 @@ sequenceDiagram
 
     Bootstrap->>FastAPI: create_app(validated Settings)
     Note over Bootstrap,FastAPI: No stateful resources are allocated
-    FastAPI->>Storage: enter lifespan and lock the Data Root
+    FastAPI->>Storage: enter lifespan and initialize the Data Root
     Storage-->>Runtime: database, task group, I/O limiter
     Runtime->>Storage: verify hosted quota allocation metrics
     Runtime->>Runtime: construct services in dependency order
@@ -84,7 +84,6 @@ sequenceDiagram
     Imports-->>Runtime: terminal commits or startup reconciliation
     Runtime->>Runtime: cancel and join the runtime task group
     Runtime->>Runtime: close Workspace slots, events, and providers
-    Runtime->>Storage: release Data Root lock
 ```
 
 ## Shutdown
@@ -101,16 +100,19 @@ Only confirmed termination is committed during shutdown. If a terminal commit
 cannot complete before exit, the strict non-terminal record remains for startup
 interruption reconciliation; shutdown does not guess its outcome. After
 execution shutdown, the application task group is cancelled and joined, then
-the resource stack unwinds provider clients, Workspace slots, event subscribers,
-and the Data Root lock in reverse construction order. The same exit stacks
+the resource stack unwinds provider clients, Workspace slots, and event
+subscribers in reverse construction order. The same exit stacks
 unwind partial startup. Workspace shutdown does not invent a save because every
 mutation commits before releasing its gate.
 
 ## Process Model
 
-The backend intentionally supports one ASGI process. Multiple Uvicorn workers
-would split Workspace gates, event subscribers, queues, and execution handles. See
-[ADR 0001](../../adr/0001-single-process-lifespan-owned-backend.md).
+Each backend instance intentionally supports one ASGI process. Multiple Uvicorn
+workers would split Workspace gates, event subscribers, queues, and execution
+handles. See [ADR 0001](../../adr/0001-single-process-lifespan-owned-backend.md).
+Independent backend instances may share one Data Root; there is no root-level
+process lock. Each persistent store remains responsible for its own transaction
+or atomic-write boundary.
 
 Supported process-entry profiles are split Vite/Uvicorn development, direct
 ASGI hosting, the bundled production CLI, the Tauri-supervised backend CLI, and

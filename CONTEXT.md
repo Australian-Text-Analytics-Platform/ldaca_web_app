@@ -120,7 +120,7 @@ and has no generic background-work parent.
 _Avoid_: import task, download job
 
 **Data Root**:
-The process-owned storage root containing users, Workspaces, User File Import
+The configured storage root containing users, Workspaces, User File Import
 records, caches, response snapshots, and the authentication database.
 _Avoid_: working directory, current directory
 
