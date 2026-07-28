@@ -40,6 +40,10 @@ vi.mock('@/features/preferences/useUserPreferences', () => ({
   useUpdateUserPreferences: () => ({ mutate: mocks.updatePreferences }),
 }));
 
+vi.mock('@/features/desktop-updater/DesktopUpdateSettingsPanel', () => ({
+  DesktopUpdateSettingsPanel: () => <p>Desktop update controls</p>,
+}));
+
 /** Resets the preferences store to a deterministic snapshot before rendering. */
 function resetPreferenceState(analysisMultiTabEnabled = false) {
   mocks.multiTabEnabled = analysisMultiTabEnabled;
@@ -122,5 +126,19 @@ describe('SettingsDialog', () => {
     expect(await screen.findByText('Annotation providers')).toBeInTheDocument();
     expect(screen.getByText('No Annotation providers configured.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add Provider' })).toBeInTheDocument();
+  });
+
+  it('shows update controls only in the desktop runtime', async () => {
+    const user = userEvent.setup();
+    const view = renderSettingsDialog();
+
+    expect(screen.queryByRole('tab', { name: 'Updates' })).not.toBeInTheDocument();
+    view.unmount();
+
+    mocks.isTauri.mockReturnValue(true);
+    renderSettingsDialog();
+    await user.click(screen.getByRole('tab', { name: 'Updates' }));
+
+    expect(screen.getByText('Desktop update controls')).toBeInTheDocument();
   });
 });

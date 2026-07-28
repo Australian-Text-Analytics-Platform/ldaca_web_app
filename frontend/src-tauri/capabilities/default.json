@@ -8,6 +8,8 @@
     "opener:allow-reveal-item-in-dir",
     "dialog:default",
     "dialog:allow-open",
+    "process:allow-restart",
+    "updater:default",
     "fs:allow-download-write-recursive",
     "fs:allow-download-meta-recursive"
   ]

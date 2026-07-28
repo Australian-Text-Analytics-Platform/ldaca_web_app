@@ -23,8 +23,9 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
 import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
 import { DataPortalCredentialPanel } from '@/features/settings/DataPortalCredentialPanel';
+import { DesktopUpdateSettingsPanel } from '@/features/desktop-updater/DesktopUpdateSettingsPanel';
 import { toast } from 'sonner';
-import { Bot, Eye, FolderOpen, Hash, KeyRound, RotateCcw, Sparkles } from 'lucide-react';
+import { Bot, Download, Eye, FolderOpen, Hash, KeyRound, RotateCcw, Sparkles } from 'lucide-react';
 import { isTauri } from '@/lib/isTauri';
 
 interface SettingsDialogProps {
@@ -37,6 +38,7 @@ const SETTINGS_TABS = [
   { value: 'portal', label: 'Portal', icon: KeyRound },
   { value: 'ai', label: 'AI', icon: Bot },
   { value: 'workspace', label: 'Workspace', icon: FolderOpen },
+  { value: 'updates', label: 'Updates', icon: Download },
   { value: 'views', label: 'Views', icon: Eye },
   { value: 'guidance', label: 'Guidance', icon: Hash },
 ] as const;
@@ -108,16 +110,18 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             className="flex min-h-0 flex-1 flex-row gap-0 overflow-hidden"
           >
             <TabsList className="h-full w-52 shrink-0 flex-col justify-start overflow-y-auto rounded-none border-r border-border/60 bg-muted/30 p-2">
-              {SETTINGS_TABS.map(({ value, label, icon: Icon }) => (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  className="h-9 w-full justify-start gap-2 px-3 text-left flex-none"
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </TabsTrigger>
-              ))}
+              {SETTINGS_TABS.map(({ value, label, icon: Icon }) =>
+                value === 'updates' && !desktopRuntime ? null : (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="h-9 w-full justify-start gap-2 px-3 text-left flex-none"
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </TabsTrigger>
+                ),
+              )}
             </TabsList>
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6">
               <TabsContent value="general" className="mt-0 space-y-5">
@@ -247,6 +251,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   })}
                 </div>
               </TabsContent>
+
+              {desktopRuntime ? (
+                <TabsContent value="updates" className="mt-0">
+                  <DesktopUpdateSettingsPanel />
+                </TabsContent>
+              ) : null}
 
               <TabsContent value="guidance" className="mt-0 space-y-4">
                 <section className="space-y-3">
