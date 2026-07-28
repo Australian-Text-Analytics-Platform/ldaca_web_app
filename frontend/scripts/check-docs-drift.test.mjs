@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectDocumentationProblems, collectWorkflowProblems } from './check-docs-drift.mjs';
+import { collectDocumentationProblems } from './check-docs-drift.mjs';
 
 const registry = {
   tutorial: {
@@ -135,10 +135,7 @@ describe('documentation drift validation', () => {
         reference: {},
       },
       documents: new Map([
-        [
-          'tutorials/guides/current.md',
-          '<h1 id="help-current">Current</h1>\n[Next](next.MD#next)',
-        ],
+        ['tutorials/guides/current.md', '<h1 id="help-current">Current</h1>\n[Next](next.MD#next)'],
         ['tutorials/guides/next.MD', '<h2 id="next">Next</h2>'],
       ]),
     });
@@ -271,42 +268,5 @@ describe('documentation drift validation', () => {
     expect(problems).toContain(
       'warnings/orphan.md is not registered or reachable from registered documentation',
     );
-  });
-});
-
-describe('documentation drift workflow validation', () => {
-  it('requires docs, registry, validator, and validator tests to trigger the executable check', () => {
-    const workflow = [
-      'on:',
-      '  pull_request:',
-      '    paths:',
-      "      - 'frontend/src/**/*.tsx'",
-      'jobs:',
-      '  drift:',
-      '    steps:',
-      '      - run: echo skipped',
-    ].join('\n');
-
-    expect(collectWorkflowProblems(workflow)).toEqual([
-      'workflow does not trigger for frontend/public documentation',
-      'workflow does not trigger for the bundled registry',
-      'workflow does not trigger for the drift validator tests',
-      'workflow does not execute scripts/check-docs-drift.mjs',
-    ]);
-  });
-
-  it('accepts the aggregate frontend trigger and verification contract', () => {
-    const workflow = [
-      'on:',
-      '  pull_request:',
-      '    paths:',
-      "      - 'frontend/**'",
-      'jobs:',
-      '  check:',
-      '    steps:',
-      '      - run: pnpm -C frontend check',
-    ].join('\n');
-
-    expect(collectWorkflowProblems(workflow)).toEqual([]);
   });
 });

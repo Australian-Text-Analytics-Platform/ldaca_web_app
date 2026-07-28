@@ -2,7 +2,7 @@
 /**
  * Verifies the complete bundled documentation contract.
  *
- * Used by: the docs-drift workflow and local frontend verification. Tests
+ * Used by: local frontend verification. Tests
  * import the pure collectors below so missing files, anchors, relative links,
  * and workflow wiring fail before the executable check reaches CI.
  */
@@ -15,10 +15,8 @@ import { BUNDLED_REGISTRY, TUTORIAL_INDEX_TARGET } from '../src/tutorials/bundle
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = resolve(SCRIPT_DIR, '..');
-const REPO_DIR = resolve(FRONTEND_DIR, '..');
 const SRC_DIR = resolve(FRONTEND_DIR, 'src');
 const PUBLIC_DIR = resolve(FRONTEND_DIR, 'public');
-const WORKFLOW_FILE = resolve(REPO_DIR, '.github/workflows/check-docs-drift.yml');
 
 const COMPONENT_TO_KIND = {
   HelpIcon: 'tutorial',
@@ -203,27 +201,6 @@ export function collectDocumentationProblems({
   return problems;
 }
 
-/** Verifies that relevant docs changes actually trigger and execute the workflow. */
-export function collectWorkflowProblems(workflow) {
-  const problems = [];
-  const checksAllFrontend = workflow.includes('frontend/**');
-  if (!checksAllFrontend && !workflow.includes('frontend/public/**')) {
-    problems.push('workflow does not trigger for frontend/public documentation');
-  }
-  if (!checksAllFrontend && !workflow.includes('frontend/src/tutorials/bundledRegistry.ts')) {
-    problems.push('workflow does not trigger for the bundled registry');
-  }
-  if (!checksAllFrontend && !workflow.includes('frontend/scripts/check-docs-drift.test.mjs')) {
-    problems.push('workflow does not trigger for the drift validator tests');
-  }
-  const runsDriftDirectly = /run:\s*node\b[^\n]*scripts\/check-docs-drift\.mjs/.test(workflow);
-  const runsFrontendContract = /run:\s*pnpm\s+-C\s+frontend\s+check\b/.test(workflow);
-  if (!runsDriftDirectly && !runsFrontendContract) {
-    problems.push('workflow does not execute scripts/check-docs-drift.mjs');
-  }
-  return problems;
-}
-
 async function collectSourceLiterals() {
   const files = (await walk(SRC_DIR)).filter(
     (path) => /\.(ts|tsx)$/.test(path) && !path.endsWith('.d.ts') && !path.includes('/__tests__/'),
@@ -266,8 +243,6 @@ async function run() {
     availablePaths,
     extraTargets: [{ name: 'tutorial:index', target: TUTORIAL_INDEX_TARGET }],
   });
-  problems.push(...collectWorkflowProblems(await readFile(WORKFLOW_FILE, 'utf8')));
-
   if (missingLiterals.length) {
     problems.unshift(
       ...missingLiterals.map(

@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to build manually, e.g. dev"
+        description: "Optional Git ref override; defaults to the selected workflow branch"
         required: false
         type: string
-        default: "dev"
+        default: ""
       publish_release:
         description: "Publish artifacts to a GitHub release"
         required: false
@@ -22,7 +22,7 @@ on:
         type: string
 
 concurrency:
-  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref_name }}
+  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.ref != '' && inputs.ref || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -36,13 +36,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref != '' && inputs.ref || github.ref }}
           fetch-depth: 0
-          # backend/pyproject.toml lives in the backend submodule, so the
-          # gate needs the submodule trees on disk before it can read all
-          # six version sources. Default checkout omits submodules; the
-          # build-windows / build-macos jobs already opt in, so this
-          # mirrors them.
           submodules: recursive
 
       - name: Check version, lock, and release-tag identity
@@ -50,17 +45,14 @@ jobs:
           EXPECTED_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.publish_release && inputs.release_tag || '' }}
         run: node scripts/check-versions.mjs --tag "$EXPECTED_RELEASE_TAG"
 
-      - name: Require the release tag to identify the checked-out commit
+      - name: Require release tag to identify checked-out commit
         if: github.event_name == 'push' || inputs.publish_release
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
         run: |
           set -Eeuo pipefail
-          if [ -z "$RELEASE_TAG" ]; then
-            echo "release_tag is required when publishing a release" >&2
-            exit 1
-          fi
+          test -n "$RELEASE_TAG" || { echo "release_tag is required when publishing" >&2; exit 1; }
           checked_out_sha="$(git rev-parse HEAD)"
           release_sha="$(git rev-parse "${RELEASE_TAG}^{commit}")"
           if [ "$checked_out_sha" != "$release_sha" ]; then
@@ -77,57 +69,108 @@ jobs:
         include:
           - name: Windows MSI
             platform: windows
-          - name: macOS DMG
+          - name: macOS DMG and updater
             platform: macos
     uses: ./.github/workflows/desktop-build.yml
+    secrets: inherit
     with:
       platform: ${{ matrix.platform }}
       debug: false
-      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref != '' && inputs.ref || github.ref }}
 
   publish-release:
     name: Publish Desktop Assets
     if: ${{ github.event_name == 'push' || inputs.publish_release }}
-    needs:
-      - build-desktop
+    needs: build-desktop
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Download Windows artifact
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v8
         with:
           name: ldaca-desktop-windows-msi
           path: release-assets/windows
 
-      - name: Download macOS artifact
+      - name: Download macOS artifacts
         uses: actions/download-artifact@v8
         with:
           name: ldaca-desktop-macos-apple-silicon
           path: release-assets/macos
 
-      - name: Create or update GitHub release assets
+      - name: Create signed updater manifest
         shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
         run: |
           set -Eeuo pipefail
-          release_tag="${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}"
+          test -n "$RELEASE_TAG" || { echo "release_tag is required when publishing" >&2; exit 1; }
 
-          if [ -z "$release_tag" ]; then
-            echo "release_tag input is required when publish_release is true" >&2
-            exit 1
-          fi
+          windows_asset="$(find release-assets/windows -type f -name '*.msi' -print -quit)"
+          macos_asset="$(find release-assets/macos -type f -name '*.app.tar.gz' -print -quit)"
+          test -s "$windows_asset"
+          test -s "$windows_asset.sig"
+          test -s "$macos_asset"
+          test -s "$macos_asset.sig"
 
-          if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$release_tag" \
-              release-assets/windows/*.msi \
-              release-assets/macos/*.dmg \
-              --clobber \
-              --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$release_tag" \
-              release-assets/windows/*.msi \
-              release-assets/macos/*.dmg \
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
               --generate-notes \
-              --title "$release_tag" \
+              --title "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY"
           fi
+
+          release_notes="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+          release_base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+          version="${RELEASE_TAG#v}"
+          windows_signature="$(tr -d '\r\n' < "$windows_asset.sig")"
+          macos_signature="$(tr -d '\r\n' < "$macos_asset.sig")"
+
+          jq -n \
+            --arg version "$version" \
+            --arg notes "$release_notes" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg windows_signature "$windows_signature" \
+            --arg windows_url "$release_base/$(basename "$windows_asset")" \
+            --arg macos_signature "$macos_signature" \
+            --arg macos_url "$release_base/$(basename "$macos_asset")" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "windows-x86_64": {
+                  signature: $windows_signature,
+                  url: $windows_url
+                },
+                "darwin-aarch64": {
+                  signature: $macos_signature,
+                  url: $macos_url
+                }
+              }
+            }' > release-assets/latest.json
+
+          jq -e \
+            '.version != "" and (.platforms | keys | sort) == ["darwin-aarch64", "windows-x86_64"] and all(.platforms[]; .signature != "" and .url != "")' \
+            release-assets/latest.json >/dev/null
+
+      - name: Replace GitHub release assets
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+        run: |
+          set -Eeuo pipefail
+          while IFS= read -r asset_name; do
+            [ -n "$asset_name" ] && gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes --repo "$GITHUB_REPOSITORY"
+          done < <(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+
+          gh release upload "$RELEASE_TAG" \
+            release-assets/windows/*.msi \
+            release-assets/windows/*.msi.sig \
+            release-assets/macos/*.dmg \
+            release-assets/macos/*.app.tar.gz \
+            release-assets/macos/*.app.tar.gz.sig \
+            release-assets/latest.json \
+            --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --latest --repo "$GITHUB_REPOSITORY"
