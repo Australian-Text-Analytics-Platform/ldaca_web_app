@@ -47,14 +47,18 @@ metadata is sufficient.
 
 The root release workflow verifies version consistency and requires the release
 tag to resolve to the checked-out commit. It then calls the shared desktop
-workflow for Windows MSI and macOS app/DMG assets and attaches Tauri's generated
-artifacts to the GitHub release. Do not hand-edit version strings, relabel the
-DMG, or reuse a published package version.
+workflow for Windows MSI and signed macOS artifacts. The release job publishes
+those exact build outputs together with their updater signatures and generated
+`latest.json`; it never rebuilds them. Do not hand-edit version strings or
+normally reuse a published package version.
 
 ## Post-release
 
 - Install the exact backend version with `uvx --from ldaca-wordflow==<semver>
   ldaca-wordflow --help`.
-- Confirm desktop assets exist for both platforms.
+- Confirm the MSI, DMG, both updater signatures, macOS updater archive, and
+  `latest.json` exist in the GitHub Release.
+- Install an older signed build and verify both startup and manual update checks
+  install and relaunch into the new version.
 - Deploy the tagged root commit and current submodule pointers.
 - Verify `/health`, hosted login, one Workspace read, and `/api/events` delivery.

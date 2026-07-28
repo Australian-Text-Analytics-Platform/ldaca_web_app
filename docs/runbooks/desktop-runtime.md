@@ -50,10 +50,59 @@ packaging workflow. The release workflow invokes it once per platform after
 version validation. Backend Ruff, Ty, and Pytest gates belong to backend CI;
 desktop CI retains only supervisor, bundle, and packaged-runtime checks.
 
-macOS builds upload Tauri's generated `*.dmg` directly. Windows builds upload
-the generated MSI. Release publication additionally requires the release tag
-and the checked-out build ref to resolve to the same commit.
+The reusable build workflow owns all compilation and packaging. It preserves
+the source-aware backend-runtime build, then:
 
-The local macOS build command sets `CI=true` only for Tauri bundling. Tauri
-then uses its built-in non-GUI DMG path instead of Finder AppleScript layout,
-which makes local and hosted builds deterministic without a custom DMG script.
+- creates a signed MSI and updater signature on Windows;
+- builds explicitly for `aarch64-apple-darwin` on Apple Silicon;
+- deep-signs the embedded Python runtime and outer application with the
+  Developer ID certificate;
+- notarizes and staples the application;
+- creates and signs the updater `.app.tar.gz` from that final application;
+- creates, signs, notarizes, and staples the direct-download DMG.
+
+The release workflow does not rebuild. It downloads both build artifacts,
+creates `latest.json`, and publishes the MSI, DMG, updater archives, signatures,
+and manifest to the matching GitHub Release. Publication requires the release
+tag and checked-out ref to peel to the same commit.
+
+Repository Actions secrets required by this workflow are:
+
+- `APPLE_CERTIFICATE`
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_ID`
+- `APPLE_PASSWORD`
+- `APPLE_SIGNING_IDENTITY`
+- `APPLE_TEAM_ID`
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+
+The matching Tauri updater public key is committed in
+`frontend/src-tauri/tauri.conf.json`. Never commit the private key or its
+password.
+
+## Updater Key Rotation
+
+Generate an encrypted updater key outside the repository and preserve its
+private half in a password manager or protected operator backup:
+
+```bash
+cd frontend
+pnpm tauri signer generate --ci --password '<strong password>' \
+  --write-keys "$HOME/.tauri/ldaca-wordflow.key"
+```
+
+Store the complete private-key text and password as the two GitHub Actions
+secrets above. Commit only the generated `.pub` text as `plugins.updater.pubkey`.
+An application can verify only keys embedded when it was built, so rotation
+requires a bridge release signed by the old key before later releases switch
+exclusively to the new key.
+
+## Release Acceptance
+
+For each published version, verify the GitHub Release contains `latest.json`,
+the MSI and signature, the Apple Silicon updater archive and signature, and the
+notarized DMG. Open the quarantined DMG on a clean Mac, confirm Gatekeeper
+acceptance, then exercise both automatic startup checking and the manual
+Settings check from an older signed build. Installation must verify, relaunch,
+and report the new version.

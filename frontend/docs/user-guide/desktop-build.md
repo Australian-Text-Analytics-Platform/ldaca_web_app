@@ -20,6 +20,16 @@
 
 **Answer:** Run the desktop build script from the web app workspace root. On Windows, this produces the MSI installer.
 
+## Step 4 — Check for updates
+
+**Question:** _How does an installed desktop app update?_
+
+**Answer:** Wordflow checks the signed GitHub Release manifest at startup. You
+can also open **Settings → Updates** and choose **Check for updates**. When a
+newer release is available, Wordflow shows its release notes and asks before
+downloading. The native updater verifies the signature, installs the package,
+and restarts the application.
+
 ## Recap
 
 **Question:** _Where are the detailed backend packaging steps?_
