@@ -45,10 +45,12 @@ def test_sync_runtime_environment_uses_locked_source_aware_sync(
 
     runtime_python_dir = Path("/tmp/runtime")
     managed_python_dir = Path("/tmp/runtime/managed-python")
+    cargo_target_dir = Path("/tmp/cargo-target")
 
     module.sync_runtime_environment(
         runtime_python_dir=runtime_python_dir,
         managed_python_dir=managed_python_dir,
+        cargo_target_dir=cargo_target_dir,
     )
 
     assert calls == [
@@ -67,6 +69,7 @@ def test_sync_runtime_environment_uses_locked_source_aware_sync(
             {
                 "UV_PYTHON_INSTALL_DIR": str(managed_python_dir),
                 "UV_PROJECT_ENVIRONMENT": str(runtime_python_dir),
+                "CARGO_TARGET_DIR": str(cargo_target_dir),
             },
         )
     ]

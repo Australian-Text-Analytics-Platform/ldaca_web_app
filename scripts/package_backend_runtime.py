@@ -265,11 +265,16 @@ def ensure_venv_libpython(
 
 
 def sync_runtime_environment(
-    *, runtime_python_dir: Path, managed_python_dir: Path
+    *,
+    runtime_python_dir: Path,
+    managed_python_dir: Path,
+    cargo_target_dir: Path,
 ) -> None:
     print("[INFO] Syncing backend runtime environment from backend/uv.lock")
     sync_env = create_uv_managed_python_env(managed_python_dir)
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_python_dir)
+    # The local Rust wheels share the Polars dependency graph.
+    sync_env["CARGO_TARGET_DIR"] = str(cargo_target_dir)
     run(
         [
             "uv",
@@ -410,6 +415,7 @@ def main() -> None:
     sync_runtime_environment(
         runtime_python_dir=runtime_python_dir,
         managed_python_dir=managed_python_dir,
+        cargo_target_dir=dist_root / "cargo-target",
     )
     remove_macos_metadata_files(output_dir)
 
