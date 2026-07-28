@@ -80,13 +80,13 @@ jobs:
             -ErrorAction SilentlyContinue
 
       - name: Checkout repository with submodules
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
           submodules: recursive
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: 24
 
@@ -97,7 +97,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install uv CLI
-        uses: astral-sh/setup-uv@v9
+        uses: astral-sh/setup-uv@v9.0.0
 
       - name: Install Node dependencies
         shell: bash
@@ -150,7 +150,7 @@ jobs:
 
       - name: Import Apple code-signing certificate
         if: inputs.platform == 'macos'
-        uses: Apple-Actions/import-codesign-certs@v7
+        uses: Apple-Actions/import-codesign-certs@v7.0.0
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -372,7 +372,7 @@ jobs:
 
       - name: Upload Windows release artifacts
         if: inputs.platform == 'windows'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ldaca-desktop-windows-msi${{ inputs.debug && '-debug' || '' }}
           path: frontend/src-tauri/target/${{ inputs.debug && 'debug' || 'release' }}/release-assets/*
@@ -381,7 +381,7 @@ jobs:
 
       - name: Upload macOS release artifacts
         if: inputs.platform == 'macos'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ldaca-desktop-macos-apple-silicon
           path: |
@@ -404,7 +404,7 @@ jobs:
 
       - name: Upload macOS failure bundle
         if: failure() && inputs.platform == 'macos'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ldaca-wordflow-app-failure
           path: /tmp/ldaca-wordflow-app.tgz

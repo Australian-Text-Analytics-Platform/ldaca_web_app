@@ -32,7 +32,16 @@ describe('desktop configuration contracts', () => {
     const buildWorkflow = read('.github/workflows/desktop-build.yml');
     const releaseWorkflow = read('.github/workflows/release.yml');
 
-    expect(buildWorkflow).toContain('Apple-Actions/import-codesign-certs@v7');
+    for (const action of [
+      'actions/checkout@v7.0.1',
+      'actions/setup-node@v7.0.0',
+      'actions/upload-artifact@v7.0.1',
+      'astral-sh/setup-uv@v9.0.0',
+    ]) {
+      expect(buildWorkflow).toContain(action);
+    }
+    expect(buildWorkflow).toContain('Apple-Actions/import-codesign-certs@v7.0.0');
+    expect(releaseWorkflow).toContain('actions/download-artifact@v8.0.1');
     expect(buildWorkflow).toContain('aarch64-apple-darwin');
     expect(buildWorkflow).toContain('xcrun notarytool submit');
     expect(buildWorkflow).toContain('TAURI_SIGNING_PRIVATE_KEY');
