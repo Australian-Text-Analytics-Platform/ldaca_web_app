@@ -1242,6 +1242,143 @@ export type ConcordanceAnalysisRequest = {
 };
 
 /**
+ * ConcordanceDensityResult
+ */
+export type ConcordanceDensityResult = {
+    /**
+     * Document Count
+     */
+    document_count: number;
+    /**
+     * Match Count
+     */
+    match_count: number;
+    /**
+     * Resolution
+     */
+    resolution?: 100;
+    /**
+     * Series
+     */
+    series: Array<ConcordanceDensitySeries>;
+};
+
+/**
+ * ConcordanceDensitySeries
+ */
+export type ConcordanceDensitySeries = {
+    /**
+     * Counts
+     */
+    counts: [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number
+    ];
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
  * ConcordancePage
  */
 export type ConcordancePage = {
@@ -1383,9 +1520,17 @@ export type ConcordanceRunAllGroupSource = {
      */
     document_column: string;
     /**
+     * Document Count
+     */
+    document_count: number;
+    /**
      * Internal Columns
      */
     internal_columns: Array<string>;
+    /**
+     * Match Count
+     */
+    match_count: number;
     /**
      * Metadata Columns
      */
@@ -1398,10 +1543,6 @@ export type ConcordanceRunAllGroupSource = {
      * Node Name
      */
     node_name: string;
-    /**
-     * Record Count
-     */
-    record_count: number;
 };
 
 /**
@@ -1476,6 +1617,26 @@ export type CreateFolderRequest = {
      * Parent Path
      */
     parent_path?: string;
+};
+
+/**
+ * DataBlockExportFormat
+ *
+ * Portable file formats supported by Data Block export.
+ */
+export type DataBlockExportFormat = 'csv' | 'json' | 'ndjson' | 'parquet' | 'ipc';
+
+/**
+ * DataBlockExportRequest
+ *
+ * Export one or more ordered Data Blocks in one shared format.
+ */
+export type DataBlockExportRequest = {
+    format?: DataBlockExportFormat;
+    /**
+     * Node Ids
+     */
+    node_ids: Array<string>;
 };
 
 /**
@@ -2363,6 +2524,28 @@ export type Progress = {
 };
 
 /**
+ * ProjectedTableResource
+ *
+ * One immutable nested table exposed through document and match rows.
+ */
+export type ProjectedTableResource = {
+    /**
+     * Delivery
+     */
+    delivery?: 'projected';
+    /**
+     * Density Url
+     */
+    density_url?: string | null;
+    documents: TableProjectionResource;
+    matches: TableProjectionResource;
+    /**
+     * Table Id
+     */
+    table_id: string;
+};
+
+/**
  * ProviderCredentialSummary
  *
  * Safe credential presence information; never contains secret values.
@@ -2900,9 +3083,17 @@ export type RunAllSourceTableResource = {
      */
     document_column: string;
     /**
+     * Document Count
+     */
+    document_count: number;
+    /**
      * Internal Columns
      */
     internal_columns: Array<string>;
+    /**
+     * Match Count
+     */
+    match_count: number;
     /**
      * Metadata Columns
      */
@@ -2915,11 +3106,7 @@ export type RunAllSourceTableResource = {
      * Node Name
      */
     node_name: string;
-    /**
-     * Record Count
-     */
-    record_count: number;
-    table: PagedTableResource;
+    table: ProjectedTableResource;
 };
 
 /**
@@ -3448,6 +3635,20 @@ export type TabUpdate = {
      * Name
      */
     name?: string | null;
+};
+
+/**
+ * TableProjectionResource
+ */
+export type TableProjectionResource = {
+    /**
+     * Rows Url
+     */
+    rows_url: string;
+    /**
+     * Schema Url
+     */
+    schema_url: string;
 };
 
 /**
@@ -7007,6 +7208,229 @@ export type DownloadAnalysisTableResponses = {
 
 export type DownloadAnalysisTableResponse = DownloadAnalysisTableResponses[keyof DownloadAnalysisTableResponses];
 
+export type GetConcordanceTableDensityData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+        /**
+         * Table Id
+         */
+        table_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/density';
+};
+
+export type GetConcordanceTableDensityErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type GetConcordanceTableDensityError = GetConcordanceTableDensityErrors[keyof GetConcordanceTableDensityErrors];
+
+export type GetConcordanceTableDensityResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConcordanceDensityResult;
+};
+
+export type GetConcordanceTableDensityResponse = GetConcordanceTableDensityResponses[keyof GetConcordanceTableDensityResponses];
+
+export type GetAnalysisTableProjectionRowsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+        /**
+         * Table Id
+         */
+        table_id: string;
+        /**
+         * Row Unit
+         */
+        row_unit: 'documents' | 'matches';
+    };
+    query?: {
+        /**
+         * Page
+         */
+        page?: number;
+        /**
+         * Page Size
+         */
+        page_size?: number;
+        /**
+         * Sort By
+         */
+        sort_by?: string | null;
+        /**
+         * Descending
+         */
+        descending?: boolean;
+    };
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows';
+};
+
+export type GetAnalysisTableProjectionRowsErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type GetAnalysisTableProjectionRowsError = GetAnalysisTableProjectionRowsErrors[keyof GetAnalysisTableProjectionRowsErrors];
+
+export type GetAnalysisTableProjectionRowsResponses = {
+    /**
+     * Arrow IPC stream
+     */
+    200: Blob | File;
+};
+
+export type GetAnalysisTableProjectionRowsResponse = GetAnalysisTableProjectionRowsResponses[keyof GetAnalysisTableProjectionRowsResponses];
+
+export type GetAnalysisTableProjectionSchemaData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+        /**
+         * Table Id
+         */
+        table_id: string;
+        /**
+         * Row Unit
+         */
+        row_unit: 'documents' | 'matches';
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/schema';
+};
+
+export type GetAnalysisTableProjectionSchemaErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type GetAnalysisTableProjectionSchemaError = GetAnalysisTableProjectionSchemaErrors[keyof GetAnalysisTableProjectionSchemaErrors];
+
+export type GetAnalysisTableProjectionSchemaResponses = {
+    /**
+     * Arrow IPC stream
+     */
+    200: Blob | File;
+};
+
+export type GetAnalysisTableProjectionSchemaResponse = GetAnalysisTableProjectionSchemaResponses[keyof GetAnalysisTableProjectionSchemaResponses];
+
 export type GetAnalysisTableRowsData = {
     body?: never;
     path: {
@@ -7326,6 +7750,60 @@ export type CreateNodeResponses = {
 };
 
 export type CreateNodeResponse = CreateNodeResponses[keyof CreateNodeResponses];
+
+export type ExportDataBlocksData = {
+    body: DataBlockExportRequest;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/nodes/exports';
+};
+
+export type ExportDataBlocksErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type ExportDataBlocksError = ExportDataBlocksErrors[keyof ExportDataBlocksErrors];
+
+export type ExportDataBlocksResponses = {
+    /**
+     * One Data Block file or a ZIP containing multiple files
+     */
+    200: Blob | File;
+};
+
+export type ExportDataBlocksResponse = ExportDataBlocksResponses[keyof ExportDataBlocksResponses];
 
 export type ReorderWorkspaceNodesByIdData = {
     body: WorkspaceNodeReorderRequest;

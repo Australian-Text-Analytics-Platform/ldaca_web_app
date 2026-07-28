@@ -2727,6 +2727,65 @@
         "title": "ConcordanceAnalysisRequest",
         "type": "object"
       },
+      "ConcordanceDensityResult": {
+        "additionalProperties": false,
+        "properties": {
+          "document_count": {
+            "minimum": 0.0,
+            "title": "Document Count",
+            "type": "integer"
+          },
+          "match_count": {
+            "minimum": 0.0,
+            "title": "Match Count",
+            "type": "integer"
+          },
+          "resolution": {
+            "const": 100,
+            "default": 100,
+            "title": "Resolution",
+            "type": "integer"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/ConcordanceDensitySeries"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document_count",
+          "match_count",
+          "series"
+        ],
+        "title": "ConcordanceDensityResult",
+        "type": "object"
+      },
+      "ConcordanceDensitySeries": {
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 100,
+            "minItems": 100,
+            "title": "Counts",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "counts"
+        ],
+        "title": "ConcordanceDensitySeries",
+        "type": "object"
+      },
       "ConcordancePage": {
         "additionalProperties": false,
         "properties": {
@@ -2994,12 +3053,22 @@
             "title": "Document Column",
             "type": "string"
           },
+          "document_count": {
+            "minimum": 0.0,
+            "title": "Document Count",
+            "type": "integer"
+          },
           "internal_columns": {
             "items": {
               "type": "string"
             },
             "title": "Internal Columns",
             "type": "array"
+          },
+          "match_count": {
+            "minimum": 0.0,
+            "title": "Match Count",
+            "type": "integer"
           },
           "metadata_columns": {
             "items": {
@@ -3018,11 +3087,6 @@
             "minLength": 1,
             "title": "Node Name",
             "type": "string"
-          },
-          "record_count": {
-            "minimum": 0.0,
-            "title": "Record Count",
-            "type": "integer"
           }
         },
         "required": [
@@ -3033,7 +3097,8 @@
           "metadata_columns",
           "analysis_columns",
           "internal_columns",
-          "record_count",
+          "document_count",
+          "match_count",
           "analysis_id"
         ],
         "title": "ConcordanceRunAllGroupSource",
@@ -3167,6 +3232,42 @@
           "name"
         ],
         "title": "CreateFolderRequest",
+        "type": "object"
+      },
+      "DataBlockExportFormat": {
+        "description": "Portable file formats supported by Data Block export.",
+        "enum": [
+          "csv",
+          "json",
+          "ndjson",
+          "parquet",
+          "ipc"
+        ],
+        "title": "DataBlockExportFormat",
+        "type": "string"
+      },
+      "DataBlockExportRequest": {
+        "additionalProperties": false,
+        "description": "Export one or more ordered Data Blocks in one shared format.",
+        "properties": {
+          "format": {
+            "$ref": "#/components/schemas/DataBlockExportFormat",
+            "default": "csv"
+          },
+          "node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Node Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "node_ids"
+        ],
+        "title": "DataBlockExportRequest",
         "type": "object"
       },
       "DataPortalCredentialPatch": {
@@ -5019,6 +5120,48 @@
         "title": "Progress",
         "type": "object"
       },
+      "ProjectedTableResource": {
+        "additionalProperties": false,
+        "description": "One immutable nested table exposed through document and match rows.",
+        "properties": {
+          "delivery": {
+            "const": "projected",
+            "default": "projected",
+            "title": "Delivery",
+            "type": "string"
+          },
+          "density_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Density Url"
+          },
+          "documents": {
+            "$ref": "#/components/schemas/TableProjectionResource"
+          },
+          "matches": {
+            "$ref": "#/components/schemas/TableProjectionResource"
+          },
+          "table_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Table Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table_id",
+          "documents",
+          "matches"
+        ],
+        "title": "ProjectedTableResource",
+        "type": "object"
+      },
       "ProviderCredentialSummary": {
         "additionalProperties": false,
         "description": "Safe credential presence information; never contains secret values.",
@@ -6071,12 +6214,22 @@
             "title": "Document Column",
             "type": "string"
           },
+          "document_count": {
+            "minimum": 0.0,
+            "title": "Document Count",
+            "type": "integer"
+          },
           "internal_columns": {
             "items": {
               "type": "string"
             },
             "title": "Internal Columns",
             "type": "array"
+          },
+          "match_count": {
+            "minimum": 0.0,
+            "title": "Match Count",
+            "type": "integer"
           },
           "metadata_columns": {
             "items": {
@@ -6096,13 +6249,8 @@
             "title": "Node Name",
             "type": "string"
           },
-          "record_count": {
-            "minimum": 0.0,
-            "title": "Record Count",
-            "type": "integer"
-          },
           "table": {
-            "$ref": "#/components/schemas/PagedTableResource"
+            "$ref": "#/components/schemas/ProjectedTableResource"
           }
         },
         "required": [
@@ -6113,7 +6261,8 @@
           "metadata_columns",
           "analysis_columns",
           "internal_columns",
-          "record_count",
+          "document_count",
+          "match_count",
           "table"
         ],
         "title": "RunAllSourceTableResource",
@@ -7131,6 +7280,27 @@
           }
         },
         "title": "TabUpdate",
+        "type": "object"
+      },
+      "TableProjectionResource": {
+        "additionalProperties": false,
+        "properties": {
+          "rows_url": {
+            "minLength": 1,
+            "title": "Rows Url",
+            "type": "string"
+          },
+          "schema_url": {
+            "minLength": 1,
+            "title": "Schema Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_url",
+          "rows_url"
+        ],
+        "title": "TableProjectionResource",
         "type": "object"
       },
       "TokenFrequencyAnalysisRequest": {
@@ -13603,6 +13773,494 @@
         ]
       }
     },
+    "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/density": {
+      "get": {
+        "operationId": "get_concordance_table_density",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcordanceDensityResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Retained artifact is no longer available"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Get Concordance Table Density",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows": {
+      "get": {
+        "operationId": "get_analysis_table_projection_rows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "title": "Table Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "row_unit",
+            "required": true,
+            "schema": {
+              "enum": [
+                "documents",
+                "matches"
+              ],
+              "title": "Row Unit",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "descending",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Descending",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.apache.arrow.stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Arrow IPC stream"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Retained artifact is no longer available"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Get Analysis Table Projection Rows",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/schema": {
+      "get": {
+        "operationId": "get_analysis_table_projection_schema",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "title": "Table Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "row_unit",
+            "required": true,
+            "schema": {
+              "enum": [
+                "documents",
+                "matches"
+              ],
+              "title": "Row Unit",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.apache.arrow.stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Arrow IPC stream"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Retained artifact is no longer available"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Get Analysis Table Projection Schema",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
     "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows": {
       "get": {
         "description": "Return one page of an open-ended Result table as Arrow IPC.",
@@ -14274,6 +14932,156 @@
           }
         ],
         "summary": "Create Node",
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/nodes/exports": {
+      "post": {
+        "description": "Return selected Data Blocks as one file or a server-built ZIP.",
+        "operationId": "export_data_blocks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataBlockExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/vnd.apache.arrow.file": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/x-ndjson": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "One Data Block file or a ZIP containing multiple files"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request or resource exceeds the configured size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Export Data Blocks",
         "tags": [
           "nodes"
         ]
