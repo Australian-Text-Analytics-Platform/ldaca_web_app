@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ArrowDown, ArrowRight, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -76,7 +76,11 @@ export function ColumnComparisonHeader({
       <TooltipProvider delayDuration={120} skipDelayDuration={0}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge asChild variant="outline" className="px-1.5 py-0 font-normal tabular-nums">
+            <Badge
+              asChild
+              variant="outline"
+              className="h-7 px-2.5 text-sm font-medium tabular-nums"
+            >
               <button type="button" aria-label={scoreDescription}>
                 {score}
               </button>
@@ -90,37 +94,64 @@ export function ColumnComparisonHeader({
             ) : labels.length === 0 ? (
               <p>No rows contain values in both columns.</p>
             ) : (
-              <table
-                aria-label={`${referenceColumn} versus ${comparisonColumn} confusion matrix`}
-                className="border-collapse text-xs tabular-nums"
-              >
-                <thead>
-                  <tr>
-                    <th className="px-2 py-1 text-right font-normal" scope="col">
-                      {referenceColumn} ↓ / {comparisonColumn} →
-                    </th>
-                    {labels.map((comparisonLabel) => (
-                      <th key={comparisonLabel} className="px-2 py-1 text-right" scope="col">
-                        {displayLabel(comparisonLabel)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {labels.map((referenceLabel) => (
-                    <tr key={referenceLabel}>
-                      <th className="px-2 py-1 text-right" scope="row">
-                        {displayLabel(referenceLabel)}
+              <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
+                <div
+                  aria-label={`${comparisonColumn} column axis`}
+                  className="col-start-2 row-start-1 flex items-center justify-center gap-1 border-b border-primary-foreground/25 pb-1 font-medium"
+                >
+                  <span>{comparisonColumn}</span>
+                  <ArrowRight aria-hidden="true" className="size-3" />
+                </div>
+                <div
+                  aria-label={`${referenceColumn} row axis`}
+                  className="col-start-1 row-start-2 flex flex-col items-center justify-center gap-1 border-r border-primary-foreground/25 pr-1.5 font-medium"
+                >
+                  <span className="rotate-180 [writing-mode:vertical-rl]">{referenceColumn}</span>
+                  <ArrowDown aria-hidden="true" className="size-3" />
+                </div>
+                <table
+                  aria-label={`${referenceColumn} versus ${comparisonColumn} confusion matrix`}
+                  className="col-start-2 row-start-2 border-separate border-spacing-x-2 border-spacing-y-1 text-xs tabular-nums"
+                >
+                  <caption className="sr-only">
+                    Rows are {referenceColumn}; columns are {comparisonColumn}.
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th className="px-1 font-normal" scope="col">
+                        <span className="sr-only">Row label</span>
                       </th>
                       {labels.map((comparisonLabel) => (
-                        <td key={comparisonLabel} className="px-2 py-1 text-right">
-                          {countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ?? 0}
-                        </td>
+                        <th
+                          key={comparisonLabel}
+                          className="px-1 text-center text-primary-foreground/80"
+                          scope="col"
+                        >
+                          {displayLabel(comparisonLabel)}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {labels.map((referenceLabel) => (
+                      <tr key={referenceLabel}>
+                        <th className="pr-2 text-right text-primary-foreground/80" scope="row">
+                          {displayLabel(referenceLabel)}
+                        </th>
+                        {labels.map((comparisonLabel) => (
+                          <td
+                            key={comparisonLabel}
+                            className="min-w-8 px-1 text-center font-medium"
+                          >
+                            {countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ??
+                              0}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </TooltipContent>
         </Tooltip>

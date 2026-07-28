@@ -271,7 +271,7 @@ export function AnnotationAiPreviewPanel({
         }
       >
         <Table className="w-full table-auto" disableContainer>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
               <TableHead>{columns.text}</TableHead>
               <TableHead className="w-px whitespace-nowrap">

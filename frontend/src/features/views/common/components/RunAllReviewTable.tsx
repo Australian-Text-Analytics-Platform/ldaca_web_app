@@ -197,7 +197,7 @@ export function RunAllReviewTable({
           }
         >
           <Table disableContainer>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 {visibleColumns.map((column) => (
                   <TableHead key={column}>

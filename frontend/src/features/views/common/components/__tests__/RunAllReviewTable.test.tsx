@@ -82,6 +82,12 @@ describe('RunAllReviewTable', () => {
 
     expect(await screen.findByText('Example')).toBeInTheDocument();
     expect(screen.getByTestId('analysis-table-scroll-area')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getAllByRole('rowgroup')[0]).toHaveClass(
+      'sticky',
+      'top-0',
+      'z-10',
+      'bg-card',
+    );
     expect(screen.getByLabelText('Rows per page')).toHaveTextContent('10');
     expect(screen.getByRole('link', { name: '2' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '4' })).toBeInTheDocument();

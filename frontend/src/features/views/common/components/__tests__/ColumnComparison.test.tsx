@@ -81,6 +81,7 @@ describe('ColumnComparison', () => {
     });
     expect(screen.getByText('review')).toBeVisible();
     expect(score).toBeVisible();
+    expect(score).toHaveClass('h-7', 'px-2.5', 'text-sm');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
 
     await user.hover(score);
@@ -90,6 +91,18 @@ describe('ColumnComparison', () => {
     });
     expect(matrix).toBeDefined();
     if (!matrix) throw new Error('Expected a confusion matrix in the reliability tooltip.');
+    const [columnAxis] = screen.getAllByLabelText('review column axis');
+    const [rowAxis] = screen.getAllByLabelText('annotation row axis');
+    expect(columnAxis).toBeVisible();
+    expect(columnAxis).toHaveTextContent('review');
+    expect(rowAxis).toBeVisible();
+    if (!rowAxis) throw new Error('Expected an annotation row axis.');
+    expect(rowAxis).toHaveTextContent('annotation');
+    expect(within(rowAxis).getByText('annotation')).toHaveClass(
+      'rotate-180',
+      '[writing-mode:vertical-rl]',
+    );
+    expect(screen.queryByText('annotation ↓ / review →')).not.toBeInTheDocument();
     const matrixRows = within(matrix).getAllByRole('row');
 
     expect(

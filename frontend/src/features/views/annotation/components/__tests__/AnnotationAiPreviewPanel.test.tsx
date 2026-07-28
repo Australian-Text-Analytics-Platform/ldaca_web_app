@@ -163,6 +163,12 @@ describe('AnnotationAiPreviewPanel', () => {
     );
 
     expect(screen.getByTestId('analysis-table-scroll-area')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getAllByRole('rowgroup')[0]).toHaveClass(
+      'sticky',
+      'top-0',
+      'z-10',
+      'bg-card',
+    );
   });
 
   it('compares preview predictions with selected columns on the current page only', async () => {

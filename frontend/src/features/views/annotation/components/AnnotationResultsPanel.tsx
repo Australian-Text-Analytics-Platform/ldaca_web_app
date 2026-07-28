@@ -212,8 +212,8 @@ export function AnnotationResultsPanel({
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="max-h-96 overflow-y-auto overflow-x-hidden">
-            <Table className="w-full table-auto">
-              <TableHeader>
+            <Table className="w-full table-auto" disableContainer>
+              <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead>{textColumn}</TableHead>
                   <TableHead className="w-px whitespace-nowrap">{annotationColumn}</TableHead>

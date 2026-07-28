@@ -119,6 +119,12 @@ describe('AnnotationResultsPanel', () => {
 
     renderPanel();
 
+    expect(within(screen.getByRole('table')).getAllByRole('rowgroup')[0]).toHaveClass(
+      'sticky',
+      'top-0',
+      'z-10',
+      'bg-card',
+    );
     const headers = screen.getAllByRole('columnheader');
     expect(headers.slice(0, 2).map((header) => header.textContent)).toEqual(['text', 'annotation']);
     expect(within(headers[2]).getByText('reviewer')).toBeInTheDocument();

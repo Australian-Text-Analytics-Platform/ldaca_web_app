@@ -141,7 +141,9 @@ describe('useProviderCredentials', () => {
       },
       throwOnError: true,
     });
-    expect(result.current.annotationProviders[0]).toMatchObject(backendConfiguration);
+    await waitFor(() =>
+      expect(result.current.annotationProviders[0]).toMatchObject(backendConfiguration),
+    );
     expect(JSON.stringify(queryClient.getQueryData(['provider-credentials']))).not.toContain(
       'backend-secret',
     );
