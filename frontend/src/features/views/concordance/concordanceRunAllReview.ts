@@ -5,7 +5,6 @@ import {
   CONCORDANCE_RUN_ALL_GENERATED_COLUMNS,
 } from '../common/generatedColumns';
 
-const SOURCE_ROW_ID_COLUMN = '__wordflow_source_row_id';
 const REVIEW_CONCORDANCE_COLUMNS = CONCORDANCE_RUN_ALL_GENERATED_COLUMNS.filter(
   (column) => column !== CONCORDANCE_COLUMN_KEYS.extraction,
 );
@@ -13,6 +12,8 @@ export interface ConcordanceRunAllReviewSource {
   analysisId: string;
   source: RunAllSourceTableResource;
 }
+
+export type ConcordanceReviewRowUnit = 'documents' | 'matches';
 
 /**
  * Rebuilds the grouped Concordance page model from the immutable Run All table.
@@ -26,29 +27,38 @@ export function projectConcordanceRunAllReviewPage(
   pageSize: number,
   sortBy: string | null,
   descending: boolean,
+  rowUnit: ConcordanceReviewRowUnit,
 ): ConcordanceNodeResult {
-  const columns = page.columns.filter((column) => !source.source.internal_columns.includes(column));
-  const groups = new Map<string, Record<string, unknown>[]>();
-
-  page.rows.forEach((rawRow) => {
-    const row = Object.fromEntries(
-      Object.entries(rawRow).filter(([column]) => !source.source.internal_columns.includes(column)),
+  const visibleSourceRow = (rawRow: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(rawRow).filter(
+        ([column]) => !source.source.internal_columns.includes(column) && column !== 'concordance',
+      ),
     );
-    row.__source_node = source.source.node_id;
-    const sourceRowId = rawRow[SOURCE_ROW_ID_COLUMN];
-    const groupKey = `${typeof sourceRowId}:${String(sourceRowId)}`;
-    const existing = groups.get(groupKey);
-    if (existing) existing.push(row);
-    else groups.set(groupKey, [row]);
+  const data = page.rows.flatMap((rawRow) => {
+    const base = visibleSourceRow(rawRow);
+    const matches =
+      rowUnit === 'documents' && Array.isArray(rawRow.concordance) ? rawRow.concordance : [rawRow];
+    const group = matches.flatMap((match) => {
+      if (!match || typeof match !== 'object') return [];
+      return [
+        { ...base, ...(match as Record<string, unknown>), __source_node: source.source.node_id },
+      ];
+    });
+    return group.length > 0 ? [group] : [];
   });
-
-  const data = Array.from(groups.values());
+  const columns = [
+    source.source.document_column,
+    ...source.source.metadata_columns,
+    ...REVIEW_CONCORDANCE_COLUMNS,
+  ];
   const metadataColumns = source.source.metadata_columns;
-  const totalRows = source.source.record_count;
+  const totalRows =
+    rowUnit === 'documents' ? source.source.document_count : source.source.match_count;
   const totalPages = totalRows === 0 ? 0 : Math.ceil(totalRows / pageSize);
 
   return {
-    data: data as ConcordanceNodeResult['data'],
+    data,
     columns,
     metadata: {
       all_columns: columns,

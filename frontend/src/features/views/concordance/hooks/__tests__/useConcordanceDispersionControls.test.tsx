@@ -16,7 +16,7 @@ describe('useConcordanceDispersionControls', () => {
     expect(result.current.hiddenMatchedTexts.size).toBe(0);
     expect(result.current.binCount).toBe(DISPERSION_DEFAULT_BIN_COUNT);
     expect(result.current.combinedSourceMode).toBe('aggregate');
-    expect(result.current.dispersionChartMode).toBe('density');
+    expect(result.current.dispersionChartMode).toBe('density-line');
     expect(result.current.selectedBinIndices).toEqual({});
   });
 

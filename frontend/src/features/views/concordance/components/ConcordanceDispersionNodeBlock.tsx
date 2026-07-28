@@ -14,6 +14,7 @@ import {
   getDispersionHits,
   type ConcordanceDispersionChartMode,
   type DispersionDisplayBinCount,
+  type ConcordanceDensitySeriesInput,
 } from '../concordanceDispersionDomain';
 import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
@@ -34,8 +35,8 @@ const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
 
 // Stable empty references so the footer-only TanStack table never rebuilds its
 // row model: the dispersion bins body renders manually; this table instance
-// exists purely to drive ServerPaginationFooter's page math from rowCount
-// (which walks SOURCE documents, not displayed bin rows).
+// exists purely to drive ServerPaginationFooter from the active Review
+// projection's explicit document-or-match row count.
 const EMPTY_DISPERSION_ROWS: Record<string, unknown>[] = [];
 const EMPTY_DISPERSION_COLUMNS: ColumnDef<Record<string, unknown>>[] = [];
 
@@ -55,6 +56,8 @@ export interface ConcordanceDispersionNodeBlockProps {
   searchWord: string;
   showMetadata: boolean;
   selectedMetadataColumns: string[];
+  reviewRowUnit: 'documents' | 'matches' | null;
+  densitySeries?: ConcordanceDensitySeriesInput[];
   resultsViewportWidth: number;
 
   // Workspace selection
@@ -147,6 +150,8 @@ export function ConcordanceDispersionNodeBlock({
   handlePageChange,
   handleRowClick,
   setCombinedPage,
+  reviewRowUnit,
+  densitySeries,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
@@ -163,7 +168,8 @@ export function ConcordanceDispersionNodeBlock({
 
   // Footer-only TanStack instance shared by both branches (only one mounts per
   // keyed instance). Called unconditionally to respect the rules of hooks; the
-  // bins body still renders manually below. rowCount = total source documents.
+  // bins body still renders manually below. The row count uses the active
+  // document-or-match projection.
   const isCombinedView = nodeKey === CONCORDANCE_COMBINED_NODE_KEY;
   const activePage = isCombinedView
     ? combinedPage
@@ -205,15 +211,23 @@ export function ConcordanceDispersionNodeBlock({
     );
     const combinedBelowTable = (
       <>
-        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-          {combinedPageSizeSummary}
-        </div>
+        {reviewRowUnit === null ? (
+          <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+            {combinedPageSizeSummary}
+          </div>
+        ) : null}
         <ServerPaginationFooter
           table={paginationTable}
           pageIndex={activePage - 1}
           pageSize={globalPageSize}
           rowCount={nodeData.pagination.total_source_rows}
-          pageSizeLabel="Documents per batch"
+          pageSizeLabel={
+            reviewRowUnit === null
+              ? 'Documents per page'
+              : panelSelectedNodes.length > 1
+                ? `${reviewRowUnit === 'documents' ? 'Documents' : 'Matches'} per source per page`
+                : `${reviewRowUnit === 'documents' ? 'Documents' : 'Matches'} per page`
+          }
           pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
           loading={combinedLoading}
           showPageSize
@@ -324,6 +338,7 @@ export function ConcordanceDispersionNodeBlock({
                   },
                 }}
                 onLegendCountsChange={setLegendCounts}
+                densitySeries={densitySeries}
               />
             );
           })()}
@@ -356,15 +371,23 @@ export function ConcordanceDispersionNodeBlock({
   );
   const belowTable = (
     <>
-      <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-        {pageSizeSummary}
-      </div>
+      {reviewRowUnit === null ? (
+        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+          {pageSizeSummary}
+        </div>
+      ) : null}
       <ServerPaginationFooter
         table={paginationTable}
         pageIndex={activePage - 1}
         pageSize={globalPageSize}
         rowCount={nodeData.pagination.total_source_rows}
-        pageSizeLabel="Documents per batch"
+        pageSizeLabel={
+          reviewRowUnit === null
+            ? 'Documents per page'
+            : panelSelectedNodes.length > 1
+              ? `${reviewRowUnit === 'documents' ? 'Documents' : 'Matches'} per source per page`
+              : `${reviewRowUnit === 'documents' ? 'Documents' : 'Matches'} per page`
+        }
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
         showPageSize
@@ -470,6 +493,7 @@ export function ConcordanceDispersionNodeBlock({
                 },
               }}
               onLegendCountsChange={setLegendCounts}
+              densitySeries={densitySeries}
             />
           );
         })()}

@@ -19,6 +19,7 @@ import {
 import { MAX_CONTEXT_LENGTH } from '../quotationTextClip';
 import { type QuotationHoverState } from './QuotationHighlightedCell';
 import { QuotationNodeBlock } from './QuotationNodeBlock';
+import type { QuotationReviewRowUnit } from '../quotationRunAllReview';
 
 interface QuotationResultsPanelProps {
   title?: string;
@@ -26,6 +27,8 @@ interface QuotationResultsPanelProps {
   displayedNodes: WorkspaceNodeMetadata[];
   activeSelections: NodeColumnSelection[];
   resultsByNode: Record<string, QuotationResultState>;
+  reviewRowUnit: QuotationReviewRowUnit | null;
+  onReviewRowUnitChange: (rowUnit: QuotationReviewRowUnit) => void;
   selectedMetadataColumns: string[];
   onSelectedMetadataColumnsChange: (columns: string[]) => void;
   contextLength: number;
@@ -60,6 +63,8 @@ export function QuotationResultsPanel({
   displayedNodes,
   activeSelections,
   resultsByNode,
+  reviewRowUnit,
+  onReviewRowUnitChange,
   selectedMetadataColumns,
   onSelectedMetadataColumnsChange,
   contextLength,
@@ -78,9 +83,10 @@ export function QuotationResultsPanel({
   isPageLoading,
 }: QuotationResultsPanelProps) {
   const metadataNodeId = displayedNodes[0]?.id ?? '';
-  const quotationMetadataColumns = buildQuotationMetadataColumns(
-    metadataNodeId ? resultsByNode[metadataNodeId] : null,
-  );
+  const metadataResult = metadataNodeId ? resultsByNode[metadataNodeId] : null;
+  const quotationMetadataColumns = reviewRowUnit
+    ? (metadataResult?.metadata.metadata_columns ?? [])
+    : buildQuotationMetadataColumns(metadataResult);
   const resolvedMetadataColumns = resolveQuotationMetadataColumns(
     selectedMetadataColumns,
     quotationMetadataColumns,
@@ -101,6 +107,26 @@ export function QuotationResultsPanel({
           </CardTitle>
           {headerAction}
         </div>
+        {reviewRowUnit ? (
+          <fieldset className="flex items-center gap-4 text-sm">
+            <legend className="sr-only">Page quotation review by</legend>
+            <span>Page by:</span>
+            {(['documents', 'matches'] as const).map((unit) => (
+              <label key={unit} className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="quotation-review-row-unit"
+                  value={unit}
+                  checked={reviewRowUnit === unit}
+                  onChange={() => {
+                    onReviewRowUnitChange(unit);
+                  }}
+                />
+                {unit === 'documents' ? 'Documents' : 'Matches'}
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
         <div className="space-y-2 text-sm">
           <div className="flex flex-wrap items-center gap-4">
             <MetadataColumnSelector
@@ -163,7 +189,13 @@ export function QuotationResultsPanel({
           const resultState = resultsByNode[nodeId];
           const rowsWithQuotes = filterQuotationRowsWithQuotes(resultState?.rows);
           const visibleMetadataColumns = showMetadata ? resolvedMetadataColumns : [];
-          const cols = buildQuotationDisplayColumns(visibleMetadataColumns);
+          const cols =
+            reviewRowUnit === 'matches'
+              ? buildQuotationDisplayColumns([
+                  ...(resultState?.metadata.quotation_columns ?? []),
+                  ...visibleMetadataColumns,
+                ])
+              : buildQuotationDisplayColumns(visibleMetadataColumns);
           return (
             <QuotationNodeBlock
               key={nodeId}
@@ -191,6 +223,15 @@ export function QuotationResultsPanel({
                 />
               }
               loading={isPageLoading}
+              pageSizeLabel={
+                reviewRowUnit === null
+                  ? 'Documents per page'
+                  : reviewRowUnit === 'documents'
+                    ? 'Documents per page'
+                    : 'Matches per page'
+              }
+              showPageSummary={reviewRowUnit === null}
+              highlightDocument={reviewRowUnit !== 'matches'}
             />
           );
         })}

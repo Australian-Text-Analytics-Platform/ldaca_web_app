@@ -11,11 +11,14 @@ describe('Quotation Run All Review projection', () => {
         metadata_columns: ['speaker'],
         analysis_columns: ['QUOTE_extraction', 'QUOTE_quote'],
         internal_columns: ['__wordflow_source_row_id'],
-        record_count: 2,
+        document_count: 1,
+        match_count: 2,
         table: {
+          delivery: 'projected',
           table_id: 'quotation-run-all',
-          rows_url: '/rows',
-          schema_url: '/schema',
+          documents: { rows_url: '/documents/rows', schema_url: '/documents/schema' },
+          matches: { rows_url: '/matches/rows', schema_url: '/matches/schema' },
+          density_url: null,
         },
       },
       {
@@ -27,24 +30,20 @@ describe('Quotation Run All Review projection', () => {
             __wordflow_source_row_id: 4,
             text: 'One document',
             speaker: 'A',
-            QUOTE_quote: 'One',
-          },
-          {
-            __wordflow_source_row_id: 4,
-            text: 'One document',
-            speaker: 'A',
-            QUOTE_quote: 'document',
+            quotation: [{ quote: 'One' }, { quote: 'document' }],
           },
         ],
         hasNext: false,
         etag: null,
       },
       { page: 1, page_size: 20, sort_by: null, descending: false },
+      'documents',
     );
 
     expect(result.data).toHaveLength(1);
     expect(result.data?.[0]).toHaveLength(2);
     expect(result.columns).not.toContain('__wordflow_source_row_id');
     expect(result.metadata?.metadata_columns).toEqual(['speaker']);
+    expect(result.pagination?.total_source_rows).toBe(1);
   });
 });

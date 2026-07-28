@@ -6,7 +6,7 @@ interface GroupedResultsPageSizeSummaryProps<
 }
 
 /** Called by: GroupedResultsPageSizeSummary when backend totals are unavailable. */
-const countGroupedResultInstances = (groups: Record<string, unknown>[][]): number => {
+const countGroupedResultMatches = (groups: Record<string, unknown>[][]): number => {
   return groups.reduce((total, group) => total + group.length, 0);
 };
 
@@ -24,12 +24,12 @@ export function GroupedResultsPageSizeSummary<Row extends Record<string, unknown
   groups,
   totalProcessed,
 }: GroupedResultsPageSizeSummaryProps<Row>) {
-  const instanceCount = countGroupedResultInstances(groups);
+  const matchCount = countGroupedResultMatches(groups);
   const documentCount = countGroupedResultDocuments(groups);
 
   return (
     <>
-      (Found {instanceCount} instance{instanceCount === 1 ? '' : 's'} in {documentCount} document
+      (Found {matchCount} match{matchCount === 1 ? '' : 'es'} in {documentCount} document
       {documentCount === 1 ? '' : 's'}
       {totalProcessed != null
         ? ` after processing ${String(totalProcessed)} document${totalProcessed === 1 ? '' : 's'}`

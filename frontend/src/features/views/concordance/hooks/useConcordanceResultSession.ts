@@ -8,8 +8,12 @@ import {
 } from 'react';
 import { useQueries } from '@tanstack/react-query';
 
-import { queryAnalysisResult } from '@/api';
-import type { ConcordanceAnalysisResponse, ConcordanceResultQuery } from '@/api';
+import { getConcordanceTableDensity, queryAnalysisResult } from '@/api';
+import type {
+  ConcordanceAnalysisResponse,
+  ConcordanceDensityResult,
+  ConcordanceResultQuery,
+} from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import { fetchArrowTablePage } from '@/lib/arrow/arrowTable';
@@ -26,6 +30,7 @@ import {
 } from '../concordanceSourceDomain';
 import {
   projectConcordanceRunAllReviewPage,
+  type ConcordanceReviewRowUnit,
   type ConcordanceRunAllReviewSource,
 } from '../concordanceRunAllReview';
 import type { PaginationState } from './useConcordanceTaskFlow';
@@ -111,6 +116,7 @@ interface UseConcordanceResultSessionOptions {
   lowercaseMatches: boolean;
   nodeColorOverrides?: Record<string, string>;
   reviewSources?: ConcordanceRunAllReviewSource[];
+  reviewDispersionRowUnit: ConcordanceReviewRowUnit;
 }
 
 /** Projects immutable per-page Query resources and owns only result-view controls. */
@@ -126,6 +132,7 @@ export function useConcordanceResultSession({
   lowercaseMatches,
   nodeColorOverrides = {},
   reviewSources = [],
+  reviewDispersionRowUnit,
 }: UseConcordanceResultSessionOptions) {
   const [state, dispatch] = useReducer(resultSessionReducer, INITIAL_STATE);
   const hydratedAnalysisRef = useRef<string | null>(null);
@@ -169,6 +176,18 @@ export function useConcordanceResultSession({
   }, [reviewIdentity]);
 
   const isReview = reviewSources.length > 0;
+  const reviewRowUnit: ConcordanceReviewRowUnit =
+    isReview && showDispersion ? reviewDispersionRowUnit : 'matches';
+  useEffect(() => {
+    if (!isReview) return;
+    dispatch({
+      type: 'set-node-pagination',
+      value: (current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([nodeId, value]) => [nodeId, { ...value, currentPage: 1 }]),
+        ),
+    });
+  }, [isReview, reviewRowUnit]);
   const effectiveBaseResult = isReview ? null : baseResult;
   const nodeIds = isReview
     ? reviewSources.map((review) => review.source.node_id)
@@ -220,10 +239,11 @@ export function useConcordanceResultSession({
       return {
         queryKey:
           workspaceId && reviewSource
-            ? queryKeys.analysisTablePage(
+            ? queryKeys.analysisTableProjectionPage(
                 workspaceId,
                 reviewSource.analysisId,
                 reviewSource.source.table.table_id,
+                reviewRowUnit,
                 pageRequest,
               )
             : workspaceId && analysisId
@@ -234,7 +254,8 @@ export function useConcordanceResultSession({
           if (workspaceId && reviewSource) {
             const pageNumber = query.page ?? 1;
             const pageSize = query.page_size ?? state.globalPageSize;
-            const page = await fetchArrowTablePage(reviewSource.source.table.rows_url, {
+            const projectionResource = reviewSource.source.table[reviewRowUnit];
+            const page = await fetchArrowTablePage(projectionResource.rows_url, {
               page: pageNumber,
               pageSize,
               sortBy: query.sort_by ?? null,
@@ -247,6 +268,7 @@ export function useConcordanceResultSession({
               pageSize,
               query.sort_by ?? null,
               query.descending ?? false,
+              reviewRowUnit,
             );
             return {
               kind: 'concordance',
@@ -272,6 +294,33 @@ export function useConcordanceResultSession({
       };
     }),
   });
+  const densityQueries = useQueries({
+    queries: reviewSources.map((review) => ({
+      queryKey: workspaceId
+        ? queryKeys.concordanceDensity(workspaceId, review.analysisId, review.source.table.table_id)
+        : queryKeys.inactiveAnalysisResult({ density: review.source.table.table_id }),
+      enabled: Boolean(workspaceId && isReview && showDispersion),
+      staleTime: Number.POSITIVE_INFINITY,
+      queryFn: async (): Promise<ConcordanceDensityResult> => {
+        if (!workspaceId) throw new Error('Workspace is unavailable');
+        const { data } = await getConcordanceTableDensity({
+          path: {
+            workspace_id: workspaceId,
+            analysis_id: review.analysisId,
+            table_id: review.source.table.table_id,
+          },
+          throwOnError: true,
+        });
+        return data;
+      },
+    })),
+  });
+  const reviewDensityByNode: Record<string, ConcordanceDensityResult> = Object.fromEntries(
+    reviewSources.flatMap((review, index) => {
+      const density = densityQueries[index]?.data;
+      return density ? [[review.source.node_id, density] as const] : [];
+    }),
+  );
 
   const projectedData = { ...(effectiveBaseResult?.data ?? {}) };
   projections.forEach(({ nodeId }, index) => {
@@ -322,7 +371,17 @@ export function useConcordanceResultSession({
     resolveConcordanceNodeIdForKey(nodeKey, selectedNodes, labelToNodeId);
   const allMatchedTexts =
     showDispersion && colourMatches
-      ? collectConcordanceMatchedTexts(results?.data, { lowercaseMatches })
+      ? isReview
+        ? Array.from(
+            new Set(
+              Object.values(reviewDensityByNode).flatMap((density) =>
+                density.series.map((item) =>
+                  lowercaseMatches ? item.label.toLowerCase() : item.label,
+                ),
+              ),
+            ),
+          ).sort()
+        : collectConcordanceMatchedTexts(results?.data, { lowercaseMatches })
       : [];
   const matchedTextColorMap = buildMatchedTextColorMap(allMatchedTexts, defaultPalette);
 
@@ -349,6 +408,7 @@ export function useConcordanceResultSession({
     sourceColorMap,
     allMatchedTexts,
     matchedTextColorMap,
+    reviewDensityByNode,
     resolveNodeIdForKey,
     handleReviewSort: (columnKey: string, paginationKey: string) => {
       if (!isReview || CONCORDANCE_PRESENTATION_COLUMN_SET.has(columnKey)) return;

@@ -9,13 +9,13 @@ describe('GroupedResultsPageSizeSummary', () => {
       <GroupedResultsPageSizeSummary groups={[[{ id: 'a1' }, { id: 'a2' }], [{ id: 'b1' }]]} />,
     );
 
-    expect(screen.getByText('(Found 3 instances in 2 documents).')).toBeInTheDocument();
+    expect(screen.getByText('(Found 3 matches in 2 documents).')).toBeInTheDocument();
   });
 
   it('formats grouped result counts for a single document', () => {
     render(<GroupedResultsPageSizeSummary groups={[[{ id: 'a1' }]]} />);
 
-    expect(screen.getByText('(Found 1 instance in 1 document).')).toBeInTheDocument();
+    expect(screen.getByText('(Found 1 match in 1 document).')).toBeInTheDocument();
   });
 
   it('includes total processed count when provided', () => {
@@ -27,7 +27,7 @@ describe('GroupedResultsPageSizeSummary', () => {
     );
 
     expect(
-      screen.getByText('(Found 3 instances in 2 documents after processing 100 documents).'),
+      screen.getByText('(Found 3 matches in 2 documents after processing 100 documents).'),
     ).toBeInTheDocument();
   });
 });

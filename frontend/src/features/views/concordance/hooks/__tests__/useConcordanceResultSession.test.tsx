@@ -62,6 +62,7 @@ describe('useConcordanceResultSession', () => {
           showDispersion: true,
           colourMatches: true,
           lowercaseMatches: true,
+          reviewDispersionRowUnit: 'documents',
         }),
       { wrapper: createWrapper() },
     );
@@ -84,6 +85,7 @@ describe('useConcordanceResultSession', () => {
           showDispersion: false,
           colourMatches: false,
           lowercaseMatches: false,
+          reviewDispersionRowUnit: 'documents',
         }),
       { wrapper: createWrapper() },
     );

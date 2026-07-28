@@ -57,7 +57,7 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
   );
   const [combinedSourceMode, setCombinedSourceMode] = useState<'aggregate' | 'split'>('aggregate');
   const [dispersionChartMode, setDispersionChartMode] =
-    useState<ConcordanceDispersionChartMode>('density');
+    useState<ConcordanceDispersionChartMode>('density-line');
   const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
   const lastSelectedBinRef = useRef<Record<string, number | null>>({});
 

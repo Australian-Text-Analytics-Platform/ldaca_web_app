@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import HelpIcon from '@/components/help/HelpIcon';
-import type { ConcordanceAnalysisResponse } from '@/api';
+import type { ConcordanceAnalysisResponse, ConcordanceDensityResult } from '@/api';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
@@ -61,6 +61,8 @@ interface ConcordanceResultsDisplay {
   setBinCount: (value: DispersionDisplayBinCount) => void;
   allMatchedTexts: string[];
   matchedTextColorMap: Record<string, string>;
+  reviewDispersionRowUnit: 'documents' | 'matches';
+  setReviewDispersionRowUnit: Dispatch<SetStateAction<'documents' | 'matches'>>;
 }
 
 interface ConcordanceResultsMetadata {
@@ -90,6 +92,7 @@ interface ConcordanceResultsSession {
   combinedPage: number;
   setCombinedPage: Dispatch<SetStateAction<number>>;
   nodeLoading: Record<string, boolean>;
+  reviewDensityByNode: Record<string, ConcordanceDensityResult>;
 }
 
 interface ConcordanceResultsCommands {
@@ -105,6 +108,7 @@ interface ConcordanceResultsCommands {
 
 export interface ConcordanceResultsPanelProps {
   title?: string;
+  isReview: boolean;
   headerAction?: React.ReactNode;
   shell: ConcordanceResultsShell;
   display: ConcordanceResultsDisplay;
@@ -119,6 +123,7 @@ export interface ConcordanceResultsPanelProps {
  */
 export function ConcordanceResultsPanel({
   title = 'Search Results',
+  isReview,
   headerAction,
   shell: {
     resultsRef,
@@ -151,6 +156,8 @@ export function ConcordanceResultsPanel({
     setBinCount,
     allMatchedTexts,
     matchedTextColorMap,
+    reviewDispersionRowUnit,
+    setReviewDispersionRowUnit,
   },
   metadata: {
     showMetadata,
@@ -176,6 +183,7 @@ export function ConcordanceResultsPanel({
     combinedPage,
     setCombinedPage,
     nodeLoading,
+    reviewDensityByNode,
   },
   commands: { handleSort, handlePageChange, handleRowClick },
 }: ConcordanceResultsPanelProps) {
@@ -254,6 +262,26 @@ export function ConcordanceResultsPanel({
           </div>
           {showDispersion ? (
             <div className="flex flex-wrap items-center gap-4">
+              {isReview ? (
+                <fieldset className="flex items-center gap-3 text-sm">
+                  <legend className="sr-only">Page dispersion by</legend>
+                  <span>Page by:</span>
+                  {(['documents', 'matches'] as const).map((unit) => (
+                    <label key={unit} className="flex items-center gap-1.5">
+                      <input
+                        type="radio"
+                        name="concordance-review-row-unit"
+                        value={unit}
+                        checked={reviewDispersionRowUnit === unit}
+                        onChange={() => {
+                          setReviewDispersionRowUnit(unit);
+                        }}
+                      />
+                      {unit === 'documents' ? 'Documents' : 'Matches'}
+                    </label>
+                  ))}
+                </fieldset>
+              ) : null}
               <label className="flex items-center gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
@@ -375,6 +403,18 @@ export function ConcordanceResultsPanel({
                     combinedPage,
                     combinedLoading,
                     nodeLoading,
+                    reviewRowUnit: isReview ? reviewDispersionRowUnit : null,
+                    densitySeries: isReview
+                      ? nodeName === CONCORDANCE_COMBINED_NODE_KEY
+                        ? Object.entries(reviewDensityByNode).flatMap(([nodeId, density]) => {
+                            const source = panelSelectedNodes.find((node) => node.id === nodeId);
+                            return density.series.map((item) => ({
+                              ...item,
+                              source: source?.name ?? nodeId,
+                            }));
+                          })
+                        : reviewDensityByNode[resolvedNodeId]?.series
+                      : undefined,
                     handlePageChange,
                     handleRowClick,
                     setCombinedPage,

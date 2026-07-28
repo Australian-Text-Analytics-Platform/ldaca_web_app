@@ -47,7 +47,10 @@ import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import { fetchArrowTablePage } from '@/lib/arrow/arrowTable';
-import { projectQuotationRunAllReviewPage } from './quotationRunAllReview';
+import {
+  projectQuotationRunAllReviewPage,
+  type QuotationReviewRowUnit,
+} from './quotationRunAllReview';
 import { ResultPublicationDialog } from '../common/components/ResultPublicationDialog';
 
 /** Renders the Quotation Preview and Run All workflow. */
@@ -115,6 +118,8 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     sort_by: null,
     descending: false,
   });
+  const [runAllReviewRowUnit, setRunAllReviewRowUnit] =
+    useState<QuotationReviewRowUnit>('documents');
   const [isClearing, setIsClearing] = useState(false);
   const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
   const [publicationDialogOpen, setPublicationDialogOpen] = useState(false);
@@ -247,17 +252,18 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   const runAllTableQuery = useQuery({
     queryKey:
       currentWorkspaceId && quotationRunAll && runAllSource
-        ? queryKeys.analysisTablePage(
+        ? queryKeys.analysisTableProjectionPage(
             currentWorkspaceId,
             quotationRunAll.id,
             runAllSource.table.table_id,
+            runAllReviewRowUnit,
             runAllPageRequest,
           )
         : queryKeys.inactiveAnalysisResult({ ...runAllPageRequest }),
     enabled: Boolean(runAllSource),
     queryFn: async () => {
       if (!runAllSource) throw new Error('Run All table is unavailable');
-      return fetchArrowTablePage(runAllSource.table.rows_url, {
+      return fetchArrowTablePage(runAllSource.table[runAllReviewRowUnit].rows_url, {
         page: runAllPageRequest.page,
         pageSize: runAllPageRequest.page_size,
         sortBy: runAllPageRequest.sort_by,
@@ -267,12 +273,17 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   });
   const runAllReviewResult =
     runAllSource && runAllTableQuery.data
-      ? projectQuotationRunAllReviewPage(runAllSource, runAllTableQuery.data, {
-          page: runAllPageRequest.page,
-          page_size: runAllPageRequest.page_size,
-          sort_by: runAllPageRequest.sort_by,
-          descending: runAllPageRequest.descending,
-        })
+      ? projectQuotationRunAllReviewPage(
+          runAllSource,
+          runAllTableQuery.data,
+          {
+            page: runAllPageRequest.page,
+            page_size: runAllPageRequest.page_size,
+            sort_by: runAllPageRequest.sort_by,
+            descending: runAllPageRequest.descending,
+          },
+          runAllReviewRowUnit,
+        )
       : null;
 
   const resultNodeId =
@@ -645,6 +656,11 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
                 : activeSelections
             }
             resultsByNode={resultsByNode}
+            reviewRowUnit={runAllSource ? runAllReviewRowUnit : null}
+            onReviewRowUnitChange={(rowUnit) => {
+              setRunAllReviewRowUnit(rowUnit);
+              setRunAllReviewQuery((current) => ({ ...current, page: 1 }));
+            }}
             selectedMetadataColumns={selectedMetadataColumns}
             onSelectedMetadataColumnsChange={setSelectedMetadataColumns}
             contextLength={contextLength}

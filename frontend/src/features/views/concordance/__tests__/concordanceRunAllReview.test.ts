@@ -10,11 +10,14 @@ const source = {
     metadata_columns: ['speaker'],
     analysis_columns: ['CONC_matched_text', 'CONC_start_idx', 'CONC_extraction'],
     internal_columns: ['__wordflow_source_row_id'],
-    record_count: 2,
+    document_count: 1,
+    match_count: 2,
     table: {
+      delivery: 'projected' as const,
       table_id: 'concordance-run-all',
-      rows_url: '/rows',
-      schema_url: '/schema',
+      documents: { rows_url: '/documents/rows', schema_url: '/documents/schema' },
+      matches: { rows_url: '/matches/rows', schema_url: '/matches/schema' },
+      density_url: '/density',
     },
   },
 };
@@ -37,16 +40,11 @@ describe('Concordance Run All Review projection', () => {
           {
             text: 'Queensland Queensland',
             speaker: 'A',
-            CONC_matched_text: 'Queensland',
-            CONC_start_idx: 0,
             __wordflow_source_row_id: 7,
-          },
-          {
-            text: 'Queensland Queensland',
-            speaker: 'A',
-            CONC_matched_text: 'Queensland',
-            CONC_start_idx: 11,
-            __wordflow_source_row_id: 7,
+            concordance: [
+              { CONC_matched_text: 'Queensland', CONC_start_idx: 0 },
+              { CONC_matched_text: 'Queensland', CONC_start_idx: 11 },
+            ],
           },
         ],
         hasNext: false,
@@ -56,6 +54,7 @@ describe('Concordance Run All Review projection', () => {
       20,
       null,
       false,
+      'documents',
     );
 
     expect(result.data).toHaveLength(1);
@@ -63,6 +62,32 @@ describe('Concordance Run All Review projection', () => {
     expect(result.columns).not.toContain('__wordflow_source_row_id');
     expect(result.metadata.metadata_columns).toContain('speaker');
     expect(result.metadata.concordance_columns).toContain('CONC_matched_text');
+    expect(result.pagination.total_source_rows).toBe(1);
+  });
+
+  it('keeps match projection rows as independent occurrences', () => {
+    const result = projectConcordanceRunAllReviewPage(
+      source,
+      {
+        table: {} as never,
+        columns: ['text', 'CONC_matched_text', 'CONC_start_idx'],
+        schema: [],
+        rows: [
+          { text: 'Queensland Queensland', CONC_matched_text: 'Queensland', CONC_start_idx: 0 },
+          { text: 'Queensland Queensland', CONC_matched_text: 'Queensland', CONC_start_idx: 11 },
+        ],
+        hasNext: false,
+        etag: null,
+      },
+      1,
+      20,
+      null,
+      false,
+      'matches',
+    );
+
+    expect(result.data).toHaveLength(2);
+    expect(result.data.every((group) => group.length === 1)).toBe(true);
     expect(result.pagination.total_source_rows).toBe(2);
   });
 });

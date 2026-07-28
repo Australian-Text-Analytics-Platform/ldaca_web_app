@@ -191,7 +191,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     name: source.node_name,
     color: source.color,
     document: source.document_column,
-    shape: [source.record_count, null],
+    shape: [source.document_count, null],
     tokenizerModel: null,
   }));
   const resultPanelNodes =
@@ -262,6 +262,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
   const [viewMode, setViewMode] = useState<'separated' | 'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
+  const [reviewDispersionRowUnit, setReviewDispersionRowUnit] = useState<'documents' | 'matches'>(
+    'documents',
+  );
 
   // Concordance has two engines. ``regex`` walks raw text (the historical
   // default, preserving ``equ\w*``-style affordances); ``tokens`` walks the
@@ -367,6 +370,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     sourceColorMap,
     allMatchedTexts,
     matchedTextColorMap,
+    reviewDensityByNode,
     resolveNodeIdForKey,
     isReview,
     reviewError,
@@ -384,6 +388,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     lowercaseMatches,
     nodeColorOverrides,
     reviewSources: concordanceReviewSources,
+    reviewDispersionRowUnit,
   });
 
   useEffect(() => {
@@ -747,6 +752,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       {results ? (
         <ConcordanceResultsPanel
           title={isReview ? 'Review' : 'Search Results'}
+          isReview={isReview}
           headerAction={
             isReview && publicationSources.length > 0 ? (
               <Button
@@ -790,6 +796,11 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             setBinCount,
             allMatchedTexts,
             matchedTextColorMap,
+            reviewDispersionRowUnit,
+            setReviewDispersionRowUnit: (rowUnit) => {
+              setReviewDispersionRowUnit(rowUnit);
+              setCombinedPage(1);
+            },
           }}
           metadata={{
             showMetadata,
@@ -815,6 +826,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             combinedPage,
             setCombinedPage,
             nodeLoading,
+            reviewDensityByNode,
           }}
           commands={{
             handleSort: isReview

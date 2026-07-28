@@ -196,19 +196,60 @@ export function buildDispersionBins(
 export const DISPERSION_DISPLAY_BIN_COUNTS = [4, 5, 10, 20, 25, 50, 100] as const;
 export type DispersionDisplayBinCount = (typeof DISPERSION_DISPLAY_BIN_COUNTS)[number];
 export const DISPERSION_DEFAULT_BIN_COUNT: DispersionDisplayBinCount = 20;
-export const CONCORDANCE_DISPERSION_CHART_MODES = ['density', 'cumulative'] as const;
+export const CONCORDANCE_DISPERSION_CHART_MODES = [
+  'density-line',
+  'density-bar',
+  'density-area',
+  'cumulative',
+] as const;
 export type ConcordanceDispersionChartMode = (typeof CONCORDANCE_DISPERSION_CHART_MODES)[number];
 
-/**
- * Re-aggregate server-binned hit counts (100 buckets) into N display bins.
- * `displayBinCount` must divide {@link DISPERSION_SERVER_BIN_COUNT} evenly;
- * if it doesn't we fall back to {@link DISPERSION_DEFAULT_BIN_COUNT}.
- */
+export interface ConcordanceDensitySeriesInput {
+  label: string;
+  counts: number[];
+  source?: string;
+}
+
 /**
  * Used by: ConcordanceDispersionSummary.tsx, ConcordanceDispersionNodeBlock.tsx.
  * Flow: validate the requested display-bin count, fold each of the 100 server
  * bins into its display bucket, accumulate series totals, then fill gaps.
  */
+export function buildDispersionBinsFromDensitySeries(
+  series: readonly ConcordanceDensitySeriesInput[],
+  displayBinCount: DispersionDisplayBinCount,
+  options: BuildDispersionBinsOptions = {},
+): BuildDispersionBinsResult {
+  const { lowercaseMatches = false, splitBySource = false, aggregateAll = false } = options;
+  const bins: DispersionBinDatum[] = Array.from({ length: displayBinCount }, (_, index) => ({
+    binCenter: ((index + 0.5) / displayBinCount) * 100,
+  }));
+  const totalsByKey: Record<string, number> = {};
+  const sources = new Set<string>();
+  for (const item of series) {
+    const text = lowercaseMatches ? item.label.toLowerCase() : item.label;
+    if (item.source) sources.add(item.source);
+    const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
+    const seriesKey =
+      splitBySource && item.source
+        ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${item.source}`
+        : baseKey;
+    totalsByKey[seriesKey] ??= 0;
+    item.counts.forEach((count, serverIndex) => {
+      if (!Number.isFinite(count) || count <= 0) return;
+      const displayIndex = Math.min(
+        displayBinCount - 1,
+        Math.floor((serverIndex * displayBinCount) / 100),
+      );
+      const bin = bins[displayIndex];
+      if (!bin) return;
+      bin[seriesKey] = (bin[seriesKey] ?? 0) + count;
+      totalsByKey[seriesKey] = (totalsByKey[seriesKey] ?? 0) + count;
+    });
+  }
+  fillEmptyBins(bins, totalsByKey);
+  return { bins, totalsByKey, sources: Array.from(sources).sort() };
+}
 /**
  * How many source documents the engine actually considered to produce
  * the current page — the per-page batch size capped by the corpus.

@@ -63,9 +63,13 @@ vi.mock('recharts', () => ({
   },
   ResponsiveContainer: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Area: () => <div data-testid="area" />,
-  AreaChart: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  Bar: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AreaChart: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="area-chart">{children}</div>
+  ),
+  Bar: ({ children }: { children?: React.ReactNode }) => <div data-testid="bar">{children}</div>,
+  BarChart: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="bar-chart">{children}</div>
+  ),
   Cell: () => <div data-testid="cell" />,
 }));
 
@@ -104,7 +108,7 @@ describe('ConcordanceDispersionSummary', () => {
         dataBlockLabel="Corpus"
         searchWord="alpha"
         aggregateAll
-        chartMode="density"
+        chartMode="density-line"
         onChartModeChange={vi.fn()}
         onBinCountChange={vi.fn()}
       />,
@@ -115,8 +119,63 @@ describe('ConcordanceDispersionSummary', () => {
       'closed',
     );
     expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveAttribute('data-state', 'closed');
-    expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveTextContent('Density');
-    expect(screen.getByText('Density dispersion')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Chart' })).toHaveTextContent('Density: line');
+    expect(screen.getByText('Density: line dispersion')).toBeInTheDocument();
+  });
+
+  it('renders density as line, bar, or area from the chart selector mode', () => {
+    const props = {
+      rows: baseRows,
+      textColumn: 'text',
+      binCount: 20 as const,
+      lowercaseMatches: false,
+      splitBySource: false,
+      allMatchedTexts: [],
+      matchedTextColors: {},
+      hiddenMatchedTexts: new Set<string>(),
+      dataBlockLabel: 'Corpus',
+      searchWord: 'alpha',
+      aggregateAll: true,
+    };
+    const { rerender } = render(
+      <ConcordanceDispersionSummary {...props} chartMode="density-line" />,
+    );
+
+    expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('line')).toBeInTheDocument();
+
+    rerender(<ConcordanceDispersionSummary {...props} chartMode="density-bar" />);
+    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('bar')).toBeInTheDocument();
+
+    rerender(<ConcordanceDispersionSummary {...props} chartMode="density-area" />);
+    expect(screen.getByTestId('area-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('area')).toBeInTheDocument();
+  });
+
+  it('labels immutable density series as covering the entire Result', () => {
+    render(
+      <ConcordanceDispersionSummary
+        rows={baseRows}
+        textColumn="text"
+        binCount={20}
+        lowercaseMatches={false}
+        splitBySource={false}
+        allMatchedTexts={[]}
+        matchedTextColors={{}}
+        hiddenMatchedTexts={new Set()}
+        dataBlockLabel="Corpus"
+        searchWord="alpha"
+        aggregateAll
+        densitySeries={[{ label: 'alpha', counts: Array.from({ length: 100 }, () => 1) }]}
+      />,
+    );
+
+    expect(
+      screen.getAllByText(
+        'Corpus: aggregated matches at relative locations across the entire Result',
+      ),
+    ).toHaveLength(2);
   });
 
   it('uses node colors for aggregate and source-split chart series', () => {

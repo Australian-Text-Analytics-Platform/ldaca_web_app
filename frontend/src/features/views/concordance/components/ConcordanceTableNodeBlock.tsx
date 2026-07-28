@@ -35,6 +35,7 @@ export interface ConcordanceTableNodeBlockProps {
   searchWord: string;
   showMetadata: boolean;
   selectedMetadataColumns: string[];
+  reviewRowUnit: 'documents' | 'matches' | null;
 
   // Workspace selection
   panelSelectedNodes: WorkspaceNodeMetadata[];
@@ -82,11 +83,10 @@ export function ConcordanceTableNodeBlock(props: ConcordanceTableNodeBlockProps)
 /**
  * Rendered by: ConcordanceTableNodeBlock for the merged two-block view.
  *
- * Concordance pagination walks SOURCE documents, not displayed rows: each source
- * document yields zero or more KWIC hits and empty documents are dropped. The
- * TanStack instance is told `rowCount = total_source_rows` and
- * `pageSize = globalPageSize`, so the footer reflects "documents per batch" while
- * the body still renders the variable number of flattened hit rows.
+ * Preview pagination walks source documents. Review table pagination walks
+ * matches, with one displayed row per matched span. The projected Result's
+ * `total_source_rows` and page size therefore use the active mode's explicit
+ * unit rather than inferring it from the rendered groups.
  * Flow: derive display columns, build the server table, then render the coloured
  * KWIC rows and the shared pagination footer.
  */
@@ -105,6 +105,7 @@ function CombinedConcordanceTable({
   combinedLoading,
   handleRowClick,
   setCombinedPage,
+  reviewRowUnit,
 }: ConcordanceTableNodeBlockProps) {
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
     nodeData,
@@ -137,15 +138,23 @@ function CombinedConcordanceTable({
   );
   const combinedBelowTable = (
     <>
-      <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-        {combinedPageSizeSummary}
-      </div>
+      {reviewRowUnit === null ? (
+        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+          {combinedPageSizeSummary}
+        </div>
+      ) : null}
       <ServerPaginationFooter
         table={table}
         pageIndex={combinedPage - 1}
         pageSize={globalPageSize}
         rowCount={nodeData.pagination.total_source_rows}
-        pageSizeLabel="Documents per batch"
+        pageSizeLabel={
+          reviewRowUnit === null
+            ? 'Documents per page'
+            : panelSelectedNodes.length > 1
+              ? 'Matches per source per page'
+              : 'Matches per page'
+        }
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={combinedLoading}
         showPageSize
@@ -197,9 +206,8 @@ function CombinedConcordanceTable({
 /**
  * Rendered by: ConcordanceTableNodeBlock for a single data block's results.
  *
- * Like the combined view, pagination walks SOURCE documents: `rowCount` is the
- * backend's `total_source_rows` so the footer's page math reflects documents per
- * batch even though the body shows a variable number of hit rows.
+ * Preview pagination walks source documents while Review table pagination
+ * walks matches. `total_source_rows` already carries the projection's unit.
  * Flow: derive display columns, build the server table, render generated KWIC
  * headers plus sortable source metadata, then render the shared footer.
  */
@@ -218,6 +226,7 @@ function PerNodeConcordanceTable({
   handleSort,
   handlePageChange,
   handleRowClick,
+  reviewRowUnit,
 }: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
@@ -259,15 +268,23 @@ function PerNodeConcordanceTable({
   );
   const belowTable = (
     <>
-      <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
-        {pageSizeSummary}
-      </div>
+      {reviewRowUnit === null ? (
+        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+          {pageSizeSummary}
+        </div>
+      ) : null}
       <ServerPaginationFooter
         table={table}
         pageIndex={currentPage - 1}
         pageSize={globalPageSize}
         rowCount={nodeData.pagination.total_source_rows}
-        pageSizeLabel="Documents per batch"
+        pageSizeLabel={
+          reviewRowUnit === null
+            ? 'Documents per page'
+            : panelSelectedNodes.length > 1
+              ? 'Matches per source per page'
+              : 'Matches per page'
+        }
         pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
         loading={nodeIsLoading}
         showPageSize

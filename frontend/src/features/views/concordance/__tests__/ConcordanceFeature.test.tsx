@@ -568,11 +568,20 @@ describe('ConcordanceFeature', () => {
           metadata_columns: [],
           analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
           internal_columns: ['__wordflow_source_row_id'],
-          record_count: 1,
+          document_count: 1,
+          match_count: 1,
           table: {
+            delivery: 'projected',
             table_id: 'concordance-run-all',
-            rows_url: '/analysis-rows',
-            schema_url: '/analysis-schema',
+            documents: {
+              rows_url: '/analysis-document-rows',
+              schema_url: '/analysis-document-schema',
+            },
+            matches: {
+              rows_url: '/analysis-match-rows',
+              schema_url: '/analysis-match-schema',
+            },
+            density_url: '/analysis-density',
           },
         },
       },
@@ -606,7 +615,7 @@ describe('ConcordanceFeature', () => {
         String((options as { body?: { sql?: string } }).body?.sql).includes('LEFT JOIN'),
       ),
     ).toBe(false);
-    expect(fetchArrowTablePageMock).toHaveBeenCalledWith('/analysis-rows', {
+    expect(fetchArrowTablePageMock).toHaveBeenCalledWith('/analysis-match-rows', {
       page: 1,
       pageSize: 20,
       sortBy: null,
@@ -907,12 +916,12 @@ describe('ConcordanceFeature', () => {
 
     renderConcordanceFeature('analysis-1');
 
-    expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Documents per page').length).toBeGreaterThan(0);
     // total_source_rows from the mock pagination (1) is now preferred over
     // page_size (20) for the "processed N documents" label — page_size is
     // a configuration knob, not an actual processed count.
     expect(
-      screen.getByText('(Found 2 instances in 1 document after processing 1 document).'),
+      screen.getByText('(Found 2 matches in 1 document after processing 1 document).'),
     ).toBeInTheDocument();
   });
 

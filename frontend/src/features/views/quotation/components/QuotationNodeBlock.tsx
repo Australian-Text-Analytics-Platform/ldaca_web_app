@@ -43,16 +43,20 @@ export interface QuotationNodeBlockProps {
   onSort: (nodeId: string, column: string) => void;
   /** Requests a different source-document page. */
   onPageChange: (page: number) => void;
-  /** Requests a different documents-per-batch size. */
+  /** Requests a different server page size. */
   onPageSizeChange: (pageSize: number) => void;
   /** Opens the row detail panel for a clicked row. */
   onRowClick: (row: QuotationResultRow) => void;
-  /** Documents-per-batch options for the footer selector. */
+  /** Page-size options for the footer selector. */
   pageSizeOptions: number[];
   /** Summary rendered beside the page-size selector. */
   pageSizeSummary?: React.ReactNode;
   /** Whether the requested preview page is still processing. */
   loading: boolean;
+  pageSizeLabel?: string;
+  showPageSummary?: boolean;
+  /** Whether the virtual document cell renders quotation highlights. */
+  highlightDocument?: boolean;
   /** Hide the page-size selector when the view is read-only. */
   showPageSize?: boolean;
   /** Trailing footer actions such as Add to Workspace. */
@@ -62,12 +66,9 @@ export interface QuotationNodeBlockProps {
 /**
  * Renders one node's quotation results as a server-paginated TanStack table.
  *
- * Quotation pagination walks SOURCE documents, not displayed rows: each source
- * document yields zero or more quotation hits and empty documents are dropped,
- * so the rendered row count differs from the page size. The TanStack instance is
- * told `rowCount = total_source_rows` and `pageSize = page_size`, so its page
- * math reflects "documents per batch" while the body still shows the variable
- * number of hit rows.
+ * Preview and document Review pages contain grouped source documents. Match
+ * Review pages contain one extract per group. The TanStack instance uses the
+ * backend projection's explicit row count and page size for either unit.
  *
  * Rendered by: QuotationFeature for each selected node because the per-node hook
  * (`useServerTable`) cannot run inside the feature's node map, so each node owns
@@ -101,6 +102,9 @@ function QuotationNodeBlockContent({
   pageSizeOptions,
   pageSizeSummary,
   loading,
+  pageSizeLabel = 'Documents per page',
+  showPageSummary = true,
+  highlightDocument = true,
   showPageSize = true,
   children,
 }: QuotationNodeBlockProps) {
@@ -135,7 +139,7 @@ function QuotationNodeBlockContent({
     },
     cell: ({ row }) => {
       const data = row.original;
-      if (Boolean(textCol) && columnName === QUOTATION_DOCUMENT_COLUMN) {
+      if (Boolean(textCol) && columnName === QUOTATION_DOCUMENT_COLUMN && highlightDocument) {
         return (
           <QuotationHighlightedCell
             row={data}
@@ -146,6 +150,7 @@ function QuotationNodeBlockContent({
           />
         );
       }
+      if (columnName === QUOTATION_DOCUMENT_COLUMN) return data.text;
       return data.cellText(columnName);
     },
   }));
@@ -187,9 +192,9 @@ function QuotationNodeBlockContent({
             pageIndex={page - 1}
             pageSize={pageSize}
             rowCount={rowCount}
-            pageSizeLabel="Documents per batch"
+            pageSizeLabel={pageSizeLabel}
             pageSizeOptions={pageSizeOptions}
-            pageSizeSummary={pageSizeSummary}
+            pageSizeSummary={showPageSummary ? pageSizeSummary : undefined}
             loading={loading}
             showPageSize={showPageSize}
           >

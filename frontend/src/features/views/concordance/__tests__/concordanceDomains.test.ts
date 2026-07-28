@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDispersionRows, getDispersionBarWidthPercent } from '../concordanceDispersionDomain';
+import {
+  buildDispersionBinsFromDensitySeries,
+  buildDispersionRows,
+  getDispersionBarWidthPercent,
+} from '../concordanceDispersionDomain';
 import {
   buildConcordanceNodeColorMap,
   buildConcordanceSourceColorMap,
@@ -77,6 +81,18 @@ describe('concordanceDomains', () => {
 
     expect(getDispersionBarWidthPercent(rows[0]!, 'text', longestTextLength)).toBe(100);
     expect(getDispersionBarWidthPercent(rows[1]!, 'text', longestTextLength)).toBeCloseTo(68.75);
+  });
+
+  it('reaggregates the whole-Result density into the selected display bins', () => {
+    const counts = Array.from({ length: 100 }, () => 0);
+    counts[0] = 2;
+    counts[99] = 3;
+
+    const result = buildDispersionBinsFromDensitySeries([{ label: 'Alpha', counts }], 20);
+
+    expect(result.bins[0]?.Alpha).toBe(2);
+    expect(result.bins[19]?.Alpha).toBe(3);
+    expect(result.totalsByKey.Alpha).toBe(5);
   });
 });
 describe('matched-text color view models', () => {

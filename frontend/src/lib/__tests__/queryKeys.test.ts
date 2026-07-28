@@ -128,6 +128,38 @@ describe('queryKeys inactive observers', () => {
   });
 });
 
+describe('queryKeys projected Result tables', () => {
+  it('separates row-unit pages while keeping density independent of page controls', () => {
+    const request = { page: 2, page_size: 20, sort_by: null, descending: false };
+    const documents = queryKeys.analysisTableProjectionPage(
+      'workspace-1',
+      'analysis-1',
+      'table-1',
+      'documents',
+      request,
+    );
+    const matches = queryKeys.analysisTableProjectionPage(
+      'workspace-1',
+      'analysis-1',
+      'table-1',
+      'matches',
+      request,
+    );
+
+    expect(documents).not.toEqual(matches);
+    expect(queryKeys.concordanceDensity('workspace-1', 'analysis-1', 'table-1')).toEqual([
+      'workspaces',
+      'workspace-1',
+      'analyses',
+      'analysis-1',
+      'results',
+      'tables',
+      'table-1',
+      'density',
+    ]);
+  });
+});
+
 describe('queryKeys.detectedColumnLanguage', () => {
   it('uses the sampled resource revision without putting sampled text in the key', () => {
     const key = queryKeys.detectedColumnLanguage(

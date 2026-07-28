@@ -68,6 +68,27 @@ export const queryKeys = {
     request: NodeDataRequest,
   ) => [...queryKeys.analysisResults(workspaceId, analysisId), 'tables', tableId, request] as const,
 
+  /** One row-unit projection of an immutable document-level Result table. */
+  analysisTableProjectionPage: (
+    workspaceId: string,
+    analysisId: string,
+    tableId: string,
+    rowUnit: 'documents' | 'matches',
+    request: NodeDataRequest,
+  ) =>
+    [
+      ...queryKeys.analysisResults(workspaceId, analysisId),
+      'tables',
+      tableId,
+      'projections',
+      rowUnit,
+      request,
+    ] as const,
+
+  /** Whole immutable Concordance Result density, independent of page controls. */
+  concordanceDensity: (workspaceId: string, analysisId: string, tableId: string) =>
+    [...queryKeys.analysisResults(workspaceId, analysisId), 'tables', tableId, 'density'] as const,
+
   /** Paginated user-owned file imports shown in the Task Inbox. */
   userFileImports: ['user-file-imports', 'list'] as const,
 

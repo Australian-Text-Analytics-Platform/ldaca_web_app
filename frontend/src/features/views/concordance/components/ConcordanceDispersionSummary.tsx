@@ -2,7 +2,12 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ReferenceArea,
@@ -46,18 +51,20 @@ import {
 import {
   CONCORDANCE_DISPERSION_CHART_MODES,
   buildDispersionBins,
+  buildDispersionBinsFromDensitySeries,
   DISPERSION_AGGREGATE_KEY,
   DISPERSION_DISPLAY_BIN_COUNTS,
   DISPERSION_SOURCE_DELIMITER,
   type ConcordanceDispersionChartMode,
   type ConcordanceDispersionRow,
   type DispersionDisplayBinCount,
+  type ConcordanceDensitySeriesInput,
 } from '../concordanceDispersionDomain';
 
 interface Props {
   rows: ConcordanceDispersionRow[];
   textColumn: string;
-  binCount: number;
+  binCount: DispersionDisplayBinCount;
   lowercaseMatches: boolean;
   splitBySource: boolean;
   allMatchedTexts: string[];
@@ -71,7 +78,7 @@ interface Props {
    * aggregate line in a default colour, with no per-matched-text breakdown.
    */
   aggregateAll?: boolean;
-  /** Dispersion figure mode. Density is the per-bin count; cumulative is the running total. */
+  /** Dispersion figure mode. Density shares per-bin counts across three renderers; cumulative is the running total. */
   chartMode?: ConcordanceDispersionChartMode;
   /** Change handler for the chart-mode selector in the header. */
   onChartModeChange?: (value: ConcordanceDispersionChartMode) => void;
@@ -101,6 +108,7 @@ interface Props {
     totals: ReadonlyMap<string, number>;
     selectedTotals: ReadonlyMap<string, number> | null;
   }) => void;
+  densitySeries?: ConcordanceDensitySeriesInput[];
 }
 
 interface DispersionChartSeries {
@@ -133,7 +141,9 @@ const X_AXIS_TICKS = [0, 20, 40, 60, 80, 100];
 const CHART_HEIGHT = 240;
 const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
 const CHART_MODE_LABELS: Record<ConcordanceDispersionChartMode, string> = {
-  density: 'Density',
+  'density-line': 'Density: line',
+  'density-bar': 'Density: bar',
+  'density-area': 'Density: area',
   cumulative: 'Cumulative',
 };
 
@@ -234,13 +244,14 @@ export function ConcordanceDispersionSummary({
   dataBlockLabel,
   searchWord,
   aggregateAll = false,
-  chartMode = 'density',
+  chartMode = 'density-line',
   onChartModeChange,
   onBinCountChange,
   sourceColor,
   sourceColors,
   selection,
   onLegendCountsChange,
+  densitySeries,
 }: Props) {
   const controlId = useId();
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -249,12 +260,19 @@ export function ConcordanceDispersionSummary({
   const [dragSelection, setDragSelection] = useState<DragSelection | null>(null);
 
   const { bins, sources, totalsByKey } = useMemo(() => {
+    if (densitySeries) {
+      return buildDispersionBinsFromDensitySeries(densitySeries, binCount, {
+        lowercaseMatches,
+        splitBySource,
+        aggregateAll,
+      });
+    }
     return buildDispersionBins(rows, textColumn, binCount, {
       lowercaseMatches,
       splitBySource,
       aggregateAll,
     });
-  }, [rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll]);
+  }, [rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll, densitySeries]);
 
   /**
    * Per-matched-text totals across every bin in the displayed graph.
@@ -316,7 +334,10 @@ export function ConcordanceDispersionSummary({
     });
   }, [onLegendCountsChange, totalsByText, selectedTotalsByText]);
 
-  const titleText = `${dataBlockLabel}: aggregated matches at relative locations of documents from page above`;
+  const scopeText = densitySeries
+    ? 'aggregated matches at relative locations across the entire Result'
+    : 'aggregated matches at relative locations of documents from page above';
+  const titleText = `${dataBlockLabel}: ${scopeText}`;
   const chartTitle = `${CHART_MODE_LABELS[chartMode]} dispersion`;
 
   const visibleTexts = useMemo(
@@ -464,11 +485,11 @@ export function ConcordanceDispersionSummary({
     return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
   };
 
-  /** Derives the Recharts dot renderer for the active density/cumulative mode and selection state. */
+  /** Derives the Recharts dot renderer for line/area modes and selection state. */
   const dotFor = (item: DispersionChartSeries) => {
     const color = chartColorVar(item.key);
-    if (selection) return renderDot(color, chartMode === 'density');
-    if (chartMode === 'density') return { fill: color };
+    if (selection) return renderDot(color, chartMode === 'density-line');
+    if (chartMode === 'density-line') return { fill: color };
     return false;
   };
 
@@ -510,17 +531,19 @@ export function ConcordanceDispersionSummary({
         ? [{ label: 'Sources', value: sources.join(' / ') }]
         : []),
     ];
+    const legendType: ChartExportLegendItem['type'] =
+      chartMode === 'density-bar' ? 'bar' : chartMode === 'density-area' ? 'area' : 'line';
     const legend: ChartExportLegendItem[] = aggregateAll
       ? series.map((item) => ({
           label: item.label ?? AGGREGATE_LINE_LABEL,
           color: item.color,
-          type: 'line' as const,
+          type: legendType,
           hidden: false,
         }))
       : allMatchedTexts.map((text) => ({
           label: text,
           color: matchedTextColors[text] ?? AGGREGATE_DEFAULT_COLOR,
-          type: 'line' as const,
+          type: legendType,
           hidden: hiddenMatchedTexts.has(text),
         }));
     if (splitBySource && sources.length > 0) {
@@ -545,6 +568,113 @@ export function ConcordanceDispersionSummary({
       const description = error instanceof Error ? error.message : String(error);
       toast.error('Failed to export chart.', { description });
     }
+  };
+
+  const chartContents = (
+    <>
+      <CartesianGrid vertical={false} />
+      <XAxis
+        dataKey="binCenter"
+        type="number"
+        domain={[0, 100]}
+        ticks={X_AXIS_TICKS}
+        tickFormatter={formatTickLabel}
+        tickLine={false}
+        axisLine={false}
+        tickMargin={8}
+      />
+      <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={36} />
+      <ChartTooltip
+        cursor={false}
+        content={
+          <ChartTooltipContent
+            indicator="line"
+            labelFormatter={(label) => formatBinRange(Number(label), binCount)}
+          />
+        }
+      />
+      {dragRange && (
+        <ReferenceArea
+          x1={dragRange.x1}
+          x2={dragRange.x2}
+          fill="var(--primary)"
+          fillOpacity={0.12}
+          strokeOpacity={0}
+        />
+      )}
+      {dragStartX != null && (
+        <ReferenceLine
+          x={dragStartX}
+          stroke="var(--primary)"
+          strokeDasharray="4 4"
+          strokeWidth={2}
+        />
+      )}
+      {chartMode === 'density-bar'
+        ? series.map((item) => (
+            <Bar
+              key={item.key}
+              dataKey={item.key}
+              name={item.label ?? item.key}
+              fill={chartColorVar(item.key)}
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={false}
+            >
+              {selection
+                ? chartData.map((_, index) => (
+                    // eslint-disable-next-line @typescript-eslint/no-deprecated -- Recharts Cell is its documented per-bar opacity API.
+                    <Cell
+                      key={`${item.key}-${String(index)}`}
+                      fillOpacity={!hasSelection || selection.selectedIndices.has(index) ? 1 : 0.25}
+                    />
+                  ))
+                : null}
+            </Bar>
+          ))
+        : chartMode === 'density-area'
+          ? series.map((item) => (
+              <Area
+                key={item.key}
+                dataKey={item.key}
+                name={item.label ?? item.key}
+                type="natural"
+                stackId="density"
+                stroke={chartColorVar(item.key)}
+                strokeDasharray={item.dash}
+                fill={chartColorVar(item.key)}
+                fillOpacity={hasSelection ? 0.2 : 0.35}
+                dot={dotFor(item)}
+                activeDot={{ r: 6 }}
+                isAnimationActive={false}
+                connectNulls
+              />
+            ))
+          : series.map((item) => (
+              <Line
+                key={item.key}
+                dataKey={item.key}
+                name={item.label ?? item.key}
+                type={lineType}
+                stroke={chartColorVar(item.key)}
+                strokeDasharray={item.dash}
+                strokeWidth={2}
+                dot={dotFor(item)}
+                activeDot={{ r: 6 }}
+                isAnimationActive={false}
+                connectNulls
+              />
+            ))}
+    </>
+  );
+
+  const chartProps = {
+    accessibilityLayer: true,
+    data: chartData as never,
+    margin: { top: 10, right: 12, bottom: 4, left: 12 },
+    onMouseDown: handleDragStart as never,
+    onMouseMove: handleDragMove as never,
+    onMouseUp: handleDragEnd as never,
+    onMouseLeave: handleDragCancel,
   };
 
   return (
@@ -644,83 +774,19 @@ export function ConcordanceDispersionSummary({
               height: CHART_HEIGHT,
             }}
           >
-            <LineChart
-              accessibilityLayer
-              data={chartData as never}
-              margin={{ top: 10, right: 12, bottom: 4, left: 12 }}
-              onMouseDown={handleDragStart as never}
-              onMouseMove={handleDragMove as never}
-              onMouseUp={handleDragEnd as never}
-              onMouseLeave={handleDragCancel}
-            >
-              <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="binCenter"
-                type="number"
-                domain={[0, 100]}
-                ticks={X_AXIS_TICKS}
-                tickFormatter={formatTickLabel}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-              />
-              <YAxis
-                allowDecimals={false}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                width={36}
-              />
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    indicator="line"
-                    labelFormatter={(label) => formatBinRange(Number(label), binCount)}
-                  />
-                }
-              />
-              {dragRange && (
-                <ReferenceArea
-                  x1={dragRange.x1}
-                  x2={dragRange.x2}
-                  fill="var(--primary)"
-                  fillOpacity={0.12}
-                  strokeOpacity={0}
-                />
-              )}
-              {dragStartX != null && (
-                <ReferenceLine
-                  x={dragStartX}
-                  stroke="var(--primary)"
-                  strokeDasharray="4 4"
-                  strokeWidth={2}
-                />
-              )}
-              {series.map((item) => (
-                <Line
-                  key={item.key}
-                  dataKey={item.key}
-                  name={item.label ?? item.key}
-                  type={lineType}
-                  stroke={chartColorVar(item.key)}
-                  strokeDasharray={item.dash}
-                  strokeWidth={2}
-                  dot={dotFor(item)}
-                  activeDot={{ r: 6 }}
-                  isAnimationActive={false}
-                  connectNulls
-                />
-              ))}
-            </LineChart>
+            {chartMode === 'density-bar' ? (
+              <BarChart {...chartProps}>{chartContents}</BarChart>
+            ) : chartMode === 'density-area' ? (
+              <AreaChart {...chartProps}>{chartContents}</AreaChart>
+            ) : (
+              <LineChart {...chartProps}>{chartContents}</LineChart>
+            )}
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center gap-2 text-foreground">
-          <span>
-            {dataBlockLabel}: aggregated matches at relative locations of documents from page above
-          </span>
+          <span>{titleText}</span>
         </div>
         {splitBySource && sources.length > 0 && (
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
