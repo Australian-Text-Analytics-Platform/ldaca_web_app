@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EVENTS, type Props as JoyrideProps, STATUS, type TooltipRenderProps } from 'react-joyride';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -187,6 +187,21 @@ describe('GuidanceProvider', () => {
     expect(screen.getByTestId('guidance-portal')).toHaveClass('fixed', 'inset-0', 'z-[100]');
     expect(screen.getByText('Target')).not.toHaveClass('guidance-target-active');
     expect(screen.getByRole('button', { name: 'Disable Hints' })).toHaveClass('bg-destructive');
+    expect(screen.getByText('Enter')).toBeInTheDocument();
+    expect(screen.getByText('= Got it')).toBeInTheDocument();
+  });
+
+  it('acknowledges the active Contextual Hint when Enter is pressed', async () => {
+    const user = userEvent.setup();
+    renderGuidance();
+    await user.click(screen.getByRole('button', { name: 'Request hint' }));
+
+    fireEvent.keyDown(window, { key: 'Enter' });
+
+    expect(useGuidanceAcknowledgmentsStore.getState().byUser['user-1']).toEqual({
+      'hint-one': 1,
+    });
+    expect(screen.queryByTestId('joyride')).not.toBeInTheDocument();
   });
 
   it('forwards per-hint automatic placement to Joyride', async () => {

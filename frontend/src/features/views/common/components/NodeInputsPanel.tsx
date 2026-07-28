@@ -1,4 +1,4 @@
-import { Bookmark, OctagonX, Plus, Search, Trash2, X } from 'lucide-react';
+import { Bookmark, ListPlus, OctagonX, Plus, Search, Trash2, X } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,12 @@ import type { ResolvedPreset } from '../nodeInputs/useTabNodeInputs';
 import { VIZ_PALETTE } from '../vizPalette';
 import { NodeColorPicker } from './NodeColorPicker';
 import { NodeColumnSelector } from './NodeColumnSelector';
-import { NodeSelectionList, type NodeSelectionRenderArgs } from './NodeSelectionList';
+import {
+  NodeSelectionList,
+  type NodeSelectionItem,
+  type NodeSelectionRenderArgs,
+  type UnavailableNodeSelection,
+} from './NodeSelectionList';
 
 const CLEAR_COLUMN_VALUE = '__ldaca__clear__';
 
@@ -27,6 +32,10 @@ export interface NodeInputColumnAddonArgs extends NodeSelectionRenderArgs {
 export interface NodeInputsPanelProps {
   /** Resolved (live, stale-dropped) inputs from useNodeInputs. */
   resolvedNodes: ResolvedNodeInput[];
+  /** Saved inputs whose Data Blocks no longer exist in the live Workspace. */
+  unavailableNodes?: UnavailableNodeSelection[];
+  /** Full saved input order when live and unavailable cards must remain interleaved. */
+  inputOrder?: string[];
   /** Live workspace nodes not yet added — the Add dropdown's candidate list. */
   availableNodes: WorkspaceNodeMetadata[];
   /** Node ids currently selected in the graph (source for "Add preset" → current selection). */
@@ -35,8 +44,12 @@ export interface NodeInputsPanelProps {
   recentPresets?: ResolvedPreset[];
   /** Whether another node may be added (max-nodes gate). */
   canAddMore: boolean;
+  /** Show one action that adds every currently available Data Block. */
+  showAddAll?: boolean;
   /** Exact max supplied by the active feature; the shared panel never invents a generic cap. */
   maxNodes?: number;
+  /** Number of cards shown before the selected list scrolls horizontally. */
+  maxVisibleCards?: number;
   /** Append nodes by id; returns rejections so the panel can surface reasons. */
   onAddNodes: (ids: string[]) => NodeAddRejection[];
   /** Per-candidate structural add-eligibility reason (null = addable). */
@@ -95,11 +108,15 @@ export interface NodeInputsPanelProps {
  */
 export function NodeInputsPanel({
   resolvedNodes,
+  unavailableNodes = [],
+  inputOrder,
   availableNodes,
   graphSelectedIds = [],
   recentPresets = [],
   canAddMore,
+  showAddAll = false,
   maxNodes,
+  maxVisibleCards,
   onAddNodes,
   getAddRejection,
   onRemoveNode,
@@ -132,8 +149,20 @@ export function NodeInputsPanel({
   const pendingInputRequest = pendingRequests.findLast(
     (request) => request.workspaceId === currentWorkspaceId && request.view === currentView,
   );
-  const nodes = resolvedNodes.map((r) => r.node);
   const nodeIds = resolvedNodes.map((r) => r.id);
+  const selectionItemById = new Map<string, NodeSelectionItem>([
+    ...resolvedNodes.map((resolved): [string, NodeSelectionItem] => [
+      resolved.id,
+      { kind: 'available', id: resolved.id, node: resolved.node },
+    ]),
+    ...unavailableNodes.map((selection): [string, NodeSelectionItem] => [
+      selection.id,
+      { kind: 'unavailable', id: selection.id, selection },
+    ]),
+  ]);
+  const selectionItems = (inputOrder ?? [...nodeIds, ...unavailableNodes.map((node) => node.id)])
+    .map((nodeId) => selectionItemById.get(nodeId))
+    .filter((item): item is NodeSelectionItem => item !== undefined);
   const columnByNode = new Map(resolvedNodes.map((r) => [r.id, r]));
   const [blockSearch, setBlockSearch] = useState('');
   const [blockOpen, setBlockOpen] = useState(false);
@@ -254,7 +283,7 @@ export function NodeInputsPanel({
       }
     : undefined;
 
-  const count = originalCount ?? resolvedNodes.length;
+  const count = originalCount ?? selectionItems.length;
   const countLabel = maxNodes != null ? `${String(count)}/${String(maxNodes)}` : String(count);
   const showInputRequestTarget = showAddControls && pendingInputRequest !== undefined;
   const inputRequestTargetFilled = !canAddMore;
@@ -279,7 +308,7 @@ export function NodeInputsPanel({
             data-testid="node-inputs-actions"
             className="ml-auto flex flex-wrap items-center justify-end gap-1.5 @max-[430px]/node-inputs:ml-0 @max-[430px]/node-inputs:basis-full @max-[430px]/node-inputs:justify-start"
           >
-            {resolvedNodes.length > 0 && (
+            {selectionItems.length > 0 && (
               <Button
                 type="button"
                 variant="ghost"
@@ -290,6 +319,22 @@ export function NodeInputsPanel({
               >
                 <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                 Clear all
+              </Button>
+            )}
+
+            {showAddAll && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={disabled || !canAddMore || availableNodes.length === 0}
+                onClick={() => {
+                  handleAdd(availableNodes.map((node) => node.id));
+                }}
+              >
+                <ListPlus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                Add All
               </Button>
             )}
 
@@ -446,7 +491,7 @@ export function NodeInputsPanel({
         </div>
       )}
 
-      {resolvedNodes.length === 0 ? (
+      {selectionItems.length === 0 ? (
         <div className="mx-3 rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
           {emptyMessage ?? (
             <>
@@ -460,11 +505,10 @@ export function NodeInputsPanel({
         </div>
       ) : (
         <NodeSelectionList
-          nodes={nodes}
-          nodeIds={nodeIds}
+          items={selectionItems}
           palette={defaultPalette}
           nodeColors={nodeColors}
-          maxCompare={maxNodes ?? nodes.length}
+          maxCompare={maxVisibleCards ?? maxNodes ?? selectionItems.length}
           onRemoveNode={showRemoveButtons && !disabled ? onRemoveNode : undefined}
           renderNodeMeta={renderNodeMeta}
           renderNodeBody={showColumnPicker ? renderColumnBody : undefined}

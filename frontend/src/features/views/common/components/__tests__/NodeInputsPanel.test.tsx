@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
@@ -93,6 +93,58 @@ describe('NodeInputsPanel', () => {
     expect(screen.getByTestId('node-inputs-controls')).toHaveClass(
       'md:grid-cols-[minmax(0,1fr)_auto_auto]',
     );
+  });
+
+  it('shows an always-visible horizontal scrollbar when selected cards overflow', () => {
+    render(
+      <NodeInputsPanel
+        {...baseProps}
+        resolvedNodes={[
+          resolvedNodes[0]!,
+          { ...resolvedNodes[0]!, id: 'node-2', name: 'Corpus B' },
+          { ...resolvedNodes[0]!, id: 'node-3', name: 'Corpus C' },
+        ]}
+        maxVisibleCards={2}
+      />,
+    );
+
+    const scrollArea = screen.getByTestId('node-selection-scroll-area');
+    // Radix scrollbars do not expose a semantic role to query through Testing Library.
+    // eslint-disable-next-line testing-library/no-node-access
+    const horizontalScrollbar = scrollArea.querySelector(
+      '[data-slot="scroll-area-scrollbar"][data-orientation="horizontal"]',
+    );
+    expect(horizontalScrollbar).toHaveAttribute('data-state', 'visible');
+  });
+
+  it('keeps a deleted saved input visible as an unavailable Data Block card', async () => {
+    const user = userEvent.setup();
+    const onRemoveNode = vi.fn();
+
+    render(
+      <NodeInputsPanel
+        {...baseProps}
+        resolvedNodes={[]}
+        unavailableNodes={[{ id: 'deleted-node', name: 'Archived Corpus', column: 'body' }]}
+        inputOrder={['deleted-node']}
+        maxNodes={2}
+        onRemoveNode={onRemoveNode}
+      />,
+    );
+
+    expect(screen.getByText('Selected Data Blocks (1/2)')).toBeInTheDocument();
+    const card = screen.getByRole('group', { name: 'Archived Corpus unavailable' });
+    expect(within(card).getByText('Archived Corpus')).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        'This Data Block no longer exists in the Workspace and cannot be used for a new run.',
+      ),
+    ).toBeInTheDocument();
+    expect(within(card).getByText('body')).toBeInTheDocument();
+    expect(screen.queryByText('No data blocks selected.')).not.toBeInTheDocument();
+
+    await user.click(within(card).getByRole('button', { name: 'Remove Archived Corpus' }));
+    expect(onRemoveNode).toHaveBeenCalledWith('deleted-node');
   });
 
   it('places and consumes only the latest matching carried Data Block', async () => {

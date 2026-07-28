@@ -31,6 +31,8 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
   // Used by: placement tests as the stable boundary for the selected-node selector.
   NodeInputsPanel: ({
     resolvedNodes,
+    unavailableNodes,
+    inputOrder,
     nodeColors,
     renderExtraNodeContent,
   }: {
@@ -40,6 +42,8 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
       column: string;
       columnOptions: { name: string }[];
     }[];
+    unavailableNodes?: { id: string; name: string; column?: string }[];
+    inputOrder?: string[];
     nodeColors?: Record<string, string>;
     renderExtraNodeContent?: (args: {
       node: { id: string; name: string };
@@ -63,6 +67,12 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
           })}
         </div>
       ))}
+      {unavailableNodes?.map((node) => (
+        <div key={node.id} data-testid={`unavailable-node-${node.id}`}>
+          {node.name} · {node.column}
+        </div>
+      ))}
+      <div data-testid="input-order">{inputOrder?.join('|')}</div>
     </div>
   ),
 }));
@@ -156,5 +166,19 @@ describe('TokenFrequencyParameterPanel', () => {
     fireEvent.click(corpusBSwitch);
 
     expect(onStudyNodeChange).toHaveBeenCalledWith('node-b');
+  });
+
+  it('projects a deleted saved input with its historical result name', () => {
+    const nodeInputs = nodeInputsFixture();
+    const remainingNode = nodeInputs.resolvedNodes[1];
+    if (!remainingNode) throw new Error('Expected the second fixture node.');
+    nodeInputs.resolvedNodes = [remainingNode];
+    nodeInputs.selectedNodes = [remainingNode.node];
+    nodeInputs.nodeColumnSelections = [{ nodeId: remainingNode.id, column: remainingNode.column }];
+
+    render(<TokenFrequencyParameterPanel {...baseProps} nodeInputs={nodeInputs} />);
+
+    expect(screen.getByTestId('unavailable-node-node-a')).toHaveTextContent('Corpus A · text');
+    expect(screen.getByTestId('input-order')).toHaveTextContent('node-a|node-b');
   });
 });

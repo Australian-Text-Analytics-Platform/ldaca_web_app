@@ -124,7 +124,15 @@ function ContextualHintTooltip({ primaryProps, step, tooltipProps }: TooltipRend
             Disable Hints
           </button>
         </div>
-        <button type="button" style={styles.buttonPrimary} {...primaryProps} />
+        <div className="flex items-center gap-2">
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
+            <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+              Enter
+            </kbd>{' '}
+            = Got it
+          </span>
+          <button type="button" style={styles.buttonPrimary} {...primaryProps} />
+        </div>
       </div>
     </div>
   );
@@ -255,6 +263,32 @@ export function GuidanceProvider({
     setDisableConfirmationOpen(false);
   };
   const guidanceVisible = session?.started && !disableConfirmationOpen;
+
+  useEffect(() => {
+    if (!guidanceVisible || session.kind !== 'hint' || !userId) return;
+
+    const acknowledgeWithEnter = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || event.defaultPrevented || event.isComposing || event.repeat) {
+        return;
+      }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest('button, input, select, textarea, a[href]'))
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      acknowledge(userId, session.definition.id, session.definition.version);
+      setSession(null);
+    };
+
+    window.addEventListener('keydown', acknowledgeWithEnter, true);
+    return () => {
+      window.removeEventListener('keydown', acknowledgeWithEnter, true);
+    };
+  }, [acknowledge, guidanceVisible, session, userId]);
 
   return (
     <GuidanceContext.Provider value={{ requestContextualHint, startGuidedTour }}>

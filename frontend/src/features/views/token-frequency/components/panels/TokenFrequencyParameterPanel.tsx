@@ -116,6 +116,18 @@ export const TokenFrequencyParameterPanel = ({
   renderTokenizerModelSelector,
 }: TokenFrequencyParameterPanelProps) => {
   const panelSelectedNodes = nodeInputs.selectedNodes;
+  const resolvedNodeIds = new Set(nodeInputs.resolvedNodes.map((node) => node.id));
+  const unavailableNodes = nodeInputs.inputs.flatMap((input) =>
+    resolvedNodeIds.has(input.node_id)
+      ? []
+      : [
+          {
+            id: input.node_id,
+            name: computeDisplayName(input.node_id),
+            column: input.column ?? undefined,
+          },
+        ],
+  );
   const nodeOptions = panelSelectedNodes
     .map((node) => {
       const nodeId = typeof node.id === 'string' ? node.id : '';
@@ -180,6 +192,8 @@ export const TokenFrequencyParameterPanel = ({
     >
       <NodeInputsPanel
         resolvedNodes={nodeInputs.resolvedNodes}
+        unavailableNodes={unavailableNodes}
+        inputOrder={nodeInputs.inputs.map((input) => input.node_id)}
         availableNodes={nodeInputs.availableNodes}
         graphSelectedIds={nodeInputs.graphSelectedIds}
         recentPresets={nodeInputs.recentPresets}

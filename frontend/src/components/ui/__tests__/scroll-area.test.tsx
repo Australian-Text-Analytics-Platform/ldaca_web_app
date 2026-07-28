@@ -1,4 +1,5 @@
 /* eslint-disable testing-library/no-container, testing-library/no-node-access -- this primitive exposes no semantic scrollbar role */
+import { createRef } from 'react';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
@@ -22,5 +23,16 @@ describe('ScrollArea', () => {
     expect(horizontal).toHaveAttribute('data-state', 'hidden');
     expect(horizontal).not.toHaveClass('data-[state=hidden]:hidden');
     expect(vertical).not.toBeInTheDocument();
+  });
+
+  it('exposes the scrolling viewport for controlled scroll position', () => {
+    const viewportRef = createRef<HTMLDivElement>();
+    render(
+      <ScrollArea viewportRef={viewportRef} scrollbars="horizontal">
+        <div>Scrollable content</div>
+      </ScrollArea>,
+    );
+
+    expect(viewportRef.current).toHaveAttribute('data-slot', 'scroll-area-viewport');
   });
 });

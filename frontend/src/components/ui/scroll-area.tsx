@@ -9,6 +9,7 @@ type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   scrollbars?: ScrollAreaScrollbarOption;
   children?: React.ReactNode;
   className?: string;
+  viewportRef?: React.Ref<HTMLDivElement>;
 };
 
 /**
@@ -21,6 +22,7 @@ function ScrollArea({
   children,
   scrollbars = 'vertical',
   type = 'scroll',
+  viewportRef,
   ...props
 }: ScrollAreaProps) {
   const showVertical = scrollbars === 'vertical' || scrollbars === 'both';
@@ -34,6 +36,7 @@ function ScrollArea({
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
+        ref={viewportRef}
         data-slot="scroll-area-viewport"
         className="focus-visible:ring-ring/50 size-full max-h-[inherit] rounded-[inherit] transition-[color,box-shadow] outline-hidden focus-visible:ring-[3px] focus-visible:outline-1 [&>div]:block! [&>div]:w-full! [&>div]:min-w-0!"
       >
