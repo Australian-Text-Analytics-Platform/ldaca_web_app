@@ -1,9 +1,29 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CustomNode from '../CustomNode';
+
+const mocks = vi.hoisted(() => ({
+  downloadDataBlocks: vi.fn(),
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
+
+vi.mock('@/features/workspace/common/dataBlockExport', () => ({
+  DATA_BLOCK_EXPORT_FORMATS: [
+    { value: 'csv', label: 'CSV (.csv)', extension: 'csv' },
+    { value: 'json', label: 'JSON (.json)', extension: 'json' },
+  ],
+  downloadDataBlocks: mocks.downloadDataBlocks,
+}));
+vi.mock('sonner', () => ({ toast: mocks.toast }));
+vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
+  useWorkspaceData: () => ({
+    currentWorkspaceId: 'workspace-1',
+    currentWorkspace: { name: 'Main Workspace' },
+  }),
+}));
 
 let mockZoom = 1;
 
@@ -74,6 +94,11 @@ const nodeData = (
 });
 
 describe('CustomNode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.downloadDataBlocks.mockResolvedValue('Corpus.csv');
+  });
+
   it('starts pointer-carry placement from the node add button', async () => {
     mockZoom = 1;
     const user = userEvent.setup();
@@ -139,6 +164,44 @@ describe('CustomNode', () => {
     expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(props.data.onUndo).toHaveBeenCalledWith('node-1');
+  });
+
+  it('opens single-Data-Block export from the node menu', async () => {
+    mockZoom = 1;
+    const user = userEvent.setup();
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: nodeData(),
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+
+    await user.hover(screen.getByTitle('Corpus'));
+    fireEvent.click(getLatestNodeSettingsButton());
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+
+    expect(screen.getByRole('heading', { name: 'Export “Corpus”' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Export format' })).toHaveTextContent('CSV');
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+
+    await waitFor(() =>
+      expect(mocks.downloadDataBlocks).toHaveBeenCalledWith({
+        workspaceId: 'workspace-1',
+        workspaceName: 'Main Workspace',
+        dataBlocks: [{ id: 'node-1', name: 'Corpus' }],
+        format: 'csv',
+      }),
+    );
   });
 
   it('paints a left color accent on the card when the node has a color', () => {

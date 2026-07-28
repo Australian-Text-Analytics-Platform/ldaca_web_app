@@ -25,6 +25,8 @@ import { GREY, toBgColor } from '@/features/views/common/vizPalette';
 import type { NodeInputPointerPosition } from '@/stores/nodeInputRequestsStore';
 import { CUSTOM_NODE_TOOLBAR_BUTTON_CLASS, CustomNodeActionMenu } from './CustomNodeActionMenu';
 import { CustomNodeRenameForm } from './CustomNodeRenameForm';
+import { DataBlockExportDialog } from '@/features/workspace/common/components/DataBlockExportDialog';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import {
   releaseToolbarOwner,
   setActiveToolbarOwner,
@@ -67,6 +69,7 @@ interface CustomNodeUiState {
   isHovered: boolean;
   isToolbarHovered: boolean;
   showDeleteConfirm: boolean;
+  showExportDialog: boolean;
 }
 
 type CustomNodeUiAction =
@@ -80,7 +83,9 @@ type CustomNodeUiAction =
   | { type: 'set-toolbar-hovered'; isToolbarHovered: boolean }
   | { type: 'hide-toolbar' }
   | { type: 'open-delete-confirm' }
-  | { type: 'set-delete-confirm'; showDeleteConfirm: boolean };
+  | { type: 'set-delete-confirm'; showDeleteConfirm: boolean }
+  | { type: 'open-export-dialog' }
+  | { type: 'set-export-dialog'; showExportDialog: boolean };
 
 const initialCustomNodeUiState: CustomNodeUiState = {
   showMenu: false,
@@ -92,6 +97,7 @@ const initialCustomNodeUiState: CustomNodeUiState = {
   isHovered: false,
   isToolbarHovered: false,
   showDeleteConfirm: false,
+  showExportDialog: false,
 };
 
 /**
@@ -139,6 +145,10 @@ function customNodeUiReducer(
       return { ...state, showMenu: false, showDeleteConfirm: true };
     case 'set-delete-confirm':
       return { ...state, showDeleteConfirm: action.showDeleteConfirm };
+    case 'open-export-dialog':
+      return { ...state, showMenu: false, showExportDialog: true };
+    case 'set-export-dialog':
+      return { ...state, showExportDialog: action.showExportDialog };
     default:
       return state;
   }
@@ -152,6 +162,7 @@ function customNodeUiReducer(
  */
 function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
   const { node, isFresh, onDelete, onRename, onCopy, onUndo, onRedo, onAddToSelection } = data;
+  const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   // Visual state is selection (React Flow ``selected``) plus an optional
   // per-node accent: a valid ``node.color`` paints a coloured left spine on the
   // card (see ``accentBorderStyle``) without tinting the header/body, so the
@@ -168,6 +179,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     isHovered,
     isToolbarHovered,
     showDeleteConfirm,
+    showExportDialog,
   } = uiState;
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +315,12 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     onCopy(node.id);
   };
 
+  /** Opens single-Data-Block export from the settings menu. */
+  const handleExportClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    dispatchUi({ type: 'open-export-dialog' });
+  };
+
   /** Undoes the Data Block's latest session edit from the settings menu. */
   const handleUndo = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -338,7 +356,10 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   // highlighting its owner removes any ambiguity about which node a floating
   // menu belongs to when nodes sit close together.
   const isToolbarActive =
-    showMenu || showDeleteConfirm || ((isHovered || isToolbarHovered) && activeToolbarId === id);
+    showMenu ||
+    showDeleteConfirm ||
+    showExportDialog ||
+    ((isHovered || isToolbarHovered) && activeToolbarId === id);
 
   // Visual treatment: selected nodes get a primary border + ring; all
   // others use the flat default card look. ``node.color`` (when set) is layered
@@ -414,6 +435,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         }}
         onRenameClick={handleRenameClick}
         onCopyNode={handleCopyNode}
+        onExportClick={handleExportClick}
         canUndo={node.canUndo}
         canRedo={node.canRedo}
         onUndo={handleUndo}
@@ -462,6 +484,18 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+
+  const exportDialog = (
+    <DataBlockExportDialog
+      open={showExportDialog}
+      onOpenChange={(open) => {
+        dispatchUi({ type: 'set-export-dialog', showExportDialog: open });
+      }}
+      workspaceId={currentWorkspaceId ?? ''}
+      workspaceName={currentWorkspace?.name ?? ''}
+      dataBlock={{ id: node.id, name: node.name }}
+    />
   );
 
   // Red "new" dot for nodes that appeared mid-session and haven't been
@@ -540,6 +574,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
           className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
         />
         {deleteDialog}
+        {exportDialog}
       </div>
     );
   }
@@ -634,6 +669,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       />
       {nodeToolbar}
       {deleteDialog}
+      {exportDialog}
     </div>
   );
 }

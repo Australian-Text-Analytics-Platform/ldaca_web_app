@@ -13,6 +13,7 @@ interface CustomNodeActionMenuProps {
   onMenuChange: (showMenu: boolean, placement: NodeMenuPlacement | null) => void;
   onRenameClick: (event: React.MouseEvent) => void;
   onCopyNode: (event: React.MouseEvent) => void;
+  onExportClick: (event: React.MouseEvent) => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: (event: React.MouseEvent) => void;
@@ -34,6 +35,7 @@ export function CustomNodeActionMenu({
   onMenuChange,
   onRenameClick,
   onCopyNode,
+  onExportClick,
   canUndo,
   canRedo,
   onUndo,
@@ -82,6 +84,14 @@ export function CustomNodeActionMenu({
             className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
           >
             Clone
+          </button>
+
+          <button
+            type="button"
+            onClick={onExportClick}
+            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
+          >
+            Export
           </button>
 
           <button
