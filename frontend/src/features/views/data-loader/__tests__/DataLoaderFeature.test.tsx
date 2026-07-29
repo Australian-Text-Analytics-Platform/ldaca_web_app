@@ -1,13 +1,14 @@
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import DataLoaderFeature from '../DataLoaderFeature';
+import React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { listFeaturedDataPortalCollections } from '@/api';
 import { WorkspaceDownloadsProvider } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsProvider';
+import DataLoaderFeature from '../DataLoaderFeature';
 
 const {
+  mockCreateWorkspace,
   mockSetCurrentWorkspace,
   mockUpdateWorkspaceDescription,
   mockHandleUploadFile,
@@ -18,6 +19,7 @@ const {
   mockListFeaturedDataPortalCollections,
   mockRequestContextualHint,
 } = vi.hoisted(() => ({
+  mockCreateWorkspace: vi.fn(),
   mockSetCurrentWorkspace: vi.fn(),
   mockUpdateWorkspaceDescription: vi.fn(),
   mockHandleUploadFile: vi.fn(),
@@ -75,7 +77,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   // Exposes only the workspace actions that this feature test asserts, while
   // keeping unrelated mutations inert.
   useWorkspaceActions: () => ({
-    createWorkspace: vi.fn(),
+    createWorkspace: mockCreateWorkspace,
     renameWorkspace: vi.fn(),
     updateWorkspaceDescription: mockUpdateWorkspaceDescription,
     saveWorkspace: vi.fn(),
@@ -227,6 +229,7 @@ describe('DataLoaderFeature citation UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockCreateWorkspace.mockResolvedValue({ id: 'ws-new' });
     mockHandleUploadFile.mockResolvedValue(true);
     mockRawFile.mockResolvedValue({ data: '# ADO Citation\n\nReference text.', error: undefined });
     mockCreateFolder.mockResolvedValue({
@@ -536,7 +539,8 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.getByText('Initial workspace description')).toBeInTheDocument();
   });
 
-  it('shows only the create workspace form when no workspace is loaded', () => {
+  it('creates and loads a workspace when no workspace is active', async () => {
+    const user = userEvent.setup();
     mockWorkspaceState = {
       workspaces: [
         {
@@ -571,6 +575,21 @@ describe('DataLoaderFeature citation UI', () => {
     expect(
       within(createWorkspaceCard).queryByLabelText('Workspace description'),
     ).not.toBeInTheDocument();
+
+    await user.type(
+      within(createWorkspaceCard).getByPlaceholderText('Workspace name'),
+      'New Workspace',
+    );
+    await user.click(
+      within(createWorkspaceCard).getByRole('button', {
+        name: /create workspace/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockCreateWorkspace).toHaveBeenCalledWith('New Workspace', undefined);
+      expect(mockSetCurrentWorkspace).toHaveBeenCalledWith('ws-new');
+    });
   });
 
   it('allows selecting multiple files from the upload picker', async () => {

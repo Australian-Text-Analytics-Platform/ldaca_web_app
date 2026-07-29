@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import type { WorkspaceSummary } from '@/api';
 import { importWorkspaceArchive } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
 import { queryKeys } from '@/lib/queryKeys';
-import type { WorkspaceSummary } from '@/api';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -45,12 +45,28 @@ export function useDataLoaderWorkspaceActions({
    * Creates a workspace from the card form and reports validation errors back
    * through the dialog state the Data Loader owns.
    * Passed to `ActiveWorkspaceCard` as `onCreate`.
-   * Flow: reject empty names, call the workspace action, surface invalid-name errors inline, and notify success or failure.
+   * Flow: reject empty names, create the workspace, load it when no workspace
+   * is already active, surface invalid-name errors inline, and notify success
+   * or failure.
    */
   const handleCreateWorkspace = async (name: string, description: string): Promise<boolean> => {
     if (!name) return false;
     try {
-      await workspaceActions.createWorkspace(name, description || undefined);
+      const workspace = await workspaceActions.createWorkspace(name, description || undefined);
+      if (!hasWorkspaceSelected) {
+        try {
+          await workspaceActions.setCurrentWorkspace(workspace.id);
+        } catch (error) {
+          const message = (error as Error).message;
+          notify(
+            'error',
+            message
+              ? `Workspace "${name}" was created, but could not be loaded: ${message}`
+              : `Workspace "${name}" was created, but could not be loaded.`,
+          );
+          return true;
+        }
+      }
       notify('success', `Workspace "${name}" created.`);
       return true;
     } catch (error) {
