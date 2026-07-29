@@ -168,9 +168,9 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             release-assets/windows/*.msi \
             release-assets/windows/*.msi.sig \
-            release-assets/macos/*.dmg \
-            release-assets/macos/*.app.tar.gz \
-            release-assets/macos/*.app.tar.gz.sig \
+            release-assets/macos/dmg/*.dmg \
+            release-assets/macos/updater/*.app.tar.gz \
+            release-assets/macos/updater/*.app.tar.gz.sig \
             release-assets/latest.json \
             --repo "$GITHUB_REPOSITORY"
           gh release edit "$RELEASE_TAG" --latest --repo "$GITHUB_REPOSITORY"
