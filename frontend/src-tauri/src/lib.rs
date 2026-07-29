@@ -12,7 +12,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use backend_process::{BackendProcess, ReadyBackend};
 use runtime::BackendRuntime;
-use tauri::{Manager, State};
+use tauri::menu::{Menu, MenuItemBuilder};
+#[cfg(not(target_os = "macos"))]
+use tauri::menu::{PredefinedMenuItem, HELP_SUBMENU_ID};
+use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 /// Tauri-owned application state for the local backend lifecycle.
@@ -86,6 +89,55 @@ pub(crate) fn ready_backend_url(state: &BackendState) -> Result<String, String> 
 
 fn boxed_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
     Box::new(io::Error::other(message.into()))
+}
+
+const CHECK_FOR_UPDATES_MENU_ID: &str = "check-for-updates";
+const CHECK_FOR_UPDATES_EVENT: &str = "desktop-update-check-requested";
+const DESKTOP_UPDATER_WINDOW_LABEL: &str = "desktop-updater";
+
+fn install_application_menu(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let menu = Menu::default(app)?;
+    let check_for_updates =
+        MenuItemBuilder::with_id(CHECK_FOR_UPDATES_MENU_ID, "Check for Updates…").build(app)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let application_menu = menu
+            .items()?
+            .into_iter()
+            .next()
+            .and_then(|item| item.as_submenu().cloned())
+            .ok_or_else(|| boxed_error("Default macOS application menu not found"))?;
+        application_menu.insert(&check_for_updates, 1)?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let help_menu = menu
+            .get(HELP_SUBMENU_ID)
+            .and_then(|item| item.as_submenu().cloned())
+            .ok_or_else(|| boxed_error("Default Help menu not found"))?;
+        let separator = PredefinedMenuItem::separator(app)?;
+        help_menu.prepend_items(&[&check_for_updates, &separator])?;
+    }
+
+    app.set_menu(menu)?;
+    Ok(())
+}
+
+fn create_desktop_updater_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    WebviewWindowBuilder::new(
+        app,
+        DESKTOP_UPDATER_WINDOW_LABEL,
+        WebviewUrl::App("index.html?desktop-updater=1".into()),
+    )
+    .title("LDaCA Wordflow Update")
+    .inner_size(520.0, 420.0)
+    .resizable(false)
+    .center()
+    .visible(false)
+    .build()?;
+    Ok(())
 }
 
 fn startup_file(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -342,6 +394,22 @@ pub fn run() {
             download::download_to_downloads
         ])
         .setup(|app| {
+            install_application_menu(app.handle())?;
+            create_desktop_updater_window(app.handle())?;
+            app.on_menu_event(|app_handle, event| {
+                if event.id() == CHECK_FOR_UPDATES_MENU_ID {
+                    if let Some(window) =
+                        app_handle.get_webview_window(DESKTOP_UPDATER_WINDOW_LABEL)
+                    {
+                        if let Err(error) = window.show().and_then(|()| window.set_focus()) {
+                            eprintln!("Failed to show the updater window: {error}");
+                        }
+                    }
+                    if let Err(error) = app_handle.emit(CHECK_FOR_UPDATES_EVENT, ()) {
+                        eprintln!("Failed to request an update check: {error}");
+                    }
+                }
+            });
             let window = app
                 .get_webview_window("main")
                 .ok_or_else(|| boxed_error("Main window not found"))?;
@@ -422,6 +490,14 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == DESKTOP_UPDATER_WINDOW_LABEL {
+                    api.prevent_close();
+                    if let Err(error) = window.hide() {
+                        eprintln!("Failed to hide updater window: {error}");
+                    }
+                    return;
+                }
+
                 let state: State<'_, BackendState> = window.state();
                 if state.closing.swap(true, Ordering::AcqRel) {
                     return;

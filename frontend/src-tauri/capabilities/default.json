@@ -1,7 +1,7 @@
 {
   "identifier": "default",
   "description": "Default permissions for the LDaCA Text Analytics app",
-  "windows": ["main"],
+  "windows": ["main", "desktop-updater"],
   "permissions": [
     "core:default",
     "opener:default",

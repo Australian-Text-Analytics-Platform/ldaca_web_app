@@ -9,14 +9,9 @@ import { LAG_HINT_DELAY_MS } from '@/config/timings';
 import { loadRemoteRegistry } from '@/tutorials/remoteRegistry';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 import { GlobalHosts } from '@/components/layout/GlobalHosts';
-import { DesktopUpdaterProvider } from '@/features/desktop-updater/DesktopUpdaterProvider';
 
 function App() {
-  return (
-    <DesktopUpdaterProvider>
-      <AppContent />
-    </DesktopUpdaterProvider>
-  );
+  return <AppContent />;
 }
 
 function AppContent() {

@@ -103,6 +103,8 @@ exclusively to the new key.
 For each published version, verify the GitHub Release contains `latest.json`,
 the MSI and signature, the Apple Silicon updater archive and signature, and the
 notarized DMG. Open the quarantined DMG on a clean Mac, confirm Gatekeeper
-acceptance, then exercise both automatic startup checking and the manual
-Settings check from an older signed build. Installation must verify, relaunch,
-and report the new version.
+acceptance, then confirm an older signed build discovers the release at startup
+and opens the separate native updater window. Verify a current build opens no
+window at startup. Dismiss the updater, choose **Check for Updates…** from the
+native application menu, and confirm the same native window finds the release.
+Installation must verify, relaunch, and report the new version.

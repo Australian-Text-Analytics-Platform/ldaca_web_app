@@ -18,6 +18,7 @@ describe('desktop configuration contracts', () => {
 
   it('makes both shared desktop build branches use runtime preparation', () => {
     const workflow = read('.github/workflows/desktop-build.yml');
+    const packageJson = JSON.parse(read('frontend/package.json'));
 
     expect(workflow).toContain("inputs.platform == 'windows'");
     expect(workflow).toContain("inputs.platform == 'macos'");
@@ -26,6 +27,12 @@ describe('desktop configuration contracts', () => {
     expect(workflow).not.toContain('pnpm stage:backend-runtime');
     expect(workflow).not.toContain('build-notes');
     expect(workflow).not.toContain('UV_NO_SOURCES');
+    expect(packageJson.scripts['desktop:build:mac']).toContain(
+      'pnpm clean:desktop:mac-bundles',
+    );
+    expect(packageJson.scripts['desktop:build:mac']).toContain(
+      '--target aarch64-apple-darwin',
+    );
   });
 
   it('builds signed updater artifacts and delegates publication to the release workflow', () => {
@@ -56,6 +63,10 @@ describe('desktop configuration contracts', () => {
     const capability = JSON.parse(read('frontend/src-tauri/capabilities/default.json'));
     const cargo = read('frontend/src-tauri/Cargo.toml');
     const packageJson = JSON.parse(read('frontend/package.json'));
+    const desktopShell = read('frontend/src-tauri/src/lib.rs');
+    const updaterRuntime = read(
+      'frontend/src/features/desktop-updater/desktopUpdaterRuntime.ts',
+    );
 
     expect(tauri.bundle.createUpdaterArtifacts).toBe(true);
     expect(tauri.plugins.updater.endpoints).toEqual([
@@ -67,6 +78,17 @@ describe('desktop configuration contracts', () => {
     expect(cargo).toContain('tauri-plugin-process = "2"');
     expect(packageJson.dependencies).toHaveProperty('@tauri-apps/plugin-updater');
     expect(packageJson.dependencies).toHaveProperty('@tauri-apps/plugin-process');
+    expect(capability.windows).toContain('desktop-updater');
+    expect(desktopShell).toContain('Check for Updates…');
+    expect(desktopShell).toContain('desktop-update-check-requested');
+    expect(desktopShell).toContain('WebviewUrl::App("index.html?desktop-updater=1".into())');
+    expect(desktopShell).toContain('window.label() == DESKTOP_UPDATER_WINDOW_LABEL');
+    expect(updaterRuntime).toContain('check({ timeout: UPDATE_CHECK_TIMEOUT_MS })');
+    expect(
+      existsSync(
+        resolve(repoRoot, 'frontend/src/features/desktop-updater/DesktopUpdaterProvider.tsx'),
+      ),
+    ).toBe(false);
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-context-docs.yml'))).toBe(false);
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-docs-drift.yml'))).toBe(false);
   });

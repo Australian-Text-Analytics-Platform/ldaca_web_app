@@ -1,11 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import { RouterProvider } from '@tanstack/react-router';
-import { router } from './router';
-import { initSentry } from './lib/sentry';
-
-void initSentry();
 
 // Silence the harmless "ResizeObserver loop completed with undelivered
 // notifications" message before any module-level code (and Vite's HMR
@@ -31,9 +26,28 @@ const container = document.getElementById('root');
 if (!container) {
   throw new Error('Root container #root not found');
 }
-const root = createRoot(container);
-root.render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>,
-);
+
+async function renderApplication(rootContainer: HTMLElement) {
+  const isUpdaterWindow = new URLSearchParams(window.location.search).has('desktop-updater');
+  if (isUpdaterWindow) {
+    const { DesktopUpdaterWindow } = await import(
+      './features/desktop-updater/DesktopUpdaterWindow'
+    );
+    createRoot(rootContainer).render(<DesktopUpdaterWindow />);
+    return;
+  }
+
+  const [{ RouterProvider }, { router }, { initSentry }] = await Promise.all([
+    import('@tanstack/react-router'),
+    import('./router'),
+    import('./lib/sentry'),
+  ]);
+  void initSentry();
+  createRoot(rootContainer).render(
+    <React.StrictMode>
+      <RouterProvider router={router} />
+    </React.StrictMode>,
+  );
+}
+
+void renderApplication(container);
