@@ -38,8 +38,8 @@ describe('AnnotationPromptInput', () => {
   it('uses a batch-oriented default instruction without overriding the JSON contract', () => {
     expect(DEFAULT_ANNOTATION_PROMPT).toBe(
       'You are an expert text annotator. You will be given one or more texts and a list of ' +
-        'candidate classes, each with a short description. Read each text carefully and assign ' +
-        'exactly one class that best fits its meaning.',
+        'candidate codes, each with a short description. Read each text carefully and assign ' +
+        'exactly one code that best fits its meaning.',
     );
   });
 

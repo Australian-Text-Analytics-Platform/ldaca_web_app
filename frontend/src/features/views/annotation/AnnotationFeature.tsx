@@ -111,7 +111,7 @@ const derivedDataBlockName = (sourceName: string, suffix: string): string =>
  * Small select used for Annotation-specific companion columns next to the
  * shared NodeInputsPanel column picker.
  *
- * Used by: AnnotationFeature's source and class-description selectors because
+ * Used by: AnnotationFeature's source and Codebook selectors because
  * each selected node needs one extra column choice while the primary column
  * remains owned by NodeInputsPanel.
  */
@@ -146,14 +146,14 @@ function AnnotationColumnPicker({
 
 /**
  * Annotation setup panel. This redesign slice exposes source node/column
- * selection plus a class-description setup card with an inline editable table.
+ * selection plus a Codebook setup card with an inline editable table.
  *
  * Rendered by: the viewComponents tabbed loader through AnalysisTabsHost so
  * Annotation shares the same workflow shell as other analysis-style views.
  *
  * Flow: bind both selectors to named input sets on the active tab, render
  * Annotation-specific companion column pickers, create/select a backend
- * class-description node when requested, and load/save editable class rows.
+ * Codebook Data Block when requested, and load/save editable code rows.
  */
 function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   const {
@@ -384,7 +384,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       ? (descriptionColumns[classDescriptionNode.id] ??
         resolveDescriptionColumn(classDescriptionColumns, classDescriptionClassColumn))
       : null;
-  // Reuse the editor's class-description query for AI Preview gating. The hook
+  // Reuse the editor's Codebook query for AI Preview gating. The hook
   // owns the disabled key/fetcher/normalization, so this parent only decides
   // whether there is at least one non-empty class name to predict into.
   const classDescriptions = useAnnotationClassDescriptions({
@@ -552,19 +552,17 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       const created = await createSqlDataBlock(
         [sourceNode.id],
         `SELECT CAST(${sourceColumn} AS VARCHAR) AS ${sqlIdentifier('class')}, CAST(${sourceColumn} AS VARCHAR) AS ${sqlIdentifier('description')} FROM ${sqlTable(sourceNode.id)} LIMIT 0`,
-        derivedDataBlockName(sourceNode.name, 'annotation_classes'),
+        derivedDataBlockName(sourceNode.name, 'codebook'),
       );
       onTabInputSetChange(
         CLASS_DESCRIPTION_SELECTOR_ID,
         nodeInputsFromSelections([{ nodeId: created.id, column: 'class' }]),
       );
       setDescriptionColumns((current) => ({ ...current, [created.id]: 'description' }));
-      toast.success('Created an empty class-description Data Block.');
+      toast.success('Created an empty Codebook Data Block.');
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : 'Could not create the class-description Data Block.',
+        error instanceof Error ? error.message : 'Could not create the Codebook Data Block.',
       );
     } finally {
       setIsCreatingClassTable(false);
@@ -926,11 +924,11 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 </section>
 
                 <section
-                  aria-label="Class Description Setup"
+                  aria-label="Codebook Setup"
                   className="rounded-lg border bg-background/60 p-4"
                 >
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <h3 className="text-base font-semibold">Class Descriptions</h3>
+                    <h3 className="text-base font-semibold">Codebook</h3>
                     <Button
                       type="button"
                       variant="outline"
@@ -945,7 +943,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                   </div>
                   <div>
                     <NodeInputsPanel
-                      title="Class Description Node"
+                      title="Codebook Data Block"
                       resolvedNodes={classNodeInputs.resolvedNodes}
                       availableNodes={classNodeInputs.availableNodes}
                       canAddMore={classNodeInputs.canAddMore}
@@ -955,7 +953,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                       onRemoveNode={classNodeInputs.removeNode}
                       onClear={classNodeInputs.clear}
                       onColumnChange={classNodeInputs.setColumn}
-                      columnLabel="Class Column"
+                      columnLabel="Code Column"
                       disabled={controlsLocked}
                       renderColumnAddon={renderDescriptionColumnPicker}
                     />

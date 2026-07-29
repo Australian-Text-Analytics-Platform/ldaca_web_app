@@ -27,7 +27,7 @@ describe('useAnnotationClassDescriptions', () => {
     });
   });
 
-  it('loads and normalizes the selected class-description columns through Workspace SQL', async () => {
+  it('loads and normalizes the selected Codebook columns through Workspace SQL', async () => {
     const { result } = renderHook(
       () =>
         useAnnotationClassDescriptions({

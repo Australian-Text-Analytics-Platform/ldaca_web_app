@@ -294,15 +294,13 @@ describe('AnnotationFeature', () => {
     expect(screen.getByRole('heading', { name: 'Annotation Data Block', level: 3 })).toHaveClass(
       'mb-3',
     );
-    expect(
-      screen.getByRole('heading', { name: 'Class Descriptions', level: 3 }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Codebook', level: 3 })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Create New' }));
 
     expect(mocks.createSqlDataBlock).toHaveBeenCalledWith(
       ['source-1'],
       'SELECT CAST("text" AS VARCHAR) AS "class", CAST("text" AS VARCHAR) AS "description" FROM "source-1" LIMIT 0',
-      'Source_annotation_classes',
+      'Source_codebook',
     );
     expect(mocks.setInputSet).toHaveBeenCalledWith('classDescriptions', [
       { node_id: 'class-node-1', column: 'class' },

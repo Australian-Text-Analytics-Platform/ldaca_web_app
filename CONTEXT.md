@@ -225,6 +225,12 @@ An optional Annotation input whose nonblank text and label pairs are supplied
 as verbatim examples to Preview and Run All.
 _Avoid_: training data, cached prompt
 
+**Codebook**:
+An Annotation Data Block containing a code column and a description column.
+Each row defines one candidate code and its meaning for Manual Annotation, AI
+Preview, and Run All.
+_Avoid_: class descriptions, class-description node
+
 **User Correction Column**:
 A string column selected in an Annotation Tab's parameter panel. The Tab keeps
 the editable draft, each submitted Analysis captures the exact column, and

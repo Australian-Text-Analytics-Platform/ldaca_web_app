@@ -37,7 +37,7 @@ interface AnnotationClassDescriptionsEditorProps {
 /**
  * Compact class summary plus an Edit dialog for the selected Annotation class node.
  *
- * Used by: AnnotationFeature's class-description card because users need to see
+ * Used by: AnnotationFeature's Codebook card because users need to see
  * the configured classes at a glance and edit them (add/rename/delete) before
  * running annotation, without the descriptions cluttering the card.
  *
@@ -107,12 +107,12 @@ export function AnnotationClassDescriptionsEditor({
       description: row.description,
     }));
     if (normalized.some((row) => row.class.length === 0)) {
-      toast.error('Every annotation class needs a name.');
+      toast.error('Every annotation code needs a name.');
       return;
     }
     const uniqueNames = new Set(normalized.map((row) => row.class.toLocaleLowerCase()));
     if (uniqueNames.size !== normalized.length) {
-      toast.error('Annotation class names must be unique.');
+      toast.error('Annotation code names must be unique.');
       return;
     }
     setIsSaving(true);
@@ -120,9 +120,9 @@ export function AnnotationClassDescriptionsEditor({
       await saveAnnotationClasses(nodeId, classColumn, descriptionColumn, normalized);
       setIsEditOpen(false);
       setDraftRows(null);
-      toast.success('Annotation classes saved.');
+      toast.success('Codebook saved.');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not save annotation classes.');
+      toast.error(error instanceof Error ? error.message : 'Could not save the codebook.');
     } finally {
       setIsSaving(false);
     }
@@ -131,7 +131,7 @@ export function AnnotationClassDescriptionsEditor({
   if (!nodeId) {
     return (
       <div className="mt-4 rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-        Select a class-description node to edit classes.
+        Select a Codebook Data Block to edit codes.
       </div>
     );
   }
@@ -139,7 +139,7 @@ export function AnnotationClassDescriptionsEditor({
   if (classDescriptions.query.isError) {
     return (
       <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-        Could not load class descriptions.
+        Could not load the codebook.
       </div>
     );
   }
@@ -147,7 +147,7 @@ export function AnnotationClassDescriptionsEditor({
   return (
     <div className="mt-3 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-sm font-semibold">Classes</h3>
+        <h3 className="text-sm font-semibold">Codes</h3>
         <Dialog open={isEditOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button
@@ -170,23 +170,23 @@ export function AnnotationClassDescriptionsEditor({
             }}
           >
             <DialogHeader>
-              <DialogTitle>Edit classes</DialogTitle>
+              <DialogTitle>Edit codebook</DialogTitle>
               <DialogDescription>
-                Add, rename, or remove annotation classes and their descriptions.
+                Add, rename, or remove annotation codes and their descriptions.
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
               {editorRows.length === 0 ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                  No classes yet. Use “Add class” to create one.
+                  No codes yet. Use “Add code” to create one.
                 </p>
               ) : (
                 editorRows.map((row, index) => (
                   <div key={index} className="flex items-start gap-2">
                     <Input
-                      aria-label={`Class ${String(index + 1)}`}
+                      aria-label={`Code ${String(index + 1)}`}
                       value={row.class}
-                      placeholder="Class"
+                      placeholder="Code"
                       className="w-1/3"
                       disabled={false}
                       onChange={(event) => {
@@ -208,7 +208,7 @@ export function AnnotationClassDescriptionsEditor({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      aria-label={`Delete class ${String(index + 1)}`}
+                      aria-label={`Delete code ${String(index + 1)}`}
                       className="shrink-0 text-muted-foreground hover:text-destructive"
                       onClick={() => {
                         handleDeleteClass(index);
@@ -229,7 +229,7 @@ export function AnnotationClassDescriptionsEditor({
                 onClick={handleAddClass}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Add class
+                Add code
               </Button>
               <div className="flex items-center gap-2">
                 <DialogClose asChild>
@@ -256,11 +256,11 @@ export function AnnotationClassDescriptionsEditor({
 
       {classDescriptions.query.isLoading ? (
         <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-          Loading class descriptions...
+          Loading codebook...
         </div>
       ) : classChips.length === 0 ? (
         <div className="rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-          No classes yet.
+          No codes yet.
         </div>
       ) : (
         <TooltipProvider delayDuration={120} skipDelayDuration={0}>

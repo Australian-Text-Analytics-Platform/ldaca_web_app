@@ -97,7 +97,7 @@ the per-user content-addressed cache.
 ## Annotation
 
 Manual Annotation is not an Analysis. Creating an annotation column, choosing a
-label, and saving class descriptions are ordinary Data Block Edits. Its
+code, and saving a Codebook are ordinary Data Block Edits. Its
 **Compare To** selection is shared with Preview and Review for the same Data
 Block. Each selected comparison column is projected into the table with its
 selected reliability score in the header and exact confusion-matrix counts

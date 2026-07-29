@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 const DISABLED_CLASS_DESCRIPTIONS_QUERY_KEY = [
   'workspaces',
   'annotation',
-  'class-descriptions',
+  'codebook',
   'disabled',
 ] as const;
 
@@ -32,12 +32,12 @@ const jsonValueToText = (value: unknown): string => {
 };
 
 /**
- * Shared class-description query for Annotation setup, editing, and AI gating.
+ * Shared Codebook query for Annotation setup, editing, and AI gating.
  *
  * Used by: AnnotationFeature to count valid AI classes and
- * AnnotationClassDescriptionsEditor to render/edit the same class-description
- * node. Flow: build one stable enabled/disabled query key, fetch the selected
- * two-column class-description node when all selectors are present, and expose
+ * AnnotationClassDescriptionsEditor to render/edit the same Codebook Data
+ * Block. Flow: build one stable enabled/disabled query key, fetch the selected
+ * two-column Codebook when all selectors are present, and expose
  * normalized rows so callers never branch on missing class/description fields.
  */
 export function useAnnotationClassDescriptions({
@@ -66,7 +66,7 @@ export function useAnnotationClassDescriptions({
     enabled: canLoad,
     queryFn: async ({ signal }) => {
       if (!workspaceId || !nodeId || !classColumn || !descriptionColumn) {
-        throw new Error('Missing class-description selection');
+        throw new Error('Missing Codebook selection');
       }
       const rows: Record<string, unknown>[] = [];
       let page = 1;
