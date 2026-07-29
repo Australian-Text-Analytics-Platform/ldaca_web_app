@@ -221,6 +221,25 @@ export function useAnnotationTabSettings({
     onTabSettingChange('annotationTargets', JSON.stringify(next));
   };
 
+  const [annotationDifferenceFilterColumns, setAnnotationDifferenceFilterColumnsState] = useState<
+    Record<string, string[]>
+  >(() =>
+    parseStringArrayMapSetting(
+      tabSettings.annotationDifferenceFilterColumns,
+      '[annotation] Ignoring malformed difference-filter-column setting:',
+    ),
+  );
+  const annotationDifferenceFilterColumnsRef = useRef(annotationDifferenceFilterColumns);
+  const setAnnotationDifferenceFilterColumns = (nodeId: string, columns: string[]) => {
+    const next = { ...annotationDifferenceFilterColumnsRef.current };
+    const uniqueColumns = Array.from(new Set(columns));
+    if (uniqueColumns.length > 0) next[nodeId] = uniqueColumns;
+    else Reflect.deleteProperty(next, nodeId);
+    annotationDifferenceFilterColumnsRef.current = next;
+    setAnnotationDifferenceFilterColumnsState(next);
+    onTabSettingChange('annotationDifferenceFilterColumns', JSON.stringify(next));
+  };
+
   const [annotationComparisonColumns, setAnnotationComparisonColumnsState] = useState<
     Record<string, string[]>
   >(() =>
@@ -238,6 +257,11 @@ export function useAnnotationTabSettings({
     annotationComparisonColumnsRef.current = next;
     setAnnotationComparisonColumnsState(next);
     onTabSettingChange('annotationComparisonColumns', JSON.stringify(next));
+    const activeFilters = annotationDifferenceFilterColumnsRef.current[nodeId] ?? [];
+    const retainedFilters = activeFilters.filter((column) => uniqueColumns.includes(column));
+    if (retainedFilters.length !== activeFilters.length) {
+      setAnnotationDifferenceFilterColumns(nodeId, retainedFilters);
+    }
   };
 
   const [annotationReliabilityMetrics, setAnnotationReliabilityMetricsState] = useState<
@@ -324,6 +348,8 @@ export function useAnnotationTabSettings({
     setAiReasoningEffort,
     annotationTargets,
     setAnnotationTarget,
+    annotationDifferenceFilterColumns,
+    setAnnotationDifferenceFilterColumns,
     annotationComparisonColumns,
     setAnnotationComparisonColumns,
     annotationReliabilityMetrics,

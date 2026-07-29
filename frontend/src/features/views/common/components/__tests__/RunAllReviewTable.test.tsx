@@ -24,12 +24,15 @@ function ReviewTable({
   | 'reliabilityMetric'
   | 'onReliabilityMetricChange'
   | 'correction'
+  | 'differenceFilterColumns'
+  | 'onDifferenceFilterColumnsChange'
 > & { correctionColumn?: string }) {
   const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
   const [correctionVisible, setCorrectionVisible] = useState(true);
   const [reliabilityMetric, setReliabilityMetric] =
     useState<IntercoderReliabilityMetric>('cohens_kappa');
+  const [differenceFilterColumns, setDifferenceFilterColumns] = useState<string[]>([]);
   return (
     <RunAllReviewTable
       {...props}
@@ -39,6 +42,8 @@ function ReviewTable({
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
+      differenceFilterColumns={differenceFilterColumns}
+      onDifferenceFilterColumnsChange={setDifferenceFilterColumns}
       correction={
         correctionColumn
           ? {
@@ -70,7 +75,9 @@ describe('RunAllReviewTable', () => {
       >
         <ReviewTable
           workspaceId="workspace-1"
-          nodeIds={['node-1']}
+          nodeId="node-1"
+          sourceColumns={['text', 'annotation']}
+          sourceColor="#2563eb"
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation']}
@@ -113,7 +120,9 @@ describe('RunAllReviewTable', () => {
       >
         <ReviewTable
           workspaceId="workspace-1"
-          nodeIds={['node-1']}
+          nodeId="node-1"
+          sourceColumns={['text', 'annotation']}
+          sourceColor="#2563eb"
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation']}
@@ -153,7 +162,9 @@ describe('RunAllReviewTable', () => {
       >
         <ReviewTable
           workspaceId="workspace-1"
-          nodeIds={['node-1']}
+          nodeId="node-1"
+          sourceColumns={['text', 'annotation', 'username']}
+          sourceColor="#2563eb"
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation']}
@@ -195,7 +206,9 @@ describe('RunAllReviewTable', () => {
       >
         <ReviewTable
           workspaceId="workspace-1"
-          nodeIds={['node-1']}
+          nodeId="node-1"
+          sourceColumns={['text', 'annotation', 'correction', 'username']}
+          sourceColor="#2563eb"
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation', 'correction']}
@@ -269,7 +282,16 @@ describe('RunAllReviewTable', () => {
       >
         <ReviewTable
           workspaceId="workspace-1"
-          nodeIds={['node-1']}
+          nodeId="node-1"
+          sourceColumns={[
+            'text',
+            'annotation',
+            'correction',
+            'reviewer_one',
+            'reviewer_two',
+            'record_id',
+          ]}
+          sourceColor="#2563eb"
           sql={'SELECT * FROM "node-1"'}
           title="Annotation"
           requiredColumns={['text', 'annotation', 'correction']}
@@ -308,8 +330,17 @@ describe('RunAllReviewTable', () => {
     expect(within(headers[3]).getByText('reviewer_one')).toBeInTheDocument();
     expect(within(headers[4]).getByText('reviewer_two')).toBeInTheDocument();
     expect(
+      within(headers[3]).getByRole('button', { name: 'Filter difference for reviewer_one' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+    expect(
       within(reviewTable).getByRole('row', { name: 'Example covid job job other' }),
     ).toBeInTheDocument();
+    const resultCells = within(
+      within(reviewTable).getByRole('row', { name: 'Example covid job job other' }),
+    ).getAllByRole('cell');
+    expect(resultCells[1]).toHaveAttribute('style', expect.stringContaining('background-color'));
+    expect(resultCells[3]).toHaveAttribute('style', expect.stringContaining('background-color'));
+    expect(resultCells[4]).toHaveAttribute('style', expect.stringContaining('background-color'));
     expect(queryWorkspaceSqlTable).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({ page: 1, page_size: 500 }),

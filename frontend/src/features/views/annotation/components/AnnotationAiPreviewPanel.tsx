@@ -31,6 +31,8 @@ import { PaginatedTableProcessingRow } from '@/features/views/common/components/
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { toBgColor } from '@/features/views/common/vizPalette';
+import { annotationValuesDiffer } from '../annotationDifferenceQuery';
 import type { AnnotationAiPreview, AnnotationPreviewRow } from '../hooks/useAnnotationAiPreview';
 
 const NO_CORRECTION_VALUE = '__no_correction__';
@@ -45,6 +47,7 @@ const cellText = (value: unknown): string => {
 
 interface AnnotationAiPreviewPanelProps {
   preview: AnnotationAiPreview;
+  sourceColor: string;
   comparison: {
     columns: string[];
     onColumnsChange: (columns: string[]) => void;
@@ -76,6 +79,7 @@ interface AnnotationAiPreviewPanelProps {
  */
 export function AnnotationAiPreviewPanel({
   preview,
+  sourceColor,
   comparison,
   metadata,
   correction,
@@ -350,12 +354,23 @@ export function AnnotationAiPreviewPanel({
                   ? `${correction.column}:${String(rowPosition)}`
                   : '';
                 const correctionValue = selections[selectionKey] ?? seededCorrection;
+                const comparisonValue = (column: string): unknown => {
+                  if (column !== correction.column) return row[column];
+                  return correctionValue || null;
+                };
+                const predictionDiffers = activeComparisonColumns.some((column) =>
+                  annotationValuesDiffer(value || null, comparisonValue(column)),
+                );
+                const differenceColor = toBgColor(sourceColor);
                 return (
                   <TableRow key={rowPosition} className="align-top hover:bg-transparent">
                     <TableCell className="break-words whitespace-pre-wrap">
                       {cellText(row[columns.text])}
                     </TableCell>
-                    <TableCell className="w-px whitespace-nowrap">
+                    <TableCell
+                      className="w-px whitespace-nowrap"
+                      style={predictionDiffers ? { backgroundColor: differenceColor } : undefined}
+                    >
                       {predictions.query.isFetching ? (
                         <span role="status" aria-label="Predicting annotation">
                           <Loader2
@@ -390,7 +405,16 @@ export function AnnotationAiPreviewPanel({
                             className="mx-auto size-4 text-muted-foreground"
                           />
                         </TableCell>
-                        <TableCell className="w-px">
+                        <TableCell
+                          className="w-px"
+                          style={
+                            correction.column &&
+                            activeComparisonColumns.includes(correction.column) &&
+                            annotationValuesDiffer(value || null, correctionValue || null)
+                              ? { backgroundColor: differenceColor }
+                              : undefined
+                          }
+                        >
                           <Select
                             value={correctionValue || NO_CORRECTION_VALUE}
                             disabled={savingRows.has(selectionKey)}
@@ -421,11 +445,22 @@ export function AnnotationAiPreviewPanel({
                         </TableCell>
                       </>
                     ) : null}
-                    {displayedSupplementalColumns.map((column) => (
-                      <TableCell key={column} className="w-px whitespace-pre-wrap">
-                        {cellText(row[column]) || '—'}
-                      </TableCell>
-                    ))}
+                    {displayedSupplementalColumns.map((column) => {
+                      const comparisonDiffers =
+                        activeComparisonColumns.includes(column) &&
+                        annotationValuesDiffer(value || null, row[column]);
+                      return (
+                        <TableCell
+                          key={column}
+                          className="w-px whitespace-pre-wrap"
+                          style={
+                            comparisonDiffers ? { backgroundColor: differenceColor } : undefined
+                          }
+                        >
+                          {cellText(row[column]) || '—'}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 );
               })

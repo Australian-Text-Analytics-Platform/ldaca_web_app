@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
+import { toBgColor } from '@/features/views/common/vizPalette';
 import type { AnnotationAiPreview } from '../../hooks/useAnnotationAiPreview';
 import { AnnotationAiPreviewPanel } from '../AnnotationAiPreviewPanel';
 
@@ -99,6 +100,7 @@ function PreviewPanel({
   return (
     <AnnotationAiPreviewPanel
       preview={previewValue}
+      sourceColor="#2563eb"
       comparison={{
         columns: comparisonColumns,
         onColumnsChange: setComparisonColumns,
@@ -189,6 +191,13 @@ describe('AnnotationAiPreviewPanel', () => {
         name: 'Cohen’s Kappa 0.333 for annotation (preview) versus review',
       }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Filter difference/ })).not.toBeInTheDocument();
+    const secondRow = screen.getByRole('row', {
+      name: 'Second text new value previous correction',
+    });
+    const cells = within(secondRow).getAllByRole('cell');
+    expect(cells[1]).toHaveStyle({ backgroundColor: toBgColor('#2563eb') });
+    expect(cells[2]).toHaveStyle({ backgroundColor: toBgColor('#2563eb') });
     expect(
       screen.queryByRole('heading', { name: 'annotation (preview) vs review' }),
     ).not.toBeInTheDocument();

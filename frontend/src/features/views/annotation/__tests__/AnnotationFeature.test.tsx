@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   persistDocumentColumn: vi.fn(),
   setSourceColumn: vi.fn(),
   setExampleColumn: vi.fn(),
+  setNodeColor: vi.fn(),
+  ensureNodeColors: vi.fn(),
   exampleSelected: false,
   sourceColumnNames: ['text'] as string[],
 }));
@@ -35,6 +37,15 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
 
 vi.mock('@/features/views/common/hooks/usePersistNodeDocumentColumn', () => ({
   usePersistNodeDocumentColumn: () => mocks.persistDocumentColumn,
+}));
+
+vi.mock('@/features/views/common/hooks/useNodeColorControls', () => ({
+  useNodeColorControls: () => ({
+    defaultPalette: ['#2563eb'],
+    nodeColors: { 'source-1': '#2563eb' },
+    setNodeColor: mocks.setNodeColor,
+    ensureNodeColors: mocks.ensureNodeColors,
+  }),
 }));
 
 vi.mock('@/features/views/common/nodeInputs', async (importOriginal) => ({
@@ -80,6 +91,7 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
     resolvedNodes,
     renderColumnAddon,
     onColumnChange,
+    onNodeColorChange,
   }: {
     title: string;
     resolvedNodes: {
@@ -97,6 +109,7 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
       columns: string[];
     }) => ReactNode;
     onColumnChange: (nodeId: string, column: string) => void;
+    onNodeColorChange?: (nodeId: string, color: string) => void;
   }) => (
     <div>
       {title}
@@ -105,6 +118,11 @@ vi.mock('@/features/views/common/components/NodeInputsPanel', () => ({
           <button type="button" onClick={() => onColumnChange(resolved.id, 'body')}>
             Change {title} text column
           </button>
+          {onNodeColorChange ? (
+            <button type="button" onClick={() => onNodeColorChange(resolved.id, '#dc2626')}>
+              Change {title} color
+            </button>
+          ) : null}
           {renderColumnAddon?.({
             node: { id: resolved.id, name: resolved.name },
             nodeId: resolved.id,
@@ -199,11 +217,14 @@ describe('AnnotationFeature', () => {
     mocks.persistDocumentColumn.mockReset();
     mocks.setSourceColumn.mockReset();
     mocks.setExampleColumn.mockReset();
+    mocks.setNodeColor.mockReset();
+    mocks.ensureNodeColors.mockReset();
     mocks.exampleSelected = false;
     mocks.sourceColumnNames = ['text'];
     mocks.createSqlDataBlock.mockResolvedValue({ id: 'class-node-1' });
     mocks.polarsExpressionApply.mockResolvedValue(undefined);
     mocks.clearResults.mockResolvedValue(undefined);
+    mocks.ensureNodeColors.mockResolvedValue(undefined);
   });
 
   it('persists manual text-column choices for source and example Data Blocks', async () => {
@@ -384,7 +405,42 @@ describe('AnnotationFeature', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Resume' }));
+    expect(mocks.ensureNodeColors).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
+  });
+
+  it('previews the main Data Block color and aborts Manual Resume when persistence fails', async () => {
+    const user = userEvent.setup();
+    mocks.sourceColumnNames = ['text', 'annotation'];
+    mocks.ensureNodeColors.mockRejectedValue(new Error('color write failed'));
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: {
+            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
+          },
+          correctionColumns: {},
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Change Selected Data Blocks color' }));
+    expect(mocks.setNodeColor).toHaveBeenCalledWith('source-1', '#dc2626');
+    await user.click(screen.getByRole('button', { name: 'Resume' }));
+    await waitFor(() => expect(mocks.ensureNodeColors).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
   });
 
   it('keeps the dialog open rather than overwriting an existing column', async () => {

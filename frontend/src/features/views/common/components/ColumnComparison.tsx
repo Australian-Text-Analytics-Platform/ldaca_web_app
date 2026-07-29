@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ChevronDown } from 'lucide-react';
+import { ArrowDown, ArrowRight, ChevronDown, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +33,8 @@ interface ColumnComparisonHeaderProps {
   rows: ConfusionCount[] | undefined;
   isLoading: boolean;
   isError: boolean;
+  differenceFilterActive?: boolean;
+  onDifferenceFilterChange?: (active: boolean) => void;
 }
 
 /** Shows reliability beside a compared column and exact pair counts on hover or focus. */
@@ -44,6 +46,8 @@ export function ColumnComparisonHeader({
   rows,
   isLoading,
   isError,
+  differenceFilterActive = false,
+  onDifferenceFilterChange,
 }: ColumnComparisonHeaderProps) {
   const labels = Array.from(
     new Set((rows ?? []).flatMap((row) => [row.reference, row.comparison])),
@@ -155,6 +159,26 @@ export function ColumnComparisonHeader({
             )}
           </TooltipContent>
         </Tooltip>
+        {onDifferenceFilterChange ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={differenceFilterActive ? 'secondary' : 'outline'}
+                size="icon"
+                className="size-7"
+                aria-label={`Filter difference for ${comparisonColumn}`}
+                aria-pressed={differenceFilterActive}
+                onClick={() => {
+                  onDifferenceFilterChange(!differenceFilterActive);
+                }}
+              >
+                <Filter aria-hidden="true" className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Filter difference</TooltipContent>
+          </Tooltip>
+        ) : null}
       </TooltipProvider>
     </span>
   );

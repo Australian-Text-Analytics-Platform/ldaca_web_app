@@ -47,6 +47,8 @@ import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import AnalysisTaskBanner from '../common/components/AnalysisTaskBanner';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
+import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
+import { GREY } from '../common/vizPalette';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { acceptPlaceholderOnTab } from '../common/placeholderTabFill';
 import { getRerunActionState } from '../common/rerunActionState';
@@ -180,6 +182,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   const [isCreatingAnnotationColumn, setIsCreatingAnnotationColumn] = useState(false);
   const [isCreatingCorrectionColumn, setIsCreatingCorrectionColumn] = useState(false);
   const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
+  const [isStartingManualReview, setIsStartingManualReview] = useState(false);
   const [isCreatingClassTable, setIsCreatingClassTable] = useState(false);
   // Tab-persisted AI settings live in their own hook so this feature body can
   // focus on selector, run, and results orchestration. API keys stay behind the
@@ -212,6 +215,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAiReasoningEffort,
     annotationTargets,
     setAnnotationTarget,
+    annotationDifferenceFilterColumns,
+    setAnnotationDifferenceFilterColumns,
     annotationComparisonColumns,
     setAnnotationComparisonColumns,
     annotationReliabilityMetrics,
@@ -255,7 +260,11 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   );
   const { currentWorkspaceId } = useWorkspaceData();
   const queryClient = useQueryClient();
-  const { polarsExpressionApply, createSqlDataBlock } = useWorkspaceActions();
+  const {
+    polarsExpressionApply,
+    createSqlDataBlock,
+    setNodeColor: persistNodeColor,
+  } = useWorkspaceActions();
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
   });
@@ -392,6 +401,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   // annotation column. Creating a column is a separate immediate Data Block edit.
   const sourceNode = sourceNodeInputs.resolvedNodes[0] ?? null;
   const sourceColumns = sourceNode?.columnOptions.map((option) => option.name) ?? [];
+  const { defaultPalette, nodeColors, setNodeColor, ensureNodeColors } = useNodeColorControls({
+    nodeIds: sourceNode ? [sourceNode.id] : [],
+    nodes: sourceNode ? [sourceNode.node] : [],
+    persistNodeColor,
+  });
+  const sourceColor = sourceNode ? nodeColors[sourceNode.id] : undefined;
   const resolvedAnnotationColumn = sourceNode ? (annotationTargets[sourceNode.id] ?? '') : '';
   const selectedAnnotationColumnExists =
     resolvedAnnotationColumn.length > 0 && sourceColumns.includes(resolvedAnnotationColumn);
@@ -715,10 +730,16 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     runAllState: annotationRunAll?.state ?? null,
     hasActiveAnalysis: Boolean(activeAnalysis),
   });
-  const controlsLocked = isLocked || isAiRunning;
+  const controlsLocked = isLocked || isAiRunning || isStartingManualReview;
 
   const runFreshAiAnalysis = async () => {
     if (!currentAiRequest || !currentWorkspaceId || aiRunningRef.current) return;
+    try {
+      await ensureNodeColors();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not save the Data Block color.');
+      return;
+    }
     await runAnalysisTaskEnvelope<Analysis>({
       runningRef: aiRunningRef,
       setIsRunning: setIsAiRunning,
@@ -752,6 +773,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     }
     setIsSubmittingRunAll(true);
     try {
+      await ensureNodeColors();
       await submitAnnotationRunAllWithProviderCredential({
         workspaceId: currentWorkspaceId,
         tabId: host.tabId,
@@ -769,6 +791,22 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       toast.error(error instanceof Error ? error.message : 'Could not start Annotation Run All.');
     } finally {
       setIsSubmittingRunAll(false);
+    }
+  };
+
+  const handleManualReviewToggle = async () => {
+    if (hasRun) {
+      setHasRun(false);
+      return;
+    }
+    setIsStartingManualReview(true);
+    try {
+      await ensureNodeColors();
+      setHasRun(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not save the Data Block color.');
+    } finally {
+      setIsStartingManualReview(false);
     }
   };
 
@@ -842,13 +880,11 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 >
                   <Button
                     type="button"
-                    disabled={!sourceNode || !selectedAnnotationColumnExists}
+                    disabled={
+                      !sourceNode || !selectedAnnotationColumnExists || isStartingManualReview
+                    }
                     onClick={() => {
-                      if (hasRun) {
-                        setHasRun(false);
-                      } else {
-                        setHasRun(true);
-                      }
+                      void handleManualReviewToggle();
                     }}
                   >
                     {hasRun ? 'Clear' : 'Resume'}
@@ -881,6 +917,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     onClear={sourceNodeInputs.clear}
                     onColumnChange={handleSourceTextColumnChange}
                     columnLabel="Text Column"
+                    defaultPalette={defaultPalette}
+                    nodeColors={nodeColors}
+                    onNodeColorChange={setNodeColor}
                     renderColumnAddon={renderAnnotationColumnPicker}
                     disabled={controlsLocked}
                   />
@@ -1277,6 +1316,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           key={`${sourceNode.id}:${resolvedAnnotationColumn}`}
           workspaceId={currentWorkspaceId ?? null}
           nodeId={sourceNode.id}
+          sourceColumns={sourceColumns}
+          sourceColor={sourceColor ?? GREY}
           rowCount={sourceNode.node.shape?.[0] ?? 0}
           textColumn={sourceNode.column}
           annotationColumn={resolvedAnnotationColumn}
@@ -1286,6 +1327,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           comparisonColumns={annotationComparisonColumns[sourceNode.id] ?? []}
           onComparisonColumnsChange={(columns) => {
             setAnnotationComparisonColumns(sourceNode.id, columns);
+          }}
+          differenceFilterColumns={annotationDifferenceFilterColumns[sourceNode.id] ?? []}
+          onDifferenceFilterColumnsChange={(columns) => {
+            setAnnotationDifferenceFilterColumns(sourceNode.id, columns);
           }}
           reliabilityMetric={
             annotationReliabilityMetrics[sourceNode.id] ?? DEFAULT_INTERCODER_RELIABILITY_METRIC
@@ -1306,8 +1351,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       sourceNode ? (
         <RunAllReviewTable
           workspaceId={currentWorkspaceId}
-          nodeIds={[sourceNode.id]}
+          nodeId={sourceNode.id}
           sql={`SELECT * FROM ${sqlTable(sourceNode.id)}`}
+          sourceColumns={sourceColumns}
+          sourceColor={sourceColor ?? GREY}
           rowCount={sourceNode.node.shape?.[0] ?? 0}
           title="Annotation"
           requiredColumns={[
@@ -1319,6 +1366,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           comparisonColumns={annotationComparisonColumns[sourceNode.id] ?? []}
           onComparisonColumnsChange={(columns) => {
             setAnnotationComparisonColumns(sourceNode.id, columns);
+          }}
+          differenceFilterColumns={annotationDifferenceFilterColumns[sourceNode.id] ?? []}
+          onDifferenceFilterColumnsChange={(columns) => {
+            setAnnotationDifferenceFilterColumns(sourceNode.id, columns);
           }}
           reliabilityMetric={
             annotationReliabilityMetrics[sourceNode.id] ?? DEFAULT_INTERCODER_RELIABILITY_METRIC
@@ -1347,6 +1398,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       ) : annotationMode === 'ai' && aiResult && serverAiRequest ? (
         <AnnotationAiPreviewPanel
           preview={aiPreview}
+          sourceColor={nodeColors[serverAiRequest.node_id] ?? sourceColor ?? GREY}
           comparison={{
             columns: annotationComparisonColumns[serverAiRequest.node_id] ?? [],
             onColumnsChange: (columns) => {

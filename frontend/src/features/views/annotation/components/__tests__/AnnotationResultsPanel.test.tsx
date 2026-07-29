@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { type ComponentProps, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
+import { toBgColor } from '@/features/views/common/vizPalette';
 import { AnnotationResultsPanel } from '../AnnotationResultsPanel';
 
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
@@ -23,8 +24,16 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
     setPagination,
     query: {
       data: {
-        columns: ['text', 'annotation', 'reviewer', 'username', 'record_id'],
+        columns: [
+          '__wordflow_annotation_source_row_index',
+          'text',
+          'annotation',
+          'reviewer',
+          'username',
+          'record_id',
+        ],
         schema: [
+          { name: '__wordflow_annotation_source_row_index', kind: 'integer' },
           { name: 'text', kind: 'string' },
           { name: 'annotation', kind: 'string' },
           { name: 'reviewer', kind: 'string' },
@@ -37,9 +46,19 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
       isFetching: false,
     },
     rows: [
-      { text: 'Example', annotation: 'covid', reviewer: 'covid', username: 'alice', record_id: 1 },
+      {
+        __wordflow_annotation_source_row_index: 0,
+        text: 'Example',
+        annotation: 'covid',
+        reviewer: 'covid',
+        username: 'alice',
+        record_id: 1,
+      },
     ],
     rowCount: 2380,
+    countQuery: { isLoading: false, isError: false, isFetching: false },
+    sourceRowIndexColumn: '__wordflow_annotation_source_row_index',
+    refreshFilteredRows: vi.fn(),
   }),
 }));
 vi.mock('../../hooks/useAnnotationClassDescriptions', () => ({
@@ -58,12 +77,15 @@ function ManualResults(
     | 'onMetadataColumnsChange'
     | 'reliabilityMetric'
     | 'onReliabilityMetricChange'
+    | 'differenceFilterColumns'
+    | 'onDifferenceFilterColumnsChange'
   >,
 ) {
   const [comparisonColumns, setComparisonColumns] = useState(['reviewer']);
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
   const [reliabilityMetric, setReliabilityMetric] =
     useState<IntercoderReliabilityMetric>('cohens_kappa');
+  const [differenceFilterColumns, setDifferenceFilterColumns] = useState<string[]>([]);
   return (
     <AnnotationResultsPanel
       {...props}
@@ -73,6 +95,8 @@ function ManualResults(
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
+      differenceFilterColumns={differenceFilterColumns}
+      onDifferenceFilterColumnsChange={setDifferenceFilterColumns}
     />
   );
 }
@@ -86,6 +110,8 @@ const renderPanel = () => {
       <ManualResults
         workspaceId="workspace-1"
         nodeId="node-1"
+        sourceColumns={['text', 'annotation', 'reviewer', 'username', 'record_id']}
+        sourceColor="#2563eb"
         rowCount={2380}
         textColumn="text"
         annotationColumn="annotation"
@@ -129,6 +155,10 @@ describe('AnnotationResultsPanel', () => {
     expect(headers.slice(0, 2).map((header) => header.textContent)).toEqual(['text', 'annotation']);
     expect(within(headers[2]).getByText('reviewer')).toBeInTheDocument();
     expect(within(headers[2]).getByRole('button', { name: /Cohen’s Kappa/ })).toBeInTheDocument();
+    const filterToggle = within(headers[2]).getByRole('button', {
+      name: 'Filter difference for reviewer',
+    });
+    expect(filterToggle).toHaveAttribute('aria-pressed', 'false');
     const resultRow = screen.getByRole('row', { name: 'Example covid' });
     expect(within(resultRow).getAllByRole('cell').at(-1)).toHaveTextContent('covid');
     expect(screen.getAllByRole('combobox', { name: /Class for row/ })).toHaveLength(1);
@@ -214,6 +244,10 @@ describe('AnnotationResultsPanel', () => {
         }),
       ).toBeInTheDocument();
     });
+    const resultRow = screen.getByRole('row', { name: 'Example covid' });
+    const cells = within(resultRow).getAllByRole('cell');
+    expect(cells[1]).toHaveStyle({ backgroundColor: toBgColor('#2563eb') });
+    expect(cells[2]).toHaveStyle({ backgroundColor: toBgColor('#2563eb') });
     expect(queryWorkspaceSqlTable).toHaveBeenCalledTimes(1);
   });
 

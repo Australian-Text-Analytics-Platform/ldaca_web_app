@@ -98,6 +98,15 @@ presentation state keyed by source Data Block and are shared by Manual, Preview,
 and Review in the same Tab. Comparison choices are restricted to string and
 categorical schema columns. Cohen's Kappa is the default metric; Percent
 Agreement and nominal Krippendorff's Alpha use the same grouped counts.
+Manual and Review also retain enabled difference filters per source Data Block.
+Removing a comparison column removes its filter, while Preview ignores filter
+state. Each filtered page and its exact row count are separate Workspace SQL
+Query resources keyed by the generated predicate and pagination. The backend
+applies multiple enabled comparisons with OR before pagination. Manual pages
+carry a transient absolute source-row number created before filtering so an
+edit still targets the original Data Block row; that transport column is never
+shown or persisted. After a successful edit, the page and filtered count
+refresh immediately and pagination clamps if the final page becomes empty.
 Correction-column visibility is keyed by source Data Block and correction
 column; a missing hidden override means the correction is shown. Hiding it
 changes only the Preview and Review table projection, not the request selection
@@ -110,6 +119,15 @@ separate comparison card owns state. A successful Manual label edit applies its
 old and new count pairs to that resource after persistence; it does not
 invalidate and rescan the aggregate. A missing baseline is fetched once, and
 ordinary refetch-on-mount or focus reconciles edits made elsewhere.
+Difference filtering never changes those aggregate resources, so reliability
+continues to describe the complete Data Block. Manual and Review header filter
+toggles control only the displayed rows and pagination. Preview, Manual, and
+Review all use the selected Data Block's previewed color as a light difference
+tint: the annotation or prediction cell is tinted when any selected comparison
+differs, and an individual comparison cell is tinted only when that value
+differs. Null pairs follow ordinary SQL inequality semantics and are neither
+filtered nor highlighted. The shared color control commits `Node.color` before
+Preview, Run All, or Manual Resume; a failed commit aborts that action.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts

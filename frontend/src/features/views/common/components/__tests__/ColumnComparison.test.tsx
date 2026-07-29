@@ -154,6 +154,30 @@ describe('ColumnComparison', () => {
     ).toHaveTextContent('α 0.531');
   });
 
+  it('exposes the accessible difference-filter toggle when the table enables it', async () => {
+    const user = userEvent.setup();
+    const onDifferenceFilterChange = vi.fn();
+    render(
+      <ColumnComparisonHeader
+        metric="cohens_kappa"
+        referenceColumn="annotation"
+        comparisonColumn="review"
+        rows={rows}
+        isLoading={false}
+        isError={false}
+        differenceFilterActive={false}
+        onDifferenceFilterChange={onDifferenceFilterChange}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Filter difference for review' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await user.hover(toggle);
+    expect((await screen.findAllByText('Filter difference'))[0]).toBeVisible();
+    await user.click(toggle);
+    expect(onDifferenceFilterChange).toHaveBeenCalledWith(true);
+  });
+
   it('offers all reliability metrics above the comparison checklist', async () => {
     const user = userEvent.setup();
     const onMetricChange = vi.fn();

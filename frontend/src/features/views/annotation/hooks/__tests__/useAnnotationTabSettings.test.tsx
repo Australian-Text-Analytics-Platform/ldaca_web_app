@@ -26,6 +26,9 @@ describe('useAnnotationTabSettings', () => {
           annotationComparisonColumns: JSON.stringify({
             'source-node': ['reviewer_one', 'reviewer_two'],
           }),
+          annotationDifferenceFilterColumns: JSON.stringify({
+            'source-node': ['reviewer_two'],
+          }),
           annotationReliabilityMetrics: JSON.stringify({
             'source-node': 'krippendorffs_alpha',
           }),
@@ -56,6 +59,9 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.annotationTargets).toEqual({ 'source-node': 'annotation' });
     expect(result.current.annotationComparisonColumns).toEqual({
       'source-node': ['reviewer_one', 'reviewer_two'],
+    });
+    expect(result.current.annotationDifferenceFilterColumns).toEqual({
+      'source-node': ['reviewer_two'],
     });
     expect(result.current.annotationReliabilityMetrics).toEqual({
       'source-node': 'krippendorffs_alpha',
@@ -160,6 +166,38 @@ describe('useAnnotationTabSettings', () => {
     });
     expect(result.current.annotationHiddenCorrectionColumns).toEqual({});
     expect(onTabSettingChange).toHaveBeenLastCalledWith('annotationHiddenCorrectionColumns', '{}');
+  });
+
+  it('persists filters per Data Block and prunes deselected comparison columns', () => {
+    const onTabSettingChange = vi.fn();
+    const { result } = renderHook(() =>
+      useAnnotationTabSettings({ tabSettings: {}, onTabSettingChange }),
+    );
+
+    act(() => {
+      result.current.setAnnotationComparisonColumns('source-node', [
+        'reviewer_one',
+        'reviewer_two',
+      ]);
+      result.current.setAnnotationDifferenceFilterColumns('source-node', [
+        'reviewer_one',
+        'reviewer_two',
+      ]);
+    });
+    expect(result.current.annotationDifferenceFilterColumns).toEqual({
+      'source-node': ['reviewer_one', 'reviewer_two'],
+    });
+
+    act(() => {
+      result.current.setAnnotationComparisonColumns('source-node', ['reviewer_two']);
+    });
+    expect(result.current.annotationDifferenceFilterColumns).toEqual({
+      'source-node': ['reviewer_two'],
+    });
+    expect(onTabSettingChange).toHaveBeenLastCalledWith(
+      'annotationDifferenceFilterColumns',
+      JSON.stringify({ 'source-node': ['reviewer_two'] }),
+    );
   });
 
   it('retains every target when two selectors persist before React rerenders', () => {

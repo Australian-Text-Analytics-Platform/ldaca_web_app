@@ -111,6 +111,20 @@ a configured correction column by default. Use **Hide correction** or **Show
 correction** to change only its table visibility; the selected correction
 column and its stored values are left unchanged.
 
+In Manual and Review, each compared-column header also has a **Filter
+difference** toggle. Turning on more than one toggle shows rows where any
+enabled comparison differs from the current Annotation Column. Filtering is
+performed before pagination, while reliability scores still describe the whole
+Data Block. Resolving a difference in Manual mode removes that row immediately
+when it no longer matches. Preview shows no filter toggles.
+
+The color picker on the **Annotation Data Block** card controls difference
+highlighting in all three modes. The annotation or prediction cell is tinted
+when any selected comparison differs, and each comparison cell is tinted only
+when that particular value differs. A null value is not treated as a
+difference. The chosen color is saved to the Data Block when you start Preview,
+Run All, or Manual Resume; if saving fails, the action does not start.
+
 ## Recap
 
 **Question:** *What should I read after the tour?*

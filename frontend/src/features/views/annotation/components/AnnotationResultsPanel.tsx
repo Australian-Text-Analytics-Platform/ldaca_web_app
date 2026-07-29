@@ -33,6 +33,8 @@ import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullC
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { queryKeys } from '@/lib/queryKeys';
+import { toBgColor } from '@/features/views/common/vizPalette';
+import { annotationValuesDiffer } from '../annotationDifferenceQuery';
 import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
 import { type AnnotationNodePageRow, useAnnotationNodePage } from '../hooks/useAnnotationNodePage';
 
@@ -53,6 +55,8 @@ const cellText = (value: unknown): string => {
 interface AnnotationResultsPanelProps {
   workspaceId: string | null;
   nodeId: string;
+  sourceColumns: string[];
+  sourceColor: string;
   rowCount: number;
   textColumn: string;
   annotationColumn: string;
@@ -62,6 +66,8 @@ interface AnnotationResultsPanelProps {
   descriptionColumn: string | null;
   comparisonColumns: string[];
   onComparisonColumnsChange: (columns: string[]) => void;
+  differenceFilterColumns: string[];
+  onDifferenceFilterColumnsChange: (columns: string[]) => void;
   reliabilityMetric: IntercoderReliabilityMetric;
   onReliabilityMetricChange: (metric: IntercoderReliabilityMetric) => void;
   metadataColumns: string[];
@@ -90,6 +96,8 @@ interface AnnotationResultsPanelProps {
 export function AnnotationResultsPanel({
   workspaceId,
   nodeId,
+  sourceColumns,
+  sourceColor,
   rowCount,
   textColumn,
   annotationColumn,
@@ -98,6 +106,8 @@ export function AnnotationResultsPanel({
   descriptionColumn,
   comparisonColumns,
   onComparisonColumnsChange,
+  differenceFilterColumns,
+  onDifferenceFilterColumnsChange,
   reliabilityMetric,
   onReliabilityMetricChange,
   metadataColumns,
@@ -111,10 +121,22 @@ export function AnnotationResultsPanel({
   const nodePage = useAnnotationNodePage({
     workspaceId,
     nodeId,
+    sourceSql: `SELECT * FROM ${sqlTable(nodeId)}`,
+    sourceColumns,
+    annotationColumn,
+    differenceColumns: differenceFilterColumns,
     rowCount,
     pageSize: ANNOTATION_RESULT_PAGE_SIZE,
   });
-  const { pagination, setPagination, query: resultsQuery, rows } = nodePage;
+  const {
+    pagination,
+    setPagination,
+    query: resultsQuery,
+    countQuery,
+    rows,
+    rowCount: effectiveRowCount,
+    sourceRowIndexColumn,
+  } = nodePage;
   const classDescriptions = useAnnotationClassDescriptions({
     workspaceId,
     nodeId: classNodeId,
@@ -126,25 +148,30 @@ export function AnnotationResultsPanel({
     .map((row) => cellText(row.class).trim())
     .filter((name, index, all) => name.length > 0 && all.indexOf(name) === index);
   const sourceSql = `SELECT * FROM ${sqlTable(nodeId)}`;
+  const dataColumns = resultsQuery.data?.columns.filter(
+    (column) => column !== sourceRowIndexColumn,
+  );
   const comparableColumnSet = new Set(
     resultsQuery.data?.schema
+      .filter((column) => column.name !== sourceRowIndexColumn)
       .filter((column) => column.kind === 'string' || column.kind === 'categorical')
       .map((column) => column.name) ?? [],
   );
   const availableComparisonColumns =
-    resultsQuery.data?.columns.filter(
+    dataColumns?.filter(
       (column) =>
         column !== textColumn && column !== annotationColumn && comparableColumnSet.has(column),
     ) ?? [];
   const availableMetadataColumns =
-    resultsQuery.data?.columns.filter(
-      (column) => column !== textColumn && column !== annotationColumn,
-    ) ?? [];
+    dataColumns?.filter((column) => column !== textColumn && column !== annotationColumn) ?? [];
   const activeComparisonColumns = comparisonColumns.filter((column) =>
     availableComparisonColumns.includes(column),
   );
   const activeMetadataColumns = metadataColumns.filter((column) =>
     availableMetadataColumns.includes(column),
+  );
+  const activeDifferenceFilterColumns = differenceFilterColumns.filter((column) =>
+    activeComparisonColumns.includes(column),
   );
   const visibleSupplementalColumns = Array.from(
     new Set([...activeComparisonColumns, ...activeMetadataColumns]),
@@ -157,7 +184,7 @@ export function AnnotationResultsPanel({
   const table = useServerTable({
     data: rows,
     columns: tableColumns,
-    rowCount,
+    rowCount: effectiveRowCount,
     pageIndex: pagination.pageIndex,
     pageSize: pagination.pageSize,
     onPaginationChange: setPagination,
@@ -197,17 +224,19 @@ export function AnnotationResultsPanel({
           </div>
         ) : null}
       </div>
-      {resultsQuery.isLoading ? (
+      {resultsQuery.isLoading || countQuery.isLoading ? (
         <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
           Loading annotations...
         </div>
-      ) : resultsQuery.isError ? (
+      ) : resultsQuery.isError || countQuery.isError ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           Could not load annotations.
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-          No rows to annotate.
+          {activeDifferenceFilterColumns.length > 0
+            ? 'No annotation differences.'
+            : 'No rows to annotate.'}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -227,6 +256,16 @@ export function AnnotationResultsPanel({
                           rows={comparisonQueryByColumn.get(column)?.data}
                           isLoading={comparisonQueryByColumn.get(column)?.isLoading ?? true}
                           isError={comparisonQueryByColumn.get(column)?.isError ?? false}
+                          differenceFilterActive={activeDifferenceFilterColumns.includes(column)}
+                          onDifferenceFilterChange={(active) => {
+                            onDifferenceFilterColumnsChange(
+                              active
+                                ? Array.from(new Set([...activeDifferenceFilterColumns, column]))
+                                : activeDifferenceFilterColumns.filter(
+                                    (candidate) => candidate !== column,
+                                  ),
+                            );
+                          }}
                         />
                       ) : (
                         column
@@ -236,20 +275,26 @@ export function AnnotationResultsPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row, index) => {
-                  const rowPosition = pagination.pageIndex * pagination.pageSize + index;
+                {rows.map((row) => {
+                  const rowPosition = Number(row[sourceRowIndexColumn]);
                   const seeded =
                     row[annotationColumn] == null ? null : cellText(row[annotationColumn]);
                   const hasSelection = Object.hasOwn(selections, rowPosition);
                   const committedValue: string | null =
                     (hasSelection ? selections[rowPosition] : seeded) ?? null;
                   const value = committedValue ?? '';
+                  const annotationDiffers = activeComparisonColumns.some((column) =>
+                    annotationValuesDiffer(committedValue, row[column]),
+                  );
+                  const differenceColor = toBgColor(sourceColor);
                   return (
                     <TableRow key={rowPosition} className="align-top hover:bg-transparent">
                       <TableCell className="break-words whitespace-pre-wrap">
                         {cellText(row[textColumn])}
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        style={annotationDiffers ? { backgroundColor: differenceColor } : undefined}
+                      >
                         <Select
                           // `value` is always a string ('' when unset); passing it
                           // directly keeps the Select controlled for its lifetime.
@@ -302,6 +347,7 @@ export function AnnotationResultsPanel({
                                     });
                                   }
                                 });
+                                return nodePage.refreshFilteredRows();
                               })
                               .catch((error: unknown) => {
                                 setSelections((current) => {
@@ -353,11 +399,22 @@ export function AnnotationResultsPanel({
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      {visibleSupplementalColumns.map((column) => (
-                        <TableCell key={column} className="w-px whitespace-pre-wrap">
-                          {cellText(row[column]) || '—'}
-                        </TableCell>
-                      ))}
+                      {visibleSupplementalColumns.map((column) => {
+                        const comparisonDiffers =
+                          activeComparisonColumns.includes(column) &&
+                          annotationValuesDiffer(committedValue, row[column]);
+                        return (
+                          <TableCell
+                            key={column}
+                            className="w-px whitespace-pre-wrap"
+                            style={
+                              comparisonDiffers ? { backgroundColor: differenceColor } : undefined
+                            }
+                          >
+                            {cellText(row[column]) || '—'}
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
                   );
                 })}
@@ -368,7 +425,7 @@ export function AnnotationResultsPanel({
             table={table}
             pageIndex={pagination.pageIndex}
             pageSize={pagination.pageSize}
-            rowCount={rowCount}
+            rowCount={effectiveRowCount}
             loading={resultsQuery.isFetching}
           />
         </div>
