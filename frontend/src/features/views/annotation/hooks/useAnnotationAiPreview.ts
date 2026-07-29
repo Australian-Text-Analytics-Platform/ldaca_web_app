@@ -130,6 +130,10 @@ export function useAnnotationAiPreview({
   return {
     columns: { text: textColumn, annotation: annotationColumn },
     sourceColumns: sourcePageQuery.data?.columns ?? [],
+    sourceStringColumns:
+      sourcePageQuery.data?.schema
+        .filter((column) => column.kind === 'string')
+        .map((column) => column.name) ?? null,
     sourceComparableColumns:
       sourcePageQuery.data?.schema
         .filter((column) => column.kind === 'string' || column.kind === 'categorical')

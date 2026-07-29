@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
+import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { sqlTable } from '@/api';
@@ -18,7 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import {
+  applyComparisonValueEdit,
   applyReferenceComparisonEdit,
   type ConfusionCount,
   type IntercoderReliabilityMetric,
@@ -26,6 +29,7 @@ import {
 import {
   ColumnComparisonHeader,
   ColumnComparisonSelector,
+  DifferenceFilterButton,
 } from '@/features/views/common/components/ColumnComparison';
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
@@ -34,9 +38,13 @@ import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { queryKeys } from '@/lib/queryKeys';
 import { toBgColor } from '@/features/views/common/vizPalette';
-import { annotationValuesDiffer } from '../annotationDifferenceQuery';
+import {
+  type AnnotationDifferenceFilter,
+  annotationValuesDiffer,
+} from '../annotationDifferenceQuery';
 import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescriptions';
 import { type AnnotationNodePageRow, useAnnotationNodePage } from '../hooks/useAnnotationNodePage';
+import { AnnotationCorrectionColumnControl } from './AnnotationCorrectionColumnControl';
 
 const ANNOTATION_RESULT_PAGE_SIZE = 10;
 // Radix `Select` rejects an empty-string item value, so the "clear" option uses
@@ -66,17 +74,23 @@ interface AnnotationResultsPanelProps {
   descriptionColumn: string | null;
   comparisonColumns: string[];
   onComparisonColumnsChange: (columns: string[]) => void;
-  differenceFilterColumns: string[];
-  onDifferenceFilterColumnsChange: (columns: string[]) => void;
+  differenceFilter: AnnotationDifferenceFilter | null;
+  onDifferenceFilterChange: (filter: AnnotationDifferenceFilter | null) => void;
   reliabilityMetric: IntercoderReliabilityMetric;
   onReliabilityMetricChange: (metric: IntercoderReliabilityMetric) => void;
   metadataColumns: string[];
   onMetadataColumnsChange: (columns: string[]) => void;
+  correction: {
+    column: string | null;
+    onColumnChange: (column: string | null) => void;
+    onCreate: () => void;
+    disabled?: boolean;
+  };
 }
 
 /**
  * Read-only text + editable-annotation result table shown below the Annotation
- * parameter panel once Resume is pressed, mirroring how other analysis
+ * parameter panel once Start is pressed, mirroring how other analysis
  * tabs surface a result table under their controls.
  *
  * Used by: AnnotationFeature after a run is triggered because reviewers want to
@@ -106,25 +120,32 @@ export function AnnotationResultsPanel({
   descriptionColumn,
   comparisonColumns,
   onComparisonColumnsChange,
-  differenceFilterColumns,
-  onDifferenceFilterColumnsChange,
+  differenceFilter,
+  onDifferenceFilterChange,
   reliabilityMetric,
   onReliabilityMetricChange,
   metadataColumns,
   onMetadataColumnsChange,
+  correction,
 }: AnnotationResultsPanelProps) {
+  const correctionColumn = correction.column;
   const { setCell } = useWorkspaceActions();
   const queryClient = useQueryClient();
   // Per-row class overrides keyed by source row position; falls back to the source value.
   const [selections, setSelections] = useState<Record<number, string | null>>({});
   const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
+  const [correctionSelections, setCorrectionSelections] = useState<Record<string, string | null>>(
+    {},
+  );
+  const [savingCorrectionRows, setSavingCorrectionRows] = useState<Set<string>>(new Set());
   const nodePage = useAnnotationNodePage({
     workspaceId,
     nodeId,
     sourceSql: `SELECT * FROM ${sqlTable(nodeId)}`,
     sourceColumns,
     annotationColumn,
-    differenceColumns: differenceFilterColumns,
+    comparisonColumns,
+    differenceFilter,
     rowCount,
     pageSize: ANNOTATION_RESULT_PAGE_SIZE,
   });
@@ -157,30 +178,59 @@ export function AnnotationResultsPanel({
       .filter((column) => column.kind === 'string' || column.kind === 'categorical')
       .map((column) => column.name) ?? [],
   );
+  const stringColumnSet = new Set(
+    resultsQuery.data?.schema
+      .filter((column) => column.name !== sourceRowIndexColumn && column.kind === 'string')
+      .map((column) => column.name) ?? [],
+  );
+  const availableCorrectionColumns = resultsQuery.data
+    ? (dataColumns?.filter(
+        (column) =>
+          column !== textColumn && column !== annotationColumn && stringColumnSet.has(column),
+      ) ?? [])
+    : null;
   const availableComparisonColumns =
     dataColumns?.filter(
       (column) =>
         column !== textColumn && column !== annotationColumn && comparableColumnSet.has(column),
     ) ?? [];
   const availableMetadataColumns =
-    dataColumns?.filter((column) => column !== textColumn && column !== annotationColumn) ?? [];
+    dataColumns?.filter(
+      (column) =>
+        column !== textColumn && column !== annotationColumn && column !== correctionColumn,
+    ) ?? [];
   const activeComparisonColumns = comparisonColumns.filter((column) =>
     availableComparisonColumns.includes(column),
   );
   const activeMetadataColumns = metadataColumns.filter((column) =>
     availableMetadataColumns.includes(column),
   );
-  const activeDifferenceFilterColumns = differenceFilterColumns.filter((column) =>
-    activeComparisonColumns.includes(column),
-  );
+  const activeDifferenceFilter =
+    differenceFilter?.kind === 'any'
+      ? activeComparisonColumns.length > 0
+        ? differenceFilter
+        : null
+      : differenceFilter?.kind === 'column' &&
+          activeComparisonColumns.includes(differenceFilter.column)
+        ? differenceFilter
+        : null;
   const visibleSupplementalColumns = Array.from(
     new Set([...activeComparisonColumns, ...activeMetadataColumns]),
-  );
-  const visibleColumns = [textColumn, annotationColumn, ...visibleSupplementalColumns];
-  const tableColumns: ColumnDef<AnnotationResultRow>[] = visibleColumns.map((column) => ({
-    id: column,
-    accessorFn: (row) => row[column],
-  }));
+  ).filter((column) => column !== correctionColumn);
+  const tableColumns: ColumnDef<AnnotationResultRow>[] = [
+    { id: textColumn, accessorFn: (row) => row[textColumn] },
+    { id: annotationColumn, accessorFn: (row) => row[annotationColumn] },
+    ...(correctionColumn
+      ? [
+          { id: 'correction_arrow', accessorFn: () => null },
+          { id: correctionColumn, accessorFn: (row: AnnotationResultRow) => row[correctionColumn] },
+        ]
+      : []),
+    ...visibleSupplementalColumns.map((column) => ({
+      id: column,
+      accessorFn: (row: AnnotationResultRow) => row[column],
+    })),
+  ];
   const table = useServerTable({
     data: rows,
     columns: tableColumns,
@@ -216,6 +266,13 @@ export function AnnotationResultsPanel({
               metric={reliabilityMetric}
               onMetricChange={onReliabilityMetricChange}
             />
+            <AnnotationCorrectionColumnControl
+              value={correctionColumn}
+              availableColumns={availableCorrectionColumns}
+              onValueChange={correction.onColumnChange}
+              onCreate={correction.onCreate}
+              disabled={correction.disabled}
+            />
             <MetadataColumnSelector
               availableColumns={availableMetadataColumns}
               selectedColumns={activeMetadataColumns}
@@ -234,9 +291,7 @@ export function AnnotationResultsPanel({
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-          {activeDifferenceFilterColumns.length > 0
-            ? 'No annotation differences.'
-            : 'No rows to annotate.'}
+          {activeDifferenceFilter ? 'No annotation differences.' : 'No rows to annotate.'}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -245,7 +300,56 @@ export function AnnotationResultsPanel({
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead>{textColumn}</TableHead>
-                  <TableHead className="w-px whitespace-nowrap">{annotationColumn}</TableHead>
+                  <TableHead className="w-px whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>{annotationColumn}</span>
+                      <TooltipProvider delayDuration={120} skipDelayDuration={0}>
+                        <DifferenceFilterButton
+                          active={activeDifferenceFilter?.kind === 'any'}
+                          ariaLabel={`Filter any difference for ${annotationColumn}`}
+                          tooltip="Filter any difference"
+                          onActiveChange={(active) => {
+                            onDifferenceFilterChange(active ? { kind: 'any' } : null);
+                          }}
+                        />
+                      </TooltipProvider>
+                    </span>
+                  </TableHead>
+                  {correctionColumn ? (
+                    <>
+                      <TableHead className="w-8 px-1 text-center" aria-label="changes to">
+                        <ArrowRight aria-hidden="true" className="mx-auto size-4" />
+                      </TableHead>
+                      <TableHead className="w-px whitespace-nowrap">
+                        {activeComparisonColumns.includes(correctionColumn) ? (
+                          <ColumnComparisonHeader
+                            label={`Correction: ${correctionColumn}`}
+                            metric={reliabilityMetric}
+                            referenceColumn={annotationColumn}
+                            comparisonColumn={correctionColumn}
+                            rows={comparisonQueryByColumn.get(correctionColumn)?.data}
+                            isLoading={
+                              comparisonQueryByColumn.get(correctionColumn)?.isLoading ?? true
+                            }
+                            isError={
+                              comparisonQueryByColumn.get(correctionColumn)?.isError ?? false
+                            }
+                            differenceFilterActive={
+                              activeDifferenceFilter?.kind === 'column' &&
+                              activeDifferenceFilter.column === correctionColumn
+                            }
+                            onDifferenceFilterChange={(active) => {
+                              onDifferenceFilterChange(
+                                active ? { kind: 'column', column: correctionColumn } : null,
+                              );
+                            }}
+                          />
+                        ) : (
+                          <>Correction: {correctionColumn}</>
+                        )}
+                      </TableHead>
+                    </>
+                  ) : null}
                   {visibleSupplementalColumns.map((column) => (
                     <TableHead key={column} className="w-px whitespace-nowrap">
                       {activeComparisonColumns.includes(column) ? (
@@ -256,15 +360,12 @@ export function AnnotationResultsPanel({
                           rows={comparisonQueryByColumn.get(column)?.data}
                           isLoading={comparisonQueryByColumn.get(column)?.isLoading ?? true}
                           isError={comparisonQueryByColumn.get(column)?.isError ?? false}
-                          differenceFilterActive={activeDifferenceFilterColumns.includes(column)}
+                          differenceFilterActive={
+                            activeDifferenceFilter?.kind === 'column' &&
+                            activeDifferenceFilter.column === column
+                          }
                           onDifferenceFilterChange={(active) => {
-                            onDifferenceFilterColumnsChange(
-                              active
-                                ? Array.from(new Set([...activeDifferenceFilterColumns, column]))
-                                : activeDifferenceFilterColumns.filter(
-                                    (candidate) => candidate !== column,
-                                  ),
-                            );
+                            onDifferenceFilterChange(active ? { kind: 'column', column } : null);
                           }}
                         />
                       ) : (
@@ -283,8 +384,22 @@ export function AnnotationResultsPanel({
                   const committedValue: string | null =
                     (hasSelection ? selections[rowPosition] : seeded) ?? null;
                   const value = committedValue ?? '';
+                  const correctionKey = correctionColumn
+                    ? `${correctionColumn}:${String(rowPosition)}`
+                    : '';
+                  const seededCorrection = correctionColumn
+                    ? row[correctionColumn] == null
+                      ? null
+                      : cellText(row[correctionColumn])
+                    : null;
+                  const hasCorrectionSelection = Object.hasOwn(correctionSelections, correctionKey);
+                  const correctionValue = hasCorrectionSelection
+                    ? (correctionSelections[correctionKey] ?? null)
+                    : seededCorrection;
+                  const comparisonValue = (column: string): unknown =>
+                    column === correctionColumn ? correctionValue : row[column];
                   const annotationDiffers = activeComparisonColumns.some((column) =>
-                    annotationValuesDiffer(committedValue, row[column]),
+                    annotationValuesDiffer(committedValue, comparisonValue(column)),
                   );
                   const differenceColor = toBgColor(sourceColor);
                   return (
@@ -399,10 +514,122 @@ export function AnnotationResultsPanel({
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      {correctionColumn ? (
+                        <>
+                          <TableCell className="w-8 px-1 text-center">
+                            <ArrowRight
+                              role="img"
+                              aria-label="corrected to"
+                              className="mx-auto size-4 text-muted-foreground"
+                            />
+                          </TableCell>
+                          <TableCell
+                            className="w-px"
+                            style={
+                              activeComparisonColumns.includes(correctionColumn) &&
+                              annotationValuesDiffer(committedValue, correctionValue)
+                                ? { backgroundColor: differenceColor }
+                                : undefined
+                            }
+                          >
+                            <Select
+                              value={correctionValue ?? NO_CLASS_VALUE}
+                              disabled={savingCorrectionRows.has(correctionKey)}
+                              onValueChange={(next) => {
+                                const resolved = next === NO_CLASS_VALUE ? null : next;
+                                const previous = correctionValue;
+                                const queryKey = queryKeys.annotationColumnComparison(
+                                  workspaceId ?? '',
+                                  [nodeId],
+                                  sourceSql,
+                                  annotationColumn,
+                                  correctionColumn,
+                                );
+                                setCorrectionSelections((current) => ({
+                                  ...current,
+                                  [correctionKey]: resolved,
+                                }));
+                                setSavingCorrectionRows((current) =>
+                                  new Set(current).add(correctionKey),
+                                );
+                                void queryClient
+                                  .cancelQueries({ queryKey, exact: true })
+                                  .then(() =>
+                                    setCell(nodeId, correctionColumn, rowPosition, resolved),
+                                  )
+                                  .then(() => {
+                                    const current =
+                                      queryClient.getQueryData<ConfusionCount[]>(queryKey);
+                                    if (current) {
+                                      queryClient.setQueryData<ConfusionCount[]>(
+                                        queryKey,
+                                        applyComparisonValueEdit(current, {
+                                          reference: committedValue,
+                                          previousComparison: previous,
+                                          nextComparison: resolved,
+                                        }),
+                                      );
+                                    } else {
+                                      void queryClient.refetchQueries({
+                                        queryKey,
+                                        exact: true,
+                                        type: 'active',
+                                      });
+                                    }
+                                    return nodePage.refreshFilteredRows();
+                                  })
+                                  .catch((error: unknown) => {
+                                    setCorrectionSelections((current) => {
+                                      const nextSelections = { ...current };
+                                      if (hasCorrectionSelection) {
+                                        nextSelections[correctionKey] = previous;
+                                      } else {
+                                        Reflect.deleteProperty(nextSelections, correctionKey);
+                                      }
+                                      return nextSelections;
+                                    });
+                                    toast.error(
+                                      error instanceof Error
+                                        ? error.message
+                                        : 'Could not save the annotation correction.',
+                                    );
+                                  })
+                                  .finally(() => {
+                                    setSavingCorrectionRows((current) => {
+                                      const nextSaving = new Set(current);
+                                      nextSaving.delete(correctionKey);
+                                      return nextSaving;
+                                    });
+                                  });
+                              }}
+                            >
+                              <SelectTrigger
+                                aria-label={`Correction for row ${String(rowPosition + 1)}`}
+                                className="w-full text-sm"
+                              >
+                                <SelectValue placeholder="None" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem
+                                  value={NO_CLASS_VALUE}
+                                  className="text-muted-foreground"
+                                >
+                                  None
+                                </SelectItem>
+                                {classOptions.map((name) => (
+                                  <SelectItem key={name} value={name}>
+                                    {name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        </>
+                      ) : null}
                       {visibleSupplementalColumns.map((column) => {
                         const comparisonDiffers =
                           activeComparisonColumns.includes(column) &&
-                          annotationValuesDiffer(committedValue, row[column]);
+                          annotationValuesDiffer(committedValue, comparisonValue(column));
                         return (
                           <TableCell
                             key={column}
@@ -411,7 +638,7 @@ export function AnnotationResultsPanel({
                               comparisonDiffers ? { backgroundColor: differenceColor } : undefined
                             }
                           >
-                            {cellText(row[column]) || '—'}
+                            {cellText(comparisonValue(column)) || '—'}
                           </TableCell>
                         );
                       })}

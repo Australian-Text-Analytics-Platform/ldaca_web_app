@@ -25,7 +25,6 @@ import {
   type ConfusionCount,
 } from '@/features/views/common/components/ColumnComparison';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
-import { CorrectionColumnVisibilityButton } from '@/features/views/common/components/CorrectionColumnVisibilityButton';
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { PaginatedTableProcessingRow } from '@/features/views/common/components/PaginatedTableProcessingRow';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
@@ -34,6 +33,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { toBgColor } from '@/features/views/common/vizPalette';
 import { annotationValuesDiffer } from '../annotationDifferenceQuery';
 import type { AnnotationAiPreview, AnnotationPreviewRow } from '../hooks/useAnnotationAiPreview';
+import { AnnotationCorrectionColumnControl } from './AnnotationCorrectionColumnControl';
 
 const NO_CORRECTION_VALUE = '__no_correction__';
 
@@ -62,8 +62,10 @@ interface AnnotationAiPreviewPanelProps {
     nodeId: string;
     column: string | null;
     classOptions: string[];
-    visible: boolean;
-    onVisibleChange: (visible: boolean) => void;
+    onColumnChange: (column: string | null) => void;
+    onCreate: () => void;
+    onUseAsExample: () => void;
+    disabled?: boolean;
   };
 }
 
@@ -98,7 +100,11 @@ export function AnnotationAiPreviewPanel({
     comparisonColumnOptions.includes(column),
   );
   const correctionColumn = correction.column;
-  const showCorrectionColumn = Boolean(correctionColumn && correction.visible);
+  const showCorrectionColumn = Boolean(correctionColumn);
+  const availableCorrectionColumns =
+    preview.sourceStringColumns?.filter(
+      (column) => column !== columns.text && column !== columns.annotation,
+    ) ?? null;
   const availableMetadataColumns = secondaryColumnOptions.filter(
     (column) => column !== correctionColumn,
   );
@@ -211,12 +217,14 @@ export function AnnotationAiPreviewPanel({
             onMetricChange={comparison.onMetricChange}
             disabled={predictions.query.isFetching || preview.comparison.query.isFetching}
           />
-          {correctionColumn ? (
-            <CorrectionColumnVisibilityButton
-              visible={correction.visible}
-              onVisibleChange={correction.onVisibleChange}
-            />
-          ) : null}
+          <AnnotationCorrectionColumnControl
+            value={correctionColumn}
+            availableColumns={availableCorrectionColumns}
+            onValueChange={correction.onColumnChange}
+            onCreate={correction.onCreate}
+            onUseAsExample={correction.onUseAsExample}
+            disabled={correction.disabled}
+          />
           <MetadataColumnSelector
             availableColumns={availableMetadataColumns}
             selectedColumns={activeMetadataColumns}

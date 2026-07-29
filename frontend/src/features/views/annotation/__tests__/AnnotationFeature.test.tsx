@@ -25,7 +25,10 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1' }),
+  useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1', nodes: [] }),
+}));
+vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
+  useNodeColumnInfos: () => ({ columnInfoCache: {} }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
@@ -169,7 +172,18 @@ vi.mock('../components/AnnotationClassDescriptionsEditor', () => ({
 }));
 
 vi.mock('../components/AnnotationResultsPanel', () => ({
-  AnnotationResultsPanel: () => null,
+  AnnotationResultsPanel: ({
+    correction,
+  }: {
+    correction: { column: string | null; onCreate: () => void };
+  }) => (
+    <div>
+      <span>Correction: {correction.column ?? 'None'}</span>
+      <button type="button" onClick={correction.onCreate}>
+        Create correction column
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('../hooks/useAnnotationClassDescriptions', () => ({
@@ -376,7 +390,7 @@ describe('AnnotationFeature', () => {
     );
   });
 
-  it('labels the active manual review action Clear', async () => {
+  it('labels the manual review action Start before opening and Close while open', async () => {
     const user = userEvent.setup();
     mocks.sourceColumnNames = ['text', 'annotation'];
 
@@ -402,12 +416,12 @@ describe('AnnotationFeature', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Resume' }));
+    await user.click(screen.getByRole('button', { name: 'Start' }));
     expect(mocks.ensureNodeColors).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 
-  it('previews the main Data Block color and aborts Manual Resume when persistence fails', async () => {
+  it('previews the main Data Block color and aborts Manual Start when persistence fails', async () => {
     const user = userEvent.setup();
     mocks.sourceColumnNames = ['text', 'annotation'];
     mocks.ensureNodeColors.mockRejectedValue(new Error('color write failed'));
@@ -436,9 +450,9 @@ describe('AnnotationFeature', () => {
 
     await user.click(screen.getByRole('button', { name: 'Change Selected Data Blocks color' }));
     expect(mocks.setNodeColor).toHaveBeenCalledWith('source-1', '#dc2626');
-    await user.click(screen.getByRole('button', { name: 'Resume' }));
+    await user.click(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() => expect(mocks.ensureNodeColors).toHaveBeenCalledTimes(1));
-    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
   });
 
   it('keeps the dialog open rather than overwriting an existing column', async () => {
@@ -477,7 +491,7 @@ describe('AnnotationFeature', () => {
     expect(mocks.setSetting).not.toHaveBeenCalled();
   });
 
-  it('owns correction-column creation and example reuse in the parameter panel', async () => {
+  it('creates correction columns from the Manual toolbar without an example shortcut', async () => {
     const user = userEvent.setup();
     const setCorrectionColumn = vi.fn();
     mocks.sourceColumnNames = ['text', 'annotation', 'review'];
@@ -492,7 +506,7 @@ describe('AnnotationFeature', () => {
           activeAnalysis: null,
           inputSets: {},
           settings: {
-            annotationMode: 'ai',
+            annotationMode: 'manual',
             annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
           },
           correctionColumns: { 'source-1': 'review' },
@@ -505,22 +519,10 @@ describe('AnnotationFeature', () => {
       />,
     );
 
-    const correctionColumn = screen.getByRole('combobox', { name: 'User Correction Column' });
-    const exampleDataBlock = screen.getByText('Example Data Block');
-    expect(correctionColumn).toHaveTextContent('review');
-    expect(
-      correctionColumn.compareDocumentPosition(exampleDataBlock) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(screen.getByText('Example Node')).toBeVisible();
-    await user.click(
-      screen.getByRole('button', { name: 'Use the correction column as the example' }),
-    );
-    expect(mocks.setInputSet).toHaveBeenCalledWith('exampleNodes', [
-      { node_id: 'source-1', column: 'text' },
-    ]);
-
-    await user.click(screen.getByRole('combobox', { name: 'User Correction Column' }));
-    await user.click(screen.getByRole('option', { name: 'Add new column' }));
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.getByText('Correction: review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Use as example' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Create correction column' }));
     const columnName = screen.getByRole('textbox', { name: 'Correction column name' });
     expect(columnName).toHaveAttribute('placeholder', 'annotation.correction');
     await user.click(columnName);

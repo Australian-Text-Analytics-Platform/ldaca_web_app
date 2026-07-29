@@ -232,10 +232,12 @@ Preview, and Run All.
 _Avoid_: class descriptions, class-description node
 
 **User Correction Column**:
-A string column selected in an Annotation Tab's parameter panel. The Tab keeps
-the editable draft, each submitted Analysis captures the exact column, and
-**Clear Results** removes the Tab draft. Explicit reviewer choices are written
-there as Data Block Edits; AI Preview predictions are never written
+A string column selected from the Annotation Manual, Preview, or Review table
+toolbar. The Tab keeps the live selection per source Data Block, while each
+submitted Analysis captures an immutable snapshot of that selection for
+provenance. Selecting **None** or using **Clear Results** removes the live Tab
+selection without deleting the column or its values. Explicit reviewer choices
+are written there as Data Block Edits; AI Preview predictions are never written
 automatically.
 _Avoid_: prediction column, hidden review state
 

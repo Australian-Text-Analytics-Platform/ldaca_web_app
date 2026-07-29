@@ -5,6 +5,7 @@ import { type ComponentProps, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
 import { toBgColor } from '@/features/views/common/vizPalette';
+import type { AnnotationDifferenceFilter } from '../../annotationDifferenceQuery';
 import { AnnotationResultsPanel } from '../AnnotationResultsPanel';
 
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
@@ -28,6 +29,7 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
           '__wordflow_annotation_source_row_index',
           'text',
           'annotation',
+          'correction',
           'reviewer',
           'username',
           'record_id',
@@ -36,6 +38,7 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
           { name: '__wordflow_annotation_source_row_index', kind: 'integer' },
           { name: 'text', kind: 'string' },
           { name: 'annotation', kind: 'string' },
+          { name: 'correction', kind: 'string' },
           { name: 'reviewer', kind: 'string' },
           { name: 'username', kind: 'string' },
           { name: 'record_id', kind: 'integer' },
@@ -50,6 +53,7 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
         __wordflow_annotation_source_row_index: 0,
         text: 'Example',
         annotation: 'covid',
+        correction: null,
         reviewer: 'covid',
         username: 'alice',
         record_id: 1,
@@ -77,15 +81,15 @@ function ManualResults(
     | 'onMetadataColumnsChange'
     | 'reliabilityMetric'
     | 'onReliabilityMetricChange'
-    | 'differenceFilterColumns'
-    | 'onDifferenceFilterColumnsChange'
+    | 'differenceFilter'
+    | 'onDifferenceFilterChange'
   >,
 ) {
   const [comparisonColumns, setComparisonColumns] = useState(['reviewer']);
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
   const [reliabilityMetric, setReliabilityMetric] =
     useState<IntercoderReliabilityMetric>('cohens_kappa');
-  const [differenceFilterColumns, setDifferenceFilterColumns] = useState<string[]>([]);
+  const [differenceFilter, setDifferenceFilter] = useState<AnnotationDifferenceFilter | null>(null);
   return (
     <AnnotationResultsPanel
       {...props}
@@ -95,13 +99,13 @@ function ManualResults(
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
-      differenceFilterColumns={differenceFilterColumns}
-      onDifferenceFilterColumnsChange={setDifferenceFilterColumns}
+      differenceFilter={differenceFilter}
+      onDifferenceFilterChange={setDifferenceFilter}
     />
   );
 }
 
-const renderPanel = () => {
+const renderPanel = (correctionColumn: string | null = null) => {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
   });
@@ -110,7 +114,7 @@ const renderPanel = () => {
       <ManualResults
         workspaceId="workspace-1"
         nodeId="node-1"
-        sourceColumns={['text', 'annotation', 'reviewer', 'username', 'record_id']}
+        sourceColumns={['text', 'annotation', 'correction', 'reviewer', 'username', 'record_id']}
         sourceColor="#2563eb"
         rowCount={2380}
         textColumn="text"
@@ -118,6 +122,11 @@ const renderPanel = () => {
         classNodeId="classes"
         classColumn="class"
         descriptionColumn="description"
+        correction={{
+          column: correctionColumn,
+          onColumnChange: vi.fn(),
+          onCreate: vi.fn(),
+        }}
       />
     </QueryClientProvider>,
   );
@@ -132,6 +141,22 @@ describe('AnnotationResultsPanel', () => {
     queryWorkspaceSqlTable.mockReset();
     setCell.mockReset();
     setPagination.mockReset();
+  });
+
+  it('edits the selected correction column without exposing an example shortcut', async () => {
+    const user = userEvent.setup();
+    renderPanel('correction');
+
+    expect(screen.getByRole('combobox', { name: 'Correction column' })).toHaveTextContent(
+      'correction',
+    );
+    expect(screen.queryByRole('button', { name: 'Use as example' })).toBeNull();
+    await user.click(screen.getByRole('combobox', { name: 'Correction for row 1' }));
+    await user.click(screen.getByRole('option', { name: 'job' }));
+
+    await waitFor(() => {
+      expect(setCell).toHaveBeenCalledWith('node-1', 'correction', 0, 'job');
+    });
   });
 
   it('renders the shared full pagination and jumps from its ellipsis popover', async () => {
@@ -152,7 +177,11 @@ describe('AnnotationResultsPanel', () => {
       'bg-card',
     );
     const headers = screen.getAllByRole('columnheader');
-    expect(headers.slice(0, 2).map((header) => header.textContent)).toEqual(['text', 'annotation']);
+    expect(headers[0]).toHaveTextContent('text');
+    expect(headers[1]).toHaveTextContent('annotation');
+    expect(
+      within(headers[1]).getByRole('button', { name: 'Filter any difference for annotation' }),
+    ).toHaveAttribute('aria-pressed', 'false');
     expect(within(headers[2]).getByText('reviewer')).toBeInTheDocument();
     expect(within(headers[2]).getByRole('button', { name: /Cohen’s Kappa/ })).toBeInTheDocument();
     const filterToggle = within(headers[2]).getByRole('button', {
@@ -172,6 +201,32 @@ describe('AnnotationResultsPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }));
 
     expect(setPagination).toHaveBeenCalledWith({ pageIndex: 99, pageSize: 10 });
+  });
+
+  it('keeps the any-difference and per-column filters mutually exclusive', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+
+    renderPanel();
+
+    const anyFilter = screen.getByRole('button', {
+      name: 'Filter any difference for annotation',
+    });
+    const reviewerFilter = screen.getByRole('button', {
+      name: 'Filter difference for reviewer',
+    });
+    await user.click(anyFilter);
+    expect(anyFilter).toHaveAttribute('aria-pressed', 'true');
+    expect(reviewerFilter).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(reviewerFilter);
+    expect(anyFilter).toHaveAttribute('aria-pressed', 'false');
+    expect(reviewerFilter).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows selected metadata alongside manual annotations', async () => {

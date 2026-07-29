@@ -35,6 +35,7 @@ const preview = ({
   ({
     columns: { text: 'text', annotation: 'annotation' },
     sourceColumns: ['text', 'annotation', 'correction', 'review', 'tweet_id'],
+    sourceStringColumns: ['text', 'annotation', 'correction', 'review'],
     sourceComparableColumns: ['text', 'annotation', 'correction', 'review'],
     page: {
       rows: isLoading
@@ -84,6 +85,8 @@ const correction = (column: string | null = null) => ({
   nodeId: 'node-1',
   column,
   classOptions: ['replacement', 'new value'],
+  onCreate: vi.fn(),
+  onUseAsExample: vi.fn(),
 });
 
 function PreviewPanel({
@@ -96,7 +99,7 @@ function PreviewPanel({
   const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
   const [metric, setMetric] = useState<IntercoderReliabilityMetric>('cohens_kappa');
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
-  const [correctionVisible, setCorrectionVisible] = useState(true);
+  const [correctionColumn, setCorrectionColumn] = useState(correctionValue.column);
   return (
     <AnnotationAiPreviewPanel
       preview={previewValue}
@@ -110,8 +113,8 @@ function PreviewPanel({
       metadata={{ columns: metadataColumns, onColumnsChange: setMetadataColumns }}
       correction={{
         ...correctionValue,
-        visible: correctionVisible,
-        onVisibleChange: setCorrectionVisible,
+        column: correctionColumn,
+        onColumnChange: setCorrectionColumn,
       }}
     />
   );
@@ -326,7 +329,7 @@ describe('AnnotationAiPreviewPanel', () => {
     expect(screen.getByRole('columnheader', { name: 'Correction: review' })).toBeInTheDocument();
   });
 
-  it('shows the correction column by default and can hide and restore it', async () => {
+  it('always shows the selected correction and removes it only by selecting None', async () => {
     const user = userEvent.setup();
     render(
       <PreviewPanel
@@ -336,15 +339,13 @@ describe('AnnotationAiPreviewPanel', () => {
     );
 
     expect(screen.getByRole('columnheader', { name: 'Correction: review' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Hide correction' }));
+    expect(screen.getByRole('button', { name: 'Use as example' })).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Correction column' }));
+    await user.click(screen.getByRole('option', { name: 'None' }));
 
     expect(
       screen.queryByRole('columnheader', { name: 'Correction: review' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show correction' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Show correction' }));
-    expect(screen.getByRole('columnheader', { name: 'Correction: review' })).toBeInTheDocument();
   });
 
   it('refreshes only the visible preview page from the lower-right action', async () => {

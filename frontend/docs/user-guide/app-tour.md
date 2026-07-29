@@ -67,12 +67,14 @@ browser or device.
 
 **Question:** *How do I review and correct AI annotations?*
 
-**Answer:** In the Annotation parameter panel, choose an existing **User
-Correction Column** or add one. Preview shows source text, the fresh prediction,
-an arrow, and the correction column separately. Correction choices are written
-to that Data Block column immediately, while predictions remain an unwritten
-preview. **Use the correction column as the example** fills the optional Example
-Data Block controls in the main parameter panel. The collapsed **Advanced** row
+**Answer:** Use the **Correction** selector in the Manual, Preview, or Review
+table toolbar to choose an existing string column, create one, or select
+**None**. Preview shows source text, the fresh prediction, an arrow, and the
+selected correction column separately. Correction choices are written to that
+Data Block column immediately, while predictions remain an unwritten preview.
+Preview and Review also provide **Use as example**, which fills the optional
+Example Data Block controls with the source Data Block and selected correction
+column. Manual omits this shortcut. The collapsed **Advanced** row
 summarizes the selected provider and model; expanding it presents those two
 controls side by side, followed by Prompt and inference controls. **Batch
 size** controls how many rows each Run All LLM request contains (20 by default,
@@ -92,8 +94,8 @@ their target rows blank while successful batches are still written; progress
 updates as each batch finishes. Review uses the standard rows-per-page and
 numbered pagination controls. Annotation keeps one current task: Run All
 replaces Preview, and a later Run All replaces the previous Run All. **Clear
-Results** also clears the selected correction-column draft so the next task
-starts without inheriting it.
+Results** also resets the live correction-column selection to **None** so the
+next task starts without inheriting it.
 
 Manual Annotation also provides **Compare To**. Select one or more other label
 columns to add them as read-only table columns. Non-string columns are omitted
@@ -106,24 +108,29 @@ the whole Data Block. The same comparison columns and reliability choice remain
 selected in all three modes, and each successfully saved Manual label updates
 its scores and counts immediately. **Show metadata** is available beside
 **Compare To** in Manual, Preview, and Review; its per-Data-Block checklist
-selection also remains the same across all three modes. Preview and Review show
-a configured correction column by default. Use **Hide correction** or **Show
-correction** to change only its table visibility; the selected correction
-column and its stored values are left unchanged.
+selection also remains the same across all three modes. The selected correction
+column is always shown and editable. Manual permits editing both the annotation
+and correction columns; Preview and Review keep the prediction or completed
+annotation read-only and permit correction edits. The live selection is retained
+by the Tab, while each submitted Analysis keeps the selection it captured as
+immutable provenance. **Clear Results** resets the live selection to **None**
+without deleting the column or its values.
 
-In Manual and Review, each compared-column header also has a **Filter
-difference** toggle. Turning on more than one toggle shows rows where any
-enabled comparison differs from the current Annotation Column. Filtering is
-performed before pagination, while reliability scores still describe the whole
-Data Block. Resolving a difference in Manual mode removes that row immediately
-when it no longer matches. Preview shows no filter toggles.
+In Manual and Review, the Annotation Column and each compared-column header
+have a visible filter toggle. The Annotation Column toggle shows rows where any
+selected comparison differs. A compared-column toggle shows rows differing
+from that column only. These controls are mutually exclusive, so selecting one
+turns off the previous filter. Filtering is performed before pagination, while
+reliability scores still describe the whole Data Block. Resolving a difference
+in Manual mode removes that row immediately when it no longer matches. Preview
+shows no filter toggles.
 
 The color picker on the **Annotation Data Block** card controls difference
 highlighting in all three modes. The annotation or prediction cell is tinted
 when any selected comparison differs, and each comparison cell is tinted only
 when that particular value differs. A null value is not treated as a
 difference. The chosen color is saved to the Data Block when you start Preview,
-Run All, or Manual Resume; if saving fails, the action does not start.
+Run All, or Manual Start; if saving fails, the action does not start.
 
 ## Recap
 

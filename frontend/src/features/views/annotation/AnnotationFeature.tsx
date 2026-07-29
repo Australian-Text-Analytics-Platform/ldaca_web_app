@@ -40,6 +40,7 @@ import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/Analy
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { cn } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryKeys';
 import { getAnalysisOutputResource } from '../common/analysisApi';
@@ -85,8 +86,6 @@ const EXAMPLE_NODE_CONSTRAINTS: NodeInputConstraints = {
   maxNodes: 1,
 };
 const CREATE_ANNOTATION_COLUMN_ACTION = '__create_annotation_column__';
-const CREATE_CORRECTION_COLUMN_ACTION = '__create_correction_column__';
-const NO_CORRECTION_COLUMN_ACTION = '__no_correction_column__';
 const DEFAULT_ANNOTATION_COLUMN_NAME = 'annotation';
 interface ColumnPickerProps {
   label: string;
@@ -175,7 +174,11 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   } | null>(null);
   const [newAnnotationColumnName, setNewAnnotationColumnName] = useState('');
   const [annotationColumnError, setAnnotationColumnError] = useState<string | null>(null);
-  const [isCorrectionColumnDialogOpen, setIsCorrectionColumnDialogOpen] = useState(false);
+  const [correctionColumnDialog, setCorrectionColumnDialog] = useState<{
+    nodeId: string;
+    annotationColumn: string;
+    columns: string[];
+  } | null>(null);
   const [newCorrectionColumnName, setNewCorrectionColumnName] = useState('');
   const [correctionColumnError, setCorrectionColumnError] = useState<string | null>(null);
   const [hasRun, setHasRun] = useState(false);
@@ -215,16 +218,14 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAiReasoningEffort,
     annotationTargets,
     setAnnotationTarget,
-    annotationDifferenceFilterColumns,
-    setAnnotationDifferenceFilterColumns,
+    annotationDifferenceFilters,
+    setAnnotationDifferenceFilter,
     annotationComparisonColumns,
     setAnnotationComparisonColumns,
     annotationReliabilityMetrics,
     setAnnotationReliabilityMetric,
     annotationMetadataColumns,
     setAnnotationMetadataColumns,
-    annotationHiddenCorrectionColumns,
-    setAnnotationCorrectionVisible,
   } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
   const providerCredentials = useProviderCredentials();
   const selectedAiProvider =
@@ -258,7 +259,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   const [exampleAnnotationColumns, setExampleAnnotationColumns] = useState<Record<string, string>>(
     {},
   );
-  const { currentWorkspaceId } = useWorkspaceData();
+  const { currentWorkspaceId, nodes } = useWorkspaceData();
   const queryClient = useQueryClient();
   const {
     polarsExpressionApply,
@@ -418,10 +419,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     storedAiCorrectionColumn !== resolvedAnnotationColumn
       ? storedAiCorrectionColumn
       : null;
-  const correctionColumnOptions = sourceColumns.filter(
-    (column) => column !== sourceNode?.column && column !== resolvedAnnotationColumn,
-  );
-  const defaultCorrectionColumnName = `${resolvedAnnotationColumn || DEFAULT_ANNOTATION_COLUMN_NAME}.correction`;
+  const defaultCorrectionColumnName = `${correctionColumnDialog?.annotationColumn ?? DEFAULT_ANNOTATION_COLUMN_NAME}.correction`;
 
   // AI-mode preview wiring. Resolve the selected named provider configuration
   // and prompt (user text or the grayed default). The
@@ -490,9 +488,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   };
 
   const handleCreateCorrectionColumn = async () => {
-    if (!sourceNode || !currentWorkspaceId) return;
+    if (!correctionColumnDialog || !currentWorkspaceId) return;
     const columnName = newCorrectionColumnName.trim() || defaultCorrectionColumnName;
-    if (sourceColumns.includes(columnName)) {
+    if (correctionColumnDialog.columns.includes(columnName)) {
       setCorrectionColumnError(`A column named "${columnName}" already exists.`);
       return;
     }
@@ -500,7 +498,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setIsCreatingCorrectionColumn(true);
     try {
       await polarsExpressionApply(
-        sourceNode.id,
+        correctionColumnDialog.nodeId,
         {
           context: 'with_columns',
           expressions: [
@@ -519,8 +517,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         },
         'update',
       );
-      await host.setCorrectionColumn(sourceNode.id, columnName);
-      setIsCorrectionColumnDialogOpen(false);
+      await host.setCorrectionColumn(correctionColumnDialog.nodeId, columnName);
+      setCorrectionColumnDialog(null);
       setNewCorrectionColumnName('');
     } catch (error) {
       console.warn('[annotation] Failed to create correction column:', error);
@@ -532,15 +530,35 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     }
   };
 
-  const useCorrectionColumnAsExample = () => {
-    if (!sourceNode || !aiCorrectionColumn) return;
+  const setLiveCorrectionColumn = (nodeId: string, column: string | null) => {
+    void host.setCorrectionColumn(nodeId, column).catch((error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Could not save the correction column.');
+    });
+  };
+
+  const openCorrectionColumnDialog = (
+    nodeId: string,
+    annotationColumn: string,
+    columns: string[],
+  ) => {
+    setNewCorrectionColumnName('');
+    setCorrectionColumnError(null);
+    setCorrectionColumnDialog({ nodeId, annotationColumn, columns });
+  };
+
+  const handleUseCorrectionColumnAsExample = (
+    nodeId: string,
+    textColumn: string,
+    correctionColumn: string | null,
+  ) => {
+    if (!correctionColumn) return;
     onTabInputSetChange(
       EXAMPLE_NODE_SELECTOR_ID,
-      nodeInputsFromSelections([{ nodeId: sourceNode.id, column: sourceNode.column }]),
+      nodeInputsFromSelections([{ nodeId, column: textColumn }]),
     );
     setExampleAnnotationColumns((current) => ({
       ...current,
-      [sourceNode.id]: aiCorrectionColumn,
+      [nodeId]: correctionColumn,
     }));
   };
 
@@ -666,7 +684,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         nodeInputsFromSelections([{ nodeId: request.node_id, column: request.text_column }]),
       );
       setAnnotationTarget(request.node_id, request.annotation_column);
-      void host.setCorrectionColumn(request.node_id, request.correction_column ?? null);
       onTabInputSetChange(
         CLASS_DESCRIPTION_SELECTOR_ID,
         nodeInputsFromSelections([{ nodeId: request.class_node_id, column: request.class_column }]),
@@ -712,8 +729,30 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     },
     onCleared: refreshAnalyses,
   });
-  const previewCorrectionColumn = serverAiRequest?.correction_column ?? null;
-  const reviewCorrectionColumn = annotationRunAllSource?.correction_column ?? null;
+  const previewCorrectionColumn = serverAiRequest
+    ? (host.correctionColumns[serverAiRequest.node_id] ?? null)
+    : null;
+  const reviewCorrectionColumn = annotationRunAllSource
+    ? (host.correctionColumns[annotationRunAllSource.node_id] ?? null)
+    : null;
+  const resultSourceIds = Array.from(
+    new Set(
+      [serverAiRequest?.node_id, annotationRunAllSource?.node_id].filter(
+        (nodeId): nodeId is string => Boolean(nodeId),
+      ),
+    ),
+  );
+  const resultSourceNodes = nodes.filter((node) => resultSourceIds.includes(node.id));
+  const { columnInfoCache: resultColumnInfoCache } = useNodeColumnInfos({
+    workspaceId: currentWorkspaceId,
+    nodes: resultSourceNodes,
+  });
+  const reviewSourceNode = annotationRunAllSource
+    ? (nodes.find((node) => node.id === annotationRunAllSource.node_id) ?? null)
+    : null;
+  const reviewSourceColumns = annotationRunAllSource
+    ? (resultColumnInfoCache[annotationRunAllSource.node_id]?.map((column) => column.name) ?? [])
+    : [];
   const aiActionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: Boolean(currentAiRequest),
@@ -885,7 +924,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                       void handleManualReviewToggle();
                     }}
                   >
-                    {hasRun ? 'Clear' : 'Resume'}
+                    {hasRun ? 'Close' : 'Start'}
                   </Button>
                 </DisabledReasonTooltip>
               ) : undefined
@@ -1059,71 +1098,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     }
                   >
                     <div className="space-y-2">
-                      <Label
-                        htmlFor="annotation-ai-correction-column"
-                        className="block text-sm font-medium"
-                      >
-                        User Correction Column
-                      </Label>
-                      <Select
-                        value={aiCorrectionColumn ?? NO_CORRECTION_COLUMN_ACTION}
-                        disabled={controlsLocked || !sourceNode || !selectedAnnotationColumnExists}
-                        onValueChange={(next) => {
-                          if (!sourceNode) return;
-                          if (next === CREATE_CORRECTION_COLUMN_ACTION) {
-                            setNewCorrectionColumnName('');
-                            setCorrectionColumnError(null);
-                            setIsCorrectionColumnDialogOpen(true);
-                            return;
-                          }
-                          void host
-                            .setCorrectionColumn(
-                              sourceNode.id,
-                              next === NO_CORRECTION_COLUMN_ACTION ? null : next,
-                            )
-                            .catch((error: unknown) => {
-                              toast.error(
-                                error instanceof Error
-                                  ? error.message
-                                  : 'Could not save the correction column.',
-                              );
-                            });
-                        }}
-                      >
-                        <SelectTrigger
-                          id="annotation-ai-correction-column"
-                          aria-label="User Correction Column"
-                          className="w-full"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value={CREATE_CORRECTION_COLUMN_ACTION}>
-                              Add new column
-                            </SelectItem>
-                            <SelectItem value={NO_CORRECTION_COLUMN_ACTION}>
-                              No correction column
-                            </SelectItem>
-                            {correctionColumnOptions.map((column) => (
-                              <SelectItem key={column} value={column}>
-                                {column}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={!sourceNode || !aiCorrectionColumn || controlsLocked}
-                        onClick={useCorrectionColumnAsExample}
-                      >
-                        Use the correction column as the example
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
                       <Label className="block text-xs font-medium text-muted-foreground">
                         Example Data Block
                         <span className="ml-1 font-normal">(optional)</span>
@@ -1222,10 +1196,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         </DialogContent>
       </Dialog>
       <Dialog
-        open={isCorrectionColumnDialogOpen}
+        open={Boolean(correctionColumnDialog)}
         onOpenChange={(open) => {
           if (open || isCreatingCorrectionColumn) return;
-          setIsCorrectionColumnDialogOpen(false);
+          setCorrectionColumnDialog(null);
           setNewCorrectionColumnName('');
           setCorrectionColumnError(null);
         }}
@@ -1277,7 +1251,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 variant="outline"
                 disabled={isCreatingCorrectionColumn}
                 onClick={() => {
-                  setIsCorrectionColumnDialogOpen(false);
+                  setCorrectionColumnDialog(null);
                   setNewCorrectionColumnName('');
                   setCorrectionColumnError(null);
                 }}
@@ -1326,9 +1300,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           onComparisonColumnsChange={(columns) => {
             setAnnotationComparisonColumns(sourceNode.id, columns);
           }}
-          differenceFilterColumns={annotationDifferenceFilterColumns[sourceNode.id] ?? []}
-          onDifferenceFilterColumnsChange={(columns) => {
-            setAnnotationDifferenceFilterColumns(sourceNode.id, columns);
+          differenceFilter={annotationDifferenceFilters[sourceNode.id] ?? null}
+          onDifferenceFilterChange={(filter) => {
+            setAnnotationDifferenceFilter(sourceNode.id, filter);
           }}
           reliabilityMetric={
             annotationReliabilityMetrics[sourceNode.id] ?? DEFAULT_INTERCODER_RELIABILITY_METRIC
@@ -1339,6 +1313,16 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           metadataColumns={annotationMetadataColumns[sourceNode.id] ?? []}
           onMetadataColumnsChange={(columns) => {
             setAnnotationMetadataColumns(sourceNode.id, columns);
+          }}
+          correction={{
+            column: aiCorrectionColumn,
+            onColumnChange: (column) => {
+              setLiveCorrectionColumn(sourceNode.id, column);
+            },
+            onCreate: () => {
+              openCorrectionColumnDialog(sourceNode.id, resolvedAnnotationColumn, sourceColumns);
+            },
+            disabled: isCreatingCorrectionColumn,
           }}
         />
       ) : null}
@@ -1346,52 +1330,61 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       annotationRunAll?.state === 'succeeded' &&
       annotationRunAllSource &&
       currentWorkspaceId &&
-      sourceNode ? (
+      reviewSourceNode ? (
         <RunAllReviewTable
           workspaceId={currentWorkspaceId}
-          nodeId={sourceNode.id}
-          sql={`SELECT * FROM ${sqlTable(sourceNode.id)}`}
-          sourceColumns={sourceColumns}
-          sourceColor={sourceColor ?? GREY}
-          rowCount={sourceNode.node.shape?.[0] ?? 0}
+          nodeId={annotationRunAllSource.node_id}
+          sql={`SELECT * FROM ${sqlTable(annotationRunAllSource.node_id)}`}
+          sourceColumns={reviewSourceColumns}
+          sourceColor={reviewSourceNode.color ?? GREY}
+          rowCount={reviewSourceNode.shape?.[0] ?? 0}
           title="Annotation"
           requiredColumns={[
             annotationRunAllSource.text_column,
             annotationRunAllSource.annotation_column,
-            ...(reviewCorrectionColumn ? [reviewCorrectionColumn] : []),
           ]}
           comparisonColumn={annotationRunAllSource.annotation_column}
-          comparisonColumns={annotationComparisonColumns[sourceNode.id] ?? []}
+          comparisonColumns={annotationComparisonColumns[annotationRunAllSource.node_id] ?? []}
           onComparisonColumnsChange={(columns) => {
-            setAnnotationComparisonColumns(sourceNode.id, columns);
+            setAnnotationComparisonColumns(annotationRunAllSource.node_id, columns);
           }}
-          differenceFilterColumns={annotationDifferenceFilterColumns[sourceNode.id] ?? []}
-          onDifferenceFilterColumnsChange={(columns) => {
-            setAnnotationDifferenceFilterColumns(sourceNode.id, columns);
+          differenceFilter={annotationDifferenceFilters[annotationRunAllSource.node_id] ?? null}
+          onDifferenceFilterChange={(filter) => {
+            setAnnotationDifferenceFilter(annotationRunAllSource.node_id, filter);
           }}
           reliabilityMetric={
-            annotationReliabilityMetrics[sourceNode.id] ?? DEFAULT_INTERCODER_RELIABILITY_METRIC
+            annotationReliabilityMetrics[annotationRunAllSource.node_id] ??
+            DEFAULT_INTERCODER_RELIABILITY_METRIC
           }
           onReliabilityMetricChange={(metric) => {
-            setAnnotationReliabilityMetric(sourceNode.id, metric);
+            setAnnotationReliabilityMetric(annotationRunAllSource.node_id, metric);
           }}
-          metadataColumns={annotationMetadataColumns[sourceNode.id] ?? []}
+          metadataColumns={annotationMetadataColumns[annotationRunAllSource.node_id] ?? []}
           onMetadataColumnsChange={(columns) => {
-            setAnnotationMetadataColumns(sourceNode.id, columns);
+            setAnnotationMetadataColumns(annotationRunAllSource.node_id, columns);
           }}
-          correction={
-            reviewCorrectionColumn
-              ? {
-                  column: reviewCorrectionColumn,
-                  visible: !(annotationHiddenCorrectionColumns[sourceNode.id] ?? []).includes(
-                    reviewCorrectionColumn,
-                  ),
-                  onVisibleChange: (visible) => {
-                    setAnnotationCorrectionVisible(sourceNode.id, reviewCorrectionColumn, visible);
-                  },
-                }
-              : undefined
-          }
+          correction={{
+            column: reviewCorrectionColumn,
+            classOptions: annotationRunAllSource.classes.map((item) => item.name),
+            onColumnChange: (column) => {
+              setLiveCorrectionColumn(annotationRunAllSource.node_id, column);
+            },
+            onCreate: () => {
+              openCorrectionColumnDialog(
+                annotationRunAllSource.node_id,
+                annotationRunAllSource.annotation_column,
+                reviewSourceColumns,
+              );
+            },
+            onUseAsExample: () => {
+              handleUseCorrectionColumnAsExample(
+                annotationRunAllSource.node_id,
+                annotationRunAllSource.text_column,
+                reviewCorrectionColumn,
+              );
+            },
+            disabled: isCreatingCorrectionColumn,
+          }}
         />
       ) : annotationMode === 'ai' && aiResult && serverAiRequest ? (
         <AnnotationAiPreviewPanel
@@ -1419,19 +1412,24 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
             nodeId: serverAiRequest.node_id,
             column: previewCorrectionColumn,
             classOptions: serverAiRequest.classes.map((item) => item.name),
-            visible:
-              !previewCorrectionColumn ||
-              !(annotationHiddenCorrectionColumns[serverAiRequest.node_id] ?? []).includes(
-                previewCorrectionColumn,
-              ),
-            onVisibleChange: (visible) => {
-              if (!previewCorrectionColumn) return;
-              setAnnotationCorrectionVisible(
+            onColumnChange: (column) => {
+              setLiveCorrectionColumn(serverAiRequest.node_id, column);
+            },
+            onCreate: () => {
+              openCorrectionColumnDialog(
                 serverAiRequest.node_id,
-                previewCorrectionColumn,
-                visible,
+                serverAiRequest.annotation_column,
+                aiPreview.sourceColumns,
               );
             },
+            onUseAsExample: () => {
+              handleUseCorrectionColumnAsExample(
+                serverAiRequest.node_id,
+                serverAiRequest.text_column,
+                previewCorrectionColumn,
+              );
+            },
+            disabled: isCreatingCorrectionColumn,
           }}
         />
       ) : null}

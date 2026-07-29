@@ -157,7 +157,7 @@ describe('ColumnComparison', () => {
   it('exposes the accessible difference-filter toggle when the table enables it', async () => {
     const user = userEvent.setup();
     const onDifferenceFilterChange = vi.fn();
-    render(
+    const { rerender } = render(
       <ColumnComparisonHeader
         metric="cohens_kappa"
         referenceColumn="annotation"
@@ -172,10 +172,25 @@ describe('ColumnComparison', () => {
 
     const toggle = screen.getByRole('button', { name: 'Filter difference for review' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle.textContent).toBe('');
     await user.hover(toggle);
     expect((await screen.findAllByText('Filter difference'))[0]).toBeVisible();
     await user.click(toggle);
     expect(onDifferenceFilterChange).toHaveBeenCalledWith(true);
+    rerender(
+      <ColumnComparisonHeader
+        metric="cohens_kappa"
+        referenceColumn="annotation"
+        comparisonColumn="review"
+        rows={rows}
+        isLoading={false}
+        isError={false}
+        differenceFilterActive
+        onDifferenceFilterChange={onDifferenceFilterChange}
+      />,
+    );
+    const activeToggle = screen.getByRole('button', { name: 'Filter difference for review' });
+    expect(activeToggle.textContent).toBe('');
   });
 
   it('offers all reliability metrics above the comparison checklist', async () => {

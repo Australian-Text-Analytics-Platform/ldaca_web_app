@@ -1,15 +1,20 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
+import type { AnnotationDifferenceFilter } from '@/features/views/annotation/annotationDifferenceQuery';
 import { RunAllReviewTable } from '../RunAllReviewTable';
 
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
+const setCell = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
   queryWorkspaceSqlTable,
+}));
+vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
+  useWorkspaceActions: () => ({ setCell }),
 }));
 
 function ReviewTable({
@@ -24,15 +29,17 @@ function ReviewTable({
   | 'reliabilityMetric'
   | 'onReliabilityMetricChange'
   | 'correction'
-  | 'differenceFilterColumns'
-  | 'onDifferenceFilterColumnsChange'
+  | 'differenceFilter'
+  | 'onDifferenceFilterChange'
 > & { correctionColumn?: string }) {
   const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
-  const [correctionVisible, setCorrectionVisible] = useState(true);
+  const [selectedCorrectionColumn, setSelectedCorrectionColumn] = useState(
+    correctionColumn ?? null,
+  );
   const [reliabilityMetric, setReliabilityMetric] =
     useState<IntercoderReliabilityMetric>('cohens_kappa');
-  const [differenceFilterColumns, setDifferenceFilterColumns] = useState<string[]>([]);
+  const [differenceFilter, setDifferenceFilter] = useState<AnnotationDifferenceFilter | null>(null);
   return (
     <RunAllReviewTable
       {...props}
@@ -42,22 +49,28 @@ function ReviewTable({
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
-      differenceFilterColumns={differenceFilterColumns}
-      onDifferenceFilterColumnsChange={setDifferenceFilterColumns}
-      correction={
-        correctionColumn
-          ? {
-              column: correctionColumn,
-              visible: correctionVisible,
-              onVisibleChange: setCorrectionVisible,
-            }
-          : undefined
-      }
+      differenceFilter={differenceFilter}
+      onDifferenceFilterChange={setDifferenceFilter}
+      correction={{
+        column: selectedCorrectionColumn,
+        classOptions: ['label', 'corrected'],
+        onColumnChange: setSelectedCorrectionColumn,
+        onCreate: vi.fn(),
+        onUseAsExample: vi.fn(),
+      }}
     />
   );
 }
 
 describe('RunAllReviewTable', () => {
+  beforeEach(() => {
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn();
+    window.HTMLElement.prototype.setPointerCapture = vi.fn();
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    setCell.mockReset();
+    setCell.mockResolvedValue(undefined);
+  });
   it('renders Review rows in the shared analysis table frame', async () => {
     queryWorkspaceSqlTable.mockResolvedValue({
       columns: ['text', 'annotation'],
@@ -175,7 +188,7 @@ describe('RunAllReviewTable', () => {
     );
 
     expect(await screen.findByRole('columnheader', { name: 'text' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'annotation' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /annotation/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'username' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Show metadata' }));
@@ -186,17 +199,32 @@ describe('RunAllReviewTable', () => {
     expect(screen.getByText('alice')).toBeInTheDocument();
   });
 
-  it('shows the correction column by default and hides it without exposing it as metadata', async () => {
+  it('always shows the selected correction and removes it only by selecting None', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockResolvedValue({
-      columns: ['text', 'annotation', 'correction', 'username'],
+      columns: [
+        '__wordflow_annotation_source_row_index',
+        'text',
+        'annotation',
+        'correction',
+        'username',
+      ],
       schema: [
+        { name: '__wordflow_annotation_source_row_index', kind: 'integer' },
         { name: 'text', kind: 'string' },
         { name: 'annotation', kind: 'string' },
         { name: 'correction', kind: 'string' },
         { name: 'username', kind: 'string' },
       ],
-      rows: [{ text: 'Example', annotation: 'label', correction: 'corrected', username: 'alice' }],
+      rows: [
+        {
+          __wordflow_annotation_source_row_index: 0,
+          text: 'Example',
+          annotation: 'label',
+          correction: 'corrected',
+          username: 'alice',
+        },
+      ],
       hasNext: false,
     });
 
@@ -219,16 +247,24 @@ describe('RunAllReviewTable', () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole('columnheader', { name: 'correction' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Hide correction' }));
+    expect(
+      await screen.findByRole('columnheader', { name: 'Correction: correction' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use as example' })).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Correction for row 1' }));
+    await user.click(screen.getByRole('option', { name: 'label' }));
+    await waitFor(() => {
+      expect(setCell).toHaveBeenCalledWith('node-1', 'correction', 0, 'label');
+    });
+    await user.click(screen.getByRole('combobox', { name: 'Correction column' }));
+    await user.click(screen.getByRole('option', { name: 'None' }));
 
-    expect(screen.queryByRole('columnheader', { name: 'correction' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Correction: correction' }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Show metadata' }));
     expect(screen.queryByRole('menuitemcheckbox', { name: 'correction' })).not.toBeInTheDocument();
     await user.keyboard('{Escape}');
-
-    await user.click(screen.getByRole('button', { name: 'Show correction' }));
-    expect(screen.getByRole('columnheader', { name: 'correction' })).toBeInTheDocument();
   });
 
   it('compares the full annotation column with multiple selected columns', async () => {
@@ -322,21 +358,38 @@ describe('RunAllReviewTable', () => {
     ).not.toBeInTheDocument();
     const reviewTable = screen.getAllByRole('table')[0];
     const headers = within(reviewTable).getAllByRole('columnheader');
-    expect(headers.slice(0, 3).map((header) => header.textContent)).toEqual([
-      'text',
-      'annotation',
-      'correction',
-    ]);
+    expect(headers[0]).toHaveTextContent('text');
+    expect(headers[1]).toHaveTextContent('annotation');
+    expect(headers[2]).toHaveTextContent('correction');
     expect(within(headers[3]).getByText('reviewer_one')).toBeInTheDocument();
     expect(within(headers[4]).getByText('reviewer_two')).toBeInTheDocument();
     expect(
       within(headers[3]).getByRole('button', { name: 'Filter difference for reviewer_one' }),
     ).toHaveAttribute('aria-pressed', 'false');
+    const anyFilter = within(headers[1]).getByRole('button', {
+      name: 'Filter any difference for annotation',
+    });
+    await user.click(anyFilter);
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Filter any difference for annotation' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+    await user.click(screen.getByRole('button', { name: 'Filter difference for reviewer_one' }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Filter any difference for annotation' }),
+      ).toHaveAttribute('aria-pressed', 'false');
+      expect(
+        screen.getByRole('button', { name: 'Filter difference for reviewer_one' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+    const filteredReviewTable = screen.getAllByRole('table')[0];
     expect(
-      within(reviewTable).getByRole('row', { name: 'Example covid job job other' }),
+      within(filteredReviewTable).getByRole('row', { name: 'Example covid job job other' }),
     ).toBeInTheDocument();
     const resultCells = within(
-      within(reviewTable).getByRole('row', { name: 'Example covid job job other' }),
+      within(filteredReviewTable).getByRole('row', { name: 'Example covid job job other' }),
     ).getAllByRole('cell');
     expect(resultCells[1]).toHaveAttribute('style', expect.stringContaining('background-color'));
     expect(resultCells[3]).toHaveAttribute('style', expect.stringContaining('background-color'));

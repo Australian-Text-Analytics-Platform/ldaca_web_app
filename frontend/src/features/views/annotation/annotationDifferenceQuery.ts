@@ -17,8 +17,11 @@ interface AnnotationDifferenceQueryArgs {
   sourceSql: string;
   sourceColumns: readonly string[];
   annotationColumn: string;
-  differenceColumns: readonly string[];
+  comparisonColumns: readonly string[];
+  differenceFilter: AnnotationDifferenceFilter | null;
 }
+
+export type AnnotationDifferenceFilter = { kind: 'any' } | { kind: 'column'; column: string };
 
 export interface AnnotationDifferenceQuery {
   pageSql: string;
@@ -31,13 +34,24 @@ export function buildAnnotationDifferenceQuery({
   sourceSql,
   sourceColumns,
   annotationColumn,
-  differenceColumns,
+  comparisonColumns,
+  differenceFilter,
 }: AnnotationDifferenceQueryArgs): AnnotationDifferenceQuery {
   const sourceRowIndexColumn = uniqueColumnName(SOURCE_ROW_INDEX, sourceColumns);
   const sourceName = sqlIdentifier(SOURCE_CTE);
   const indexedName = sqlIdentifier(INDEXED_CTE);
   const filteredName = sqlIdentifier(FILTERED_CTE);
   const rowIndexName = sqlIdentifier(sourceRowIndexColumn);
+  const selectedComparisonColumns = comparisonColumns.filter(
+    (column) => column !== annotationColumn && sourceColumns.includes(column),
+  );
+  const differenceColumns =
+    differenceFilter?.kind === 'any'
+      ? selectedComparisonColumns
+      : differenceFilter?.kind === 'column' &&
+          selectedComparisonColumns.includes(differenceFilter.column)
+        ? [differenceFilter.column]
+        : [];
   const predicate = differenceColumns
     .map((column) => `${sqlIdentifier(annotationColumn)} != ${sqlIdentifier(column)}`)
     .join(' OR ');

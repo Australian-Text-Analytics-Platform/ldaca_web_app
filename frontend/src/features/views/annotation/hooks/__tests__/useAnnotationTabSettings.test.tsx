@@ -26,17 +26,14 @@ describe('useAnnotationTabSettings', () => {
           annotationComparisonColumns: JSON.stringify({
             'source-node': ['reviewer_one', 'reviewer_two'],
           }),
-          annotationDifferenceFilterColumns: JSON.stringify({
-            'source-node': ['reviewer_two'],
+          annotationDifferenceFilters: JSON.stringify({
+            'source-node': { kind: 'column', column: 'reviewer_two' },
           }),
           annotationReliabilityMetrics: JSON.stringify({
             'source-node': 'krippendorffs_alpha',
           }),
           annotationMetadataColumns: JSON.stringify({
             'source-node': ['username', 'created_at'],
-          }),
-          annotationHiddenCorrectionColumns: JSON.stringify({
-            'source-node': ['annotation.correction'],
           }),
         },
       }),
@@ -60,17 +57,14 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.annotationComparisonColumns).toEqual({
       'source-node': ['reviewer_one', 'reviewer_two'],
     });
-    expect(result.current.annotationDifferenceFilterColumns).toEqual({
-      'source-node': ['reviewer_two'],
+    expect(result.current.annotationDifferenceFilters).toEqual({
+      'source-node': { kind: 'column', column: 'reviewer_two' },
     });
     expect(result.current.annotationReliabilityMetrics).toEqual({
       'source-node': 'krippendorffs_alpha',
     });
     expect(result.current.annotationMetadataColumns).toEqual({
       'source-node': ['username', 'created_at'],
-    });
-    expect(result.current.annotationHiddenCorrectionColumns).toEqual({
-      'source-node': ['annotation.correction'],
     });
   });
 
@@ -104,7 +98,6 @@ describe('useAnnotationTabSettings', () => {
       ]);
       result.current.setAnnotationReliabilityMetric('source-node', 'percent_agreement');
       result.current.setAnnotationMetadataColumns('source-node', ['username', 'created_at']);
-      result.current.setAnnotationCorrectionVisible('source-node', 'annotation.correction', false);
     });
 
     expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
@@ -140,35 +133,9 @@ describe('useAnnotationTabSettings', () => {
       'annotationMetadataColumns',
       JSON.stringify({ 'source-node': ['username', 'created_at'] }),
     );
-    expect(onTabSettingChange).toHaveBeenCalledWith(
-      'annotationHiddenCorrectionColumns',
-      JSON.stringify({ 'source-node': ['annotation.correction'] }),
-    );
   });
 
-  it('shows correction columns by default and removes their hidden override when shown', () => {
-    const onTabSettingChange = vi.fn();
-    const { result } = renderHook(() =>
-      useAnnotationTabSettings({ tabSettings: {}, onTabSettingChange }),
-    );
-
-    expect(result.current.annotationHiddenCorrectionColumns).toEqual({});
-
-    act(() => {
-      result.current.setAnnotationCorrectionVisible('source-node', 'annotation.correction', false);
-    });
-    expect(result.current.annotationHiddenCorrectionColumns).toEqual({
-      'source-node': ['annotation.correction'],
-    });
-
-    act(() => {
-      result.current.setAnnotationCorrectionVisible('source-node', 'annotation.correction', true);
-    });
-    expect(result.current.annotationHiddenCorrectionColumns).toEqual({});
-    expect(onTabSettingChange).toHaveBeenLastCalledWith('annotationHiddenCorrectionColumns', '{}');
-  });
-
-  it('persists filters per Data Block and prunes deselected comparison columns', () => {
+  it('persists one exclusive filter per Data Block and prunes a deselected target', () => {
     const onTabSettingChange = vi.fn();
     const { result } = renderHook(() =>
       useAnnotationTabSettings({ tabSettings: {}, onTabSettingChange }),
@@ -179,25 +146,27 @@ describe('useAnnotationTabSettings', () => {
         'reviewer_one',
         'reviewer_two',
       ]);
-      result.current.setAnnotationDifferenceFilterColumns('source-node', [
-        'reviewer_one',
-        'reviewer_two',
-      ]);
+      result.current.setAnnotationDifferenceFilter('source-node', { kind: 'any' });
     });
-    expect(result.current.annotationDifferenceFilterColumns).toEqual({
-      'source-node': ['reviewer_one', 'reviewer_two'],
+    expect(result.current.annotationDifferenceFilters).toEqual({
+      'source-node': { kind: 'any' },
+    });
+
+    act(() => {
+      result.current.setAnnotationDifferenceFilter('source-node', {
+        kind: 'column',
+        column: 'reviewer_one',
+      });
+    });
+    expect(result.current.annotationDifferenceFilters).toEqual({
+      'source-node': { kind: 'column', column: 'reviewer_one' },
     });
 
     act(() => {
       result.current.setAnnotationComparisonColumns('source-node', ['reviewer_two']);
     });
-    expect(result.current.annotationDifferenceFilterColumns).toEqual({
-      'source-node': ['reviewer_two'],
-    });
-    expect(onTabSettingChange).toHaveBeenLastCalledWith(
-      'annotationDifferenceFilterColumns',
-      JSON.stringify({ 'source-node': ['reviewer_two'] }),
-    );
+    expect(result.current.annotationDifferenceFilters).toEqual({});
+    expect(onTabSettingChange).toHaveBeenLastCalledWith('annotationDifferenceFilters', '{}');
   });
 
   it('retains every target when two selectors persist before React rerenders', () => {

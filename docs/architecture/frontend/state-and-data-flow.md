@@ -77,10 +77,12 @@ the same provider type is chosen; otherwise the selection is cleared. Preview
 inference is a page query against a Preview-scoped Analysis and its pages use
 zero-lifetime Query entries. Labels are not written into the source.
 Choosing a correction is instead an explicit Workspace `set_cell`
-action against the selected correction column. The parameter panel owns column
-selection and creation, and captures the exact selection in every Preview or
-Run All request. **Clear Results** clears both the Analysis forest and this Tab
-draft so a new task does not inherit the prior correction column. The Example
+action against the selected correction column. A shared table-toolbar control
+owns live selection and creation in Manual, Preview, and Review. That selection
+is persisted immediately in the Tab and captured as an immutable provenance
+snapshot in every Preview or Run All request. Hydrating a historical request
+does not overwrite newer Tab state. **Clear Results** clears both the Analysis
+forest and this Tab selection without deleting the column or its values. The Example
 Data Block selector stays in the main parameter panel. The collapsed
 **Advanced** row summarizes Provider and Model; its expanded content keeps those
 controls side by side with prompt and inference settings below. The Run All
@@ -88,30 +90,32 @@ processing mode, batch size, and per-batch retry limit are captured in the
 immutable Analysis request. Reprocessing every row is the default; users
 can instead fill only blank annotations. Batch size defaults to 20 rows and is
 bounded to 100 rows, while two retries provide at most three attempts per batch;
-the correction column can seed the source Data Block and its correction column
-as the example pair. Hydrating a historical Analysis first restores its exact
-safe request snapshot, so any provider fallback is visible to re-run change
-detection rather than rewriting the historical request.
+Preview and Review toolbars can seed the source Data Block and selected
+correction column as the example pair. Provider fallback remains visible to
+re-run change detection rather than rewriting a historical request.
 
 Annotation comparison columns, reliability metric, and metadata selections are
 presentation state keyed by source Data Block and are shared by Manual, Preview,
 and Review in the same Tab. Comparison choices are restricted to string and
 categorical schema columns. Cohen's Kappa is the default metric; Percent
 Agreement and nominal Krippendorff's Alpha use the same grouped counts.
-Manual and Review also retain enabled difference filters per source Data Block.
-Removing a comparison column removes its filter, while Preview ignores filter
-state. Each filtered page and its exact row count are separate Workspace SQL
-Query resources keyed by the generated predicate and pagination. The backend
-applies multiple enabled comparisons with OR before pagination. Manual pages
-carry a transient absolute source-row number created before filtering so an
-edit still targets the original Data Block row; that transport column is never
-shown or persisted. After a successful edit, the page and filtered count
-refresh immediately and pagination clamps if the final page becomes empty.
-Correction-column visibility is keyed by source Data Block and correction
-column; a missing hidden override means the correction is shown. Hiding it
-changes only the Preview and Review table projection, not the request selection
-or stored correction values. Preview compares only its current page. Manual and
-Review use a dedicated full-table grouped-count Query resource keyed by
+Manual and Review retain one exclusive difference filter per source Data Block:
+either any selected comparison or one named comparison column. Removing the
+named comparison removes its filter, while Preview ignores filter state. Each
+filtered page and its exact row count are separate Workspace SQL Query
+resources keyed by the generated predicate and pagination. The backend applies
+the selected-column predicate, or OR across every selected comparison for the
+any-difference choice, before pagination. Manual pages carry a transient
+absolute source-row number created before filtering so an edit still targets
+the original Data Block row; that transport column is never shown or persisted.
+After a successful edit, the page and filtered count refresh immediately and
+pagination clamps if the final page becomes empty.
+When selected, the correction column is always present and editable. Manual
+edits annotation and correction cells; Preview and Review edit only correction
+cells and keep their prediction or submitted annotation read-only. Each write
+uses the transient absolute source-row number, disables only the affected cell,
+and rolls back its local value on failure. Preview compares only its current
+page. Manual and Review use a dedicated full-table grouped-count Query resource keyed by
 Workspace, Data Block dependencies, source SQL, reference column, and target
 column. Compared columns project that resource as the selected reliability
 value beside the table header and a plain count matrix on hover or focus; no
@@ -127,7 +131,7 @@ tint: the annotation or prediction cell is tinted when any selected comparison
 differs, and an individual comparison cell is tinted only when that value
 differs. Null pairs follow ordinary SQL inequality semantics and are neither
 filtered nor highlighted. The shared color control commits `Node.color` before
-Preview, Run All, or Manual Resume; a failed commit aborts that action.
+Preview, Run All, or Manual Start; a failed commit aborts that action.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts

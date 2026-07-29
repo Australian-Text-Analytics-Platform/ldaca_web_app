@@ -25,6 +25,42 @@ export type { ConfusionCount } from '@/features/views/common/columnComparisonMod
 
 const displayLabel = (value: string): string => (value === '' ? '(blank)' : value);
 
+interface DifferenceFilterButtonProps {
+  active: boolean;
+  ariaLabel: string;
+  tooltip: string;
+  onActiveChange: (active: boolean) => void;
+}
+
+/** Prominent exclusive filter control used by Annotation table headers. */
+export function DifferenceFilterButton({
+  active,
+  ariaLabel,
+  tooltip,
+  onActiveChange,
+}: DifferenceFilterButtonProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant={active ? 'default' : 'outline'}
+          size="sm"
+          className="size-7 p-0"
+          aria-label={ariaLabel}
+          aria-pressed={active}
+          onClick={() => {
+            onActiveChange(!active);
+          }}
+        >
+          <Filter aria-hidden="true" className="size-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 interface ColumnComparisonHeaderProps {
   label?: string;
   metric: IntercoderReliabilityMetric;
@@ -160,24 +196,12 @@ export function ColumnComparisonHeader({
           </TooltipContent>
         </Tooltip>
         {onDifferenceFilterChange ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={differenceFilterActive ? 'secondary' : 'outline'}
-                size="icon"
-                className="size-7"
-                aria-label={`Filter difference for ${comparisonColumn}`}
-                aria-pressed={differenceFilterActive}
-                onClick={() => {
-                  onDifferenceFilterChange(!differenceFilterActive);
-                }}
-              >
-                <Filter aria-hidden="true" className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Filter difference</TooltipContent>
-          </Tooltip>
+          <DifferenceFilterButton
+            active={differenceFilterActive}
+            ariaLabel={`Filter difference for ${comparisonColumn}`}
+            tooltip="Filter difference"
+            onActiveChange={onDifferenceFilterChange}
+          />
         ) : null}
       </TooltipProvider>
     </span>

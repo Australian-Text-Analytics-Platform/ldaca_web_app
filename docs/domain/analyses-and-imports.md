@@ -114,12 +114,12 @@ comparison resource next refetches.
 AI Annotation Preview is a Preview-scoped Analysis. Each requested page is
 fresh inference over the retained snapshot. Predictions are never written
 automatically. Reviewer corrections are explicit `set_cell` Data Block Edits
-to the correction column captured by the immutable request. The editable
-selection is stored on the Tab until **Clear Results** removes it. Preview
-renders the prediction and correction as separate columns with an intervening
-arrow. A configured correction column is visible by default; hiding it changes
-only the table projection and leaves the correction-column selection and values
-untouched. Preview comparisons reuse the same header-level presentation as
+to the correction column currently selected by the Tab. The immutable request
+retains the selection captured at submission for provenance, but never
+overwrites newer Tab state. Selecting **None** or using **Clear Results** clears
+the live selection without deleting the column or its values. Preview renders
+the prediction and selected editable correction as separate columns with an
+intervening arrow. Preview comparisons reuse the same header-level presentation as
 Review, but count only the fresh predictions and selected comparison-column
 values on the current Preview page. Selected comparison columns appear as
 read-only columns after the optional correction column. Their headers show
@@ -140,10 +140,12 @@ rows so partial completion remains explicit after publication.
 Submitting it replaces the current Annotation Preview or Run All immediately;
 a later Run All likewise replaces the earlier Run All.
 
-Annotation Review shows the document, annotation, and configured correction
-columns by default, with other columns available through the metadata selector.
-The correction visibility control changes only the table projection. Its shared
-table footer provides rows-per-page selection and direct numbered pagination.
+Annotation Review shows the document and read-only completed annotation, plus
+the selected editable correction column, with other columns available through
+the metadata selector. Manual exposes the same correction selector while also
+keeping the annotation editable. Preview and Review can use the selected
+correction as the Example Data Block; Manual intentionally omits that shortcut.
+The shared table footer provides rows-per-page selection and direct numbered pagination.
 **Compare To** accepts one or more other columns and adds them as read-only
 table columns after the optional correction column in Manual and Run All
 Review. Each selected column header shows the selected reliability score and
