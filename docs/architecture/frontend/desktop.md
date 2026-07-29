@@ -77,43 +77,39 @@ webview cannot supply an arbitrary URL or privileged headers.
 
 ## Application Updates
 
-The official Tauri updater is the only application-update path. Tauri creates a
-dedicated native updater window at launch and keeps it hidden while its
-lightweight React entry checks once for a newer signed release. The window is
-shown only when startup discovers an update. The native application menu
-exposes **Check for Updates…** as the sole manual control and emits one event to
-that same window. Each manifest request has a 15-second timeout so the window
-can present a retryable error instead of remaining in its checking state.
-Settings and the main webview do not duplicate updater state.
-The web deployment never renders the updater entry or loads native updater APIs.
+The official Tauri updater is the only application-update path. Rust owns the
+signed update resource and the complete check, download, install, and restart
+lifecycle. The native application menu exposes **Check for Updates…** as the
+sole control. Checks are manual; application startup performs no update request
+and creates no updater window. Rust applies a 15-second request timeout and
+uses standard operating-system dialogs for the up-to-date result, errors, and
+the install confirmation. The main React application and web deployment have
+no updater UI, state, dependencies, or permissions.
 
 ```mermaid
 sequenceDiagram
     participant Menu as Native application menu
-    participant Window as Native updater window
-    participant UI as Updater React entry
+    participant Rust as Rust updater owner
+    participant Dialog as Native system dialog
     participant Plugin as Tauri updater plugin
     participant Release as GitHub Release
-    participant Process as Tauri process plugin
 
-    alt Desktop startup
-        Window->>UI: load hidden updater entry
-        UI->>Plugin: quiet check
-    else Manual check
-        Menu->>Window: Check for Updates event
-        Window->>Window: show and focus
-        UI->>Plugin: check
-    end
+    Menu->>Rust: request check
+    Rust->>Plugin: check with timeout
     Plugin->>Release: fetch latest.json
     Release-->>Plugin: version, platform URL, signature
-    Plugin-->>UI: newer signed release metadata or none
-    UI->>Window: show only for a newer startup release
-    UI->>UI: ask user before installation
-    UI->>Plugin: download and install
-    Plugin->>Release: stream platform updater artifact
-    Plugin->>Plugin: verify embedded public key signature
-    Plugin-->>UI: installed
-    UI->>Process: relaunch
+    Plugin-->>Rust: newer signed release metadata or none
+    alt No update or check error
+        Rust->>Dialog: show native result
+    else Newer release
+        Rust->>Dialog: ask to download and restart
+        Dialog-->>Rust: user accepts
+        Rust->>Plugin: download and install
+        Plugin->>Release: stream platform updater artifact
+        Plugin->>Plugin: verify embedded public key signature
+        Plugin-->>Rust: installed
+        Rust->>Rust: restart application
+    end
 ```
 
 The updater public key and endpoint are compiled into Tauri configuration.
@@ -121,9 +117,6 @@ The private updater key exists only as GitHub Actions secrets. GitHub Releases
 retain the versioned installers and updater packages; neither the FastAPI
 backend nor a Workspace stores application versions. Release tags and assets
 are treated as immutable after publication.
-
-Closing the updater window hides it and preserves its live update resource;
-only closing the main window shuts down the local backend and exits the app.
 
 Main-window close requests trigger bounded process-tree termination before the
 window closes. Unix uses a process group with escalation; Windows terminates

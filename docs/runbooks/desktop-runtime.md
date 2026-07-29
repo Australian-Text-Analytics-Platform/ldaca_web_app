@@ -103,8 +103,9 @@ exclusively to the new key.
 For each published version, verify the GitHub Release contains `latest.json`,
 the MSI and signature, the Apple Silicon updater archive and signature, and the
 notarized DMG. Open the quarantined DMG on a clean Mac, confirm Gatekeeper
-acceptance, then confirm an older signed build discovers the release at startup
-and opens the separate native updater window. Verify a current build opens no
-window at startup. Dismiss the updater, choose **Check for Updates…** from the
-native application menu, and confirm the same native window finds the release.
-Installation must verify, relaunch, and report the new version.
+acceptance, and verify startup performs no updater request and opens no updater
+window. In an older signed build, choose **Check for Updates…** from the native
+application menu, accept the standard system confirmation, and verify the app
+downloads, verifies, installs, and relaunches into the new version. In a current
+build, the same menu action must show the native up-to-date dialog. Failed checks
+must show a native error dialog within the Rust-owned 15-second request timeout.

@@ -58,10 +58,9 @@ normally reuse a published package version.
   ldaca-wordflow --help`.
 - Confirm the MSI, DMG, both updater signatures, macOS updater archive, and
   `latest.json` exist in the GitHub Release.
-- Install an older signed build and verify both its quiet startup check and
-  **Check for Updates…** in the native application menu discover the release.
-  The startup check must open the separate native updater window only when the
-  release is newer. Install it and confirm the app relaunches into the new
-  version.
+- Install an older signed build and verify startup performs no updater request.
+  Choose **Check for Updates…** in the native application menu, accept the
+  standard system confirmation, and confirm the app installs the release and
+  relaunches into the new version.
 - Deploy the tagged root commit and current submodule pointers.
 - Verify `/health`, hosted login, one Workspace read, and `/api/events` delivery.

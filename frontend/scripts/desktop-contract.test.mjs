@@ -61,24 +61,37 @@ describe('desktop configuration contracts', () => {
     const cargo = read('frontend/src-tauri/Cargo.toml');
     const packageJson = JSON.parse(read('frontend/package.json'));
     const desktopShell = read('frontend/src-tauri/src/lib.rs');
-    const updaterRuntime = read('frontend/src/features/desktop-updater/desktopUpdaterRuntime.ts');
+    const nativeUpdater = read('frontend/src-tauri/src/desktop_updater.rs');
 
     expect(tauri.bundle.createUpdaterArtifacts).toBe(true);
     expect(tauri.plugins.updater.endpoints).toEqual([
       'https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/releases/latest/download/latest.json',
     ]);
-    expect(capability.permissions).toContain('updater:default');
-    expect(capability.permissions).toContain('process:allow-restart');
+    expect(capability.permissions).not.toContain('updater:default');
+    expect(capability.permissions).not.toContain('process:allow-restart');
     expect(cargo).toContain('tauri-plugin-updater = "2"');
-    expect(cargo).toContain('tauri-plugin-process = "2"');
-    expect(packageJson.dependencies).toHaveProperty('@tauri-apps/plugin-updater');
-    expect(packageJson.dependencies).toHaveProperty('@tauri-apps/plugin-process');
-    expect(capability.windows).toContain('desktop-updater');
+    expect(cargo).not.toContain('tauri-plugin-process = "2"');
+    expect(packageJson.dependencies).not.toHaveProperty('@tauri-apps/plugin-updater');
+    expect(packageJson.dependencies).not.toHaveProperty('@tauri-apps/plugin-process');
+    expect(capability.windows).toEqual(['main']);
     expect(desktopShell).toContain('Check for Updates…');
-    expect(desktopShell).toContain('desktop-update-check-requested');
-    expect(desktopShell).toContain('WebviewUrl::App("index.html?desktop-updater=1".into())');
-    expect(desktopShell).toContain('window.label() == DESKTOP_UPDATER_WINDOW_LABEL');
-    expect(updaterRuntime).toContain('check({ timeout: UPDATE_CHECK_TIMEOUT_MS })');
+    expect(desktopShell).toContain('desktop_updater::check(app_handle.clone())');
+    expect(desktopShell).not.toContain('desktop_update_check_requested');
+    expect(desktopShell).not.toContain('desktop-updater=1');
+    expect(nativeUpdater).toContain('.timeout(CHECK_TIMEOUT)');
+    expect(nativeUpdater).toContain('.download_and_install(');
+    expect(nativeUpdater).toContain('app.restart()');
+    expect(nativeUpdater).toContain('MessageDialogButtons::OkCancelCustom');
+    expect(
+      existsSync(
+        resolve(repoRoot, 'frontend/src/features/desktop-updater/DesktopUpdaterWindow.tsx'),
+      ),
+    ).toBe(false);
+    expect(
+      existsSync(
+        resolve(repoRoot, 'frontend/src/features/desktop-updater/desktopUpdaterRuntime.ts'),
+      ),
+    ).toBe(false);
     expect(
       existsSync(
         resolve(repoRoot, 'frontend/src/features/desktop-updater/DesktopUpdaterProvider.tsx'),

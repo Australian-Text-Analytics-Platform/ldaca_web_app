@@ -1,15 +1,13 @@
 {
   "identifier": "default",
   "description": "Default permissions for the LDaCA Text Analytics app",
-  "windows": ["main", "desktop-updater"],
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "opener:default",
     "opener:allow-reveal-item-in-dir",
     "dialog:default",
     "dialog:allow-open",
-    "process:allow-restart",
-    "updater:default",
     "fs:allow-download-write-recursive",
     "fs:allow-download-meta-recursive"
   ]

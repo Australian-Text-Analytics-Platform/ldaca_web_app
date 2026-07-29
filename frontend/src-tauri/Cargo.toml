@@ -1,6 +1,6 @@
 [package]
 name = "ldaca-wordflow"
-version = "0.7.0"
+version = "0.7.1"
 description = "LDaCA Wordflow Desktop Application"
 authors = ["Australian Text Analytics Platform"]
 edition = "2021"
@@ -27,7 +27,6 @@ tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 
 [target.'cfg(unix)'.dependencies]

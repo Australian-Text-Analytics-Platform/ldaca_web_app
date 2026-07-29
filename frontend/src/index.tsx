@@ -28,15 +28,6 @@ if (!container) {
 }
 
 async function renderApplication(rootContainer: HTMLElement) {
-  const isUpdaterWindow = new URLSearchParams(window.location.search).has('desktop-updater');
-  if (isUpdaterWindow) {
-    const { DesktopUpdaterWindow } = await import(
-      './features/desktop-updater/DesktopUpdaterWindow'
-    );
-    createRoot(rootContainer).render(<DesktopUpdaterWindow />);
-    return;
-  }
-
   const [{ RouterProvider }, { router }, { initSentry }] = await Promise.all([
     import('@tanstack/react-router'),
     import('./router'),

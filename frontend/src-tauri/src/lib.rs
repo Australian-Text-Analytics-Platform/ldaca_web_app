@@ -1,5 +1,6 @@
 mod backend_process;
 mod data_root;
+mod desktop_updater;
 mod download;
 mod platform;
 mod runtime;
@@ -15,7 +16,7 @@ use runtime::BackendRuntime;
 use tauri::menu::{Menu, MenuItemBuilder};
 #[cfg(not(target_os = "macos"))]
 use tauri::menu::{PredefinedMenuItem, HELP_SUBMENU_ID};
-use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, State};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 /// Tauri-owned application state for the local backend lifecycle.
@@ -92,8 +93,6 @@ fn boxed_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
 }
 
 const CHECK_FOR_UPDATES_MENU_ID: &str = "check-for-updates";
-const CHECK_FOR_UPDATES_EVENT: &str = "desktop-update-check-requested";
-const DESKTOP_UPDATER_WINDOW_LABEL: &str = "desktop-updater";
 
 fn install_application_menu(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu = Menu::default(app)?;
@@ -122,21 +121,6 @@ fn install_application_menu(app: &tauri::AppHandle) -> Result<(), Box<dyn std::e
     }
 
     app.set_menu(menu)?;
-    Ok(())
-}
-
-fn create_desktop_updater_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    WebviewWindowBuilder::new(
-        app,
-        DESKTOP_UPDATER_WINDOW_LABEL,
-        WebviewUrl::App("index.html?desktop-updater=1".into()),
-    )
-    .title("LDaCA Wordflow Update")
-    .inner_size(520.0, 420.0)
-    .resizable(false)
-    .center()
-    .visible(false)
-    .build()?;
     Ok(())
 }
 
@@ -384,9 +368,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state)
+        .manage(desktop_updater::DesktopUpdaterState::default())
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
             get_data_root,
@@ -395,19 +379,9 @@ pub fn run() {
         ])
         .setup(|app| {
             install_application_menu(app.handle())?;
-            create_desktop_updater_window(app.handle())?;
             app.on_menu_event(|app_handle, event| {
                 if event.id() == CHECK_FOR_UPDATES_MENU_ID {
-                    if let Some(window) =
-                        app_handle.get_webview_window(DESKTOP_UPDATER_WINDOW_LABEL)
-                    {
-                        if let Err(error) = window.show().and_then(|()| window.set_focus()) {
-                            eprintln!("Failed to show the updater window: {error}");
-                        }
-                    }
-                    if let Err(error) = app_handle.emit(CHECK_FOR_UPDATES_EVENT, ()) {
-                        eprintln!("Failed to request an update check: {error}");
-                    }
+                    desktop_updater::check(app_handle.clone());
                 }
             });
             let window = app
@@ -490,14 +464,6 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == DESKTOP_UPDATER_WINDOW_LABEL {
-                    api.prevent_close();
-                    if let Err(error) = window.hide() {
-                        eprintln!("Failed to hide updater window: {error}");
-                    }
-                    return;
-                }
-
                 let state: State<'_, BackendState> = window.state();
                 if state.closing.swap(true, Ordering::AcqRel) {
                     return;
