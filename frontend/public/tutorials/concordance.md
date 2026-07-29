@@ -101,12 +101,9 @@ the relative position of each match within the document. **Bar length
 proportional to text length** scales bars by document length; with it off, all
 bars use the same width for easier positional comparison.
 
-<h4 id="help-concordance-colour">Colour matches and legend</h4>
-
-Enable **Colour matches** to distinguish different matched strings, especially
-for regular-expression or multi-token searches. Click a legend item to hide or
-restore that matched text in the current-page bars and summary. **Lowercase
-matches** combines case variants for colouring and aggregation.
+Match markers and dispersion series use the colour assigned to their source
+Data Block in the selector. Combined Results retain those colours so sources
+remain distinguishable across the table and summary chart.
 
 <h4 id="help-concordance-tooltip">Hover details</h4>
 

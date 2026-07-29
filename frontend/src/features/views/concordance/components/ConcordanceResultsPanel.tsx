@@ -38,8 +38,6 @@ interface ConcordanceResultsDisplay {
   setConcordanceView: Dispatch<SetStateAction<'table' | 'dispersion'>>;
   proportionalDispersionBars: boolean;
   setProportionalDispersionBars: Dispatch<SetStateAction<boolean>>;
-  combinedSourceMode: 'aggregate' | 'split';
-  setCombinedSourceMode: Dispatch<SetStateAction<'aggregate' | 'split'>>;
   dispersionChartMode: ConcordanceDispersionChartMode;
   setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
@@ -51,16 +49,8 @@ interface ConcordanceResultsDisplay {
     shiftHeld: boolean,
   ) => void;
   onClearBinSelection: (blockKey: string) => void;
-  colourMatches: boolean;
-  setColourMatches: Dispatch<SetStateAction<boolean>>;
-  lowercaseMatches: boolean;
-  setLowercaseMatches: Dispatch<SetStateAction<boolean>>;
-  hiddenMatchedTexts: Set<string>;
-  setHiddenMatchedTexts: Dispatch<SetStateAction<Set<string>>>;
   binCount: DispersionDisplayBinCount;
   setBinCount: (value: DispersionDisplayBinCount) => void;
-  allMatchedTexts: string[];
-  matchedTextColorMap: Record<string, string>;
   reviewDispersionRowUnit: 'documents' | 'matches';
   setReviewDispersionRowUnit: Dispatch<SetStateAction<'documents' | 'matches'>>;
 }
@@ -138,24 +128,14 @@ export function ConcordanceResultsPanel({
     setConcordanceView,
     proportionalDispersionBars,
     setProportionalDispersionBars,
-    combinedSourceMode,
-    setCombinedSourceMode,
     dispersionChartMode,
     setDispersionChartMode,
     selectedBinIndices,
     onBinSelect,
     onBinRangeSelect,
     onClearBinSelection,
-    colourMatches,
-    setColourMatches,
-    lowercaseMatches,
-    setLowercaseMatches,
-    hiddenMatchedTexts,
-    setHiddenMatchedTexts,
     binCount,
     setBinCount,
-    allMatchedTexts,
-    matchedTextColorMap,
     reviewDispersionRowUnit,
     setReviewDispersionRowUnit,
   },
@@ -239,9 +219,6 @@ export function ConcordanceResultsPanel({
                 setConcordanceView(newView);
                 if (newView === 'table') {
                   setProportionalDispersionBars(false);
-                  setColourMatches(false);
-                  setLowercaseMatches(false);
-                  setHiddenMatchedTexts(new Set());
                 }
               }}
             >
@@ -293,51 +270,6 @@ export function ConcordanceResultsPanel({
                 />
                 <span>Bar length proportional to text length</span>
               </label>
-              {!proportionalDispersionBars && viewMode === 'combined' && (
-                <label className="flex items-center gap-2 text-sm text-foreground">
-                  <span>Sources:</span>
-                  <select
-                    value={combinedSourceMode}
-                    onChange={(e) => {
-                      setCombinedSourceMode(e.target.value as 'aggregate' | 'split');
-                    }}
-                    className="h-7 rounded border border-input bg-background px-2 text-sm"
-                  >
-                    <option value="aggregate">Aggregate</option>
-                    <option value="split">Split (solid/dashed)</option>
-                  </select>
-                </label>
-              )}
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  checked={colourMatches}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setColourMatches(checked);
-                    if (!checked) {
-                      setLowercaseMatches(false);
-                      setHiddenMatchedTexts(new Set());
-                    }
-                  }}
-                  className="h-4 w-4"
-                />
-                <span>Colour matches</span>
-              </label>
-              {colourMatches && (
-                <label className="flex items-center gap-2 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={lowercaseMatches}
-                    onChange={(e) => {
-                      setLowercaseMatches(e.target.checked);
-                      setHiddenMatchedTexts(new Set());
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <span>Lowercase matches</span>
-                </label>
-              )}
             </div>
           ) : null}
         </div>
@@ -425,21 +357,14 @@ export function ConcordanceResultsPanel({
                       {...sharedProps}
                       resultsViewportWidth={resultsViewportWidth}
                       proportionalDispersionBars={proportionalDispersionBars}
-                      colourMatches={colourMatches}
-                      lowercaseMatches={lowercaseMatches}
-                      hiddenMatchedTexts={hiddenMatchedTexts}
-                      setHiddenMatchedTexts={setHiddenMatchedTexts}
                       binCount={binCount}
                       onBinCountChange={setBinCount}
-                      combinedSourceMode={combinedSourceMode}
                       dispersionChartMode={dispersionChartMode}
                       onDispersionChartModeChange={setDispersionChartMode}
                       selectedBinIndices={selectedBinIndices}
                       onBinSelect={onBinSelect}
                       onBinRangeSelect={onBinRangeSelect}
                       onClearBinSelection={onClearBinSelection}
-                      allMatchedTexts={allMatchedTexts}
-                      matchedTextColorMap={matchedTextColorMap}
                     />
                   ) : (
                     <ConcordanceTableNodeBlock

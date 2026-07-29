@@ -1,5 +1,3 @@
-import type { ConcordanceNodeResult } from '@/api';
-import { CONCORDANCE_COLUMN_KEYS } from '../common/generatedColumns';
 import { CONCORDANCE_COMBINED_NODE_KEY, toCellText } from './concordanceTableDomain';
 
 interface ConcordanceNodeIdentity {
@@ -155,55 +153,4 @@ export function resolveConcordanceResultBlock<T extends ConcordanceNodeIdentity>
 
   const column = selections.find((selection) => selection.nodeId === node.id)?.column ?? '';
   return { node, nodeId: node.id, column };
-}
-
-export interface CollectConcordanceMatchedTextsOptions {
-  lowercaseMatches: boolean;
-}
-
-/**
- * Collects the unique matched-text series names used by coloured dispersion charts.
- * Used by: ConcordanceFeature because the feature shell needs one tested helper
- * to derive chart series from current-page concordance rows before assigning
- * stable colours.
- *
- * Flow:
- * - Walk each result block in display order.
- * - Walk grouped page rows, normalize case according to the active concordance
- *   setting, and return sorted unique labels for deterministic colour assignment.
- */
-export function collectConcordanceMatchedTexts(
-  resultsData: Record<string, ConcordanceNodeResult> | undefined,
-  { lowercaseMatches }: CollectConcordanceMatchedTextsOptions,
-): string[] {
-  if (!resultsData) return [];
-
-  const seen = new Set<string>();
-  for (const nodeData of Object.values(resultsData)) {
-    for (const group of nodeData.data) {
-      for (const hit of group) {
-        const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
-        if (rawText) seen.add(lowercaseMatches ? rawText.toLowerCase() : rawText);
-      }
-    }
-  }
-
-  return [...seen].sort();
-}
-
-/**
- * Assigns stable colours to matched-text series by cycling through a palette.
- * Used by: ConcordanceFeature so chart and row-rendering surfaces receive the
- * same text-to-colour lookup without duplicating palette logic in the feature
- * component.
- */
-export function buildMatchedTextColorMap(
-  matchedTexts: readonly string[],
-  palette: readonly string[],
-): Record<string, string> {
-  if (palette.length === 0) return {};
-
-  return Object.fromEntries(
-    matchedTexts.map((text, index) => [text, cyclePalette(palette, index, '')]),
-  );
 }

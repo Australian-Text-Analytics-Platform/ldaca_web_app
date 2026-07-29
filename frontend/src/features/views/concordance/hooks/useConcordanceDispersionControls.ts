@@ -11,16 +11,8 @@ export interface UseConcordanceDispersionControlsResult {
   showDispersion: boolean;
   proportionalDispersionBars: boolean;
   setProportionalDispersionBars: Dispatch<SetStateAction<boolean>>;
-  colourMatches: boolean;
-  setColourMatches: Dispatch<SetStateAction<boolean>>;
-  lowercaseMatches: boolean;
-  setLowercaseMatches: Dispatch<SetStateAction<boolean>>;
-  hiddenMatchedTexts: Set<string>;
-  setHiddenMatchedTexts: Dispatch<SetStateAction<Set<string>>>;
   binCount: DispersionDisplayBinCount;
   setBinCount: (value: DispersionDisplayBinCount) => void;
-  combinedSourceMode: 'aggregate' | 'split';
-  setCombinedSourceMode: Dispatch<SetStateAction<'aggregate' | 'split'>>;
   dispersionChartMode: ConcordanceDispersionChartMode;
   setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
@@ -49,13 +41,9 @@ export interface UseConcordanceDispersionControlsResult {
 export function useConcordanceDispersionControls(): UseConcordanceDispersionControlsResult {
   const [concordanceView, setConcordanceView] = useState<'table' | 'dispersion'>('table');
   const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
-  const [colourMatches, setColourMatches] = useState(false);
-  const [lowercaseMatches, setLowercaseMatches] = useState(false);
-  const [hiddenMatchedTexts, setHiddenMatchedTexts] = useState<Set<string>>(new Set());
   const [binCount, setRawBinCount] = useState<DispersionDisplayBinCount>(
     DISPERSION_DEFAULT_BIN_COUNT,
   );
-  const [combinedSourceMode, setCombinedSourceMode] = useState<'aggregate' | 'split'>('aggregate');
   const [dispersionChartMode, setDispersionChartMode] =
     useState<ConcordanceDispersionChartMode>('density-line');
   const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
@@ -126,16 +114,8 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     showDispersion: concordanceView === 'dispersion',
     proportionalDispersionBars,
     setProportionalDispersionBars,
-    colourMatches,
-    setColourMatches,
-    lowercaseMatches,
-    setLowercaseMatches,
-    hiddenMatchedTexts,
-    setHiddenMatchedTexts,
     binCount,
     setBinCount,
-    combinedSourceMode,
-    setCombinedSourceMode,
     dispersionChartMode,
     setDispersionChartMode,
     selectedBinIndices,

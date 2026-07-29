@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -100,14 +100,9 @@ describe('ConcordanceDispersionSummary', () => {
         rows={baseRows}
         textColumn="text"
         binCount={20}
-        lowercaseMatches={false}
         splitBySource={false}
-        allMatchedTexts={[]}
-        matchedTextColors={{}}
-        hiddenMatchedTexts={new Set()}
         dataBlockLabel="Corpus"
         searchWord="alpha"
-        aggregateAll
         chartMode="density-line"
         onChartModeChange={vi.fn()}
         onBinCountChange={vi.fn()}
@@ -123,19 +118,41 @@ describe('ConcordanceDispersionSummary', () => {
     expect(screen.getByText('Density: line dispersion')).toBeInTheDocument();
   });
 
+  it('hides the cumulative chart option behind an expandable menu row', () => {
+    const onChartModeChange = vi.fn();
+    render(
+      <ConcordanceDispersionSummary
+        rows={baseRows}
+        textColumn="text"
+        binCount={20}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="alpha"
+        chartMode="density-line"
+        onChartModeChange={onChartModeChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Chart' }));
+    expect(screen.queryByRole('button', { name: 'Cumulative' })).not.toBeInTheDocument();
+
+    const moreButton = screen.getByRole('button', { name: 'More' });
+    expect(moreButton).toHaveAttribute('data-state', 'closed');
+    fireEvent.click(moreButton);
+    expect(moreButton).toHaveAttribute('data-state', 'open');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cumulative' }));
+    expect(onChartModeChange).toHaveBeenCalledWith('cumulative');
+  });
+
   it('renders density as line, bar, or area from the chart selector mode', () => {
     const props = {
       rows: baseRows,
       textColumn: 'text',
       binCount: 20 as const,
-      lowercaseMatches: false,
       splitBySource: false,
-      allMatchedTexts: [],
-      matchedTextColors: {},
-      hiddenMatchedTexts: new Set<string>(),
       dataBlockLabel: 'Corpus',
       searchWord: 'alpha',
-      aggregateAll: true,
     };
     const { rerender } = render(
       <ConcordanceDispersionSummary {...props} chartMode="density-line" />,
@@ -159,14 +176,9 @@ describe('ConcordanceDispersionSummary', () => {
         rows={baseRows}
         textColumn="text"
         binCount={20}
-        lowercaseMatches={false}
         splitBySource={false}
-        allMatchedTexts={[]}
-        matchedTextColors={{}}
-        hiddenMatchedTexts={new Set()}
         dataBlockLabel="Corpus"
         searchWord="alpha"
-        aggregateAll
         densitySeries={[{ label: 'alpha', counts: Array.from({ length: 100 }, () => 1) }]}
       />,
     );
@@ -184,14 +196,9 @@ describe('ConcordanceDispersionSummary', () => {
         rows={baseRows}
         textColumn="text"
         binCount={20}
-        lowercaseMatches={false}
         splitBySource={false}
-        allMatchedTexts={[]}
-        matchedTextColors={{}}
-        hiddenMatchedTexts={new Set()}
         dataBlockLabel="Corpus"
         searchWord="alpha"
-        aggregateAll
         sourceColor="#123456"
       />,
     );
@@ -223,14 +230,9 @@ describe('ConcordanceDispersionSummary', () => {
         ]}
         textColumn="text"
         binCount={20}
-        lowercaseMatches={false}
         splitBySource
-        allMatchedTexts={[]}
-        matchedTextColors={{}}
-        hiddenMatchedTexts={new Set()}
         dataBlockLabel="Combined"
         searchWord="alpha"
-        aggregateAll
         chartMode="cumulative"
         sourceColors={{
           'left corpus': '#aa0000',
@@ -276,14 +278,9 @@ describe('ConcordanceDispersionSummary', () => {
         rows={baseRows}
         textColumn="text"
         binCount={20}
-        lowercaseMatches={false}
         splitBySource={false}
-        allMatchedTexts={[]}
-        matchedTextColors={{}}
-        hiddenMatchedTexts={new Set()}
         dataBlockLabel="Corpus"
         searchWord="alpha"
-        aggregateAll
         selection={{
           selectedIndices: new Set(),
           onSelect,
@@ -329,14 +326,9 @@ describe('ConcordanceDispersionSummary', () => {
         rows={baseRows}
         textColumn="text"
         binCount={20}
-        lowercaseMatches={false}
         splitBySource={false}
-        allMatchedTexts={[]}
-        matchedTextColors={{}}
-        hiddenMatchedTexts={new Set()}
         dataBlockLabel="Corpus"
         searchWord="alpha"
-        aggregateAll
         selection={{
           selectedIndices: new Set(),
           onSelect,

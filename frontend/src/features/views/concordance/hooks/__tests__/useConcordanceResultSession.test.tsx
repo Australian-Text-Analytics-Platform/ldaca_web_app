@@ -49,7 +49,7 @@ const createWrapper = () => {
 };
 
 describe('useConcordanceResultSession', () => {
-  it('projects the canonical analysis result into display colors and matched-text filters', () => {
+  it('projects the canonical analysis result into Data Block display colors', () => {
     const { result: hook } = renderHook(
       () =>
         useConcordanceResultSession({
@@ -60,8 +60,6 @@ describe('useConcordanceResultSession', () => {
           combinedPage: 1,
           selectedNodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
           showDispersion: true,
-          colourMatches: true,
-          lowercaseMatches: true,
           reviewDispersionRowUnit: 'documents',
         }),
       { wrapper: createWrapper() },
@@ -69,7 +67,6 @@ describe('useConcordanceResultSession', () => {
 
     expect(hook.current.nodeColors['node-1']).toBe('#2563eb');
     expect(hook.current.sourceColorMap.corpus).toBe('#2563eb');
-    expect(hook.current.allMatchedTexts).toEqual(['alpha', 'beta']);
   });
 
   it('clears result pagination and loading state when reset', () => {
@@ -83,8 +80,6 @@ describe('useConcordanceResultSession', () => {
           combinedPage: 1,
           selectedNodes: [],
           showDispersion: false,
-          colourMatches: false,
-          lowercaseMatches: false,
           reviewDispersionRowUnit: 'documents',
         }),
       { wrapper: createWrapper() },

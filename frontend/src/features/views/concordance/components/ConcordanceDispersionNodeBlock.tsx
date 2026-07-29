@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
@@ -18,17 +17,9 @@ import {
 } from '../concordanceDispersionDomain';
 import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
-import { ConcordanceDispersionLegend } from './ConcordanceDispersionLegend';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
 import { ConcordanceDispersionRowsTable } from './ConcordanceDispersionRowsTable';
 import { buildConcordanceDispersionTableModel } from './concordanceDispersionTableModel';
-const toggleHiddenMatchedText = (current: Set<string>, text: string): Set<string> => {
-  const next = new Set(current);
-  if (next.has(text)) next.delete(text);
-  else next.add(text);
-  return next;
-};
-
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
 const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
@@ -79,13 +70,8 @@ export interface ConcordanceDispersionNodeBlockProps {
 
   // Dispersion-specific state
   proportionalDispersionBars: boolean;
-  colourMatches: boolean;
-  lowercaseMatches: boolean;
-  hiddenMatchedTexts: Set<string>;
-  setHiddenMatchedTexts: React.Dispatch<React.SetStateAction<Set<string>>>;
   binCount: DispersionDisplayBinCount;
   onBinCountChange: (value: DispersionDisplayBinCount) => void;
-  combinedSourceMode: 'aggregate' | 'split';
   dispersionChartMode: ConcordanceDispersionChartMode;
   onDispersionChartModeChange: (value: ConcordanceDispersionChartMode) => void;
   selectedBinIndices: Record<string, Set<number>>;
@@ -97,8 +83,6 @@ export interface ConcordanceDispersionNodeBlockProps {
     shiftHeld: boolean,
   ) => void;
   onClearBinSelection: (blockKey: string) => void;
-  allMatchedTexts: string[];
-  matchedTextColorMap: Record<string, string>;
   // Handlers
   handlePageChange: (newPage: number, paginationKey: string, requestNodeId: string) => void;
   handleRowClick: (
@@ -132,21 +116,14 @@ export function ConcordanceDispersionNodeBlock({
   combinedLoading,
   nodeLoading,
   proportionalDispersionBars,
-  colourMatches,
-  lowercaseMatches,
-  hiddenMatchedTexts,
-  setHiddenMatchedTexts,
   binCount,
   onBinCountChange,
-  combinedSourceMode,
   dispersionChartMode,
   onDispersionChartModeChange,
   selectedBinIndices,
   onBinSelect,
   onBinRangeSelect,
   onClearBinSelection,
-  allMatchedTexts,
-  matchedTextColorMap,
   handlePageChange,
   handleRowClick,
   setCombinedPage,
@@ -154,17 +131,6 @@ export function ConcordanceDispersionNodeBlock({
   densitySeries,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
-
-  // Per-matched-text totals + selection-scoped sub-totals, published up
-  // from the active ``ConcordanceDispersionSummary`` so the standalone
-  // legend (kept above the chart for visual continuity with the
-  // proportional-bars table) can show ``(n)`` or ``(m/n)`` next to each
-  // label. A single state slot is enough because only one branch
-  // (combined vs per-node) mounts a Summary per render.
-  const [legendCounts, setLegendCounts] = useState<{
-    totals: ReadonlyMap<string, number>;
-    selectedTotals: ReadonlyMap<string, number> | null;
-  }>(() => ({ totals: new Map<string, number>(), selectedTotals: null }));
 
   // Footer-only TanStack instance shared by both branches (only one mounts per
   // keyed instance). Called unconditionally to respect the rules of hooks; the
@@ -253,10 +219,8 @@ export function ConcordanceDispersionNodeBlock({
             dispersionColumnStyle={dispersionColumnStyle}
             metadataColumnStyle={metadataColumnStyle}
             proportionalDispersionBars={proportionalDispersionBars}
-            colourMatches={colourMatches}
-            matchedTextColorMap={matchedTextColorMap}
-            lowercaseMatches={lowercaseMatches}
-            hiddenMatchedTexts={hiddenMatchedTexts}
+            sourceColorMap={sourceColorMap}
+            defaultPalette={defaultPalette}
             getRowClassName={() => 'cursor-pointer'}
             getRowStyle={(row) => {
               const color = getConcordanceSourceColor(
@@ -280,18 +244,6 @@ export function ConcordanceDispersionNodeBlock({
             }}
           />
         </AnalysisTableFrame>
-        {colourMatches && allMatchedTexts.length > 0 && (
-          <ConcordanceDispersionLegend
-            matchedTexts={allMatchedTexts}
-            matchedTextColors={matchedTextColorMap}
-            hiddenMatchedTexts={hiddenMatchedTexts}
-            onToggle={(text) => {
-              setHiddenMatchedTexts((prev) => toggleHiddenMatchedText(prev, text));
-            }}
-            totals={legendCounts.totals}
-            selectedTotals={legendCounts.selectedTotals}
-          />
-        )}
         {!proportionalDispersionBars &&
           (() => {
             const dispersionRows = rows;
@@ -302,14 +254,9 @@ export function ConcordanceDispersionNodeBlock({
                 rows={dispersionRows}
                 textColumn={column}
                 binCount={binCount}
-                lowercaseMatches={lowercaseMatches}
-                splitBySource={combinedSourceMode === 'split'}
-                allMatchedTexts={allMatchedTexts}
-                matchedTextColors={matchedTextColorMap}
-                hiddenMatchedTexts={hiddenMatchedTexts}
+                splitBySource
                 dataBlockLabel={dataBlockLabel}
                 searchWord={searchWord}
-                aggregateAll={!colourMatches}
                 sourceColors={sourceColorMap}
                 chartMode={dispersionChartMode}
                 onChartModeChange={onDispersionChartModeChange}
@@ -337,7 +284,6 @@ export function ConcordanceDispersionNodeBlock({
                     onClearBinSelection(CONCORDANCE_COMBINED_NODE_KEY);
                   },
                 }}
-                onLegendCountsChange={setLegendCounts}
                 densitySeries={densitySeries}
               />
             );
@@ -427,10 +373,7 @@ export function ConcordanceDispersionNodeBlock({
           dispersionColumnStyle={dispersionColumnStyle}
           metadataColumnStyle={metadataColumnStyle}
           proportionalDispersionBars={proportionalDispersionBars}
-          colourMatches={colourMatches}
-          matchedTextColorMap={matchedTextColorMap}
-          lowercaseMatches={lowercaseMatches}
-          hiddenMatchedTexts={hiddenMatchedTexts}
+          sourceColor={context.nodeColor}
           getRowClassName={(_row, index) =>
             `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
           }
@@ -441,18 +384,6 @@ export function ConcordanceDispersionNodeBlock({
           }}
         />
       </AnalysisTableFrame>
-      {colourMatches && allMatchedTexts.length > 0 && (
-        <ConcordanceDispersionLegend
-          matchedTexts={allMatchedTexts}
-          matchedTextColors={matchedTextColorMap}
-          hiddenMatchedTexts={hiddenMatchedTexts}
-          onToggle={(text) => {
-            setHiddenMatchedTexts((prev) => toggleHiddenMatchedText(prev, text));
-          }}
-          totals={legendCounts.totals}
-          selectedTotals={legendCounts.selectedTotals}
-        />
-      )}
       {!proportionalDispersionBars &&
         (() => {
           const dispersionRows = rows;
@@ -463,14 +394,9 @@ export function ConcordanceDispersionNodeBlock({
               rows={dispersionRows}
               textColumn={column}
               binCount={binCount}
-              lowercaseMatches={lowercaseMatches}
               splitBySource={false}
-              allMatchedTexts={allMatchedTexts}
-              matchedTextColors={matchedTextColorMap}
-              hiddenMatchedTexts={hiddenMatchedTexts}
               dataBlockLabel={dataBlockLabel}
               searchWord={searchWord}
-              aggregateAll={!colourMatches}
               sourceColor={context.nodeColor}
               chartMode={dispersionChartMode}
               onChartModeChange={onDispersionChartModeChange}
@@ -492,7 +418,6 @@ export function ConcordanceDispersionNodeBlock({
                   onClearBinSelection(nodeKey);
                 },
               }}
-              onLegendCountsChange={setLegendCounts}
               densitySeries={densitySeries}
             />
           );

@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Download } from 'lucide-react';
+import { useId, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Area,
@@ -33,6 +33,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -65,19 +67,10 @@ interface Props {
   rows: ConcordanceDispersionRow[];
   textColumn: string;
   binCount: DispersionDisplayBinCount;
-  lowercaseMatches: boolean;
   splitBySource: boolean;
-  allMatchedTexts: string[];
-  matchedTextColors: Record<string, string>;
-  hiddenMatchedTexts: Set<string>;
   /** Human-readable label for the data block (used in title and download filename). */
   dataBlockLabel: string;
   searchWord: string;
-  /**
-   * When true (i.e. "Colour matches" is off), all hits are plotted as a single
-   * aggregate line in a default colour, with no per-matched-text breakdown.
-   */
-  aggregateAll?: boolean;
   /** Dispersion figure mode. Density shares per-bin counts across three renderers; cumulative is the running total. */
   chartMode?: ConcordanceDispersionChartMode;
   /** Change handler for the chart-mode selector in the header. */
@@ -95,19 +88,6 @@ interface Props {
     onSelectRange: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
     onClear: () => void;
   };
-  /**
-   * Published whenever the bins / selection / source switch change. The
-   * caller (``ConcordanceDispersionNodeBlock``) feeds these to its
-   * standalone ``ConcordanceDispersionLegend`` so each legend row can
-   * show ``(n)`` — or ``(m/n)`` when a bin selection is active — in the
-   * same colour as the line. Owning the legend up there (instead of
-   * inside this component) preserves the existing visual anchoring
-   * between the legend row and the proportional-bars list above it.
-   */
-  onLegendCountsChange?: (counts: {
-    totals: ReadonlyMap<string, number>;
-    selectedTotals: ReadonlyMap<string, number> | null;
-  }) => void;
   densitySeries?: ConcordanceDensitySeriesInput[];
 }
 
@@ -176,13 +156,6 @@ const formatTickLabel = (value: number): string => {
   return `${String(Math.round(value))}%`;
 };
 
-/** Used by: ConcordanceDispersionSummary legend/count derivation to split combined text/source series keys. */
-const stripSeriesKey = (key: string): { text: string; source: string | null } => {
-  const idx = key.indexOf(DISPERSION_SOURCE_DELIMITER);
-  if (idx === -1) return { text: key, source: null };
-  return { text: key.slice(0, idx), source: key.slice(idx + DISPERSION_SOURCE_DELIMITER.length) };
-};
-
 /** Resolves source-node chart colours from exact or normalized labels before falling back to the current aggregate colour. */
 const resolveSourceColor = (
   sourceColors: Record<string, string> | undefined,
@@ -236,21 +209,15 @@ export function ConcordanceDispersionSummary({
   rows,
   textColumn,
   binCount,
-  lowercaseMatches,
   splitBySource,
-  allMatchedTexts,
-  matchedTextColors,
-  hiddenMatchedTexts,
   dataBlockLabel,
   searchWord,
-  aggregateAll = false,
   chartMode = 'density-line',
   onChartModeChange,
   onBinCountChange,
   sourceColor,
   sourceColors,
   selection,
-  onLegendCountsChange,
   densitySeries,
 }: Props) {
   const controlId = useId();
@@ -258,81 +225,19 @@ export function ConcordanceDispersionSummary({
   const dragSelectionRef = useRef<DragSelection | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [dragSelection, setDragSelection] = useState<DragSelection | null>(null);
+  const [chartMenuOpen, setChartMenuOpen] = useState(false);
+  const [cumulativeOptionOpen, setCumulativeOptionOpen] = useState(false);
 
-  const { bins, sources, totalsByKey } = useMemo(() => {
+  const { bins, sources } = useMemo(() => {
     if (densitySeries) {
       return buildDispersionBinsFromDensitySeries(densitySeries, binCount, {
-        lowercaseMatches,
         splitBySource,
-        aggregateAll,
       });
     }
     return buildDispersionBins(rows, textColumn, binCount, {
-      lowercaseMatches,
       splitBySource,
-      aggregateAll,
     });
-  }, [rows, textColumn, binCount, lowercaseMatches, splitBySource, aggregateAll, densitySeries]);
-
-  /**
-   * Per-matched-text totals across every bin in the displayed graph.
-   * Folds the per-source split-key form back to per-text by stripping
-   * the source delimiter, so users always see one number per legend
-   * row regardless of whether ``splitBySource`` is on. Hidden items are
-   * still included — toggling visibility doesn't recompute the total
-   * (the user wants to see the weight of the filter they just turned
-   * off).
-   */
-  const totalsByText = useMemo(() => {
-    const out = new Map<string, number>();
-    for (const [key, value] of Object.entries(totalsByKey)) {
-      if (key === DISPERSION_AGGREGATE_KEY) continue;
-      const { text } = stripSeriesKey(key);
-      if (!text) continue;
-      out.set(text, (out.get(text) ?? 0) + value);
-    }
-    return out;
-  }, [totalsByKey]);
-
-  /**
-   * Per-matched-text totals across only the user-selected bins. ``null``
-   * when no selection is active so the legend renders the plain
-   * ``(n)`` form instead of ``(m/n)``. When a selection exists but a
-   * given matched-text has zero hits inside it, the value is 0 (the
-   * legend displays it as ``(0/n)`` so the user sees which items are
-   * absent from their selected window).
-   */
-  const selectedTotalsByText = useMemo<Map<string, number> | null>(() => {
-    if (!selection || selection.selectedIndices.size === 0) return null;
-    const out = new Map<string, number>();
-    // Seed every known text with 0 so missing-from-selection items
-    // surface as ``0`` instead of being undefined.
-    for (const text of totalsByText.keys()) out.set(text, 0);
-    for (const idx of selection.selectedIndices) {
-      const bin = bins[idx];
-      if (!bin) continue;
-      for (const [key, val] of Object.entries(bin)) {
-        if (key === 'binCenter' || key === DISPERSION_AGGREGATE_KEY) continue;
-        const { text } = stripSeriesKey(key);
-        if (!text) continue;
-        out.set(text, (out.get(text) ?? 0) + (val || 0));
-      }
-    }
-    return out;
-  }, [selection, bins, totalsByText]);
-
-  // Publish the per-text counts up to the parent so its standalone
-  // legend (kept above the chart for visual continuity with the
-  // proportional-bars table) can show ``(n)`` / ``(m/n)`` next to each
-  // label. One-frame lag is acceptable — the legend mounts before the
-  // first chart paint and just re-renders once the totals land.
-  useEffect(() => {
-    if (!onLegendCountsChange) return;
-    onLegendCountsChange({
-      totals: totalsByText,
-      selectedTotals: selectedTotalsByText,
-    });
-  }, [onLegendCountsChange, totalsByText, selectedTotalsByText]);
+  }, [rows, textColumn, binCount, splitBySource, densitySeries]);
 
   const scopeText = densitySeries
     ? 'aggregated matches at relative locations across the entire Result'
@@ -340,59 +245,18 @@ export function ConcordanceDispersionSummary({
   const titleText = `${dataBlockLabel}: ${scopeText}`;
   const chartTitle = `${CHART_MODE_LABELS[chartMode]} dispersion`;
 
-  const visibleTexts = useMemo(
-    () => allMatchedTexts.filter((t) => !hiddenMatchedTexts.has(t)),
-    [allMatchedTexts, hiddenMatchedTexts],
-  );
-
   const series: DispersionChartSeries[] = useMemo(() => {
     const aggregateColor = sourceColor ?? AGGREGATE_DEFAULT_COLOR;
-    if (aggregateAll) {
-      // No matched-text differentiation. If the user wants split-by-source,
-      // emit one aggregate line per source (solid/dashed); otherwise a
-      // single overall line.
-      if (splitBySource && sources.length > 0) {
-        return sources.map((src, idx) => ({
-          key: `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${src}`,
-          color: resolveSourceColor(sourceColors, src, aggregateColor),
-          dash: SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length],
-          label: `${AGGREGATE_LINE_LABEL} (${src})`,
-        }));
-      }
-      return [
-        {
-          key: DISPERSION_AGGREGATE_KEY,
-          color: aggregateColor,
-          label: AGGREGATE_LINE_LABEL,
-        },
-      ];
+    if (splitBySource && sources.length > 0) {
+      return sources.map((src, idx) => ({
+        key: `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${src}`,
+        color: resolveSourceColor(sourceColors, src, aggregateColor),
+        dash: SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length],
+        label: `${AGGREGATE_LINE_LABEL} (${src})`,
+      }));
     }
-    const out: DispersionChartSeries[] = [];
-    for (const text of visibleTexts) {
-      const color = matchedTextColors[text] ?? AGGREGATE_DEFAULT_COLOR;
-      if (splitBySource && sources.length > 0) {
-        sources.forEach((src, idx) => {
-          out.push({
-            key: `${text}${DISPERSION_SOURCE_DELIMITER}${src}`,
-            color,
-            dash: SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length],
-            label: `${text} (${src})`,
-          });
-        });
-      } else {
-        out.push({ key: text, color, label: text });
-      }
-    }
-    return out;
-  }, [
-    aggregateAll,
-    sourceColor,
-    sourceColors,
-    visibleTexts,
-    matchedTextColors,
-    splitBySource,
-    sources,
-  ]);
+    return [{ key: DISPERSION_AGGREGATE_KEY, color: aggregateColor, label: AGGREGATE_LINE_LABEL }];
+  }, [sourceColor, sourceColors, splitBySource, sources]);
 
   const chartData = useMemo(
     () => (chartMode === 'cumulative' ? buildCumulativeChartData(bins, series) : bins),
@@ -533,29 +397,12 @@ export function ConcordanceDispersionSummary({
     ];
     const legendType: ChartExportLegendItem['type'] =
       chartMode === 'density-bar' ? 'bar' : chartMode === 'density-area' ? 'area' : 'line';
-    const legend: ChartExportLegendItem[] = aggregateAll
-      ? series.map((item) => ({
-          label: item.label ?? AGGREGATE_LINE_LABEL,
-          color: item.color,
-          type: legendType,
-          hidden: false,
-        }))
-      : allMatchedTexts.map((text) => ({
-          label: text,
-          color: matchedTextColors[text] ?? AGGREGATE_DEFAULT_COLOR,
-          type: legendType,
-          hidden: hiddenMatchedTexts.has(text),
-        }));
-    if (splitBySource && sources.length > 0) {
-      sources.forEach((src, idx) => {
-        legend.push({
-          label: `${src}${idx === 0 ? ' (solid)' : ' (dashed)'}`,
-          color: resolveSourceColor(sourceColors, src, '#374151'),
-          type: 'line' as const,
-          hidden: false,
-        });
-      });
-    }
+    const legend: ChartExportLegendItem[] = series.map((item) => ({
+      label: item.label ?? AGGREGATE_LINE_LABEL,
+      color: item.color,
+      type: legendType,
+      hidden: false,
+    }));
     try {
       await downloadChartAs(svg, {
         nodeName: dataBlockLabel,
@@ -723,28 +570,66 @@ export function ConcordanceDispersionSummary({
           {onChartModeChange && (
             <div className="flex items-center gap-2 text-sm text-foreground">
               <span id={`${controlId}-chart-mode`}>Chart</span>
-              <Select
-                value={chartMode}
-                onValueChange={(value) => {
-                  onChartModeChange(value as ConcordanceDispersionChartMode);
+              <Popover
+                open={chartMenuOpen}
+                onOpenChange={(open) => {
+                  setChartMenuOpen(open);
+                  if (!open) setCumulativeOptionOpen(false);
                 }}
               >
-                <SelectTrigger
-                  aria-labelledby={`${controlId}-chart-mode`}
-                  className="h-8 w-36 px-2 py-1"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {CONCORDANCE_DISPERSION_CHART_MODES.map((value) => (
-                      <SelectItem key={value} value={value}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-labelledby={`${controlId}-chart-mode`}
+                    aria-expanded={chartMenuOpen}
+                    className="h-8 w-36 justify-between px-2 py-1 font-normal"
+                  >
+                    <span className="truncate">{CHART_MODE_LABELS[chartMode]}</span>
+                    <ChevronDown className="size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-44 p-1">
+                  <div className="space-y-0.5">
+                    {CONCORDANCE_DISPERSION_CHART_MODES.filter(
+                      (value) => value !== 'cumulative',
+                    ).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden"
+                        onClick={() => {
+                          onChartModeChange(value);
+                          setChartMenuOpen(false);
+                        }}
+                      >
                         {CHART_MODE_LABELS[value]}
-                      </SelectItem>
+                        {chartMode === value && <Check className="size-4" />}
+                      </button>
                     ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                    <Collapsible open={cumulativeOptionOpen} onOpenChange={setCumulativeOptionOpen}>
+                      <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden">
+                        More
+                        <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-0.5">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between rounded-sm py-1.5 pr-2 pl-5 text-left text-sm hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden"
+                          onClick={() => {
+                            onChartModeChange('cumulative');
+                            setChartMenuOpen(false);
+                          }}
+                        >
+                          Cumulative
+                          {chartMode === 'cumulative' && <Check className="size-4" />}
+                        </button>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
           <Button

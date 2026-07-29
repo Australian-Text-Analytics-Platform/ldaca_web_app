@@ -100,17 +100,10 @@ type DispersionBinDatum = {
 } & Record<string, number>;
 
 export interface BuildDispersionBinsOptions {
-  lowercaseMatches?: boolean;
   splitBySource?: boolean;
-  /**
-   * When true, all hits collapse into a single aggregate series rather than
-   * being split per matched-text. Used when the user has not enabled "Colour
-   * matches" — the plot shows a single overall distribution line.
-   */
-  aggregateAll?: boolean;
 }
 
-/** Series key used when {@link BuildDispersionBinsOptions.aggregateAll} is true. */
+/** Aggregate series key used for a single source or as the base of a source-specific key. */
 export const DISPERSION_AGGREGATE_KEY = '__dispersion_total__';
 
 /**
@@ -148,14 +141,14 @@ export function buildDispersionBins(
   binCount: number,
   options: BuildDispersionBinsOptions = {},
 ): BuildDispersionBinsResult {
-  const { lowercaseMatches = false, splitBySource = false, aggregateAll = false } = options;
+  const { splitBySource = false } = options;
   const safeBinCount = Math.max(1, Math.floor(binCount));
   const bins: DispersionBinDatum[] = Array.from({ length: safeBinCount }, (_, i) => ({
     binCenter: ((i + 0.5) / safeBinCount) * 100,
   }));
   const totalsByKey: Record<string, number> = {};
   const sourceSet = new Set<string>();
-  if (aggregateAll) totalsByKey[DISPERSION_AGGREGATE_KEY] = 0;
+  totalsByKey[DISPERSION_AGGREGATE_KEY] = 0;
 
   for (const row of rows) {
     const docLength = getDispersionTextLength(row, textColumn);
@@ -169,12 +162,12 @@ export function buildDispersionBins(
       const binIdx = Math.min(safeBinCount - 1, Math.max(0, Math.floor(ratio * safeBinCount)));
       const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
       if (!rawText) continue;
-      const text = lowercaseMatches ? rawText.toLowerCase() : rawText;
       const source = rowSource || toCellText(hit.__source_node);
       if (source) sourceSet.add(source);
-      const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
       const seriesKey =
-        splitBySource && source ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${source}` : baseKey;
+        splitBySource && source
+          ? `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${source}`
+          : DISPERSION_AGGREGATE_KEY;
       const bin = bins[binIdx];
       if (bin === undefined) continue;
       bin[seriesKey] = (bin[seriesKey] ?? 0) + 1;
@@ -220,20 +213,18 @@ export function buildDispersionBinsFromDensitySeries(
   displayBinCount: DispersionDisplayBinCount,
   options: BuildDispersionBinsOptions = {},
 ): BuildDispersionBinsResult {
-  const { lowercaseMatches = false, splitBySource = false, aggregateAll = false } = options;
+  const { splitBySource = false } = options;
   const bins: DispersionBinDatum[] = Array.from({ length: displayBinCount }, (_, index) => ({
     binCenter: ((index + 0.5) / displayBinCount) * 100,
   }));
   const totalsByKey: Record<string, number> = {};
   const sources = new Set<string>();
   for (const item of series) {
-    const text = lowercaseMatches ? item.label.toLowerCase() : item.label;
     if (item.source) sources.add(item.source);
-    const baseKey = aggregateAll ? DISPERSION_AGGREGATE_KEY : text;
     const seriesKey =
       splitBySource && item.source
-        ? `${baseKey}${DISPERSION_SOURCE_DELIMITER}${item.source}`
-        : baseKey;
+        ? `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${item.source}`
+        : DISPERSION_AGGREGATE_KEY;
     totalsByKey[seriesKey] ??= 0;
     item.counts.forEach((count, serverIndex) => {
       if (!Number.isFinite(count) || count <= 0) return;

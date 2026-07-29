@@ -26,10 +26,9 @@ interface Props {
   dispersionColumnStyle: CSSProperties | undefined;
   metadataColumnStyle: CSSProperties | undefined;
   proportionalDispersionBars: boolean;
-  colourMatches: boolean;
-  matchedTextColorMap: Record<string, string>;
-  lowercaseMatches: boolean;
-  hiddenMatchedTexts: Set<string>;
+  sourceColor?: string;
+  sourceColorMap?: Record<string, string>;
+  defaultPalette?: string[];
   getRowClassName: (row: ConcordanceDispersionRow, index: number) => string;
   getRowStyle?: (row: ConcordanceDispersionRow, index: number) => CSSProperties | undefined;
   onRowClick: (row: ConcordanceDispersionRow) => void;
@@ -52,10 +51,9 @@ export function ConcordanceDispersionRowsTable({
   dispersionColumnStyle,
   metadataColumnStyle,
   proportionalDispersionBars,
-  colourMatches,
-  matchedTextColorMap,
-  lowercaseMatches,
-  hiddenMatchedTexts,
+  sourceColor,
+  sourceColorMap,
+  defaultPalette,
   getRowClassName,
   getRowStyle,
   onRowClick,
@@ -118,10 +116,9 @@ export function ConcordanceDispersionRowsTable({
                           ? getDispersionBarWidthPercent(row, textColumn, longestTextLength)
                           : 100
                       }
-                      colourMatches={colourMatches}
-                      matchedTextColors={matchedTextColorMap}
-                      lowercaseMatches={lowercaseMatches}
-                      hiddenMatchedTexts={hiddenMatchedTexts}
+                      sourceColor={sourceColor}
+                      sourceColorMap={sourceColorMap}
+                      defaultPalette={defaultPalette}
                     />
                   ) : (
                     toCellText(row[columnKey])

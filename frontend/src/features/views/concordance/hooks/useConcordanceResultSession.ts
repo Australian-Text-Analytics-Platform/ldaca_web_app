@@ -24,8 +24,6 @@ import { CONCORDANCE_PRESENTATION_COLUMN_SET } from '../../common/generatedColum
 import {
   buildConcordanceNodeColorMap,
   buildConcordanceSourceColorMap,
-  buildMatchedTextColorMap,
-  collectConcordanceMatchedTexts,
   resolveConcordanceNodeIdForKey,
 } from '../concordanceSourceDomain';
 import {
@@ -112,8 +110,6 @@ interface UseConcordanceResultSessionOptions {
   combinedPage: number;
   selectedNodes: WorkspaceNodeMetadata[];
   showDispersion: boolean;
-  colourMatches: boolean;
-  lowercaseMatches: boolean;
   nodeColorOverrides?: Record<string, string>;
   reviewSources?: ConcordanceRunAllReviewSource[];
   reviewDispersionRowUnit: ConcordanceReviewRowUnit;
@@ -128,8 +124,6 @@ export function useConcordanceResultSession({
   combinedPage,
   selectedNodes,
   showDispersion,
-  colourMatches,
-  lowercaseMatches,
   nodeColorOverrides = {},
   reviewSources = [],
   reviewDispersionRowUnit,
@@ -369,22 +363,6 @@ export function useConcordanceResultSession({
   const sourceColorMap = buildConcordanceSourceColorMap(selectedNodes, nodeColors, defaultPalette);
   const resolveNodeIdForKey = (nodeKey: string): string | null =>
     resolveConcordanceNodeIdForKey(nodeKey, selectedNodes, labelToNodeId);
-  const allMatchedTexts =
-    showDispersion && colourMatches
-      ? isReview
-        ? Array.from(
-            new Set(
-              Object.values(reviewDensityByNode).flatMap((density) =>
-                density.series.map((item) =>
-                  lowercaseMatches ? item.label.toLowerCase() : item.label,
-                ),
-              ),
-            ),
-          ).sort()
-        : collectConcordanceMatchedTexts(results?.data, { lowercaseMatches })
-      : [];
-  const matchedTextColorMap = buildMatchedTextColorMap(allMatchedTexts, defaultPalette);
-
   return {
     isReview,
     reviewError,
@@ -406,8 +384,6 @@ export function useConcordanceResultSession({
     defaultPalette,
     nodeColors,
     sourceColorMap,
-    allMatchedTexts,
-    matchedTextColorMap,
     reviewDensityByNode,
     resolveNodeIdForKey,
     handleReviewSort: (columnKey: string, paginationKey: string) => {

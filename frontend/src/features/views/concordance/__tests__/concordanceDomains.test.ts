@@ -8,8 +8,6 @@ import {
 import {
   buildConcordanceNodeColorMap,
   buildConcordanceSourceColorMap,
-  buildMatchedTextColorMap,
-  collectConcordanceMatchedTexts,
   findConcordanceSourceNode,
   getConcordanceSourceColor,
 } from '../concordanceSourceDomain';
@@ -90,52 +88,11 @@ describe('concordanceDomains', () => {
 
     const result = buildDispersionBinsFromDensitySeries([{ label: 'Alpha', counts }], 20);
 
-    expect(result.bins[0]?.Alpha).toBe(2);
-    expect(result.bins[19]?.Alpha).toBe(3);
-    expect(result.totalsByKey.Alpha).toBe(5);
+    expect(result.bins[0]?.__dispersion_total__).toBe(2);
+    expect(result.bins[19]?.__dispersion_total__).toBe(3);
+    expect(result.totalsByKey.__dispersion_total__).toBe(5);
   });
 });
-describe('matched-text color view models', () => {
-  const resultData = {
-    'node-1': {
-      data: [
-        [
-          { CONC_matched_text: 'Alpha' },
-          { CONC_matched_text: 'beta' },
-          { CONC_matched_text: 'Alpha' },
-        ],
-      ],
-    },
-    'node-2': {
-      data: [[{ CONC_matched_text: 'gamma' }]],
-    },
-  } as unknown as Record<string, ConcordanceNodeResult>;
-
-  it('collects unique sorted matched texts from raw result rows', () => {
-    expect(collectConcordanceMatchedTexts(resultData, { lowercaseMatches: false })).toEqual([
-      'Alpha',
-      'beta',
-      'gamma',
-    ]);
-  });
-
-  it('normalizes matched text labels when the lowercase option is enabled', () => {
-    expect(collectConcordanceMatchedTexts(resultData, { lowercaseMatches: true })).toEqual([
-      'alpha',
-      'beta',
-      'gamma',
-    ]);
-  });
-
-  it('assigns matched-text colors by palette order', () => {
-    expect(buildMatchedTextColorMap(['alpha', 'beta', 'gamma'], ['red', 'blue'])).toEqual({
-      alpha: 'red',
-      beta: 'blue',
-      gamma: 'red',
-    });
-  });
-});
-
 describe('concordance source display helpers', () => {
   const sourceNodes = [
     { id: 'node-1', name: 'Left Corpus' },

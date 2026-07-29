@@ -1,16 +1,16 @@
 type ConcordanceGroupedRow = Record<string, unknown>[];
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
+import { getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { toCellText } from '../concordanceTableDomain';
 
 interface Props {
   hits: ConcordanceGroupedRow;
   textLength?: number;
   barWidthPercent?: number;
-  colourMatches?: boolean;
-  matchedTextColors?: Record<string, string>;
-  lowercaseMatches?: boolean;
-  hiddenMatchedTexts?: Set<string>;
+  sourceColor?: string;
+  sourceColorMap?: Record<string, string>;
+  defaultPalette?: string[];
 }
 
 const DEFAULT_BAR_COLOR = '#0284c7';
@@ -34,10 +34,9 @@ export function ConcordanceDispersionCell({
   hits,
   textLength,
   barWidthPercent = 100,
-  colourMatches = false,
-  matchedTextColors,
-  lowercaseMatches = false,
-  hiddenMatchedTexts,
+  sourceColor = DEFAULT_BAR_COLOR,
+  sourceColorMap = {},
+  defaultPalette = [],
 }: Props) {
   const fallbackLength = hits.reduce((max, hit) => {
     const endIndex = getNumericIndex(hit[CONCORDANCE_COLUMN_KEYS.endIdx]);
@@ -45,6 +44,7 @@ export function ConcordanceDispersionCell({
   }, 0);
   const domain = Math.max(textLength ?? 0, fallbackLength, 1);
   const widthPercent = Math.max(0, Math.min(barWidthPercent, 100));
+  const hasSourcePalette = Object.keys(sourceColorMap).length > 0 || defaultPalette.length > 0;
 
   return (
     <TooltipProvider delayDuration={120} skipDelayDuration={0}>
@@ -61,15 +61,12 @@ export function ConcordanceDispersionCell({
               return null;
             }
             const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
-            const normalizedText = lowercaseMatches ? rawText.toLowerCase() : rawText;
-            if (hiddenMatchedTexts?.has(normalizedText)) {
-              return null;
-            }
             const leftPercent = Math.min(100, (startIndex / domain) * 100);
-            const barColor = colourMatches
-              ? (matchedTextColors?.[normalizedText] ?? DEFAULT_BAR_COLOR)
-              : undefined;
-            const matchTextColor = barColor ?? DEFAULT_BAR_COLOR;
+            const hitSource = hit.__source_node;
+            const matchColor =
+              hitSource && hasSourcePalette
+                ? getConcordanceSourceColor(hitSource, sourceColorMap, defaultPalette)
+                : sourceColor;
             const leftContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.leftContext]);
             const rightContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.rightContext]);
             return (
@@ -80,8 +77,9 @@ export function ConcordanceDispersionCell({
                     style={{ left: `${String(leftPercent)}%` }}
                   >
                     <span
-                      className={`pointer-events-none absolute top-1/2 left-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full${barColor ? '' : ' bg-sky-600'}`}
-                      style={barColor ? { backgroundColor: barColor } : undefined}
+                      data-testid="concordance-match-marker"
+                      className="pointer-events-none absolute top-1/2 left-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                      style={{ backgroundColor: matchColor }}
                     />
                   </span>
                 </TooltipTrigger>
@@ -90,7 +88,7 @@ export function ConcordanceDispersionCell({
                   className="max-w-md whitespace-normal break-words border border-slate-200 bg-white px-3 py-2 text-xs text-black shadow-md"
                 >
                   <span>{leftContext} </span>
-                  <span style={{ color: matchTextColor, fontWeight: 600 }}>{rawText}</span>
+                  <span style={{ color: matchColor, fontWeight: 600 }}>{rawText}</span>
                   <span> {rightContext}</span>
                 </TooltipContent>
               </Tooltip>
