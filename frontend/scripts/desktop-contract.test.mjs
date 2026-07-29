@@ -27,12 +27,8 @@ describe('desktop configuration contracts', () => {
     expect(workflow).not.toContain('pnpm stage:backend-runtime');
     expect(workflow).not.toContain('build-notes');
     expect(workflow).not.toContain('UV_NO_SOURCES');
-    expect(packageJson.scripts['desktop:build:mac']).toContain(
-      'pnpm clean:desktop:mac-bundles',
-    );
-    expect(packageJson.scripts['desktop:build:mac']).toContain(
-      '--target aarch64-apple-darwin',
-    );
+    expect(packageJson.scripts['desktop:build:mac']).toContain('pnpm clean:desktop:mac-bundles');
+    expect(packageJson.scripts['desktop:build:mac']).toContain('--target aarch64-apple-darwin');
   });
 
   it('builds signed updater artifacts and delegates publication to the release workflow', () => {
@@ -51,6 +47,7 @@ describe('desktop configuration contracts', () => {
     expect(releaseWorkflow).toContain('actions/download-artifact@v8.0.1');
     expect(buildWorkflow).toContain('aarch64-apple-darwin');
     expect(buildWorkflow).toContain('xcrun notarytool submit');
+    expect(buildWorkflow).toContain('DMG notarization failed after $attempt attempts');
     expect(buildWorkflow).toContain('TAURI_SIGNING_PRIVATE_KEY');
     expect(buildWorkflow).toContain('.app.tar.gz.sig');
     expect(releaseWorkflow).toContain('secrets: inherit');
@@ -64,9 +61,7 @@ describe('desktop configuration contracts', () => {
     const cargo = read('frontend/src-tauri/Cargo.toml');
     const packageJson = JSON.parse(read('frontend/package.json'));
     const desktopShell = read('frontend/src-tauri/src/lib.rs');
-    const updaterRuntime = read(
-      'frontend/src/features/desktop-updater/desktopUpdaterRuntime.ts',
-    );
+    const updaterRuntime = read('frontend/src/features/desktop-updater/desktopUpdaterRuntime.ts');
 
     expect(tauri.bundle.createUpdaterArtifacts).toBe(true);
     expect(tauri.plugins.updater.endpoints).toEqual([
