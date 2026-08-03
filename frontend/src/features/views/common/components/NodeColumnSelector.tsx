@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +13,7 @@ export interface NodeColumnSelectorProps {
   disabledReason?: string;
   placeholder?: string;
   clearOptionValue?: string;
-  clearOptionLabel?: React.ReactNode;
+  clearOptionLabel?: string;
   noColumnsMessage?: React.ReactNode;
   preserveValue?: string;
   className?: string;
@@ -31,6 +24,10 @@ export interface NodeColumnSelectorProps {
 /**
  * Renders the shared column selector used by analysis parameter panels,
  * including disabled-reason tooltips for unavailable controls.
+ *
+ * The option list is type-in filterable (substring, or `*`/`?` wildcards)
+ * because tabular corpora routinely carry hundreds of columns, where a
+ * scroll-only dropdown cannot be navigated.
  * Used by: node input/selection panels and feature-specific column selection controls.
  */
 export function NodeColumnSelector({
@@ -51,63 +48,56 @@ export function NodeColumnSelector({
 }: NodeColumnSelectorProps) {
   const triggerAriaLabel = typeof label === 'string' ? label : undefined;
 
+  const heading = label && (
+    <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>
+      {label}
+    </span>
+  );
+
   if (!columns.length) {
     return (
       <div className={cn('space-y-1', className)}>
-        {label && (
-          <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>
-            {label}
-          </span>
-        )}
+        {heading}
         <DisabledReasonTooltip reason={disabledReason} className="w-full">
-          <Select value="" onValueChange={onChange} disabled>
-            <SelectTrigger
-              aria-label={triggerAriaLabel}
-              className={cn('w-full text-sm', triggerClassName)}
-            >
-              <SelectValue placeholder={noColumnsMessage} />
-            </SelectTrigger>
-          </Select>
+          <SearchableSelect
+            options={[]}
+            onChange={onChange}
+            disabled
+            ariaLabel={triggerAriaLabel}
+            placeholder={noColumnsMessage}
+            triggerClassName={cn('text-sm', triggerClassName)}
+          />
         </DisabledReasonTooltip>
       </div>
     );
   }
 
   const optionValues = [...columns];
+  // A saved column that no longer exists in the block stays selectable so the
+  // panel can show what was configured rather than silently dropping it.
   if (preserveValue && preserveValue.length > 0 && !optionValues.includes(preserveValue)) {
     optionValues.push(preserveValue);
   }
+  const options: SearchableSelectOption[] = optionValues.map((column) => ({ value: column }));
 
   return (
     <div className={cn('space-y-1', className)}>
-      {label && (
-        <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>
-          {label}
-        </span>
-      )}
+      {heading}
       <DisabledReasonTooltip reason={disabled ? disabledReason : undefined} className="w-full">
-        <Select value={value} onValueChange={onChange} disabled={disabled}>
-          <SelectTrigger
-            aria-label={triggerAriaLabel}
-            className={cn('w-full text-sm', triggerClassName)}
-          >
-            <SelectValue placeholder={placeholder} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {clearOptionValue && (
-                <SelectItem key={clearOptionValue} value={clearOptionValue}>
-                  {clearOptionLabel}
-                </SelectItem>
-              )}
-              {optionValues.map((column) => (
-                <SelectItem key={column} value={column}>
-                  {column}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          options={options}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          ariaLabel={triggerAriaLabel}
+          placeholder={placeholder}
+          searchPlaceholder="Filter columns… (* and ? wildcards)"
+          emptyMessage="No matching columns"
+          pinnedOptions={
+            clearOptionValue ? [{ value: clearOptionValue, label: clearOptionLabel }] : undefined
+          }
+          triggerClassName={cn('text-sm', triggerClassName)}
+        />
       </DisabledReasonTooltip>
     </div>
   );

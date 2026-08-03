@@ -36,6 +36,14 @@ reset their history from **Settings → Guidance**.
 
 **Answer:** Select nodes, run an analysis tab (token frequency, concordance, etc.), and view results in the center panel.
 
+Column pickers — the per-Data-Block column choice in an analysis tab's input
+panel, the Filter tab's condition column, and the Annotation correction column
+— open with a filter box. Type any part of a column name to narrow the list, or
+use `*` and `?` wildcards for a whole-name pattern: `spk_*` matches every
+column whose name starts with `spk_`, and `*_id` every column ending in `_id`.
+A count above the list shows how many of the block's columns match. Arrow keys
+move through the results and Enter selects the highlighted one.
+
 ## Step 5 — Workspace graph and data view
 
 **Question:** *How do I inspect data?*

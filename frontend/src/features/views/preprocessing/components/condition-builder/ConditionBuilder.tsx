@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { type ConditionColumnOption } from '../../types';
 
@@ -150,9 +151,13 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                   </div>
 
                   <div className="flex flex-1 flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2">
-                    <Select
+                    <SearchableSelect
                       value={condition.column}
-                      onValueChange={(value) => {
+                      options={availableColumns.map((col) => ({
+                        value: col.name,
+                        label: `${col.label ?? col.name} (${col.dataType})`,
+                      }))}
+                      onChange={(value) => {
                         onConditionChange(
                           condition.id,
                           'column',
@@ -160,21 +165,15 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                         );
                       }}
                       disabled={disabled}
-                    >
-                      <SelectTrigger
-                        className="min-w-40 grow"
-                        data-filter-column-empty={condition.column ? 'false' : 'true'}
-                      >
-                        <SelectValue placeholder="Select column" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableColumns.map((col) => (
-                          <SelectItem key={col.name} value={col.name}>
-                            {col.label ?? col.name} ({col.dataType})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      ariaLabel="Filter column"
+                      placeholder="Select column"
+                      searchPlaceholder="Filter columns… (* and ? wildcards)"
+                      emptyMessage="No matching columns"
+                      triggerClassName="min-w-40 grow"
+                      triggerData={{
+                        'data-filter-column-empty': condition.column ? 'false' : 'true',
+                      }}
+                    />
 
                     {!hideOperator && (
                       <Select

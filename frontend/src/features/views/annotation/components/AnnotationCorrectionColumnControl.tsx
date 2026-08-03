@@ -1,13 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 const CREATE_CORRECTION_COLUMN = '__create_correction_column__';
 const NO_CORRECTION_COLUMN = '__no_correction_column__';
@@ -47,33 +40,27 @@ export function AnnotationCorrectionColumnControl({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Select
+      <SearchableSelect
         value={invalidValue ? NO_CORRECTION_COLUMN : (value ?? NO_CORRECTION_COLUMN)}
+        options={columns.map((column) => ({ value: column }))}
+        pinnedOptions={[
+          { value: NO_CORRECTION_COLUMN, label: 'None' },
+          { value: CREATE_CORRECTION_COLUMN, label: 'Create new…' },
+        ]}
         disabled={disabled || availableColumns === null}
-        onValueChange={(next) => {
+        ariaLabel="Correction column"
+        triggerPrefix={<span className="mr-1 shrink-0 text-muted-foreground">Correction:</span>}
+        searchPlaceholder="Filter columns… (* and ? wildcards)"
+        emptyMessage="No matching columns"
+        triggerClassName="h-8 w-auto min-w-36 text-sm"
+        onChange={(next) => {
           if (next === CREATE_CORRECTION_COLUMN) {
             onCreate();
             return;
           }
           onValueChange(next === NO_CORRECTION_COLUMN ? null : next);
         }}
-      >
-        <SelectTrigger aria-label="Correction column" className="h-8 w-auto min-w-36 text-sm">
-          <span className="mr-1 text-muted-foreground">Correction:</span>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="end">
-          <SelectGroup>
-            <SelectItem value={NO_CORRECTION_COLUMN}>None</SelectItem>
-            <SelectItem value={CREATE_CORRECTION_COLUMN}>Create new…</SelectItem>
-            {columns.map((column) => (
-              <SelectItem key={column} value={column}>
-                {column}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      />
       {onUseAsExample ? (
         <Button
           type="button"
