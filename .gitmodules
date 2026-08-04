@@ -10,3 +10,6 @@
 [submodule "ldaca-analytics-sample-data"]
 	path = ldaca-analytics-sample-data
 	url = https://github.com/Australian-Text-Analytics-Platform/ldaca-analytics-sample-data.git
+[submodule "ldaca-wordflow-docs"]
+	path = ldaca-wordflow-docs
+	url = https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow-docs

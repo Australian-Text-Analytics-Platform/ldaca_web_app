@@ -22,5 +22,21 @@ export const BACKEND_PORT: string = import.meta.env.VITE_BACKEND_PORT ?? '';
 /** Explicit backend API base path override. */
 export const BACKEND_API_BASE: string = import.meta.env.VITE_BACKEND_API_BASE ?? '';
 
-/** Remote docs base URL for non-bundled documentation. */
-export const DOCS_BASE_URL: string = import.meta.env.VITE_DOCS_BASE_URL ?? '';
+/** Derives the mutable minor-version tag used by the online documentation. */
+export const docsMinorTagFor = (version: string): string => {
+  const match = /^(\d+)\.(\d+)(?:\.|$)/.exec(version.trim());
+  const major = match?.[1];
+  const minor = match?.[2];
+  return major && minor ? `v${major}.${minor}` : '';
+};
+
+/** Resolves one deployment origin to the app's matching minor-tag directory. */
+export const docsBaseUrlFor = (origin: string, version: string): string => {
+  const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+  const tag = docsMinorTagFor(version);
+  return normalizedOrigin && tag ? `${normalizedOrigin}/${tag}` : '';
+};
+
+/** Reads the versioned docs base lazily so tests and runtime config share one contract. */
+export const getDocsBaseUrl = (): string =>
+  docsBaseUrlFor(import.meta.env.VITE_DOCS_ORIGIN ?? '', APP_VERSION);

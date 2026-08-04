@@ -12,6 +12,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type {
   FileTreeDirectory,
@@ -31,6 +41,12 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 interface FileMoveTarget {
   key: string;
   directoryPath: string;
+}
+
+interface DeleteTarget {
+  path: string;
+  name: string;
+  type: 'file' | 'directory';
 }
 
 const directoryPathsIn = (nodes: FileTreeNode[]): string[] =>
@@ -95,6 +111,7 @@ function FileTreeContent({
 }: FileTreeContentProps) {
   const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
   const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   const [storedCollapsedPaths, setStoredCollapsedPaths] = useState<Set<string>>(() => {
     try {
@@ -344,7 +361,7 @@ function FileTreeContent({
             aria-label={`Delete ${file.name}`}
             title={`Delete ${file.name}`}
             onClick={() => {
-              onDeleteFile(file.path);
+              setDeleteTarget({ path: file.path, name: file.name, type: 'file' });
             }}
             disabled={loadingFiles}
           >
@@ -443,7 +460,7 @@ function FileTreeContent({
             aria-label={`Delete folder ${node.name}`}
             title={`Delete folder ${node.name}`}
             onClick={() => {
-              onDeleteFile(node.path);
+              setDeleteTarget({ path: node.path, name: node.name, type: 'directory' });
             }}
             disabled={loadingFiles}
           >
@@ -462,5 +479,43 @@ function FileTreeContent({
     );
   };
 
-  return <>{nodes.map((node) => renderNode(node))}</>;
+  return (
+    <>
+      {nodes.map((node) => renderNode(node))}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.type === 'directory' ? 'folder ' : ''}&ldquo;
+              {deleteTarget?.name}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.type === 'directory'
+                ? `This will permanently delete "${deleteTarget.name}" and everything inside it. This action cannot be undone.`
+                : `This will permanently delete "${deleteTarget?.name ?? 'this file'}". This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loadingFiles}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={loadingFiles}
+              onClick={() => {
+                if (!deleteTarget) return;
+                onDeleteFile(deleteTarget.path);
+                setDeleteTarget(null);
+              }}
+            >
+              {deleteTarget?.type === 'directory' ? 'Delete folder' : 'Delete file'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }

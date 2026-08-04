@@ -12,6 +12,11 @@ A User File is mutable import material. Adding one to a Workspace snapshots it
 into an immutable Workspace-owned source, so later moves or deletion in the
 user file area cannot rewrite an existing Source Data Block.
 
+The User File area accepts arbitrary regular files. Loadability is a separate
+property derived from one backend-owned, case-insensitive extension allowlist.
+The complete User File tree therefore includes assets such as images even
+though the Data Loader presents only Loadable User Files and their directories.
+
 Every user area may contain non-secret User Preferences. Only the canonical
 single-user `root` area may contain the separate write-only
 `provider-credentials.toml` schema 2, containing named Annotation Provider
@@ -49,6 +54,13 @@ flowchart TB
   files at every level, ordered by Unicode case-folded name and exact relative
   path. A configured serialized-response byte bound fails the whole read rather
   than introducing pagination or truncation.
+- Every file resource reports whether it is loadable. Directories and files
+  outside the canonical extension allowlist report `loadable: false` without
+  being deleted, rejected at upload, or removed from the complete API tree.
+- Loadable ZIP files are inspected without extraction under the same
+  compression-ratio, path, encryption, and file-kind rules used for ZIP-based
+  spreadsheets. Safe members that decode as strict
+  UTF-8 become one document row each; undecodable members are ignored.
 - Downloads stream response-owned snapshots so concurrent source mutation
   cannot truncate an accepted response.
 - Workspace archives are inspected and extracted into staging before

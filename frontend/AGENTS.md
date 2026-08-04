@@ -37,8 +37,11 @@ before changing an unfamiliar state or desktop boundary.
   [desktop runtime runbook](../docs/runbooks/desktop-runtime.md), then inspect
   `scripts/package_backend_runtime.py` and
   `frontend/scripts/stage-backend-runtime.mjs`.
-- Keep package-local `docs/user-guide/`, `docs/tutorials/`, and
-  `docs/reference/` aligned with observable UI behavior. Engineering
+- Keep `public/tutorials/`, `public/information/`, `public/references/`, and
+  `src/tutorials/bundledRegistry.ts` complete and aligned with observable UI
+  behavior. They are the documentation source of truth. Run
+  `pnpm -C frontend docs:sync-publish` to copy a validated publication mirror
+  into `ldaca-wordflow-docs`; never edit published content first. Engineering
   architecture remains in the repository-level `docs/` taxonomy.
 
 ## Commands

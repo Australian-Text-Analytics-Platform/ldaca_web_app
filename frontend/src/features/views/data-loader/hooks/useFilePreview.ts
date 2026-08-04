@@ -10,7 +10,7 @@ import { queryKeys } from '@/lib/queryKeys';
  */
 export const useFilePreview = (filename: string | null, isOpen: boolean) => {
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect -- Resetting local UI state on prop change; no cascading renders */

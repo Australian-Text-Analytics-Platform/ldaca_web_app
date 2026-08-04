@@ -76,4 +76,66 @@ describe('useFiles cache policy', () => {
     expect(invalidateQueries).not.toHaveBeenCalled();
     expect(mocks.listUserFiles).toHaveBeenCalledTimes(readsBeforeRefresh + 1);
   });
+
+  it('keeps directories but hides User Files that are not loadable', async () => {
+    mocks.listUserFiles.mockResolvedValue({
+      data: [
+        {
+          name: 'figures',
+          path: 'figures',
+          type: 'directory',
+          size_bytes: null,
+          file_type: null,
+          modified_at: 1,
+          loadable: false,
+        },
+        {
+          name: 'chart.png',
+          path: 'figures/chart.png',
+          type: 'file',
+          size_bytes: 64,
+          file_type: 'unknown',
+          modified_at: 1,
+          loadable: false,
+        },
+        {
+          name: 'records.csv',
+          path: 'records.csv',
+          type: 'file',
+          size_bytes: 32,
+          file_type: 'csv',
+          modified_at: 1,
+          loadable: true,
+        },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const { result } = renderHook(() => useFiles(), {
+      wrapper: makeWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.fileTree).toEqual([
+        {
+          name: 'figures',
+          path: 'figures',
+          type: 'directory',
+          children: [],
+        },
+        {
+          name: 'records.csv',
+          path: 'records.csv',
+          type: 'file',
+          size: 32,
+          size_bytes: 32,
+          modified_at: 1,
+          file_type: 'csv',
+          loadable: true,
+        },
+      ]);
+    });
+  });
 });

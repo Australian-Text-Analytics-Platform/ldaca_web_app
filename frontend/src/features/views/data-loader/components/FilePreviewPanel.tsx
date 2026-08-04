@@ -77,9 +77,10 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
             value={String(pageSize)}
             onValueChange={(value) => {
               setPageSize(Number(value));
+              setPage(1);
             }}
           >
-            <SelectTrigger className="w-20">
+            <SelectTrigger className="w-20" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

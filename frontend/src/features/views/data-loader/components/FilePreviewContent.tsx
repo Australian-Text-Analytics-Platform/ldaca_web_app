@@ -150,7 +150,7 @@ export function FilePreviewContent({
                       </tr>
                     </thead>
                     <tbody>
-                      {previewData.slice(0, 10).map((row, rowIndex) => (
+                      {previewData.map((row, rowIndex) => (
                         <tr
                           key={rowIndex}
                           className={rowIndex % 2 ? 'bg-muted/50' : 'bg-background'}

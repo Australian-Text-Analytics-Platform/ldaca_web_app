@@ -58,8 +58,10 @@ flowchart LR
   acknowledgments, and modal-layer coordination. Feature-local hooks may
   request the next relevant hint from workflow state; the guidance boundary
   does not poll the DOM or infer global application conditions.
-- `src/tutorials/` and `frontend/public/` own the in-app documentation
-  registry and content.
+- `src/tutorials/` and `frontend/public/` own the complete in-app documentation
+  registry and offline content. `frontend/scripts/sync-published-docs.mjs`
+  mirrors that content outward to the publication submodule; content never
+  synchronizes in the opposite direction.
 - `src-tauri/` owns the native desktop supervisor and commands.
 
 The app has one static route so the same built assets work behind FastAPI SPA
@@ -87,6 +89,18 @@ manager, the choice between sample import and personal uploads, the
 file-to-Data-Block transition, and where the resulting Data Block appears. Each
 explanation is requested only when its target and workflow state are present,
 and each is acknowledged independently.
+
+The backend User File tree is complete. The Data Loader derives its own tree by
+removing file leaves whose `loadable` signal is false while preserving every
+directory, including empty directories. Counts and empty-state guidance use
+only the resulting Loadable User Files.
+
+Online documentation is an optional urgent-update channel. The build-time
+`VITE_DOCS_ORIGIN` identifies the site root, and the frontend appends the
+current app's `v{major}.{minor}` tag. Markdown from that tag is tried before the
+bundled copy; network and HTTP failures fall back locally. Registry caches are
+scoped to the resolved origin and tag so one minor version cannot shadow
+another.
 
 ## Backend Contract Transition
 

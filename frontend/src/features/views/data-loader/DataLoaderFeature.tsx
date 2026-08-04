@@ -372,7 +372,7 @@ function DataLoaderFeature() {
                   <HelpIcon
                     targetKey="data-loader.files.section"
                     label="Files and uploads section"
-                    tooltip="Upload CSV, TSV, Excel, or JSON files, preview them, and add them to the active workspace."
+                    tooltip="Load delimited, JSON, Parquet, Avro, Arrow IPC, spreadsheet, UTF-8 text, or ZIP document files into the active workspace."
                   />
                 </CardTitle>
                 <Button
@@ -452,7 +452,7 @@ function DataLoaderFeature() {
                   <div className="text-muted-foreground flex items-center gap-2 text-sm">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading files…
                   </div>
-                ) : totalFileCount === 0 ? (
+                ) : fileTree.length === 0 ? (
                   <FileListShell
                     creatingFolder={creatingFolder}
                     isDropActive={isFileDropActive}

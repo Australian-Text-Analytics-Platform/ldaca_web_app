@@ -63,4 +63,83 @@ describe('FileTree workspace routing', () => {
     );
     expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled();
   });
+
+  it('requires confirmation before deleting a file', () => {
+    const onDeleteFile = vi.fn();
+    render(
+      <FileTree
+        nodes={[{ type: 'file', name: 'records.csv', path: 'uploads/records.csv', size: 10 }]}
+        selectedFile={null}
+        loadingFiles={false}
+        hasWorkspaceSelected
+        workspaceId="workspace-1"
+        onPreviewFile={vi.fn()}
+        onAddFile={vi.fn()}
+        onSelectFile={vi.fn()}
+        onDownloadFile={vi.fn()}
+        onDeleteFile={onDeleteFile}
+        onCreateFolderInside={vi.fn()}
+        onOpenCitation={vi.fn()}
+        onMoveFile={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete records.csv' }));
+
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Delete “records.csv”?' })).toBeInTheDocument();
+    expect(onDeleteFile).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(onDeleteFile).not.toHaveBeenCalled();
+  });
+
+  it('confirms deletion of a folder and its contents', () => {
+    const onDeleteFile = vi.fn();
+    render(
+      <FileTree
+        nodes={[
+          {
+            type: 'directory',
+            name: 'archive',
+            path: 'uploads/archive',
+            loadable: false,
+            children: [
+              {
+                type: 'file',
+                name: 'records.csv',
+                path: 'uploads/archive/records.csv',
+                size: 10,
+                loadable: true,
+              },
+            ],
+          },
+        ]}
+        selectedFile={null}
+        loadingFiles={false}
+        hasWorkspaceSelected
+        workspaceId="workspace-1"
+        onPreviewFile={vi.fn()}
+        onAddFile={vi.fn()}
+        onSelectFile={vi.fn()}
+        onDownloadFile={vi.fn()}
+        onDeleteFile={onDeleteFile}
+        onCreateFolderInside={vi.fn()}
+        onOpenCitation={vi.fn()}
+        onMoveFile={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete folder archive' }));
+
+    expect(screen.getByText(/everything inside it/)).toBeInTheDocument();
+    expect(onDeleteFile).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete folder' }));
+
+    expect(onDeleteFile).toHaveBeenCalledOnce();
+    expect(onDeleteFile).toHaveBeenCalledWith('uploads/archive');
+  });
 });

@@ -7,7 +7,7 @@ import rehypeRaw from 'rehype-raw';
 import logo from '../logo.png';
 import 'katex/dist/katex.min.css';
 import { BUNDLED_DOCUMENT_FILES, type DocumentTarget } from '@/tutorials/documentationRegistry';
-import { APP_VERSION, APP_BUILD_DATE, APP_BUILD, DOCS_BASE_URL } from '@/config/env';
+import { APP_VERSION, APP_BUILD_DATE, APP_BUILD, getDocsBaseUrl } from '@/config/env';
 import { useZoom } from '@/hooks/useZoom';
 import { useDocumentAnchor } from '@/hooks/useDocumentAnchor';
 
@@ -71,24 +71,25 @@ const resolveLocalDocUrl = (requestedFile: string): string => {
 
 /**
  * Resolves a requested doc file to the URL fetched by `DocumentView`.
- * Bundled files stay local for desktop/offline use, while optional remote docs
- * can be served from `VITE_DOCS_BASE_URL` without changing document links.
- * Called by: DocumentView's markdown-loading effect.
+ * Called by: DocumentView when constructing its bundled fallback source.
  */
-const resolveDocUrl = (requestedFile: string): string => {
-  if (BUNDLED_DOCUMENT_FILES.has(requestedFile)) {
-    return resolveLocalDocUrl(requestedFile);
+const resolveFromRoot = (requestedPath: string, root: string): string => {
+  const rootWithSlash = root.endsWith('/') ? root : `${root}/`;
+  return new URL(requestedPath.replace(/^\/+/, ''), rootWithSlash).toString();
+};
+
+const resolveAssetUrl = (
+  requestedPath: string | undefined,
+  sourceRoot: string,
+): string | undefined => {
+  if (!requestedPath || !sourceRoot || /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(requestedPath)) {
+    return requestedPath;
   }
-  const remoteBase = DOCS_BASE_URL.trim();
-  if (remoteBase) {
-    try {
-      const baseWithSlash = remoteBase.endsWith('/') ? remoteBase : `${remoteBase}/`;
-      return new URL(requestedFile, baseWithSlash).toString();
-    } catch {
-      // fall through to local
-    }
+  try {
+    return resolveFromRoot(requestedPath, sourceRoot);
+  } catch {
+    return requestedPath;
   }
-  return resolveLocalDocUrl(requestedFile);
 };
 
 /**
@@ -112,6 +113,7 @@ function DocumentView({
   const [content, setContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [documentSourceRoot, setDocumentSourceRoot] = useState<string>('');
   const [navigationState, setNavigationState] = useState<NavigationState>(() => ({
     propTarget: target,
     currentTarget: target,
@@ -135,10 +137,35 @@ function DocumentView({
       setError(null);
       try {
         const requestedFile = currentTarget.file;
-        const url = resolveDocUrl(requestedFile);
-        const resp = await fetch(url, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`HTTP ${String(resp.status)}`);
-        const text = await resp.text();
+        const remoteBase = getDocsBaseUrl();
+        const localRoot = resolveLocalDocUrl('');
+        const sources: { url: string; root: string }[] = [];
+        if (remoteBase) {
+          sources.push({ url: resolveFromRoot(requestedFile, remoteBase), root: remoteBase });
+        }
+        if (!remoteBase || BUNDLED_DOCUMENT_FILES.has(requestedFile)) {
+          sources.push({ url: resolveLocalDocUrl(requestedFile), root: localRoot });
+        }
+
+        let text: string | null = null;
+        let sourceRoot = '';
+        let lastError: Error = new Error('Failed to load document');
+        for (const source of sources) {
+          try {
+            const resp = await fetch(source.url, { cache: 'no-store' });
+            if (!resp.ok) {
+              lastError = new Error(`HTTP ${String(resp.status)}`);
+              continue;
+            }
+            text = await resp.text();
+            sourceRoot = source.root;
+            break;
+          } catch (sourceError: unknown) {
+            lastError =
+              sourceError instanceof Error ? sourceError : new Error('Failed to load document');
+          }
+        }
+        if (text === null) throw lastError;
         // Substitute build-time placeholders so docs like
         // `references/general.md` can show the current app version /
         // build date without manual edits per release. Inserted via
@@ -147,7 +174,10 @@ function DocumentView({
           .replace(/\{\{\s*VERSION\s*\}\}/g, APP_VERSION)
           .replace(/\{\{\s*BUILD_DATE\s*\}\}/g, APP_BUILD_DATE)
           .replace(/\{\{\s*BUILD\s*\}\}/g, APP_BUILD);
-        if (!cancelled) setContent(rendered);
+        if (!cancelled) {
+          setContent(rendered);
+          setDocumentSourceRoot(sourceRoot);
+        }
       } catch (err: unknown) {
         if (!cancelled) {
           const message =
@@ -171,10 +201,17 @@ function DocumentView({
    */
   const markdownComponents: Components = {
     /** Called by: ReactMarkdown when rendering markdown image nodes inside DocumentView. */
-    img: ({ node: _node, className, alt, ...props }) => {
+    img: ({ node: _node, className, alt, src, ...props }) => {
       const mergedClassName = ['max-w-full h-auto', className].filter(Boolean).join(' ');
       const resolvedAlt = typeof alt === 'string' ? alt : '';
-      return <img {...props} className={mergedClassName.trim()} alt={resolvedAlt} />;
+      return (
+        <img
+          {...props}
+          src={resolveAssetUrl(src, documentSourceRoot)}
+          className={mergedClassName.trim()}
+          alt={resolvedAlt}
+        />
+      );
     },
     /**
      * Rewrites markdown anchors so document consumers stay inside the modal navigation flow.
@@ -228,8 +265,12 @@ function DocumentView({
         );
       }
 
+      const renderedHref =
+        href?.endsWith('.md') || href?.includes('.md#')
+          ? href
+          : resolveAssetUrl(href, documentSourceRoot);
       return (
-        <a {...props} href={href} onClick={handleClick}>
+        <a {...props} href={renderedHref} onClick={handleClick}>
           {children}
         </a>
       );

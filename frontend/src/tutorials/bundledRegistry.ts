@@ -1,6 +1,6 @@
 /**
  * Bundled fallback registry. Ships inside the app bundle and is used:
- *  - when `VITE_DOCS_BASE_URL` is unset (offline-only build),
+ *  - when `VITE_DOCS_ORIGIN` is unset (offline-only build),
  *  - while the remote `registry.json` fetch is in flight on first paint,
  *  - if the remote fetch fails and no cache is present.
  *
@@ -8,10 +8,8 @@
  * shadowed once the remote registry arrives. To drop an entry from the
  * bundle, delete it here — the remote registry continues to serve it.
  *
- * Today this file mirrors the previously-inline registries 1:1 so nothing
- * breaks before the docs site is live. Once the remote registry is
- * deployed and reliable, trim this down to the minimal offline set
- * (see `docs/refactoring/online-tutorial-migration.md` §3.10B).
+ * This registry remains complete because bundled docs are the offline source
+ * of truth; a matching remote minor tag may shadow entries for urgent fixes.
  */
 
 export interface DocTarget {
@@ -549,9 +547,7 @@ const reference = {
 /** Bundled docs registry consumed before or instead of the remote docs registry. */
 export const BUNDLED_REGISTRY: RegistryShape = { tutorial, info, reference };
 
-/** Files that ship inside `frontend/public/`. The remote-URL resolver in
- *  `DocumentView` falls back to the local-relative path for these even when
- *  `VITE_DOCS_BASE_URL` is set, so first-paint remains zero-network. */
+/** Files that ship inside `frontend/public/` and can serve as remote fallbacks. */
 export const BUNDLED_FILES: ReadonlySet<string> = new Set(
   [...Object.values(tutorial), ...Object.values(info), ...Object.values(reference)].map(
     (t) => t.file,

@@ -3,6 +3,7 @@ import {
   useRegistryStore,
   type PartialRemoteRegistry,
 } from './registryStore';
+import { getDocsBaseUrl } from '@/config/env';
 
 /**
  * Stale-while-revalidate loader for the remote `registry.json`.
@@ -11,16 +12,16 @@ import {
  *  1. Synchronously read any cached payload from `localStorage` and merge
  *     it into the store, so the first modal open never sees an empty
  *     remote.
- *  2. Kick off a background `fetch` of `${VITE_DOCS_BASE_URL}/registry.json`.
+ *  2. Kick off a background fetch of the matching minor-tag registry.
  *     On success, replace the merged registry + rewrite the cache. On
  *     failure, leave the cached payload in place and log to debug.
  *
- * Cache hydration always runs. If `VITE_DOCS_BASE_URL` is empty / unset,
- * only the network refresh is skipped; bundled docs plus any valid cache
- * remain available for offline builds.
+ * Cache keys include the resolved origin and minor tag, so data from another
+ * app version cannot shadow the complete bundled fallback.
  */
 
-const CACHE_KEY = 'ldaca.docs.registry.v1';
+const CACHE_KEY_PREFIX = 'ldaca.docs.registry.v1';
+const cacheKeyFor = (baseUrl: string): string => `${CACHE_KEY_PREFIX}:${baseUrl}`;
 
 interface CachedEnvelope {
   schemaVersion: number;
@@ -46,10 +47,10 @@ const isPartialRegistry = (value: unknown): value is PartialRemoteRegistry => {
 
 /** Restores a cached registry payload so docs links work before the network refresh finishes. */
 /** Called by loadRemoteRegistry during its synchronous startup hydration. */
-const readCache = (): PartialRemoteRegistry | null => {
+const readCache = (cacheKey: string): PartialRemoteRegistry | null => {
   if (typeof localStorage === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<CachedEnvelope>;
     if (parsed.schemaVersion !== REGISTRY_SCHEMA_VERSION) return null;
@@ -62,7 +63,7 @@ const readCache = (): PartialRemoteRegistry | null => {
 
 /** Stores the last successful remote registry as a startup-latency optimization. */
 /** Called by loadRemoteRegistry after a validated network refresh succeeds. */
-const writeCache = (payload: PartialRemoteRegistry): void => {
+const writeCache = (cacheKey: string, payload: PartialRemoteRegistry): void => {
   if (typeof localStorage === 'undefined') return;
   try {
     const envelope: CachedEnvelope = {
@@ -70,7 +71,7 @@ const writeCache = (payload: PartialRemoteRegistry): void => {
       fetchedAt: Date.now(),
       payload,
     };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(envelope));
+    localStorage.setItem(cacheKey, JSON.stringify(envelope));
   } catch {
     // Quota / serialization issues are non-fatal — bundled fallback
     // covers correctness, the cache is purely a startup-latency win.
@@ -88,7 +89,7 @@ const fetchRegistry = async (baseUrl: string): Promise<PartialRemoteRegistry | n
       'registry.json',
       baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
     ).toString();
-    const resp = await fetch(url, { cache: 'no-cache' });
+    const resp = await fetch(url, { cache: 'no-store' });
     if (!resp.ok) return null;
     const json = (await resp.json()) as unknown;
     return isPartialRegistry(json) ? json : null;
@@ -113,28 +114,22 @@ let loadPromise: Promise<void> | null = null;
 export const loadRemoteRegistry = (): Promise<void> => {
   if (loadPromise) return loadPromise;
 
-  const baseUrl = import.meta.env.VITE_DOCS_BASE_URL?.trim() ?? '';
-
-  // Synchronous cache hydration happens regardless of base URL: a
-  // previously-deployed cache from a different build of this app should
-  // still apply.
-  const cached = readCache();
-  if (cached) {
-    useRegistryStore.getState().applyRemote(cached);
-  }
+  const baseUrl = getDocsBaseUrl();
 
   if (!baseUrl) {
-    // Bundled-only mode needs no status mirror; cached content, if present,
-    // was already applied synchronously above.
     loadPromise = Promise.resolve();
     return loadPromise;
   }
+
+  const cacheKey = cacheKeyFor(baseUrl);
+  const cached = readCache(cacheKey);
+  if (cached) useRegistryStore.getState().applyRemote(cached);
 
   loadPromise = (async () => {
     const fresh = await fetchRegistry(baseUrl);
     if (fresh) {
       useRegistryStore.getState().applyRemote(fresh);
-      writeCache(fresh);
+      writeCache(cacheKey, fresh);
     }
   })();
 
@@ -148,4 +143,4 @@ export const __resetLoadPromiseForTests = (): void => {
   loadPromise = null;
 };
 
-export const __CACHE_KEY_FOR_TESTS = CACHE_KEY;
+export const __cacheKeyForTests = cacheKeyFor;

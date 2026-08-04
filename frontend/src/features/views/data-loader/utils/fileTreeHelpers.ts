@@ -8,6 +8,23 @@ const README_FILENAME = 'README.md';
 export const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
 
 /**
+ * Projects the complete User File tree into the Data Loader's presentation:
+ * unsupported file leaves disappear while every directory remains visible.
+ * Used by `useFiles` after the backend resource list is normalized.
+ */
+export function filterLoadableFileTree(nodes: FileTreeNode[]): FileTreeNode[] {
+  const filtered: FileTreeNode[] = [];
+  for (const node of nodes) {
+    if (node.type === 'file') {
+      if (node.loadable === true) filtered.push(node);
+      continue;
+    }
+    filtered.push({ ...node, children: filterLoadableFileTree(node.children) });
+  }
+  return filtered;
+}
+
+/**
  * Counts visible data files below a file-tree node. Data Loader excludes README
  * citation files from totals because they are shown as folder metadata instead.
  * Used by `DataLoaderFeature` to summarize the server file tree.

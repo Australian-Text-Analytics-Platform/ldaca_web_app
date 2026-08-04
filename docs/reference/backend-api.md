@@ -82,6 +82,27 @@ destinations are deliberately accepted for trusted authenticated users.
 | `POST /api/data-portal/featured` | `list_featured_data_portal_collections` | 200 | Read featured collections with an optional write-only request token |
 | `POST /api/data-portal/imports` | `submit_data_portal_import` | 202 | Create and queue a retained portal User File Import using an optional write-only request token |
 
+`FileResource.loadable` is required for every resource. It is `false` for
+directories and for files outside the canonical case-insensitive allowlist.
+The User File collection remains complete; `loadable` is a consumer signal,
+not a storage or upload filter. `file_type` remains `unknown` for unsupported
+files.
+
+Loadable filename extensions are:
+
+- delimited: `.csv`, `.tsv`;
+- JSON: `.json`, `.jsonl`, `.ndjson`;
+- columnar: `.parquet`, `.avro`, `.arrow`, `.ipc`, `.feather`;
+- spreadsheets: `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`;
+- strict UTF-8 text: `.txt`, `.text`, `.md`, `.rst`, `.log`;
+- UTF-8 document archives: `.zip`.
+
+ZIP ingestion returns one deterministic path-ordered row per decodable regular
+member with string columns `file_path`, `base_name`, `extension`, and
+`document`. Directories, macOS metadata, and members that fail strict UTF-8
+decoding are omitted. A safe archive with no readable members returns the same
+typed schema with zero rows.
+
 Data Portal request bodies accept optional write-only `api_token`. A supplied
 token is used for that call; otherwise the deployment token is used. The token
 is removed before a User File Import request is retained.

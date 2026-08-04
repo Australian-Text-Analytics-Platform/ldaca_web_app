@@ -104,7 +104,7 @@ export const fileResponse = (overrides: Partial<FileResource> = {}): FileResourc
   file_type: 'csv',
   size_bytes: 64,
   modified_at: 1,
-  preview_available: true,
+  loadable: true,
   ...overrides,
 });
 

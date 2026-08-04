@@ -4259,6 +4259,10 @@
             ],
             "title": "File Type"
           },
+          "loadable": {
+            "title": "Loadable",
+            "type": "boolean"
+          },
           "modified_at": {
             "title": "Modified At",
             "type": "number"
@@ -4270,11 +4274,6 @@
           "path": {
             "title": "Path",
             "type": "string"
-          },
-          "preview_available": {
-            "default": false,
-            "title": "Preview Available",
-            "type": "boolean"
           },
           "size_bytes": {
             "anyOf": [
@@ -4301,7 +4300,8 @@
           "name",
           "path",
           "type",
-          "modified_at"
+          "modified_at",
+          "loadable"
         ],
         "title": "FileResource",
         "type": "object"

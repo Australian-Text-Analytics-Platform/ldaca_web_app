@@ -6,6 +6,7 @@ import { type FileTreeNode } from '../types';
 import { queryKeys } from '@/lib/queryKeys';
 import { refreshFilePathQuery } from './fileCache';
 import { toFileTree } from '@/api/frontendModels';
+import { filterLoadableFileTree } from '../utils/fileTreeHelpers';
 
 interface UseFilesProps {
   /** Defer the initial fetch until auth has been resolved. */
@@ -30,7 +31,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
      */
     queryFn: async () => {
       const { data } = await listUserFiles({ throwOnError: true });
-      return toFileTree(data) as FileTreeNode[];
+      return filterLoadableFileTree(toFileTree(data) as FileTreeNode[]);
     },
     enabled,
     staleTime: 2 * 60 * 1000,

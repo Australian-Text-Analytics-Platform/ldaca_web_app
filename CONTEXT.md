@@ -113,6 +113,11 @@ A mutable file or folder in a user's import area. Adding it to a Workspace
 creates an independent Source Data Block snapshot.
 _Avoid_: source node, workspace file
 
+**Loadable User File**:
+A stored User File whose filename extension is supported for creating a Source
+Data Block. Unsupported assets remain User Files but are not loadable.
+_Avoid_: previewable file, supported upload
+
 **User File Import**:
 A user-owned retained lifecycle record for publishing a complete sample or
 Data Portal collection into the User File area. It is not Workspace content
@@ -250,6 +255,7 @@ _Avoid_: prediction column, hidden review state
   Workspace from device history.
 - A Source Data Block snapshots a User File; later User File changes do not
   mutate the Data Block.
+- Only a Loadable User File can become a Source Data Block.
 - A Derived Data Block records one or more parent Data Blocks.
 - A Data Block may have a Document Column Preference, a Tokenizer Preference,
   both, or neither. Analysis controls expose and persist only the preferences

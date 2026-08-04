@@ -4,7 +4,7 @@ import { BUNDLED_REGISTRY } from '../bundledRegistry';
 import { getDocumentTarget } from '../documentationRegistry';
 import { useRegistryStore, REGISTRY_SCHEMA_VERSION } from '../registryStore';
 import {
-  __CACHE_KEY_FOR_TESTS,
+  __cacheKeyForTests,
   __resetLoadPromiseForTests,
   loadRemoteRegistry,
 } from '../remoteRegistry';
@@ -84,8 +84,8 @@ describe('getDocumentTarget', () => {
 });
 
 describe('loadRemoteRegistry — cache only path', () => {
-  it('is a no-op when VITE_DOCS_BASE_URL is empty and no cache exists', async () => {
-    vi.stubEnv('VITE_DOCS_BASE_URL', '');
+  it('is a no-op when VITE_DOCS_ORIGIN is empty and no cache exists', async () => {
+    vi.stubEnv('VITE_DOCS_ORIGIN', '');
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
 
@@ -96,7 +96,7 @@ describe('loadRemoteRegistry — cache only path', () => {
     expect(getDocumentTarget('tutorial', 'ui.tool-choice')).not.toBeNull();
   });
 
-  it('hydrates from cache synchronously when present', async () => {
+  it('does not hydrate a versioned cache when remote docs are disabled', async () => {
     const cached = {
       schemaVersion: REGISTRY_SCHEMA_VERSION,
       fetchedAt: Date.now(),
@@ -109,15 +109,16 @@ describe('loadRemoteRegistry — cache only path', () => {
         },
       },
     };
-    localStorage.setItem(__CACHE_KEY_FOR_TESTS, JSON.stringify(cached));
-    vi.stubEnv('VITE_DOCS_BASE_URL', '');
+    localStorage.setItem(
+      __cacheKeyForTests('https://docs.example.com/wordflow/v0.7'),
+      JSON.stringify(cached),
+    );
+    vi.stubEnv('VITE_DOCS_ORIGIN', '');
     vi.stubGlobal('fetch', vi.fn());
 
     await loadRemoteRegistry();
 
-    expect(getDocumentTarget('tutorial', 'cached.only')).toMatchObject({
-      file: 'tutorials/cached.md',
-    });
+    expect(getDocumentTarget('tutorial', 'cached.only')).toBeNull();
   });
 
   it('ignores cache with a stale schemaVersion', async () => {
@@ -128,8 +129,11 @@ describe('loadRemoteRegistry — cache only path', () => {
         tutorial: { 'stale.entry': { file: 'x.md', anchor: 'y' } },
       },
     };
-    localStorage.setItem(__CACHE_KEY_FOR_TESTS, JSON.stringify(stale));
-    vi.stubEnv('VITE_DOCS_BASE_URL', '');
+    vi.stubEnv('VITE_DOCS_ORIGIN', 'https://docs.example.com/wordflow');
+    localStorage.setItem(
+      __cacheKeyForTests('https://docs.example.com/wordflow/v0.7'),
+      JSON.stringify(stale),
+    );
     vi.stubGlobal('fetch', vi.fn());
 
     await loadRemoteRegistry();
@@ -139,8 +143,8 @@ describe('loadRemoteRegistry — cache only path', () => {
 });
 
 describe('loadRemoteRegistry — network path', () => {
-  it('fetches registry.json from VITE_DOCS_BASE_URL and merges + caches it', async () => {
-    vi.stubEnv('VITE_DOCS_BASE_URL', 'https://docs.example.com/v0.3');
+  it('fetches registry.json from the matching minor tag and merges + caches it', async () => {
+    vi.stubEnv('VITE_DOCS_ORIGIN', 'https://docs.example.com/wordflow');
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
       /** Returns a remote registry payload so the loader can merge and cache it. */
@@ -149,7 +153,7 @@ describe('loadRemoteRegistry — network path', () => {
           tutorial: {
             'remote.only': { file: 'tutorials/remote.md', anchor: 'help-remote' },
           },
-          meta: { version: '0.3.0' },
+          meta: { version: '0.7.1' },
         }),
     });
     vi.stubGlobal('fetch', fetchSpy);
@@ -157,15 +161,19 @@ describe('loadRemoteRegistry — network path', () => {
     await loadRemoteRegistry();
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe('https://docs.example.com/v0.3/registry.json');
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
+      'https://docs.example.com/wordflow/v0.7/registry.json',
+    );
 
     expect(getDocumentTarget('tutorial', 'remote.only')).toMatchObject({
       file: 'tutorials/remote.md',
     });
-    expect(useRegistryStore.getState().meta).toMatchObject({ version: '0.3.0' });
+    expect(useRegistryStore.getState().meta).toMatchObject({ version: '0.7.1' });
 
     // cache rewritten with the fresh payload
-    const cached = JSON.parse(localStorage.getItem(__CACHE_KEY_FOR_TESTS) ?? '{}');
+    const cached = JSON.parse(
+      localStorage.getItem(__cacheKeyForTests('https://docs.example.com/wordflow/v0.7')) ?? '{}',
+    );
     expect(cached.schemaVersion).toBe(REGISTRY_SCHEMA_VERSION);
     expect(cached.payload.tutorial['remote.only'].file).toBe('tutorials/remote.md');
   });
@@ -180,9 +188,12 @@ describe('loadRemoteRegistry — network path', () => {
         },
       },
     };
-    localStorage.setItem(__CACHE_KEY_FOR_TESTS, JSON.stringify(cached));
+    localStorage.setItem(
+      __cacheKeyForTests('https://docs.example.com/wordflow/v0.7'),
+      JSON.stringify(cached),
+    );
 
-    vi.stubEnv('VITE_DOCS_BASE_URL', 'https://docs.example.com/v0.3');
+    vi.stubEnv('VITE_DOCS_ORIGIN', 'https://docs.example.com/wordflow');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
     await loadRemoteRegistry();
@@ -193,7 +204,7 @@ describe('loadRemoteRegistry — network path', () => {
   });
 
   it('is idempotent — repeated calls reuse the in-flight promise', async () => {
-    vi.stubEnv('VITE_DOCS_BASE_URL', 'https://docs.example.com/v0.3');
+    vi.stubEnv('VITE_DOCS_ORIGIN', 'https://docs.example.com/wordflow');
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
       /** Returns an empty remote registry so repeated loads can share one in-flight request. */
@@ -204,5 +215,26 @@ describe('loadRemoteRegistry — network path', () => {
     await Promise.all([loadRemoteRegistry(), loadRemoteRegistry(), loadRemoteRegistry()]);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reuse a registry cached for a different minor tag', async () => {
+    localStorage.setItem(
+      __cacheKeyForTests('https://docs.example.com/wordflow/v0.5'),
+      JSON.stringify({
+        schemaVersion: REGISTRY_SCHEMA_VERSION,
+        fetchedAt: Date.now(),
+        payload: {
+          tutorial: {
+            'old.minor': { file: 'tutorials/old.md', anchor: 'help-old' },
+          },
+        },
+      }),
+    );
+    vi.stubEnv('VITE_DOCS_ORIGIN', 'https://docs.example.com/wordflow');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    await loadRemoteRegistry();
+
+    expect(getDocumentTarget('tutorial', 'old.minor')).toBeNull();
   });
 });

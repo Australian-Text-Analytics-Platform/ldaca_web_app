@@ -2138,6 +2138,10 @@ export type FileResource = {
      */
     file_type?: string | null;
     /**
+     * Loadable
+     */
+    loadable: boolean;
+    /**
      * Modified At
      */
     modified_at: number;
@@ -2149,10 +2153,6 @@ export type FileResource = {
      * Path
      */
     path: string;
-    /**
-     * Preview Available
-     */
-    preview_available?: boolean;
     /**
      * Size Bytes
      */

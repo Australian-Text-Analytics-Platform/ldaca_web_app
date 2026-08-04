@@ -89,6 +89,7 @@
     "format": "biome format --write src/",
     "format:check": "biome format src/",
     "docs:check": "node --experimental-strip-types scripts/check-docs-drift.mjs",
+    "docs:sync-publish": "node --experimental-strip-types scripts/sync-published-docs.mjs",
     "versions:check": "node ../scripts/check-versions.mjs && node --test ../scripts/check-versions.test.mjs ../scripts/prepare-backend-runtime.test.mjs scripts/stage-backend-runtime.test-node.mjs",
     "tauri": "tauri",
     "clean": "cd src-tauri && cargo clean",

@@ -5,6 +5,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { listFeaturedDataPortalCollections } from '@/api';
 import { WorkspaceDownloadsProvider } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsProvider';
+import type { FileTreeNode } from '@/features/views/data-loader/types';
 import DataLoaderFeature from '../DataLoaderFeature';
 
 const {
@@ -106,7 +107,7 @@ vi.mock('@/features/guidance/GuidanceContext', () => ({
   }),
 }));
 
-const mockFileTree = [
+const defaultMockFileTree: FileTreeNode[] = [
   {
     name: 'sample_data',
     path: 'sample_data',
@@ -147,6 +148,7 @@ const mockFileTree = [
     ],
   },
 ];
+let mockFileTree = defaultMockFileTree;
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -229,6 +231,7 @@ describe('DataLoaderFeature citation UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockFileTree = defaultMockFileTree;
     mockCreateWorkspace.mockResolvedValue({ id: 'ws-new' });
     mockHandleUploadFile.mockResolvedValue(true);
     mockRawFile.mockResolvedValue({ data: '# ADO Citation\n\nReference text.', error: undefined });
@@ -270,6 +273,26 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.getByRole('region', { name: 'Files upload area' })).not.toHaveAttribute(
       'data-guidance',
     );
+  });
+
+  it('renders preserved empty directories while counting only loadable files', () => {
+    mockFileTree = [
+      {
+        name: 'figures',
+        path: 'figures',
+        type: 'directory',
+        children: [],
+      },
+    ];
+
+    renderWithProviders(<DataLoaderFeature />);
+
+    expect(screen.getByRole('button', { name: 'figures' })).toBeInTheDocument();
+    expect(within(screen.getByTestId('folder-row-figures')).getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('Total files: 0')).toBeInTheDocument();
+    expect(
+      screen.queryByText('No files found. Upload a dataset to begin.'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows folder citation icons only for directories with readme and opens citation dialog', async () => {
@@ -340,10 +363,14 @@ describe('DataLoaderFeature citation UI', () => {
     });
   });
 
-  it('deletes a folder when clicking its trash button', () => {
+  it('deletes a folder only after confirmation', () => {
     renderWithProviders(<DataLoaderFeature />);
 
     fireEvent.click(getVisibleMatch(screen.getAllByRole('button', { name: /delete folder ado/i })));
+
+    expect(mockHandleDeleteFile).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /^delete folder$/i }));
 
     expect(mockHandleDeleteFile).toHaveBeenCalledWith('sample_data/ADO');
   });

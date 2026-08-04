@@ -64,12 +64,21 @@ This panel is used to bring data into the application. It supports file uploads,
 
 Click this button to upload a file from your local machine. Supported formats:
 
-- Plain text: `.txt`, `.md`, `.xml`
-- Delimited tabular text: `.csv`, `.tsv`, `.xlsx`
-- Columnar tabular format: `.parquet`
-- ZIP-archived collections of plain text files
+- Delimited tables: `.csv`, `.tsv`
+- JSON: `.json`, `.jsonl`, `.ndjson`
+- Columnar tables: `.parquet`, `.avro`, `.arrow`, `.ipc`, `.feather`
+- Spreadsheets: `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`
+- UTF-8 text: `.txt`, `.text`, `.md`, `.rst`, `.log`
+- UTF-8 document archives: `.zip`
 
-Supported file types can be previewed before being added to the workspace as a data block.
+The application stores other uploaded files, but the Data Loader hides them
+because they cannot become Data Blocks. Folders remain visible even when they
+contain no supported files.
+
+Supported file types can be previewed before being added to the workspace as a
+Data Block. A ZIP becomes a table with one row per member that can be decoded as
+strict UTF-8; members that fail decoding are ignored. The table records each member's path,
+filename stem, extension, and complete document text.
 
 <h2 id="help-data-loader-import-sample-button">Import sample data</h2>
 
@@ -111,7 +120,7 @@ Click the <kbd>+</kbd> folder icon next to any existing folder to create a subfo
 
 **Deleting files and folders**
 
-Click the trash icon next to any file to remove it permanently. There is no separate delete-folder button — a folder is removed automatically once all files inside it have been deleted.
+Click the trash icon next to a file or folder to request its permanent removal. A confirmation dialog identifies the selected item before deletion. Deleting a folder also deletes everything inside it.
 
 **Moving files by drag-and-drop**
 

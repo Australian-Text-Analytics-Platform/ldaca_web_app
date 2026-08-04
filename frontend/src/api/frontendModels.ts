@@ -101,7 +101,7 @@ export interface FileTreeNodeResponse {
   size_bytes?: number | null;
   modified_at?: number;
   file_type?: string | null;
-  preview_available?: boolean;
+  loadable?: boolean;
   children?: FileTreeNodeResponse[];
 }
 
@@ -195,7 +195,7 @@ export function toFileTree(resources: FileResource[]): FileTreeNodeResponse[] {
       size_bytes: resource.size_bytes,
       modified_at: resource.modified_at,
       file_type: resource.file_type,
-      preview_available: resource.preview_available,
+      loadable: resource.loadable,
     };
     if (parentPath) ensureDirectory(parentPath).children?.push(file);
     else roots.push(file);
