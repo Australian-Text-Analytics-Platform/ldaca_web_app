@@ -40,6 +40,15 @@ afterAll(() => {
   storageDom.window.close();
 });
 
+// jsdom has no layout engine and therefore no scrollIntoView. Components that
+// keep a keyboard-highlighted row in view (searchable selects, long lists) call
+// it during normal interaction, so provide an inert stand-in.
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = function scrollIntoView() {
+    /* no-op mock */
+  };
+}
+
 const TEST_RESIZE_OBSERVER_WIDTH = 1024;
 const TEST_RESIZE_OBSERVER_HEIGHT = 768;
 
