@@ -27,11 +27,11 @@ import {
 
 const IMPORT_PAGE_SIZE = 100;
 
-const publishesWorkspaceDataBlocks = (kind: string): boolean =>
-  kind === 'concordance_match_publication' ||
-  kind === 'concordance_document_publication' ||
-  kind === 'quotation_result_publication' ||
-  kind === 'topic_modeling_detachment';
+const createsWorkspaceDataBlocks = (kind: string): boolean =>
+  kind === 'concordance_match_data_block_creation' ||
+  kind === 'concordance_document_data_block_creation' ||
+  kind === 'quotation_result_data_block_creation' ||
+  kind === 'topic_modeling_data_block_creation';
 
 const nextPage = (page: { page: number; total_pages: number }): number | undefined =>
   page.page < page.total_pages ? page.page + 1 : undefined;
@@ -181,7 +181,7 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
                 },
               );
             }
-            if (publishesWorkspaceDataBlocks(data.request.kind)) {
+            if (createsWorkspaceDataBlocks(data.request.kind)) {
               useFreshNodesStore.getState().markCreated(workspaceId, data.output_node_ids);
             }
           }

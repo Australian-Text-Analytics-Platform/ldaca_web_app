@@ -175,9 +175,6 @@ export interface SequentialChartModel {
     selectedIndices: Set<number>;
     selectedCount: number;
     hasInvalidSelection: boolean;
-    selectedPeriods: { period_start: string | number; period_end: string | number }[];
-    visibleGroups?: { values: Record<string, SequentialGroupValue> }[];
-    canDetach: boolean;
   };
   counts: SequentialVisibilityCounts;
 }
@@ -491,13 +488,13 @@ function normalizeRows(
 }
 
 /**
- * Builds the complete render/export/detach domain for one Sequential result.
+ * Builds the complete render and export domain for one Sequential result.
  *
  * Used by: `SequentialAnalysisFeature`, which keeps task submission and chart
  * interaction state outside this pure boundary. Flow: validate saved params and
  * rows, normalize one canonical row representation, assign collision-safe
  * series ids, pivot/backfill/sort chart rows, build category/linear axis data,
- * and derive series, legend, visibility counts, and detach metadata from that
+ * and derive series, legend, visibility counts, and selection metadata from that
  * same source. Partial valid rows remain usable while diagnostics make malformed
  * payloads explicit instead of trusting casts or silent fallbacks.
  */
@@ -608,15 +605,6 @@ export function buildSequentialChartModel({
       typeof row.__period_key__ === 'string' ? row.__period_key__ : '',
     ),
   );
-  const selectedPeriods = selectedChartRows
-    .map((row) => ({
-      period_start: row.period_start,
-      period_end: row.period_end,
-    }))
-    .filter(
-      (period): period is { period_start: string | number; period_end: string | number } =>
-        isPeriodBoundary(period.period_start) && isPeriodBoundary(period.period_end),
-    );
   const shownRows = canonicalRows.filter((row) => !hiddenKeys.has(row.groupId));
   const chosenRows = shownRows.filter((row) => selectedPeriodKeys.has(row.periodKey));
   const sumCounts = (rows: SequentialCanonicalRow[]) =>
@@ -642,11 +630,6 @@ export function buildSequentialChartModel({
     chosenPointCount: validSelectedIndices.size > 0 ? chosenRows.length : 0,
     chosenDocumentCount: validSelectedIndices.size > 0 ? sumCounts(chosenRows) : 0,
   };
-  const selectionVisibleGroups =
-    summary.groupBy.length === 0
-      ? undefined
-      : visibleGroups.map((group) => ({ values: group.values }));
-
   return {
     chartType,
     xAxisType,
@@ -673,16 +656,6 @@ export function buildSequentialChartModel({
       selectedIndices: validSelectedIndices,
       selectedCount: validSelectedIndices.size,
       hasInvalidSelection,
-      selectedPeriods,
-      visibleGroups: selectionVisibleGroups,
-      canDetach:
-        validSelectedIndices.size > 0 &&
-        validSelectedIndices.size < chartData.length &&
-        !hasInvalidSelection &&
-        selectedPeriods.length === validSelectedIndices.size &&
-        groups.length > 0 &&
-        visibleGroups.length > 0 &&
-        (selectionVisibleGroups === undefined || selectionVisibleGroups.length > 0),
     },
     counts,
   };

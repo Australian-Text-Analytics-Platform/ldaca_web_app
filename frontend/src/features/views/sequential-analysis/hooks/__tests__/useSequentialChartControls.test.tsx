@@ -54,13 +54,11 @@ describe('useSequentialChartControls', () => {
     act(() => {
       result.current.toggleKey('speaker-a');
       result.current.selectPeriod(0, false, 3);
-      result.current.setDetachNodeName('Subset');
       result.current.resetResultSelection();
     });
 
     expect(result.current.hiddenKeys.has('speaker-a')).toBe(true);
     expect(result.current.selectedPeriodIndices.size).toBe(0);
-    expect(result.current.detachNodeName).toBe('');
   });
 
   it('clears hidden keys and selection after result clearing', () => {

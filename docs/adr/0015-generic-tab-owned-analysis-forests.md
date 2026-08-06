@@ -30,7 +30,7 @@ Every Analysis records:
 Parent links may have arbitrary depth. Scope describes intent, not a separate
 resource or state machine. Preview and Run All may be independent roots.
 Supporting Analyses use the same scheduler, persistence, cancellation, Result,
-Artifact, and output-publication contracts.
+Artifact, and Derived Data Block Creation contracts.
 
 Replacement is explicit and success-dependent. Predecessors remain readable
 while replacement runs and survive failure or cancellation. Clearing removes
@@ -63,7 +63,7 @@ route, or runtime migration.
 - The backend forest and immutable requests are the sole lifecycle and
   historical hydration authority.
 - Multi-source group orchestration can reuse ordinary Analysis scheduling
-  while retaining atomic publication.
+  while retaining an atomic commit.
 - Clients must reason about a collection rather than one attached Analysis.
 - Older Workspace and archive layouts must be operationally converted before
   the cutover or remain rejected.

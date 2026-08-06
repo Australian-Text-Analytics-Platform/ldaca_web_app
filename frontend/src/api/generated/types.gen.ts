@@ -65,16 +65,16 @@ export type Analysis = {
     } & ConcordanceRunAllAnalysisRequest) | ({
         kind: 'quotation_run_all';
     } & QuotationRunAllAnalysisRequest) | ({
-        kind: 'concordance_match_publication';
-    } & ConcordanceMatchPublicationAnalysisRequest) | ({
-        kind: 'concordance_document_publication';
-    } & ConcordanceDocumentPublicationAnalysisRequest) | ({
-        kind: 'quotation_result_publication';
-    } & QuotationResultPublicationAnalysisRequest) | ({
+        kind: 'concordance_match_data_block_creation';
+    } & ConcordanceMatchDataBlockCreationAnalysisRequest) | ({
+        kind: 'concordance_document_data_block_creation';
+    } & ConcordanceDocumentDataBlockCreationAnalysisRequest) | ({
+        kind: 'quotation_result_data_block_creation';
+    } & QuotationResultDataBlockCreationAnalysisRequest) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllAnalysisRequest) | ({
-        kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentAnalysisRequest);
+        kind: 'topic_modeling_data_block_creation';
+    } & TopicModelingDataBlockCreationAnalysisRequest);
     /**
      * Revision
      */
@@ -125,16 +125,16 @@ export type AnalysisCreate = {
     } & ConcordanceRunAllAnalysisRequest) | ({
         kind: 'quotation_run_all';
     } & QuotationRunAllAnalysisRequest) | ({
-        kind: 'concordance_match_publication';
-    } & ConcordanceMatchPublicationAnalysisRequest) | ({
-        kind: 'concordance_document_publication';
-    } & ConcordanceDocumentPublicationAnalysisRequest) | ({
-        kind: 'quotation_result_publication';
-    } & QuotationResultPublicationAnalysisRequest) | ({
+        kind: 'concordance_match_data_block_creation';
+    } & ConcordanceMatchDataBlockCreationAnalysisRequest) | ({
+        kind: 'concordance_document_data_block_creation';
+    } & ConcordanceDocumentDataBlockCreationAnalysisRequest) | ({
+        kind: 'quotation_result_data_block_creation';
+    } & QuotationResultDataBlockCreationAnalysisRequest) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllSubmission) | ({
-        kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentAnalysisRequest);
+        kind: 'topic_modeling_data_block_creation';
+    } & TopicModelingDataBlockCreationAnalysisRequest);
     /**
      * Supersedes Analysis Ids
      */
@@ -1383,6 +1383,80 @@ export type ConcordanceDensitySeries = {
 };
 
 /**
+ * ConcordanceDocumentDataBlockCreationAnalysisRequest
+ */
+export type ConcordanceDocumentDataBlockCreationAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_document_data_block_creation';
+    /**
+     * Sources
+     */
+    sources: Array<ConcordanceDocumentDataBlockCreationSource>;
+};
+
+/**
+ * ConcordanceDocumentDataBlockCreationDerivation
+ */
+export type ConcordanceDocumentDataBlockCreationDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_document_data_block_creation';
+};
+
+/**
+ * ConcordanceDocumentDataBlockCreationResult
+ */
+export type ConcordanceDocumentDataBlockCreationResult = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_document_data_block_creation';
+    /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
+     * Outputs
+     */
+    outputs: Array<DataBlockCreationOutput>;
+};
+
+/**
+ * ConcordanceDocumentDataBlockCreationSource
+ *
+ * One source and exact Review filter for document-wise Data Block Creation.
+ */
+export type ConcordanceDocumentDataBlockCreationSource = {
+    /**
+     * Bin Count
+     */
+    bin_count?: 4 | 5 | 10 | 20 | 25 | 50 | 100 | null;
+    /**
+     * Excluded Matched Texts
+     */
+    excluded_matched_texts?: Array<string>;
+    /**
+     * New Node Name
+     */
+    new_node_name: string;
+    /**
+     * Selected Bins
+     */
+    selected_bins?: Array<number> | null;
+    /**
+     * Selected Metadata Columns
+     */
+    selected_metadata_columns?: Array<string>;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
  * ConcordanceDocumentProjectionQuery
  *
  * Filter and page document rows from an immutable Concordance Result.
@@ -1419,37 +1493,37 @@ export type ConcordanceDocumentProjectionQuery = {
 };
 
 /**
- * ConcordanceDocumentPublicationAnalysisRequest
+ * ConcordanceMatchDataBlockCreationAnalysisRequest
  */
-export type ConcordanceDocumentPublicationAnalysisRequest = {
+export type ConcordanceMatchDataBlockCreationAnalysisRequest = {
     /**
      * Kind
      */
-    kind?: 'concordance_document_publication';
+    kind?: 'concordance_match_data_block_creation';
     /**
      * Sources
      */
-    sources: Array<ConcordanceDocumentPublicationSource>;
+    sources: Array<DataBlockCreationSource>;
 };
 
 /**
- * ConcordanceDocumentPublicationDerivation
+ * ConcordanceMatchDataBlockCreationDerivation
  */
-export type ConcordanceDocumentPublicationDerivation = {
+export type ConcordanceMatchDataBlockCreationDerivation = {
     /**
      * Kind
      */
-    kind?: 'concordance_document_publication';
+    kind?: 'concordance_match_data_block_creation';
 };
 
 /**
- * ConcordanceDocumentPublicationResult
+ * ConcordanceMatchDataBlockCreationResult
  */
-export type ConcordanceDocumentPublicationResult = {
+export type ConcordanceMatchDataBlockCreationResult = {
     /**
      * Kind
      */
-    kind?: 'concordance_document_publication';
+    kind?: 'concordance_match_data_block_creation';
     /**
      * Output Node Ids
      */
@@ -1457,81 +1531,7 @@ export type ConcordanceDocumentPublicationResult = {
     /**
      * Outputs
      */
-    outputs: Array<ResultPublicationOutput>;
-};
-
-/**
- * ConcordanceDocumentPublicationSource
- *
- * One source and exact Review filter for document-wise publication.
- */
-export type ConcordanceDocumentPublicationSource = {
-    /**
-     * Bin Count
-     */
-    bin_count?: 4 | 5 | 10 | 20 | 25 | 50 | 100 | null;
-    /**
-     * Excluded Matched Texts
-     */
-    excluded_matched_texts?: Array<string>;
-    /**
-     * New Node Name
-     */
-    new_node_name: string;
-    /**
-     * Selected Bins
-     */
-    selected_bins?: Array<number> | null;
-    /**
-     * Selected Metadata Columns
-     */
-    selected_metadata_columns?: Array<string>;
-    /**
-     * Source Node Id
-     */
-    source_node_id: string;
-};
-
-/**
- * ConcordanceMatchPublicationAnalysisRequest
- */
-export type ConcordanceMatchPublicationAnalysisRequest = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_match_publication';
-    /**
-     * Sources
-     */
-    sources: Array<ResultPublicationSource>;
-};
-
-/**
- * ConcordanceMatchPublicationDerivation
- */
-export type ConcordanceMatchPublicationDerivation = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_match_publication';
-};
-
-/**
- * ConcordanceMatchPublicationResult
- */
-export type ConcordanceMatchPublicationResult = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_match_publication';
-    /**
-     * Output Node Ids
-     */
-    output_node_ids: Array<string>;
-    /**
-     * Outputs
-     */
-    outputs: Array<ResultPublicationOutput>;
+    outputs: Array<DataBlockCreationOutput>;
 };
 
 /**
@@ -1731,6 +1731,48 @@ export type CreateFolderRequest = {
      * Parent Path
      */
     parent_path?: string;
+};
+
+/**
+ * DataBlockCreationOutput
+ */
+export type DataBlockCreationOutput = {
+    /**
+     * Output Columns
+     */
+    output_columns: Array<string>;
+    /**
+     * Output Node Id
+     */
+    output_node_id: string;
+    /**
+     * Record Count
+     */
+    record_count: number;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
+ * DataBlockCreationSource
+ *
+ * One immutable selection for publishing a successful Analysis Result.
+ */
+export type DataBlockCreationSource = {
+    /**
+     * New Node Name
+     */
+    new_node_name: string;
+    /**
+     * Selected Columns
+     */
+    selected_columns: Array<string>;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
 };
 
 /**
@@ -2019,14 +2061,14 @@ export type DerivationProvenance = {
     } & SqlDerivation) | ({
         kind: 'annotation';
     } & AnnotationDerivation) | ({
-        kind: 'concordance_match_publication';
-    } & ConcordanceMatchPublicationDerivation) | ({
-        kind: 'concordance_document_publication';
-    } & ConcordanceDocumentPublicationDerivation) | ({
-        kind: 'quotation_result_publication';
-    } & QuotationResultPublicationDerivation) | ({
-        kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentDerivation);
+        kind: 'concordance_match_data_block_creation';
+    } & ConcordanceMatchDataBlockCreationDerivation) | ({
+        kind: 'concordance_document_data_block_creation';
+    } & ConcordanceDocumentDataBlockCreationDerivation) | ({
+        kind: 'quotation_result_data_block_creation';
+    } & QuotationResultDataBlockCreationDerivation) | ({
+        kind: 'topic_modeling_data_block_creation';
+    } & TopicModelingDataBlockCreationDerivation);
     /**
      * Type
      */
@@ -2770,34 +2812,34 @@ export type QuotationResult = {
 };
 
 /**
- * QuotationResultPublicationAnalysisRequest
+ * QuotationResultDataBlockCreationAnalysisRequest
  */
-export type QuotationResultPublicationAnalysisRequest = {
+export type QuotationResultDataBlockCreationAnalysisRequest = {
     /**
      * Kind
      */
-    kind?: 'quotation_result_publication';
-    source: ResultPublicationSource;
+    kind?: 'quotation_result_data_block_creation';
+    source: DataBlockCreationSource;
 };
 
 /**
- * QuotationResultPublicationDerivation
+ * QuotationResultDataBlockCreationDerivation
  */
-export type QuotationResultPublicationDerivation = {
+export type QuotationResultDataBlockCreationDerivation = {
     /**
      * Kind
      */
-    kind?: 'quotation_result_publication';
+    kind?: 'quotation_result_data_block_creation';
 };
 
 /**
- * QuotationResultPublicationResult
+ * QuotationResultDataBlockCreationResult
  */
-export type QuotationResultPublicationResult = {
+export type QuotationResultDataBlockCreationResult = {
     /**
      * Kind
      */
-    kind?: 'quotation_result_publication';
+    kind?: 'quotation_result_data_block_creation';
     /**
      * Output Node Ids
      */
@@ -2805,7 +2847,7 @@ export type QuotationResultPublicationResult = {
     /**
      * Outputs
      */
-    outputs: Array<ResultPublicationOutput>;
+    outputs: Array<DataBlockCreationOutput>;
 };
 
 /**
@@ -3056,48 +3098,6 @@ export type ResultPagination = {
      * Total Rows
      */
     total_rows: number;
-};
-
-/**
- * ResultPublicationOutput
- */
-export type ResultPublicationOutput = {
-    /**
-     * Output Columns
-     */
-    output_columns: Array<string>;
-    /**
-     * Output Node Id
-     */
-    output_node_id: string;
-    /**
-     * Record Count
-     */
-    record_count: number;
-    /**
-     * Source Node Id
-     */
-    source_node_id: string;
-};
-
-/**
- * ResultPublicationSource
- *
- * One immutable selection for publishing a successful Analysis Result.
- */
-export type ResultPublicationSource = {
-    /**
-     * New Node Name
-     */
-    new_node_name: string;
-    /**
-     * Selected Columns
-     */
-    selected_columns: Array<string>;
-    /**
-     * Source Node Id
-     */
-    source_node_id: string;
 };
 
 /**
@@ -4005,43 +4005,13 @@ export type TopicModelingAnalysisRequest = {
 };
 
 /**
- * TopicModelingDetachedOutput
+ * TopicModelingDataBlockCreationAnalysisRequest
  */
-export type TopicModelingDetachedOutput = {
-    /**
-     * Source Node Id
-     */
-    source_node_id: string;
-    /**
-     * Topic Data Columns
-     */
-    topic_data_columns: Array<string>;
-    /**
-     * Topic Data Node Id
-     */
-    topic_data_node_id: string;
-    /**
-     * Topic Data Record Count
-     */
-    topic_data_record_count: number;
-    /**
-     * Topic Meanings Node Id
-     */
-    topic_meanings_node_id: string;
-    /**
-     * Topic Meanings Record Count
-     */
-    topic_meanings_record_count: number;
-};
-
-/**
- * TopicModelingDetachmentAnalysisRequest
- */
-export type TopicModelingDetachmentAnalysisRequest = {
+export type TopicModelingDataBlockCreationAnalysisRequest = {
     /**
      * Kind
      */
-    kind?: 'topic_modeling_detachment';
+    kind?: 'topic_modeling_data_block_creation';
     /**
      * New Node Names
      */
@@ -4069,13 +4039,13 @@ export type TopicModelingDetachmentAnalysisRequest = {
 };
 
 /**
- * TopicModelingDetachmentDerivation
+ * TopicModelingDataBlockCreationDerivation
  */
-export type TopicModelingDetachmentDerivation = {
+export type TopicModelingDataBlockCreationDerivation = {
     /**
      * Kind
      */
-    kind?: 'topic_modeling_detachment';
+    kind?: 'topic_modeling_data_block_creation';
     /**
      * Role
      */
@@ -4083,13 +4053,43 @@ export type TopicModelingDetachmentDerivation = {
 };
 
 /**
- * TopicModelingDetachmentResult
+ * TopicModelingDataBlockCreationOutput
  */
-export type TopicModelingDetachmentResult = {
+export type TopicModelingDataBlockCreationOutput = {
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+    /**
+     * Topic Data Columns
+     */
+    topic_data_columns: Array<string>;
+    /**
+     * Topic Data Node Id
+     */
+    topic_data_node_id: string;
+    /**
+     * Topic Data Record Count
+     */
+    topic_data_record_count: number;
+    /**
+     * Topic Meanings Node Id
+     */
+    topic_meanings_node_id: string;
+    /**
+     * Topic Meanings Record Count
+     */
+    topic_meanings_record_count: number;
+};
+
+/**
+ * TopicModelingDataBlockCreationResult
+ */
+export type TopicModelingDataBlockCreationResult = {
     /**
      * Kind
      */
-    kind?: 'topic_modeling_detachment';
+    kind?: 'topic_modeling_data_block_creation';
     /**
      * Output Node Ids
      */
@@ -4097,7 +4097,7 @@ export type TopicModelingDetachmentResult = {
     /**
      * Outputs
      */
-    outputs: Array<TopicModelingDetachedOutput>;
+    outputs: Array<TopicModelingDataBlockCreationOutput>;
 };
 
 /**
@@ -4690,16 +4690,16 @@ export type AnalysisCreateWritable = {
     } & ConcordanceRunAllAnalysisRequest) | ({
         kind: 'quotation_run_all';
     } & QuotationRunAllAnalysisRequest) | ({
-        kind: 'concordance_match_publication';
-    } & ConcordanceMatchPublicationAnalysisRequest) | ({
-        kind: 'concordance_document_publication';
-    } & ConcordanceDocumentPublicationAnalysisRequest) | ({
-        kind: 'quotation_result_publication';
-    } & QuotationResultPublicationAnalysisRequest) | ({
+        kind: 'concordance_match_data_block_creation';
+    } & ConcordanceMatchDataBlockCreationAnalysisRequest) | ({
+        kind: 'concordance_document_data_block_creation';
+    } & ConcordanceDocumentDataBlockCreationAnalysisRequest) | ({
+        kind: 'quotation_result_data_block_creation';
+    } & QuotationResultDataBlockCreationAnalysisRequest) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllSubmissionWritable) | ({
-        kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentAnalysisRequest);
+        kind: 'topic_modeling_data_block_creation';
+    } & TopicModelingDataBlockCreationAnalysisRequest);
     /**
      * Supersedes Analysis Ids
      */
@@ -7153,14 +7153,14 @@ export type GetAnalysisResultResponses = {
     } & QuotationRunAllResult) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllResult) | ({
-        kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentResult) | ({
-        kind: 'concordance_match_publication';
-    } & ConcordanceMatchPublicationResult) | ({
-        kind: 'concordance_document_publication';
-    } & ConcordanceDocumentPublicationResult) | ({
-        kind: 'quotation_result_publication';
-    } & QuotationResultPublicationResult);
+        kind: 'topic_modeling_data_block_creation';
+    } & TopicModelingDataBlockCreationResult) | ({
+        kind: 'concordance_match_data_block_creation';
+    } & ConcordanceMatchDataBlockCreationResult) | ({
+        kind: 'concordance_document_data_block_creation';
+    } & ConcordanceDocumentDataBlockCreationResult) | ({
+        kind: 'quotation_result_data_block_creation';
+    } & QuotationResultDataBlockCreationResult);
 };
 
 export type GetAnalysisResultResponse = GetAnalysisResultResponses[keyof GetAnalysisResultResponses];
@@ -7262,14 +7262,14 @@ export type QueryAnalysisResultResponses = {
     } & QuotationRunAllResult) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllResult) | ({
-        kind: 'topic_modeling_detachment';
-    } & TopicModelingDetachmentResult) | ({
-        kind: 'concordance_match_publication';
-    } & ConcordanceMatchPublicationResult) | ({
-        kind: 'concordance_document_publication';
-    } & ConcordanceDocumentPublicationResult) | ({
-        kind: 'quotation_result_publication';
-    } & QuotationResultPublicationResult);
+        kind: 'topic_modeling_data_block_creation';
+    } & TopicModelingDataBlockCreationResult) | ({
+        kind: 'concordance_match_data_block_creation';
+    } & ConcordanceMatchDataBlockCreationResult) | ({
+        kind: 'concordance_document_data_block_creation';
+    } & ConcordanceDocumentDataBlockCreationResult) | ({
+        kind: 'quotation_result_data_block_creation';
+    } & QuotationResultDataBlockCreationResult);
 };
 
 export type QueryAnalysisResultResponse = QueryAnalysisResultResponses[keyof QueryAnalysisResultResponses];

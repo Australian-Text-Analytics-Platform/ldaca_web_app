@@ -228,12 +228,12 @@ one frontend-only filter and sends it independently to each source.
 Two-source Concordance Run All appears as one thin Run All root with one
 Supporting Analysis per source. The forest projection keeps that relationship
 generic; Concordance interprets the group for progress and ordered Review.
-**Add to Workspace** opens the shared Result Publication dialog and submits one
+**Add to Workspace** opens the shared Derived Data Block Creation dialog and submits one
 typed Supporting Analysis under the successful Run All parent. Table View
-submits Concordance Match Publication; Dispersion View submits Concordance
-Document Publication with its active term and bin filter. Concordance lets the
-user include or exclude each source before submitting the atomic publication.
-Only successful publication invalidates the Workspace graph.
+submits Concordance Match Data Block Creation; Dispersion View submits
+Concordance Document Data Block Creation with its active term and bin filter.
+Concordance lets the user include or exclude each source before submitting the
+atomic creation. Only successful creation invalidates the Workspace graph.
 
 The active Tab is device-local presentation state, stored in localStorage by
 Workspace and analysis kind. Returning to an analysis view or reloading the

@@ -2,11 +2,11 @@ import { type QueryClient, useMutation } from '@tanstack/react-query';
 import { submitTabAnalysis } from '@/api';
 import type {
   ConcordanceRunAllAnalysisRequest,
-  ConcordanceDocumentPublicationAnalysisRequest,
-  ConcordanceMatchPublicationAnalysisRequest,
-  QuotationResultPublicationAnalysisRequest,
+  ConcordanceDocumentDataBlockCreationAnalysisRequest,
+  ConcordanceMatchDataBlockCreationAnalysisRequest,
+  QuotationResultDataBlockCreationAnalysisRequest,
   QuotationRunAllAnalysisRequest,
-  TopicModelingDetachmentAnalysisRequest,
+  TopicModelingDataBlockCreationAnalysisRequest,
 } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateWorkspaceGraphQuery } from './workspaceMutationCache';
@@ -16,10 +16,16 @@ interface WorkspaceAnalysisMutationsParams {
   queryClient: QueryClient;
 }
 
-type ResultPublicationRequest =
-  | ({ kind: 'concordance_match_publication' } & ConcordanceMatchPublicationAnalysisRequest)
-  | ({ kind: 'concordance_document_publication' } & ConcordanceDocumentPublicationAnalysisRequest)
-  | ({ kind: 'quotation_result_publication' } & QuotationResultPublicationAnalysisRequest);
+type DataBlockCreationRequest =
+  | ({
+      kind: 'concordance_match_data_block_creation';
+    } & ConcordanceMatchDataBlockCreationAnalysisRequest)
+  | ({
+      kind: 'concordance_document_data_block_creation';
+    } & ConcordanceDocumentDataBlockCreationAnalysisRequest)
+  | ({
+      kind: 'quotation_result_data_block_creation';
+    } & QuotationResultDataBlockCreationAnalysisRequest);
 
 /** Owns supporting and Run All Analysis commands exposed by Workspace actions. */
 export const useWorkspaceAnalysisMutations = ({
@@ -86,8 +92,8 @@ export const useWorkspaceAnalysisMutations = ({
       });
     },
   });
-  const detachTopicModelingMutation = useMutation({
-    mutationKey: ['workspace', 'detach-topic-modeling'],
+  const createTopicModelingDataBlocksMutation = useMutation({
+    mutationKey: ['workspace', 'create-topic-modeling-data-blocks'],
     mutationFn: ({
       workspaceId,
       tabId,
@@ -97,13 +103,13 @@ export const useWorkspaceAnalysisMutations = ({
       workspaceId: string;
       tabId: string;
       analysisId: string;
-      request: Omit<TopicModelingDetachmentAnalysisRequest, 'kind'>;
+      request: Omit<TopicModelingDataBlockCreationAnalysisRequest, 'kind'>;
     }) =>
       submitTabAnalysis({
         body: {
           execution_scope: 'supporting',
           parent_analysis_id: analysisId,
-          request: { kind: 'topic_modeling_detachment', ...request },
+          request: { kind: 'topic_modeling_data_block_creation', ...request },
         },
         path: { workspace_id: workspaceId, tab_id: tabId },
         throwOnError: true,
@@ -112,8 +118,8 @@ export const useWorkspaceAnalysisMutations = ({
       invalidateWorkspaceGraphQuery(queryClient, variables.workspaceId);
     },
   });
-  const publishResultMutation = useMutation({
-    mutationKey: ['workspace', 'publish-analysis-result'],
+  const createResultDataBlocksMutation = useMutation({
+    mutationKey: ['workspace', 'create-result-data-blocks'],
     mutationFn: ({
       workspaceId,
       tabId,
@@ -123,7 +129,7 @@ export const useWorkspaceAnalysisMutations = ({
       workspaceId: string;
       tabId: string;
       analysisId: string;
-      request: ResultPublicationRequest;
+      request: DataBlockCreationRequest;
     }) =>
       submitTabAnalysis({
         body: {
@@ -165,23 +171,23 @@ export const useWorkspaceAnalysisMutations = ({
           request,
           supersedesAnalysisIds,
         }),
-      detachTopicModeling: (
+      createTopicModelingDataBlocks: (
         tabId: string,
         analysisId: string,
-        request: Omit<TopicModelingDetachmentAnalysisRequest, 'kind'>,
+        request: Omit<TopicModelingDataBlockCreationAnalysisRequest, 'kind'>,
       ) =>
-        detachTopicModelingMutation.mutateAsync({
+        createTopicModelingDataBlocksMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
           tabId,
           analysisId,
           request,
         }),
-      publishAnalysisResult: (
+      createResultDataBlocks: (
         tabId: string,
         analysisId: string,
-        request: ResultPublicationRequest,
+        request: DataBlockCreationRequest,
       ) =>
-        publishResultMutation.mutateAsync({
+        createResultDataBlocksMutation.mutateAsync({
           workspaceId: ensureWorkspaceSelected(),
           tabId,
           analysisId,

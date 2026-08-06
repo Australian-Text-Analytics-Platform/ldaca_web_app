@@ -1,11 +1,4 @@
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useReducer,
-  useState,
-} from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useReducer, useState } from 'react';
 import {
   ACTIONS,
   EVENTS,
@@ -226,8 +219,7 @@ export function GuidanceProvider({
     .map((id) => contextualHints.find((definition) => definition.id === id))
     .find(
       (definition): definition is ContextualHintDefinition =>
-        definition !== undefined &&
-        (acknowledgments?.[definition.id] ?? 0) < definition.version,
+        definition !== undefined && (acknowledgments?.[definition.id] ?? 0) < definition.version,
     );
 
   const hintSession: GuidanceSession | null =
@@ -388,35 +380,35 @@ export function GuidanceProvider({
           <GuidancePresentationBoundary key={sessionKey}>
             {disableConfirmationOpen ? null : (
               <Joyride
-            run
-            continuous
-            steps={steps}
-            portalElement={portalElement}
-            onEvent={handleEvent}
-            locale={{ close: 'Not now', last: isHint ? 'Got it' : 'Done' }}
-            styles={guidanceStyles}
-            tooltipComponent={isHint ? ContextualHintTooltip : undefined}
-            options={{
-              arrowBase: 22,
-              arrowColor: 'var(--popover)',
-              arrowSize: 11,
-              buttons: isHint ? ['primary'] : ['back', 'skip', 'primary'],
-              blockTargetInteraction: true,
-              disableFocusTrap: modalOpen,
-              dismissKeyAction: isHint ? 'close' : false,
-              offset: 14,
-              overlayClickAction: false,
-              overlayColor: 'rgba(15, 23, 42, 0.36)',
-              primaryColor: GUIDANCE_ACCENT,
-              scrollDuration: reducedMotion ? 0 : 300,
-              skipBeacon: true,
-              spotlightPadding: 6,
-              spotlightRadius: 14,
-              targetWaitTimeout: 3_000,
-              textColor: 'var(--popover-foreground)',
-              width: 360,
-              zIndex: 1,
-            }}
+                run
+                continuous
+                steps={steps}
+                portalElement={portalElement}
+                onEvent={handleEvent}
+                locale={{ close: 'Not now', last: isHint ? 'Got it' : 'Done' }}
+                styles={guidanceStyles}
+                tooltipComponent={isHint ? ContextualHintTooltip : undefined}
+                options={{
+                  arrowBase: 22,
+                  arrowColor: 'var(--popover)',
+                  arrowSize: 11,
+                  buttons: isHint ? ['primary'] : ['back', 'skip', 'primary'],
+                  blockTargetInteraction: true,
+                  disableFocusTrap: modalOpen,
+                  dismissKeyAction: isHint ? 'close' : false,
+                  offset: 14,
+                  overlayClickAction: false,
+                  overlayColor: 'rgba(15, 23, 42, 0.36)',
+                  primaryColor: GUIDANCE_ACCENT,
+                  scrollDuration: reducedMotion ? 0 : 300,
+                  skipBeacon: true,
+                  spotlightPadding: 6,
+                  spotlightRadius: 14,
+                  targetWaitTimeout: 3_000,
+                  textColor: 'var(--popover-foreground)',
+                  width: 360,
+                  zIndex: 1,
+                }}
               />
             )}
           </GuidancePresentationBoundary>

@@ -18,7 +18,7 @@ You need to make sure that the column that includes the date is correctly classi
 
 For visualising words on the timeline: You first have to create a Concordance,
 open Review in **Table View**, and use **Add to Workspace** to create a
-**Concordance Match Publication**. Include the date and any other metadata that
+**Concordance Match Data Block Creation**. Include the date and any other metadata that
 you need. Then use that Data Block as the source for Trends and Sequence and add
 `CONC_matched_text` (string) as a Group By column. This shows how each exact
 matched term occurs over time. A preprocessing step may be required if you want

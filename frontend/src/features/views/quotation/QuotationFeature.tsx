@@ -7,7 +7,7 @@ import {
   type QuotationEngineConfig,
   type QuotationResultQuery,
   type QuotationRunAllResult,
-  type ResultPublicationSource,
+  type DataBlockCreationSource,
   queryAnalysisResult,
 } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,7 @@ import {
   projectQuotationRunAllReviewPage,
   type QuotationReviewRowUnit,
 } from './quotationRunAllReview';
-import { ResultPublicationDialog } from '../common/components/ResultPublicationDialog';
+import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
 
 /** Renders the Quotation Preview and Run All workflow. */
 /**
@@ -82,7 +82,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   } = host;
   const tabTaskId = latestPreview?.id ?? null;
   const { currentWorkspaceId } = useWorkspaceData();
-  const { runQuotationAll, publishAnalysisResult } = useWorkspaceActions();
+  const { runQuotationAll, createResultDataBlocks } = useWorkspaceActions();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -124,8 +124,8 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     useState<QuotationReviewRowUnit>('documents');
   const [isClearing, setIsClearing] = useState(false);
   const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
-  const [publicationDialogOpen, setPublicationDialogOpen] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
+  const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
   const {
@@ -451,23 +451,23 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     }
   };
 
-  const handlePublishResult = async (sources: ResultPublicationSource[]) => {
+  const handleAddToWorkspace = async (sources: DataBlockCreationSource[]) => {
     const source = sources[0];
     if (!quotationRunAll || !source || sources.length !== 1) return;
-    setIsPublishing(true);
+    setIsAddingToWorkspace(true);
     try {
-      await publishAnalysisResult(host.tabId, quotationRunAll.id, {
-        kind: 'quotation_result_publication',
+      await createResultDataBlocks(host.tabId, quotationRunAll.id, {
+        kind: 'quotation_result_data_block_creation',
         source,
       });
-      setPublicationDialogOpen(false);
+      setAddToWorkspaceDialogOpen(false);
       toast.success('Adding Quotation Results to the Workspace.');
     } catch (cause) {
       toast.error('Could not add Quotation Results.', {
         description: cause instanceof Error ? cause.message : String(cause),
       });
     } finally {
-      setIsPublishing(false);
+      setIsAddingToWorkspace(false);
     }
   };
 
@@ -516,7 +516,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     ...(canRunQuotation ? [CONTEXTUAL_HINT_IDS.quotation.engine] : []),
     ...(showPreviewTable ? [CONTEXTUAL_HINT_IDS.quotation.previewResults] : []),
     ...(runAllReviewResult ? [CONTEXTUAL_HINT_IDS.quotation.runAllResults] : []),
-    ...(runAllSource ? [CONTEXTUAL_HINT_IDS.quotation.publish] : []),
+    ...(runAllSource ? [CONTEXTUAL_HINT_IDS.quotation.addToWorkspace] : []),
   ]);
 
   return (
@@ -642,10 +642,10 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
             headerAction={
               runAllSource ? (
                 <Button
-                  data-guidance="quotation-publish"
+                  data-guidance="quotation-add-to-workspace"
                   type="button"
                   onClick={() => {
-                    setPublicationDialogOpen(true);
+                    setAddToWorkspaceDialogOpen(true);
                   }}
                 >
                   Add to Workspace
@@ -696,16 +696,16 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
           />
         ) : null}
       </div>
-      {publicationDialogOpen && runAllSource ? (
-        <ResultPublicationDialog
+      {addToWorkspaceDialogOpen && runAllSource ? (
+        <ResultAddToWorkspaceDialog
           open
-          onOpenChange={setPublicationDialogOpen}
+          onOpenChange={setAddToWorkspaceDialogOpen}
           title="Add Quotation Results to Workspace"
           nameSuffix="quotation"
           sources={[runAllSource]}
-          isSubmitting={isPublishing}
+          isSubmitting={isAddingToWorkspace}
           onSubmit={(sources) => {
-            void handlePublishResult(sources);
+            void handleAddToWorkspace(sources);
           }}
         />
       ) : null}

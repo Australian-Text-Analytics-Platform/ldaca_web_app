@@ -33,7 +33,7 @@ export const CONTEXTUAL_HINT_IDS = {
     search: 'concordance.search',
     previewResults: 'concordance.preview-results',
     runAllResults: 'concordance.run-all-results',
-    publish: 'concordance.publish',
+    addToWorkspace: 'concordance.add-to-workspace',
   },
   trends: {
     inputs: 'trends.inputs',
@@ -44,14 +44,14 @@ export const CONTEXTUAL_HINT_IDS = {
     inputs: 'topic-modeling.inputs',
     run: 'topic-modeling.run',
     results: 'topic-modeling.results',
-    publish: 'topic-modeling.publish',
+    addToWorkspace: 'topic-modeling.add-to-workspace',
   },
   quotation: {
     inputs: 'quotation.inputs',
     engine: 'quotation.engine',
     previewResults: 'quotation.preview-results',
     runAllResults: 'quotation.run-all-results',
-    publish: 'quotation.publish',
+    addToWorkspace: 'quotation.add-to-workspace',
   },
   annotation: {
     source: 'annotation.source',
@@ -263,9 +263,9 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     'Run All stores an immutable Result for the whole search. Page through matches and documents, then choose the columns you want to keep.',
   ),
   hint(
-    CONTEXTUAL_HINT_IDS.concordance.publish,
-    '[data-guidance="concordance-publish"]',
-    'Publish only what you need',
+    CONTEXTUAL_HINT_IDS.concordance.addToWorkspace,
+    '[data-guidance="concordance-add-to-workspace"]',
+    'Keep only what you need',
     'Add to Workspace creates Derived Data Blocks from selected Result columns without changing the Result. Name the outputs, then add them to the Workspace.',
   ),
 
@@ -307,9 +307,9 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     'The bubbles and representative words describe discovered clusters; topic −1 contains outliers. Inspect source documents before naming or interpreting a topic.',
   ),
   hint(
-    CONTEXTUAL_HINT_IDS.topicModeling.publish,
-    '[data-guidance="topic-modeling-publish"]',
-    'Publish topic data for reuse',
+    CONTEXTUAL_HINT_IDS.topicModeling.addToWorkspace,
+    '[data-guidance="topic-modeling-add-to-workspace"]',
+    'Add topic data for reuse',
     'Add to Workspace creates Derived Data Blocks from selected topic columns and names without changing the Result. Select what to keep, then add it to the Workspace.',
   ),
 
@@ -338,9 +338,9 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     'Run All stores an immutable Result for the complete source. Page through documents and matches, then choose the columns you want to keep.',
   ),
   hint(
-    CONTEXTUAL_HINT_IDS.quotation.publish,
-    '[data-guidance="quotation-publish"]',
-    'Publish reviewed quotations',
+    CONTEXTUAL_HINT_IDS.quotation.addToWorkspace,
+    '[data-guidance="quotation-add-to-workspace"]',
+    'Keep reviewed quotations',
     'Add to Workspace creates Derived Data Blocks from selected Result columns without changing the Result. Name the output, then add it to the Workspace.',
   ),
 

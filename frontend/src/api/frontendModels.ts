@@ -135,13 +135,6 @@ export interface AnnotationClassDescriptionRow {
   class: string;
   description: string;
 }
-export interface DetachNodeOption {
-  node_id: string;
-  node_name: string;
-  text_column: string;
-  available_columns: string[];
-  disabled_columns?: string[];
-}
 export type PolarsExpressionRequest = Pick<
   ExpressionNodeCreateRequest,
   'context' | 'expressions' | 'group_by' | 'name'

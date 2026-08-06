@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ResultPublicationSource, RunAllSourceTableResource } from '@/api';
+import type { DataBlockCreationSource, RunAllSourceTableResource } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ColumnSelectionActions } from './ColumnSelectionActions';
 
 interface Props {
   open: boolean;
@@ -20,7 +21,7 @@ interface Props {
   nameSuffix: string;
   sources: RunAllSourceTableResource[];
   isSubmitting: boolean;
-  onSubmit: (sources: ResultPublicationSource[]) => void;
+  onSubmit: (sources: DataBlockCreationSource[]) => void;
   mode?: 'match' | 'document';
   allowSourceSelection?: boolean;
 }
@@ -33,8 +34,42 @@ const defaultColumns = (source: RunAllSourceTableResource, mode: 'match' | 'docu
         ...source.analysis_columns.filter((column) => column !== source.document_column),
       ];
 
-/** Selects the immutable Result columns used by a Result Publication Analysis. */
-export function ResultPublicationDialog({
+const uniqueColumns = (columns: readonly string[]) => [...new Set(columns)];
+
+const requiredColumns = (
+  source: RunAllSourceTableResource,
+  mode: 'match' | 'document',
+): string[] =>
+  mode === 'document'
+    ? uniqueColumns([source.document_column, 'CONC_extraction'])
+    : [source.document_column];
+
+const selectableColumns = (
+  source: RunAllSourceTableResource,
+  mode: 'match' | 'document',
+): string[] =>
+  mode === 'document'
+    ? uniqueColumns([...requiredColumns(source, mode), ...source.metadata_columns])
+    : uniqueColumns([
+        ...requiredColumns(source, mode),
+        ...source.metadata_columns,
+        ...source.analysis_columns,
+      ]);
+
+const normalizeSelectedColumns = (
+  source: RunAllSourceTableResource,
+  mode: 'match' | 'document',
+  selected: readonly string[],
+) => {
+  const selectedSet = new Set(selected);
+  const requiredSet = new Set(requiredColumns(source, mode));
+  return selectableColumns(source, mode).filter(
+    (column) => requiredSet.has(column) || selectedSet.has(column),
+  );
+};
+
+/** Selects immutable Result columns for Derived Data Block Creation. */
+export function ResultAddToWorkspaceDialog({
   open,
   onOpenChange,
   title,
@@ -85,7 +120,7 @@ export function ResultPublicationDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Choose which immutable Result columns to publish as new Workspace Data Blocks.
+            Choose which immutable Result columns create new Workspace Data Blocks.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -113,11 +148,11 @@ export function ResultPublicationDialog({
                 {included ? (
                   <>
                     <div className="space-y-1">
-                      <Label htmlFor={`publication-name-${source.node_id}`}>
+                      <Label htmlFor={`add-to-workspace-name-${source.node_id}`}>
                         New Data Block name
                       </Label>
                       <Input
-                        id={`publication-name-${source.node_id}`}
+                        id={`add-to-workspace-name-${source.node_id}`}
                         value={namesBySource[source.node_id] ?? ''}
                         maxLength={475}
                         onChange={(event) => {
@@ -129,7 +164,24 @@ export function ResultPublicationDialog({
                       />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Columns</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Columns</p>
+                        <ColumnSelectionActions
+                          sourceName={source.node_name}
+                          onSelectAll={() => {
+                            setColumnsBySource((current) => ({
+                              ...current,
+                              [source.node_id]: selectableColumns(source, mode),
+                            }));
+                          }}
+                          onSelectNone={() => {
+                            setColumnsBySource((current) => ({
+                              ...current,
+                              [source.node_id]: requiredColumns(source, mode),
+                            }));
+                          }}
+                        />
+                      </div>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <label className="flex items-center gap-2 text-sm">
                           <Checkbox checked disabled />
@@ -198,8 +250,11 @@ export function ResultPublicationDialog({
                   .filter((source) => includedSourceIds.has(source.node_id))
                   .map((source) => ({
                     source_node_id: source.node_id,
-                    selected_columns:
+                    selected_columns: normalizeSelectedColumns(
+                      source,
+                      mode,
                       columnsBySource[source.node_id] ?? defaultColumns(source, mode),
+                    ),
                     new_node_name: namesBySource[source.node_id]?.trim() ?? '',
                   })),
               );

@@ -17,7 +17,7 @@ cleanup ownership. This keeps each public resource self-contained and avoids a
 second generic record that would duplicate or contradict its real owner.
 
 An Analysis therefore owns an ordered `output_node_ids` list rather than a
-separate publication resource or a singular output slot. This lets one typed
-child operation, such as Topic Modelling detachment, atomically publish a
-semantic group of Derived Data Blocks while keeping lifecycle, rollback, and
-lineage under the same Workspace mutation.
+separate Data Block Creation resource or a singular output slot. This lets one
+typed child operation, such as Topic Modelling Data Block Creation, atomically
+commit a semantic group of Derived Data Blocks while keeping lifecycle,
+rollback, and lineage under the same Workspace mutation.

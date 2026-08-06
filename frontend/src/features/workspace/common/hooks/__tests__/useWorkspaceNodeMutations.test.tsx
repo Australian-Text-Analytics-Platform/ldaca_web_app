@@ -378,17 +378,17 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
-  it('submits Result Publication without treating queue admission as graph publication', async () => {
+  it('submits Result Data Block Creation without treating queue admission as graph creation', async () => {
     const queryClient = createTestClient();
-    workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'publication-1' } });
+    workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'creation-1' } });
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
       wrapper: wrapWithClient(queryClient),
     });
 
     await act(async () => {
-      await result.current.actions.publishAnalysisResult('tab-1', 'run-all-1', {
-        kind: 'concordance_result_publication',
+      await result.current.actions.createResultDataBlocks('tab-1', 'run-all-1', {
+        kind: 'concordance_match_data_block_creation',
         sources: [
           {
             source_node_id: 'node-1',
@@ -404,7 +404,7 @@ describe('useWorkspaceNodeMutations', () => {
         execution_scope: 'supporting',
         parent_analysis_id: 'run-all-1',
         request: {
-          kind: 'concordance_result_publication',
+          kind: 'concordance_match_data_block_creation',
           sources: [
             {
               source_node_id: 'node-1',
@@ -422,7 +422,7 @@ describe('useWorkspaceNodeMutations', () => {
     });
   });
 
-  it('submits Topic Modeling detachment as one typed multi-source child', async () => {
+  it('submits Topic Modeling Data Block Creation as one typed multi-source child', async () => {
     const queryClient = createTestClient();
     workspaceSdkMock.submitTabAnalysis.mockResolvedValue({ data: { id: 'child-topics' } });
     const { result } = renderHook(() => useWorkspaceNodeMutations(buildArgs(queryClient)), {
@@ -430,9 +430,9 @@ describe('useWorkspaceNodeMutations', () => {
     });
 
     await act(async () => {
-      await result.current.actions.detachTopicModeling('tab-1', 'analysis-1', {
+      await result.current.actions.createTopicModelingDataBlocks('tab-1', 'analysis-1', {
         node_ids: ['node-1', 'node-2'],
-        metadata_columns: { 'node-1': ['text'], 'node-2': ['text'] },
+        selected_columns: { 'node-1': ['text'], 'node-2': ['text'] },
         new_node_names: { 'node-1': 'First topics', 'node-2': 'Second topics' },
         topic_ids: [1, 3],
         topic_meanings_override: [{ topic_id: 1, words: ['word'] }],
@@ -444,9 +444,9 @@ describe('useWorkspaceNodeMutations', () => {
         execution_scope: 'supporting',
         parent_analysis_id: 'analysis-1',
         request: {
-          kind: 'topic_modeling_detachment',
+          kind: 'topic_modeling_data_block_creation',
           node_ids: ['node-1', 'node-2'],
-          metadata_columns: { 'node-1': ['text'], 'node-2': ['text'] },
+          selected_columns: { 'node-1': ['text'], 'node-2': ['text'] },
           new_node_names: { 'node-1': 'First topics', 'node-2': 'Second topics' },
           topic_ids: [1, 3],
           topic_meanings_override: [{ topic_id: 1, words: ['word'] }],

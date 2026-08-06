@@ -13,8 +13,8 @@ flowchart LR
     ROOT --> SUB["Optional Sub-Analysis"]
     SUB --> DEEP["Optional deeper Sub-Analysis"]
     ROOT --> RESULT["Typed Result"]
-    RESULT --> PUBLICATION["Optional Result Publication"]
-    PUBLICATION --> OUTPUTS["Derived Data Blocks"]
+    RESULT --> CREATION["Optional Derived Data Block Creation"]
+    CREATION --> OUTPUTS["Derived Data Blocks"]
 
     USER["User"] --> IMPORT["User File Import"]
     IMPORT --> FILES["Published User Files"]
@@ -134,9 +134,9 @@ only blank annotation rows and preserves every existing label. A provider batch
 accepts only a complete row-aligned JSON label array. Invalid responses are
 retried, then recursively split so a degenerate large reply does not discard
 otherwise valid rows. A terminal provider batch contributes null labels while
-successful batches are still published, keeping every output row aligned.
+successful batches are still committed, keeping every output row aligned.
 The durable Result records attempted rows, failed terminal batches, and failed
-rows so partial completion remains explicit after publication.
+rows so partial completion remains explicit after the commit.
 Submitting it replaces the current Annotation Preview or Run All immediately;
 a later Run All likewise replaces the earlier Run All.
 
@@ -172,17 +172,18 @@ Dispersion View filters and pages documents. Quotation retains its existing
 document or match Review projections.
 
 **Add to Workspace** submits a typed Supporting Analysis under the successful
-Run All parent. Concordance Match Publication emits selected flat match
-columns. Concordance Document Publication emits the required document and
-newline-joined `CONC_extraction` plus optional metadata after applying the
-Review term/bin filter. Checked sources, including empty ones, are published
+Run All parent. Concordance Match Data Block Creation emits selected flat match
+columns. Concordance Document Data Block Creation emits the required document
+and newline-joined `CONC_extraction` plus optional metadata after applying the
+Review term/bin filter. Checked sources, including empty ones, are committed
 atomically. Run All itself never changes the Workspace graph.
 
 ## Other Analysis Kinds
 
 Token Frequency, Trends, Topic Modelling, and other full-table functions submit
-Run-All-scoped Analyses directly. Topic Modelling detachment remains an ordinary
-Supporting Analysis and may publish multiple ordered output Data Blocks.
+Run-All-scoped Analyses directly. Topic Modelling Data Block Creation remains
+an ordinary Supporting Analysis and may create multiple ordered output Data
+Blocks.
 
 A Topic Modelling Analysis request owns one segmentation method and maximum
 token count for all selected Data Blocks. The successful Result records the

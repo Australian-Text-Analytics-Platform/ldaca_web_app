@@ -132,12 +132,12 @@
                 "discriminator": {
                   "mapping": {
                     "annotation_run_all": "#/components/schemas/AnnotationRunAllAnalysisRequest",
-                    "concordance_document_publication": "#/components/schemas/ConcordanceDocumentPublicationAnalysisRequest",
-                    "concordance_match_publication": "#/components/schemas/ConcordanceMatchPublicationAnalysisRequest",
+                    "concordance_document_data_block_creation": "#/components/schemas/ConcordanceDocumentDataBlockCreationAnalysisRequest",
+                    "concordance_match_data_block_creation": "#/components/schemas/ConcordanceMatchDataBlockCreationAnalysisRequest",
                     "concordance_run_all": "#/components/schemas/ConcordanceRunAllAnalysisRequest",
-                    "quotation_result_publication": "#/components/schemas/QuotationResultPublicationAnalysisRequest",
+                    "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest",
                     "quotation_run_all": "#/components/schemas/QuotationRunAllAnalysisRequest",
-                    "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
+                    "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationAnalysisRequest"
                   },
                   "propertyName": "kind"
                 },
@@ -149,19 +149,19 @@
                     "$ref": "#/components/schemas/QuotationRunAllAnalysisRequest"
                   },
                   {
-                    "$ref": "#/components/schemas/ConcordanceMatchPublicationAnalysisRequest"
+                    "$ref": "#/components/schemas/ConcordanceMatchDataBlockCreationAnalysisRequest"
                   },
                   {
-                    "$ref": "#/components/schemas/ConcordanceDocumentPublicationAnalysisRequest"
+                    "$ref": "#/components/schemas/ConcordanceDocumentDataBlockCreationAnalysisRequest"
                   },
                   {
-                    "$ref": "#/components/schemas/QuotationResultPublicationAnalysisRequest"
+                    "$ref": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest"
                   },
                   {
                     "$ref": "#/components/schemas/AnnotationRunAllAnalysisRequest"
                   },
                   {
-                    "$ref": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
+                    "$ref": "#/components/schemas/TopicModelingDataBlockCreationAnalysisRequest"
                   }
                 ]
               }
@@ -248,16 +248,16 @@
                 "annotation": "#/components/schemas/AnnotationAnalysisSubmission",
                 "annotation_run_all": "#/components/schemas/AnnotationRunAllSubmission",
                 "concordance": "#/components/schemas/ConcordanceAnalysisRequest",
-                "concordance_document_publication": "#/components/schemas/ConcordanceDocumentPublicationAnalysisRequest",
-                "concordance_match_publication": "#/components/schemas/ConcordanceMatchPublicationAnalysisRequest",
+                "concordance_document_data_block_creation": "#/components/schemas/ConcordanceDocumentDataBlockCreationAnalysisRequest",
+                "concordance_match_data_block_creation": "#/components/schemas/ConcordanceMatchDataBlockCreationAnalysisRequest",
                 "concordance_run_all": "#/components/schemas/ConcordanceRunAllAnalysisRequest",
                 "quotation": "#/components/schemas/QuotationAnalysisRequest",
-                "quotation_result_publication": "#/components/schemas/QuotationResultPublicationAnalysisRequest",
+                "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest",
                 "quotation_run_all": "#/components/schemas/QuotationRunAllAnalysisRequest",
                 "sequential": "#/components/schemas/SequentialAnalysisRequest",
                 "token_frequency": "#/components/schemas/TokenFrequencyAnalysisRequest",
                 "topic_modeling": "#/components/schemas/TopicModelingAnalysisRequest",
-                "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
+                "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationAnalysisRequest"
               },
               "propertyName": "kind"
             },
@@ -287,19 +287,19 @@
                 "$ref": "#/components/schemas/QuotationRunAllAnalysisRequest"
               },
               {
-                "$ref": "#/components/schemas/ConcordanceMatchPublicationAnalysisRequest"
+                "$ref": "#/components/schemas/ConcordanceMatchDataBlockCreationAnalysisRequest"
               },
               {
-                "$ref": "#/components/schemas/ConcordanceDocumentPublicationAnalysisRequest"
+                "$ref": "#/components/schemas/ConcordanceDocumentDataBlockCreationAnalysisRequest"
               },
               {
-                "$ref": "#/components/schemas/QuotationResultPublicationAnalysisRequest"
+                "$ref": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest"
               },
               {
                 "$ref": "#/components/schemas/AnnotationRunAllSubmission"
               },
               {
-                "$ref": "#/components/schemas/TopicModelingDetachmentAnalysisRequest"
+                "$ref": "#/components/schemas/TopicModelingDataBlockCreationAnalysisRequest"
               }
             ],
             "title": "Request"
@@ -2794,6 +2794,155 @@
         "title": "ConcordanceDensitySeries",
         "type": "object"
       },
+      "ConcordanceDocumentDataBlockCreationAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_document_data_block_creation",
+            "default": "concordance_document_data_block_creation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConcordanceDocumentDataBlockCreationSource"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
+        ],
+        "title": "ConcordanceDocumentDataBlockCreationAnalysisRequest",
+        "type": "object"
+      },
+      "ConcordanceDocumentDataBlockCreationDerivation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_document_data_block_creation",
+            "default": "concordance_document_data_block_creation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "ConcordanceDocumentDataBlockCreationDerivation",
+        "type": "object"
+      },
+      "ConcordanceDocumentDataBlockCreationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance_document_data_block_creation",
+            "default": "concordance_document_data_block_creation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/DataBlockCreationOutput"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "output_node_ids",
+          "outputs"
+        ],
+        "title": "ConcordanceDocumentDataBlockCreationResult",
+        "type": "object"
+      },
+      "ConcordanceDocumentDataBlockCreationSource": {
+        "additionalProperties": false,
+        "description": "One source and exact Review filter for document-wise Data Block Creation.",
+        "properties": {
+          "bin_count": {
+            "anyOf": [
+              {
+                "enum": [
+                  4,
+                  5,
+                  10,
+                  20,
+                  25,
+                  50,
+                  100
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bin Count"
+          },
+          "excluded_matched_texts": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Excluded Matched Texts",
+            "type": "array"
+          },
+          "new_node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "New Node Name",
+            "type": "string"
+          },
+          "selected_bins": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 100,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Bins"
+          },
+          "selected_metadata_columns": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Selected Metadata Columns",
+            "type": "array"
+          },
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "new_node_name"
+        ],
+        "title": "ConcordanceDocumentDataBlockCreationSource",
+        "type": "object"
+      },
       "ConcordanceDocumentProjectionQuery": {
         "additionalProperties": false,
         "description": "Filter and page document rows from an immutable Concordance Result.",
@@ -2874,18 +3023,18 @@
         "title": "ConcordanceDocumentProjectionQuery",
         "type": "object"
       },
-      "ConcordanceDocumentPublicationAnalysisRequest": {
+      "ConcordanceMatchDataBlockCreationAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "concordance_document_publication",
-            "default": "concordance_document_publication",
+            "const": "concordance_match_data_block_creation",
+            "default": "concordance_match_data_block_creation",
             "title": "Kind",
             "type": "string"
           },
           "sources": {
             "items": {
-              "$ref": "#/components/schemas/ConcordanceDocumentPublicationSource"
+              "$ref": "#/components/schemas/DataBlockCreationSource"
             },
             "maxItems": 2,
             "minItems": 1,
@@ -2896,28 +3045,28 @@
         "required": [
           "sources"
         ],
-        "title": "ConcordanceDocumentPublicationAnalysisRequest",
+        "title": "ConcordanceMatchDataBlockCreationAnalysisRequest",
         "type": "object"
       },
-      "ConcordanceDocumentPublicationDerivation": {
+      "ConcordanceMatchDataBlockCreationDerivation": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "concordance_document_publication",
-            "default": "concordance_document_publication",
+            "const": "concordance_match_data_block_creation",
+            "default": "concordance_match_data_block_creation",
             "title": "Kind",
             "type": "string"
           }
         },
-        "title": "ConcordanceDocumentPublicationDerivation",
+        "title": "ConcordanceMatchDataBlockCreationDerivation",
         "type": "object"
       },
-      "ConcordanceDocumentPublicationResult": {
+      "ConcordanceMatchDataBlockCreationResult": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "concordance_document_publication",
-            "default": "concordance_document_publication",
+            "const": "concordance_match_data_block_creation",
+            "default": "concordance_match_data_block_creation",
             "title": "Kind",
             "type": "string"
           },
@@ -2933,7 +3082,7 @@
           },
           "outputs": {
             "items": {
-              "$ref": "#/components/schemas/ResultPublicationOutput"
+              "$ref": "#/components/schemas/DataBlockCreationOutput"
             },
             "maxItems": 2,
             "minItems": 1,
@@ -2945,156 +3094,7 @@
           "output_node_ids",
           "outputs"
         ],
-        "title": "ConcordanceDocumentPublicationResult",
-        "type": "object"
-      },
-      "ConcordanceDocumentPublicationSource": {
-        "additionalProperties": false,
-        "description": "One source and exact Review filter for document-wise publication.",
-        "properties": {
-          "bin_count": {
-            "anyOf": [
-              {
-                "enum": [
-                  4,
-                  5,
-                  10,
-                  20,
-                  25,
-                  50,
-                  100
-                ],
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bin Count"
-          },
-          "excluded_matched_texts": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "title": "Excluded Matched Texts",
-            "type": "array"
-          },
-          "new_node_name": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "New Node Name",
-            "type": "string"
-          },
-          "selected_bins": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "maxItems": 100,
-                "minItems": 1,
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selected Bins"
-          },
-          "selected_metadata_columns": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "title": "Selected Metadata Columns",
-            "type": "array"
-          },
-          "source_node_id": {
-            "format": "uuid",
-            "title": "Source Node Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "source_node_id",
-          "new_node_name"
-        ],
-        "title": "ConcordanceDocumentPublicationSource",
-        "type": "object"
-      },
-      "ConcordanceMatchPublicationAnalysisRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_match_publication",
-            "default": "concordance_match_publication",
-            "title": "Kind",
-            "type": "string"
-          },
-          "sources": {
-            "items": {
-              "$ref": "#/components/schemas/ResultPublicationSource"
-            },
-            "maxItems": 2,
-            "minItems": 1,
-            "title": "Sources",
-            "type": "array"
-          }
-        },
-        "required": [
-          "sources"
-        ],
-        "title": "ConcordanceMatchPublicationAnalysisRequest",
-        "type": "object"
-      },
-      "ConcordanceMatchPublicationDerivation": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_match_publication",
-            "default": "concordance_match_publication",
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "title": "ConcordanceMatchPublicationDerivation",
-        "type": "object"
-      },
-      "ConcordanceMatchPublicationResult": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "concordance_match_publication",
-            "default": "concordance_match_publication",
-            "title": "Kind",
-            "type": "string"
-          },
-          "output_node_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "maxItems": 2,
-            "minItems": 1,
-            "title": "Output Node Ids",
-            "type": "array"
-          },
-          "outputs": {
-            "items": {
-              "$ref": "#/components/schemas/ResultPublicationOutput"
-            },
-            "maxItems": 2,
-            "minItems": 1,
-            "title": "Outputs",
-            "type": "array"
-          }
-        },
-        "required": [
-          "output_node_ids",
-          "outputs"
-        ],
-        "title": "ConcordanceMatchPublicationResult",
+        "title": "ConcordanceMatchDataBlockCreationResult",
         "type": "object"
       },
       "ConcordancePage": {
@@ -3469,6 +3469,74 @@
           "name"
         ],
         "title": "CreateFolderRequest",
+        "type": "object"
+      },
+      "DataBlockCreationOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "output_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Output Columns",
+            "type": "array"
+          },
+          "output_node_id": {
+            "format": "uuid",
+            "title": "Output Node Id",
+            "type": "string"
+          },
+          "record_count": {
+            "minimum": 0.0,
+            "title": "Record Count",
+            "type": "integer"
+          },
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "output_node_id",
+          "output_columns",
+          "record_count"
+        ],
+        "title": "DataBlockCreationOutput",
+        "type": "object"
+      },
+      "DataBlockCreationSource": {
+        "additionalProperties": false,
+        "description": "One immutable selection for publishing a successful Analysis Result.",
+        "properties": {
+          "new_node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "New Node Name",
+            "type": "string"
+          },
+          "selected_columns": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Selected Columns",
+            "type": "array"
+          },
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "selected_columns",
+          "new_node_name"
+        ],
+        "title": "DataBlockCreationSource",
         "type": "object"
       },
       "DataBlockExportFormat": {
@@ -3962,16 +4030,16 @@
                 "cast": "#/components/schemas/CastDerivation",
                 "clone": "#/components/schemas/CloneDerivation",
                 "concat": "#/components/schemas/ConcatDerivation",
-                "concordance_document_publication": "#/components/schemas/ConcordanceDocumentPublicationDerivation",
-                "concordance_match_publication": "#/components/schemas/ConcordanceMatchPublicationDerivation",
+                "concordance_document_data_block_creation": "#/components/schemas/ConcordanceDocumentDataBlockCreationDerivation",
+                "concordance_match_data_block_creation": "#/components/schemas/ConcordanceMatchDataBlockCreationDerivation",
                 "expression": "#/components/schemas/ExpressionDerivation",
                 "filter": "#/components/schemas/FilterDerivation",
                 "join": "#/components/schemas/JoinDerivation",
-                "quotation_result_publication": "#/components/schemas/QuotationResultPublicationDerivation",
+                "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationDerivation",
                 "replace": "#/components/schemas/ReplaceDerivation",
                 "slice": "#/components/schemas/SliceDerivation",
                 "sql": "#/components/schemas/SqlDerivation",
-                "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentDerivation"
+                "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationDerivation"
               },
               "propertyName": "kind"
             },
@@ -4007,16 +4075,16 @@
                 "$ref": "#/components/schemas/AnnotationDerivation"
               },
               {
-                "$ref": "#/components/schemas/ConcordanceMatchPublicationDerivation"
+                "$ref": "#/components/schemas/ConcordanceMatchDataBlockCreationDerivation"
               },
               {
-                "$ref": "#/components/schemas/ConcordanceDocumentPublicationDerivation"
+                "$ref": "#/components/schemas/ConcordanceDocumentDataBlockCreationDerivation"
               },
               {
-                "$ref": "#/components/schemas/QuotationResultPublicationDerivation"
+                "$ref": "#/components/schemas/QuotationResultDataBlockCreationDerivation"
               },
               {
-                "$ref": "#/components/schemas/TopicModelingDetachmentDerivation"
+                "$ref": "#/components/schemas/TopicModelingDataBlockCreationDerivation"
               }
             ],
             "title": "Operation"
@@ -5635,44 +5703,44 @@
         "title": "QuotationResult",
         "type": "object"
       },
-      "QuotationResultPublicationAnalysisRequest": {
+      "QuotationResultDataBlockCreationAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "quotation_result_publication",
-            "default": "quotation_result_publication",
+            "const": "quotation_result_data_block_creation",
+            "default": "quotation_result_data_block_creation",
             "title": "Kind",
             "type": "string"
           },
           "source": {
-            "$ref": "#/components/schemas/ResultPublicationSource"
+            "$ref": "#/components/schemas/DataBlockCreationSource"
           }
         },
         "required": [
           "source"
         ],
-        "title": "QuotationResultPublicationAnalysisRequest",
+        "title": "QuotationResultDataBlockCreationAnalysisRequest",
         "type": "object"
       },
-      "QuotationResultPublicationDerivation": {
+      "QuotationResultDataBlockCreationDerivation": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "quotation_result_publication",
-            "default": "quotation_result_publication",
+            "const": "quotation_result_data_block_creation",
+            "default": "quotation_result_data_block_creation",
             "title": "Kind",
             "type": "string"
           }
         },
-        "title": "QuotationResultPublicationDerivation",
+        "title": "QuotationResultDataBlockCreationDerivation",
         "type": "object"
       },
-      "QuotationResultPublicationResult": {
+      "QuotationResultDataBlockCreationResult": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "quotation_result_publication",
-            "default": "quotation_result_publication",
+            "const": "quotation_result_data_block_creation",
+            "default": "quotation_result_data_block_creation",
             "title": "Kind",
             "type": "string"
           },
@@ -5688,7 +5756,7 @@
           },
           "outputs": {
             "items": {
-              "$ref": "#/components/schemas/ResultPublicationOutput"
+              "$ref": "#/components/schemas/DataBlockCreationOutput"
             },
             "maxItems": 2,
             "minItems": 1,
@@ -5700,7 +5768,7 @@
           "output_node_ids",
           "outputs"
         ],
-        "title": "QuotationResultPublicationResult",
+        "title": "QuotationResultDataBlockCreationResult",
         "type": "object"
       },
       "QuotationResultQuery": {
@@ -6143,74 +6211,6 @@
           "total_pages"
         ],
         "title": "ResultPagination",
-        "type": "object"
-      },
-      "ResultPublicationOutput": {
-        "additionalProperties": false,
-        "properties": {
-          "output_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Output Columns",
-            "type": "array"
-          },
-          "output_node_id": {
-            "format": "uuid",
-            "title": "Output Node Id",
-            "type": "string"
-          },
-          "record_count": {
-            "minimum": 0.0,
-            "title": "Record Count",
-            "type": "integer"
-          },
-          "source_node_id": {
-            "format": "uuid",
-            "title": "Source Node Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "source_node_id",
-          "output_node_id",
-          "output_columns",
-          "record_count"
-        ],
-        "title": "ResultPublicationOutput",
-        "type": "object"
-      },
-      "ResultPublicationSource": {
-        "additionalProperties": false,
-        "description": "One immutable selection for publishing a successful Analysis Result.",
-        "properties": {
-          "new_node_name": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "New Node Name",
-            "type": "string"
-          },
-          "selected_columns": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Selected Columns",
-            "type": "array"
-          },
-          "source_node_id": {
-            "format": "uuid",
-            "title": "Source Node Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "source_node_id",
-          "selected_columns",
-          "new_node_name"
-        ],
-        "title": "ResultPublicationSource",
         "type": "object"
       },
       "ResultSorting": {
@@ -8038,59 +8038,12 @@
         "title": "TopicModelingAnalysisRequest",
         "type": "object"
       },
-      "TopicModelingDetachedOutput": {
-        "additionalProperties": false,
-        "properties": {
-          "source_node_id": {
-            "format": "uuid",
-            "title": "Source Node Id",
-            "type": "string"
-          },
-          "topic_data_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Topic Data Columns",
-            "type": "array"
-          },
-          "topic_data_node_id": {
-            "format": "uuid",
-            "title": "Topic Data Node Id",
-            "type": "string"
-          },
-          "topic_data_record_count": {
-            "minimum": 0.0,
-            "title": "Topic Data Record Count",
-            "type": "integer"
-          },
-          "topic_meanings_node_id": {
-            "format": "uuid",
-            "title": "Topic Meanings Node Id",
-            "type": "string"
-          },
-          "topic_meanings_record_count": {
-            "minimum": 0.0,
-            "title": "Topic Meanings Record Count",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "source_node_id",
-          "topic_data_node_id",
-          "topic_meanings_node_id",
-          "topic_data_columns",
-          "topic_data_record_count",
-          "topic_meanings_record_count"
-        ],
-        "title": "TopicModelingDetachedOutput",
-        "type": "object"
-      },
-      "TopicModelingDetachmentAnalysisRequest": {
+      "TopicModelingDataBlockCreationAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "topic_modeling_detachment",
-            "default": "topic_modeling_detachment",
+            "const": "topic_modeling_data_block_creation",
+            "default": "topic_modeling_data_block_creation",
             "title": "Kind",
             "type": "string"
           },
@@ -8156,15 +8109,15 @@
           "selected_columns",
           "new_node_names"
         ],
-        "title": "TopicModelingDetachmentAnalysisRequest",
+        "title": "TopicModelingDataBlockCreationAnalysisRequest",
         "type": "object"
       },
-      "TopicModelingDetachmentDerivation": {
+      "TopicModelingDataBlockCreationDerivation": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "topic_modeling_detachment",
-            "default": "topic_modeling_detachment",
+            "const": "topic_modeling_data_block_creation",
+            "default": "topic_modeling_data_block_creation",
             "title": "Kind",
             "type": "string"
           },
@@ -8180,15 +8133,62 @@
         "required": [
           "role"
         ],
-        "title": "TopicModelingDetachmentDerivation",
+        "title": "TopicModelingDataBlockCreationDerivation",
         "type": "object"
       },
-      "TopicModelingDetachmentResult": {
+      "TopicModelingDataBlockCreationOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          },
+          "topic_data_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Topic Data Columns",
+            "type": "array"
+          },
+          "topic_data_node_id": {
+            "format": "uuid",
+            "title": "Topic Data Node Id",
+            "type": "string"
+          },
+          "topic_data_record_count": {
+            "minimum": 0.0,
+            "title": "Topic Data Record Count",
+            "type": "integer"
+          },
+          "topic_meanings_node_id": {
+            "format": "uuid",
+            "title": "Topic Meanings Node Id",
+            "type": "string"
+          },
+          "topic_meanings_record_count": {
+            "minimum": 0.0,
+            "title": "Topic Meanings Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "topic_data_node_id",
+          "topic_meanings_node_id",
+          "topic_data_columns",
+          "topic_data_record_count",
+          "topic_meanings_record_count"
+        ],
+        "title": "TopicModelingDataBlockCreationOutput",
+        "type": "object"
+      },
+      "TopicModelingDataBlockCreationResult": {
         "additionalProperties": false,
         "properties": {
           "kind": {
-            "const": "topic_modeling_detachment",
-            "default": "topic_modeling_detachment",
+            "const": "topic_modeling_data_block_creation",
+            "default": "topic_modeling_data_block_creation",
             "title": "Kind",
             "type": "string"
           },
@@ -8203,7 +8203,7 @@
           },
           "outputs": {
             "items": {
-              "$ref": "#/components/schemas/TopicModelingDetachedOutput"
+              "$ref": "#/components/schemas/TopicModelingDataBlockCreationOutput"
             },
             "minItems": 1,
             "title": "Outputs",
@@ -8214,7 +8214,7 @@
           "output_node_ids",
           "outputs"
         ],
-        "title": "TopicModelingDetachmentResult",
+        "title": "TopicModelingDataBlockCreationResult",
         "type": "object"
       },
       "TopicModelingResult": {
@@ -13502,16 +13502,16 @@
                       "annotation": "#/components/schemas/AnnotationResult",
                       "annotation_run_all": "#/components/schemas/AnnotationRunAllResult",
                       "concordance": "#/components/schemas/ConcordanceResult",
-                      "concordance_document_publication": "#/components/schemas/ConcordanceDocumentPublicationResult",
-                      "concordance_match_publication": "#/components/schemas/ConcordanceMatchPublicationResult",
+                      "concordance_document_data_block_creation": "#/components/schemas/ConcordanceDocumentDataBlockCreationResult",
+                      "concordance_match_data_block_creation": "#/components/schemas/ConcordanceMatchDataBlockCreationResult",
                       "concordance_run_all": "#/components/schemas/ConcordanceRunAllResult",
                       "quotation": "#/components/schemas/QuotationResult",
-                      "quotation_result_publication": "#/components/schemas/QuotationResultPublicationResult",
+                      "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationResult",
                       "quotation_run_all": "#/components/schemas/QuotationRunAllResult",
                       "sequential": "#/components/schemas/SequentialResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
                       "topic_modeling": "#/components/schemas/TopicModelingResult",
-                      "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentResult"
+                      "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationResult"
                     },
                     "propertyName": "kind"
                   },
@@ -13544,16 +13544,16 @@
                       "$ref": "#/components/schemas/AnnotationRunAllResult"
                     },
                     {
-                      "$ref": "#/components/schemas/TopicModelingDetachmentResult"
+                      "$ref": "#/components/schemas/TopicModelingDataBlockCreationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceMatchPublicationResult"
+                      "$ref": "#/components/schemas/ConcordanceMatchDataBlockCreationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceDocumentPublicationResult"
+                      "$ref": "#/components/schemas/ConcordanceDocumentDataBlockCreationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/QuotationResultPublicationResult"
+                      "$ref": "#/components/schemas/QuotationResultDataBlockCreationResult"
                     }
                   ],
                   "title": "Response Get Analysis Result"
@@ -13733,16 +13733,16 @@
                       "annotation": "#/components/schemas/AnnotationResult",
                       "annotation_run_all": "#/components/schemas/AnnotationRunAllResult",
                       "concordance": "#/components/schemas/ConcordanceResult",
-                      "concordance_document_publication": "#/components/schemas/ConcordanceDocumentPublicationResult",
-                      "concordance_match_publication": "#/components/schemas/ConcordanceMatchPublicationResult",
+                      "concordance_document_data_block_creation": "#/components/schemas/ConcordanceDocumentDataBlockCreationResult",
+                      "concordance_match_data_block_creation": "#/components/schemas/ConcordanceMatchDataBlockCreationResult",
                       "concordance_run_all": "#/components/schemas/ConcordanceRunAllResult",
                       "quotation": "#/components/schemas/QuotationResult",
-                      "quotation_result_publication": "#/components/schemas/QuotationResultPublicationResult",
+                      "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationResult",
                       "quotation_run_all": "#/components/schemas/QuotationRunAllResult",
                       "sequential": "#/components/schemas/SequentialResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
                       "topic_modeling": "#/components/schemas/TopicModelingResult",
-                      "topic_modeling_detachment": "#/components/schemas/TopicModelingDetachmentResult"
+                      "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationResult"
                     },
                     "propertyName": "kind"
                   },
@@ -13775,16 +13775,16 @@
                       "$ref": "#/components/schemas/AnnotationRunAllResult"
                     },
                     {
-                      "$ref": "#/components/schemas/TopicModelingDetachmentResult"
+                      "$ref": "#/components/schemas/TopicModelingDataBlockCreationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceMatchPublicationResult"
+                      "$ref": "#/components/schemas/ConcordanceMatchDataBlockCreationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/ConcordanceDocumentPublicationResult"
+                      "$ref": "#/components/schemas/ConcordanceDocumentDataBlockCreationResult"
                     },
                     {
-                      "$ref": "#/components/schemas/QuotationResultPublicationResult"
+                      "$ref": "#/components/schemas/QuotationResultDataBlockCreationResult"
                     }
                   ],
                   "title": "Response Query Analysis Result"

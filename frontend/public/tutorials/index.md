@@ -35,7 +35,7 @@ Wordflow's analyses are designed to work together seamlessly, allowing you to co
 
 The data block is the fundamental analytic unit across Wordflow, serves as both input and output so that the result of one analysis can be processed by any other seamlessly. 
 The text corpus and metadata can be uploaded to Wordflow then loaded as a data block to an active workspace.
-Most operations (filtering, sampling, joining, stacking, detaching etc.) on a data block derives a new data block in the workspace, and 
+Most operations (filtering, sampling, joining, stacking, and creating derived data) on a Data Block create a new Data Block in the Workspace, and
 
 - Data Loader: Upload your text files and load  the text corpus (e.g., interview transcripts, articles) into a project workspace.
 - Preprocessing: Use built-in cleaning tools to prepare your text, including removal of stopwords, stemming, and normalization.

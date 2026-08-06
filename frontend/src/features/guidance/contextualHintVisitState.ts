@@ -1,6 +1,6 @@
 import type { ViewType } from '@/features/views/viewIds';
 
-export interface ContextualHintRegistration {
+interface ContextualHintRegistration {
   view: ViewType;
   ids: readonly string[];
 }

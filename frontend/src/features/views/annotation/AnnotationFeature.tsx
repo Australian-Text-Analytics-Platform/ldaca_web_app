@@ -984,10 +984,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                   aria-label="Main Data Block Setup"
                   className="rounded-lg border bg-background/60 p-4"
                 >
-                  <h3
-                    data-guidance="annotation-source"
-                    className="mb-3 text-base font-semibold"
-                  >
+                  <h3 data-guidance="annotation-source" className="mb-3 text-base font-semibold">
                     Annotation Data Block
                   </h3>
                   <NodeInputsPanel

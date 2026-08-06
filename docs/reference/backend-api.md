@@ -226,7 +226,7 @@ reset after load, clone, import, close/reopen, or backend restart.
 
 Every valid Analysis resource includes required ordered `output_node_ids`.
 The list is empty until a publishing Analysis succeeds. Existing single-output
-operations return one ID; Topic Modelling detachment returns topic-data then
+operations return one ID; Topic Modelling Data Block Creation returns topic-data then
 topic-meanings IDs for each source in request order. The removed singular field
 is not accepted.
 
@@ -245,14 +245,14 @@ descriptors with document and match row resources. Their stored artifacts have
 one row per matching document and a nested analysis list; each descriptor also
 reports explicit document and match counts. Concordance descriptors expose a
 whole-Result density resource. They do not create Data Blocks and therefore retain empty
-`output_node_ids`. A `concordance_match_publication`,
-`concordance_document_publication`, or `quotation_result_publication`
-Supporting Analysis must name the successful matching Run All parent. Match
-and Quotation publication select columns. Document publication carries the
-exact Review filter and optional metadata while document and extraction are
-implicit required columns.
-Successful publication atomically creates the requested Derived Data Blocks;
-only the publication Result carries their output IDs.
+`output_node_ids`. A `concordance_match_data_block_creation`,
+`concordance_document_data_block_creation`, or
+`quotation_result_data_block_creation` Supporting Analysis must name the
+successful matching Run All parent. Match and Quotation Data Block Creation
+requests select columns. Document Data Block Creation carries the exact Review
+filter and optional metadata while document and extraction are implicit
+required columns. Successful creation atomically commits the requested Derived
+Data Blocks; only the Data Block Creation Result carries their output IDs.
 
 `TokenFrequencyAnalysisRequest.node_tokenizer_models` must contain exactly the
 selected Data Block IDs. `ConcordanceAnalysisRequest.node_tokenizer_models`

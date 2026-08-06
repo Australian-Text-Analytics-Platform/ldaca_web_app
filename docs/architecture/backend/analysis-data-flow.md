@@ -114,19 +114,19 @@ flowchart LR
 The thin group owns no worker process. Cancelling it cascades to active
 descendants without signalling a nonexistent group worker.
 
-A later Result Publication is a typed Supporting Analysis parented to the
+A later Derived Data Block Creation is a typed Supporting Analysis parented to the
 successful Run All Analysis:
 
 ```mermaid
 flowchart LR
     RUN["Successful Run All"] --> RESULT["Immutable Result tables"]
-    RUN --> PUBLICATION["Result Publication"]
-    RESULT --> PUBLICATION
-    PUBLICATION --> SELECT["Validate selected columns"]
-    SELECT --> ATOMIC["Atomically publish Derived Data Blocks"]
+    RUN --> CREATION["Derived Data Block Creation"]
+    RESULT --> CREATION
+    CREATION --> SELECT["Validate selected columns"]
+    SELECT --> ATOMIC["Atomically commit Derived Data Blocks"]
 ```
 
-Result Publication reads only the parent Result Artifacts. Its document column
+Derived Data Block Creation reads only the parent Result Artifacts. Its document column
 is mandatory, and its selected source identities, columns, and output names
 are immutable request data.
 
@@ -165,16 +165,17 @@ flowchart LR
 Result queries are side-effect free and keys contain all content-bearing
 projection inputs. A missing retained snapshot fails clearly rather than
 falling back to a mutable Data Block. Topic Distribution remains a named Arrow
-extension through storage, transport, and detachment.
+extension through storage, transport, and Derived Data Block Creation.
 
 Concordance and Quotation Run All retain one row per matching source document.
 The row carries source metadata, an internal stable source-row ID, and a nested
 list of Concordance Matches or quotation extracts. Explicit document and match
 projection resources expose deterministic Arrow pages without changing the
 stored Result. Concordance adds a filtered document query whose exact-term and
-relative-bin predicate runs before count, sort, and page. Match Publication
-explodes the artifact; Document Publication reuses the document filter and
-keeps stable source-row identity. Quotation Result Publication remains flat.
+relative-bin predicate runs before count, sort, and page. Concordance Match
+Data Block Creation explodes the artifact; Concordance Document Data Block
+Creation reuses the document filter and keeps stable source-row identity.
+Quotation Result Data Block Creation remains flat.
 
 Concordance density is a separate side-effect-free projection over the complete
 immutable child Result. It returns exact-match series in 100 fixed relative

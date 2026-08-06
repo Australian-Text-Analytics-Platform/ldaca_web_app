@@ -65,7 +65,7 @@ const buildProps = (handleSort: ConcordanceTableNodeBlockProps['handleSort']) =>
     handlePageChange: vi.fn(),
     handleRowClick: vi.fn(),
     setCombinedPage: vi.fn(),
-    openDetachDialog: vi.fn(),
+    openAddToWorkspaceDialog: vi.fn(),
   }) satisfies ConcordanceTableNodeBlockProps;
 
 describe('ConcordanceTableNodeBlock', () => {

@@ -8,4 +8,4 @@
 - [x] Route Table and Dispersion publication separately.
 - [x] Add checked-source publication controls.
 - [x] Update durable and user documentation.
-- [ ] Complete all backend, frontend, documentation, and live smoke checks.
+- [x] Complete all backend, frontend, documentation, and live smoke checks.

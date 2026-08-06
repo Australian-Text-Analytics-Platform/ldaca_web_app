@@ -70,7 +70,7 @@ describe('SequentialChart', () => {
     render(
       <SequentialChart
         model={model}
-        isDetaching={false}
+        isAddingToWorkspace={false}
         onToggleKey={vi.fn()}
         onPeriodClick={vi.fn()}
         onClearSelection={vi.fn()}

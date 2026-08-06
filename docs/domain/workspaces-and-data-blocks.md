@@ -126,7 +126,7 @@ other, and functions persist only controls they expose. Workspace save/reopen
 and archive export/import preserve the preferences already owned by each Data
 Block. Creation of a Derived Data Block may carry a Document Column Preference
 when its operation defines that behavior, but never inherits a Tokenizer
-Preference from a source, clone, or detached Analysis output.
+Preference from a source, clone, or Analysis-created output.
 
 ## Persistence Invariants
 

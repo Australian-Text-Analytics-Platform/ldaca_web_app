@@ -168,7 +168,7 @@ export function TopicModelingResultsPanel({
                     }
                   >
                     <Button
-                      data-guidance="topic-modeling-publish"
+                      data-guidance="topic-modeling-add-to-workspace"
                       size="sm"
                       onClick={onAddToWorkspace}
                       disabled={isAddingToWorkspace}

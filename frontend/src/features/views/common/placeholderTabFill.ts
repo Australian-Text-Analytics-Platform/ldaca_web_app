@@ -31,8 +31,8 @@ const scheduleCaretRestore = (input: HTMLInputElement, value: string) => {
 /**
  * Lets generated-name inputs accept a suggested placeholder on the first Tab
  * press while preserving normal focus traversal after a value exists.
- * Used by: preprocessing output-name fields and SequentialChart detach-name
- * inputs because both surfaces share the same keyboard interaction.
+ * Used by generated-name fields across preprocessing and Annotation because
+ * those surfaces share the same keyboard interaction.
  * Flow: ignore modified/non-Tab keys and non-empty fields, copy the trimmed
  * placeholder, prevent that one focus move, then restore the caret.
  */

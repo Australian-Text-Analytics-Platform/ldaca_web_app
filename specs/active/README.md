@@ -7,4 +7,4 @@ issue backlogs here.
 
 ## Current implementation work
 
-- [Issue 22: Concordance Match and Document Publication](22-concordance-document-publication/spec.md)
+- [Issue 25: Derived Data Block Creation](25-derived-data-block-creation/spec.md)

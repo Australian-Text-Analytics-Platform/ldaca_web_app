@@ -26,7 +26,7 @@ export function useProgressiveContextualHints(eligibleHintIds: readonly string[]
   useEffect(() => {
     return () => {
       // Strict Mode replays effect setup after cleanup in development. Reset
-      // the publication guard so the replay restores the registration.
+      // the registration guard so the replay restores this milestone.
       lastPublished.current = [];
       dispatchContextualHintVisit({ type: 'unregister', sourceId });
     };

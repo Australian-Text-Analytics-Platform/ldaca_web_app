@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { projectQuotationRunAllReviewPage } from '../quotationRunAllReview';
 
 describe('Quotation Run All Review projection', () => {
-  it('groups immutable rows and hides internal publication columns', () => {
+  it('groups immutable rows and hides internal Result columns', () => {
     const result = projectQuotationRunAllReviewPage(
       {
         node_id: 'node-1',

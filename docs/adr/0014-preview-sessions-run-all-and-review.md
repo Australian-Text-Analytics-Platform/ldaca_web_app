@@ -23,6 +23,7 @@ Annotation reads the edited source, Quotation reads its Result Data Block, and
 Concordance left-joins current source rows to result rows on the selected text
 column. Duplicate text follows ordinary relational multiplication.
 
-This strict cutover removes standalone Annotation preview routes, per-result
-detach commands, and Concordance dispersion detachment. Native Workspace schema
-8 and portable archive format 7 reject older layouts without runtime migration.
+This strict cutover removes standalone Annotation preview routes, per-Result
+Data Block Creation commands, and the former Concordance dispersion creation
+path. Native Workspace schema 8 and portable archive format 7 reject older
+layouts without runtime migration.

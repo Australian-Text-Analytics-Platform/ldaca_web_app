@@ -47,7 +47,7 @@ _Avoid_: uploaded node, root node
 
 **Derived Data Block**:
 A Data Block created from one or more parent Data Blocks by a transformation,
-including a Supporting Analysis such as detachment.
+including a Supporting Analysis such as Derived Data Block Creation.
 _Avoid_: child table, output node
 
 **Workspace SQL Query**:
@@ -83,28 +83,27 @@ from any retained file that carries its large data and from browser-local
 presentation settings.
 _Avoid_: payload, artifact when referring to the typed outcome
 
-**Result Publication**:
-A Supporting Analysis that creates one or more Derived Data Blocks from
-user-selected columns of a successful parent Analysis Result. Computing a
-Result and publishing it to the Workspace are separate operations.
-_Avoid_: detach action, automatic Run All output
+**Derived Data Block Creation**:
+A Supporting Analysis whose successful outcome creates one or more Derived
+Data Blocks from user-selected data in a parent Result.
+_Avoid_: automatic Run All output
 
-**Concordance Match Publication**:
-The Table View publication that explodes a nested Concordance Result and emits
-one Derived Data Block row per Concordance Match.
-_Avoid_: generic Concordance Result Publication
+**Concordance Match Data Block Creation**:
+The Table View creation that explodes a nested Concordance Result and emits one
+Derived Data Block row per Concordance Match.
+_Avoid_: generic Concordance Data Block Creation
 
-**Concordance Document Publication**:
-The Dispersion View publication that keeps stable source-row identity, applies
+**Concordance Document Data Block Creation**:
+The Dispersion View creation that keeps stable source-row identity, applies
 the exact visible-term and selected-bin Review filter, and emits one row per
 qualifying source document with a newline-joined `CONC_extraction`.
-_Avoid_: dispersion detachment, grouping by document text
+_Avoid_: grouping by document text
 
 **Concordance Match**:
 One matched span in one source document, identified by its exact matched text
 and character offsets. A matching document may contain multiple Concordance
-Matches. Table View and Match Publication use this unit; Dispersion View and
-Document Publication use the stable source-document unit.
+Matches. Table View and Match Data Block Creation use this unit; Dispersion
+View and Document Data Block Creation use the stable source-document unit.
 _Avoid_: document hit, dispersion row, cached line
 
 **Topic Distribution**:
@@ -243,8 +242,8 @@ _Avoid_: cached Analysis, server draft
 **Review**:
 The post-Run-All view of durable output. Annotation Review reads the edited
 source Data Block; Concordance and Quotation Review read immutable Result
-tables without requiring a published Data Block.
-_Avoid_: preview result, detached output
+tables without requiring a created Data Block.
+_Avoid_: preview result
 
 **Example Data Block**:
 An optional Annotation input whose nonblank text and label pairs are supplied
@@ -311,4 +310,4 @@ _Avoid_: prediction column, hidden review state
   column in place.
 - Concordance and Quotation Run All retain immutable Result tables and do not
   change the Data Block graph. Concordance exposes named Match and Document
-  Publications; Quotation retains Result Publication.
+  Data Block Creation flows; Quotation retains Derived Data Block Creation.

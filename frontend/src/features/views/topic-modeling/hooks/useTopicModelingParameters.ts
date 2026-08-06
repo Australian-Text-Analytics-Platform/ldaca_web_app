@@ -71,7 +71,7 @@ const nodeDocumentCount = (nodeInfo: WorkspaceNodeInfo | undefined): number => {
  *
  * Used by: TopicModelingFeature because the feature needs one place to manage
  * sampling defaults, user-set flags, request hydration, clear behavior, and the
- * derived request fractions that are shared by run, diff, warning, and detach
+ * derived request fractions that are shared by run, diff, warning, and Add to Workspace
  * flows.
  *
  * Flow: derive corpus document counts from selected nodes, reset sampling when

@@ -496,7 +496,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     // Re-query the button inside waitFor: the surrounding
     // <DisabledReasonTooltip> swaps its child when its `reason` prop
     // transitions undefined↔defined, so a once-grabbed DOM ref goes
-    // stale (still references a detached node with disabled="").
+    // stale (still references a detached DOM node with disabled="").
     await waitFor(() => {
       expect(within(filterPanel).getByRole('button', { name: 'Create Data Block' })).toBeEnabled();
     });

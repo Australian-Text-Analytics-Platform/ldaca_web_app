@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ColumnSelectionActions } from '../../common/components/ColumnSelectionActions';
 
-export interface TopicModelingDetachSource {
+export interface TopicModelingAddToWorkspaceSource {
   id: string;
   name: string;
   columns: string[];
@@ -21,7 +22,7 @@ export interface TopicModelingDetachSource {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sources: TopicModelingDetachSource[];
+  sources: TopicModelingAddToWorkspaceSource[];
   selectedSourceIds: Set<string>;
   selectedColumns: Record<string, string[]>;
   names: Record<string, string>;
@@ -33,7 +34,7 @@ interface Props {
   onSubmit: () => void;
 }
 
-export function TopicModelingDetachDialog({
+export function TopicModelingAddToWorkspaceDialog({
   open,
   onOpenChange,
   sources,
@@ -69,22 +70,24 @@ export function TopicModelingDetachDialog({
               <div key={source.id} className="space-y-3 rounded-lg border p-3">
                 <div className="flex items-center gap-2">
                   <Checkbox
-                    id={`detach-source-${source.id}`}
+                    id={`add-to-workspace-source-${source.id}`}
                     checked={selected}
                     onCheckedChange={() => {
                       onToggleSource(source.id);
                     }}
                   />
-                  <Label htmlFor={`detach-source-${source.id}`} className="font-medium">
+                  <Label htmlFor={`add-to-workspace-source-${source.id}`} className="font-medium">
                     {source.name}
                   </Label>
                 </div>
                 {selected ? (
                   <>
                     <div className="space-y-1">
-                      <Label htmlFor={`detach-name-${source.id}`}>New Data Block name</Label>
+                      <Label htmlFor={`add-to-workspace-name-${source.id}`}>
+                        New Data Block name
+                      </Label>
                       <Input
-                        id={`detach-name-${source.id}`}
+                        id={`add-to-workspace-name-${source.id}`}
                         value={names[source.id] ?? ''}
                         maxLength={475}
                         onChange={(event) => {
@@ -93,7 +96,24 @@ export function TopicModelingDetachDialog({
                       />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Source columns</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Source columns</p>
+                        <ColumnSelectionActions
+                          sourceName={source.name}
+                          onSelectAll={() => {
+                            const current = selectedColumns[source.id] ?? [];
+                            for (const column of source.columns) {
+                              if (!current.includes(column)) onToggleColumn(source.id, column);
+                            }
+                          }}
+                          onSelectNone={() => {
+                            const sourceColumns = new Set(source.columns);
+                            for (const column of selectedColumns[source.id] ?? []) {
+                              if (sourceColumns.has(column)) onToggleColumn(source.id, column);
+                            }
+                          }}
+                        />
+                      </div>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <label className="flex items-center gap-2 text-sm">
                           <Checkbox checked disabled />

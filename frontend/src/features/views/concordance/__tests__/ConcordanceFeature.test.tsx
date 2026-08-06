@@ -232,7 +232,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Stubs workspace mutations that are outside this feature-level test boundary. */
   useWorkspaceActions: () => ({
     runConcordanceAll: vi.fn(),
-    publishAnalysisResult: vi.fn(),
+    createResultDataBlocks: vi.fn(),
     setNodeColor: vi.fn(),
   }),
 }));

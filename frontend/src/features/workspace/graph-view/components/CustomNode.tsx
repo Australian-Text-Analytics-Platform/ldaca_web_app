@@ -35,7 +35,7 @@ import {
 
 interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceGraphNodeCard;
-  /** True for nodes that appeared mid-session (detach / join / stack /
+  /** True for nodes that appeared mid-session (analysis creation / join / stack /
    * clone outputs etc.) and haven't been interacted with yet. Triggers
    * the red "new" dot in the graph + sidebar. Cleared by ``markInteracted``
    * in useFreshNodesStore on first click / selection. */

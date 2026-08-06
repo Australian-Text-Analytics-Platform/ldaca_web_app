@@ -4,7 +4,7 @@ import type { SequentialXAxisType } from './sequentialChartModel';
 
 /**
  * Owns chart interaction state for sequential analysis: hidden series, selected
- * periods, detach naming, x-axis mode, and the export dialog.
+ * periods, x-axis mode, and the export dialog.
  * Used by: SequentialAnalysisFeature so task lifecycle and request parameters
  * stay separate from chart-only interaction state.
  * Flow: toggle legend keys, support single/range period selection, clear
@@ -16,7 +16,6 @@ export function useSequentialChartControls() {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
-  const [detachNodeName, setDetachNodeName] = useState('');
   const lastClickedIndexRef = useRef<number | null>(null);
 
   /**
@@ -36,7 +35,7 @@ export function useSequentialChartControls() {
   };
 
   /**
-   * Toggles or range-selects chart periods for the add-to-workspace detach flow.
+   * Toggles or range-selects chart periods for chart inspection.
    * Called by: SequentialChart point clicks with the current chart length from
    * SequentialAnalysisFeature.
    */
@@ -76,12 +75,11 @@ export function useSequentialChartControls() {
   };
 
   /**
-   * Clears result-bound detach selection without touching chart visibility.
+   * Clears result-bound period selection without touching chart visibility.
    * Called by: SequentialAnalysisFeature when a result payload is fetched or
    * hydrated.
    */
   const resetResultSelection = () => {
-    setDetachNodeName('');
     clearPeriodSelection();
   };
 
@@ -103,8 +101,6 @@ export function useSequentialChartControls() {
     downloadDialogOpen,
     setDownloadDialogOpen,
     selectedPeriodIndices,
-    detachNodeName,
-    setDetachNodeName,
     toggleKey,
     selectPeriod,
     clearPeriodSelection,

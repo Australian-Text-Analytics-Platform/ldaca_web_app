@@ -43,7 +43,7 @@ export const CONCORDANCE_PRESENTATION_COLUMN_SET: ReadonlySet<string> = new Set(
 
 export const QUOTATION_COLUMN_KEYS = {
   // Canonical name for the per-quote-row raw source-document text.
-  // Detached output may include `QUOTE_extraction`; the live result table
+  // A created Data Block may include `QUOTE_extraction`; the live Result table
   // renders it as a virtual column backed by the selected source text column.
   document: 'QUOTE_extraction',
   speaker: 'QUOTE_speaker',

@@ -17,7 +17,7 @@ Wordflow separates these concerns into three authorities:
   independent of the Document Column Preference, and used only to initialize
   a fresh control that exposes tokenizer selection. It survives save/reopen and
   archive round trips already owned by that Data Block, but is never inherited
-  by a Derived Data Block, clone, or Analysis detachment.
+  by another Derived Data Block, clone, or Derived Data Block Creation.
 - A submitted Analysis owns its exact document-column and tokenizer-model
   mappings, plus Concordance search mode. Token Frequency requires a model for
   every selected Data Block. Concordance Text mode retains any selections but

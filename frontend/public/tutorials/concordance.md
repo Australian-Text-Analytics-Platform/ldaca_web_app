@@ -138,7 +138,8 @@ reinterpreted under new boundaries.
 In Review, click a chart bin to select it; Shift-click another bin to extend
 the range. **Clear Selection** removes the bin filter. Click a legend term to
 hide or show it. Visible terms intersected with selected bins control the
-displayed documents, match markers, legend counts, and Document Publication.
+displayed documents, match markers, legend counts, and Concordance Document
+Data Block Creation.
 Documents without a surviving match disappear. Preview has a static legend and
 does not apply these filters.
 
@@ -189,9 +190,9 @@ the visible page. `CONC_dispersion` remains a frontend presentation field and
 is never stored or queried as a physical Result column.
 
 Use **Add to Workspace** to create Derived Data Blocks after reviewing the
-Result. Table View creates a **Concordance Match Publication**, with one row per
+Result. Table View creates a **Concordance Match Data Block Creation**, with one row per
 match and the current flat selected-column behavior. Dispersion View creates a
-**Concordance Document Publication**, with one row per qualifying original
+**Concordance Document Data Block Creation**, with one row per qualifying original
 source row. It contains the required original document, required
 `CONC_extraction` (surviving KWIC extractions joined with plain newlines), and
 optional metadata. The document and extraction columns are locked on and
@@ -238,8 +239,8 @@ forest, including after failure or cancellation.
 2. Compare two source-metadata sort orders.
 3. Switch to Preview Dispersion and compare the per-term series.
 4. Run All, open Review Dispersion, hide a term, and select a bin range.
-5. Compare Match Publication from Table View with Document Publication from
-   Dispersion View.
+5. Compare Concordance Match Data Block Creation from Table View with
+   Concordance Document Data Block Creation from Dispersion View.
 6. Change the source Data Block, reopen the historical Preview Analysis, and
    then use **Update Preview** to compare the new request deliberately.
 

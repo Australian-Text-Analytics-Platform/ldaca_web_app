@@ -5,8 +5,8 @@ import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
   type ConcordanceRunAllResult,
-  type ConcordanceDocumentPublicationSource,
-  type ResultPublicationSource,
+  type ConcordanceDocumentDataBlockCreationSource,
+  type DataBlockCreationSource,
 } from '@/api';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
@@ -45,7 +45,7 @@ import { usePersistNodeTokenizerModel } from '../common/hooks/usePersistNodeToke
 import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
 import type { ConcordanceRunAllReviewSource } from './concordanceRunAllReview';
 import { queryKeys } from '@/lib/queryKeys';
-import { ResultPublicationDialog } from '../common/components/ResultPublicationDialog';
+import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { CONCORDANCE_COMBINED_NODE_KEY } from './concordanceTableDomain';
 
@@ -75,7 +75,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const { currentWorkspaceId } = useWorkspaceData();
   const {
     runConcordanceAll,
-    publishAnalysisResult,
+    createResultDataBlocks,
     setNodeColor: persistNodeColor,
   } = useWorkspaceActions();
   const persistDocumentColumn = usePersistNodeDocumentColumn({
@@ -189,7 +189,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           ? new Error('Run All source Analyses are incomplete')
           : null))
       : null;
-  const publicationSources = concordanceReviewSources.map((review) => review.source);
+  const addToWorkspaceSources = concordanceReviewSources.map((review) => review.source);
   const reviewNodes: WorkspaceNodeMetadata[] = concordanceReviewSources.map(({ source }) => ({
     id: source.node_id,
     name: source.node_name,
@@ -234,8 +234,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   } = concordanceParameters;
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
   const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
-  const [publicationDialogOpen, setPublicationDialogOpen] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
+  const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
   // Metadata visibility derives from the selected columns: any selection
   // shows the corresponding metadata columns in the results table.
   const showMetadata = selectedMetadataColumns.length > 0;
@@ -627,49 +627,51 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     }
   };
 
-  const handlePublishResult = async (sources: ResultPublicationSource[]) => {
+  const handleAddToWorkspace = async (sources: DataBlockCreationSource[]) => {
     if (!concordanceRunAll) return;
-    setIsPublishing(true);
+    setIsAddingToWorkspace(true);
     try {
       if (concordanceView === 'dispersion') {
-        const documentSources: ConcordanceDocumentPublicationSource[] = sources.map((source) => {
-          const descriptor = publicationSources.find(
-            (candidate) => candidate.node_id === source.source_node_id,
-          );
-          const filterKey =
-            viewMode === 'combined' ? CONCORDANCE_COMBINED_NODE_KEY : source.source_node_id;
-          const selectedBins = Array.from(selectedBinIndices[filterKey] ?? []).sort(
-            (left, right) => left - right,
-          );
-          return {
-            source_node_id: source.source_node_id,
-            new_node_name: source.new_node_name,
-            selected_metadata_columns: source.selected_columns.filter((column) =>
-              descriptor?.metadata_columns.includes(column),
-            ),
-            excluded_matched_texts: Array.from(excludedMatchedTexts[filterKey] ?? []).sort(),
-            bin_count: selectedBins.length > 0 ? binCount : null,
-            selected_bins: selectedBins.length > 0 ? selectedBins : null,
-          };
-        });
-        await publishAnalysisResult(host.tabId, concordanceRunAll.id, {
-          kind: 'concordance_document_publication',
+        const documentSources: ConcordanceDocumentDataBlockCreationSource[] = sources.map(
+          (source) => {
+            const descriptor = addToWorkspaceSources.find(
+              (candidate) => candidate.node_id === source.source_node_id,
+            );
+            const filterKey =
+              viewMode === 'combined' ? CONCORDANCE_COMBINED_NODE_KEY : source.source_node_id;
+            const selectedBins = Array.from(selectedBinIndices[filterKey] ?? []).sort(
+              (left, right) => left - right,
+            );
+            return {
+              source_node_id: source.source_node_id,
+              new_node_name: source.new_node_name,
+              selected_metadata_columns: source.selected_columns.filter((column) =>
+                descriptor?.metadata_columns.includes(column),
+              ),
+              excluded_matched_texts: Array.from(excludedMatchedTexts[filterKey] ?? []).sort(),
+              bin_count: selectedBins.length > 0 ? binCount : null,
+              selected_bins: selectedBins.length > 0 ? selectedBins : null,
+            };
+          },
+        );
+        await createResultDataBlocks(host.tabId, concordanceRunAll.id, {
+          kind: 'concordance_document_data_block_creation',
           sources: documentSources,
         });
       } else {
-        await publishAnalysisResult(host.tabId, concordanceRunAll.id, {
-          kind: 'concordance_match_publication',
+        await createResultDataBlocks(host.tabId, concordanceRunAll.id, {
+          kind: 'concordance_match_data_block_creation',
           sources,
         });
       }
-      setPublicationDialogOpen(false);
+      setAddToWorkspaceDialogOpen(false);
       toast.success('Adding Concordance Results to the Workspace.');
     } catch (cause) {
       toast.error('Could not add Concordance Results.', {
         description: cause instanceof Error ? cause.message : String(cause),
       });
     } finally {
-      setIsPublishing(false);
+      setIsAddingToWorkspace(false);
     }
   };
 
@@ -688,7 +690,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       : []),
     ...(results && !isReview ? [CONTEXTUAL_HINT_IDS.concordance.previewResults] : []),
     ...(results && isReview ? [CONTEXTUAL_HINT_IDS.concordance.runAllResults] : []),
-    ...(isReview && publicationSources.length > 0 ? [CONTEXTUAL_HINT_IDS.concordance.publish] : []),
+    ...(isReview && addToWorkspaceSources.length > 0
+      ? [CONTEXTUAL_HINT_IDS.concordance.addToWorkspace]
+      : []),
   ]);
 
   return (
@@ -792,12 +796,12 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           guidanceTarget={isReview ? 'concordance-run-all-results' : 'concordance-preview-results'}
           isReview={isReview}
           headerAction={
-            isReview && publicationSources.length > 0 ? (
+            isReview && addToWorkspaceSources.length > 0 ? (
               <Button
-                data-guidance="concordance-publish"
+                data-guidance="concordance-add-to-workspace"
                 type="button"
                 onClick={() => {
-                  setPublicationDialogOpen(true);
+                  setAddToWorkspaceDialogOpen(true);
                 }}
               >
                 Add to Workspace
@@ -902,18 +906,18 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         payload={detailPayload}
         customization={concordanceCustomization}
       />
-      {publicationDialogOpen ? (
-        <ResultPublicationDialog
+      {addToWorkspaceDialogOpen ? (
+        <ResultAddToWorkspaceDialog
           open
-          onOpenChange={setPublicationDialogOpen}
+          onOpenChange={setAddToWorkspaceDialogOpen}
           title={`Add Concordance ${concordanceView === 'dispersion' ? 'Documents' : 'Matches'} to Workspace`}
           nameSuffix={concordanceView === 'dispersion' ? 'concordance_documents' : 'concordance'}
-          sources={publicationSources}
-          isSubmitting={isPublishing}
+          sources={addToWorkspaceSources}
+          isSubmitting={isAddingToWorkspace}
           mode={concordanceView === 'dispersion' ? 'document' : 'match'}
           allowSourceSelection
           onSubmit={(sources) => {
-            void handlePublishResult(sources);
+            void handleAddToWorkspace(sources);
           }}
         />
       ) : null}

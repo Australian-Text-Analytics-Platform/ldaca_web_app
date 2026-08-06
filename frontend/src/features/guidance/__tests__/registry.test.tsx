@@ -1,11 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import {
-  CONTEXTUAL_HINT_IDS,
-  contextualHintRegistry,
-  contextualHintSequences,
-} from '../registry';
+import { CONTEXTUAL_HINT_IDS, contextualHintRegistry, contextualHintSequences } from '../registry';
 
 const addDataBlockHint = contextualHintRegistry.find(
   (definition) => definition.id === CONTEXTUAL_HINT_IDS.dataLoader.addDataBlock,

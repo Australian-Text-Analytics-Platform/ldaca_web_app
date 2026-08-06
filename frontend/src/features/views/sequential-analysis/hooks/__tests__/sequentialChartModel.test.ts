@@ -255,7 +255,7 @@ describe('buildSequentialChartModel', () => {
     expect(forward.series).toEqual(reversed.series);
   });
 
-  it('derives visibility, selection, and detach metadata from canonical rows', () => {
+  it('derives visibility, selection, and counts from canonical rows', () => {
     const initial = build({
       data: [
         {
@@ -325,14 +325,11 @@ describe('buildSequentialChartModel', () => {
       chosenPointCount: 1,
       chosenDocumentCount: 4,
     });
-    expect(model.selection.selectedPeriods).toEqual([
-      { period_start: '2024-02-01', period_end: '2024-03-01' },
-    ]);
-    expect(model.selection.visibleGroups).toEqual([{ values: { group: 'A' } }]);
-    expect(model.selection.canDetach).toBe(true);
+    expect(model.selection.selectedIndices).toEqual(new Set([1]));
+    expect(model.selection.selectedCount).toBe(1);
   });
 
-  it('rejects stale selections and all-hidden ungrouped detach state', () => {
+  it('rejects stale selection indices', () => {
     const result = {
       data: [
         {
@@ -352,18 +349,8 @@ describe('buildSequentialChartModel', () => {
     };
 
     const stale = build(result, { selectedPeriodIndices: new Set([9]) }).selection;
-    expect(stale.canDetach).toBe(false);
     expect(stale.selectedIndices).toEqual(new Set());
     expect(stale.hasInvalidSelection).toBe(true);
-    expect(build(result, { selectedPeriodIndices: new Set([0, 1]) }).selection.canDetach).toBe(
-      false,
-    );
-    expect(
-      build(result, {
-        selectedPeriodIndices: new Set([0]),
-        hiddenKeys: new Set(['sequential_count']),
-      }).selection.canDetach,
-    ).toBe(false);
   });
 
   it('rejects negative counts and inverted period bounds', () => {
@@ -390,7 +377,7 @@ describe('buildSequentialChartModel', () => {
     expect(model.diagnostics.map((item) => item.code)).toEqual(['invalid-count', 'invalid-period']);
   });
 
-  it('reports malformed payloads and retains only rows safe for chart/export/detach', () => {
+  it('reports malformed payloads and retains only rows safe for chart and export', () => {
     const model = build({
       data: [
         {
@@ -595,7 +582,6 @@ describe('buildSequentialChartModel', () => {
     expect(model.diagnostics).toContainEqual(
       expect.objectContaining({ code: 'invalid-group-columns' }),
     );
-    expect(model.selection.visibleGroups).toEqual([{ values: { group: 'A' } }]);
   });
 
   it('rejects invalid source counts and uses canonical result rows', () => {

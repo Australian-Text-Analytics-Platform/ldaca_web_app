@@ -164,25 +164,25 @@ describe('useWorkspaceTaskInbox', () => {
     expect(queryClient.getQueryState(unrelatedPageKey)?.isInvalidated).toBe(false);
   });
 
-  it('marks only published Analysis outputs as newly created Data Blocks', async () => {
-    const publication = analysisResponse({
-      id: 'publication-1',
+  it('marks only Analysis Data Block Creation outputs as newly created', async () => {
+    const creation = analysisResponse({
+      id: 'creation-1',
       execution_scope: 'supporting',
-      output_node_ids: ['published-1'],
+      output_node_ids: ['created-1'],
       request: {
-        kind: 'concordance_match_publication',
+        kind: 'concordance_match_data_block_creation',
         sources: [
           {
             source_node_id: 'node-1',
             selected_columns: ['text', 'CONC_matched_text'],
-            new_node_name: 'Published matches',
+            new_node_name: 'Created matches',
           },
         ],
       },
     });
     server.use(
       http.get('*/api/workspaces/:workspace_id/analyses/:analysis_id', () =>
-        HttpResponse.json(publication),
+        HttpResponse.json(creation),
       ),
     );
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -197,7 +197,7 @@ describe('useWorkspaceTaskInbox', () => {
         sequence: 2,
         occurred_at: new Date().toISOString(),
         resource_type: 'analysis',
-        resource_id: 'publication-1',
+        resource_id: 'creation-1',
         workspace_id: 'workspace-1',
         state: 'succeeded',
         progress: { fraction: 1, message: 'done' },
@@ -207,7 +207,7 @@ describe('useWorkspaceTaskInbox', () => {
 
     await waitFor(() =>
       expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('workspace-1')).toEqual(
-        new Set(['published-1']),
+        new Set(['created-1']),
       ),
     );
   });

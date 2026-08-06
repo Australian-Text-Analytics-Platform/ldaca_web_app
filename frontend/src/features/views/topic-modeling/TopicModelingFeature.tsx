@@ -23,10 +23,10 @@ import { analysisInputsFromRequest } from '../common/utils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import {
-  TopicModelingDetachDialog,
-  type TopicModelingDetachSource,
-} from './components/TopicModelingDetachDialog';
-import { createDefaultTopicModelingDetachColumns } from './components/topicModelingDetachState';
+  TopicModelingAddToWorkspaceDialog,
+  type TopicModelingAddToWorkspaceSource,
+} from './components/TopicModelingAddToWorkspaceDialog';
+import { createDefaultTopicModelingAddToWorkspaceColumns } from './components/topicModelingAddToWorkspaceState';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 import {
   DEFAULT_MAX_SEGMENT_TOKENS,
@@ -62,7 +62,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     latestRunAll?.state === 'running' ||
     latestRunAll?.state === 'succeeded';
   const { currentWorkspaceId } = useWorkspaceData();
-  const { setNodeColor: persistNodeColor, detachTopicModeling } = useWorkspaceActions();
+  const { setNodeColor: persistNodeColor, createTopicModelingDataBlocks } = useWorkspaceActions();
   const nodeInputs = useTabNodeInputs({
     tabInputSets,
     onTabInputSetChange,
@@ -130,11 +130,11 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const [chartWidth, setChartWidth] = useState<number>(800);
   const chartResizeFrameRef = useRef<number | null>(null);
   const [isClearing, setIsClearing] = useState(false);
-  const [detachDialogOpen, setDetachDialogOpen] = useState(false);
-  const [isDetaching, setIsDetaching] = useState(false);
-  const [detachSourceIds, setDetachSourceIds] = useState<Set<string>>(new Set());
-  const [detachColumns, setDetachColumns] = useState<Record<string, string[]>>({});
-  const [detachNames, setDetachNames] = useState<Record<string, string>>({});
+  const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
+  const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
+  const [addToWorkspaceSourceIds, setAddToWorkspaceSourceIds] = useState<Set<string>>(new Set());
+  const [addToWorkspaceColumns, setAddToWorkspaceColumns] = useState<Record<string, string[]>>({});
+  const [addToWorkspaceNames, setAddToWorkspaceNames] = useState<Record<string, string>>({});
 
   const {
     request: serverRequest,
@@ -317,39 +317,47 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     }
     return filtered;
   })();
-  const detachSources: TopicModelingDetachSource[] = (result?.artifacts.nodes ?? []).map(
-    (node) => ({
-      id: node.node_id,
-      name: node.node_name,
-      columns: node.original_columns,
-      documentColumn: node.text_column,
-    }),
-  );
+  const addToWorkspaceSources: TopicModelingAddToWorkspaceSource[] = (
+    result?.artifacts.nodes ?? []
+  ).map((node) => ({
+    id: node.node_id,
+    name: node.node_name,
+    columns: node.original_columns,
+    documentColumn: node.text_column,
+  }));
 
-  const openDetachDialog = () => {
-    const sourceIds = new Set(detachSources.map((source) => source.id));
-    setDetachSourceIds(sourceIds);
-    setDetachColumns(createDefaultTopicModelingDetachColumns(detachSources));
-    setDetachNames(
-      Object.fromEntries(detachSources.map((source) => [source.id, `${source.name} topics`])),
+  const openAddToWorkspaceDialog = () => {
+    const sourceIds = new Set(addToWorkspaceSources.map((source) => source.id));
+    setAddToWorkspaceSourceIds(sourceIds);
+    setAddToWorkspaceColumns(
+      createDefaultTopicModelingAddToWorkspaceColumns(addToWorkspaceSources),
     );
-    setDetachDialogOpen(true);
+    setAddToWorkspaceNames(
+      Object.fromEntries(
+        addToWorkspaceSources.map((source) => [source.id, `${source.name} topics`]),
+      ),
+    );
+    setAddToWorkspaceDialogOpen(true);
   };
 
-  const handleDetach = async () => {
-    if (!tabTaskId || detachSourceIds.size === 0) return;
-    const nodeIds = detachSources
+  const handleAddToWorkspace = async () => {
+    if (!tabTaskId || addToWorkspaceSourceIds.size === 0) return;
+    const nodeIds = addToWorkspaceSources
       .map((source) => source.id)
-      .filter((nodeId) => detachSourceIds.has(nodeId));
-    setIsDetaching(true);
+      .filter((nodeId) => addToWorkspaceSourceIds.has(nodeId));
+    setIsAddingToWorkspace(true);
     try {
-      await detachTopicModeling(host.tabId, tabTaskId, {
+      await createTopicModelingDataBlocks(host.tabId, tabTaskId, {
         node_ids: nodeIds,
         selected_columns: Object.fromEntries(
-          nodeIds.map((nodeId) => [nodeId, detachColumns[nodeId] ?? []]),
+          nodeIds.map((nodeId) => {
+            const source = addToWorkspaceSources.find((candidate) => candidate.id === nodeId);
+            const selected = new Set(addToWorkspaceColumns[nodeId] ?? []);
+            return [nodeId, source?.columns.filter((column) => selected.has(column)) ?? []];
+          }),
         ),
         new_node_names: Object.fromEntries(
-          nodeIds.map((nodeId) => [nodeId, detachNames[nodeId]?.trim() ?? '']),
+          nodeIds.map((nodeId) => [nodeId, addToWorkspaceNames[nodeId]?.trim() ?? '']),
         ),
         topic_ids: selectedTopicIds.size > 0 ? [...selectedTopicIds] : null,
         topic_meanings_override: topics.map((topic) => ({
@@ -357,14 +365,14 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           words: topic.representative_words.slice(0, representativeWordsCount),
         })),
       });
-      setDetachDialogOpen(false);
-      toast.success('Topic Modelling publication started.');
+      setAddToWorkspaceDialogOpen(false);
+      toast.success('Adding Topic Modelling results to the Workspace.');
     } catch (cause) {
       toast.error('Failed to add Topic Modelling results.', {
         description: cause instanceof Error ? cause.message : String(cause),
       });
     } finally {
-      setIsDetaching(false);
+      setIsAddingToWorkspace(false);
     }
   };
 
@@ -454,7 +462,10 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     CONTEXTUAL_HINT_IDS.topicModeling.inputs,
     ...(!actionState.runDisabled ? [CONTEXTUAL_HINT_IDS.topicModeling.run] : []),
     ...(result
-      ? [CONTEXTUAL_HINT_IDS.topicModeling.results, CONTEXTUAL_HINT_IDS.topicModeling.publish]
+      ? [
+          CONTEXTUAL_HINT_IDS.topicModeling.results,
+          CONTEXTUAL_HINT_IDS.topicModeling.addToWorkspace,
+        ]
       : []),
   ]);
 
@@ -528,21 +539,21 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           nodeNames={panelSelectedNodes.map((n) => n.name)}
           randomSeed={randomSeed}
           maxSegmentTokens={maxSegmentTokens}
-          onAddToWorkspace={openDetachDialog}
-          isAddingToWorkspace={isDetaching}
+          onAddToWorkspace={openAddToWorkspaceDialog}
+          isAddingToWorkspace={isAddingToWorkspace}
         />
       )}
-      <TopicModelingDetachDialog
-        open={detachDialogOpen}
-        onOpenChange={setDetachDialogOpen}
-        sources={detachSources}
-        selectedSourceIds={detachSourceIds}
-        selectedColumns={detachColumns}
-        names={detachNames}
+      <TopicModelingAddToWorkspaceDialog
+        open={addToWorkspaceDialogOpen}
+        onOpenChange={setAddToWorkspaceDialogOpen}
+        sources={addToWorkspaceSources}
+        selectedSourceIds={addToWorkspaceSourceIds}
+        selectedColumns={addToWorkspaceColumns}
+        names={addToWorkspaceNames}
         selectedTopicCount={selectedTopicIds.size > 0 ? selectedTopicIds.size : null}
-        isSubmitting={isDetaching}
+        isSubmitting={isAddingToWorkspace}
         onToggleSource={(nodeId) => {
-          setDetachSourceIds((current) => {
+          setAddToWorkspaceSourceIds((current) => {
             const next = new Set(current);
             if (next.has(nodeId)) next.delete(nodeId);
             else next.add(nodeId);
@@ -550,7 +561,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           });
         }}
         onToggleColumn={(nodeId, column) => {
-          setDetachColumns((current) => {
+          setAddToWorkspaceColumns((current) => {
             const columns = current[nodeId] ?? [];
             return {
               ...current,
@@ -561,10 +572,10 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           });
         }}
         onNameChange={(nodeId, name) => {
-          setDetachNames((current) => ({ ...current, [nodeId]: name }));
+          setAddToWorkspaceNames((current) => ({ ...current, [nodeId]: name }));
         }}
         onSubmit={() => {
-          void handleDetach();
+          void handleAddToWorkspace();
         }}
       />
     </div>
