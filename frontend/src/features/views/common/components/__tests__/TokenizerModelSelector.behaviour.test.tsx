@@ -17,15 +17,17 @@ vi.mock('@/lib/languageDetection', () => ({
 }));
 
 /**
- * Renders TokenizerModelSelector with a fresh query client so lazy model loading
+ * Renders TokenizerModelSelector with a fresh query client so model loading
  * and language detection cache state cannot leak between behavior tests.
  */
 const renderSelector = ({
   value = '',
   onChange = vi.fn(),
+  autoSelectRecommended = false,
 }: {
   value?: string;
   onChange?: Mock;
+  autoSelectRecommended?: boolean;
 } = {}) => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -39,6 +41,7 @@ const renderSelector = ({
           nodeId="node-1"
           column="text"
           value={value}
+          autoSelectRecommended={autoSelectRecommended}
           onChange={onChange}
         />
       </QueryClientProvider>,
@@ -48,6 +51,7 @@ const renderSelector = ({
 
 describe('TokenizerModelSelector', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     if (!HTMLElement.prototype.hasPointerCapture) {
       Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
         configurable: true,
@@ -80,7 +84,16 @@ describe('TokenizerModelSelector', () => {
     vi.mocked(detectLanguageIso6391).mockResolvedValue('en');
   });
 
-  it('fetches models on open and outlines language-compatible recommendations', async () => {
+  it('automatically selects the first recommended tokenizer for an unset data block', async () => {
+    const { onChange } = renderSelector({ autoSelectRecommended: true });
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith('native:plain_words_en', 'en');
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads models for defaulting and outlines language-compatible recommendations on open', async () => {
     const user = userEvent.setup();
     renderSelector();
 
@@ -91,6 +104,7 @@ describe('TokenizerModelSelector', () => {
     await waitFor(() => {
       expect(listTokenizerModels).toHaveBeenCalledTimes(1);
     });
+
     expect(await screen.findByText('Recommended')).toBeInTheDocument();
     expect(screen.getByTestId('tokenizer-model-recommendations')).toHaveClass('rounded-lg');
     expect(screen.getByText('Plain words (English)')).toBeInTheDocument();
@@ -100,11 +114,15 @@ describe('TokenizerModelSelector', () => {
 
   it('offers None as a clearing option', async () => {
     const user = userEvent.setup();
-    const { onChange } = renderSelector({ value: 'native:plain_words_en' });
+    const { onChange } = renderSelector({
+      value: 'native:plain_words_en',
+      autoSelectRecommended: true,
+    });
 
     await user.click(screen.getByRole('combobox', { name: /tokenizer model/i }));
     await user.click(await screen.findByText('None'));
 
     expect(onChange).toHaveBeenCalledWith('', 'en');
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 });

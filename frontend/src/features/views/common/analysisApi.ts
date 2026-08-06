@@ -124,7 +124,7 @@ export async function getAnalysisResultResource<TResult>(
           throwOnError: true,
         });
         if (data.kind !== 'topic_modeling') {
-          throw new Error('Topic Modeling query returned the wrong Result kind');
+          throw new Error('Topic Modelling query returned the wrong Result kind');
         }
         return data as TopicModelingResult;
       };
@@ -144,6 +144,7 @@ export async function getAnalysisResultResource<TResult>(
       data: {
         topics: topicResult.topics,
         corpus_sizes: topicResult.corpus_sizes,
+        meta: topicResult.meta,
         per_corpus_topic_counts: topicResult.per_corpus_topic_counts,
       },
     } as TResult;

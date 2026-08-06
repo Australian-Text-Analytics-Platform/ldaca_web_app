@@ -179,9 +179,16 @@ Workspace graph.
 
 ## Other Analysis Kinds
 
-Token Frequency, Trends, Topic Modeling, and other full-table functions submit
-Run-All-scoped Analyses directly. Topic Modeling detachment remains an ordinary
+Token Frequency, Trends, Topic Modelling, and other full-table functions submit
+Run-All-scoped Analyses directly. Topic Modelling detachment remains an ordinary
 Supporting Analysis and may publish multiple ordered output Data Blocks.
+
+A Topic Modelling Analysis request owns one segmentation method and maximum
+token count for all selected Data Blocks. The successful Result records the
+total Topic Segment count and how many semantic segments were truncated.
+Automatic segmentation may split and overlap text; Paragraph and Sentence
+segmentation preserve their respective Unicode text boundaries and truncate an
+oversized segment on the right.
 
 ## Persistence
 

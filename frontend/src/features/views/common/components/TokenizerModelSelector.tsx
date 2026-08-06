@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Select,
@@ -28,6 +28,7 @@ interface TokenizerModelSelectorProps {
   column: string;
   value?: string;
   onChange: (value: string, detectedLanguage: string | null) => void;
+  autoSelectRecommended?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   className?: string;
@@ -44,11 +45,13 @@ function TokenizerModelSelector({
   column,
   value,
   onChange,
+  autoSelectRecommended = false,
   disabled = false,
   disabledReason,
   className,
 }: TokenizerModelSelectorProps) {
   const [open, setOpen] = useState(false);
+  const autoSelectionKeyRef = useRef<string | null>(null);
   const canFetchSample = Boolean(workspaceId && nodeId && column);
   const isDisabled = disabled || !column;
   const reason = disabled ? disabledReason : !column ? 'Select a text column first' : undefined;
@@ -61,9 +64,9 @@ function TokenizerModelSelector({
 
   const modelQuery = useQuery({
     queryKey: queryKeys.tokenizerModels,
-    enabled: open && !isDisabled,
+    enabled: (open || autoSelectRecommended) && !isDisabled,
     staleTime: 10 * 60_000,
-    /** Called by: TanStack Query when the selector opens and requests model inventory. */
+    /** Called by: TanStack Query for automatic selection or an opened selector. */
     queryFn: async (): Promise<TokenizerModelInfo[]> => {
       const { data } = await listTokenizerModels({
         throwOnError: true,
@@ -79,6 +82,40 @@ function TokenizerModelSelector({
     modelQuery.data ?? [],
     detectedLanguage,
   );
+  const firstRecommendedModel = recommended[0]?.model ?? null;
+  const modelCatalogueLoaded = modelQuery.data !== undefined;
+
+  useEffect(() => {
+    if (
+      !autoSelectRecommended ||
+      !workspaceId ||
+      isDisabled ||
+      !detectedLanguage ||
+      !modelCatalogueLoaded
+    ) {
+      return;
+    }
+
+    const autoSelectionKey = `${workspaceId}:${nodeId}:${column}`;
+    if (autoSelectionKeyRef.current === autoSelectionKey) return;
+    autoSelectionKeyRef.current = autoSelectionKey;
+
+    if (!value?.trim() && firstRecommendedModel) {
+      onChange(firstRecommendedModel, detectedLanguage);
+    }
+  }, [
+    autoSelectRecommended,
+    column,
+    detectedLanguage,
+    firstRecommendedModel,
+    isDisabled,
+    modelCatalogueLoaded,
+    nodeId,
+    onChange,
+    value,
+    workspaceId,
+  ]);
+
   const selectedModel = modelQuery.data?.find((option) => option.model === value);
   const selectValue = value && value.length > 0 ? value : TOKENIZER_MODEL_CLEAR_VALUE;
 

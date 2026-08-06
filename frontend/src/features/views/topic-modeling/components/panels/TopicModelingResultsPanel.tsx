@@ -42,6 +42,7 @@ interface Props {
   nodeNames?: string[];
   topicSizeValue?: number;
   randomSeed?: number;
+  maxSegmentTokens: number;
   onAddToWorkspace: () => void;
   isAddingToWorkspace: boolean;
 }
@@ -76,6 +77,7 @@ export function TopicModelingResultsPanel({
   nodeNames,
   topicSizeValue,
   randomSeed,
+  maxSegmentTokens,
   onAddToWorkspace,
   isAddingToWorkspace,
 }: Props) {
@@ -90,12 +92,21 @@ export function TopicModelingResultsPanel({
   const isSuccessfulState = Boolean(result) && !isRunningState && !isErrorState;
 
   const cardTone: 'default' | 'error' = isErrorState ? 'error' : 'default';
-  const cardTitle = 'Topic Modeling Results';
+  const cardTitle = 'Topic Modelling Results';
   const helperConfig = {
     targetKey: 'analysis.topic-modeling.results',
-    label: 'Topic modeling results',
-    tooltip: 'Shows running progress, failures, and final topic modeling outputs.',
+    label: 'Topic modelling results',
+    tooltip: 'Shows running progress, failures, and final topic modelling outputs.',
   };
+  const truncatedSegmentCount = result?.data.meta.truncated_segment_count ?? 0;
+  const totalSegmentCount = result?.data.meta.n_chunks ?? 0;
+  const truncationWarning = (() => {
+    if (truncatedSegmentCount <= 0) return null;
+    const segmentLabel = totalSegmentCount === 1 ? 'Topic Segment' : 'Topic Segments';
+    const verb = truncatedSegmentCount === 1 ? 'was' : 'were';
+    const tailReference = truncatedSegmentCount === 1 ? 'that segment' : 'those segments';
+    return `${String(truncatedSegmentCount)} of ${String(totalSegmentCount)} ${segmentLabel} ${verb} truncated to ${String(maxSegmentTokens)} tokens; later text in ${tailReference} was not modelled.`;
+  })();
 
   return (
     <>
@@ -118,6 +129,14 @@ export function TopicModelingResultsPanel({
 
         {isSuccessfulState ? (
           <div className="space-y-4">
+            {truncationWarning ? (
+              <p
+                className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                role="status"
+              >
+                {truncationWarning}
+              </p>
+            ) : null}
             <TopicModelingBubbleChartSection
               topics={topics}
               chartRef={chartRef}

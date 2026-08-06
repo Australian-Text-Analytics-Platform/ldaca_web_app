@@ -1,12 +1,14 @@
 import { useEffect, useReducer, useRef } from 'react';
-import type { WorkspaceNodeInfo } from '@/api';
+import type { TopicSegmentationMethod, WorkspaceNodeInfo } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import {
   DEFAULT_TOPIC_SIZE_VALUE,
+  DEFAULT_MAX_SEGMENT_TOKENS,
   createTopicModelingParameterState,
   defaultCorpusSample,
   effectiveSampleDocumentCount,
   normalizeTopicSampleFractions,
+  sanitizeMaxSegmentTokens,
   sampleToFraction,
   sanitizeSamplePercent,
   topicModelingParameterReducer,
@@ -14,10 +16,12 @@ import {
 } from './topicModelingParameterState';
 
 export {
+  DEFAULT_MAX_SEGMENT_TOKENS,
   DEFAULT_TOPIC_SIZE_VALUE,
   effectiveSampleDocumentCount,
   normalizeTopicSampleFractions,
   sanitizeSamplePercent,
+  sanitizeMaxSegmentTokens,
 };
 export type { CorpusSample };
 
@@ -41,6 +45,10 @@ export interface UseTopicModelingParametersResult {
   representativeWordsCount: number;
   representativeWordsCountUserSet: boolean;
   setRepresentativeWordsCountFromUser: (value: number) => void;
+  segmentationMethod: TopicSegmentationMethod;
+  setSegmentationMethod: (value: TopicSegmentationMethod) => void;
+  maxSegmentTokens: number;
+  setMaxSegmentTokens: (value: number) => void;
   nodeDocCounts: number[];
   effectiveDocCounts: number[];
   topicSizeWarning: 'orange' | 'red' | null;
@@ -90,6 +98,8 @@ export function useTopicModelingParameters({
     randomSeedUserSet,
     representativeWordsCount,
     representativeWordsCountUserSet,
+    segmentationMethod,
+    maxSegmentTokens,
   } = parameterState;
   const skipNextNodeDefaultRef = useRef(false);
   const lastDefaultNodeIdsKeyRef = useRef<string | null>(null);
@@ -153,6 +163,14 @@ export function useTopicModelingParameters({
     dispatchParameters({ type: 'setRepresentativeWordsCountFromUser', value });
   };
 
+  const setSegmentationMethod = (value: TopicSegmentationMethod) => {
+    dispatchParameters({ type: 'setSegmentationMethod', value });
+  };
+
+  const setMaxSegmentTokens = (value: number) => {
+    dispatchParameters({ type: 'setMaxSegmentTokens', value: sanitizeMaxSegmentTokens(value) });
+  };
+
   /** Restores saved request parameters when the analysis lifecycle hydrates a task. */
   // Called by: TopicModelingFeature.onRequest so historical Analyses reopen
   // with their immutable run parameters.
@@ -212,6 +230,10 @@ export function useTopicModelingParameters({
     representativeWordsCount,
     representativeWordsCountUserSet,
     setRepresentativeWordsCountFromUser,
+    segmentationMethod,
+    setSegmentationMethod,
+    maxSegmentTokens,
+    setMaxSegmentTokens,
     nodeDocCounts,
     effectiveDocCounts,
     topicSizeWarning,

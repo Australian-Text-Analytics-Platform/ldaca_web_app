@@ -30,7 +30,7 @@ interface WorkspaceNodeListProps {
  * row width, and show the left fade while clipped or while leading actions are
  * visible on hover/focus.
  */
-function NodeRowName({ name }: { name: string }) {
+function NodeRowName({ name, fadeColor }: { name: string; fadeColor: string }) {
   const wrapRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [overflowing, setOverflowing] = useState(false);
@@ -76,8 +76,11 @@ function NodeRowName({ name }: { name: string }) {
       <span
         data-testid="node-name-left-fade"
         aria-hidden="true"
+        style={{
+          backgroundImage: `linear-gradient(to right, ${fadeColor} 0%, ${fadeColor} 40%, transparent 100%)`,
+        }}
         className={cn(
-          'pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background via-background/90 to-transparent group-hover/row:w-32',
+          'pointer-events-none absolute inset-y-0 left-0 w-10 group-hover/row:w-32',
           overflowing ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
         )}
       />
@@ -156,6 +159,7 @@ function WorkspaceNodeList({
                 // with a 4px FG spine on the left; a selected row also takes the
                 // full FG colour as its border.
                 const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
+                const rowBackgroundColor = toBgColor(effectiveColor);
 
                 return (
                   <Tooltip key={node.id}>
@@ -188,7 +192,7 @@ function WorkspaceNodeList({
                           )}
                           data-testid={`workspace-node-row-${node.id}`}
                           style={{
-                            backgroundColor: toBgColor(effectiveColor),
+                            backgroundColor: rowBackgroundColor,
                             // Selected: full FG-colour border. Unselected keeps the
                             // neutral border class; both keep the 4px FG left spine.
                             // Use per-side longhands (not the `borderColor`
@@ -222,7 +226,7 @@ function WorkspaceNodeList({
                               {pinnedRowAction}
                             </div>
                           )}
-                          <NodeRowName name={displayName} />
+                          <NodeRowName name={displayName} fadeColor={rowBackgroundColor} />
                           {isFresh && (
                             <span
                               className="pointer-events-none h-2 w-2 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover/row:opacity-0"

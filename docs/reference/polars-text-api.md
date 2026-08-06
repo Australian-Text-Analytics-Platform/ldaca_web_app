@@ -21,8 +21,17 @@ with Unicode character offsets. Supported model namespaces are `native:`,
 cache; `None` computes directly.
 
 Embedding accepts string or list-of-string input and returns a vector or nested
-vectors per row. Topic modeling is a whole-column expression that returns one
-result struct per source document.
+vectors per row. `topic_modeling` is a whole-column expression that returns one
+result struct per source document. Its segmentation arguments are:
+
+- `segmentation_method`: `"automatic"`, `"paragraph"`, or `"sentence"`;
+- `max_tokens`: maximum model tokens per Topic Segment; and
+- `overlap`: the automatic-mode overlap. Paragraph and Sentence modes ignore
+  overlap, preserve semantic units, and right-truncate units over `max_tokens`.
+
+The result includes `n_chunks` and `truncated_segment_count` as replicated
+run-level fields. `n_chunks` retains its lower-level name but counts Topic
+Segments.
 
 ## Direct Functions
 

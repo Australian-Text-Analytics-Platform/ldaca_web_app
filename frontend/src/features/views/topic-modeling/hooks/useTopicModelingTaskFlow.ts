@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
-import type { Analysis, TopicModelingRequest } from '@/api';
+import type { Analysis, TopicModelingRequest, TopicSegmentationMethod } from '@/api';
 import { runAnalysisTaskEnvelope } from '@/features/views/common/tasks/runAnalysisTaskEnvelope';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
@@ -16,6 +16,8 @@ interface TopicModelingState {
   representativeWordsCount: number;
   sampleFractions?: (number | null)[] | null;
   minTopicSize?: number;
+  segmentationMethod: TopicSegmentationMethod;
+  maxSegmentTokens: number;
 }
 
 interface TopicModelingActions {
@@ -43,6 +45,8 @@ export function useTopicModelingTaskFlow({
     representativeWordsCount,
     sampleFractions,
     minTopicSize,
+    segmentationMethod,
+    maxSegmentTokens,
   },
   actions: { setIsRunning, runningRef, setError, setLocalTaskId, onSubmitted },
 }: Params) {
@@ -67,6 +71,8 @@ export function useTopicModelingTaskFlow({
       random_seed: randomSeed,
       representative_words_count: representativeWordsCount,
       min_topic_size: minTopicSize ?? DEFAULT_TOPIC_SIZE_VALUE,
+      segmentation_method: segmentationMethod,
+      max_segment_tokens: maxSegmentTokens,
       ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
     };
 
@@ -95,7 +101,7 @@ export function useTopicModelingTaskFlow({
         }
       },
       onError: (error) => {
-        setError(error instanceof Error ? error.message : 'Error running topic modeling');
+        setError(error instanceof Error ? error.message : 'Error running topic modelling');
       },
     });
   };

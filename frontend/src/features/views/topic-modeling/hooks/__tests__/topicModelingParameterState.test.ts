@@ -28,6 +28,8 @@ describe('topicModelingParameterReducer', () => {
         random_seed: 7,
         representative_words_count: 30,
         min_topic_size: 12,
+        segmentation_method: 'paragraph',
+        max_segment_tokens: 64,
         sample_fractions: [0.2, null],
       },
       nodeDocCounts: [10000, 5000],
@@ -40,6 +42,8 @@ describe('topicModelingParameterReducer', () => {
       representativeWordsCountUserSet: true,
       topicSizeValue: 12,
       topicSizeUserSet: true,
+      segmentationMethod: 'paragraph',
+      maxSegmentTokens: 64,
       corpusSamples: [{ percent: '20' }, { percent: '100' }],
       corpusSamplesUserSet: true,
     });
@@ -52,6 +56,8 @@ describe('topicModelingParameterReducer', () => {
         random_seed: 99,
         representative_words_count: 25,
         min_topic_size: 6,
+        segmentation_method: 'sentence',
+        max_segment_tokens: 128,
         sample_fractions: [0.25],
       },
       nodeDocCounts: [10000],
@@ -69,5 +75,7 @@ describe('topicModelingParameterReducer', () => {
     expect(cleared.randomSeedUserSet).toBe(false);
     expect(cleared.representativeWordsCount).toBe(25);
     expect(cleared.representativeWordsCountUserSet).toBe(false);
+    expect(cleared.segmentationMethod).toBe('sentence');
+    expect(cleared.maxSegmentTokens).toBe(128);
   });
 });

@@ -7682,6 +7682,18 @@
             ],
             "title": "Total Topics Incl Outlier"
           },
+          "truncated_segment_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncated Segment Count"
+          },
           "vectorizer_model": {
             "anyOf": [
               {
@@ -7705,6 +7717,13 @@
             "default": "topic_modeling",
             "title": "Kind",
             "type": "string"
+          },
+          "max_segment_tokens": {
+            "default": 256,
+            "maximum": 510.0,
+            "minimum": 32.0,
+            "title": "Max Segment Tokens",
+            "type": "integer"
           },
           "min_topic_size": {
             "default": 10,
@@ -7765,6 +7784,10 @@
               }
             ],
             "title": "Sample Fractions"
+          },
+          "segmentation_method": {
+            "$ref": "#/components/schemas/TopicSegmentationMethod",
+            "default": "automatic"
           }
         },
         "required": [
@@ -8072,6 +8095,15 @@
         },
         "title": "TopicModelingResultQuery",
         "type": "object"
+      },
+      "TopicSegmentationMethod": {
+        "enum": [
+          "automatic",
+          "paragraph",
+          "sentence"
+        ],
+        "title": "TopicSegmentationMethod",
+        "type": "string"
       },
       "TopicStageTiming": {
         "additionalProperties": false,

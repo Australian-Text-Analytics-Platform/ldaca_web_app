@@ -456,6 +456,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
             nodeId={nodeId}
             column={column}
             value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
+            autoSelectRecommended
             onChange={(model, detectedLanguage) => {
               handleTokenizerModelChange(nodeId, column, model, detectedLanguage);
             }}

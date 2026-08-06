@@ -69,6 +69,7 @@ const baseProps = {
   nodeNames: ['Corpus A'],
   topicSizeValue: 10,
   randomSeed: 0,
+  maxSegmentTokens: 256,
   onAddToWorkspace: vi.fn(),
   isAddingToWorkspace: false,
 };
@@ -94,8 +95,31 @@ describe('TopicModelingResultsPanel', () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByText('Topic Modeling Results')).toBeInTheDocument();
+    expect(screen.getByText('Topic Modelling Results')).toBeInTheDocument();
     expect(screen.getByText('Topics (1)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add to Workspace' })).toBeInTheDocument();
+  });
+
+  it('warns when later text was truncated from Topic Segments', () => {
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          result={{
+            ...baseProps.result,
+            data: {
+              ...baseProps.result.data,
+              meta: { n_chunks: 742, truncated_segment_count: 18 },
+            },
+          }}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(
+      screen.getByText(
+        '18 of 742 Topic Segments were truncated to 256 tokens; later text in those segments was not modelled.',
+      ),
+    ).toBeInTheDocument();
   });
 });

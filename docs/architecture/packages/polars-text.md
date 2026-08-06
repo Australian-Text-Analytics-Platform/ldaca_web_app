@@ -30,8 +30,9 @@ flowchart LR
   locking; token and embedding schemas remain with their expression modules.
 - `src/concordance.rs` and `src/offsets.rs` own matching and Unicode offset
   conversion.
-- `src/topic_modeling/` owns native embedding, reduction, clustering, and
-  topic-label computation.
+- `src/topic_modeling/` owns Topic Segment construction, native embedding,
+  reduction, clustering, document roll-up, and c-TF-IDF topic-label
+  computation.
 
 Expression APIs preserve lazy execution. Direct PyO3 functions are reserved
 for operations that are not natural expressions, such as model inventory,

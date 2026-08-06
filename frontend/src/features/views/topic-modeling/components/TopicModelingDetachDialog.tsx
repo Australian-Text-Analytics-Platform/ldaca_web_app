@@ -54,7 +54,7 @@ export function TopicModelingDetachDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-[calc(100vw-2rem)] lg:max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Add Topic Modeling results to Workspace</DialogTitle>
+          <DialogTitle>Add Topic Modelling results to Workspace</DialogTitle>
           <DialogDescription>
             Creates topic-data and topic-meanings Data Blocks for each selected source.
             {selectedTopicCount === null

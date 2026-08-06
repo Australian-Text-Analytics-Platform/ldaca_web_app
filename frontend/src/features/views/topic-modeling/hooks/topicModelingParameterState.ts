@@ -1,4 +1,7 @@
+import type { TopicSegmentationMethod } from '@/api';
+
 export const DEFAULT_TOPIC_SIZE_VALUE = 10;
+export const DEFAULT_MAX_SEGMENT_TOKENS = 256;
 const DEFAULT_TOPIC_SAMPLE_PERCENT = 100;
 
 export interface CorpusSample {
@@ -14,6 +17,8 @@ export interface TopicModelingParameterState {
   randomSeedUserSet: boolean;
   representativeWordsCount: number;
   representativeWordsCountUserSet: boolean;
+  segmentationMethod: TopicSegmentationMethod;
+  maxSegmentTokens: number;
 }
 
 type TopicModelingParameterAction =
@@ -22,6 +27,8 @@ type TopicModelingParameterAction =
   | { type: 'setTopicSizeFromUser'; value: number }
   | { type: 'setRandomSeedFromUser'; value: number }
   | { type: 'setRepresentativeWordsCountFromUser'; value: number }
+  | { type: 'setSegmentationMethod'; value: TopicSegmentationMethod }
+  | { type: 'setMaxSegmentTokens'; value: number }
   | { type: 'hydrateRequest'; request: Record<string, unknown>; nodeDocCounts: number[] }
   | { type: 'resetAfterClear'; defaultSamples: CorpusSample[] };
 
@@ -40,7 +47,19 @@ export const createTopicModelingParameterState = (): TopicModelingParameterState
   randomSeedUserSet: false,
   representativeWordsCount: 15,
   representativeWordsCountUserSet: false,
+  segmentationMethod: 'automatic',
+  maxSegmentTokens: DEFAULT_MAX_SEGMENT_TOKENS,
 });
+
+export const sanitizeMaxSegmentTokens = (value: string | number | undefined): number => {
+  const raw = typeof value === 'number' ? value : Number(value);
+  const rounded = Number.isFinite(raw) ? Math.round(raw) : DEFAULT_MAX_SEGMENT_TOKENS;
+  return Math.min(510, Math.max(32, rounded));
+};
+
+const normalizeSegmentationMethod = (value: unknown): TopicSegmentationMethod => {
+  return value === 'paragraph' || value === 'sentence' ? value : 'automatic';
+};
 
 export const defaultCorpusSample = (): CorpusSample => {
   return { percent: String(DEFAULT_TOPIC_SAMPLE_PERCENT) };
@@ -135,6 +154,10 @@ export const topicModelingParameterReducer = (
         representativeWordsCount: action.value,
         representativeWordsCountUserSet: true,
       };
+    case 'setSegmentationMethod':
+      return { ...state, segmentationMethod: action.value };
+    case 'setMaxSegmentTokens':
+      return { ...state, maxSegmentTokens: sanitizeMaxSegmentTokens(action.value) };
     case 'hydrateRequest': {
       const hasSampling = Array.isArray(action.request.sample_fractions);
       return {
@@ -145,6 +168,10 @@ export const topicModelingParameterReducer = (
         representativeWordsCountUserSet: true,
         topicSizeValue: Number(action.request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
         topicSizeUserSet: true,
+        segmentationMethod: normalizeSegmentationMethod(action.request.segmentation_method),
+        maxSegmentTokens: sanitizeMaxSegmentTokens(
+          action.request.max_segment_tokens as number | undefined,
+        ),
         corpusSamples: hasSampling
           ? fractionsToSamples(action.request.sample_fractions, action.nodeDocCounts)
           : state.corpusSamples,

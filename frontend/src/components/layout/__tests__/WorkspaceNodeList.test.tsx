@@ -82,6 +82,9 @@ describe('WorkspaceNodeList', () => {
     expect(accentBox.style.borderLeftColor).not.toBe('');
     // The name is a sibling of the accent border, never overlaid by it.
     expect(screen.getByText('Corpus')).toBeInTheDocument();
+    expect(screen.getByTestId('node-name-left-fade').style.backgroundImage).toContain(
+      accentBox.style.backgroundColor,
+    );
   });
 
   it('defaults an uncoloured node to a grey spine and a background fill', () => {

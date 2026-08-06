@@ -225,7 +225,7 @@ reset after load, clone, import, close/reopen, or backend restart.
 
 Every valid Analysis resource includes required ordered `output_node_ids`.
 The list is empty until a publishing Analysis succeeds. Existing single-output
-operations return one ID; Topic Modeling detachment returns topic-data then
+operations return one ID; Topic Modelling detachment returns topic-data then
 topic-meanings IDs for each source in request order. The removed singular field
 is not accepted.
 

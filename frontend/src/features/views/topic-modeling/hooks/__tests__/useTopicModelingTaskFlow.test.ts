@@ -29,6 +29,8 @@ describe('useTopicModelingTaskFlow', () => {
         representativeWordsCount: 10,
         sampleFractions: null,
         minTopicSize: 5,
+        segmentationMethod: 'paragraph',
+        maxSegmentTokens: 64,
       },
       actions: {
         setIsRunning: vi.fn(),
@@ -45,7 +47,12 @@ describe('useTopicModelingTaskFlow', () => {
         path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
         body: expect.objectContaining({
           execution_scope: 'run_all',
-          request: expect.objectContaining({ kind: 'topic_modeling', node_ids: ['node-1'] }),
+          request: expect.objectContaining({
+            kind: 'topic_modeling',
+            node_ids: ['node-1'],
+            segmentation_method: 'paragraph',
+            max_segment_tokens: 64,
+          }),
         }),
       }),
     );

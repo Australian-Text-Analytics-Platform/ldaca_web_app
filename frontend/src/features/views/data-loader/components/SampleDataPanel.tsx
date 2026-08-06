@@ -26,7 +26,7 @@ const TOOL_LABELS: Record<string, string> = {
   'token-frequency': 'Token Frequency',
   preprocessing: 'Preprocessing',
   'data-loader': 'Data Loader',
-  'topic-modeling': 'Topic Modeling',
+  'topic-modeling': 'Topic Modelling',
   'sequential-analysis': 'Sequential Analysis',
 };
 

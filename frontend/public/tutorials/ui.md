@@ -17,7 +17,7 @@ The left sidebar lists the available tool modules. Click a tool name to switch t
 - [**Token Frequency**](./token-frequency.md) — count and explore the most common terms.
 - [**Concordance**](./concordance.md) — inspect search terms in their surrounding context.
 - [**Trends and Sequence**](./sequential-analysis.md) — count documents over time or any ordered numeric axis.
-- [**Topic Modelling**](./topic-modeling.md) — discover themes using BERTopic.
+- [**Topic Modelling**](./topic-modeling.md) — discover themes with native semantic clustering.
 - [**Quotation Extraction**](./quotation.md) — capture quoted speech with speaker and verb annotations.
 
 The edit icon next to the heading lets you customise which tools appear.

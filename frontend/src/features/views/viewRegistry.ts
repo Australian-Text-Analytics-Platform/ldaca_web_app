@@ -66,7 +66,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
   },
   {
     id: 'topic-modeling',
-    label: 'Topic Modeling',
+    label: 'Topic Modelling',
     icon: Puzzle,
     requiresWorkspace: true,
     ownsMainCard: true,

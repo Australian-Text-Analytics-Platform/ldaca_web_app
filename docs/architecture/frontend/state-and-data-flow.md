@@ -291,7 +291,7 @@ backend's `can_undo` and `can_redo` flags.
 Fetched Data Block metadata projects independent optional Document Column and
 Tokenizer Preferences. A fresh selector uses the applicable value only as its
 initial choice. Token Frequency and Concordance expose and immediately persist
-both controls; Quotation and Topic Modeling expose and persist only the
+both controls; Quotation and Topic Modelling expose and persist only the
 document column. No function writes a preference for a control it does not
 show.
 

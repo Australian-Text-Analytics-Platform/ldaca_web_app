@@ -12,7 +12,7 @@ describe('view registry', () => {
       'Frequency',
       'Concordance',
       'Trends',
-      'Topic Modeling',
+      'Topic Modelling',
       'Quotation',
       'Annotation',
       'Export',

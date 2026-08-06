@@ -39,7 +39,7 @@ Most operations (filtering, sampling, joining, stacking, detaching etc.) on a da
 
 - Data Loader: Upload your text files and load  the text corpus (e.g., interview transcripts, articles) into a project workspace.
 - Preprocessing: Use built-in cleaning tools to prepare your text, including removal of stopwords, stemming, and normalization.
-- Analysis Modules: Select from available tools — such as frequency analysis, quotation extractor, topic modeling or concordance analysis — to process your data.
+- Analysis Modules: Select from available tools — such as frequency analysis, quotation extraction, topic modelling, or concordance analysis — to process your data.
 -	Results Integration: Combine the findings from different modules to gain holistic insights, e.g., linking topics to historical trends.
 - Export & Share: Export your results in various formats (CSV, image or a whole zip archived workspace) and share with your collaborators.
 
@@ -54,7 +54,7 @@ Most operations (filtering, sampling, joining, stacking, detaching etc.) on a da
 1. **Create or load a workspace** so your work is saved together.
 2. **Upload files** or import sample data to explore quickly.
 3. **Clean and join** your data if needed.
-4. **Run analyses** like token frequency, concordance, or topic modeling.
+4. **Run analyses** like token frequency, concordance, or topic modelling.
 5. **Export** results for sharing or downstream work.
 
 > **Placeholder (image):** Add a hero screenshot of the workspace with highlighted side panels.
@@ -66,7 +66,7 @@ Most operations (filtering, sampling, joining, stacking, detaching etc.) on a da
 - [Data Preprocessing](./preprocessing.md) — filter, slice, join, stack, and create columns.
 - [Token frequency](./token-frequency.md) — count and explore common terms.
 - [Concordance](./concordance.md) — inspect terms in context.
-- [Topic modeling](./topic-modeling.md) — discover themes with BERTopic.
+- [Topic modelling](./topic-modeling.md) — discover themes with native semantic clustering.
 - [Sequential analysis](./sequential-analysis.md) — analyze sequences over time.
 - [Quotation extraction](./quotation.md) — capture quoted segments with context.
 - [Export](./export.md) — download tables or reports.

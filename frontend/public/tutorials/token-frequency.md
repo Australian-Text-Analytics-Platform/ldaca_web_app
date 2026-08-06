@@ -16,7 +16,7 @@ Use the data-block selector to choose which corpus (or corpora) to analyse. The 
 
 When two are selected, the tool runs in comparison mode and produces the Juxtorpus cloud and statistical measures in addition to the per-block results.
 
-For each selected block, choose the **text column** that contains the documents you want to count and a **tokenizer model** that defines the tokens. Only columns that hold plain text are available. Each choice is saved independently on that data block and initializes the corresponding control the next time you add it to a fresh Token Frequency or Concordance selector. Clearing one does not clear the other.
+For each selected block, choose the **text column** that contains the documents you want to count and a **tokenizer model** that defines the tokens. Only columns that hold plain text are available. Each choice is saved independently on that data block and initializes the corresponding control the next time you add it to a fresh Token Frequency or Concordance selector. If a block has no saved tokenizer preference, Token Frequency detects the selected column's language and automatically saves the first recommended tokenizer; Jieba is the first recommendation for Chinese text. Clearing one preference does not clear the other.
 
 Every Token Frequency run requires a tokenizer model for every selected data block. The Analysis stores the exact model mapping it used, so reopening a historical result does not substitute a tokenizer preference that was changed later.
 

@@ -27,6 +27,7 @@ import {
 import { createDefaultTopicModelingDetachColumns } from './components/topicModelingDetachState';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 import {
+  DEFAULT_MAX_SEGMENT_TOKENS,
   DEFAULT_TOPIC_SIZE_VALUE,
   normalizeTopicSampleFractions,
   useTopicModelingParameters,
@@ -36,7 +37,7 @@ import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 
 /**
- * Renders the topic-modeling workflow for live BERTopic runs and result exploration.
+ * Renders the native topic-modelling workflow and Result exploration.
  * Rendered by: the viewComponents tabbed loader, which mounts one instance per analysis tab and feeds it tab props.
  * Flow: read workspace/tab state, derive inputs and analysis parameters, wire hydration/run/clear callbacks, then render controls and results.
  *
@@ -94,6 +95,10 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     representativeWordsCount,
     representativeWordsCountUserSet,
     setRepresentativeWordsCountFromUser,
+    segmentationMethod,
+    setSegmentationMethod,
+    maxSegmentTokens,
+    setMaxSegmentTokens,
     nodeDocCounts,
     topicSizeWarning,
     showSamplingWarning,
@@ -176,6 +181,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     random_seed?: number;
     representative_words_count?: number;
     sample_fractions?: (number | null)[];
+    segmentation_method?: 'automatic' | 'paragraph' | 'sentence';
+    max_segment_tokens?: number;
   } | null;
 
   /**
@@ -246,6 +253,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     random_seed: randomSeed,
     min_topic_size: topicSizeValue,
     sample_fractions: sampleFractionsForRequest,
+    segmentation_method: segmentationMethod,
+    max_segment_tokens: maxSegmentTokens,
   };
   const serverTopicParams = (request: Record<string, unknown>) => ({
     random_seed: Number(request.random_seed),
@@ -254,6 +263,11 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       (request as unknown as { sample_fractions?: unknown }).sample_fractions,
       panelNodeIds.length,
     ),
+    segmentation_method:
+      request.segmentation_method === 'paragraph' || request.segmentation_method === 'sentence'
+        ? request.segmentation_method
+        : 'automatic',
+    max_segment_tokens: Number(request.max_segment_tokens ?? DEFAULT_MAX_SEGMENT_TOKENS),
   });
   const hasTopicChanges = !typedServerRequest
     ? true
@@ -342,9 +356,9 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         })),
       });
       setDetachDialogOpen(false);
-      toast.success('Topic Modeling detachment started.');
+      toast.success('Topic Modelling publication started.');
     } catch (cause) {
-      toast.error('Failed to add Topic Modeling results.', {
+      toast.error('Failed to add Topic Modelling results.', {
         description: cause instanceof Error ? cause.message : String(cause),
       });
     } finally {
@@ -363,6 +377,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       representativeWordsCount,
       sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
       minTopicSize: topicSizeValue,
+      segmentationMethod,
+      maxSegmentTokens,
     },
     actions: {
       setIsRunning,
@@ -456,6 +472,10 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           typedServerRequest ? Number(typedServerRequest.representative_words_count) || null : null
         }
         onRepresentativeWordsCountChange={setRepresentativeWordsCountFromUser}
+        segmentationMethod={segmentationMethod}
+        onSegmentationMethodChange={setSegmentationMethod}
+        maxSegmentTokens={maxSegmentTokens}
+        onMaxSegmentTokensChange={setMaxSegmentTokens}
         isRunning={isRunning}
         isStopping={isStopping}
         isClearing={isClearing}
@@ -497,6 +517,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           activeDomain={activeDomain}
           nodeNames={panelSelectedNodes.map((n) => n.name)}
           randomSeed={randomSeed}
+          maxSegmentTokens={maxSegmentTokens}
           onAddToWorkspace={openDetachDialog}
           isAddingToWorkspace={isDetaching}
         />

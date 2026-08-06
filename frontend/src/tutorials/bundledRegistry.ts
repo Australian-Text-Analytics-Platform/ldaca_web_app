@@ -349,12 +349,12 @@ const tutorial = {
   'analysis.topic-modeling.tab': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-section',
-    label: 'Topic modeling overview',
+    label: 'Topic modelling overview',
   },
   'analysis.topic-modeling.parameters': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-parameters',
-    label: 'Topic modeling parameters',
+    label: 'Topic modelling parameters',
   },
   'analysis.topic-modeling.clear-results': {
     file: 'tutorials/topic-modeling.md',
@@ -364,7 +364,7 @@ const tutorial = {
   'analysis.topic-modeling.results': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-results',
-    label: 'Topic modeling results',
+    label: 'Topic modelling results',
   },
   'analysis.topic-modeling.sampling': {
     file: 'tutorials/topic-modeling.md',
@@ -376,25 +376,20 @@ const tutorial = {
     anchor: 'help-topic-modeling-options',
     label: 'Topic parameters',
   },
-  'analysis.topic-modeling.topic-size-mode': {
+  'analysis.topic-modeling.segmentation-method': {
     file: 'tutorials/topic-modeling.md',
-    anchor: 'help-topic-modeling-topic-size-mode',
-    label: 'Topic size mode',
+    anchor: 'help-topic-modeling-segmentation-method',
+    label: 'Segmentation method',
   },
-  'analysis.topic-modeling.aim-topic-no': {
+  'analysis.topic-modeling.max-segment-tokens': {
     file: 'tutorials/topic-modeling.md',
-    anchor: 'help-topic-modeling-aim-topic-no',
-    label: 'Aim Topic No.',
+    anchor: 'help-topic-modeling-max-segment-tokens',
+    label: 'Maximum tokens per segment',
   },
   'analysis.topic-modeling.min-topic-size': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-min-topic-size',
     label: 'Min Topic Size',
-  },
-  'analysis.topic-modeling.exact-topic-no': {
-    file: 'tutorials/topic-modeling.md',
-    anchor: 'help-topic-modeling-exact-topic-no',
-    label: 'Exact Topic No.',
   },
   'analysis.topic-modeling.random-seed': {
     file: 'tutorials/topic-modeling.md',
@@ -527,7 +522,7 @@ const info = {
   'topic-modeling.overview': {
     file: 'information/topic-modeling.md',
     anchor: 'info-topic-modeling-overview',
-    label: 'About Topic Modeling',
+    label: 'About Topic Modelling',
   },
   'export.overview': {
     file: 'information/export.md',

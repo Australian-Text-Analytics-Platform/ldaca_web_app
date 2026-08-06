@@ -103,6 +103,13 @@ proportions are zero, and the proportions sum to approximately one. It is
 distinct from the single dominant topic assigned to the document.
 _Avoid_: variable topic list, dominant topic
 
+**Topic Segment**:
+The bounded span of source text embedded and clustered as one observation by
+Topic Modelling. A document may contribute one or many Topic Segments, whose
+assignments are rolled up into its Topic Distribution. In code and lower-level
+interfaces this unit may retain the established name `Chunk` or `n_chunks`.
+_Avoid_: document when referring to the model input, chunk in product copy
+
 **Artifact**:
 A named retained file owned by an Analysis and exposed without revealing its
 host filesystem path.

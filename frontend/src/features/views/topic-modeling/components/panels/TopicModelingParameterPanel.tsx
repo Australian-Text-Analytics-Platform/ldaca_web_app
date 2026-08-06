@@ -3,6 +3,14 @@ import { CircleHelp } from 'lucide-react';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { TopicSegmentationMethod } from '@/api';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import {
   NodeInputsPanel,
@@ -12,6 +20,7 @@ import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs'
 import {
   effectiveSampleDocumentCount,
   sanitizeSamplePercent,
+  sanitizeMaxSegmentTokens,
   type CorpusSample,
 } from '../../hooks/useTopicModelingParameters';
 
@@ -55,6 +64,10 @@ interface Props {
   /** Override for the tooltip on the locked "Words per topic" input. */
   representativeWordsCountLockedReason?: string;
   onRepresentativeWordsCountChange: (value: number) => void;
+  segmentationMethod: TopicSegmentationMethod;
+  onSegmentationMethodChange: (value: TopicSegmentationMethod) => void;
+  maxSegmentTokens: number;
+  onMaxSegmentTokensChange: (value: number) => void;
   isRunning: boolean;
   isStopping?: boolean;
   isClearing: boolean;
@@ -94,6 +107,10 @@ export function TopicModelingParameterPanel({
   representativeWordsCountServerMax = null,
   representativeWordsCountLockedReason,
   onRepresentativeWordsCountChange,
+  segmentationMethod,
+  onSegmentationMethodChange,
+  maxSegmentTokens,
+  onMaxSegmentTokensChange,
   isRunning,
   isStopping,
   isClearing,
@@ -155,6 +172,21 @@ export function TopicModelingParameterPanel({
     onRepresentativeWordsCountChange(clamped);
   };
 
+  const [maxSegmentTokensDraft, setMaxSegmentTokensDraft] = useState<NumericInputDraft>(() => ({
+    source: maxSegmentTokens,
+    value: String(maxSegmentTokens),
+  }));
+  const maxSegmentTokensValueDraft =
+    maxSegmentTokensDraft.source === maxSegmentTokens
+      ? maxSegmentTokensDraft.value
+      : String(maxSegmentTokens);
+
+  const handleMaxSegmentTokensBlur = (event: FocusEvent<HTMLInputElement>) => {
+    const next = sanitizeMaxSegmentTokens(event.currentTarget.value);
+    setMaxSegmentTokensDraft({ source: next, value: String(next) });
+    onMaxSegmentTokensChange(next);
+  };
+
   // Called by: NodeInputsPanel to place topic sampling next to each selected node's text column because sampling is per-corpus input context rather than a separate global option.
   const renderSamplingInput = ({ index, nodeId }: NodeInputColumnAddonArgs) => {
     const sample = corpusSamples[index] ?? { percent: '100' };
@@ -203,11 +235,11 @@ export function TopicModelingParameterPanel({
 
   return (
     <AnalysisCardLayout
-      title="Topic Modelling - BERTopic"
+      title="Topic Modelling"
       info={{
         targetKey: 'topic-modeling.overview',
-        label: 'About Topic Modeling',
-        tooltip: 'Learn what topic modeling is and how it can help you.',
+        label: 'About Topic Modelling',
+        tooltip: 'Learn what topic modelling is and how it can help you.',
       }}
       actions={{
         onRunAll: onRun,
@@ -255,6 +287,74 @@ export function TopicModelingParameterPanel({
 
       <div className="mt-4 px-3">
         <div className="flex flex-wrap items-end gap-4">
+          <div className="min-w-[11rem] space-y-1">
+            <Label
+              htmlFor="topic-segmentation-method"
+              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
+            >
+              Segmentation method
+              <span
+                aria-label="Segmentation method controls which text spans become Topic Segments"
+                title="Automatic packs nearby text and may overlap boundaries. Paragraph uses each non-empty line. Sentence uses Unicode sentence boundaries."
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
+              >
+                <CircleHelp className="h-4 w-4" />
+              </span>
+            </Label>
+            <Select
+              value={segmentationMethod}
+              onValueChange={(value) => {
+                onSegmentationMethodChange(value as TopicSegmentationMethod);
+              }}
+            >
+              <SelectTrigger
+                id="topic-segmentation-method"
+                aria-label="Segmentation method"
+                className="h-9 w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="automatic">Automatic</SelectItem>
+                <SelectItem value="paragraph">Paragraph</SelectItem>
+                <SelectItem value="sentence">Sentence</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-[12rem] space-y-1">
+            <Label
+              htmlFor="topic-max-segment-tokens"
+              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
+            >
+              Maximum tokens per segment
+              <span
+                aria-label="Tokens are model units and may be words or parts of words"
+                title="Sets the largest Topic Segment from 32 to 510 model tokens. Oversized Paragraph and Sentence segments keep their beginning and report truncation after the run."
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
+              >
+                <CircleHelp className="h-4 w-4" />
+              </span>
+            </Label>
+            <Input
+              id="topic-max-segment-tokens"
+              aria-label="Maximum tokens per segment"
+              type="number"
+              min={32}
+              max={510}
+              step={1}
+              value={maxSegmentTokensValueDraft}
+              className="h-9 w-full px-2 text-right text-sm"
+              onChange={(event) => {
+                setMaxSegmentTokensDraft({
+                  source: maxSegmentTokens,
+                  value: event.target.value,
+                });
+              }}
+              onBlur={handleMaxSegmentTokensBlur}
+            />
+          </div>
+
           {/* Minimum topic size (HDBSCAN min cluster size) */}
           <div className="min-w-[11rem] space-y-1">
             <Label

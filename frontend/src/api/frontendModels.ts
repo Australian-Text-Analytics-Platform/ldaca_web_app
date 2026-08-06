@@ -69,6 +69,7 @@ export type TopicModelingResponse = Omit<TopicModelingResult, 'topics'> & {
   data: {
     topics: TopicModelingResult['topics'];
     corpus_sizes: number[];
+    meta: TopicModelingResult['meta'];
     per_corpus_topic_counts?: Record<string, number>[] | null;
   };
 };

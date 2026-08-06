@@ -3838,6 +3838,10 @@ export type TopicMetadata = {
      */
     total_topics_incl_outlier?: number | null;
     /**
+     * Truncated Segment Count
+     */
+    truncated_segment_count?: number | null;
+    /**
      * Vectorizer Model
      */
     vectorizer_model?: string | null;
@@ -3851,6 +3855,10 @@ export type TopicModelingAnalysisRequest = {
      * Kind
      */
     kind?: 'topic_modeling';
+    /**
+     * Max Segment Tokens
+     */
+    max_segment_tokens?: number;
     /**
      * Min Topic Size
      */
@@ -3877,6 +3885,7 @@ export type TopicModelingAnalysisRequest = {
      * Sample Fractions
      */
     sample_fractions?: Array<number | null> | null;
+    segmentation_method?: TopicSegmentationMethod;
 };
 
 /**
@@ -4032,6 +4041,11 @@ export type TopicModelingResultQuery = {
      */
     topic_ids?: Array<number> | null;
 };
+
+/**
+ * TopicSegmentationMethod
+ */
+export type TopicSegmentationMethod = 'automatic' | 'paragraph' | 'sentence';
 
 /**
  * TopicStageTiming

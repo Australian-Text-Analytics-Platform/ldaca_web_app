@@ -116,6 +116,10 @@ const baseProps = {
   representativeWordsCount: 5,
   representativeWordsCountUserSet: false,
   onRepresentativeWordsCountChange: vi.fn(),
+  segmentationMethod: 'automatic' as const,
+  onSegmentationMethodChange: vi.fn(),
+  maxSegmentTokens: 256,
+  onMaxSegmentTokensChange: vi.fn(),
   isRunning: false,
   isClearing: false,
   onRun: vi.fn(),
@@ -129,7 +133,28 @@ describe('TopicModelingParameterPanel', () => {
 
     expect(screen.getByLabelText('Random Seed')).toBeInTheDocument();
     expect(screen.getByLabelText('Words per topic')).toBeInTheDocument();
+    expect(screen.getByLabelText('Segmentation method')).toBeInTheDocument();
+    expect(screen.getByLabelText('Maximum tokens per segment')).toHaveValue(256);
     expect(screen.queryByText('Topic Modelling Options')).not.toBeInTheDocument();
+  });
+
+  it('commits maximum tokens per segment within the supported model window', () => {
+    const onMaxSegmentTokensChange = vi.fn();
+    render(
+      <TopicModelingParameterPanel
+        {...baseProps}
+        onMaxSegmentTokensChange={onMaxSegmentTokensChange}
+      />,
+    );
+
+    const input = screen.getByLabelText<HTMLInputElement>('Maximum tokens per segment');
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    expect(onMaxSegmentTokensChange).toHaveBeenLastCalledWith(32);
+
+    fireEvent.change(input, { target: { value: '999' } });
+    fireEvent.blur(input);
+    expect(onMaxSegmentTokensChange).toHaveBeenLastCalledWith(510);
   });
 
   it('keeps the raw topic size value input while editing', () => {
