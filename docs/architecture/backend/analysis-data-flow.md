@@ -171,8 +171,10 @@ Concordance and Quotation Run All retain one row per matching source document.
 The row carries source metadata, an internal stable source-row ID, and a nested
 list of Concordance Matches or quotation extracts. Explicit document and match
 projection resources expose deterministic Arrow pages without changing the
-stored Result. Result Publication explodes the same nested artifact and emits
-one flat row per match or extract.
+stored Result. Concordance adds a filtered document query whose exact-term and
+relative-bin predicate runs before count, sort, and page. Match Publication
+explodes the artifact; Document Publication reuses the document filter and
+keeps stable source-row identity. Quotation Result Publication remains flat.
 
 Concordance density is a separate side-effect-free projection over the complete
 immutable child Result. It returns exact-match series in 100 fixed relative

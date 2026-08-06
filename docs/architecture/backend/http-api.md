@@ -95,11 +95,15 @@ boundary only as Arrow IPC streams with media type
 - a complete immutable Result table has one URL and one self-contained stream;
 - an open-ended table has independent schema and row-page URLs;
 - a nested Concordance or Quotation Run All table has explicit document and
-  match schema/page URLs; its row unit is part of the resource identity;
+  match schema/page URLs; Concordance additionally exposes a side-effect-free
+  filtered document-query endpoint for exact-term exclusions and relative
+  position bins;
 - whole-Result Concordance density is a small JSON semantic summary and does
   not vary with page, sort, or row unit;
 - each page is a complete stream and uses `X-Wordflow-Has-Next` for one-row
-  lookahead pagination, without an expensive total-count query;
+  lookahead pagination. The filtered Concordance document query also returns
+  `X-Wordflow-Total-Rows` because its filter-aware pager requires an exact
+  qualifying-source-row count;
 - a schema response is a zero-row stream, so schema and row decoding use one
   transport and one frontend library;
 - Data Block metadata resources do not duplicate column names or stringified

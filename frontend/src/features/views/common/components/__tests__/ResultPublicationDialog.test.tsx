@@ -51,4 +51,44 @@ describe('ResultPublicationDialog', () => {
       },
     ]);
   });
+
+  it('publishes only checked document sources and locks extraction on', () => {
+    const onSubmit = vi.fn();
+    const source = (id: string, name: string) => ({
+      node_id: id,
+      node_name: name,
+      document_column: 'text',
+      metadata_columns: ['speaker'],
+      analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
+      internal_columns: ['__wordflow_source_row_id'],
+      record_count: 0,
+      table: { table_id: `${id}-result`, rows_url: '/rows', schema_url: '/schema' },
+    });
+    render(
+      <ResultPublicationDialog
+        open
+        onOpenChange={vi.fn()}
+        title="Add Documents"
+        nameSuffix="concordance_documents"
+        sources={[source('node-1', 'First'), source('node-2', 'Second')]}
+        isSubmitting={false}
+        mode="document"
+        allowSourceSelection
+        onSubmit={onSubmit}
+      />,
+    );
+
+    expect(screen.getAllByRole('checkbox', { name: /CONC_extraction.*required/i })).toHaveLength(2);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Second' }));
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'speaker' })[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Workspace' }));
+
+    expect(onSubmit).toHaveBeenCalledWith([
+      {
+        source_node_id: 'node-1',
+        selected_columns: ['text', 'CONC_extraction', 'speaker'],
+        new_node_name: 'First_concordance_documents',
+      },
+    ]);
+  });
 });

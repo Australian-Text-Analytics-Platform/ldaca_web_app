@@ -211,22 +211,29 @@ and is never written into Query data.
 Concordance and Quotation Review query explicit document or match projections
 of immutable Analysis tables. Run All therefore creates no graph node and
 Review does not depend on Workspace SQL. Concordance Table View always pages by
-matches. Dispersion View and Quotation Review can page by documents or matches;
-changing the unit resets that Result table to page one. `CONC_dispersion`
-remains frontend presentation state rather than a stored column.
+matches, Concordance Dispersion View always pages by qualifying source rows,
+and Quotation Review retains its existing projection controls.
+`CONC_dispersion` remains frontend presentation state rather than a stored
+column.
 
 Concordance Review fetches whole-Result density only while Dispersion View is
 active. Its TanStack Query key is Workspace, child Analysis, and table identity,
-excluding page, sort, and row unit. The frontend reaggregates the backend's 100
-fixed bins into the selected display resolution, so changing a Review table
-page never changes the density chart.
+excluding page and sort. The frontend reaggregates the backend's exact-term
+100-bin series into the selected display resolution. Exact, case-sensitive
+term exclusions and selected bins are included in each document-projection
+query key, reset that source to page one, and filter before sorting, counting,
+and paging. Separated mode keeps those filters per source. Combined mode owns
+one frontend-only filter and sends it independently to each source.
 
 Two-source Concordance Run All appears as one thin Run All root with one
 Supporting Analysis per source. The forest projection keeps that relationship
 generic; Concordance interprets the group for progress and ordered Review.
 **Add to Workspace** opens the shared Result Publication dialog and submits one
-typed Supporting Analysis under the successful Run All parent. Only successful
-publication invalidates the Workspace graph.
+typed Supporting Analysis under the successful Run All parent. Table View
+submits Concordance Match Publication; Dispersion View submits Concordance
+Document Publication with its active term and bin filter. Concordance lets the
+user include or exclude each source before submitting the atomic publication.
+Only successful publication invalidates the Workspace graph.
 
 The active Tab is device-local presentation state, stored in localStorage by
 Workspace and analysis kind. Returning to an analysis view or reloading the
@@ -307,9 +314,11 @@ tokenizer-model mappings, plus Concordance search mode, come from the immutable
 Analysis request and replace selector defaults, including explicit absence.
 They also participate in re-run change detection. Token Frequency passes its
 exact submitted tokenizer mapping into a Concordance handoff instead of
-consulting current Data Block preferences. On a fresh Concordance selection,
-Tokens mode is selected automatically when every selected Data Block has a
-model unless the user explicitly chose Text mode.
+consulting current Data Block preferences. Fresh Concordance selections remain
+in Text mode even when every selected Data Block has a model. Selecting Tokens
+mode explicitly enables the tokenizer selectors; execution then requires a
+model for every selected source. Reopening an existing Analysis restores the
+search mode captured in its request.
 
 ## Documentation Registry
 

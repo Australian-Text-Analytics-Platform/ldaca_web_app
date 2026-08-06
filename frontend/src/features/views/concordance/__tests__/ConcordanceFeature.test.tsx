@@ -28,6 +28,7 @@ let mockInitialResult: Record<string, unknown> | null = null;
 let mockAnalysisState: 'successful' | null = null;
 let mockRunAllAnalysis: Record<string, unknown> | null = null;
 let mockIsPreviewRunning = false;
+let mockTokenizerModel: string | null = null;
 let latestAnalysisFeatureConfig: {
   onRequest?: (request: unknown) => void | Promise<void>;
 } | null = null;
@@ -82,9 +83,19 @@ vi.mock('../../common/nodeInputs', () => ({
     canAddMore: true,
     graphSelectedIds: [],
     workspaceId: 'ws-1',
-    nodeInfoById: { 'node-1': { id: 'node-1', name: 'Node 1' } },
+    nodeInfoById: {
+      'node-1': {
+        id: 'node-1',
+        name: 'Node 1',
+        tokenizer_model: mockTokenizerModel,
+      },
+    },
     getColumnInfos: vi.fn(() => [{ name: 'text', dataType: 'string' }]),
-    getNodeInfo: vi.fn(() => ({ id: 'node-1', name: 'Node 1' })),
+    getNodeInfo: vi.fn(() => ({
+      id: 'node-1',
+      name: 'Node 1',
+      tokenizer_model: mockTokenizerModel,
+    })),
   }),
 }));
 
@@ -420,6 +431,7 @@ describe('ConcordanceFeature', () => {
     mockAnalysisState = null;
     mockRunAllAnalysis = null;
     mockIsPreviewRunning = false;
+    mockTokenizerModel = null;
     latestAnalysisFeatureConfig = null;
     queryWorkspaceSqlTableMock.mockReset();
     getAnalysisResultMock.mockReset();
@@ -441,6 +453,25 @@ describe('ConcordanceFeature', () => {
       etag: 'default-etag',
     });
     clearResultsMock.mockResolvedValue(true);
+  });
+
+  it('starts in Text mode and enables tokenizer selectors only after Tokens is selected', () => {
+    mockTokenizerModel = 'native:plain_words_en';
+    const { unmount } = renderConcordanceFeature();
+
+    const tokenizerSelectors = screen.getAllByRole('combobox', { name: 'Tokenizer model' });
+    expect(tokenizerSelectors.length).toBeGreaterThan(0);
+    tokenizerSelectors.forEach((selector) => {
+      expect(selector).toBeDisabled();
+    });
+
+    fireEvent.click(screen.getAllByRole('tab', { name: 'Tokens' })[0]!);
+
+    screen.getAllByRole('combobox', { name: 'Tokenizer model' }).forEach((selector) => {
+      expect(selector).toBeEnabled();
+    });
+
+    unmount();
   });
 
   it('restores the persisted Analysis Data Blocks into the owning Tab input set', async () => {

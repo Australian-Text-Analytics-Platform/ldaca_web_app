@@ -10,7 +10,7 @@ const flushDeferredState = async () => {
 };
 
 describe('useConcordanceTokenizerMode', () => {
-  it('starts in regex mode until every selected column has a tokenizer model', async () => {
+  it('keeps Text mode as the default when every selected column gains a tokenizer model', async () => {
     const { result, rerender } = renderHook(
       ({ liveModel }: { liveModel?: string }) =>
         useConcordanceTokenizerMode({
@@ -27,16 +27,16 @@ describe('useConcordanceTokenizerMode', () => {
     );
 
     expect(result.current.searchMode).toBe('regex');
-    expect(result.current.tokensModeAvailable).toBe(false);
+    expect(result.current.tokensModeAvailable).toBe(true);
 
     rerender({ liveModel: 'native:plain_words_en' });
     await flushDeferredState();
 
     expect(result.current.tokensModeAvailable).toBe(true);
-    expect(result.current.searchMode).toBe('tokens');
+    expect(result.current.searchMode).toBe('regex');
   });
 
-  it('preserves a user-selected regex mode while token mode remains available', async () => {
+  it('allows the user to select Tokens mode when every input has a model', async () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],
@@ -52,15 +52,15 @@ describe('useConcordanceTokenizerMode', () => {
     await flushDeferredState();
 
     act(() => {
-      result.current.setSearchModeFromUser('regex');
+      result.current.setSearchModeFromUser('tokens');
     });
     await flushDeferredState();
 
     expect(result.current.tokensModeAvailable).toBe(true);
-    expect(result.current.searchMode).toBe('regex');
+    expect(result.current.searchMode).toBe('tokens');
   });
 
-  it('forces regex mode again when token models stop covering the selected columns', async () => {
+  it('keeps Tokens selectable when tokenizer model coverage disappears', async () => {
     const { result, rerender } = renderHook(
       ({ hasModel }: { hasModel: boolean }) =>
         useConcordanceTokenizerMode({
@@ -76,12 +76,12 @@ describe('useConcordanceTokenizerMode', () => {
       { initialProps: { hasModel: true } },
     );
     await flushDeferredState();
-    expect(result.current.searchMode).toBe('tokens');
+    expect(result.current.searchMode).toBe('regex');
 
     rerender({ hasModel: false });
     await flushDeferredState();
 
-    expect(result.current.tokensModeAvailable).toBe(false);
+    expect(result.current.tokensModeAvailable).toBe(true);
     expect(result.current.searchMode).toBe('regex');
   });
 
@@ -101,7 +101,7 @@ describe('useConcordanceTokenizerMode', () => {
     expect(result.current.effectiveTokenizerModelsByNode).toEqual({
       'node-a': 'native:plain_words_en',
     });
-    expect(result.current.searchMode).toBe('tokens');
+    expect(result.current.searchMode).toBe('regex');
 
     act(() => {
       result.current.recordTokenizerModel('node-a', '');
@@ -139,10 +139,10 @@ describe('useConcordanceTokenizerMode', () => {
     await flushDeferredState();
 
     expect(result.current.effectiveTokenizerModelsByNode).toEqual({ 'node-a': '' });
-    expect(result.current.tokensModeAvailable).toBe(false);
+    expect(result.current.tokensModeAvailable).toBe(true);
   });
 
-  it('keeps hydrated tokens mode when hydration precedes the initial deferred auto-mode update', async () => {
+  it('keeps the explicit Tokens mode stored in a hydrated Analysis request', async () => {
     const { result } = renderHook(() =>
       useConcordanceTokenizerMode({
         effectiveNodeColumnSelections: [{ nodeId: 'node-a', column: 'text' }],

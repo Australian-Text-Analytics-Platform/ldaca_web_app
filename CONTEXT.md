@@ -89,11 +89,22 @@ user-selected columns of a successful parent Analysis Result. Computing a
 Result and publishing it to the Workspace are separate operations.
 _Avoid_: detach action, automatic Run All output
 
+**Concordance Match Publication**:
+The Table View publication that explodes a nested Concordance Result and emits
+one Derived Data Block row per Concordance Match.
+_Avoid_: generic Concordance Result Publication
+
+**Concordance Document Publication**:
+The Dispersion View publication that keeps stable source-row identity, applies
+the exact visible-term and selected-bin Review filter, and emits one row per
+qualifying source document with a newline-joined `CONC_extraction`.
+_Avoid_: dispersion detachment, grouping by document text
+
 **Concordance Match**:
 One matched span in one source document, identified by its exact matched text
 and character offsets. A matching document may contain multiple Concordance
-Matches; Review may page either unit, while Result Publication always emits
-one row per Concordance Match.
+Matches. Table View and Match Publication use this unit; Dispersion View and
+Document Publication use the stable source-document unit.
 _Avoid_: document hit, dispersion row, cached line
 
 **Topic Distribution**:
@@ -296,5 +307,5 @@ _Avoid_: prediction column, hidden review state
   All is an independent Run-All-scoped Analysis that edits the selected source
   column in place.
 - Concordance and Quotation Run All retain immutable Result tables and do not
-  change the Data Block graph. A separate Result Publication may create Derived
-  Data Blocks from selected Result columns.
+  change the Data Block graph. Concordance exposes named Match and Document
+  Publications; Quotation retains Result Publication.

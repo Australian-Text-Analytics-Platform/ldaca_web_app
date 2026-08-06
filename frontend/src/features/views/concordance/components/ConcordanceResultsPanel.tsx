@@ -16,6 +16,7 @@ import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
+import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
 
 interface Section {
   columns: string[];
@@ -41,6 +42,8 @@ interface ConcordanceResultsDisplay {
   dispersionChartMode: ConcordanceDispersionChartMode;
   setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
+  excludedMatchedTexts: Record<string, Set<string>>;
+  onToggleMatchedText: (blockKey: string, matchedText: string) => void;
   onBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
   onBinRangeSelect: (
     blockKey: string,
@@ -51,8 +54,6 @@ interface ConcordanceResultsDisplay {
   onClearBinSelection: (blockKey: string) => void;
   binCount: DispersionDisplayBinCount;
   setBinCount: (value: DispersionDisplayBinCount) => void;
-  reviewDispersionRowUnit: 'documents' | 'matches';
-  setReviewDispersionRowUnit: Dispatch<SetStateAction<'documents' | 'matches'>>;
 }
 
 interface ConcordanceResultsMetadata {
@@ -131,13 +132,13 @@ export function ConcordanceResultsPanel({
     dispersionChartMode,
     setDispersionChartMode,
     selectedBinIndices,
+    excludedMatchedTexts,
+    onToggleMatchedText,
     onBinSelect,
     onBinRangeSelect,
     onClearBinSelection,
     binCount,
     setBinCount,
-    reviewDispersionRowUnit,
-    setReviewDispersionRowUnit,
   },
   metadata: {
     showMetadata,
@@ -168,6 +169,27 @@ export function ConcordanceResultsPanel({
   commands: { handleSort, handlePageChange, handleRowClick },
 }: ConcordanceResultsPanelProps) {
   const showDispersion = concordanceView === 'dispersion';
+  const previewTermLabels = Object.values(results.data).flatMap((node) =>
+    node.data.flatMap((group) =>
+      group.flatMap((row) => {
+        const value = row[CONCORDANCE_COLUMN_KEYS.matchedText];
+        return typeof value === 'string' && value ? [value] : [];
+      }),
+    ),
+  );
+  const termColors = Object.fromEntries(
+    Array.from(
+      new Set(
+        isReview
+          ? Object.values(reviewDensityByNode).flatMap((density) =>
+              density.series.map((item) => item.label),
+            )
+          : previewTermLabels,
+      ),
+    )
+      .sort((left, right) => left.localeCompare(right))
+      .map((label, index) => [label, defaultPalette[index % defaultPalette.length] ?? '#0284c7']),
+  );
 
   return (
     <Card ref={resultsRef}>
@@ -239,26 +261,6 @@ export function ConcordanceResultsPanel({
           </div>
           {showDispersion ? (
             <div className="flex flex-wrap items-center gap-4">
-              {isReview ? (
-                <fieldset className="flex items-center gap-3 text-sm">
-                  <legend className="sr-only">Page dispersion by</legend>
-                  <span>Page by:</span>
-                  {(['documents', 'matches'] as const).map((unit) => (
-                    <label key={unit} className="flex items-center gap-1.5">
-                      <input
-                        type="radio"
-                        name="concordance-review-row-unit"
-                        value={unit}
-                        checked={reviewDispersionRowUnit === unit}
-                        onChange={() => {
-                          setReviewDispersionRowUnit(unit);
-                        }}
-                      />
-                      {unit === 'documents' ? 'Documents' : 'Matches'}
-                    </label>
-                  ))}
-                </fieldset>
-              ) : null}
               <label className="flex items-center gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
@@ -335,7 +337,11 @@ export function ConcordanceResultsPanel({
                     combinedPage,
                     combinedLoading,
                     nodeLoading,
-                    reviewRowUnit: isReview ? reviewDispersionRowUnit : null,
+                    reviewRowUnit: isReview ? ('documents' as const) : null,
+                    interactiveFilters: isReview,
+                    excludedMatchedTexts,
+                    onToggleMatchedText,
+                    termColors,
                     densitySeries: isReview
                       ? nodeName === CONCORDANCE_COMBINED_NODE_KEY
                         ? Object.entries(reviewDensityByNode).flatMap(([nodeId, density]) => {

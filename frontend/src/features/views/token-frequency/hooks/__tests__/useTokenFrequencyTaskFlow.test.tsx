@@ -153,7 +153,7 @@ describe('useTokenFrequencyTaskFlow', () => {
               'node-2': 'lindera:jieba',
             },
             search_word: 'hello',
-            search_mode: 'tokens',
+            search_mode: 'regex',
           }),
         }),
         path: { workspace_id: 'workspace-1', tab_id: 'concordance-tab' },

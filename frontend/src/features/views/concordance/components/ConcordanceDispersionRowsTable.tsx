@@ -29,6 +29,7 @@ interface Props {
   sourceColor?: string;
   sourceColorMap?: Record<string, string>;
   defaultPalette?: string[];
+  termColors?: Record<string, string>;
   getRowClassName: (row: ConcordanceDispersionRow, index: number) => string;
   getRowStyle?: (row: ConcordanceDispersionRow, index: number) => CSSProperties | undefined;
   onRowClick: (row: ConcordanceDispersionRow) => void;
@@ -54,6 +55,7 @@ export function ConcordanceDispersionRowsTable({
   sourceColor,
   sourceColorMap,
   defaultPalette,
+  termColors,
   getRowClassName,
   getRowStyle,
   onRowClick,
@@ -119,6 +121,7 @@ export function ConcordanceDispersionRowsTable({
                       sourceColor={sourceColor}
                       sourceColorMap={sourceColorMap}
                       defaultPalette={defaultPalette}
+                      termColors={termColors}
                     />
                   ) : (
                     toCellText(row[columnKey])

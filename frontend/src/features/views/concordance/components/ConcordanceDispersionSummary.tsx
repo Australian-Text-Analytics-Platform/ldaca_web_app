@@ -50,13 +50,12 @@ import {
   type ChartExportLegendItem,
   type ChartImageFormat,
 } from '@/lib/chartExport';
+import { VIZ_PALETTE } from '../../common/vizPalette';
 import {
   CONCORDANCE_DISPERSION_CHART_MODES,
   buildDispersionBins,
   buildDispersionBinsFromDensitySeries,
-  DISPERSION_AGGREGATE_KEY,
   DISPERSION_DISPLAY_BIN_COUNTS,
-  DISPERSION_SOURCE_DELIMITER,
   type ConcordanceDispersionChartMode,
   type ConcordanceDispersionRow,
   type DispersionDisplayBinCount,
@@ -79,8 +78,6 @@ interface Props {
   onBinCountChange?: (value: DispersionDisplayBinCount) => void;
   /** Effective Node.color for a single-source aggregate chart. */
   sourceColor?: string;
-  /** Effective source-label to Node.color map for source-split charts. */
-  sourceColors?: Record<string, string>;
   /** Click-to-select bins. Omitted = selection disabled. */
   selection?: {
     selectedIndices: ReadonlySet<number>;
@@ -89,6 +86,9 @@ interface Props {
     onClear: () => void;
   };
   densitySeries?: ConcordanceDensitySeriesInput[];
+  termColors?: Record<string, string>;
+  excludedMatchedTexts?: ReadonlySet<string>;
+  onToggleMatchedText?: (matchedText: string) => void;
 }
 
 interface DispersionChartSeries {
@@ -100,6 +100,9 @@ interface DispersionChartSeries {
   label?: string;
   /** Recharts `strokeDasharray` string. Undefined = solid. */
   dash?: string;
+  matchedText: string;
+  hidden: boolean;
+  countLabel: string;
 }
 
 interface ChartPointerState {
@@ -116,7 +119,6 @@ interface DragSelection {
 }
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
-const AGGREGATE_LINE_LABEL = 'All matches';
 const X_AXIS_TICKS = [0, 20, 40, 60, 80, 100];
 const CHART_HEIGHT = 240;
 const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
@@ -148,24 +150,14 @@ const formatBinRange = (binCenter: number, binCount: number): string => {
   return `${lower.toFixed(1)}-${upper.toFixed(1)}%`;
 };
 
-const SOURCE_DASH_STYLES: (string | undefined)[] = [undefined, '6 4'];
-
 /** Used by: ConcordanceDispersionSummary chart axis to format ticks as relative-position percentages. */
 const formatTickLabel = (value: number): string => {
   if (!Number.isFinite(value)) return '';
   return `${String(Math.round(value))}%`;
 };
 
-/** Resolves source-node chart colours from exact or normalized labels before falling back to the current aggregate colour. */
-const resolveSourceColor = (
-  sourceColors: Record<string, string> | undefined,
-  source: string,
-  fallback: string,
-): string => sourceColors?.[source] ?? sourceColors?.[source.toLowerCase()] ?? fallback;
-
 /** Mirrors ChartContainer's CSS-variable slug so lines can use shadcn chart theme variables. */
-const chartColorVar = (key: string): string =>
-  `var(--color-${key.toLowerCase().replace(/[^a-z0-9]+/g, '-')})`;
+const chartColorVar = (key: string): string => `var(--color-${key.replace(/[^a-zA-Z0-9]+/g, '-')})`;
 
 /** Builds cumulative running totals from the density-bin rows for the stepped cumulative figure. */
 const buildCumulativeChartData = (
@@ -216,9 +208,11 @@ export function ConcordanceDispersionSummary({
   onChartModeChange,
   onBinCountChange,
   sourceColor,
-  sourceColors,
   selection,
   densitySeries,
+  termColors = {},
+  excludedMatchedTexts = new Set<string>(),
+  onToggleMatchedText,
 }: Props) {
   const controlId = useId();
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -228,7 +222,7 @@ export function ConcordanceDispersionSummary({
   const [chartMenuOpen, setChartMenuOpen] = useState(false);
   const [cumulativeOptionOpen, setCumulativeOptionOpen] = useState(false);
 
-  const { bins, sources } = useMemo(() => {
+  const { bins, totalsByKey, labelsByKey, sources } = useMemo(() => {
     if (densitySeries) {
       return buildDispersionBinsFromDensitySeries(densitySeries, binCount, {
         splitBySource,
@@ -240,23 +234,50 @@ export function ConcordanceDispersionSummary({
   }, [rows, textColumn, binCount, splitBySource, densitySeries]);
 
   const scopeText = densitySeries
-    ? 'aggregated matches at relative locations across the entire Result'
-    : 'aggregated matches at relative locations of documents from page above';
+    ? 'exact-term matches at relative locations across the entire Result'
+    : 'exact-term matches at relative locations of documents from page above';
   const titleText = `${dataBlockLabel}: ${scopeText}`;
   const chartTitle = `${CHART_MODE_LABELS[chartMode]} dispersion`;
 
-  const series: DispersionChartSeries[] = useMemo(() => {
-    const aggregateColor = sourceColor ?? AGGREGATE_DEFAULT_COLOR;
-    if (splitBySource && sources.length > 0) {
-      return sources.map((src, idx) => ({
-        key: `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${src}`,
-        color: resolveSourceColor(sourceColors, src, aggregateColor),
-        dash: SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length],
-        label: `${AGGREGATE_LINE_LABEL} (${src})`,
-      }));
-    }
-    return [{ key: DISPERSION_AGGREGATE_KEY, color: aggregateColor, label: AGGREGATE_LINE_LABEL }];
-  }, [sourceColor, sourceColors, splitBySource, sources]);
+  const allSeries: DispersionChartSeries[] = useMemo(() => {
+    const selected = selection?.selectedIndices ?? new Set<number>();
+    return Object.entries(labelsByKey)
+      .sort((left, right) => left[1].localeCompare(right[1]))
+      .map(([key, matchedText], index) => {
+        const total = totalsByKey[key] ?? 0;
+        const selectedTotal =
+          selected.size === 0
+            ? total
+            : bins.reduce(
+                (sum, bin, binIndex) => (selected.has(binIndex) ? sum + (bin[key] ?? 0) : sum),
+                0,
+              );
+        return {
+          key,
+          matchedText,
+          color:
+            termColors[matchedText] ??
+            VIZ_PALETTE[index % VIZ_PALETTE.length] ??
+            sourceColor ??
+            AGGREGATE_DEFAULT_COLOR,
+          label: matchedText,
+          hidden: excludedMatchedTexts.has(matchedText),
+          countLabel:
+            selected.size === 0
+              ? `${matchedText} (${String(total)})`
+              : `${matchedText} (${String(selectedTotal)}/${String(total)})`,
+        };
+      });
+  }, [
+    bins,
+    excludedMatchedTexts,
+    labelsByKey,
+    selection?.selectedIndices,
+    sourceColor,
+    termColors,
+    totalsByKey,
+  ]);
+  const series = allSeries.filter((item) => !item.hidden);
 
   const chartData = useMemo(
     () => (chartMode === 'cumulative' ? buildCumulativeChartData(bins, series) : bins),
@@ -397,11 +418,11 @@ export function ConcordanceDispersionSummary({
     ];
     const legendType: ChartExportLegendItem['type'] =
       chartMode === 'density-bar' ? 'bar' : chartMode === 'density-area' ? 'area' : 'line';
-    const legend: ChartExportLegendItem[] = series.map((item) => ({
-      label: item.label ?? AGGREGATE_LINE_LABEL,
+    const legend: ChartExportLegendItem[] = allSeries.map((item) => ({
+      label: item.countLabel,
       color: item.color,
       type: legendType,
-      hidden: false,
+      hidden: item.hidden,
     }));
     try {
       await downloadChartAs(svg, {
@@ -673,30 +694,29 @@ export function ConcordanceDispersionSummary({
         <div className="flex flex-wrap items-center gap-2 text-foreground">
           <span>{titleText}</span>
         </div>
-        {splitBySource && sources.length > 0 && (
-          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            {sources.map((src, idx) => {
-              const dash = SOURCE_DASH_STYLES[idx % SOURCE_DASH_STYLES.length];
-              const color = resolveSourceColor(sourceColors, src, 'currentColor');
-              return (
-                <span key={src} className="flex items-center gap-2">
-                  <svg width="22" height="6" aria-hidden="true">
-                    <line
-                      x1="0"
-                      y1="3"
-                      x2="22"
-                      y2="3"
-                      stroke={color}
-                      strokeWidth="2"
-                      strokeDasharray={dash}
-                    />
-                  </svg>
-                  <span>{src}</span>
-                </span>
-              );
-            })}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {allSeries.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`flex items-center gap-2 rounded px-1 py-0.5 ${
+                item.hidden ? 'opacity-50 line-through' : ''
+              }`}
+              disabled={!onToggleMatchedText}
+              aria-pressed={item.hidden}
+              onClick={() => {
+                onToggleMatchedText?.(item.matchedText);
+              }}
+            >
+              <span
+                className="inline-block h-0.5 w-5"
+                style={{ backgroundColor: item.color }}
+                aria-hidden="true"
+              />
+              <span>{item.countLabel}</span>
+            </button>
+          ))}
+        </div>
       </CardFooter>
       <ChartImageDownloadDialog
         open={downloadDialogOpen}

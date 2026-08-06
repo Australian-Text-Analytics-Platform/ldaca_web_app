@@ -45,6 +45,7 @@ export interface ArrowTableData {
 
 export interface ArrowTablePage extends ArrowTableData {
   hasNext: boolean;
+  totalRows: number | null;
   etag: string | null;
 }
 
@@ -146,6 +147,12 @@ export const decodeArrowPage = async (
 ): Promise<ArrowTablePage> => ({
   ...(await decodeArrowTable(source)),
   hasNext: response.headers.get('X-Wordflow-Has-Next') === 'true',
+  totalRows: (() => {
+    const raw = response.headers.get('X-Wordflow-Total-Rows');
+    if (raw === null) return null;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  })(),
   etag: response.headers.get('ETag'),
 });
 

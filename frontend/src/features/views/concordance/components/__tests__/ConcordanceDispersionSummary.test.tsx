@@ -185,12 +185,52 @@ describe('ConcordanceDispersionSummary', () => {
 
     expect(
       screen.getAllByText(
-        'Corpus: aggregated matches at relative locations across the entire Result',
+        'Corpus: exact-term matches at relative locations across the entire Result',
       ),
     ).toHaveLength(2);
   });
 
-  it('uses node colors for aggregate and source-split chart series', () => {
+  it('keeps hidden exact terms in the interactive legend with selected-bin counts', () => {
+    const alphaCounts = Array.from({ length: 100 }, () => 0);
+    alphaCounts[0] = 2;
+    const lowerCounts = Array.from({ length: 100 }, () => 0);
+    lowerCounts[1] = 1;
+    const onToggle = vi.fn();
+    render(
+      <ConcordanceDispersionSummary
+        rows={[]}
+        textColumn="text"
+        binCount={20}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="alpha"
+        densitySeries={[
+          { label: 'Alpha', counts: alphaCounts },
+          { label: 'alpha', counts: lowerCounts },
+        ]}
+        selection={{
+          selectedIndices: new Set([0]),
+          onSelect: vi.fn(),
+          onSelectRange: vi.fn(),
+          onClear: vi.fn(),
+        }}
+        excludedMatchedTexts={new Set(['alpha'])}
+        onToggleMatchedText={onToggle}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Alpha (2/2)' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    const hidden = screen.getByRole('button', { name: 'alpha (1/1)' });
+    expect(hidden).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByTestId('line')).toHaveLength(1);
+    fireEvent.click(hidden);
+    expect(onToggle).toHaveBeenCalledWith('alpha');
+  });
+
+  it('uses deterministic matched-term colors for chart series', () => {
     render(
       <ConcordanceDispersionSummary
         rows={baseRows}
@@ -199,21 +239,46 @@ describe('ConcordanceDispersionSummary', () => {
         splitBySource={false}
         dataBlockLabel="Corpus"
         searchWord="alpha"
-        sourceColor="#123456"
+        termColors={{ alpha: '#123456' }}
       />,
     );
 
     expect(chartProps.lineProps.at(-1)).toMatchObject({
-      dataKey: '__dispersion_total__',
-      stroke: 'var(--color--dispersion-total-)',
+      dataKey: 'term:alpha',
+      stroke: 'var(--color-term-alpha)',
       type: 'natural',
     });
     expect(chartProps.lineProps.at(-1)?.dot).toEqual({
-      fill: 'var(--color--dispersion-total-)',
+      fill: 'var(--color-term-alpha)',
     });
   });
 
-  it('renders cumulative charts as stepped running totals with source colors', () => {
+  it('keeps case-sensitive term colors distinct between chart lines and the legend', () => {
+    render(
+      <ConcordanceDispersionSummary
+        rows={[]}
+        textColumn="text"
+        binCount={20}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="jobs Jobs"
+        densitySeries={[
+          { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
+          { label: 'Jobs', counts: Array.from({ length: 100 }, () => 2) },
+        ]}
+        termColors={{ jobs: '#123456', Jobs: '#abcdef' }}
+      />,
+    );
+
+    expect(chartProps.lineProps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ dataKey: 'term:jobs', stroke: 'var(--color-term-jobs)' }),
+        expect.objectContaining({ dataKey: 'term:Jobs', stroke: 'var(--color-term-Jobs)' }),
+      ]),
+    );
+  });
+
+  it('renders cumulative charts as stepped running totals pooled by exact term', () => {
     render(
       <ConcordanceDispersionSummary
         rows={[
@@ -234,38 +299,26 @@ describe('ConcordanceDispersionSummary', () => {
         dataBlockLabel="Combined"
         searchWord="alpha"
         chartMode="cumulative"
-        sourceColors={{
-          'left corpus': '#aa0000',
-          'right corpus': '#00aa00',
-        }}
+        termColors={{ alpha: '#aa0000' }}
       />,
     );
 
     expect(screen.getByText('Cumulative dispersion')).toBeInTheDocument();
-    expect(chartProps.lineProps).toHaveLength(2);
+    expect(chartProps.lineProps).toHaveLength(1);
     expect(chartProps.lineProps[0]).toMatchObject({
-      dataKey: '__dispersion_total__\0Left Corpus',
-      stroke: 'var(--color--dispersion-total-left-corpus)',
-      type: 'step',
-      dot: false,
-    });
-    expect(chartProps.lineProps[1]).toMatchObject({
-      dataKey: '__dispersion_total__\0Right Corpus',
-      stroke: 'var(--color--dispersion-total-right-corpus)',
-      strokeDasharray: '6 4',
+      dataKey: 'term:alpha',
+      stroke: 'var(--color-term-alpha)',
       type: 'step',
       dot: false,
     });
     const chartData = chartProps.lineChartProps.at(-1)?.data;
     expect(chartData?.[0]).toMatchObject({
       binCenter: 2.5,
-      '__dispersion_total__\0Left Corpus': 1,
-      '__dispersion_total__\0Right Corpus': 0,
+      'term:alpha': 1,
     });
     expect(chartData?.[5]).toMatchObject({
       binCenter: expect.closeTo(27.5),
-      '__dispersion_total__\0Left Corpus': 1,
-      '__dispersion_total__\0Right Corpus': 1,
+      'term:alpha': 2,
     });
   });
 

@@ -65,8 +65,10 @@ export type Analysis = {
     } & ConcordanceRunAllAnalysisRequest) | ({
         kind: 'quotation_run_all';
     } & QuotationRunAllAnalysisRequest) | ({
-        kind: 'concordance_result_publication';
-    } & ConcordanceResultPublicationAnalysisRequest) | ({
+        kind: 'concordance_match_publication';
+    } & ConcordanceMatchPublicationAnalysisRequest) | ({
+        kind: 'concordance_document_publication';
+    } & ConcordanceDocumentPublicationAnalysisRequest) | ({
         kind: 'quotation_result_publication';
     } & QuotationResultPublicationAnalysisRequest) | ({
         kind: 'annotation_run_all';
@@ -123,8 +125,10 @@ export type AnalysisCreate = {
     } & ConcordanceRunAllAnalysisRequest) | ({
         kind: 'quotation_run_all';
     } & QuotationRunAllAnalysisRequest) | ({
-        kind: 'concordance_result_publication';
-    } & ConcordanceResultPublicationAnalysisRequest) | ({
+        kind: 'concordance_match_publication';
+    } & ConcordanceMatchPublicationAnalysisRequest) | ({
+        kind: 'concordance_document_publication';
+    } & ConcordanceDocumentPublicationAnalysisRequest) | ({
         kind: 'quotation_result_publication';
     } & QuotationResultPublicationAnalysisRequest) | ({
         kind: 'annotation_run_all';
@@ -1379,6 +1383,158 @@ export type ConcordanceDensitySeries = {
 };
 
 /**
+ * ConcordanceDocumentProjectionQuery
+ *
+ * Filter and page document rows from an immutable Concordance Result.
+ */
+export type ConcordanceDocumentProjectionQuery = {
+    /**
+     * Bin Count
+     */
+    bin_count?: 4 | 5 | 10 | 20 | 25 | 50 | 100 | null;
+    /**
+     * Descending
+     */
+    descending?: boolean;
+    /**
+     * Excluded Matched Texts
+     */
+    excluded_matched_texts?: Array<string>;
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Selected Bins
+     */
+    selected_bins?: Array<number> | null;
+    /**
+     * Sort By
+     */
+    sort_by?: string | null;
+};
+
+/**
+ * ConcordanceDocumentPublicationAnalysisRequest
+ */
+export type ConcordanceDocumentPublicationAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_document_publication';
+    /**
+     * Sources
+     */
+    sources: Array<ConcordanceDocumentPublicationSource>;
+};
+
+/**
+ * ConcordanceDocumentPublicationDerivation
+ */
+export type ConcordanceDocumentPublicationDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_document_publication';
+};
+
+/**
+ * ConcordanceDocumentPublicationResult
+ */
+export type ConcordanceDocumentPublicationResult = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_document_publication';
+    /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
+     * Outputs
+     */
+    outputs: Array<ResultPublicationOutput>;
+};
+
+/**
+ * ConcordanceDocumentPublicationSource
+ *
+ * One source and exact Review filter for document-wise publication.
+ */
+export type ConcordanceDocumentPublicationSource = {
+    /**
+     * Bin Count
+     */
+    bin_count?: 4 | 5 | 10 | 20 | 25 | 50 | 100 | null;
+    /**
+     * Excluded Matched Texts
+     */
+    excluded_matched_texts?: Array<string>;
+    /**
+     * New Node Name
+     */
+    new_node_name: string;
+    /**
+     * Selected Bins
+     */
+    selected_bins?: Array<number> | null;
+    /**
+     * Selected Metadata Columns
+     */
+    selected_metadata_columns?: Array<string>;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
+ * ConcordanceMatchPublicationAnalysisRequest
+ */
+export type ConcordanceMatchPublicationAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_match_publication';
+    /**
+     * Sources
+     */
+    sources: Array<ResultPublicationSource>;
+};
+
+/**
+ * ConcordanceMatchPublicationDerivation
+ */
+export type ConcordanceMatchPublicationDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_match_publication';
+};
+
+/**
+ * ConcordanceMatchPublicationResult
+ */
+export type ConcordanceMatchPublicationResult = {
+    /**
+     * Kind
+     */
+    kind?: 'concordance_match_publication';
+    /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
+     * Outputs
+     */
+    outputs: Array<ResultPublicationOutput>;
+};
+
+/**
  * ConcordancePage
  */
 export type ConcordancePage = {
@@ -1414,48 +1570,6 @@ export type ConcordanceResult = {
      * Sources
      */
     sources?: Array<ConcordanceSourceResult> | null;
-};
-
-/**
- * ConcordanceResultPublicationAnalysisRequest
- */
-export type ConcordanceResultPublicationAnalysisRequest = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_result_publication';
-    /**
-     * Sources
-     */
-    sources: Array<ResultPublicationSource>;
-};
-
-/**
- * ConcordanceResultPublicationDerivation
- */
-export type ConcordanceResultPublicationDerivation = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_result_publication';
-};
-
-/**
- * ConcordanceResultPublicationResult
- */
-export type ConcordanceResultPublicationResult = {
-    /**
-     * Kind
-     */
-    kind?: 'concordance_result_publication';
-    /**
-     * Output Node Ids
-     */
-    output_node_ids: Array<string>;
-    /**
-     * Outputs
-     */
-    outputs: Array<ResultPublicationOutput>;
 };
 
 /**
@@ -1905,8 +2019,10 @@ export type DerivationProvenance = {
     } & SqlDerivation) | ({
         kind: 'annotation';
     } & AnnotationDerivation) | ({
-        kind: 'concordance_result_publication';
-    } & ConcordanceResultPublicationDerivation) | ({
+        kind: 'concordance_match_publication';
+    } & ConcordanceMatchPublicationDerivation) | ({
+        kind: 'concordance_document_publication';
+    } & ConcordanceDocumentPublicationDerivation) | ({
         kind: 'quotation_result_publication';
     } & QuotationResultPublicationDerivation) | ({
         kind: 'topic_modeling_detachment';
@@ -4574,8 +4690,10 @@ export type AnalysisCreateWritable = {
     } & ConcordanceRunAllAnalysisRequest) | ({
         kind: 'quotation_run_all';
     } & QuotationRunAllAnalysisRequest) | ({
-        kind: 'concordance_result_publication';
-    } & ConcordanceResultPublicationAnalysisRequest) | ({
+        kind: 'concordance_match_publication';
+    } & ConcordanceMatchPublicationAnalysisRequest) | ({
+        kind: 'concordance_document_publication';
+    } & ConcordanceDocumentPublicationAnalysisRequest) | ({
         kind: 'quotation_result_publication';
     } & QuotationResultPublicationAnalysisRequest) | ({
         kind: 'annotation_run_all';
@@ -7037,8 +7155,10 @@ export type GetAnalysisResultResponses = {
     } & AnnotationRunAllResult) | ({
         kind: 'topic_modeling_detachment';
     } & TopicModelingDetachmentResult) | ({
-        kind: 'concordance_result_publication';
-    } & ConcordanceResultPublicationResult) | ({
+        kind: 'concordance_match_publication';
+    } & ConcordanceMatchPublicationResult) | ({
+        kind: 'concordance_document_publication';
+    } & ConcordanceDocumentPublicationResult) | ({
         kind: 'quotation_result_publication';
     } & QuotationResultPublicationResult);
 };
@@ -7144,8 +7264,10 @@ export type QueryAnalysisResultResponses = {
     } & AnnotationRunAllResult) | ({
         kind: 'topic_modeling_detachment';
     } & TopicModelingDetachmentResult) | ({
-        kind: 'concordance_result_publication';
-    } & ConcordanceResultPublicationResult) | ({
+        kind: 'concordance_match_publication';
+    } & ConcordanceMatchPublicationResult) | ({
+        kind: 'concordance_document_publication';
+    } & ConcordanceDocumentPublicationResult) | ({
         kind: 'quotation_result_publication';
     } & QuotationResultPublicationResult);
 };
@@ -7287,6 +7409,72 @@ export type GetConcordanceTableDensityResponses = {
 };
 
 export type GetConcordanceTableDensityResponse = GetConcordanceTableDensityResponses[keyof GetConcordanceTableDensityResponses];
+
+export type QueryConcordanceDocumentProjectionData = {
+    body: ConcordanceDocumentProjectionQuery;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+        /**
+         * Table Id
+         */
+        table_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/documents/query';
+};
+
+export type QueryConcordanceDocumentProjectionErrors = {
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type QueryConcordanceDocumentProjectionError = QueryConcordanceDocumentProjectionErrors[keyof QueryConcordanceDocumentProjectionErrors];
+
+export type QueryConcordanceDocumentProjectionResponses = {
+    /**
+     * Arrow IPC stream
+     */
+    200: Blob | File;
+};
+
+export type QueryConcordanceDocumentProjectionResponse = QueryConcordanceDocumentProjectionResponses[keyof QueryConcordanceDocumentProjectionResponses];
 
 export type GetAnalysisTableProjectionRowsData = {
     body?: never;

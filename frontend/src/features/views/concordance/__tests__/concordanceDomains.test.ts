@@ -88,9 +88,10 @@ describe('concordanceDomains', () => {
 
     const result = buildDispersionBinsFromDensitySeries([{ label: 'Alpha', counts }], 20);
 
-    expect(result.bins[0]?.__dispersion_total__).toBe(2);
-    expect(result.bins[19]?.__dispersion_total__).toBe(3);
-    expect(result.totalsByKey.__dispersion_total__).toBe(5);
+    expect(result.bins[0]?.['term:Alpha']).toBe(2);
+    expect(result.bins[19]?.['term:Alpha']).toBe(3);
+    expect(result.totalsByKey['term:Alpha']).toBe(5);
+    expect(result.labelsByKey['term:Alpha']).toBe('Alpha');
   });
 });
 describe('concordance source display helpers', () => {

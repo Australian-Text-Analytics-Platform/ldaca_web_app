@@ -7,4 +7,4 @@ issue backlogs here.
 
 ## Current implementation work
 
-No substantial change is currently active.
+- [Issue 22: Concordance Match and Document Publication](22-concordance-document-publication/spec.md)

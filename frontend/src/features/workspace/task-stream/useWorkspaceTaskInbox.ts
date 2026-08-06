@@ -28,7 +28,8 @@ import {
 const IMPORT_PAGE_SIZE = 100;
 
 const publishesWorkspaceDataBlocks = (kind: string): boolean =>
-  kind === 'concordance_result_publication' ||
+  kind === 'concordance_match_publication' ||
+  kind === 'concordance_document_publication' ||
   kind === 'quotation_result_publication' ||
   kind === 'topic_modeling_detachment';
 

@@ -60,7 +60,9 @@ describe('useConcordanceResultSession', () => {
           combinedPage: 1,
           selectedNodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
           showDispersion: true,
-          reviewDispersionRowUnit: 'documents',
+          selectedBinIndices: {},
+          excludedMatchedTexts: {},
+          binCount: 20,
         }),
       { wrapper: createWrapper() },
     );
@@ -80,7 +82,9 @@ describe('useConcordanceResultSession', () => {
           combinedPage: 1,
           selectedNodes: [],
           showDispersion: false,
-          reviewDispersionRowUnit: 'documents',
+          selectedBinIndices: {},
+          excludedMatchedTexts: {},
+          binCount: 20,
         }),
       { wrapper: createWrapper() },
     );

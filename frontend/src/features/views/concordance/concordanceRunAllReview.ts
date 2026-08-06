@@ -54,7 +54,8 @@ export function projectConcordanceRunAllReviewPage(
   ];
   const metadataColumns = source.source.metadata_columns;
   const totalRows =
-    rowUnit === 'documents' ? source.source.document_count : source.source.match_count;
+    page.totalRows ??
+    (rowUnit === 'documents' ? source.source.document_count : source.source.match_count);
   const totalPages = totalRows === 0 ? 0 : Math.ceil(totalRows / pageSize);
 
   return {

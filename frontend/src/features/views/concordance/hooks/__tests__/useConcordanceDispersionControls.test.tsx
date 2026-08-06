@@ -14,6 +14,25 @@ describe('useConcordanceDispersionControls', () => {
     expect(result.current.binCount).toBe(DISPERSION_DEFAULT_BIN_COUNT);
     expect(result.current.dispersionChartMode).toBe('density-line');
     expect(result.current.selectedBinIndices).toEqual({});
+    expect(result.current.excludedMatchedTexts).toEqual({});
+  });
+
+  it('tracks exact hidden terms per block and resets all Review filters', () => {
+    const { result } = renderHook(() => useConcordanceDispersionControls());
+
+    act(() => {
+      result.current.toggleMatchedText('node-a', 'Alpha');
+      result.current.toggleMatchedText('node-b', 'alpha');
+      result.current.handleBinSelect('node-a', 2, false);
+    });
+    expect(Array.from(result.current.excludedMatchedTexts['node-a'] ?? [])).toEqual(['Alpha']);
+    expect(Array.from(result.current.excludedMatchedTexts['node-b'] ?? [])).toEqual(['alpha']);
+
+    act(() => {
+      result.current.resetDispersionFilters();
+    });
+    expect(result.current.excludedMatchedTexts).toEqual({});
+    expect(result.current.selectedBinIndices).toEqual({});
   });
 
   it('tracks bin selections per block and supports shift-range extension', () => {

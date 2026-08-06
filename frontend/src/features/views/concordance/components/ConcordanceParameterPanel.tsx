@@ -37,8 +37,8 @@ export interface ConcordanceParameterPanelProps {
   setCaseSensitive: Dispatch<SetStateAction<boolean>>;
   /**
    * Selected concordance engine. ``tokens`` mode walks the tokenization column
-   * prepared by the selected tokenizer model; only meaningful when
-   * ``tokensModeAvailable`` is true.
+   * prepared by the selected tokenizer model. It becomes selectable after
+   * every selected Data Block has a source column.
    */
   searchMode: 'regex' | 'tokens';
   setSearchMode: (next: 'regex' | 'tokens') => void;
@@ -214,10 +214,10 @@ export function ConcordanceParameterPanel({
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-sm">
-              {/* Search mode picker. ``tokens`` is auto-selected when every selected
-              Data Block has a tokenizer model. The regex / whole-word / case
-              checkboxes only apply to text mode, so they're hidden entirely when
-              tokens mode is active. */}
+              {/* Search mode picker. Text is the default; Tokens becomes selectable
+              after every selected Data Block has a source column, then exposes the
+              required tokenizer selectors. The regex / whole-word / case
+              checkboxes apply only to Text mode. */}
               <div className="flex items-center gap-1">
                 <span className="text-sm font-medium text-foreground">Search mode:</span>
                 <Tabs
@@ -235,7 +235,7 @@ export function ConcordanceParameterPanel({
                       reason={
                         tokensModeAvailable
                           ? 'Each alternative is an exact-token match. Example: 猫|犬|魚 or cat dog fish finds every hit of any of them.'
-                          : 'Tokens mode needs a tokenizer model for each selected data block.'
+                          : 'Select a source text column for every data block first.'
                       }
                     >
                       <TabsTrigger

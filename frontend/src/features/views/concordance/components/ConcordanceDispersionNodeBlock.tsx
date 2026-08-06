@@ -49,6 +49,10 @@ export interface ConcordanceDispersionNodeBlockProps {
   selectedMetadataColumns: string[];
   reviewRowUnit: 'documents' | 'matches' | null;
   densitySeries?: ConcordanceDensitySeriesInput[];
+  interactiveFilters: boolean;
+  excludedMatchedTexts: Record<string, Set<string>>;
+  onToggleMatchedText: (blockKey: string, matchedText: string) => void;
+  termColors: Record<string, string>;
   resultsViewportWidth: number;
 
   // Workspace selection
@@ -129,6 +133,10 @@ export function ConcordanceDispersionNodeBlock({
   setCombinedPage,
   reviewRowUnit,
   densitySeries,
+  interactiveFilters,
+  excludedMatchedTexts,
+  onToggleMatchedText,
+  termColors,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
@@ -221,6 +229,7 @@ export function ConcordanceDispersionNodeBlock({
             proportionalDispersionBars={proportionalDispersionBars}
             sourceColorMap={sourceColorMap}
             defaultPalette={defaultPalette}
+            termColors={termColors}
             getRowClassName={() => 'cursor-pointer'}
             getRowStyle={(row) => {
               const color = getConcordanceSourceColor(
@@ -257,34 +266,48 @@ export function ConcordanceDispersionNodeBlock({
                 splitBySource
                 dataBlockLabel={dataBlockLabel}
                 searchWord={searchWord}
-                sourceColors={sourceColorMap}
                 chartMode={dispersionChartMode}
                 onChartModeChange={onDispersionChartModeChange}
                 onBinCountChange={onBinCountChange}
-                selection={{
-                  selectedIndices:
-                    (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
-                      | ReadonlySet<number>
-                      | undefined) ?? EMPTY_BIN_SELECTION,
-                  /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection. */
-                  onSelect: (index, shiftHeld) => {
-                    onBinSelect(CONCORDANCE_COMBINED_NODE_KEY, index, shiftHeld);
-                  },
-                  /** Used by: ConcordanceDispersionSummary selection prop to route combined chart drag ranges because callers need one state update for the full selected bin span. */
-                  onSelectRange: (startIndex, endIndex, shiftHeld) => {
-                    onBinRangeSelect(
-                      CONCORDANCE_COMBINED_NODE_KEY,
-                      startIndex,
-                      endIndex,
-                      shiftHeld,
-                    );
-                  },
-                  /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection. */
-                  onClear: () => {
-                    onClearBinSelection(CONCORDANCE_COMBINED_NODE_KEY);
-                  },
-                }}
+                selection={
+                  interactiveFilters
+                    ? {
+                        selectedIndices:
+                          (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
+                            | ReadonlySet<number>
+                            | undefined) ?? EMPTY_BIN_SELECTION,
+                        /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection. */
+                        onSelect: (index, shiftHeld) => {
+                          onBinSelect(CONCORDANCE_COMBINED_NODE_KEY, index, shiftHeld);
+                        },
+                        /** Used by: ConcordanceDispersionSummary selection prop to route combined chart drag ranges because callers need one state update for the full selected bin span. */
+                        onSelectRange: (startIndex, endIndex, shiftHeld) => {
+                          onBinRangeSelect(
+                            CONCORDANCE_COMBINED_NODE_KEY,
+                            startIndex,
+                            endIndex,
+                            shiftHeld,
+                          );
+                        },
+                        /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection. */
+                        onClear: () => {
+                          onClearBinSelection(CONCORDANCE_COMBINED_NODE_KEY);
+                        },
+                      }
+                    : undefined
+                }
                 densitySeries={densitySeries}
+                termColors={termColors}
+                excludedMatchedTexts={
+                  excludedMatchedTexts[CONCORDANCE_COMBINED_NODE_KEY] ?? new Set<string>()
+                }
+                onToggleMatchedText={
+                  interactiveFilters
+                    ? (matchedText) => {
+                        onToggleMatchedText(CONCORDANCE_COMBINED_NODE_KEY, matchedText);
+                      }
+                    : undefined
+                }
               />
             );
           })()}
@@ -374,6 +397,7 @@ export function ConcordanceDispersionNodeBlock({
           metadataColumnStyle={metadataColumnStyle}
           proportionalDispersionBars={proportionalDispersionBars}
           sourceColor={context.nodeColor}
+          termColors={termColors}
           getRowClassName={(_row, index) =>
             `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
           }
@@ -401,24 +425,37 @@ export function ConcordanceDispersionNodeBlock({
               chartMode={dispersionChartMode}
               onChartModeChange={onDispersionChartModeChange}
               onBinCountChange={onBinCountChange}
-              selection={{
-                selectedIndices:
-                  (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
-                  EMPTY_BIN_SELECTION,
-                /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection. */
-                onSelect: (index, shiftHeld) => {
-                  onBinSelect(nodeKey, index, shiftHeld);
-                },
-                /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart drag ranges because callers need one state update for the full selected bin span. */
-                onSelectRange: (startIndex, endIndex, shiftHeld) => {
-                  onBinRangeSelect(nodeKey, startIndex, endIndex, shiftHeld);
-                },
-                /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection. */
-                onClear: () => {
-                  onClearBinSelection(nodeKey);
-                },
-              }}
+              selection={
+                interactiveFilters
+                  ? {
+                      selectedIndices:
+                        (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
+                        EMPTY_BIN_SELECTION,
+                      /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection. */
+                      onSelect: (index, shiftHeld) => {
+                        onBinSelect(nodeKey, index, shiftHeld);
+                      },
+                      /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart drag ranges because callers need one state update for the full selected bin span. */
+                      onSelectRange: (startIndex, endIndex, shiftHeld) => {
+                        onBinRangeSelect(nodeKey, startIndex, endIndex, shiftHeld);
+                      },
+                      /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection. */
+                      onClear: () => {
+                        onClearBinSelection(nodeKey);
+                      },
+                    }
+                  : undefined
+              }
               densitySeries={densitySeries}
+              termColors={termColors}
+              excludedMatchedTexts={excludedMatchedTexts[nodeKey] ?? new Set<string>()}
+              onToggleMatchedText={
+                interactiveFilters
+                  ? (matchedText) => {
+                      onToggleMatchedText(nodeKey, matchedText);
+                    }
+                  : undefined
+              }
             />
           );
         })()}

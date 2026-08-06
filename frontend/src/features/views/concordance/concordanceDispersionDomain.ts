@@ -89,12 +89,6 @@ export function getDispersionBarWidthPercent(
   return Math.min(100, (textLength / longestTextLength) * 100);
 }
 
-/**
- * Delimiter used inside binned-series keys to combine matched-text with a
- * source-node identifier. Chosen because NUL is never present in normal text.
- */
-export const DISPERSION_SOURCE_DELIMITER = '\0';
-
 type DispersionBinDatum = {
   binCenter: number;
 } & Record<string, number>;
@@ -102,9 +96,6 @@ type DispersionBinDatum = {
 export interface BuildDispersionBinsOptions {
   splitBySource?: boolean;
 }
-
-/** Aggregate series key used for a single source or as the base of a source-specific key. */
-export const DISPERSION_AGGREGATE_KEY = '__dispersion_total__';
 
 /**
  * Make sure every bin has an explicit entry for every series key encountered.
@@ -126,8 +117,12 @@ const fillEmptyBins = (bins: DispersionBinDatum[], totalsByKey: Record<string, n
 export interface BuildDispersionBinsResult {
   bins: DispersionBinDatum[];
   totalsByKey: Record<string, number>;
+  labelsByKey: Record<string, string>;
   sources: string[];
 }
+
+const dispersionTermSeriesKey = (matchedText: string): string =>
+  `term:${encodeURIComponent(matchedText)}`;
 
 /** Builds normalized hit-count bins from raw grouped rows for client-side previews. */
 /**
@@ -141,14 +136,14 @@ export function buildDispersionBins(
   binCount: number,
   options: BuildDispersionBinsOptions = {},
 ): BuildDispersionBinsResult {
-  const { splitBySource = false } = options;
+  void options;
   const safeBinCount = Math.max(1, Math.floor(binCount));
   const bins: DispersionBinDatum[] = Array.from({ length: safeBinCount }, (_, i) => ({
     binCenter: ((i + 0.5) / safeBinCount) * 100,
   }));
   const totalsByKey: Record<string, number> = {};
+  const labelsByKey: Record<string, string> = {};
   const sourceSet = new Set<string>();
-  totalsByKey[DISPERSION_AGGREGATE_KEY] = 0;
 
   for (const row of rows) {
     const docLength = getDispersionTextLength(row, textColumn);
@@ -164,10 +159,8 @@ export function buildDispersionBins(
       if (!rawText) continue;
       const source = rowSource || toCellText(hit.__source_node);
       if (source) sourceSet.add(source);
-      const seriesKey =
-        splitBySource && source
-          ? `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${source}`
-          : DISPERSION_AGGREGATE_KEY;
+      const seriesKey = dispersionTermSeriesKey(rawText);
+      labelsByKey[seriesKey] = rawText;
       const bin = bins[binIdx];
       if (bin === undefined) continue;
       bin[seriesKey] = (bin[seriesKey] ?? 0) + 1;
@@ -176,7 +169,7 @@ export function buildDispersionBins(
   }
 
   fillEmptyBins(bins, totalsByKey);
-  return { bins, totalsByKey, sources: [...sourceSet].sort() };
+  return { bins, totalsByKey, labelsByKey, sources: [...sourceSet].sort() };
 }
 
 /**
@@ -213,18 +206,17 @@ export function buildDispersionBinsFromDensitySeries(
   displayBinCount: DispersionDisplayBinCount,
   options: BuildDispersionBinsOptions = {},
 ): BuildDispersionBinsResult {
-  const { splitBySource = false } = options;
+  void options;
   const bins: DispersionBinDatum[] = Array.from({ length: displayBinCount }, (_, index) => ({
     binCenter: ((index + 0.5) / displayBinCount) * 100,
   }));
   const totalsByKey: Record<string, number> = {};
+  const labelsByKey: Record<string, string> = {};
   const sources = new Set<string>();
   for (const item of series) {
     if (item.source) sources.add(item.source);
-    const seriesKey =
-      splitBySource && item.source
-        ? `${DISPERSION_AGGREGATE_KEY}${DISPERSION_SOURCE_DELIMITER}${item.source}`
-        : DISPERSION_AGGREGATE_KEY;
+    const seriesKey = dispersionTermSeriesKey(item.label);
+    labelsByKey[seriesKey] = item.label;
     totalsByKey[seriesKey] ??= 0;
     item.counts.forEach((count, serverIndex) => {
       if (!Number.isFinite(count) || count <= 0) return;
@@ -239,7 +231,7 @@ export function buildDispersionBinsFromDensitySeries(
     });
   }
   fillEmptyBins(bins, totalsByKey);
-  return { bins, totalsByKey, sources: Array.from(sources).sort() };
+  return { bins, totalsByKey, labelsByKey, sources: Array.from(sources).sort() };
 }
 /**
  * How many source documents the engine actually considered to produce

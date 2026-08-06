@@ -21,25 +21,28 @@ stored.
 The backend exposes explicit document and match projections. Both use stable
 source order; match projections additionally order by the Concordance start
 offset or quotation row index. Generated analysis fields are not sortable.
-Result Publication always explodes the nested Result and publishes one flat row
-per match or extract.
+Quotation Result Publication and Concordance Match Publication explode the
+nested Result. Concordance Document Publication instead filters the nested
+matches by exact surface form and relative-position bins, keeps source-row
+identity, and emits the document, normalized newline-joined extraction, and
+selected metadata.
 
 Concordance density is computed by a dedicated side-effect-free endpoint over
 the complete immutable child Result. It returns 100 fixed bins keyed by exact
 matched text and is neither a stored artifact nor a page-local cache.
 
-Native Workspace schema 13 and portable archive format 12 are a strict cutover.
+Native Workspace schema 14 and portable archive format 13 are a strict cutover.
 Older layouts are rejected without a compatibility reader or runtime migration.
 
 ## Consequences
 
-- Review can page by the unit the interface presents without rewriting the
-  canonical Result.
+- Concordance Table View is match-wise and Dispersion View is document-wise
+  without rewriting the canonical Result.
 - Concordance density is stable across table pagination and sorting.
 - The internal source-row ID remains hidden but gives projections deterministic
   order.
-- Publication preserves its existing one-occurrence-per-row Data Block
-  contract.
+- Match Publication preserves the one-occurrence-per-row contract; Document
+  Publication creates a distinct one-source-row-per-document contract.
 
 ## Supersession
 

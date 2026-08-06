@@ -1,4 +1,4 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   type ConcordanceDispersionChartMode,
   DISPERSION_DEFAULT_BIN_COUNT,
@@ -16,6 +16,8 @@ export interface UseConcordanceDispersionControlsResult {
   dispersionChartMode: ConcordanceDispersionChartMode;
   setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
+  excludedMatchedTexts: Record<string, Set<string>>;
+  toggleMatchedText: (blockKey: string, matchedText: string) => void;
   handleBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
   handleBinRangeSelect: (
     blockKey: string,
@@ -24,6 +26,7 @@ export interface UseConcordanceDispersionControlsResult {
     shiftHeld: boolean,
   ) => void;
   handleClearBinSelection: (blockKey: string) => void;
+  resetDispersionFilters: () => void;
 }
 
 /**
@@ -47,6 +50,7 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
   const [dispersionChartMode, setDispersionChartMode] =
     useState<ConcordanceDispersionChartMode>('density-line');
   const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
+  const [excludedMatchedTexts, setExcludedMatchedTexts] = useState<Record<string, Set<string>>>({});
   const lastSelectedBinRef = useRef<Record<string, number | null>>({});
 
   /** Updates a block's bin set from a click or shift-click range gesture. */
@@ -108,6 +112,23 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     lastSelectedBinRef.current = {};
   };
 
+  const toggleMatchedText = (blockKey: string, matchedText: string) => {
+    setExcludedMatchedTexts((current) => {
+      const nextForBlock = new Set(current[blockKey] ?? []);
+      if (nextForBlock.has(matchedText)) nextForBlock.delete(matchedText);
+      else nextForBlock.add(matchedText);
+      return { ...current, [blockKey]: nextForBlock };
+    });
+  };
+
+  // Stable identity is required because ConcordanceFeature resets filters from
+  // an effect keyed only by the immutable Run All identity.
+  const resetDispersionFilters = useCallback(() => {
+    setSelectedBinIndices({});
+    setExcludedMatchedTexts({});
+    lastSelectedBinRef.current = {};
+  }, []);
+
   return {
     concordanceView,
     setConcordanceView,
@@ -119,8 +140,11 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     dispersionChartMode,
     setDispersionChartMode,
     selectedBinIndices,
+    excludedMatchedTexts,
+    toggleMatchedText,
     handleBinSelect,
     handleBinRangeSelect,
     handleClearBinSelection,
+    resetDispersionFilters,
   };
 }

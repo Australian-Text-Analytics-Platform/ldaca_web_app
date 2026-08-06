@@ -164,18 +164,19 @@ with one Supporting Sub-Analysis and nested document Result per selected
 source. Supporting work executes independently, but the group succeeds only
 after every source Result is durable.
 
-Review reads explicit document or match projections of those Results. A
+Review reads explicit projections of those Results. A
 matching document is one stored row and owns a nested list of Concordance
 Matches or quotation extracts. `CONC_dispersion` is derived by the frontend and
-is never stored as a backend column. Result Publication flattens the nested
-Result to one row per match or extract.
+is never stored as a backend column. Concordance Table View reads matches;
+Dispersion View filters and pages documents. Quotation retains its existing
+document or match Review projections.
 
-**Add to Workspace** submits a Result Publication Supporting Analysis under the
-successful Run All parent. Its immutable request selects one output name and a
-set of columns per source. The document column is mandatory, metadata columns
-default off, and analysis columns default on. The publication creates all
-requested Derived Data Blocks atomically; Run All itself never changes the
-Workspace graph.
+**Add to Workspace** submits a typed Supporting Analysis under the successful
+Run All parent. Concordance Match Publication emits selected flat match
+columns. Concordance Document Publication emits the required document and
+newline-joined `CONC_extraction` plus optional metadata after applying the
+Review term/bin filter. Checked sources, including empty ones, are published
+atomically. Run All itself never changes the Workspace graph.
 
 ## Other Analysis Kinds
 

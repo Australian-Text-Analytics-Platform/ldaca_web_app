@@ -229,7 +229,7 @@ export const useTokenFrequencyTaskFlow = ({
             regex: false,
             whole_word: true,
             case_sensitive: false,
-            search_mode: 'tokens',
+            search_mode: 'regex',
           };
           await submitTabAnalysis({
             body: {

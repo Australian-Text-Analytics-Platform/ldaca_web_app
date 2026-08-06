@@ -5,6 +5,7 @@ import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
   type ConcordanceRunAllResult,
+  type ConcordanceDocumentPublicationSource,
   type ResultPublicationSource,
 } from '@/api';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
@@ -44,6 +45,7 @@ import type { ConcordanceRunAllReviewSource } from './concordanceRunAllReview';
 import { queryKeys } from '@/lib/queryKeys';
 import { ResultPublicationDialog } from '../common/components/ResultPublicationDialog';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import { CONCORDANCE_COMBINED_NODE_KEY } from './concordanceTableDomain';
 
 /** Orchestrates the full Concordance Preview and Run All lifecycle. */
 /**
@@ -246,22 +248,21 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     dispersionChartMode,
     setDispersionChartMode,
     selectedBinIndices,
+    excludedMatchedTexts,
+    toggleMatchedText,
     handleBinSelect,
     handleBinRangeSelect,
     handleClearBinSelection,
+    resetDispersionFilters,
   } = useConcordanceDispersionControls();
   const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
   const resultsViewportRef = useRef<HTMLDivElement | null>(null);
   const [viewMode, setViewMode] = useState<'separated' | 'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
-  const [reviewDispersionRowUnit, setReviewDispersionRowUnit] = useState<'documents' | 'matches'>(
-    'documents',
-  );
 
-  // Concordance has two engines. ``regex`` walks raw text (the historical
-  // default, preserving ``equ\w*``-style affordances); ``tokens`` walks the
-  // tokenization column prepared by the selected tokenizer model for
-  // actual-token context. The hook owns availability and auto-switching.
+  // Concordance has two engines. ``regex`` walks raw text and remains the fresh
+  // default, preserving ``equ\w*``-style affordances. ``tokens`` is an explicit
+  // choice that walks the tokenization column prepared by the selected model.
   const {
     searchMode,
     tokensModeAvailable,
@@ -376,8 +377,15 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     showDispersion,
     nodeColorOverrides,
     reviewSources: concordanceReviewSources,
-    reviewDispersionRowUnit,
+    selectedBinIndices,
+    excludedMatchedTexts,
+    binCount,
   });
+
+  useEffect(() => {
+    setConcordanceView('table');
+    resetDispersionFilters();
+  }, [concordanceRunAll?.id, resetDispersionFilters, setConcordanceView]);
 
   useEffect(() => {
     const element = resultsViewportRef.current;
@@ -621,10 +629,37 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     if (!concordanceRunAll) return;
     setIsPublishing(true);
     try {
-      await publishAnalysisResult(host.tabId, concordanceRunAll.id, {
-        kind: 'concordance_result_publication',
-        sources,
-      });
+      if (concordanceView === 'dispersion') {
+        const documentSources: ConcordanceDocumentPublicationSource[] = sources.map((source) => {
+          const descriptor = publicationSources.find(
+            (candidate) => candidate.node_id === source.source_node_id,
+          );
+          const filterKey =
+            viewMode === 'combined' ? CONCORDANCE_COMBINED_NODE_KEY : source.source_node_id;
+          const selectedBins = Array.from(selectedBinIndices[filterKey] ?? []).sort(
+            (left, right) => left - right,
+          );
+          return {
+            source_node_id: source.source_node_id,
+            new_node_name: source.new_node_name,
+            selected_metadata_columns: source.selected_columns.filter((column) =>
+              descriptor?.metadata_columns.includes(column),
+            ),
+            excluded_matched_texts: Array.from(excludedMatchedTexts[filterKey] ?? []).sort(),
+            bin_count: selectedBins.length > 0 ? binCount : null,
+            selected_bins: selectedBins.length > 0 ? selectedBins : null,
+          };
+        });
+        await publishAnalysisResult(host.tabId, concordanceRunAll.id, {
+          kind: 'concordance_document_publication',
+          sources: documentSources,
+        });
+      } else {
+        await publishAnalysisResult(host.tabId, concordanceRunAll.id, {
+          kind: 'concordance_match_publication',
+          sources,
+        });
+      }
       setPublicationDialogOpen(false);
       toast.success('Adding Concordance Results to the Workspace.');
     } catch (cause) {
@@ -675,6 +710,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             nodeId={nodeId}
             column={column}
             value={effectiveTokenizerModelsByNode[nodeId] ?? ''}
+            disabled={searchMode !== 'tokens'}
+            disabledReason="Tokenizer models apply only in Tokens mode."
             onChange={(model, detectedLanguage) => {
               handleTokenizerModelChange(nodeId, column, model, detectedLanguage);
             }}
@@ -769,15 +806,27 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             dispersionChartMode,
             setDispersionChartMode,
             selectedBinIndices,
-            onBinSelect: handleBinSelect,
-            onBinRangeSelect: handleBinRangeSelect,
-            onClearBinSelection: handleClearBinSelection,
+            excludedMatchedTexts,
+            onToggleMatchedText: (blockKey, matchedText) => {
+              if (blockKey === CONCORDANCE_COMBINED_NODE_KEY) setCombinedPage(1);
+              toggleMatchedText(blockKey, matchedText);
+            },
+            onBinSelect: (blockKey, index, shiftHeld) => {
+              if (blockKey === CONCORDANCE_COMBINED_NODE_KEY) setCombinedPage(1);
+              handleBinSelect(blockKey, index, shiftHeld);
+            },
+            onBinRangeSelect: (blockKey, startIndex, endIndex, shiftHeld) => {
+              if (blockKey === CONCORDANCE_COMBINED_NODE_KEY) setCombinedPage(1);
+              handleBinRangeSelect(blockKey, startIndex, endIndex, shiftHeld);
+            },
+            onClearBinSelection: (blockKey) => {
+              if (blockKey === CONCORDANCE_COMBINED_NODE_KEY) setCombinedPage(1);
+              handleClearBinSelection(blockKey);
+            },
             binCount,
-            setBinCount,
-            reviewDispersionRowUnit,
-            setReviewDispersionRowUnit: (rowUnit) => {
-              setReviewDispersionRowUnit(rowUnit);
+            setBinCount: (value) => {
               setCombinedPage(1);
+              setBinCount(value);
             },
           }}
           metadata={{
@@ -843,10 +892,12 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         <ResultPublicationDialog
           open
           onOpenChange={setPublicationDialogOpen}
-          title="Add Concordance Results to Workspace"
-          nameSuffix="concordance"
+          title={`Add Concordance ${concordanceView === 'dispersion' ? 'Documents' : 'Matches'} to Workspace`}
+          nameSuffix={concordanceView === 'dispersion' ? 'concordance_documents' : 'concordance'}
           sources={publicationSources}
           isSubmitting={isPublishing}
+          mode={concordanceView === 'dispersion' ? 'document' : 'match'}
+          allowSourceSelection
           onSubmit={(sources) => {
             void handlePublishResult(sources);
           }}

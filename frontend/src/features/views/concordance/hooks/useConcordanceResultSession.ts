@@ -17,6 +17,7 @@ import type {
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import { fetchArrowTablePage } from '@/lib/arrow/arrowTable';
+import { queryConcordanceDocumentProjectionTable } from '@/api/tableApi';
 import { projectConcordanceResult } from '../../common/analysisApi';
 import { VIZ_PALETTE } from '../../common/vizPalette';
 import { buildCombinedSlice, CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
@@ -31,6 +32,7 @@ import {
   type ConcordanceReviewRowUnit,
   type ConcordanceRunAllReviewSource,
 } from '../concordanceRunAllReview';
+import type { DispersionDisplayBinCount } from '../concordanceDispersionDomain';
 import type { PaginationState } from './useConcordanceTaskFlow';
 
 interface ConcordanceResultSessionState {
@@ -112,7 +114,9 @@ interface UseConcordanceResultSessionOptions {
   showDispersion: boolean;
   nodeColorOverrides?: Record<string, string>;
   reviewSources?: ConcordanceRunAllReviewSource[];
-  reviewDispersionRowUnit: ConcordanceReviewRowUnit;
+  selectedBinIndices: Record<string, Set<number>>;
+  excludedMatchedTexts: Record<string, Set<string>>;
+  binCount: DispersionDisplayBinCount;
 }
 
 /** Projects immutable per-page Query resources and owns only result-view controls. */
@@ -126,7 +130,9 @@ export function useConcordanceResultSession({
   showDispersion,
   nodeColorOverrides = {},
   reviewSources = [],
-  reviewDispersionRowUnit,
+  selectedBinIndices,
+  excludedMatchedTexts,
+  binCount,
 }: UseConcordanceResultSessionOptions) {
   const [state, dispatch] = useReducer(resultSessionReducer, INITIAL_STATE);
   const hydratedAnalysisRef = useRef<string | null>(null);
@@ -171,7 +177,20 @@ export function useConcordanceResultSession({
 
   const isReview = reviewSources.length > 0;
   const reviewRowUnit: ConcordanceReviewRowUnit =
-    isReview && showDispersion ? reviewDispersionRowUnit : 'matches';
+    isReview && showDispersion ? 'documents' : 'matches';
+  const reviewFilterIdentity = JSON.stringify({
+    viewMode,
+    binCount,
+    selectedBins: Object.fromEntries(
+      Object.entries(selectedBinIndices).map(([key, values]) => [
+        key,
+        Array.from(values).sort((left, right) => left - right),
+      ]),
+    ),
+    excludedTerms: Object.fromEntries(
+      Object.entries(excludedMatchedTexts).map(([key, values]) => [key, Array.from(values).sort()]),
+    ),
+  });
   useEffect(() => {
     if (!isReview) return;
     dispatch({
@@ -181,7 +200,7 @@ export function useConcordanceResultSession({
           Object.entries(current).map(([nodeId, value]) => [nodeId, { ...value, currentPage: 1 }]),
         ),
     });
-  }, [isReview, reviewRowUnit]);
+  }, [isReview, reviewFilterIdentity, reviewRowUnit]);
   const effectiveBaseResult = isReview ? null : baseResult;
   const nodeIds = isReview
     ? reviewSources.map((review) => review.source.node_id)
@@ -208,6 +227,16 @@ export function useConcordanceResultSession({
       (base?.sorting.sort_by ?? null) === (query.sort_by ?? null) &&
       base?.sorting.descending === query.descending;
     const reviewSource = reviewSources.find((review) => review.source.node_id === nodeId) ?? null;
+    const filterKey = viewMode === 'combined' ? CONCORDANCE_COMBINED_NODE_KEY : nodeId;
+    const excludedTerms = Array.from(excludedMatchedTexts[filterKey] ?? []).sort();
+    const selectedBins = Array.from(selectedBinIndices[filterKey] ?? []).sort(
+      (left, right) => left - right,
+    );
+    const documentFilter = {
+      excluded_matched_texts: excludedTerms,
+      bin_count: selectedBins.length > 0 ? binCount : null,
+      selected_bins: selectedBins.length > 0 ? selectedBins : null,
+    } as const;
     const pageRequest = createNodeDataRequest({
       page: query.page ?? 1,
       page_size: pageSize,
@@ -218,6 +247,7 @@ export function useConcordanceResultSession({
       nodeId,
       query,
       pageRequest,
+      documentFilter,
       reviewSource,
       enabled: isReview
         ? Boolean(workspaceId && reviewSource)
@@ -226,20 +256,23 @@ export function useConcordanceResultSession({
   });
 
   const projectionQueries = useQueries({
-    queries: projections.map(({ query, pageRequest, reviewSource, enabled }) => {
+    queries: projections.map(({ query, pageRequest, documentFilter, reviewSource, enabled }) => {
       const projection = { kind: 'concordance', ...query } as const;
       // pageRequest already contains the effective global-or-node page size.
       // eslint-disable-next-line @tanstack/query/exhaustive-deps
       return {
         queryKey:
           workspaceId && reviewSource
-            ? queryKeys.analysisTableProjectionPage(
-                workspaceId,
-                reviewSource.analysisId,
-                reviewSource.source.table.table_id,
-                reviewRowUnit,
-                pageRequest,
-              )
+            ? [
+                ...queryKeys.analysisTableProjectionPage(
+                  workspaceId,
+                  reviewSource.analysisId,
+                  reviewSource.source.table.table_id,
+                  reviewRowUnit,
+                  pageRequest,
+                ),
+                reviewRowUnit === 'documents' ? documentFilter : null,
+              ]
             : workspaceId && analysisId
               ? queryKeys.analysisResult(workspaceId, analysisId, projection)
               : queryKeys.inactiveAnalysisResult(projection),
@@ -248,13 +281,28 @@ export function useConcordanceResultSession({
           if (workspaceId && reviewSource) {
             const pageNumber = query.page ?? 1;
             const pageSize = query.page_size ?? state.globalPageSize;
-            const projectionResource = reviewSource.source.table[reviewRowUnit];
-            const page = await fetchArrowTablePage(projectionResource.rows_url, {
-              page: pageNumber,
-              pageSize,
-              sortBy: query.sort_by ?? null,
-              descending: query.descending ?? false,
-            });
+            const page =
+              reviewRowUnit === 'documents'
+                ? await queryConcordanceDocumentProjectionTable({
+                    path: {
+                      workspace_id: workspaceId,
+                      analysis_id: reviewSource.analysisId,
+                      table_id: reviewSource.source.table.table_id,
+                    },
+                    body: {
+                      page: pageNumber,
+                      page_size: pageSize,
+                      sort_by: query.sort_by ?? null,
+                      descending: query.descending ?? false,
+                      ...documentFilter,
+                    },
+                  })
+                : await fetchArrowTablePage(reviewSource.source.table.matches.rows_url, {
+                    page: pageNumber,
+                    pageSize,
+                    sortBy: query.sort_by ?? null,
+                    descending: query.descending ?? false,
+                  });
             const result = projectConcordanceRunAllReviewPage(
               reviewSource,
               page,

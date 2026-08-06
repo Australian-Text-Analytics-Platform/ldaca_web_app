@@ -16,7 +16,13 @@ Your textual data should be consistently encoded (UTF8) and should not contain a
 
 You need to make sure that the column that includes the date is correctly classified in the Data Loader (not as string, but as datetime, integer or float). You can auto-convert this in the Data Loader. For additional metadata (e.g. gender, age, political party) it is a good idea to have these metadata converted in the Data Loader as categorical.
 
-For visualising words on the timeline: You first have to create a Concordance and add this as a data block to your workspace. When you do this, make sure you include the date and any other metadata that you need for your analysis. You then use the Concordance data block as source when doing the Trends and Sequence analysis and you add CONC_matched_text (string) as a Group By column. This will show you how the concordance search term occurs over time. Certain preprocess step may be required to eliminate the case differences in extracted data.
+For visualising words on the timeline: You first have to create a Concordance,
+open Review in **Table View**, and use **Add to Workspace** to create a
+**Concordance Match Publication**. Include the date and any other metadata that
+you need. Then use that Data Block as the source for Trends and Sequence and add
+`CONC_matched_text` (string) as a Group By column. This shows how each exact
+matched term occurs over time. A preprocessing step may be required if you want
+to eliminate case differences in the extracted data.
 
 - Can I change any of the settings/parameters?
 You can change the frequency (e.g. daily vs monthly), you can change the chart type for the visualisation, and you can add parameters (based on metadata) for the comparison (Add Group). You can change which parameters are visible and which are not visible in the timeline. When numerical data is selected, you can decide the interval where the origin to start for the X-axis (not necessarily starting from Zero).

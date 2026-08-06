@@ -219,6 +219,7 @@ reset after load, clone, import, close/reopen, or backend restart.
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows` | `get_analysis_table_projection_rows` | 200 Arrow | Deterministic document or match page from a nested Run All Result |
+| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/documents/query` | `query_concordance_document_projection` | 200 Arrow | Exact-term/bin-filtered Concordance document page with filtered total-row header |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/schema` | `get_analysis_table_projection_schema` | 200 Arrow | Zero-row schema for a document or match projection |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/density` | `get_concordance_table_density` | 200 JSON | Whole-Result Concordance density in 100 fixed bins |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/artifacts/{artifact_name}` | `download_analysis_artifact` | 200 | Download a declared Analysis Artifact snapshot |
@@ -244,10 +245,12 @@ descriptors with document and match row resources. Their stored artifacts have
 one row per matching document and a nested analysis list; each descriptor also
 reports explicit document and match counts. Concordance descriptors expose a
 whole-Result density resource. They do not create Data Blocks and therefore retain empty
-`output_node_ids`. A `concordance_result_publication` or
-`quotation_result_publication` Supporting Analysis must name the successful
-matching Run All parent. Its request selects the required document column plus
-optional metadata and analysis columns and one output name per source.
+`output_node_ids`. A `concordance_match_publication`,
+`concordance_document_publication`, or `quotation_result_publication`
+Supporting Analysis must name the successful matching Run All parent. Match
+and Quotation publication select columns. Document publication carries the
+exact Review filter and optional metadata while document and extraction are
+implicit required columns.
 Successful publication atomically creates the requested Derived Data Blocks;
 only the publication Result carries their output IDs.
 

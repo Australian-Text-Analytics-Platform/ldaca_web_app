@@ -11,6 +11,7 @@ interface Props {
   sourceColor?: string;
   sourceColorMap?: Record<string, string>;
   defaultPalette?: string[];
+  termColors?: Record<string, string>;
 }
 
 const DEFAULT_BAR_COLOR = '#0284c7';
@@ -37,6 +38,7 @@ export function ConcordanceDispersionCell({
   sourceColor = DEFAULT_BAR_COLOR,
   sourceColorMap = {},
   defaultPalette = [],
+  termColors = {},
 }: Props) {
   const fallbackLength = hits.reduce((max, hit) => {
     const endIndex = getNumericIndex(hit[CONCORDANCE_COLUMN_KEYS.endIdx]);
@@ -64,9 +66,10 @@ export function ConcordanceDispersionCell({
             const leftPercent = Math.min(100, (startIndex / domain) * 100);
             const hitSource = hit.__source_node;
             const matchColor =
-              hitSource && hasSourcePalette
+              termColors[rawText] ??
+              (hitSource && hasSourcePalette
                 ? getConcordanceSourceColor(hitSource, sourceColorMap, defaultPalette)
-                : sourceColor;
+                : sourceColor);
             const leftContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.leftContext]);
             const rightContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.rightContext]);
             return (

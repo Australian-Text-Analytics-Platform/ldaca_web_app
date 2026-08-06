@@ -170,7 +170,7 @@ describe('useWorkspaceTaskInbox', () => {
       execution_scope: 'supporting',
       output_node_ids: ['published-1'],
       request: {
-        kind: 'concordance_result_publication',
+        kind: 'concordance_match_publication',
         sources: [
           {
             source_node_id: 'node-1',

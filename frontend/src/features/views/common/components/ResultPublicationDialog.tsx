@@ -21,12 +21,17 @@ interface Props {
   sources: RunAllSourceTableResource[];
   isSubmitting: boolean;
   onSubmit: (sources: ResultPublicationSource[]) => void;
+  mode?: 'match' | 'document';
+  allowSourceSelection?: boolean;
 }
 
-const defaultColumns = (source: RunAllSourceTableResource): string[] => [
-  source.document_column,
-  ...source.analysis_columns.filter((column) => column !== source.document_column),
-];
+const defaultColumns = (source: RunAllSourceTableResource, mode: 'match' | 'document'): string[] =>
+  mode === 'document'
+    ? [source.document_column, 'CONC_extraction']
+    : [
+        source.document_column,
+        ...source.analysis_columns.filter((column) => column !== source.document_column),
+      ];
 
 /** Selects the immutable Result columns used by a Result Publication Analysis. */
 export function ResultPublicationDialog({
@@ -37,9 +42,14 @@ export function ResultPublicationDialog({
   sources,
   isSubmitting,
   onSubmit,
+  mode = 'match',
+  allowSourceSelection = false,
 }: Props) {
   const [columnsBySource, setColumnsBySource] = useState<Record<string, string[]>>(() =>
-    Object.fromEntries(sources.map((source) => [source.node_id, defaultColumns(source)])),
+    Object.fromEntries(sources.map((source) => [source.node_id, defaultColumns(source, mode)])),
+  );
+  const [includedSourceIds, setIncludedSourceIds] = useState<Set<string>>(
+    () => new Set(sources.map((source) => source.node_id)),
   );
   const [namesBySource, setNamesBySource] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -50,7 +60,7 @@ export function ResultPublicationDialog({
   const toggleColumn = (source: RunAllSourceTableResource, column: string) => {
     if (column === source.document_column) return;
     setColumnsBySource((current) => {
-      const selected = current[source.node_id] ?? defaultColumns(source);
+      const selected = current[source.node_id] ?? defaultColumns(source, mode);
       return {
         ...current,
         [source.node_id]: selected.includes(column)
@@ -60,12 +70,14 @@ export function ResultPublicationDialog({
     });
   };
   const canSubmit =
-    sources.length > 0 &&
-    sources.every(
-      (source) =>
-        namesBySource[source.node_id]?.trim() &&
-        columnsBySource[source.node_id]?.includes(source.document_column),
-    );
+    includedSourceIds.size > 0 &&
+    sources
+      .filter((source) => includedSourceIds.has(source.node_id))
+      .every(
+        (source) =>
+          namesBySource[source.node_id]?.trim() &&
+          columnsBySource[source.node_id]?.includes(source.document_column),
+      );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -78,60 +90,92 @@ export function ResultPublicationDialog({
         </DialogHeader>
         <div className="space-y-4">
           {sources.map((source) => {
-            const selected = columnsBySource[source.node_id] ?? defaultColumns(source);
+            const selected = columnsBySource[source.node_id] ?? defaultColumns(source, mode);
+            const included = includedSourceIds.has(source.node_id);
             return (
               <section key={source.node_id} className="space-y-3 rounded-lg border p-3">
-                <h3 className="font-medium">{source.node_name}</h3>
-                <div className="space-y-1">
-                  <Label htmlFor={`publication-name-${source.node_id}`}>New Data Block name</Label>
-                  <Input
-                    id={`publication-name-${source.node_id}`}
-                    value={namesBySource[source.node_id] ?? ''}
-                    maxLength={475}
-                    onChange={(event) => {
-                      setNamesBySource((current) => ({
-                        ...current,
-                        [source.node_id]: event.target.value,
-                      }));
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Columns</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox checked disabled />
-                      <span>
-                        {source.document_column}{' '}
-                        <span className="text-muted-foreground">(document, required)</span>
-                      </span>
-                    </label>
-                    {source.metadata_columns.map((column) => (
-                      <label key={column} className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={selected.includes(column)}
-                          onCheckedChange={() => {
-                            toggleColumn(source, column);
-                          }}
-                        />
-                        <span>{column}</span>
-                      </label>
-                    ))}
-                    {source.analysis_columns
-                      .filter((column) => column !== source.document_column)
-                      .map((column) => (
-                        <label key={column} className="flex items-center gap-2 text-sm">
-                          <Checkbox
-                            checked={selected.includes(column)}
-                            onCheckedChange={() => {
-                              toggleColumn(source, column);
-                            }}
-                          />
-                          <span>{column}</span>
+                <label className="flex items-center gap-2 font-medium">
+                  {allowSourceSelection ? (
+                    <Checkbox
+                      checked={included}
+                      onCheckedChange={() => {
+                        setIncludedSourceIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(source.node_id)) next.delete(source.node_id);
+                          else next.add(source.node_id);
+                          return next;
+                        });
+                      }}
+                    />
+                  ) : null}
+                  <span>{source.node_name}</span>
+                </label>
+                {included ? (
+                  <>
+                    <div className="space-y-1">
+                      <Label htmlFor={`publication-name-${source.node_id}`}>
+                        New Data Block name
+                      </Label>
+                      <Input
+                        id={`publication-name-${source.node_id}`}
+                        value={namesBySource[source.node_id] ?? ''}
+                        maxLength={475}
+                        onChange={(event) => {
+                          setNamesBySource((current) => ({
+                            ...current,
+                            [source.node_id]: event.target.value,
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Columns</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <label className="flex items-center gap-2 text-sm">
+                          <Checkbox checked disabled />
+                          <span>
+                            {source.document_column}{' '}
+                            <span className="text-muted-foreground">(document, required)</span>
+                          </span>
                         </label>
-                      ))}
-                  </div>
-                </div>
+                        {source.metadata_columns.map((column) => (
+                          <label key={column} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={selected.includes(column)}
+                              onCheckedChange={() => {
+                                toggleColumn(source, column);
+                              }}
+                            />
+                            <span>{column}</span>
+                          </label>
+                        ))}
+                        {mode === 'document' ? (
+                          <label className="flex items-center gap-2 text-sm">
+                            <Checkbox checked disabled />
+                            <span>
+                              CONC_extraction{' '}
+                              <span className="text-muted-foreground">(required)</span>
+                            </span>
+                          </label>
+                        ) : (
+                          source.analysis_columns
+                            .filter((column) => column !== source.document_column)
+                            .map((column) => (
+                              <label key={column} className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={selected.includes(column)}
+                                  onCheckedChange={() => {
+                                    toggleColumn(source, column);
+                                  }}
+                                />
+                                <span>{column}</span>
+                              </label>
+                            ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
               </section>
             );
           })}
@@ -150,11 +194,14 @@ export function ResultPublicationDialog({
             disabled={!canSubmit || isSubmitting}
             onClick={() => {
               onSubmit(
-                sources.map((source) => ({
-                  source_node_id: source.node_id,
-                  selected_columns: columnsBySource[source.node_id] ?? defaultColumns(source),
-                  new_node_name: namesBySource[source.node_id]?.trim() ?? '',
-                })),
+                sources
+                  .filter((source) => includedSourceIds.has(source.node_id))
+                  .map((source) => ({
+                    source_node_id: source.node_id,
+                    selected_columns:
+                      columnsBySource[source.node_id] ?? defaultColumns(source, mode),
+                    new_node_name: namesBySource[source.node_id]?.trim() ?? '',
+                  })),
               );
             }}
           >

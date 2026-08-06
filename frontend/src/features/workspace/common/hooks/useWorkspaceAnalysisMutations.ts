@@ -2,7 +2,8 @@ import { type QueryClient, useMutation } from '@tanstack/react-query';
 import { submitTabAnalysis } from '@/api';
 import type {
   ConcordanceRunAllAnalysisRequest,
-  ConcordanceResultPublicationAnalysisRequest,
+  ConcordanceDocumentPublicationAnalysisRequest,
+  ConcordanceMatchPublicationAnalysisRequest,
   QuotationResultPublicationAnalysisRequest,
   QuotationRunAllAnalysisRequest,
   TopicModelingDetachmentAnalysisRequest,
@@ -16,7 +17,8 @@ interface WorkspaceAnalysisMutationsParams {
 }
 
 type ResultPublicationRequest =
-  | ({ kind: 'concordance_result_publication' } & ConcordanceResultPublicationAnalysisRequest)
+  | ({ kind: 'concordance_match_publication' } & ConcordanceMatchPublicationAnalysisRequest)
+  | ({ kind: 'concordance_document_publication' } & ConcordanceDocumentPublicationAnalysisRequest)
   | ({ kind: 'quotation_result_publication' } & QuotationResultPublicationAnalysisRequest);
 
 /** Owns supporting and Run All Analysis commands exposed by Workspace actions. */
