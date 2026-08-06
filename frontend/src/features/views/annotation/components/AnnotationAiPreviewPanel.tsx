@@ -207,7 +207,9 @@ export function AnnotationAiPreviewPanel({
       className="mt-5 rounded-lg border bg-background/60 p-4"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold">AI Preview</h3>
+        <h3 data-guidance="annotation-ai-preview-results" className="text-base font-semibold">
+          AI Preview
+        </h3>
         <div className="flex flex-wrap items-center gap-2">
           <ColumnComparisonSelector
             availableColumns={comparisonColumnOptions}

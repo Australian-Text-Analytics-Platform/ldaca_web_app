@@ -258,9 +258,11 @@ export function TopicModelingParameterPanel({
         hasResult,
         runAllLabel: actionState.runLabel,
       }}
+      actionsGuidanceTarget="topic-modeling-actions"
       parametersLocked={parametersLocked}
     >
       <NodeInputsPanel
+        guidanceTarget="topic-modeling-inputs"
         resolvedNodes={nodeInputs.resolvedNodes}
         availableNodes={nodeInputs.availableNodes}
         graphSelectedIds={nodeInputs.graphSelectedIds}

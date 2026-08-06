@@ -1,10 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { contextualHintRegistry, DATA_LOADER_GUIDANCE_IDS } from '../registry';
+import {
+  CONTEXTUAL_HINT_IDS,
+  contextualHintRegistry,
+  contextualHintSequences,
+} from '../registry';
 
 const addDataBlockHint = contextualHintRegistry.find(
-  (definition) => definition.id === DATA_LOADER_GUIDANCE_IDS.addDataBlock,
+  (definition) => definition.id === CONTEXTUAL_HINT_IDS.dataLoader.addDataBlock,
 );
 
 function resolveAddDataBlockTarget() {
@@ -44,5 +48,18 @@ describe('Data Loader guidance registry', () => {
     );
 
     expect(resolveAddDataBlockTarget()).toBe(screen.getByText('File toolbar'));
+  });
+
+  it('defines 50 unique, automatically placed hints in exactly one view sequence', () => {
+    const ids = contextualHintRegistry.map((definition) => definition.id);
+    const sequencedIds = Object.values(contextualHintSequences).flat();
+
+    expect(ids).toHaveLength(50);
+    expect(new Set(ids).size).toBe(50);
+    expect(sequencedIds).toHaveLength(50);
+    expect(new Set(sequencedIds)).toEqual(new Set(ids));
+    expect(contextualHintRegistry.every((definition) => definition.placement === 'auto')).toBe(
+      true,
+    );
   });
 });

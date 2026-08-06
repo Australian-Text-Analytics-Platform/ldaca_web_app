@@ -18,7 +18,7 @@ const {
   mockCreateFolder,
   mockMoveFile,
   mockListFeaturedDataPortalCollections,
-  mockRequestContextualHint,
+  mockPublishContextualHints,
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
   mockSetCurrentWorkspace: vi.fn(),
@@ -29,7 +29,7 @@ const {
   mockCreateFolder: vi.fn(),
   mockMoveFile: vi.fn(),
   mockListFeaturedDataPortalCollections: vi.fn(),
-  mockRequestContextualHint: vi.fn(),
+  mockPublishContextualHints: vi.fn(),
 }));
 
 interface MockWorkspaceState {
@@ -100,11 +100,8 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
   useAuth: () => ({}),
 }));
 
-vi.mock('@/features/guidance/GuidanceContext', () => ({
-  useGuidance: () => ({
-    requestContextualHint: mockRequestContextualHint,
-    startGuidedTour: vi.fn(),
-  }),
+vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
+  useProgressiveContextualHints: mockPublishContextualHints,
 }));
 
 const defaultMockFileTree: FileTreeNode[] = [

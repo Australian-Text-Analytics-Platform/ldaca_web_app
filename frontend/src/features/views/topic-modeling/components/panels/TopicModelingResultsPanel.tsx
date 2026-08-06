@@ -113,6 +113,7 @@ export function TopicModelingResultsPanel({
       <AnalysisCardLayout
         cardRef={isSuccessfulState ? containerRef : undefined}
         title={cardTitle}
+        titleGuidanceTarget={isSuccessfulState ? 'topic-modeling-results' : undefined}
         tone={cardTone}
         help={helperConfig}
       >
@@ -166,7 +167,12 @@ export function TopicModelingResultsPanel({
                         : undefined
                     }
                   >
-                    <Button size="sm" onClick={onAddToWorkspace} disabled={isAddingToWorkspace}>
+                    <Button
+                      data-guidance="topic-modeling-publish"
+                      size="sm"
+                      onClick={onAddToWorkspace}
+                      disabled={isAddingToWorkspace}
+                    >
                       <Plus className="mr-1 h-4 w-4" />
                       Add to Workspace
                     </Button>

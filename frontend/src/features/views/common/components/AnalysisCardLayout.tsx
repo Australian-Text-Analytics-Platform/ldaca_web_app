@@ -47,6 +47,9 @@ interface AnalysisCardLayoutProps {
   children: React.ReactNode;
   parametersLocked?: boolean;
   footer?: React.ReactNode;
+  titleGuidanceTarget?: string;
+  actionsGuidanceTarget?: string;
+  footerGuidanceTarget?: string;
   cardRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -65,6 +68,9 @@ export function AnalysisCardLayout({
   children,
   parametersLocked = false,
   footer,
+  titleGuidanceTarget,
+  actionsGuidanceTarget,
+  footerGuidanceTarget,
   cardRef,
 }: AnalysisCardLayoutProps) {
   const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-destructive/50');
@@ -102,7 +108,7 @@ export function AnalysisCardLayout({
     <Card ref={cardRef} className={cardToneClassName}>
       <CardHeader className="space-y-0 pb-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle data-guidance={titleGuidanceTarget} className="flex items-center gap-2">
             {title}
             {info ? (
               <InfoIcon targetKey={info.targetKey} label={info.label} tooltip={info.tooltip} />
@@ -124,7 +130,10 @@ export function AnalysisCardLayout({
       </fieldset>
 
       {actions ? (
-        <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
+        <CardFooter
+          data-guidance={actionsGuidanceTarget}
+          className="flex flex-wrap items-center gap-3 pt-0"
+        >
           {actions.onPreview ? (
             <div className="flex items-center gap-2">
               <DisabledReasonTooltip reason={previewDisabledReason}>
@@ -229,7 +238,7 @@ export function AnalysisCardLayout({
         </CardFooter>
       ) : null}
 
-      {footer ? <CardFooter>{footer}</CardFooter> : null}
+      {footer ? <CardFooter data-guidance={footerGuidanceTarget}>{footer}</CardFooter> : null}
     </Card>
   );
 }

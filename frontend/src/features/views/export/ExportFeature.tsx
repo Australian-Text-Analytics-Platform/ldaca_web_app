@@ -12,6 +12,9 @@ import {
 } from '@/components/ui/select';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
+import { useGuidance } from '@/features/guidance/GuidanceContext';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { NodeInput } from '@/features/views/common/nodeInputs/nodeInputsCore';
 import { useNodeInputs } from '@/features/views/common/nodeInputs/useNodeInputs';
@@ -37,6 +40,7 @@ interface ExportSelection {
 
 /** Selects and downloads physical Data Block contents or the complete Workspace archive. */
 function ExportFeature() {
+  const { reachContextualHint } = useGuidance();
   const { currentWorkspaceId, currentWorkspace, nodes } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const [selection, setSelection] = useState<ExportSelection>({
@@ -68,6 +72,7 @@ function ExportFeature() {
         dataBlocks: nodeInputs.selectedNodes.map((node) => ({ id: node.id, name: node.name })),
         format,
       });
+      reachContextualHint(CONTEXTUAL_HINT_IDS.export.dataBlockSuccess);
       toast.success(
         selectedIds.length === 1
           ? 'Data Block exported'
@@ -90,6 +95,7 @@ function ExportFeature() {
         throwOnError: true,
       });
       await saveBlob(data, `${safeStem(currentWorkspace?.name ?? '', currentWorkspaceId)}.zip`);
+      reachContextualHint(CONTEXTUAL_HINT_IDS.export.workspaceSuccess);
       toast.success('Workspace archive exported');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not export workspace archive');
@@ -97,6 +103,11 @@ function ExportFeature() {
       setExportingWorkspace(false);
     }
   };
+
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.export.inputs,
+    ...(selectedIds.length > 0 ? [CONTEXTUAL_HINT_IDS.export.format] : []),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -118,6 +129,7 @@ function ExportFeature() {
         </CardHeader>
         <CardContent className="space-y-5">
           <NodeInputsPanel
+            guidanceTarget="export-inputs"
             resolvedNodes={nodeInputs.resolvedNodes}
             availableNodes={nodeInputs.availableNodes}
             graphSelectedIds={selectedNodeIds}
@@ -135,7 +147,10 @@ function ExportFeature() {
             emptyMessage="No Data Blocks selected. Add individual Data Blocks or use Add all."
           />
 
-          <div className="flex flex-wrap items-end justify-between gap-4 border-t pt-4">
+          <div
+            data-guidance="export-actions"
+            className="flex flex-wrap items-end justify-between gap-4 border-t pt-4"
+          >
             <div className="w-full max-w-xs space-y-2">
               <label htmlFor="data-block-export-format" className="text-sm font-medium">
                 Format
@@ -164,6 +179,7 @@ function ExportFeature() {
             </div>
             <div className="space-y-1 text-right">
               <Button
+                data-guidance="export-data-blocks"
                 type="button"
                 onClick={() => void handleDataBlockExport()}
                 disabled={!currentWorkspaceId || selectedIds.length === 0 || exportingDataBlocks}
@@ -194,6 +210,7 @@ function ExportFeature() {
             to relocate the workspace.
           </p>
           <Button
+            data-guidance="export-workspace"
             type="button"
             onClick={() => void handleWorkspaceExport()}
             disabled={!currentWorkspaceId || exportingWorkspace}

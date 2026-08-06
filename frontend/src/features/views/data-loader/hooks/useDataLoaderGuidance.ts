@@ -1,7 +1,5 @@
-import { useEffect } from 'react';
-
-import { useGuidance } from '@/features/guidance/GuidanceContext';
-import { DATA_LOADER_GUIDANCE_IDS } from '@/features/guidance/registry';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 
 interface DataLoaderGuidanceState {
   currentWorkspaceId: string | null;
@@ -13,8 +11,8 @@ interface DataLoaderGuidanceState {
 }
 
 /**
- * Requests the next first-run explanation from the Data Loader's real workflow
- * state. Acknowledgment and single-session policy remain owned by GuidanceProvider.
+ * Publishes the Data Loader milestones reached by the current workflow state.
+ * Ordering, visit deferral, and acknowledgment remain owned by GuidanceProvider.
  */
 export function useDataLoaderGuidance({
   currentWorkspaceId,
@@ -24,35 +22,16 @@ export function useDataLoaderGuidance({
   workspaceBusy,
   workspaceCount,
 }: DataLoaderGuidanceState) {
-  const { requestContextualHint } = useGuidance();
-
-  useEffect(() => {
-    if (workspaceBusy || loadingFiles) return;
-
+  const ids = CONTEXTUAL_HINT_IDS.dataLoader;
+  const eligibleHintIds: string[] = [];
+  if (!workspaceBusy && !loadingFiles) {
     if (!currentWorkspaceId) {
-      requestContextualHint(
-        workspaceCount === 0
-          ? DATA_LOADER_GUIDANCE_IDS.workspace
-          : DATA_LOADER_GUIDANCE_IDS.workspaceLoad,
-      );
-      return;
+      eligibleHintIds.push(workspaceCount === 0 ? ids.workspace : ids.workspaceLoad);
+    } else {
+      eligibleHintIds.push(ids.activeWorkspace, ids.fileSources);
+      if (totalFileCount > 0) eligibleHintIds.push(ids.addDataBlock);
+      if (nodeCount > 0) eligibleHintIds.push(ids.dataBlocks);
     }
-    if (totalFileCount === 0) {
-      requestContextualHint(DATA_LOADER_GUIDANCE_IDS.fileSources);
-      return;
-    }
-    if (nodeCount === 0) {
-      requestContextualHint(DATA_LOADER_GUIDANCE_IDS.addDataBlock);
-      return;
-    }
-    requestContextualHint(DATA_LOADER_GUIDANCE_IDS.dataBlocks);
-  }, [
-    currentWorkspaceId,
-    loadingFiles,
-    nodeCount,
-    requestContextualHint,
-    totalFileCount,
-    workspaceBusy,
-    workspaceCount,
-  ]);
+  }
+  useProgressiveContextualHints(eligibleHintIds);
 }

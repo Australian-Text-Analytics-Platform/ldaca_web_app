@@ -136,6 +136,7 @@ export function ConcordanceParameterPanel({
       <fieldset disabled={parametersLocked} className="contents">
         <CardContent className="space-y-4 pt-0">
           <NodeInputsPanel
+            guidanceTarget="concordance-inputs"
             resolvedNodes={nodeInputs.resolvedNodes}
             availableNodes={nodeInputs.availableNodes}
             graphSelectedIds={nodeInputs.graphSelectedIds}
@@ -308,7 +309,10 @@ export function ConcordanceParameterPanel({
           </div>
         </CardContent>
       </fieldset>
-      <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
+      <CardFooter
+        data-guidance="concordance-actions"
+        className="flex flex-wrap items-center gap-3 pt-0"
+      >
         <>
           <DisabledReasonTooltip reason={runDisabledReason}>
             <Button

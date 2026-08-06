@@ -61,6 +61,7 @@ interface RunAllReviewTableProps {
   sourceColumns: string[];
   sourceColor: string;
   title: string;
+  guidanceTarget?: string;
   requiredColumns: string[];
   comparisonColumn: string;
   comparisonColumns: string[];
@@ -90,6 +91,7 @@ export function RunAllReviewTable({
   sourceColumns,
   sourceColor,
   title,
+  guidanceTarget,
   requiredColumns,
   comparisonColumn,
   comparisonColumns,
@@ -218,7 +220,9 @@ export function RunAllReviewTable({
   return (
     <section aria-label={`${title} Review`} className="rounded-lg border bg-background/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold">{title} Review</h3>
+        <h3 data-guidance={guidanceTarget} className="text-base font-semibold">
+          {title} Review
+        </h3>
         {data ? (
           <div className="flex flex-wrap items-center gap-2">
             <ColumnComparisonSelector

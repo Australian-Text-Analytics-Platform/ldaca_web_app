@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { TokenFrequencyRequest, TokenFrequencyResponse } from '@/api';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { usePersistNodeDocumentColumn } from '@/features/views/common/hooks/usePersistNodeDocumentColumn';
 import { usePersistNodeTokenizerModel } from '@/features/views/common/hooks/usePersistNodeTokenizerModel';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
@@ -419,6 +421,12 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     setLiveTokenizerModelsByNode((prev) => ({ ...prev, [nodeId]: model.trim() }));
     void persistTokenizerModel(nodeId, model);
   };
+
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.tokenFrequency.inputs,
+    ...(!actionState.runDisabled ? [CONTEXTUAL_HINT_IDS.tokenFrequency.run] : []),
+    ...(results ? [CONTEXTUAL_HINT_IDS.tokenFrequency.results] : []),
+  ]);
 
   return (
     <div className="space-y-4">

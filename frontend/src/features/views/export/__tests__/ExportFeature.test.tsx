@@ -2,12 +2,23 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/features/guidance/GuidanceContext', () => ({
+  useGuidance: () => ({
+    reachContextualHint: mocks.reachContextualHint,
+    startGuidedTour: vi.fn(),
+  }),
+}));
+vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
+  useProgressiveContextualHints: vi.fn(),
+}));
+
 import ExportFeature from '../ExportFeature';
 
 const mocks = vi.hoisted(() => ({
   exportDataBlocks: vi.fn(),
   exportWorkspaceArchive: vi.fn(),
   saveBlob: vi.fn(),
+  reachContextualHint: vi.fn(),
   useWorkspaceData: vi.fn(),
   useWorkspaceSelection: vi.fn(),
   toast: { error: vi.fn(), success: vi.fn() },
@@ -81,6 +92,7 @@ describe('ExportFeature', () => {
       throwOnError: true,
     });
     expect(mocks.saveBlob).toHaveBeenCalledWith(expect.any(Blob), 'Corpus_One.parquet');
+    expect(mocks.reachContextualHint).toHaveBeenCalledWith('export.data-block-success');
   });
 
   it('adds every remaining Data Block without a selector maximum and downloads one ZIP', async () => {
@@ -125,5 +137,6 @@ describe('ExportFeature', () => {
     await waitFor(() =>
       expect(mocks.saveBlob).toHaveBeenCalledWith(expect.any(Blob), 'Main_Workspace.zip'),
     );
+    expect(mocks.reachContextualHint).toHaveBeenCalledWith('export.workspace-success');
   });
 });

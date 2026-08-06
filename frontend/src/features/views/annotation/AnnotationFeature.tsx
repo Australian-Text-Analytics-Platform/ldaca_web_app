@@ -4,6 +4,9 @@ import { toast } from 'sonner';
 import type { Analysis, AnnotationAnalysisRequest, AnnotationResult } from '@/api';
 import { sqlIdentifier, sqlTable } from '@/api';
 import { Button } from '@/components/ui/button';
+import { useGuidance } from '@/features/guidance/GuidanceContext';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import {
   Dialog,
@@ -155,6 +158,7 @@ function AnnotationColumnPicker({
  * Codebook Data Block when requested, and load/save editable code rows.
  */
 function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
+  const { reachContextualHint } = useGuidance();
   const {
     latestPreview,
     latestRunAll,
@@ -858,12 +862,50 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     enabled: Boolean(aiResult),
   });
 
+  const sourceReady = Boolean(sourceNode && selectedAnnotationColumnExists);
+  const codebookReady = Boolean(
+    classDescriptionNode && classDescriptionClassColumn && classDescriptionDescriptionColumn,
+  );
+  const aiRunAllReady = Boolean(
+    annotationRunAll?.state === 'succeeded' && annotationRunAllSource && reviewSourceNode,
+  );
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.annotation.source,
+    ...(sourceReady ? [CONTEXTUAL_HINT_IDS.annotation.codebook] : []),
+    ...(sourceReady && codebookReady ? [CONTEXTUAL_HINT_IDS.annotation.mode] : []),
+    ...(annotationMode === 'manual' && sourceReady && codebookReady
+      ? [CONTEXTUAL_HINT_IDS.annotation.manualStart]
+      : []),
+    ...(annotationMode === 'manual' && hasRun
+      ? [CONTEXTUAL_HINT_IDS.annotation.manualResults]
+      : []),
+    ...(annotationMode === 'ai' && sourceReady && codebookReady
+      ? [CONTEXTUAL_HINT_IDS.annotation.aiSetup]
+      : []),
+    ...(annotationMode === 'ai' && aiResult && serverAiRequest && !aiRunAllReady
+      ? [CONTEXTUAL_HINT_IDS.annotation.aiPreviewResults]
+      : []),
+    ...(annotationMode === 'ai' && aiRunAllReady
+      ? [CONTEXTUAL_HINT_IDS.annotation.aiRunAllResults]
+      : []),
+  ]);
+
   return (
     <section aria-label="Annotation Setup" className="space-y-5">
       <div className="relative">
         <section aria-label="Annotation Parameter Panel">
           <AnalysisCardLayout
             title="Annotation"
+            info={{
+              targetKey: 'annotation.overview',
+              label: 'About Annotation',
+              tooltip: 'Learn what manual and AI annotation are for.',
+            }}
+            help={{
+              targetKey: 'analysis.annotation.parameters',
+              label: 'Annotation setup',
+              tooltip: 'Set up the source, Codebook, mode, and review workflow.',
+            }}
             parametersLocked={annotationMode === 'ai' && analysisActionLifecycle.parametersLocked}
             actions={
               annotationMode === 'ai'
@@ -929,6 +971,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 </DisabledReasonTooltip>
               ) : undefined
             }
+            footerGuidanceTarget={
+              annotationMode === 'manual' ? 'annotation-manual-start' : undefined
+            }
           >
             <div className="@container/annotation-selectors">
               <div
@@ -939,7 +984,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                   aria-label="Main Data Block Setup"
                   className="rounded-lg border bg-background/60 p-4"
                 >
-                  <h3 className="mb-3 text-base font-semibold">Annotation Data Block</h3>
+                  <h3
+                    data-guidance="annotation-source"
+                    className="mb-3 text-base font-semibold"
+                  >
+                    Annotation Data Block
+                  </h3>
                   <NodeInputsPanel
                     title="Selected Data Blocks"
                     resolvedNodes={sourceNodeInputs.resolvedNodes}
@@ -966,7 +1016,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                   aria-label="Codebook Setup"
                   className="rounded-lg border bg-background/60 p-4"
                 >
-                  <div className="mb-3 flex items-center justify-between gap-2">
+                  <div
+                    data-guidance="annotation-codebook"
+                    className="mb-3 flex items-center justify-between gap-2"
+                  >
                     <h3 className="text-base font-semibold">Codebook</h3>
                     <Button
                       type="button"
@@ -1013,6 +1066,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
             </div>
 
             <section
+              data-guidance="annotation-mode"
               aria-label="Annotation Mode"
               className="mt-5 rounded-lg border bg-background/60 p-4"
             >
@@ -1060,6 +1114,11 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     providerModels={aiProviderModels}
                     model={aiModel}
                     disabled={controlsLocked}
+                    onAdvancedOpenChange={(open) => {
+                      if (open) {
+                        reachContextualHint(CONTEXTUAL_HINT_IDS.annotation.aiAdvanced);
+                      }
+                    }}
                     advanced={
                       <>
                         <div className="space-y-2">
@@ -1339,6 +1398,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           sourceColor={reviewSourceNode.color ?? GREY}
           rowCount={reviewSourceNode.shape?.[0] ?? 0}
           title="Annotation"
+          guidanceTarget="annotation-ai-run-all-results"
           requiredColumns={[
             annotationRunAllSource.text_column,
             annotationRunAllSource.annotation_column,

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useSchemaManagement } from '@/features/workspace/common/hooks/useSchemaManagement';
@@ -312,6 +314,12 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     await handleAnalyze();
   };
 
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.trends.inputs,
+    ...(!actionState.runDisabled && activeTimeColumn ? [CONTEXTUAL_HINT_IDS.trends.run] : []),
+    ...(results ? [CONTEXTUAL_HINT_IDS.trends.results] : []),
+  ]);
+
   const chartModel = buildSequentialChartModel({
     results,
     parameters: serverRequest,
@@ -422,6 +430,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
             label: 'Clear results',
           },
         }}
+        actionsGuidanceTarget="trends-actions"
         parametersLocked={runAllLocksParameters}
       >
         <SequentialAnalysisParameterPanel

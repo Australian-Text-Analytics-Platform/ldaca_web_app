@@ -3,6 +3,9 @@ import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucid
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { useGuidance } from '@/features/guidance/GuidanceContext';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { NodeSelectionRenderArgs } from '@/features/views/common/components/NodeSelectionList';
 import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
@@ -63,6 +66,7 @@ const PolarsExpressionFallback = () => (
  * expression editor only when users open that subtab.
  */
 function DataPreprocessingFeature() {
+  const { reachContextualHint } = useGuidance();
   const { currentWorkspaceId } = useWorkspaceData();
   const userId = useAuthStore((state) => state.session?.user?.id ?? '__anonymous__');
   const {
@@ -157,6 +161,89 @@ function DataPreprocessingFeature() {
     setAlertOpen(true);
   };
 
+  const reachApplyOutcome = (mode: PreprocessingApplyMode) => {
+    reachContextualHint(
+      mode === CREATE_DATA_BLOCK_MODE
+        ? CONTEXTUAL_HINT_IDS.preprocessing.createOutcome
+        : CONTEXTUAL_HINT_IDS.preprocessing.updateOutcome,
+    );
+  };
+  const guidedFilterPreview = async (...args: Parameters<typeof filterPreview>) => {
+    const response = await filterPreview(...args);
+    reachContextualHint(CONTEXTUAL_HINT_IDS.preprocessing.preview);
+    return response;
+  };
+  const guidedFilterNode = async (...args: Parameters<typeof filterNode>) => {
+    const response = await filterNode(...args);
+    reachApplyOutcome(args[2] ?? CREATE_DATA_BLOCK_MODE);
+    return response;
+  };
+  const guidedSlicePreview = async (...args: Parameters<typeof slicePreview>) => {
+    const response = await slicePreview(...args);
+    reachContextualHint(CONTEXTUAL_HINT_IDS.preprocessing.preview);
+    return response;
+  };
+  const guidedSliceNode = async (...args: Parameters<typeof sliceNode>) => {
+    const response = await sliceNode(...args);
+    reachApplyOutcome(CREATE_DATA_BLOCK_MODE);
+    return response;
+  };
+  const guidedJoinNodes = async (...args: Parameters<typeof joinNodes>) => {
+    const response = await joinNodes(...args);
+    reachApplyOutcome(CREATE_DATA_BLOCK_MODE);
+    return response;
+  };
+  const guidedConcatPreview = async (...args: Parameters<typeof concatPreview>) => {
+    const response = await concatPreview(...args);
+    reachContextualHint(CONTEXTUAL_HINT_IDS.preprocessing.preview);
+    return response;
+  };
+  const guidedConcatNodes = async (...args: Parameters<typeof concatNodes>) => {
+    const response = await concatNodes(...args);
+    reachApplyOutcome(CREATE_DATA_BLOCK_MODE);
+    return response;
+  };
+  const guidedReplaceTextPreview = async (...args: Parameters<typeof replaceTextPreview>) => {
+    const response = await replaceTextPreview(...args);
+    reachContextualHint(CONTEXTUAL_HINT_IDS.preprocessing.preview);
+    return response;
+  };
+  const guidedReplaceText = async (...args: Parameters<typeof replaceText>) => {
+    const response = await replaceText(...args);
+    reachApplyOutcome(args[2] ?? CREATE_DATA_BLOCK_MODE);
+    return response;
+  };
+  const guidedExpressionPreview = async (...args: Parameters<typeof polarsExpressionPreview>) => {
+    const response = await polarsExpressionPreview(...args);
+    reachContextualHint(CONTEXTUAL_HINT_IDS.preprocessing.preview);
+    return response;
+  };
+  const guidedExpressionApply = async (...args: Parameters<typeof polarsExpressionApply>) => {
+    const response = await polarsExpressionApply(...args);
+    reachApplyOutcome(args[2] ?? CREATE_DATA_BLOCK_MODE);
+    return response;
+  };
+
+  const operationReady =
+    activeSubtab === 'join'
+      ? selectedNodeIds.length >= 2
+      : activeSubtab === 'concat'
+        ? selectedNodeIds.length >= 2
+        : Boolean(selectedNodeId);
+  const activeOperationHint = {
+    filter: CONTEXTUAL_HINT_IDS.preprocessing.filter,
+    slice: CONTEXTUAL_HINT_IDS.preprocessing.sample,
+    join: CONTEXTUAL_HINT_IDS.preprocessing.join,
+    concat: CONTEXTUAL_HINT_IDS.preprocessing.stack,
+    find: CONTEXTUAL_HINT_IDS.preprocessing.find,
+    aggregate: CONTEXTUAL_HINT_IDS.preprocessing.create,
+    expression: CONTEXTUAL_HINT_IDS.preprocessing.expression,
+  }[activeSubtab];
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.preprocessing.inputs,
+    ...(operationReady ? [activeOperationHint] : []),
+  ]);
+
   /**
    * Renders the single shared preprocessing input panel inside each active
    * subtab card so preprocessing matches the other functional tab layouts.
@@ -164,6 +251,7 @@ function DataPreprocessingFeature() {
   const renderNodeInputsPanel = () => (
     <div>
       <NodeInputsPanel
+        guidanceTarget="preprocessing-inputs"
         resolvedNodes={nodeInputs.resolvedNodes}
         availableNodes={nodeInputs.availableNodes}
         graphSelectedIds={nodeInputs.graphSelectedIds}
@@ -219,31 +307,31 @@ function DataPreprocessingFeature() {
             aria-label="Data preprocessing sub-views"
             className="flex w-max flex-nowrap justify-start gap-2"
           >
-            <TabsTrigger value="filter">
+            <TabsTrigger data-guidance="preprocessing-operation-filter" value="filter">
               <Filter className="mr-1.5 h-4 w-4" />
               Filter
             </TabsTrigger>
-            <TabsTrigger value="slice">
+            <TabsTrigger data-guidance="preprocessing-operation-sample" value="slice">
               <Shuffle className="mr-1.5 h-4 w-4" />
               Sample
             </TabsTrigger>
-            <TabsTrigger value="join">
+            <TabsTrigger data-guidance="preprocessing-operation-join" value="join">
               <Merge className="mr-1.5 h-4 w-4" />
               Join
             </TabsTrigger>
-            <TabsTrigger value="concat">
+            <TabsTrigger data-guidance="preprocessing-operation-stack" value="concat">
               <Layers className="mr-1.5 h-4 w-4" />
               Stack
             </TabsTrigger>
-            <TabsTrigger value="find">
+            <TabsTrigger data-guidance="preprocessing-operation-find" value="find">
               <Search className="mr-1.5 h-4 w-4" />
               Find
             </TabsTrigger>
-            <TabsTrigger value="aggregate">
+            <TabsTrigger data-guidance="preprocessing-operation-create" value="aggregate">
               <Calculator className="mr-1.5 h-4 w-4" />
               Create
             </TabsTrigger>
-            <TabsTrigger value="expression">
+            <TabsTrigger data-guidance="preprocessing-operation-expression" value="expression">
               <Code2 className="mr-1.5 h-4 w-4" />
               Expression
             </TabsTrigger>
@@ -261,8 +349,8 @@ function DataPreprocessingFeature() {
             selectedNode={selectedNode}
             columnOptions={selectedNodeColumnOptions}
             currentWorkspaceId={currentWorkspaceId}
-            filterNode={filterNode}
-            filterPreview={filterPreview}
+            filterNode={guidedFilterNode}
+            filterPreview={guidedFilterPreview}
             isLoading={isLoading}
             onAlert={handleAlert}
             applyMode={applyMode}
@@ -275,8 +363,8 @@ function DataPreprocessingFeature() {
             currentWorkspaceId={currentWorkspaceId}
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
-            sliceNode={sliceNode}
-            slicePreview={slicePreview}
+            sliceNode={guidedSliceNode}
+            slicePreview={guidedSlicePreview}
             isLoading={isLoading}
             onAlert={handleAlert}
           />
@@ -291,7 +379,10 @@ function DataPreprocessingFeature() {
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
             getColumnInfos={nodeInputs.getColumnInfos}
-            joinNodes={joinNodes}
+            joinNodes={guidedJoinNodes}
+            onPreviewSuccess={() => {
+              reachContextualHint(CONTEXTUAL_HINT_IDS.preprocessing.preview);
+            }}
             isLoading={isLoading}
             onAlert={handleAlert}
           />
@@ -304,8 +395,8 @@ function DataPreprocessingFeature() {
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
             getColumnInfos={nodeInputs.getColumnInfos}
-            concatNodes={concatNodes}
-            concatPreview={concatPreview}
+            concatNodes={guidedConcatNodes}
+            concatPreview={guidedConcatPreview}
             isLoading={isLoading}
             onAlert={handleAlert}
           />
@@ -320,8 +411,8 @@ function DataPreprocessingFeature() {
             getColumnInfos={nodeInputs.getColumnInfos}
             isLoading={isLoading}
             onAlert={handleAlert}
-            replaceTextPreview={replaceTextPreview}
-            replaceText={replaceText}
+            replaceTextPreview={guidedReplaceTextPreview}
+            replaceText={guidedReplaceText}
             refreshNodeSchema={refreshNodeSchema}
             applyMode={applyMode}
           />
@@ -335,8 +426,8 @@ function DataPreprocessingFeature() {
             getColumnInfos={nodeInputs.getColumnInfos}
             isLoading={isLoading}
             onAlert={handleAlert}
-            polarsExpressionPreview={polarsExpressionPreview}
-            polarsExpressionApply={polarsExpressionApply}
+            polarsExpressionPreview={guidedExpressionPreview}
+            polarsExpressionApply={guidedExpressionApply}
             refreshNodeSchema={refreshNodeSchema}
             applyMode={applyMode}
           />
@@ -350,8 +441,8 @@ function DataPreprocessingFeature() {
               selectedNodes={selectedNodes}
               isLoading={isLoading}
               onAlert={handleAlert}
-              polarsExpressionPreview={polarsExpressionPreview}
-              polarsExpressionApply={polarsExpressionApply}
+              polarsExpressionPreview={guidedExpressionPreview}
+              polarsExpressionApply={guidedExpressionApply}
               refreshNodeSchema={refreshNodeSchema}
               applyMode={applyMode}
             />

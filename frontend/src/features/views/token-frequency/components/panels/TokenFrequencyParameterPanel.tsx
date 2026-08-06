@@ -188,9 +188,11 @@ export const TokenFrequencyParameterPanel = ({
         runAllHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
         clearHelp: { targetKey: 'analysis.token-frequency.clear-results', label: 'Clear results' },
       }}
+      actionsGuidanceTarget="token-frequency-actions"
       parametersLocked={parametersLocked}
     >
       <NodeInputsPanel
+        guidanceTarget="token-frequency-inputs"
         resolvedNodes={nodeInputs.resolvedNodes}
         unavailableNodes={unavailableNodes}
         inputOrder={nodeInputs.inputs.map((input) => input.node_id)}

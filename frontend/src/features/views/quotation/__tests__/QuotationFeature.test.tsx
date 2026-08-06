@@ -3,6 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
+  useProgressiveContextualHints: vi.fn(),
+}));
+
 const resultApiMocks = vi.hoisted(() => ({
   getAnalysisResult: vi.fn(),
   queryAnalysisResult: vi.fn(),

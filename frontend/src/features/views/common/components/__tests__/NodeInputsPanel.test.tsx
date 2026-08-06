@@ -74,6 +74,24 @@ describe('NodeInputsPanel', () => {
     nodeInputRequestsStore();
   });
 
+  it('keeps its guidance anchor clear of analysis tab chrome when Joyride scrolls to it', () => {
+    render(
+      <NodeInputsPanel
+        {...baseProps}
+        title="Concordance inputs"
+        guidanceTarget="concordance-inputs"
+      />,
+    );
+
+    expect(screen.getByRole('group', { name: 'Concordance inputs controls' })).toHaveClass(
+      'scroll-mt-16',
+    );
+    expect(screen.getByRole('group', { name: 'Concordance inputs controls' })).toHaveAttribute(
+      'data-guidance',
+      'concordance-inputs',
+    );
+  });
+
   it('lets auto-width column add-ons give remaining row space to the column selector', () => {
     render(
       <NodeInputsPanel

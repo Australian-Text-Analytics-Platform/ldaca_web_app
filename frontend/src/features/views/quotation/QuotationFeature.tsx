@@ -21,6 +21,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
@@ -509,6 +511,14 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     void handleSort(nodeId, columnName);
   };
 
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.quotation.inputs,
+    ...(canRunQuotation ? [CONTEXTUAL_HINT_IDS.quotation.engine] : []),
+    ...(showPreviewTable ? [CONTEXTUAL_HINT_IDS.quotation.previewResults] : []),
+    ...(runAllReviewResult ? [CONTEXTUAL_HINT_IDS.quotation.runAllResults] : []),
+    ...(runAllSource ? [CONTEXTUAL_HINT_IDS.quotation.publish] : []),
+  ]);
+
   return (
     <>
       <div className="space-y-4">
@@ -577,9 +587,11 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
               label: 'Clear results',
             },
           }}
+          actionsGuidanceTarget="quotation-actions"
           parametersLocked={analysisActionLifecycle.parametersLocked}
         >
           <NodeInputsPanel
+            guidanceTarget="quotation-inputs"
             resolvedNodes={nodeInputs.resolvedNodes}
             availableNodes={nodeInputs.availableNodes}
             graphSelectedIds={nodeInputs.graphSelectedIds}
@@ -624,9 +636,13 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         {runAllReviewResult || showPreviewTable ? (
           <QuotationResultsPanel
             title={runAllReviewResult ? 'Review' : 'Search Results'}
+            guidanceTarget={
+              runAllReviewResult ? 'quotation-run-all-results' : 'quotation-preview-results'
+            }
             headerAction={
               runAllSource ? (
                 <Button
+                  data-guidance="quotation-publish"
                   type="button"
                   onClick={() => {
                     setPublicationDialogOpen(true);

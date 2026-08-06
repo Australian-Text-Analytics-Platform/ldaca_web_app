@@ -25,7 +25,8 @@ flowchart LR
     LOCAL --> ACKS["Per-user device acknowledgment history"]
     PREFS --> GUIDANCE["Guidance provider"]
     ACKS --> GUIDANCE
-    ACTIONS["Feature-local workflow state"] -->|"request next Contextual Hint"| GUIDANCE
+    ACTIONS["Feature milestones"] -->|"publish ordered eligibility"| GUIDANCE
+    VIEW["Function view visit"] -->|"start, pause, end"| GUIDANCE
     HELP["Help launchers"] -->|"start Guided Tour"| GUIDANCE
     GUIDANCE --> JOYRIDE["React Joyride"]
     MODALS["Radix modal layer count"] -->|"inert below z-50"| GUIDANCE
@@ -53,11 +54,12 @@ flowchart LR
   the non-devtools multi-user provider-configuration store, and request-boundary
   credential injection. Components receive safe ordered configuration metadata
   rather than secret values.
-- `src/features/guidance/` owns versioned production definitions, Contextual
-  Hint and Guided Tour requests, Joyride adaptation, device-local version
-  acknowledgments, and modal-layer coordination. Feature-local hooks may
-  request the next relevant hint from workflow state; the guidance boundary
-  does not poll the DOM or infer global application conditions.
+- `src/features/guidance/` owns versioned production definitions, ordered
+  per-function milestone sequences, function-visit coordination, deliberate
+  Guided Tour requests, Joyride adaptation, device-local acknowledgments, and
+  modal-layer coordination. Features publish reached milestones from their
+  own state or successful events; the guidance boundary does not poll the DOM
+  or infer application conditions.
 - `src/tutorials/` and `frontend/public/` own the complete in-app documentation
   registry and offline content. `frontend/scripts/sync-published-docs.mjs`
   mirrors that content outward to the publication submodule; content never
@@ -83,12 +85,14 @@ count. While guidance is active, Joyride renders in a full-viewport z-100
 portal above application content; the portal becomes inert and hidden from
 assistive technology while an app modal is open.
 
-The Data Loader ships the first progressive Contextual Hint sequence. It
-separately explains creating a workspace and loading one from Workspace
-manager, the choice between sample import and personal uploads, the
-file-to-Data-Block transition, and where the resulting Data Block appears. Each
-explanation is requested only when its target and workflow state are present,
-and each is acknowledged independently.
+All nine function views publish progressive Contextual Hint milestones. A view
+visit spans Analysis Tab changes inside that function and ends only when the
+sidebar function changes. The provider selects the earliest eligible,
+unacknowledged version; event-only successes remain in an in-memory backlog for
+later visits in the same session. Acknowledgment advances immediately, while
+Not now, Escape, and missing targets pause the visit without acknowledgment.
+Joyride remains responsible for positioning, focus, overlay, scrolling, and
+collision handling.
 
 The backend User File tree is complete. The Data Loader derives its own tree by
 removing file leaves whose `loadable` signal is false while preserving every

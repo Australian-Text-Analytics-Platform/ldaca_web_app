@@ -71,6 +71,8 @@ export interface NodeInputsPanelProps {
   showRemoveButtons?: boolean;
   columnLabel?: ReactNode | ((args: NodeSelectionRenderArgs) => ReactNode);
   title?: string;
+  /** Optional compact header anchor for Contextual Hints. */
+  guidanceTarget?: string;
   className?: string;
   originalCount?: number;
   emptyMessage?: React.ReactNode;
@@ -130,6 +132,7 @@ export function NodeInputsPanel({
   showRemoveButtons = true,
   columnLabel = 'Text Column:',
   title = 'Selected Data Blocks',
+  guidanceTarget,
   className,
   originalCount,
   emptyMessage,
@@ -296,7 +299,12 @@ export function NodeInputsPanel({
 
   return (
     <div className={cn('@container/node-inputs relative flex flex-col gap-2', className)}>
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-3 pt-1.5">
+      <div
+        data-guidance={guidanceTarget}
+        role="group"
+        aria-label={`${title} controls`}
+        className="scroll-mt-16 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-3 pt-1.5"
+      >
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <label className="block text-sm font-medium text-muted-foreground">
             {title} ({countLabel})

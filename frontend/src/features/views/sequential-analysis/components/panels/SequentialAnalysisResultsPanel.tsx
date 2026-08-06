@@ -54,7 +54,7 @@ export function SequentialAnalysisResultsPanel({
     <Card className="mt-6">
       <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle data-guidance="trends-results" className="flex items-center gap-2">
             Trends and Sequence Results
             <HelpIcon
               targetKey="analysis.sequential-analysis.results"

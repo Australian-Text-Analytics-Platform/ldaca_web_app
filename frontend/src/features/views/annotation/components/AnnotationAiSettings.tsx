@@ -21,6 +21,7 @@ interface AnnotationAiSettingsProps {
   disabled?: boolean;
   children?: ReactNode;
   advanced?: ReactNode;
+  onAdvancedOpenChange?: (open: boolean) => void;
 }
 
 /** Named provider-configuration and model selection for Annotation requests. */
@@ -35,6 +36,7 @@ export function AnnotationAiSettings({
   disabled,
   children,
   advanced,
+  onAdvancedOpenChange,
 }: AnnotationAiSettingsProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
@@ -53,10 +55,14 @@ export function AnnotationAiSettings({
 
       <Collapsible
         open={advancedOpen}
-        onOpenChange={setAdvancedOpen}
+        onOpenChange={(open) => {
+          setAdvancedOpen(open);
+          onAdvancedOpenChange?.(open);
+        }}
         className="relative rounded-lg border bg-background/60"
       >
         <CollapsibleTrigger
+          data-guidance="annotation-ai-settings-trigger"
           aria-label="Advanced settings"
           title={advancedOpen ? 'Collapse advanced settings' : 'Expand advanced settings'}
           className="group grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-300 ease-out hover:bg-muted/30 focus-visible:outline-hidden data-[state=closed]:w-full data-[state=open]:absolute data-[state=open]:top-2 data-[state=open]:right-2 data-[state=open]:z-10 data-[state=open]:size-7 data-[state=open]:grid-cols-1 data-[state=open]:gap-0 data-[state=open]:p-0 motion-reduce:transition-none"
@@ -102,6 +108,7 @@ export function AnnotationAiSettings({
           <div className="min-h-0 overflow-hidden">
             <div className="space-y-4 px-3 py-3">
               <div
+                data-guidance="annotation-ai-provider-model"
                 className="grid grid-cols-2 items-end gap-3"
                 data-testid="annotation-ai-provider-model-controls"
               >

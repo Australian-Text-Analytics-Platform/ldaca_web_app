@@ -134,6 +134,7 @@ export function SequentialAnalysisParameterPanel({
   return (
     <>
       <NodeInputsPanel
+        guidanceTarget="trends-inputs"
         resolvedNodes={nodeInputs.resolvedNodes}
         availableNodes={nodeInputs.availableNodes}
         graphSelectedIds={nodeInputs.graphSelectedIds}

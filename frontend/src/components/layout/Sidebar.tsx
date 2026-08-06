@@ -287,7 +287,6 @@ function Sidebar() {
             return (
               <div
                 key={key}
-                data-guidance={key === 'nodes' ? 'data-blocks' : undefined}
                 className="flex min-h-0 flex-col rounded-md border border-border/40 bg-background/40"
                 style={getSectionFlexStyle(key)}
               >
@@ -305,6 +304,7 @@ function Sidebar() {
                   <div className="flex items-center border-b border-border/40 bg-muted/40">
                     <button
                       type="button"
+                      data-guidance={key === 'nodes' ? 'data-blocks' : undefined}
                       className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                       onClick={() => {
                         toggleSection(key);

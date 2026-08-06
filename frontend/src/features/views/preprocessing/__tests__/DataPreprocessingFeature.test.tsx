@@ -8,6 +8,13 @@ import DataPreprocessingFeature from '../DataPreprocessingFeature';
 
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
+vi.mock('@/features/guidance/GuidanceContext', () => ({
+  useGuidance: () => ({ reachContextualHint: vi.fn(), startGuidedTour: vi.fn() }),
+}));
+vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
+  useProgressiveContextualHints: vi.fn(),
+}));
+
 const mockSliceNode = vi.fn();
 const mockSlicePreview = vi.fn();
 const mockFilterNode = vi.fn();

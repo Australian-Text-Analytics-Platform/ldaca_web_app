@@ -69,6 +69,7 @@ Most operations (filtering, sampling, joining, stacking, detaching etc.) on a da
 - [Topic modelling](./topic-modeling.md) — discover themes with native semantic clustering.
 - [Sequential analysis](./sequential-analysis.md) — analyze sequences over time.
 - [Quotation extraction](./quotation.md) — capture quoted segments with context.
+- [Annotation](./annotation.md) — label text manually or with a configured AI provider.
 - [Export](./export.md) — download tables or reports.
 
 ## Questions to check your understanding

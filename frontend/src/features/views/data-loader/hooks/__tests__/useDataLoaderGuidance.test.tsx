@@ -1,108 +1,74 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DATA_LOADER_GUIDANCE_IDS } from '@/features/guidance/registry';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
 import { useDataLoaderGuidance } from '../useDataLoaderGuidance';
 
-const mockRequestContextualHint = vi.fn();
+const publish = vi.fn();
 
-vi.mock('@/features/guidance/GuidanceContext', () => ({
-  useGuidance: () => ({
-    requestContextualHint: mockRequestContextualHint,
-    startGuidedTour: vi.fn(),
-  }),
+vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
+  useProgressiveContextualHints: (ids: readonly string[]) => publish(ids),
 }));
 
 describe('useDataLoaderGuidance', () => {
-  beforeEach(() => {
-    mockRequestContextualHint.mockClear();
+  beforeEach(() => publish.mockClear());
+
+  it('waits for stable workspace and file state', () => {
+    renderHook(() =>
+      useDataLoaderGuidance({
+        currentWorkspaceId: null,
+        loadingFiles: true,
+        nodeCount: 0,
+        totalFileCount: 0,
+        workspaceBusy: true,
+        workspaceCount: 0,
+      }),
+    );
+    expect(publish).toHaveBeenLastCalledWith([]);
   });
 
-  it('waits for workspace and file state before requesting guidance', () => {
+  it('publishes the mutually exclusive create and load branches', () => {
     const { rerender } = renderHook(
-      (state) => {
-        useDataLoaderGuidance(state);
-      },
-      {
-        initialProps: {
+      (workspaceCount) =>
+        useDataLoaderGuidance({
           currentWorkspaceId: null,
-          loadingFiles: true,
-          nodeCount: 0,
-          totalFileCount: 0,
-          workspaceBusy: true,
-          workspaceCount: 0,
-        },
-      },
-    );
-
-    expect(mockRequestContextualHint).not.toHaveBeenCalled();
-
-    rerender({
-      currentWorkspaceId: null,
-      loadingFiles: false,
-      nodeCount: 0,
-      totalFileCount: 0,
-      workspaceBusy: false,
-      workspaceCount: 0,
-    });
-
-    expect(mockRequestContextualHint).toHaveBeenLastCalledWith(DATA_LOADER_GUIDANCE_IDS.workspace);
-
-    rerender({
-      currentWorkspaceId: null,
-      loadingFiles: false,
-      nodeCount: 0,
-      totalFileCount: 0,
-      workspaceBusy: false,
-      workspaceCount: 1,
-    });
-
-    expect(mockRequestContextualHint).toHaveBeenLastCalledWith(
-      DATA_LOADER_GUIDANCE_IDS.workspaceLoad,
-    );
-  });
-
-  it('requests each explanation as the first-run workflow progresses', () => {
-    const { rerender } = renderHook(
-      (state) => {
-        useDataLoaderGuidance(state);
-      },
-      {
-        initialProps: {
-          currentWorkspaceId: 'workspace-1',
           loadingFiles: false,
           nodeCount: 0,
           totalFileCount: 0,
           workspaceBusy: false,
+          workspaceCount,
+        }),
+      { initialProps: 0 },
+    );
+    expect(publish).toHaveBeenLastCalledWith([CONTEXTUAL_HINT_IDS.dataLoader.workspace]);
+    rerender(1);
+    expect(publish).toHaveBeenLastCalledWith([CONTEXTUAL_HINT_IDS.dataLoader.workspaceLoad]);
+  });
+
+  it('catches up through every reached active-Workspace milestone', () => {
+    const { rerender } = renderHook(
+      ({ nodeCount, totalFileCount }) =>
+        useDataLoaderGuidance({
+          currentWorkspaceId: 'workspace-1',
+          loadingFiles: false,
+          nodeCount,
+          totalFileCount,
+          workspaceBusy: false,
           workspaceCount: 1,
-        },
-      },
+        }),
+      { initialProps: { nodeCount: 0, totalFileCount: 0 } },
     );
+    expect(publish).toHaveBeenLastCalledWith([
+      CONTEXTUAL_HINT_IDS.dataLoader.activeWorkspace,
+      CONTEXTUAL_HINT_IDS.dataLoader.fileSources,
+    ]);
 
-    expect(mockRequestContextualHint).toHaveBeenLastCalledWith(
-      DATA_LOADER_GUIDANCE_IDS.fileSources,
-    );
-
-    rerender({
-      currentWorkspaceId: 'workspace-1',
-      loadingFiles: false,
-      nodeCount: 0,
-      totalFileCount: 1,
-      workspaceBusy: false,
-      workspaceCount: 1,
-    });
-    expect(mockRequestContextualHint).toHaveBeenLastCalledWith(
-      DATA_LOADER_GUIDANCE_IDS.addDataBlock,
-    );
-
-    rerender({
-      currentWorkspaceId: 'workspace-1',
-      loadingFiles: false,
-      nodeCount: 1,
-      totalFileCount: 1,
-      workspaceBusy: false,
-      workspaceCount: 1,
-    });
-    expect(mockRequestContextualHint).toHaveBeenLastCalledWith(DATA_LOADER_GUIDANCE_IDS.dataBlocks);
+    rerender({ nodeCount: 1, totalFileCount: 1 });
+    expect(publish).toHaveBeenLastCalledWith([
+      CONTEXTUAL_HINT_IDS.dataLoader.activeWorkspace,
+      CONTEXTUAL_HINT_IDS.dataLoader.fileSources,
+      CONTEXTUAL_HINT_IDS.dataLoader.addDataBlock,
+      CONTEXTUAL_HINT_IDS.dataLoader.dataBlocks,
+    ]);
   });
 });

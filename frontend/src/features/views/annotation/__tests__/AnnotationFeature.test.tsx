@@ -3,6 +3,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/features/guidance/GuidanceContext', () => ({
+  useGuidance: () => ({ reachContextualHint: vi.fn(), startGuidedTour: vi.fn() }),
+}));
+vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
+  useProgressiveContextualHints: vi.fn(),
+}));
+
 const mocks = vi.hoisted(() => ({
   createSqlDataBlock: vi.fn(),
   polarsExpressionApply: vi.fn(),

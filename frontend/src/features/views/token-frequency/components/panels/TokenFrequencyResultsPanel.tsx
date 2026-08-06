@@ -141,6 +141,7 @@ export const TokenFrequencyResultsPanel = ({
   return (
     <AnalysisCardLayout
       title="Token Frequency Results"
+      titleGuidanceTarget="token-frequency-results"
       help={{
         targetKey: 'analysis.token-frequency.results',
         label: 'Token frequency results',

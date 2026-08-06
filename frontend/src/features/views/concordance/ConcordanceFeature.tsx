@@ -9,6 +9,8 @@ import {
   type ResultPublicationSource,
 } from '@/api';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { Card, CardContent } from '@/components/ui/card';
@@ -679,6 +681,16 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     resultsRef,
   });
 
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.concordance.inputs,
+    ...(panelSelectedNodes.length > 0 && nodeColumnSelections.every((selection) => selection.column)
+      ? [CONTEXTUAL_HINT_IDS.concordance.search]
+      : []),
+    ...(results && !isReview ? [CONTEXTUAL_HINT_IDS.concordance.previewResults] : []),
+    ...(results && isReview ? [CONTEXTUAL_HINT_IDS.concordance.runAllResults] : []),
+    ...(isReview && publicationSources.length > 0 ? [CONTEXTUAL_HINT_IDS.concordance.publish] : []),
+  ]);
+
   return (
     <div className="space-y-4">
       <ConcordanceParameterPanel
@@ -777,10 +789,12 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       {results ? (
         <ConcordanceResultsPanel
           title={isReview ? 'Review' : 'Search Results'}
+          guidanceTarget={isReview ? 'concordance-run-all-results' : 'concordance-preview-results'}
           isReview={isReview}
           headerAction={
             isReview && publicationSources.length > 0 ? (
               <Button
+                data-guidance="concordance-publish"
                 type="button"
                 onClick={() => {
                   setPublicationDialogOpen(true);

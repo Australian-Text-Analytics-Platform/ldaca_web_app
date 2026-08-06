@@ -436,6 +436,16 @@ const tutorial = {
     anchor: 'help-quotation-section',
     label: 'Quotation extraction overview',
   },
+  'analysis.annotation.tab': {
+    file: 'tutorials/annotation.md',
+    anchor: 'help-annotation-section',
+    label: 'Annotation overview',
+  },
+  'analysis.annotation.parameters': {
+    file: 'tutorials/annotation.md',
+    anchor: 'help-annotation-setup',
+    label: 'Annotation setup',
+  },
   'analysis.quotation.parameters': {
     file: 'tutorials/quotation.md',
     anchor: 'help-quotation-parameters',
@@ -528,6 +538,11 @@ const info = {
     file: 'information/export.md',
     anchor: 'info-export-overview',
     label: 'About Exporting Data',
+  },
+  'annotation.overview': {
+    file: 'information/annotation.md',
+    anchor: 'info-annotation-overview',
+    label: 'About Annotation',
   },
 } as const satisfies Record<string, DocTarget>;
 

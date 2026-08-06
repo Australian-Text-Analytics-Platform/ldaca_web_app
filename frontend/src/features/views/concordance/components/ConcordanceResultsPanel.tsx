@@ -99,6 +99,7 @@ interface ConcordanceResultsCommands {
 
 export interface ConcordanceResultsPanelProps {
   title?: string;
+  guidanceTarget?: string;
   isReview: boolean;
   headerAction?: React.ReactNode;
   shell: ConcordanceResultsShell;
@@ -114,6 +115,7 @@ export interface ConcordanceResultsPanelProps {
  */
 export function ConcordanceResultsPanel({
   title = 'Search Results',
+  guidanceTarget,
   isReview,
   headerAction,
   shell: {
@@ -195,7 +197,7 @@ export function ConcordanceResultsPanel({
     <Card ref={resultsRef}>
       <CardHeader className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle data-guidance={guidanceTarget} className="flex items-center gap-2">
             {title}
             <HelpIcon
               targetKey="analysis.concordance.results"

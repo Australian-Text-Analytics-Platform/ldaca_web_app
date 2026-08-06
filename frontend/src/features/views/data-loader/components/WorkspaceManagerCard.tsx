@@ -223,6 +223,7 @@ export function WorkspaceManagerCard({
                       }
                     >
                       <Button
+                        data-guidance={isActive ? undefined : 'load-workspace'}
                         size="sm"
                         variant={isActive ? 'outline' : 'secondary'}
                         onClick={() => {

@@ -169,7 +169,9 @@ A replayable multi-step orientation that a user deliberately starts.
 _Avoid_: automatic tour, contextual hint
 
 **Contextual Hint**:
-A single versioned guidance message requested after a relevant user action.
+A single versioned guidance message shown when its feature milestone is
+eligible. Several independently acknowledged hints may form a progressive
+sequence within one function visit.
 _Avoid_: tour step, coach-mark scheduler
 
 **Inline Guidance**:
@@ -183,8 +185,9 @@ _Avoid_: help article, contextual hint
 
 **Hint Acknowledgment History**:
 The device-local record of the highest Contextual Hint version acknowledged by
-each user.
-_Avoid_: dismissal list, account preference
+each user. **Not now**, Escape, and a missing target defer the current function
+visit and do not change this history.
+_Avoid_: transient deferral list, account preference
 
 **User Preferences**:
 A user's synchronized, non-secret choices that apply across their Wordflow

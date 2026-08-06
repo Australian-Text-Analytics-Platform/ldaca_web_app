@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { GuidanceVisitBoundary } from '@/features/guidance/GuidanceVisitBoundary';
 import { ViewFeature } from '@/features/views/viewComponents';
 import { useUIStore } from '@/stores';
 
@@ -28,7 +29,9 @@ export function ViewRouter() {
     <div className="min-h-0 min-w-0 w-full flex-1">
       <ErrorBoundary>
         <Suspense fallback={<Fallback />}>
-          <ViewFeature view={currentView} />
+          <GuidanceVisitBoundary view={currentView}>
+            <ViewFeature view={currentView} />
+          </GuidanceVisitBoundary>
         </Suspense>
       </ErrorBoundary>
     </div>

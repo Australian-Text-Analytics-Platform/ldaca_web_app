@@ -19,6 +19,8 @@ The left sidebar lists the available tool modules. Click a tool name to switch t
 - [**Trends and Sequence**](./sequential-analysis.md) — count documents over time or any ordered numeric axis.
 - [**Topic Modelling**](./topic-modeling.md) — discover themes with native semantic clustering.
 - [**Quotation Extraction**](./quotation.md) — capture quoted speech with speaker and verb annotations.
+- [**Annotation**](./annotation.md) — label text manually or with a configured AI provider.
+- [**Export**](./export.md) — download selected Data Blocks or a Workspace archive.
 
 The edit icon next to the heading lets you customise which tools appear.
 
@@ -111,13 +113,18 @@ The **Help** and **Feedback** buttons at the very bottom of the left sidebar pro
 - **Help** opens the built-in written guides in a floating window (the one you are currently reading). Clicking any **?** icon scrolls Help to the relevant section.
 - **Feedback** opens a form where you can report bugs, request features, or ask questions. Your feedback goes directly to the developer team. Please do not include any confidential information.
 <span id="help-ui-hint-system"></span>
-- A **Contextual Hint** may appear after a successful action when a feature has
-  a short next-step message. Choose **Got it** or press **Enter** to acknowledge
-  that version. It will not appear again on this device unless its guidance is
-  updated.
+- Each of the nine functions can show brief **Contextual Hints** as you reach
+  useful milestones. Several hints may form a progressive sequence, but each
+  is acknowledged independently. Choose **Got it** or press **Enter** to
+  acknowledge the current version and continue to another milestone already
+  reached.
+- Choose **Not now** or press **Escape** to pause hints for the current function
+  visit without acknowledging anything. Switching Analysis Tabs does not
+  resume them; leave the function and return to retry the earliest eligible
+  unacknowledged hint.
 - Contextual Hints can be disabled under **Settings → Guidance**. The same page
-  can reset acknowledgment history for the current user. This release includes
-  the guidance framework but does not ship automatic Contextual Hints.
+  can reset acknowledgment history for the current user, causing eligible hint
+  versions to appear again on this device.
 - A replayable **Guided Tour** is shown in Help only when one is available. A
   tour is started deliberately and is unaffected by the Contextual Hint switch.
 

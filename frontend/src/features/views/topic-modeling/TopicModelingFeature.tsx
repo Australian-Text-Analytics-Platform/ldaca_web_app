@@ -5,6 +5,8 @@ import type {
   TopicModelingResponse,
   TopicModelingTopic,
 } from '@/api';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
@@ -447,6 +449,14 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- this is a truthiness OR: a falsy banner/result/error must fall through to the next, so ?? would short-circuit incorrectly
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
+
+  useProgressiveContextualHints([
+    CONTEXTUAL_HINT_IDS.topicModeling.inputs,
+    ...(!actionState.runDisabled ? [CONTEXTUAL_HINT_IDS.topicModeling.run] : []),
+    ...(result
+      ? [CONTEXTUAL_HINT_IDS.topicModeling.results, CONTEXTUAL_HINT_IDS.topicModeling.publish]
+      : []),
+  ]);
 
   return (
     <div className="space-y-4">

@@ -34,6 +34,7 @@ export interface JoinSubTabProps {
   isLoading: {
     operations: boolean;
   };
+  onPreviewSuccess?: () => void;
   onAlert: (message: string) => void;
 }
 
@@ -137,6 +138,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     getColumnInfos,
     joinNodes,
     isLoading,
+    onPreviewSuccess,
     onAlert,
   } = props;
 
@@ -355,6 +357,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       },
       signal,
     });
+    onPreviewSuccess?.();
     return {
       data: response.rows as PreviewRow[],
       columns: response.columns,

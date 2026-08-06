@@ -23,6 +23,7 @@ import type { QuotationReviewRowUnit } from '../quotationRunAllReview';
 
 interface QuotationResultsPanelProps {
   title?: string;
+  guidanceTarget?: string;
   headerAction?: React.ReactNode;
   displayedNodes: WorkspaceNodeMetadata[];
   activeSelections: NodeColumnSelection[];
@@ -59,6 +60,7 @@ interface QuotationResultsPanelProps {
  */
 export function QuotationResultsPanel({
   title = 'Search Results',
+  guidanceTarget,
   headerAction,
   displayedNodes,
   activeSelections,
@@ -97,7 +99,7 @@ export function QuotationResultsPanel({
     <Card>
       <CardHeader className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle data-guidance={guidanceTarget} className="flex items-center gap-2">
             {title}
             <HelpIcon
               targetKey="analysis.quotation.results"

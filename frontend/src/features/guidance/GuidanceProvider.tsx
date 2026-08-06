@@ -1,9 +1,17 @@
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useReducer,
+  useState,
+} from 'react';
 import {
   ACTIONS,
   EVENTS,
   type EventData,
   Joyride,
+  ORIGIN,
   type Props as JoyrideProps,
   STATUS,
   type Step,
@@ -25,23 +33,36 @@ import {
   useUpdateUserPreferences,
   useUserPreferences,
 } from '@/features/preferences/useUserPreferences';
+import type { ViewType } from '@/features/views/viewIds';
 import { useGuidanceAcknowledgmentsStore } from './acknowledgmentsStore';
+import {
+  contextualHintVisitReducer,
+  initialContextualHintVisitState,
+  selectContextualHintCandidates,
+} from './contextualHintVisitState';
 import { GuidanceContext } from './GuidanceContext';
 import { useModalLayerStore } from './modalLayerStore';
-import { contextualHintRegistry, guidedTourRegistry } from './registry';
+import {
+  contextualHintRegistry,
+  contextualHintSequences as productionContextualHintSequences,
+  guidedTourRegistry,
+} from './registry';
 import type { ContextualHintDefinition, GuidedTourDefinition } from './types';
 
 type GuidanceSession =
-  | { kind: 'hint'; definition: ContextualHintDefinition; started: boolean }
+  | {
+      kind: 'hint';
+      view: ViewType;
+      definition: ContextualHintDefinition;
+      started: boolean;
+    }
   | { kind: 'tour'; definition: GuidedTourDefinition; started: boolean };
 
 const GUIDANCE_ACCENT = '#2563eb';
 const DisableContextualHintsContext = createContext<(() => void) | null>(null);
 
 const guidanceStyles = {
-  floater: {
-    filter: 'none',
-  },
+  floater: { filter: 'none' },
   tooltip: {
     backgroundColor: 'var(--popover)',
     border: '1px solid var(--border)',
@@ -49,12 +70,10 @@ const guidanceStyles = {
     boxShadow: '0 18px 48px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.1)',
     color: 'var(--popover-foreground)',
     fontSize: 13,
+    maxWidth: 'calc(100vw - 24px)',
     padding: '18px 18px 14px',
   },
-  tooltipContainer: {
-    lineHeight: 1.55,
-    textAlign: 'left',
-  },
+  tooltipContainer: { lineHeight: 1.55, textAlign: 'left' },
   tooltipTitle: {
     fontSize: 16,
     fontWeight: 650,
@@ -66,10 +85,7 @@ const guidanceStyles = {
     paddingBottom: 16,
     paddingTop: 8,
   },
-  tooltipFooter: {
-    borderTop: '1px solid var(--border)',
-    paddingTop: 12,
-  },
+  tooltipFooter: { borderTop: '1px solid var(--border)', paddingTop: 12 },
   buttonPrimary: {
     backgroundColor: GUIDANCE_ACCENT,
     borderRadius: 'calc(var(--radius) - 2px)',
@@ -84,14 +100,17 @@ const guidanceStyles = {
     color: 'var(--muted-foreground)',
     fontSize: 13,
     fontWeight: 500,
+    padding: '8px 6px',
   },
-  buttonSkip: {
-    color: 'var(--muted-foreground)',
-    fontSize: 13,
-  },
+  buttonSkip: { color: 'var(--muted-foreground)', fontSize: 13 },
 } satisfies NonNullable<JoyrideProps['styles']>;
 
-function ContextualHintTooltip({ primaryProps, step, tooltipProps }: TooltipRenderProps) {
+function ContextualHintTooltip({
+  closeProps,
+  primaryProps,
+  step,
+  tooltipProps,
+}: TooltipRenderProps) {
   const requestDisable = useContext(DisableContextualHintsContext);
   const { content, styles, title } = step;
 
@@ -114,7 +133,7 @@ function ContextualHintTooltip({ primaryProps, step, tooltipProps }: TooltipRend
           {content}
         </div>
       </div>
-      <div style={styles.tooltipFooter}>
+      <div style={styles.tooltipFooter} className="flex flex-wrap items-center gap-3">
         <div style={styles.tooltipFooterSpacer}>
           <button
             type="button"
@@ -124,15 +143,13 @@ function ContextualHintTooltip({ primaryProps, step, tooltipProps }: TooltipRend
             Disable Hints
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="whitespace-nowrap text-xs text-muted-foreground">
-            <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
-              Enter
-            </kbd>{' '}
-            = Got it
-          </span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" style={styles.buttonBack} {...closeProps} />
           <button type="button" style={styles.buttonPrimary} {...primaryProps} />
         </div>
+        <p className="order-last w-full text-right text-[11px] text-muted-foreground">
+          Esc = Not now · Enter = Got it
+        </p>
       </div>
     </div>
   );
@@ -141,6 +158,7 @@ function ContextualHintTooltip({ primaryProps, step, tooltipProps }: TooltipRend
 export interface GuidanceProviderProps {
   children: ReactNode;
   contextualHints?: readonly ContextualHintDefinition[];
+  contextualHintSequences?: Parameters<typeof selectContextualHintCandidates>[1];
   guidedTours?: readonly GuidedTourDefinition[];
 }
 
@@ -163,9 +181,24 @@ function useReducedMotion() {
   return reduced;
 }
 
+function GuidancePresentationBoundary({ children }: { children: ReactNode }) {
+  const [started, setStarted] = useState(() => useModalLayerStore.getState().count === 0);
+
+  useEffect(
+    () =>
+      useModalLayerStore.subscribe((state) => {
+        if (state.count === 0) setStarted(true);
+      }),
+    [],
+  );
+
+  return started ? children : null;
+}
+
 export function GuidanceProvider({
   children,
   contextualHints = contextualHintRegistry,
+  contextualHintSequences = productionContextualHintSequences,
   guidedTours = guidedTourRegistry,
 }: GuidanceProviderProps) {
   const userId = useAuth().user?.id ?? null;
@@ -173,41 +206,77 @@ export function GuidanceProvider({
   const updatePreferences = useUpdateUserPreferences();
   const modalCount = useModalLayerStore((state) => state.count);
   const acknowledge = useGuidanceAcknowledgmentsStore((state) => state.acknowledge);
-  const isAcknowledged = useGuidanceAcknowledgmentsStore((state) => state.isAcknowledged);
-  const [session, setSession] = useState<GuidanceSession | null>(null);
+  const acknowledgments = useGuidanceAcknowledgmentsStore((state) =>
+    userId ? state.byUser[userId] : undefined,
+  );
+  const [visitState, dispatchContextualHintVisit] = useReducer(
+    contextualHintVisitReducer,
+    initialContextualHintVisitState,
+  );
+  const [tourSession, setTourSession] = useState<Extract<GuidanceSession, { kind: 'tour' }> | null>(
+    null,
+  );
   const [portalElement, setPortalElement] = useState<HTMLDivElement | null>(null);
   const [disableConfirmationOpen, setDisableConfirmationOpen] = useState(false);
   const reducedMotion = useReducedMotion();
   const contextualHintsEnabled = preferences?.contextual_hints_enabled === true;
-  const [previousContextualHintsEnabled, setPreviousContextualHintsEnabled] =
-    useState(contextualHintsEnabled);
 
-  if (previousContextualHintsEnabled !== contextualHintsEnabled) {
-    setPreviousContextualHintsEnabled(contextualHintsEnabled);
-    if (!contextualHintsEnabled && session?.kind === 'hint') {
-      setSession(null);
-    }
-  }
+  const candidateIds = selectContextualHintCandidates(visitState, contextualHintSequences);
+  const nextDefinition = candidateIds
+    .map((id) => contextualHints.find((definition) => definition.id === id))
+    .find(
+      (definition): definition is ContextualHintDefinition =>
+        definition !== undefined &&
+        (acknowledgments?.[definition.id] ?? 0) < definition.version,
+    );
 
-  useEffect(() => {
-    return useModalLayerStore.subscribe((current, previous) => {
-      if (previous.count > 0 && current.count === 0) {
-        setSession((active) => (active && !active.started ? { ...active, started: true } : active));
-      }
-    });
-  }, []);
-
-  const requestContextualHint = (id: string) => {
-    if (!userId || !contextualHintsEnabled) return;
-    const definition = contextualHints.find((candidate) => candidate.id === id);
-    if (!definition || isAcknowledged(userId, definition.id, definition.version)) return;
-    setSession((current) => current ?? { kind: 'hint', definition, started: modalCount === 0 });
-  };
+  const hintSession: GuidanceSession | null =
+    userId &&
+    contextualHintsEnabled &&
+    visitState.activeView &&
+    !visitState.paused &&
+    nextDefinition
+      ? {
+          kind: 'hint',
+          view: visitState.activeView,
+          definition: nextDefinition,
+          started: modalCount === 0,
+        }
+      : null;
+  const session: GuidanceSession | null = tourSession
+    ? { ...tourSession, started: modalCount === 0 }
+    : hintSession;
+  const sessionKey = session
+    ? `${session.kind}:${session.definition.id}${session.kind === 'hint' ? `:${String(session.definition.version)}` : ''}`
+    : null;
 
   const startGuidedTour = (id: string) => {
     const definition = guidedTours.find((candidate) => candidate.id === id);
     if (!definition) return;
-    setSession((current) => current ?? { kind: 'tour', definition, started: modalCount === 0 });
+    setTourSession((current) => current ?? { kind: 'tour', definition, started: true });
+  };
+
+  const acknowledgeCurrentHint = () => {
+    if (session?.kind !== 'hint' || !userId) return;
+    acknowledge(userId, session.definition.id, session.definition.version);
+    dispatchContextualHintVisit({
+      type: 'acknowledge',
+      view: session.view,
+      id: session.definition.id,
+    });
+  };
+
+  const deferCurrentHint = () => {
+    if (session?.kind !== 'hint') return;
+    dispatchContextualHintVisit({
+      type: 'defer',
+      view: session.view,
+    });
+  };
+
+  const pauseCurrentHint = (type: 'target-missing' | 'hints-disabled') => {
+    if (session?.kind !== 'hint') return;
+    dispatchContextualHintVisit({ type, view: session.view });
   };
 
   const steps: Step[] =
@@ -218,7 +287,7 @@ export function GuidanceProvider({
             target: session.definition.target,
             title: session.definition.title,
             content: session.definition.content,
-            placement: session.definition.placement ?? 'bottom',
+            placement: session.definition.placement ?? 'auto',
           },
         ]
       : (session?.definition.steps.map((step) => ({
@@ -230,17 +299,29 @@ export function GuidanceProvider({
 
   const handleEvent = (event: EventData) => {
     if (event.type === EVENTS.TARGET_NOT_FOUND) {
-      setSession(null);
+      pauseCurrentHint('target-missing');
       return;
     }
     if (
       session?.kind === 'hint' &&
-      userId &&
-      event.type === EVENTS.TOUR_END &&
-      event.status === STATUS.FINISHED
+      (event.action === ACTIONS.CLOSE ||
+        event.origin === ORIGIN.BUTTON_CLOSE ||
+        event.origin === ORIGIN.KEYBOARD)
     ) {
-      acknowledge(userId, session.definition.id, session.definition.version);
-      setSession(null);
+      deferCurrentHint();
+      return;
+    }
+    if (
+      session?.kind === 'hint' &&
+      (event.action === ACTIONS.NEXT || event.origin === ORIGIN.BUTTON_PRIMARY)
+    ) {
+      acknowledgeCurrentHint();
+      return;
+    }
+    if (session?.kind === 'hint' && event.type === EVENTS.TOUR_END) {
+      // Joyride can normalize the final event to action "update" and clear its
+      // origin. The preceding close/next event owns the user intent, so an
+      // origin-less tour end must not acknowledge a Contextual Hint.
       return;
     }
     if (
@@ -248,7 +329,7 @@ export function GuidanceProvider({
       event.status === STATUS.SKIPPED ||
       event.action === ACTIONS.SKIP
     ) {
-      setSession(null);
+      setTourSession(null);
     }
   };
 
@@ -259,13 +340,16 @@ export function GuidanceProvider({
   };
   const disableContextualHints = () => {
     updatePreferences.mutate({ contextual_hints_enabled: false });
-    setSession(null);
+    if (session?.kind === 'hint') {
+      pauseCurrentHint('hints-disabled');
+    }
+    setTourSession(null);
     setDisableConfirmationOpen(false);
   };
-  const guidanceVisible = session?.started && !disableConfirmationOpen;
+  const guidanceInteractive = Boolean(session) && !modalOpen && !disableConfirmationOpen;
 
   useEffect(() => {
-    if (!guidanceVisible || session.kind !== 'hint' || !userId) return;
+    if (!guidanceInteractive || session?.kind !== 'hint' || !userId) return;
 
     const acknowledgeWithEnter = (event: KeyboardEvent) => {
       if (event.key !== 'Enter' || event.defaultPrevented || event.isComposing || event.repeat) {
@@ -280,35 +364,36 @@ export function GuidanceProvider({
       }
       event.preventDefault();
       event.stopPropagation();
-      acknowledge(userId, session.definition.id, session.definition.version);
-      setSession(null);
+      acknowledgeCurrentHint();
     };
 
     window.addEventListener('keydown', acknowledgeWithEnter, true);
     return () => {
       window.removeEventListener('keydown', acknowledgeWithEnter, true);
     };
-  }, [acknowledge, guidanceVisible, session, userId]);
+  });
 
   return (
-    <GuidanceContext.Provider value={{ requestContextualHint, startGuidedTour }}>
+    <GuidanceContext.Provider value={{ dispatchContextualHintVisit, startGuidedTour }}>
       <DisableContextualHintsContext.Provider value={requestDisableContextualHints}>
         {children}
         <div
           ref={setPortalElement}
           aria-hidden={modalOpen}
           inert={modalOpen}
-          className={guidanceVisible ? 'fixed inset-0 z-[100]' : 'relative z-[100]'}
+          className={session ? 'fixed inset-0 z-[100]' : 'relative z-[100]'}
           data-testid="guidance-portal"
         />
-        {guidanceVisible && portalElement ? (
-          <Joyride
+        {session && sessionKey && portalElement ? (
+          <GuidancePresentationBoundary key={sessionKey}>
+            {disableConfirmationOpen ? null : (
+              <Joyride
             run
             continuous
             steps={steps}
             portalElement={portalElement}
             onEvent={handleEvent}
-            locale={{ last: isHint ? 'Got it' : 'Done' }}
+            locale={{ close: 'Not now', last: isHint ? 'Got it' : 'Done' }}
             styles={guidanceStyles}
             tooltipComponent={isHint ? ContextualHintTooltip : undefined}
             options={{
@@ -318,7 +403,7 @@ export function GuidanceProvider({
               buttons: isHint ? ['primary'] : ['back', 'skip', 'primary'],
               blockTargetInteraction: true,
               disableFocusTrap: modalOpen,
-              dismissKeyAction: false,
+              dismissKeyAction: isHint ? 'close' : false,
               offset: 14,
               overlayClickAction: false,
               overlayColor: 'rgba(15, 23, 42, 0.36)',
@@ -332,7 +417,9 @@ export function GuidanceProvider({
               width: 360,
               zIndex: 1,
             }}
-          />
+              />
+            )}
+          </GuidancePresentationBoundary>
         ) : null}
         <AlertDialog open={disableConfirmationOpen} onOpenChange={setDisableConfirmationOpen}>
           <AlertDialogContent>

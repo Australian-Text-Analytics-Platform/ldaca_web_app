@@ -31,7 +31,11 @@ const configurations: AnnotationProviderConfigurationView[] = [
   },
 ];
 
-const renderSettings = (onProviderChange = vi.fn(), advanced?: ReactNode) => {
+const renderSettings = (
+  onProviderChange = vi.fn(),
+  advanced?: ReactNode,
+  onAdvancedOpenChange?: (open: boolean) => void,
+) => {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <AnnotationAiSettings
@@ -43,6 +47,7 @@ const renderSettings = (onProviderChange = vi.fn(), advanced?: ReactNode) => {
         providerModels={{ [configurations[1]!.id]: 'model-2' }}
         model="model-1"
         advanced={advanced}
+        onAdvancedOpenChange={onAdvancedOpenChange}
       />
     </QueryClientProvider>,
   );
@@ -116,5 +121,17 @@ describe('AnnotationAiSettings', () => {
       'false',
     );
     expect(screen.queryByRole('button', { name: 'Provider' })).not.toBeInTheDocument();
+  });
+
+  it('reports only actual Advanced expansion state changes', async () => {
+    const user = userEvent.setup();
+    const onAdvancedOpenChange = vi.fn();
+    renderSettings(vi.fn(), undefined, onAdvancedOpenChange);
+
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    expect(onAdvancedOpenChange).toHaveBeenLastCalledWith(true);
+
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    expect(onAdvancedOpenChange).toHaveBeenLastCalledWith(false);
   });
 });

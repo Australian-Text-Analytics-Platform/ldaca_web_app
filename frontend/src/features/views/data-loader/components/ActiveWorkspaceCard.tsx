@@ -71,7 +71,7 @@ export function ActiveWorkspaceCard({
   return (
     <Card
       data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
-      data-guidance="workspace-setup"
+      data-guidance={currentWorkspace ? 'active-workspace' : 'workspace-setup'}
       className="flex h-full flex-col overflow-hidden"
     >
       <CardHeader>

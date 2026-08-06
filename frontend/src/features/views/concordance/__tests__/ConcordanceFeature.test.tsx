@@ -213,6 +213,11 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
   }),
 }));
 
+vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
+  /** Keeps guidance infrastructure outside this feature-level test boundary. */
+  useProgressiveContextualHints: vi.fn(),
+}));
+
 vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
   /** Keeps workspace loading false so the feature renders immediately. */
   useWorkspaceStatus: () => ({ isLoading: { graph: false } }),
