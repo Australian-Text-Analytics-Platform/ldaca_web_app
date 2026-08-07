@@ -13,7 +13,7 @@ import {
   getUserFileImport,
   listUserFileImports,
 } from '@/api';
-import type { UserFileImport, UserFileImportPage, WorkspaceResource } from '@/api';
+import type { UserFileImport, UserFileImportPage, WorkspaceCatalogueItem } from '@/api';
 import { invalidateNodeWorkspaceQueries } from '@/features/workspace/common/hooks/workspaceMutationCache';
 import { workspaceAnalysesQueryOptions } from '@/features/workspace/common/hooks/workspaceAnalysesQuery';
 import { queryKeys } from '@/lib/queryKeys';
@@ -271,16 +271,16 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
             void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
           }
           if (event.resource_type === 'workspace') {
-            void queryClient.invalidateQueries({
-              queryKey: queryKeys.workspaceList,
-              exact: true,
-            });
+            queryClient.setQueryData<WorkspaceCatalogueItem[]>(
+              queryKeys.workspaceList,
+              (previous) => previous?.filter((workspace) => workspace.id !== event.workspace_id),
+            );
           }
           break;
         case 'workspace_runtime_changed':
-          queryClient.setQueryData<WorkspaceResource[]>(queryKeys.workspaceList, (previous) =>
+          queryClient.setQueryData<WorkspaceCatalogueItem[]>(queryKeys.workspaceList, (previous) =>
             previous?.map((workspace) =>
-              workspace.id === event.workspace_id
+              workspace.availability === 'available' && workspace.id === event.workspace_id
                 ? { ...workspace, runtime_state: event.runtime_state }
                 : workspace,
             ),

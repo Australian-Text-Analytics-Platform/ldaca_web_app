@@ -21,18 +21,21 @@ flowchart TB
     SCAN --> ACCESS["Validate exact access.json owner"]
     DIRECT --> ACCESS
     ACCESS -->|"different owner or invalid sidecar"| HIDDEN["workspace_not_found"]
-    ACCESS -->|"current owner"| SNAPSHOT["Validate workspace.json and plan files"]
-    SNAPSHOT -->|"valid"| RESOURCE["Workspace resource"]
-    SNAPSHOT -->|"corrupt collection entry"| OMIT["Log and omit only this Workspace"]
+    ACCESS -->|"current owner"| SNAPSHOT["Lightweight metadata, reference, format, and limit validation"]
+    SNAPSHOT -->|"valid"| RESOURCE["Available Workspace list item"]
+    SNAPSHOT -->|"incompatible, corrupt, or over limit"| UNAVAILABLE["ID-only Unavailable Workspace list item"]
     SNAPSHOT -->|"corrupt direct access"| CORRUPT["workspace_corrupt"]
 ```
 
 Non-UUID entries, links, reparse points, and missing or malformed access
-sidecars are logged and skipped without blocking valid siblings. A corrupt
-Workspace with a valid current-owner sidecar is omitted from a collection and
-fails direct access with `500 workspace_corrupt`. Other users receive a
+sidecars are logged and skipped without blocking valid siblings. Collection
+discovery validates metadata, graph and plan references, native format, and
+configured limits without reconstructing every Tab, Analysis, or lazy plan. An
+incompatible, corrupt, or over-limit Workspace with a valid current-owner
+sidecar appears as an ID-only Unavailable Workspace with a safe reason. It
+still fails direct access with `500 workspace_corrupt`. Other users receive a
 concealed 404 before portable data is parsed. The valid sidecar is sufficient
-to authorize deletion of corrupt content.
+to authorize deletion of unavailable content.
 
 ## Service Boundary
 
@@ -133,7 +136,7 @@ tracked in the
 [persistence-integrity reference](../../reference/persistence-integrity.md).
 Export omits `access.json`; import rejects an archive-supplied sidecar.
 
-Portable archive format 12 materializes Data Blocks and retained Analysis query
+Portable archive format 14 materializes Data Blocks and retained Analysis query
 inputs as Parquet, includes terminal Analysis forests and declared Artifacts,
 and contains no serialized executable plans. Import reconstructs private lazy
 plans from those safe files, rebases their sources and Workspace identity after

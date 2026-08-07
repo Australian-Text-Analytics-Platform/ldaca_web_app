@@ -104,7 +104,7 @@ function FileListShell({
  * data, preview, and dialog panels with the handlers they need.
  */
 function DataLoaderFeature() {
-  const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
+  const { workspaceCatalogue, workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
 
   const {
@@ -169,8 +169,10 @@ function DataLoaderFeature() {
     handleRefreshWorkspaces,
     handleUploadWorkspaceZip,
     handleAddFileToWorkspace,
+    workspaceLoadFailures,
+    workspaceSelectionOperation,
   } = useDataLoaderWorkspaceActions({
-    workspaces,
+    workspaceCatalogue,
     hasWorkspaceSelected,
     notify,
   });
@@ -247,6 +249,12 @@ function DataLoaderFeature() {
     const bTime = Date.parse(b.modified_at || b.created_at || '');
     return (bTime || 0) - (aTime || 0);
   });
+  const sortedWorkspaceCatalogue = [
+    ...sortedWorkspaces,
+    ...workspaceCatalogue
+      .filter((workspace) => workspace.availability === 'unavailable')
+      .toSorted((a, b) => a.id.localeCompare(b.id)),
+  ];
 
   const totalFileCount = fileTree.reduce((sum, node) => sum + countFilesInNode(node), 0);
 
@@ -328,21 +336,26 @@ function DataLoaderFeature() {
               nodeCount={nodeCount}
               busy={workspaceBusy}
               hasActiveTask={hasActiveTask}
+              selectionOperation={workspaceSelectionOperation}
               onCreate={handleCreateWorkspace}
               onRename={handleRenameWorkspace}
               onUpdateDescription={handleUpdateWorkspaceDescription}
               onSave={handleSaveWorkspace}
-              onUnload={() => handleSetCurrentWorkspace(null)}
+              onUnload={() => {
+                void handleSetCurrentWorkspace(null);
+              }}
             />
 
             <WorkspaceManagerCard
-              workspaces={sortedWorkspaces}
+              workspaces={sortedWorkspaceCatalogue}
               currentWorkspaceId={currentWorkspaceId}
               busy={workspaceBusy}
               hasActiveTask={hasActiveTask}
+              selectionOperation={workspaceSelectionOperation}
               uploadingZip={uploadingWorkspaceZip}
               refreshing={refreshingWorkspaces}
               downloads={workspaceDownloads}
+              loadFailures={workspaceLoadFailures}
               onUploadZip={handleUploadWorkspaceZip}
               onRefresh={() => void handleRefreshWorkspaces()}
               onLoadWorkspace={(workspaceId) => void handleSetCurrentWorkspace(workspaceId)}

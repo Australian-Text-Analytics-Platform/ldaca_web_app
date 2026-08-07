@@ -7,16 +7,17 @@ deployment.
 
 ## Current Guarantees
 
-- Native Workspace schema 13 and portable archive format 12 are strict current
+- Native Workspace schema 15 and portable archive format 14 are strict current
   contracts. Older formats are rejected rather than guessed or migrated at
   runtime.
 - Workspace and User File data use private same-filesystem staging and atomic
   replacement for their normal publication paths.
 - User File Import records are strict, size-bounded JSON files, and each
   individual record save is atomic.
-- Workspace list operations isolate corrupt Workspace entries, and Analysis
-  hydration can expose corrupt Tab-owned records without making healthy sibling
-  Analyses unreadable.
+- Workspace list operations expose safely attributable incompatible, corrupt,
+  and over-limit Workspaces as ID-only unavailable entries while isolating
+  them from healthy siblings. Analysis hydration can expose corrupt Tab-owned
+  records without making healthy sibling Analyses unreadable.
 - Central storage admission measures allocated bytes and reserves concurrent
   growth for Workspace, User File, import, Analysis, and response-snapshot
   writes.

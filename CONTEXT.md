@@ -13,6 +13,13 @@ At runtime, the backend permits at most one open Workspace per user; this is a
 resource state, not a remembered client selection.
 _Avoid_: project, document workspace, current workspace
 
+**Unavailable Workspace**:
+An owned, discoverable Workspace that cannot currently open because its native
+format is incompatible, its snapshot is corrupt, or it exceeds configured
+deployment limits. It remains identifiable and deletable without exposing
+unvalidated Workspace metadata.
+_Avoid_: failed Workspace, broken project, recoverable backup
+
 **Data Block**:
 A named tabular dataset in a Workspace, together with its lineage and analysis
 metadata. Backend code and HTTP schemas represent a Data Block as a `Node`;

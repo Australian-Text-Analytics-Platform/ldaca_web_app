@@ -35,6 +35,7 @@ export const useWorkspaceInternal = () => {
   } = core;
 
   const {
+    workspaceCatalogue,
     workspaces,
     currentWorkspace,
     workspaceGraph,
@@ -134,6 +135,7 @@ export const useWorkspaceInternal = () => {
   );
 
   return {
+    workspaceCatalogue,
     workspaces,
     currentWorkspace,
     currentWorkspaceId,

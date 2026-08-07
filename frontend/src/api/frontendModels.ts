@@ -6,6 +6,7 @@
  * that is assembled by React components after an API response is received.
  */
 import type {
+  AvailableWorkspaceListItem,
   ConcordancePage,
   ConcordanceResult,
   DataPortalRecord,
@@ -24,7 +25,8 @@ import type {
   TokenizerModelResource,
   QuotationEngineSelection,
   WorkspaceNodeInfo,
-  WorkspaceResource,
+  ListWorkspacesResponse,
+  UnavailableWorkspaceListItem,
 } from './generated/types.gen';
 import type { ColumnKind } from '@/lib/arrow/arrowTable';
 
@@ -92,7 +94,11 @@ export interface WorkspaceGraphResponse {
   nodes: WorkspaceGraphNode[];
   edges: WorkspaceGraphEdge[];
 }
-export type WorkspaceSummary = WorkspaceResource;
+export type WorkspaceCatalogueItem = ListWorkspacesResponse[number];
+export type WorkspaceSummary = AvailableWorkspaceListItem & { availability: 'available' };
+export type UnavailableWorkspaceSummary = UnavailableWorkspaceListItem & {
+  availability: 'unavailable';
+};
 
 export interface FileTreeNodeResponse {
   name: string;

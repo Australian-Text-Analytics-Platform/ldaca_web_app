@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { WorkspaceSummary } from '@/api';
+import type { WorkspaceCatalogueItem } from '@/api';
 import { importWorkspaceArchive } from '@/api';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { getInvalidWorkspaceNameMessage } from '@/features/workspace/common/workspaceName';
@@ -14,7 +14,7 @@ interface DeleteWorkspaceTarget {
 }
 
 interface UseDataLoaderWorkspaceActionsParams {
-  workspaces: WorkspaceSummary[];
+  workspaceCatalogue: WorkspaceCatalogueItem[];
   hasWorkspaceSelected: boolean;
   notify: Notify;
 }
@@ -29,7 +29,7 @@ interface UseDataLoaderWorkspaceActionsParams {
  * APIs, refresh workspace data, and return action handlers for cards/dialogs.
  */
 export function useDataLoaderWorkspaceActions({
-  workspaces,
+  workspaceCatalogue,
   hasWorkspaceSelected,
   notify,
 }: UseDataLoaderWorkspaceActionsParams) {
@@ -38,8 +38,47 @@ export function useDataLoaderWorkspaceActions({
   const [workspaceToDelete, setWorkspaceToDelete] = useState<DeleteWorkspaceTarget | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
   const [workspaceNameAlert, setWorkspaceNameAlert] = useState<string | null>(null);
+  const [workspaceLoadFailures, setWorkspaceLoadFailures] = useState<Record<string, string>>({});
+  const [workspaceSelectionOperation, setWorkspaceSelectionOperation] = useState<{
+    workspaceId: string | null;
+    action: 'load' | 'unload';
+  } | null>(null);
   const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
   const [uploadingWorkspaceZip, setUploadingWorkspaceZip] = useState(false);
+
+  /**
+   * Runs the sole Load/Unload operation, clears an old Load failure before a
+   * retry, and records any new Load failure on that available Workspace.
+   */
+  const handleSetCurrentWorkspace = async (
+    workspaceId: string | null,
+    failureLead?: string,
+  ): Promise<boolean> => {
+    if (workspaceSelectionOperation) return false;
+    if (workspaceId) {
+      setWorkspaceLoadFailures((current) => {
+        const { [workspaceId]: _clearedFailure, ...remaining } = current;
+        return remaining;
+      });
+    }
+    setWorkspaceSelectionOperation({
+      workspaceId,
+      action: workspaceId ? 'load' : 'unload',
+    });
+    try {
+      await workspaceActions.setCurrentWorkspace(workspaceId);
+      return true;
+    } catch (error) {
+      const message = (error as Error).message || 'Failed to update active workspace.';
+      if (workspaceId) {
+        setWorkspaceLoadFailures((current) => ({ ...current, [workspaceId]: message }));
+      }
+      notify('error', failureLead ? `${failureLead}: ${message}` : message);
+      return false;
+    } finally {
+      setWorkspaceSelectionOperation(null);
+    }
+  };
 
   /**
    * Creates a workspace from the card form and reports validation errors back
@@ -54,16 +93,11 @@ export function useDataLoaderWorkspaceActions({
     try {
       const workspace = await workspaceActions.createWorkspace(name, description || undefined);
       if (!hasWorkspaceSelected) {
-        try {
-          await workspaceActions.setCurrentWorkspace(workspace.id);
-        } catch (error) {
-          const message = (error as Error).message;
-          notify(
-            'error',
-            message
-              ? `Workspace "${name}" was created, but could not be loaded: ${message}`
-              : `Workspace "${name}" was created, but could not be loaded.`,
-          );
+        const loaded = await handleSetCurrentWorkspace(
+          workspace.id,
+          `Workspace "${name}" was created, but could not be loaded`,
+        );
+        if (!loaded) {
           return true;
         }
       }
@@ -115,19 +149,6 @@ export function useDataLoaderWorkspaceActions({
   };
 
   /**
-   * Loads or unloads the active workspace for the manager and active card. It
-   * centralizes notification handling around the shared workspace action hook.
-   * Used for `WorkspaceManagerCard.onLoadWorkspace` and `ActiveWorkspaceCard.onUnload`.
-   */
-  const handleSetCurrentWorkspace = async (workspaceId: string | null) => {
-    try {
-      await workspaceActions.setCurrentWorkspace(workspaceId);
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to update active workspace.');
-    }
-  };
-
-  /**
    * Persists the active workspace description from the card's inline editor.
    * Passed to `ActiveWorkspaceCard` as `onUpdateDescription`.
    */
@@ -146,8 +167,11 @@ export function useDataLoaderWorkspaceActions({
    * Passed to `WorkspaceManagerCard` as `onDeleteWorkspace`.
    */
   const openDeleteWorkspaceDialog = (workspaceId: string) => {
-    const target = workspaces.find((workspace) => workspace.id === workspaceId);
-    setWorkspaceToDelete({ id: workspaceId, name: target?.name });
+    const target = workspaceCatalogue.find((workspace) => workspace.id === workspaceId);
+    setWorkspaceToDelete({
+      id: workspaceId,
+      name: target?.availability === 'available' ? target.name : undefined,
+    });
   };
 
   /**
@@ -160,6 +184,10 @@ export function useDataLoaderWorkspaceActions({
     setDeletingWorkspace(true);
     try {
       await workspaceActions.deleteWorkspace(workspaceToDelete.id);
+      setWorkspaceLoadFailures((current) => {
+        const { [workspaceToDelete.id]: _clearedFailure, ...remaining } = current;
+        return remaining;
+      });
       notify('success', 'Workspace deleted.');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to delete workspace.');
@@ -227,6 +255,8 @@ export function useDataLoaderWorkspaceActions({
     workspaceNameAlert,
     refreshingWorkspaces,
     uploadingWorkspaceZip,
+    workspaceLoadFailures,
+    workspaceSelectionOperation,
     // Dialog close handlers are returned with the state they clear because
     // `DataLoaderDialogs` owns only presentation, not workspace state.
     // Passed to DataLoaderDialogs as workspaceNameAlert.onClose.

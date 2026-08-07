@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { listNodes, listWorkspaces } from '@/api';
-import type { WorkspaceGraphResponse } from '@/api';
+import type { WorkspaceCatalogueItem, WorkspaceGraphResponse, WorkspaceSummary } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type { WorkspaceNodeInfo as GraphNode } from '@/api';
 
@@ -9,6 +9,13 @@ interface WorkspaceQueriesParams {
   activeNodeId: string | null;
   selectedNodeIds: string[];
 }
+
+export const availableWorkspacesFromCatalogue = (
+  catalogue: WorkspaceCatalogueItem[],
+): WorkspaceSummary[] =>
+  catalogue.filter(
+    (workspace): workspace is WorkspaceSummary => workspace.availability === 'available',
+  );
 
 /**
  * Owns all workspace React Query reads. `useWorkspaceInternal` consumes this
@@ -39,7 +46,8 @@ export const useWorkspaceQueries = ({
     staleTime: 5 * 60 * 1000,
   });
 
-  const workspaces = workspacesQuery.data ?? [];
+  const workspaceCatalogue = workspacesQuery.data ?? [];
+  const workspaces = availableWorkspacesFromCatalogue(workspaceCatalogue);
   const openWorkspaces = workspaces.filter((workspace) => workspace.runtime_state === 'open');
   if (openWorkspaces.length > 1) {
     throw new Error(
@@ -94,6 +102,7 @@ export const useWorkspaceQueries = ({
   };
 
   return {
+    workspaceCatalogue,
     workspaces,
     currentWorkspace,
     workspaceGraph,

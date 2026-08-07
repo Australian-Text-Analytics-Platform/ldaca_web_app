@@ -11,6 +11,7 @@ import DataLoaderFeature from '../DataLoaderFeature';
 const {
   mockCreateWorkspace,
   mockSetCurrentWorkspace,
+  mockDeleteWorkspace,
   mockUpdateWorkspaceDescription,
   mockHandleUploadFile,
   mockHandleDeleteFile,
@@ -22,6 +23,7 @@ const {
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
   mockSetCurrentWorkspace: vi.fn(),
+  mockDeleteWorkspace: vi.fn(),
   mockUpdateWorkspaceDescription: vi.fn(),
   mockHandleUploadFile: vi.fn(),
   mockHandleDeleteFile: vi.fn(),
@@ -41,6 +43,17 @@ interface MockWorkspaceState {
     modified_at: string;
     total_nodes: number;
   }[];
+  workspaceCatalogue?: (
+    | MockWorkspaceState['workspaces'][number]
+    | {
+        availability: 'unavailable';
+        id: string;
+        reason: 'incompatible_format' | 'corrupt_snapshot' | 'configured_limit';
+        message: string;
+        stored_schema_version?: number | null;
+        supported_schema_version?: number | null;
+      }
+  )[];
   currentWorkspaceId: string | null;
   workspaceGraph: { nodes: unknown[] };
 }
@@ -71,7 +84,10 @@ vi.mock('sonner', () => ({
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   // Supplies a mutable workspace fixture so each test can exercise loaded and
   // unloaded Data Loader states without mounting the real workspace provider.
-  useWorkspaceData: () => mockWorkspaceState,
+  useWorkspaceData: () => ({
+    ...mockWorkspaceState,
+    workspaceCatalogue: mockWorkspaceState.workspaceCatalogue ?? mockWorkspaceState.workspaces,
+  }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
@@ -82,7 +98,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
     renameWorkspace: vi.fn(),
     updateWorkspaceDescription: mockUpdateWorkspaceDescription,
     saveWorkspace: vi.fn(),
-    deleteWorkspace: vi.fn(),
+    deleteWorkspace: mockDeleteWorkspace,
     setCurrentWorkspace: mockSetCurrentWorkspace,
     createNodeFromFile: vi.fn(),
   }),
@@ -476,6 +492,44 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
   });
 
+  it('renders unavailable UUID cards last with only safe disabled actions and Delete', async () => {
+    const user = userEvent.setup();
+    const unavailableId = '0a120442-2f33-4474-9d09-9adbdfea7ebc';
+    mockWorkspaceState.workspaceCatalogue = [
+      {
+        availability: 'unavailable',
+        id: unavailableId,
+        reason: 'incompatible_format',
+        message: 'Workspace format 14 is incompatible with supported format 15.',
+        stored_schema_version: 14,
+        supported_schema_version: 15,
+      },
+      ...mockWorkspaceState.workspaces,
+    ];
+
+    renderWithProviders(<DataLoaderFeature />);
+
+    const cards = screen.getAllByTestId(/^workspace-manager-item-/);
+    expect(cards.at(-1)).toHaveAttribute('data-testid', `workspace-manager-item-${unavailableId}`);
+    const unavailable = within(cards.at(-1)!);
+    expect(unavailable.getByText('Unavailable Workspace')).toBeInTheDocument();
+    expect(unavailable.getByText(unavailableId)).toBeInTheDocument();
+    expect(
+      unavailable.getByText('Workspace format 14 is incompatible with supported format 15.'),
+    ).toBeInTheDocument();
+    expect(unavailable.getByRole('button', { name: 'Load' })).toBeDisabled();
+    expect(unavailable.getByRole('button', { name: 'Download' })).toBeDisabled();
+    expect(unavailable.getByRole('button', { name: 'Delete' })).toBeEnabled();
+    expect(unavailable.queryByLabelText(/favorites/i)).not.toBeInTheDocument();
+    expect(unavailable.queryByLabelText(/workspace description/i)).not.toBeInTheDocument();
+
+    await user.click(unavailable.getByRole('button', { name: 'Delete' }));
+    const confirmation = screen.getByRole('alertdialog', { name: 'Delete workspace?' });
+    expect(confirmation).toHaveTextContent(unavailableId);
+    await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
+    expect(mockDeleteWorkspace).not.toHaveBeenCalled();
+  });
+
   it('links LDaCA collection card titles to their portal pages', async () => {
     const user = userEvent.setup();
     vi.mocked(listFeaturedDataPortalCollections).mockResolvedValueOnce({
@@ -542,6 +596,131 @@ describe('DataLoaderFeature citation UI', () => {
     fireEvent.click(quickUnloadButton);
 
     expect(mockSetCurrentWorkspace).toHaveBeenCalledWith(null);
+  });
+
+  it('keeps each workspace load failure visible until that workspace loads successfully', async () => {
+    const user = userEvent.setup();
+    mockWorkspaceState = {
+      workspaces: [
+        {
+          id: 'ws-corrupt',
+          name: 'Corrupt Workspace',
+          description: '',
+          created_at: '2024-01-01',
+          modified_at: '2024-01-02',
+          total_nodes: 2,
+        },
+        {
+          id: 'ws-offline',
+          name: 'Remote Workspace',
+          description: '',
+          created_at: '2024-01-01',
+          modified_at: '2024-01-02',
+          total_nodes: 1,
+        },
+      ],
+      currentWorkspaceId: null,
+      workspaceGraph: { nodes: [] },
+    };
+    mockSetCurrentWorkspace
+      .mockRejectedValueOnce(new Error('Workspace snapshot is corrupt.'))
+      .mockRejectedValueOnce(new Error('Unable to reach the backend.'))
+      .mockResolvedValueOnce(undefined);
+
+    renderWithProviders(<DataLoaderFeature />);
+
+    const corruptWorkspace = getVisibleMatch(
+      screen.getAllByTestId('workspace-manager-item-ws-corrupt'),
+    );
+    const offlineWorkspace = getVisibleMatch(
+      screen.getAllByTestId('workspace-manager-item-ws-offline'),
+    );
+
+    await user.click(within(corruptWorkspace).getByRole('button', { name: 'Load' }));
+    expect(await within(corruptWorkspace).findByRole('alert')).toHaveTextContent(
+      'Failed to load: Workspace snapshot is corrupt.',
+    );
+
+    await user.click(within(offlineWorkspace).getByRole('button', { name: 'Load' }));
+    expect(await within(offlineWorkspace).findByRole('alert')).toHaveTextContent(
+      'Failed to load: Unable to reach the backend.',
+    );
+    expect(within(corruptWorkspace).getByRole('alert')).toBeInTheDocument();
+
+    await user.click(within(corruptWorkspace).getByRole('button', { name: 'Load' }));
+    await waitFor(() => {
+      expect(within(corruptWorkspace).queryByRole('alert')).not.toBeInTheDocument();
+    });
+    expect(within(offlineWorkspace).getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('serializes pending Load controls and shows the target loading state', async () => {
+    const user = userEvent.setup();
+    let finishLoad: () => void = () => undefined;
+    mockWorkspaceState = {
+      workspaces: [
+        ...mockWorkspaceState.workspaces,
+        {
+          id: 'ws-2',
+          name: 'Second Workspace',
+          description: '',
+          created_at: '2024-01-01',
+          modified_at: '2024-01-03',
+          total_nodes: 0,
+        },
+      ],
+      currentWorkspaceId: null,
+      workspaceGraph: { nodes: [] },
+    };
+    mockSetCurrentWorkspace.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLoad = resolve;
+        }),
+    );
+
+    renderWithProviders(<DataLoaderFeature />);
+
+    const workspace = getVisibleMatch(screen.getAllByTestId('workspace-manager-item-ws-1'));
+    const other = getVisibleMatch(screen.getAllByTestId('workspace-manager-item-ws-2'));
+    await user.click(within(workspace).getByRole('button', { name: 'Load' }));
+
+    expect(within(workspace).getByRole('button', { name: 'Loading…' })).toBeDisabled();
+    expect(within(other).getByRole('button', { name: 'Load' })).toBeDisabled();
+    await user.click(within(other).getByRole('button', { name: 'Load' }));
+    expect(mockSetCurrentWorkspace).toHaveBeenCalledTimes(1);
+
+    finishLoad();
+
+    await waitFor(() => {
+      expect(within(other).getByRole('button', { name: 'Load' })).toBeEnabled();
+    });
+  });
+
+  it('serializes pending Unload controls and shows Unloading on the active Workspace', async () => {
+    const user = userEvent.setup();
+    let finishUnload: () => void = () => undefined;
+    mockSetCurrentWorkspace.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishUnload = resolve;
+        }),
+    );
+
+    renderWithProviders(<DataLoaderFeature />);
+
+    const activeCard = getVisibleMatch(screen.getAllByTestId('active-workspace-card'));
+    await user.click(within(activeCard).getByRole('button', { name: 'Unload' }));
+
+    expect(within(activeCard).getByRole('button', { name: 'Unloading…' })).toBeDisabled();
+    const manager = getVisibleMatch(screen.getAllByTestId('workspace-manager-item-ws-1'));
+    expect(within(manager).getByRole('button', { name: 'Unloading…' })).toBeDisabled();
+    expect(mockSetCurrentWorkspace).toHaveBeenCalledTimes(1);
+
+    finishUnload();
+    await waitFor(() => {
+      expect(within(activeCard).getByRole('button', { name: 'Unload' })).toBeEnabled();
+    });
   });
 
   it('shows workspace description details from the manager', () => {
@@ -613,6 +792,61 @@ describe('DataLoaderFeature citation UI', () => {
     await waitFor(() => {
       expect(mockCreateWorkspace).toHaveBeenCalledWith('New Workspace', undefined);
       expect(mockSetCurrentWorkspace).toHaveBeenCalledWith('ws-new');
+    });
+  });
+
+  it('shows automatic post-create Load failures on the created Workspace card', async () => {
+    const user = userEvent.setup();
+    mockWorkspaceState = {
+      workspaces: [],
+      currentWorkspaceId: null,
+      workspaceGraph: { nodes: [] },
+    };
+    mockCreateWorkspace.mockImplementationOnce(async () => {
+      mockWorkspaceState = {
+        workspaces: [
+          {
+            id: 'ws-new',
+            name: 'New Workspace',
+            description: '',
+            created_at: '2024-01-01',
+            modified_at: '2024-01-01',
+            total_nodes: 0,
+          },
+        ],
+        currentWorkspaceId: null,
+        workspaceGraph: { nodes: [] },
+      };
+      return { id: 'ws-new' };
+    });
+    mockSetCurrentWorkspace.mockRejectedValueOnce(new Error('Snapshot failed validation.'));
+
+    renderWithProviders(<DataLoaderFeature />);
+    const createCard = getVisibleMatch(screen.getAllByTestId('create-workspace-card'));
+    await user.type(within(createCard).getByPlaceholderText('Workspace name'), 'New Workspace');
+    await user.click(within(createCard).getByRole('button', { name: /create workspace/i }));
+
+    const createdCard = await screen.findByTestId('workspace-manager-item-ws-new');
+    expect(await within(createdCard).findByRole('alert')).toHaveTextContent(
+      'Failed to load: Snapshot failed validation.',
+    );
+  });
+
+  it('clears a transient Load failure after deleting its Workspace', async () => {
+    const user = userEvent.setup();
+    mockWorkspaceState.currentWorkspaceId = null;
+    mockSetCurrentWorkspace.mockRejectedValueOnce(new Error('Temporary load error.'));
+
+    renderWithProviders(<DataLoaderFeature />);
+    const workspace = getVisibleMatch(screen.getAllByTestId('workspace-manager-item-ws-1'));
+    await user.click(within(workspace).getByRole('button', { name: 'Load' }));
+    expect(await within(workspace).findByRole('alert')).toBeInTheDocument();
+
+    await user.click(within(workspace).getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: 'Delete workspace' }));
+
+    await waitFor(() => {
+      expect(within(workspace).queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 

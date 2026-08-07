@@ -8,6 +8,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { analysisResponse } from '@/test/msw/fixtures';
 import { server } from '@/test/msw/server';
 import type { UserFileImport } from '@/api';
+import type { WorkspaceCatalogueItem } from '@/api';
 import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
@@ -318,6 +319,96 @@ describe('useWorkspaceTaskInbox', () => {
     });
 
     await waitFor(() => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true));
+  });
+
+  it('patches runtime state only on available catalogue entries', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const unavailable: WorkspaceCatalogueItem = {
+      availability: 'unavailable',
+      id: 'workspace-unavailable',
+      reason: 'corrupt_snapshot',
+      message: 'Workspace data is corrupt.',
+    };
+    const available: WorkspaceCatalogueItem = {
+      availability: 'available',
+      id: 'workspace-available',
+      name: 'Available',
+      description: '',
+      created_at: '2026-08-08T00:00:00Z',
+      modified_at: '2026-08-08T00:00:00Z',
+      total_nodes: 0,
+      root_nodes: 0,
+      leaf_nodes: 0,
+      revision: 1,
+      runtime_state: 'closed',
+    };
+    queryClient.setQueryData(queryKeys.workspaceList, [unavailable, available]);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useWorkspaceTaskInbox(null), { wrapper });
+
+    act(() => {
+      emitEvent?.({
+        type: 'workspace_runtime_changed',
+        sequence: 4,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'workspace',
+        resource_id: available.id,
+        workspace_id: available.id,
+        runtime_state: 'open',
+        revision: null,
+      });
+    });
+
+    expect(queryClient.getQueryData(queryKeys.workspaceList)).toEqual([
+      unavailable,
+      { ...available, runtime_state: 'open' },
+    ]);
+  });
+
+  it('removes either catalogue variant when a Workspace removal event arrives', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const catalogue: WorkspaceCatalogueItem[] = [
+      {
+        availability: 'unavailable',
+        id: 'workspace-unavailable',
+        reason: 'configured_limit',
+        message: 'Workspace exceeds the configured limits.',
+      },
+      {
+        availability: 'available',
+        id: 'workspace-available',
+        name: 'Available',
+        description: '',
+        created_at: '2026-08-08T00:00:00Z',
+        modified_at: '2026-08-08T00:00:00Z',
+        total_nodes: 0,
+        root_nodes: 0,
+        leaf_nodes: 0,
+        revision: 1,
+        runtime_state: 'closed',
+      },
+    ];
+    queryClient.setQueryData(queryKeys.workspaceList, catalogue);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useWorkspaceTaskInbox(null), { wrapper });
+
+    act(() => {
+      emitEvent?.({
+        type: 'resource_removed',
+        sequence: 5,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'workspace',
+        resource_id: 'workspace-unavailable',
+        workspace_id: 'workspace-unavailable',
+        revision: null,
+      });
+    });
+
+    expect(queryClient.getQueryData(queryKeys.workspaceList)).toEqual([catalogue[1]]);
   });
 
   it('cancels a User File Import and patches the returned resource into Query state', async () => {

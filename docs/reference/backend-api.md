@@ -120,7 +120,7 @@ is removed before a User File Import request is retained.
 
 | Method and path | Operation ID | Success | Purpose |
 |---|---|---:|---|
-| `GET /api/workspaces` | `list_workspaces` | 200 | Fresh owner-filtered filesystem catalogue |
+| `GET /api/workspaces` | `list_workspaces` | 200 | Fresh owner-filtered available/unavailable filesystem catalogue |
 | `POST /api/workspaces` | `create_workspace` | 201 | Create one closed Revision-1 Workspace |
 | `POST /api/workspaces/imports` | `import_workspace_archive` | 201 | Validate, re-identify, and atomically install an archive |
 | `GET /api/workspaces/{workspace_id}` | `get_workspace_by_id` | 200 | Read lightweight metadata and runtime state |
@@ -146,8 +146,17 @@ closing target makes it the sole open resource. If opening fails after a sibling
 transition, the response reports the real error and subsequent collection reads
 expose the resulting backend state.
 
-Native Workspace snapshots use schema version 13 and portable archives use
-format version 12. Readers accept only those exact versions; import and open do
+`GET /api/workspaces` returns a discriminated `WorkspaceListItem` collection.
+An `available` item contains every `WorkspaceResource` field. An `unavailable`
+item contains only `availability`, canonical `id`, safe `message`, and `reason`:
+`incompatible_format`, `corrupt_snapshot`, or `configured_limit`. Incompatible
+items also contain `stored_schema_version` and `supported_schema_version`;
+other reasons return those fields as null. Create, direct read, open, update,
+and import continue to return strict `WorkspaceResource` responses. Delete
+continues to authorize from the canonical directory and ownership sidecar.
+
+Native Workspace snapshots use schema version 15 and portable archives use
+format version 14. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks

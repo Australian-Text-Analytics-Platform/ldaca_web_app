@@ -1578,6 +1578,84 @@
         "title": "AuthProvider",
         "type": "object"
       },
+      "AvailableWorkspaceListItem": {
+        "additionalProperties": false,
+        "description": "Available Workspace entry returned by catalogue discovery.",
+        "properties": {
+          "availability": {
+            "const": "available",
+            "default": "available",
+            "title": "Availability",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "leaf_nodes": {
+            "minimum": 0.0,
+            "title": "Leaf Nodes",
+            "type": "integer"
+          },
+          "modified_at": {
+            "format": "date-time",
+            "title": "Modified At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "root_nodes": {
+            "minimum": 0.0,
+            "title": "Root Nodes",
+            "type": "integer"
+          },
+          "runtime_state": {
+            "enum": [
+              "closed",
+              "open",
+              "closing"
+            ],
+            "title": "Runtime State",
+            "type": "string"
+          },
+          "total_nodes": {
+            "minimum": 0.0,
+            "title": "Total Nodes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "created_at",
+          "modified_at",
+          "total_nodes",
+          "root_nodes",
+          "leaf_nodes",
+          "revision",
+          "runtime_state"
+        ],
+        "title": "AvailableWorkspaceListItem",
+        "type": "object"
+      },
       "BackgroundState": {
         "enum": [
           "queued",
@@ -8574,6 +8652,65 @@
         "title": "UnaryExpression",
         "type": "object"
       },
+      "UnavailableWorkspaceListItem": {
+        "additionalProperties": false,
+        "description": "ID-only catalogue entry for an owned Workspace that cannot open.",
+        "properties": {
+          "availability": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "title": "Availability",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "incompatible_format",
+              "corrupt_snapshot",
+              "configured_limit"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "stored_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Schema Version"
+          },
+          "supported_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supported Schema Version"
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "message"
+        ],
+        "title": "UnavailableWorkspaceListItem",
+        "type": "object"
+      },
       "UnlimitedStorageResource": {
         "additionalProperties": false,
         "description": "A principal with no durable storage limit.",
@@ -12445,7 +12582,21 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/WorkspaceResource"
+                    "discriminator": {
+                      "mapping": {
+                        "available": "#/components/schemas/AvailableWorkspaceListItem",
+                        "unavailable": "#/components/schemas/UnavailableWorkspaceListItem"
+                      },
+                      "propertyName": "availability"
+                    },
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/AvailableWorkspaceListItem"
+                      },
+                      {
+                        "$ref": "#/components/schemas/UnavailableWorkspaceListItem"
+                      }
+                    ]
                   },
                   "title": "Response List Workspaces",
                   "type": "array"

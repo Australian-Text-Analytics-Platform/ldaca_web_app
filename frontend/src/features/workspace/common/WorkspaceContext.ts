@@ -4,6 +4,7 @@ import type { useWorkspaceInternal } from './hooks/useWorkspaceInternal';
 type WorkspaceInternal = ReturnType<typeof useWorkspaceInternal>;
 
 export interface WorkspaceDataSlice {
+  workspaceCatalogue: WorkspaceInternal['workspaceCatalogue'];
   workspaces: WorkspaceInternal['workspaces'];
   currentWorkspace: WorkspaceInternal['currentWorkspace'];
   currentWorkspaceId: WorkspaceInternal['currentWorkspaceId'];

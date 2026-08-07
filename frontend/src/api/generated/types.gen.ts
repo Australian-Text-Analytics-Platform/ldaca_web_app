@@ -769,6 +769,58 @@ export type AuthProvider = {
 };
 
 /**
+ * AvailableWorkspaceListItem
+ *
+ * Available Workspace entry returned by catalogue discovery.
+ */
+export type AvailableWorkspaceListItem = {
+    /**
+     * Availability
+     */
+    availability?: 'available';
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Leaf Nodes
+     */
+    leaf_nodes: number;
+    /**
+     * Modified At
+     */
+    modified_at: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Revision
+     */
+    revision: number;
+    /**
+     * Root Nodes
+     */
+    root_nodes: number;
+    /**
+     * Runtime State
+     */
+    runtime_state: 'closed' | 'open' | 'closing';
+    /**
+     * Total Nodes
+     */
+    total_nodes: number;
+};
+
+/**
  * BackgroundState
  */
 export type BackgroundState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -4238,6 +4290,38 @@ export type UnaryExpressionOutput = {
 };
 
 /**
+ * UnavailableWorkspaceListItem
+ *
+ * ID-only catalogue entry for an owned Workspace that cannot open.
+ */
+export type UnavailableWorkspaceListItem = {
+    /**
+     * Availability
+     */
+    availability?: 'unavailable';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Reason
+     */
+    reason: 'incompatible_format' | 'corrupt_snapshot' | 'configured_limit';
+    /**
+     * Stored Schema Version
+     */
+    stored_schema_version?: number | null;
+    /**
+     * Supported Schema Version
+     */
+    supported_schema_version?: number | null;
+};
+
+/**
  * UnlimitedStorageResource
  *
  * A principal with no durable storage limit.
@@ -6584,7 +6668,11 @@ export type ListWorkspacesResponses = {
      *
      * Successful Response
      */
-    200: Array<WorkspaceResource>;
+    200: Array<({
+        availability: 'available';
+    } & AvailableWorkspaceListItem) | ({
+        availability: 'unavailable';
+    } & UnavailableWorkspaceListItem)>;
 };
 
 export type ListWorkspacesResponse = ListWorkspacesResponses[keyof ListWorkspacesResponses];

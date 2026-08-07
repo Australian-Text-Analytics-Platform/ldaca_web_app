@@ -1,4 +1,5 @@
 import {
+  CircleAlert,
   Download as DownloadIcon,
   Loader2,
   MoreHorizontal,
@@ -8,7 +9,7 @@ import {
   Upload,
 } from 'lucide-react';
 import React, { useRef } from 'react';
-import type { WorkspaceSummary } from '@/api';
+import type { WorkspaceCatalogueItem } from '@/api';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,16 +27,19 @@ import {
 import type { WorkspaceDownloadsHandle } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
 import { formatTimestamp } from '../utils/format';
 
-export type WorkspaceListItem = WorkspaceSummary;
-
 export interface WorkspaceManagerCardProps {
-  workspaces: WorkspaceListItem[];
+  workspaces: WorkspaceCatalogueItem[];
   currentWorkspaceId: string | null;
   busy: boolean;
   hasActiveTask?: boolean;
+  selectionOperation?: {
+    workspaceId: string | null;
+    action: 'load' | 'unload';
+  } | null;
   uploadingZip: boolean;
   refreshing: boolean;
   downloads: WorkspaceDownloadsHandle;
+  loadFailures?: Readonly<Record<string, string>>;
   onUploadZip: (file: File) => Promise<void> | void;
   onRefresh: () => void;
   onLoadWorkspace: (workspaceId: string | null) => void;
@@ -55,9 +59,11 @@ export function WorkspaceManagerCard({
   currentWorkspaceId,
   busy,
   hasActiveTask = false,
+  selectionOperation = null,
   uploadingZip,
   refreshing,
   downloads,
+  loadFailures = {},
   onUploadZip,
   onRefresh,
   onLoadWorkspace,
@@ -151,16 +157,66 @@ export function WorkspaceManagerCard({
           <div className="space-y-3 overflow-y-auto pr-2">
             {workspaces.map((workspace) => {
               const workspaceId = workspace.id;
+              if (workspace.availability === 'unavailable') {
+                return (
+                  <div
+                    key={workspaceId}
+                    data-testid={`workspace-manager-item-${workspaceId}`}
+                    className="flex flex-col gap-3 rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 @min-[480px]/workspace-manager:flex-row @min-[480px]/workspace-manager:items-center @min-[480px]/workspace-manager:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 font-medium text-destructive">
+                        <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span>Unavailable Workspace</span>
+                      </div>
+                      <div className="mt-1 break-all font-mono text-xs text-foreground">
+                        {workspaceId}
+                      </div>
+                      <div className="mt-2 max-w-prose text-xs text-muted-foreground">
+                        {workspace.message}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <DisabledReasonTooltip reason={workspace.message}>
+                        <Button size="sm" variant="secondary" disabled>
+                          Load
+                        </Button>
+                      </DisabledReasonTooltip>
+                      <DisabledReasonTooltip reason={workspace.message}>
+                        <Button size="sm" variant="outline" disabled>
+                          <DownloadIcon className="mr-1.5 h-4 w-4" /> Download
+                        </Button>
+                      </DisabledReasonTooltip>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          onDeleteWorkspace(workspaceId);
+                        }}
+                      >
+                        <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
               const isActive = workspaceId === currentWorkspaceId;
               const blockCount = workspace.total_nodes;
+              const loadFailure = loadFailures[workspaceId];
+              const isSelectionTarget =
+                selectionOperation?.action === 'load'
+                  ? selectionOperation.workspaceId === workspaceId
+                  : selectionOperation?.action === 'unload' && isActive;
               return (
                 <div
                   key={workspaceId}
                   data-testid={`workspace-manager-item-${workspaceId}`}
                   className={`flex flex-col gap-2 rounded-md border px-4 py-3 @min-[480px]/workspace-manager:flex-row @min-[480px]/workspace-manager:items-center @min-[480px]/workspace-manager:justify-between ${
-                    isActive
-                      ? 'border-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm'
-                      : 'border-border/70 bg-background'
+                    loadFailure
+                      ? 'border-destructive/50 bg-destructive/5'
+                      : isActive
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm'
+                        : 'border-border/70 bg-background'
                   }`}
                 >
                   <div>
@@ -211,6 +267,17 @@ export function WorkspaceManagerCard({
                       Updated {formatTimestamp(workspace.modified_at)} | {blockCount} data block
                       {blockCount === 1 ? '' : 's'}
                     </div>
+                    {loadFailure ? (
+                      <div
+                        role="alert"
+                        className="mt-2 flex max-w-prose items-start gap-1.5 text-xs text-destructive"
+                      >
+                        <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>
+                          <span className="font-medium">Failed to load:</span> {loadFailure}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <DisabledReasonTooltip
@@ -219,7 +286,9 @@ export function WorkspaceManagerCard({
                           ? isActive
                             ? 'A task is still running on this workspace. Wait for it to finish, or cancel it from the task list, before unloading.'
                             : 'A task is still running on the current workspace. Wait for it to finish, or cancel it from the task list, before switching workspaces.'
-                          : undefined
+                          : selectionOperation
+                            ? 'Another Workspace Load or Unload operation is in progress.'
+                            : undefined
                       }
                     >
                       <Button
@@ -229,9 +298,18 @@ export function WorkspaceManagerCard({
                         onClick={() => {
                           onLoadWorkspace(isActive ? null : workspaceId);
                         }}
-                        disabled={hasActiveTask}
+                        disabled={hasActiveTask || Boolean(selectionOperation)}
                       >
-                        {isActive ? 'Unload' : 'Load'}
+                        {isSelectionTarget ? (
+                          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : null}
+                        {isSelectionTarget
+                          ? selectionOperation?.action === 'unload'
+                            ? 'Unloading…'
+                            : 'Loading…'
+                          : isActive
+                            ? 'Unload'
+                            : 'Load'}
                       </Button>
                     </DisabledReasonTooltip>
                     <Button

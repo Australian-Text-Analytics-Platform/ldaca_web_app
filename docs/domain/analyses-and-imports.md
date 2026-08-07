@@ -196,7 +196,7 @@ oversized segment on the right.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 13 and portable archive format 12 accept only this
+Native Workspace schema 15 and portable archive format 14 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

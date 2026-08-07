@@ -35,6 +35,7 @@ const coreDefaults = {
 };
 
 const queryDefaults = {
+  workspaceCatalogue: [],
   workspaces: [],
   currentWorkspace: null,
   workspaceGraph: null,

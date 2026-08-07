@@ -25,13 +25,21 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const dataValue = useMemo(
     () => ({
+      workspaceCatalogue: ws.workspaceCatalogue,
       workspaces: ws.workspaces,
       currentWorkspace: ws.currentWorkspace,
       currentWorkspaceId: ws.currentWorkspaceId,
       nodes: ws.nodes,
       workspaceGraph: ws.workspaceGraph,
     }),
-    [ws.workspaces, ws.currentWorkspace, ws.currentWorkspaceId, ws.nodes, ws.workspaceGraph],
+    [
+      ws.workspaceCatalogue,
+      ws.workspaces,
+      ws.currentWorkspace,
+      ws.currentWorkspaceId,
+      ws.nodes,
+      ws.workspaceGraph,
+    ],
   );
 
   const selectionValue = useMemo(

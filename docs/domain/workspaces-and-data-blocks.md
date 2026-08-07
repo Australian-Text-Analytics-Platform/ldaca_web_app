@@ -140,8 +140,13 @@ Preference from a source, clone, or Analysis-created output.
   discoverable.
 - Creation and import publish from `workspaces/.staging/` through one atomic
   rename; import always creates a fresh Workspace identity and owner sidecar.
-- Collection scans omit one corrupt owned Workspace without blocking healthy
-  siblings, while direct owned access reports `workspace_corrupt`.
+- Collection scans expose a safely attributable incompatible, corrupt, or
+  over-limit Workspace as an ID-only Unavailable Workspace without blocking
+  healthy siblings. Direct owned access remains strict and reports
+  `workspace_corrupt`.
+- Collection scans hide foreign-owned, unattributable, unsafely named,
+  staging, trash, and non-UUID entries. An Unavailable Workspace is visible
+  only after its canonical UUID directory and current-owner sidecar validate.
 - Workspace deletion cannot race active Analysis execution or completion.
 - Removing a Data Block preserves graph validity and cannot orphan descendants.
 - Idempotent completion may reuse an existing Data Block only when its complete
