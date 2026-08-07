@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { ColumnSelectionActions } from './ColumnSelectionActions';
 
 interface Props {
@@ -68,6 +69,43 @@ const normalizeSelectedColumns = (
   );
 };
 
+const optionalColumns = (
+  source: RunAllSourceTableResource,
+  mode: 'match' | 'document',
+): string[] => {
+  const required = new Set(requiredColumns(source, mode));
+  return selectableColumns(source, mode).filter((column) => !required.has(column));
+};
+
+const sharedOptionalColumns = (
+  sources: readonly RunAllSourceTableResource[],
+  mode: 'match' | 'document',
+): string[] => {
+  const [first, ...remaining] = sources;
+  if (!first || remaining.length === 0) return [];
+  return optionalColumns(first, mode).filter((column) =>
+    remaining.every((source) => optionalColumns(source, mode).includes(column)),
+  );
+};
+
+const reconcileSyncedColumns = (
+  current: Record<string, string[]>,
+  sources: readonly RunAllSourceTableResource[],
+  mode: 'match' | 'document',
+) => {
+  const shared = sharedOptionalColumns(sources, mode);
+  const selectedShared = shared.filter((column) =>
+    sources.some((source) =>
+      (current[source.node_id] ?? defaultColumns(source, mode)).includes(column),
+    ),
+  );
+  const next = { ...current };
+  for (const source of sources) {
+    next[source.node_id] = normalizeSelectedColumns(source, mode, selectedShared);
+  }
+  return next;
+};
+
 /** Selects immutable Result columns for Derived Data Block Creation. */
 export function ResultAddToWorkspaceDialog({
   open,
@@ -86,21 +124,83 @@ export function ResultAddToWorkspaceDialog({
   const [includedSourceIds, setIncludedSourceIds] = useState<Set<string>>(
     () => new Set(sources.map((source) => source.node_id)),
   );
+  const [syncColumns, setSyncColumns] = useState(false);
   const [namesBySource, setNamesBySource] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       sources.map((source) => [source.node_id, `${source.node_name}_${nameSuffix}`]),
     ),
   );
 
+  const includedSources = sources.filter((source) => includedSourceIds.has(source.node_id));
+  const sharedOptional = sharedOptionalColumns(includedSources, mode);
+  const sharedOptionalSet = new Set(sharedOptional);
+
+  const toggleSource = (source: RunAllSourceTableResource) => {
+    const nextIncludedSourceIds = new Set(includedSourceIds);
+    if (nextIncludedSourceIds.has(source.node_id)) nextIncludedSourceIds.delete(source.node_id);
+    else nextIncludedSourceIds.add(source.node_id);
+    setIncludedSourceIds(nextIncludedSourceIds);
+
+    if (!syncColumns) return;
+    const nextIncludedSources = sources.filter((candidate) =>
+      nextIncludedSourceIds.has(candidate.node_id),
+    );
+    if (nextIncludedSources.length < 2) {
+      setSyncColumns(false);
+      return;
+    }
+    setColumnsBySource((current) => reconcileSyncedColumns(current, nextIncludedSources, mode));
+  };
+
   const toggleColumn = (source: RunAllSourceTableResource, column: string) => {
-    if (column === source.document_column) return;
+    if (requiredColumns(source, mode).includes(column)) return;
     setColumnsBySource((current) => {
       const selected = current[source.node_id] ?? defaultColumns(source, mode);
+      if (syncColumns) {
+        if (!includedSourceIds.has(source.node_id) || !sharedOptionalSet.has(column))
+          return current;
+        const shouldSelect = !selected.includes(column);
+        const next = { ...current };
+        for (const includedSource of includedSources) {
+          const includedSelected =
+            current[includedSource.node_id] ?? defaultColumns(includedSource, mode);
+          next[includedSource.node_id] = normalizeSelectedColumns(
+            includedSource,
+            mode,
+            shouldSelect
+              ? [...includedSelected, column]
+              : includedSelected.filter((value) => value !== column),
+          );
+        }
+        return next;
+      }
       return {
         ...current,
         [source.node_id]: selected.includes(column)
           ? selected.filter((value) => value !== column)
           : [...selected, column],
+      };
+    });
+  };
+
+  const selectOptionalColumns = (source: RunAllSourceTableResource, selectAll: boolean) => {
+    setColumnsBySource((current) => {
+      if (syncColumns) {
+        const next = { ...current };
+        for (const includedSource of includedSources) {
+          next[includedSource.node_id] = normalizeSelectedColumns(
+            includedSource,
+            mode,
+            selectAll ? sharedOptional : [],
+          );
+        }
+        return next;
+      }
+      return {
+        ...current,
+        [source.node_id]: selectAll
+          ? selectableColumns(source, mode)
+          : requiredColumns(source, mode),
       };
     });
   };
@@ -124,6 +224,32 @@ export function ResultAddToWorkspaceDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {sources.length >= 2 ? (
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div className="space-y-1">
+                <Label htmlFor="sync-add-to-workspace-columns">Sync columns</Label>
+                <p className="text-sm text-muted-foreground">
+                  Apply shared optional-column selections to every checked Data Block.
+                </p>
+              </div>
+              <Switch
+                id="sync-add-to-workspace-columns"
+                checked={syncColumns}
+                disabled={includedSources.length < 2}
+                onCheckedChange={(checked) => {
+                  if (!checked) {
+                    setSyncColumns(false);
+                    return;
+                  }
+                  if (includedSources.length < 2) return;
+                  setColumnsBySource((current) =>
+                    reconcileSyncedColumns(current, includedSources, mode),
+                  );
+                  setSyncColumns(true);
+                }}
+              />
+            </div>
+          ) : null}
           {sources.map((source) => {
             const selected = columnsBySource[source.node_id] ?? defaultColumns(source, mode);
             const included = includedSourceIds.has(source.node_id);
@@ -134,12 +260,7 @@ export function ResultAddToWorkspaceDialog({
                     <Checkbox
                       checked={included}
                       onCheckedChange={() => {
-                        setIncludedSourceIds((current) => {
-                          const next = new Set(current);
-                          if (next.has(source.node_id)) next.delete(source.node_id);
-                          else next.add(source.node_id);
-                          return next;
-                        });
+                        toggleSource(source);
                       }}
                     />
                   ) : null}
@@ -169,16 +290,10 @@ export function ResultAddToWorkspaceDialog({
                         <ColumnSelectionActions
                           sourceName={source.node_name}
                           onSelectAll={() => {
-                            setColumnsBySource((current) => ({
-                              ...current,
-                              [source.node_id]: selectableColumns(source, mode),
-                            }));
+                            selectOptionalColumns(source, true);
                           }}
                           onSelectNone={() => {
-                            setColumnsBySource((current) => ({
-                              ...current,
-                              [source.node_id]: requiredColumns(source, mode),
-                            }));
+                            selectOptionalColumns(source, false);
                           }}
                         />
                       </div>
@@ -194,6 +309,7 @@ export function ResultAddToWorkspaceDialog({
                           <label key={column} className="flex items-center gap-2 text-sm">
                             <Checkbox
                               checked={selected.includes(column)}
+                              disabled={syncColumns && !sharedOptionalSet.has(column)}
                               onCheckedChange={() => {
                                 toggleColumn(source, column);
                               }}
@@ -216,6 +332,7 @@ export function ResultAddToWorkspaceDialog({
                               <label key={column} className="flex items-center gap-2 text-sm">
                                 <Checkbox
                                   checked={selected.includes(column)}
+                                  disabled={syncColumns && !sharedOptionalSet.has(column)}
                                   onCheckedChange={() => {
                                     toggleColumn(source, column);
                                   }}

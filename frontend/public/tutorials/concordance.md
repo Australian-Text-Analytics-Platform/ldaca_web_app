@@ -198,6 +198,13 @@ source row. It contains the required original document, required
 optional metadata. The document and extraction columns are locked on and
 metadata starts off. Every source is checked by default; unchecking a source
 hides but retains its controls, and at least one source must remain checked.
+For multiple sources, enable **Sync columns** to limit optional choices to exact,
+case-sensitive column names shared by every checked source. Existing shared
+selections are combined when Sync columns is enabled, and individual changes or
+**Select all** and **Select none** then apply to every checked source. Unchecked
+sources keep their independent selections. Required document and extraction
+columns remain locked on and are not synchronized. If fewer than two sources
+remain checked, Sync columns turns off automatically.
 Submitting the checked sources is atomic, including when a source has no
 qualifying rows and therefore creates a schema-only Data Block.
 
