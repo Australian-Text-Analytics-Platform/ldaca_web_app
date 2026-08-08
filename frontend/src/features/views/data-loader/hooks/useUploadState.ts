@@ -1,167 +1,337 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import type { FileResource } from '@/api';
 import { isExternalFileDrag } from '@/lib/externalFileDropGuard';
+import type { FileTreeNode } from '../types';
+import {
+  collectDroppedSelection,
+  collectPickerSelection,
+  computeUploadConflicts,
+  getMissingUploadDirectories,
+  prepareUploadSelection,
+  type DroppedEntry,
+  type UploadSelectionInput,
+} from '../utils/uploadSelection';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
-type UploadFile = (file: File) => Promise<boolean>;
+export type UploadActivity =
+  | { phase: 'idle' }
+  | { phase: 'preparing' }
+  | { phase: 'creating-folders'; current: number; total: number; path: string }
+  | { phase: 'uploading'; current: number; total: number; path: string };
 
 interface UseUploadStateParams {
-  uploadFile: UploadFile;
+  createUploadDirectory: (path: string) => Promise<void>;
+  getUploadResource: (path: string) => Promise<FileResource>;
   notify: Notify;
+  refreshFiles: () => Promise<FileTreeNode[] | null>;
+  uploadFileAtPath: (file: File, path: string) => Promise<void>;
 }
 
-/**
- * Owns upload picker/drop-zone state for Data Loader. The feature consumes the
- * returned handlers for both the hidden file input and drag-and-drop upload
- * area.
- * Used by `DataLoaderFeature` for its upload button, hidden input, and drop zone.
- * Flow: normalize picker/drop input into file arrays, serialize uploads through the provided
- * upload function, manage drag/busy state, and notify success/failure counts.
- */
-export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [uploadingFiles, setUploadingFiles] = useState(false);
-  const [isFileDropActive, setIsFileDropActive] = useState(false);
+function errorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String(error.message);
+  }
+  return 'Unexpected error';
+}
 
-  /**
-   * Opens the hidden file input from the visible Upload files button.
-   * Returned to `DataLoaderFeature` as the button's click handler.
-   */
-  const openFilePicker = () => {
-    fileInputRef.current?.click();
+function isResourceConflict(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'resource_conflict'
+  );
+}
+
+function skippedSummary(skipped: { files: number; directories: number }) {
+  if (skipped.files === 0 && skipped.directories === 0) return '';
+  return ` Skipped ${String(skipped.files)} hidden ${skipped.files === 1 ? 'file' : 'files'} and ${String(skipped.directories)} hidden ${skipped.directories === 1 ? 'folder' : 'folders'}.`;
+}
+
+/** Coordinates every picker and drop upload through one preflighted, cancellable pipeline. */
+export function useUploadState({
+  createUploadDirectory,
+  getUploadResource,
+  notify,
+  refreshFiles,
+  uploadFileAtPath,
+}: UseUploadStateParams) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const cancelRequestedRef = useRef(false);
+  const busyRef = useRef(false);
+  const [activity, setActivity] = useState<UploadActivity>({ phase: 'idle' });
+  const [isFileDropActive, setIsFileDropActive] = useState(false);
+  const [conflicts, setConflicts] = useState<string[]>([]);
+
+  const openFilePicker = () => fileInputRef.current?.click();
+  const openFolderPicker = () => folderInputRef.current?.click();
+
+  const cancelUpload = () => {
+    cancelRequestedRef.current = true;
   };
 
-  /**
-   * Uploads one or more selected files sequentially, tracks partial failures,
-   * and reports aggregate success or failure.
-   * Shared by the picker-change and drop handlers below.
-   * Steps: copy the selected list, skip empty batches, upload files sequentially so
-   * notifications match actual outcomes, then reset busy/drop state.
-   */
-  const uploadSelectedFiles = async (filesToUpload: FileList | File[] | null | undefined) => {
-    const selectedFiles = Array.from(filesToUpload ?? []);
-    if (selectedFiles.length === 0) {
+  const closeConflictDialog = () => {
+    setConflicts([]);
+  };
+
+  const isCancellationRequested = () => cancelRequestedRef.current;
+
+  const runUploadSelection = async (input: UploadSelectionInput) => {
+    if (input.unsupportedFolderDrop) {
+      notify('info', 'Folder drop is not supported here. Use Upload folder instead.');
       return;
     }
 
-    setUploadingFiles(true);
-    let uploadedCount = 0;
-    const failedFiles: string[] = [];
-    try {
-      for (const file of selectedFiles) {
-        try {
-          const success = await uploadFile(file);
-          if (success) {
-            uploadedCount += 1;
-          } else {
-            failedFiles.push(file.name);
+    const selection = prepareUploadSelection(input);
+    if (selection.files.length === 0) {
+      notify('info', `No uploadable files found.${skippedSummary(selection.skipped)}`);
+      return;
+    }
+
+    if (isCancellationRequested()) {
+      notify(
+        'info',
+        `Upload cancelled after 0 of ${String(selection.files.length)} files.${skippedSummary(selection.skipped)}`,
+      );
+      return;
+    }
+
+    const completeTree = (await refreshFiles()) ?? [];
+    if (isCancellationRequested()) {
+      notify(
+        'info',
+        `Upload cancelled after 0 of ${String(selection.files.length)} files.${skippedSummary(selection.skipped)}`,
+      );
+      return;
+    }
+    const detectedConflicts = computeUploadConflicts(selection, completeTree);
+    if (detectedConflicts.length > 0) {
+      setConflicts(detectedConflicts);
+      return;
+    }
+
+    const missingDirectories = getMissingUploadDirectories(selection, completeTree);
+    let attemptedMutation = false;
+    let createdFolders = 0;
+    let uploadedFiles = 0;
+    let cancelled = false;
+    let failure: { path: string; error: unknown } | null = null;
+
+    for (let index = 0; index < missingDirectories.length; index += 1) {
+      const path = missingDirectories[index] ?? '';
+      if (isCancellationRequested()) {
+        cancelled = true;
+        break;
+      }
+      setActivity({
+        phase: 'creating-folders',
+        current: index + 1,
+        total: missingDirectories.length,
+        path,
+      });
+      attemptedMutation = true;
+      try {
+        await createUploadDirectory(path);
+        createdFolders += 1;
+      } catch (error) {
+        if (isResourceConflict(error)) {
+          try {
+            const resource = await getUploadResource(path);
+            if (resource.type !== 'directory') failure = { path, error };
+          } catch {
+            failure = { path, error };
           }
-        } catch {
-          failedFiles.push(file.name);
-        }
-      }
-
-      if (failedFiles.length === 0) {
-        if (uploadedCount === 1) {
-          notify('success', `Uploaded ${selectedFiles[0]?.name ?? ''}.`);
         } else {
-          notify('success', `Uploaded ${String(uploadedCount)} files.`);
+          failure = { path, error };
         }
-        return;
       }
-
-      if (uploadedCount === 0) {
-        notify(
-          'error',
-          `Failed to upload ${
-            failedFiles.length === 1
-              ? (failedFiles[0] ?? '')
-              : `${String(failedFiles.length)} files`
-          }.`,
-        );
-        return;
+      if (failure) break;
+      if (isCancellationRequested()) {
+        cancelled = true;
+        break;
       }
+    }
 
+    if (!failure && !cancelled) {
+      for (let index = 0; index < selection.files.length; index += 1) {
+        const candidate = selection.files[index];
+        if (!candidate) continue;
+        if (isCancellationRequested()) {
+          cancelled = true;
+          break;
+        }
+        setActivity({
+          phase: 'uploading',
+          current: index + 1,
+          total: selection.files.length,
+          path: candidate.relativePath,
+        });
+        attemptedMutation = true;
+        try {
+          await uploadFileAtPath(candidate.file, candidate.relativePath);
+          uploadedFiles += 1;
+        } catch (error) {
+          failure = { path: candidate.relativePath, error };
+          break;
+        }
+        if (isCancellationRequested()) {
+          cancelled = true;
+          break;
+        }
+      }
+    }
+
+    let refreshFailure: unknown = null;
+    if (attemptedMutation) {
+      try {
+        await refreshFiles();
+      } catch (error) {
+        refreshFailure = error;
+      }
+    }
+
+    const skips = skippedSummary(selection.skipped);
+    if (failure) {
       notify(
         'error',
-        `Uploaded ${String(uploadedCount)} of ${String(selectedFiles.length)} files. Failed: ${failedFiles.join(', ')}.`,
+        `Upload failed at ${failure.path} after ${String(uploadedFiles)} of ${String(selection.files.length)} files: ${errorMessage(failure.error)}${skips}`,
       );
-    } finally {
-      setUploadingFiles(false);
+    } else if (cancelled) {
+      notify(
+        'info',
+        `Upload cancelled after ${String(uploadedFiles)} of ${String(selection.files.length)} files.${skips}`,
+      );
+    } else if (refreshFailure) {
+      notify(
+        'error',
+        `Uploaded ${String(uploadedFiles)} ${uploadedFiles === 1 ? 'file' : 'files'}, but refreshing User File failed: ${errorMessage(refreshFailure)}${skips}`,
+      );
+    } else {
+      const folderSummary =
+        createdFolders > 0
+          ? ` Created ${String(createdFolders)} ${createdFolders === 1 ? 'folder' : 'folders'}.`
+          : '';
+      notify(
+        'success',
+        `Uploaded ${String(uploadedFiles)} ${uploadedFiles === 1 ? 'file' : 'files'}.${folderSummary}${skips}`,
+      );
     }
   };
 
-  /**
-   * Activates the drop-zone state for native file drags and tells the browser
-   * this target accepts copy drops.
-   * Attached to the upload area's `onDragOver` prop.
-   */
-  const handleFileAreaDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (!isExternalFileDrag(event.dataTransfer)) {
-      return;
+  const beginUpload = async (collect: () => Promise<UploadSelectionInput>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    cancelRequestedRef.current = false;
+    setConflicts([]);
+    setActivity({ phase: 'preparing' });
+    try {
+      await runUploadSelection(await collect());
+    } catch (error) {
+      notify('error', `Could not prepare the upload: ${errorMessage(error)}`);
+    } finally {
+      setActivity({ phase: 'idle' });
+      busyRef.current = false;
     }
+  };
 
+  const uploadSelectedFiles = async (files: File[]) => {
+    await beginUpload(() => Promise.resolve(collectPickerSelection(files)));
+  };
+
+  const handleFileAreaDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!isExternalFileDrag(event.dataTransfer) || busyRef.current) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
     setIsFileDropActive(true);
   };
 
-  /**
-   * Clears drop-zone highlighting once the native file drag leaves the upload
-   * area rather than a child element inside it.
-   * Attached to the upload area's `onDragLeave` prop.
-   */
   const handleFileAreaDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    if (!isExternalFileDrag(event.dataTransfer)) {
-      return;
-    }
-
+    if (!isExternalFileDrag(event.dataTransfer)) return;
     const relatedTarget = event.relatedTarget;
-    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
-      return;
-    }
-
+    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
     setIsFileDropActive(false);
   };
 
-  /**
-   * Accepts dropped native files from the upload area and reuses the same batch
-   * upload path as the picker.
-   * Attached to the upload area's `onDrop` prop.
-   */
   const handleFileAreaDrop = async (event: DragEvent<HTMLDivElement>) => {
-    if (!isExternalFileDrag(event.dataTransfer)) {
-      return;
-    }
-
+    if (!isExternalFileDrag(event.dataTransfer) || busyRef.current) return;
     event.preventDefault();
     setIsFileDropActive(false);
-    await uploadSelectedFiles(event.dataTransfer.files);
+    // Synthetic and older webviews can expose files without a DataTransferItemList.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const items = Array.from(event.dataTransfer.items ?? []).filter((item) => item.kind === 'file');
+    await beginUpload(async () => {
+      if (items.length === 0) return collectPickerSelection(Array.from(event.dataTransfer.files));
+      const entries: DroppedEntry[] = [];
+      const fallbackFiles: File[] = [];
+      let unsupportedFolderDrop = false;
+      for (const item of items) {
+        const entry = typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
+        if (entry) entries.push(entry);
+        else {
+          const fallbackFile = item.getAsFile();
+          if (fallbackFile) fallbackFiles.push(fallbackFile);
+          else unsupportedFolderDrop = true;
+        }
+      }
+      if (unsupportedFolderDrop) {
+        return {
+          candidates: [],
+          folderRoots: [],
+          skipped: { files: 0, directories: 0 },
+          unsupportedFolderDrop: true,
+        };
+      }
+      const dropped = await collectDroppedSelection(entries);
+      const fallback = collectPickerSelection(fallbackFiles);
+      return {
+        candidates: [...dropped.candidates, ...fallback.candidates],
+        folderRoots: dropped.folderRoots,
+        skipped: {
+          files: dropped.skipped.files + fallback.skipped.files,
+          directories: dropped.skipped.directories + fallback.skipped.directories,
+        },
+        unsupportedFolderDrop: false,
+      };
+    });
   };
 
-  /**
-   * Handles the hidden file input change event and clears its value so the same
-   * files can be selected again later.
-   * Attached to the hidden input's `onChange` prop.
-   */
-  const handleFileInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
     try {
-      await uploadSelectedFiles(event.target.files);
-    } catch (error) {
-      notify('error', (error as Error).message || 'Upload failed.');
+      await uploadSelectedFiles(Array.from(event.target.files ?? []));
     } finally {
       event.target.value = '';
     }
   };
 
+  const progressText =
+    activity.phase === 'preparing'
+      ? 'Preparing…'
+      : activity.phase === 'creating-folders'
+        ? `Creating folder ${String(activity.current)} of ${String(activity.total)}: ${activity.path}`
+        : activity.phase === 'uploading'
+          ? `Uploading file ${String(activity.current)} of ${String(activity.total)}: ${activity.path}`
+          : '';
+
   return {
     fileInputRef,
-    uploadingFiles,
+    folderInputRef,
+    activity,
+    progressText,
+    isBusy: activity.phase !== 'idle',
     isFileDropActive,
+    conflicts,
     openFilePicker,
+    openFolderPicker,
+    cancelUpload,
+    closeConflictDialog,
+    uploadSelectedFiles,
     handleFileAreaDragOver,
     handleFileAreaDragLeave,
     handleFileAreaDrop,
-    handleFileInputChange,
+    handleFileInputChange: handleInputChange,
+    handleFolderInputChange: handleInputChange,
   };
 }

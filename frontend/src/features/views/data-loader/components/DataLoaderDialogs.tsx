@@ -58,6 +58,10 @@ export interface DataLoaderDialogsProps {
     loading: boolean;
     onClose: () => void;
   };
+  uploadConflicts: {
+    paths: string[];
+    onClose: () => void;
+  };
 }
 
 /**
@@ -75,6 +79,7 @@ export function DataLoaderDialogs({
   ldacaImport,
   createFolder,
   citation,
+  uploadConflicts,
 }: DataLoaderDialogsProps) {
   return (
     <>
@@ -204,6 +209,34 @@ export function DataLoaderDialogs({
           ) : (
             <p className="text-muted-foreground text-sm">No citation available for this folder.</p>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={uploadConflicts.paths.length > 0}
+        onOpenChange={(open) => {
+          if (!open) uploadConflicts.onClose();
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Upload conflicts</DialogTitle>
+            <DialogDescription>
+              Nothing was uploaded. Resolve every conflicting User File path, then try again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-64 overflow-y-auto rounded-md border p-3" tabIndex={0}>
+            <ul className="space-y-1 text-sm">
+              {uploadConflicts.paths.map((path) => (
+                <li key={path}>
+                  <code className="break-all">{path}</code>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button onClick={uploadConflicts.onClose}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -36,6 +36,7 @@ describe('DataLoaderDialogs ownership', () => {
           loading: false,
           onClose: vi.fn(),
         }}
+        uploadConflicts={{ paths: [], onClose: vi.fn() }}
       />,
     );
 

@@ -1,4 +1,11 @@
-import { Download as DownloadIcon, FolderPlus, Loader2, RefreshCcw, Upload } from 'lucide-react';
+import {
+  Download as DownloadIcon,
+  FolderPlus,
+  FolderUp,
+  Loader2,
+  RefreshCcw,
+  Upload,
+} from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import HelpIcon from '@/components/help/HelpIcon';
@@ -112,8 +119,9 @@ function DataLoaderFeature() {
     selectedFile,
     setSelectedFile,
     loadingFiles,
-    uploading,
-    handleUploadFile,
+    uploadFileAtPath,
+    createUploadDirectory,
+    getUploadResource,
     handleDeleteFile,
     handleDownloadFile,
     refreshFiles,
@@ -211,14 +219,27 @@ function DataLoaderFeature() {
   } = useLdacaImport({ notify });
   const {
     fileInputRef,
-    uploadingFiles,
+    folderInputRef,
+    isBusy: uploadBusy,
+    progressText,
+    conflicts: uploadConflicts,
     isFileDropActive,
     openFilePicker,
+    openFolderPicker,
+    cancelUpload,
+    closeConflictDialog,
     handleFileAreaDragOver,
     handleFileAreaDragLeave,
     handleFileAreaDrop,
     handleFileInputChange,
-  } = useUploadState({ uploadFile: handleUploadFile, notify });
+    handleFolderInputChange,
+  } = useUploadState({
+    uploadFileAtPath,
+    createUploadDirectory,
+    getUploadResource,
+    refreshFiles,
+    notify,
+  });
   const {
     createFolderOpen,
     setCreateFolderOpen,
@@ -405,12 +426,14 @@ function DataLoaderFeature() {
             <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden pb-4">
               <div data-guidance="file-sources" className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1">
-                  <Button onClick={openFilePicker} disabled={uploading || uploadingFiles}>
-                    <Upload className="mr-2 h-4 w-4" />{' '}
-                    {uploading || uploadingFiles ? 'Uploading…' : 'Upload files'}
+                  <Button onClick={openFilePicker} disabled={uploadBusy}>
+                    <Upload className="mr-2 h-4 w-4" /> Upload files
                   </Button>
                   <HelpIcon targetKey="data-loader.upload.button" label="About upload files" />
                 </div>
+                <Button variant="outline" onClick={openFolderPicker} disabled={uploadBusy}>
+                  <FolderUp className="mr-2 h-4 w-4" /> Upload folder
+                </Button>
                 <div className="flex items-center gap-1">
                   <SampleDataPanel />
                   <HelpIcon
@@ -443,12 +466,36 @@ function DataLoaderFeature() {
                     void handleFileInputChange(e);
                   }}
                 />
+                <input
+                  ref={(input) => {
+                    folderInputRef.current = input;
+                    if (input) input.setAttribute('webkitdirectory', '');
+                  }}
+                  type="file"
+                  aria-label="Upload folder"
+                  className="hidden"
+                  onChange={(event) => {
+                    void handleFolderInputChange(event);
+                  }}
+                />
               </div>
 
               <div className="text-muted-foreground text-xs">
-                Drag multiple files into the file list to upload them, or use Upload files to select
-                several at once.
+                Drop files and folders into the file list, or use the upload buttons. Folder picking
+                is available if this browser cannot accept a dropped folder.
               </div>
+
+              {uploadBusy ? (
+                <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+                  <div role="status" aria-live="polite" className="flex min-w-0 items-center gap-2">
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    <span className="truncate">{progressText}</span>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={cancelUpload}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : null}
 
               <div
                 role="region"
@@ -476,7 +523,7 @@ function DataLoaderFeature() {
                   >
                     <div className="flex flex-1 items-start px-4 py-3 text-sm">
                       {isFileDropActive
-                        ? 'Drop files here to upload them.'
+                        ? 'Drop files or folders here to upload them.'
                         : 'No files found. Upload a dataset to begin.'}
                     </div>
                   </FileListShell>
@@ -609,6 +656,10 @@ function DataLoaderFeature() {
           content: citationContent,
           loading: citationLoading,
           onClose: closeCitation,
+        }}
+        uploadConflicts={{
+          paths: uploadConflicts,
+          onClose: closeConflictDialog,
         }}
       />
     </div>

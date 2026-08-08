@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteFile, downloadFile, listUserFiles, uploadFile } from '@/api';
+import {
+  createFolder,
+  deleteFile,
+  downloadFile,
+  getUserFileResource,
+  listUserFiles,
+  uploadFile,
+} from '@/api';
 import { saveBlob } from '@/lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '@/lib/queryKeys';
@@ -12,8 +19,6 @@ interface UseFilesProps {
   /** Defer the initial fetch until auth has been resolved. */
   enabled?: boolean;
 }
-
-const uploadPath = (file: File): string => file.name;
 
 /** Coordinates user file tree loading plus upload/delete/download actions for data-loader panels. */
 /**
@@ -31,7 +36,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
      */
     queryFn: async () => {
       const { data } = await listUserFiles({ throwOnError: true });
-      return filterLoadableFileTree(toFileTree(data) as FileTreeNode[]);
+      return toFileTree(data) as FileTreeNode[];
     },
     enabled,
     staleTime: 2 * 60 * 1000,
@@ -39,18 +44,6 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   });
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-
-  const uploadMutation = useMutation({
-    /** Uploads a browser File object through the generated SDK for file panel actions. */
-    /** Called by: the upload mutation when `handleUploadFile` invokes `mutateAsync`. */
-    mutationFn: (file: File) =>
-      uploadFile({
-        body: file,
-        query: { path: uploadPath(file) },
-        throwOnError: true,
-      }),
-    onSuccess: (_response, file) => refreshFilePathQuery(queryClient, uploadPath(file)),
-  });
 
   const deleteMutation = useMutation({
     /** Deletes the selected server-side file and lets mutation success refresh the tree. */
@@ -70,16 +63,23 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
    */
   const refreshFiles = async () => (await filesQuery.refetch()).data ?? null;
 
-  /** Uploads a selected file and returns a boolean so panels can update inline status. */
-  /** Returned to: `DataLoaderFeature`, which passes it into `useUploadState`. */
-  const handleUploadFile = async (file: File) => {
-    try {
-      await uploadMutation.mutateAsync(file);
-      return true;
-    } catch (error) {
-      console.error('Failed to upload file:', error);
-      return false;
-    }
+  /** Uploads one file at its preflighted destination without refreshing mid-batch. */
+  const uploadFileAtPath = async (file: File, path: string) => {
+    await uploadFile({ body: file, query: { path }, throwOnError: true });
+  };
+
+  /** Creates one preflighted destination directory without refreshing mid-batch. */
+  const createUploadDirectory = async (path: string) => {
+    const separatorIndex = path.lastIndexOf('/');
+    const parentPath = separatorIndex === -1 ? '' : path.slice(0, separatorIndex);
+    const name = separatorIndex === -1 ? path : path.slice(separatorIndex + 1);
+    await createFolder({ body: { name, parent_path: parentPath }, throwOnError: true });
+  };
+
+  /** Reads one destination after a late create conflict so callers can verify directory reuse. */
+  const getUploadResource = async (path: string) => {
+    const { data } = await getUserFileResource({ query: { path }, throwOnError: true });
+    return data;
   };
 
   /** Deletes a user file and clears selection if the deleted file was active. */
@@ -114,12 +114,14 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   };
 
   return {
-    fileTree: filesQuery.data ?? [],
+    completeFileTree: filesQuery.data ?? [],
+    fileTree: filterLoadableFileTree(filesQuery.data ?? []),
     selectedFile,
     setSelectedFile,
     loadingFiles: filesQuery.isLoading || filesQuery.isFetching,
-    uploading: uploadMutation.isPending,
-    handleUploadFile,
+    uploadFileAtPath,
+    createUploadDirectory,
+    getUploadResource,
     handleDeleteFile,
     handleDownloadFile,
     refreshFiles,

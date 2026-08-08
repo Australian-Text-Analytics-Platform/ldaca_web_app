@@ -97,7 +97,15 @@ collision handling.
 The backend User File tree is complete. The Data Loader derives its own tree by
 removing file leaves whose `loadable` signal is false while preserving every
 directory, including empty directories. Counts and empty-state guidance use
-only the resulting Loadable User Files.
+only the resulting Loadable User Files. Local file picking, single-folder
+picking, and file/folder drops share one browser upload-selection adapter. It
+retains relative paths, filters hidden entries, and preflights the full
+selection against the refreshed complete tree before any mutation. The upload
+coordinator then creates missing directories parent-first and uploads files
+sequentially, with cooperative cancellation and one final tree refresh after a
+mutating attempt. Folder drop uses feature-detected Entries API traversal;
+folder picking is the compatibility fallback used by browser and macOS Tauri
+builds alike.
 
 Online documentation is an optional urgent-update channel. The build-time
 `VITE_DOCS_ORIGIN` identifies the site root, and the frontend appends the

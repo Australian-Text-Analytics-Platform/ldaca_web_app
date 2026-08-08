@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,25 +13,33 @@ const {
   mockSetCurrentWorkspace,
   mockDeleteWorkspace,
   mockUpdateWorkspaceDescription,
-  mockHandleUploadFile,
+  mockUploadFileAtPath,
+  mockCreateUploadDirectory,
+  mockGetUploadResource,
+  mockRefreshFiles,
   mockHandleDeleteFile,
   mockRawFile,
   mockCreateFolder,
   mockMoveFile,
   mockListFeaturedDataPortalCollections,
   mockPublishContextualHints,
+  mockToast,
 } = vi.hoisted(() => ({
   mockCreateWorkspace: vi.fn(),
   mockSetCurrentWorkspace: vi.fn(),
   mockDeleteWorkspace: vi.fn(),
   mockUpdateWorkspaceDescription: vi.fn(),
-  mockHandleUploadFile: vi.fn(),
+  mockUploadFileAtPath: vi.fn(),
+  mockCreateUploadDirectory: vi.fn(),
+  mockGetUploadResource: vi.fn(),
+  mockRefreshFiles: vi.fn(),
   mockHandleDeleteFile: vi.fn(),
   mockRawFile: vi.fn(),
   mockCreateFolder: vi.fn(),
   mockMoveFile: vi.fn(),
   mockListFeaturedDataPortalCollections: vi.fn(),
   mockPublishContextualHints: vi.fn(),
+  mockToast: vi.fn(),
 }));
 
 interface MockWorkspaceState {
@@ -74,7 +82,7 @@ let mockWorkspaceState: MockWorkspaceState = {
 };
 
 vi.mock('sonner', () => ({
-  toast: Object.assign(vi.fn(), {
+  toast: Object.assign(mockToast, {
     success: vi.fn(),
     error: vi.fn(),
     promise: vi.fn((promise: Promise<unknown>) => promise),
@@ -181,11 +189,13 @@ vi.mock('@/features/views/data-loader/hooks/useFiles', () => ({
     setSelectedFile: vi.fn(),
     loadingFiles: false,
     loading: false,
-    uploading: false,
-    handleUploadFile: mockHandleUploadFile,
+    completeFileTree: mockFileTree,
+    uploadFileAtPath: mockUploadFileAtPath,
+    createUploadDirectory: mockCreateUploadDirectory,
+    getUploadResource: mockGetUploadResource,
     handleDeleteFile: mockHandleDeleteFile,
     handleDownloadFile: vi.fn(),
-    refreshFiles: vi.fn(),
+    refreshFiles: mockRefreshFiles,
   }),
 }));
 
@@ -246,7 +256,11 @@ describe('DataLoaderFeature citation UI', () => {
     localStorage.clear();
     mockFileTree = defaultMockFileTree;
     mockCreateWorkspace.mockResolvedValue({ id: 'ws-new' });
-    mockHandleUploadFile.mockResolvedValue(true);
+    mockDeleteWorkspace.mockResolvedValue(undefined);
+    mockUploadFileAtPath.mockResolvedValue(undefined);
+    mockCreateUploadDirectory.mockResolvedValue(undefined);
+    mockGetUploadResource.mockResolvedValue({ type: 'directory', path: 'existing' });
+    mockRefreshFiles.mockImplementation(async () => mockFileTree);
     mockRawFile.mockResolvedValue({ data: '# ADO Citation\n\nReference text.', error: undefined });
     mockCreateFolder.mockResolvedValue({
       data: { message: 'Folder created', path: 'new-folder' },
@@ -864,10 +878,90 @@ describe('DataLoaderFeature citation UI', () => {
     await user.upload(uploadInput!, [firstFile, secondFile]);
 
     await waitFor(() => {
-      expect(mockHandleUploadFile).toHaveBeenCalledTimes(2);
+      expect(mockUploadFileAtPath).toHaveBeenCalledTimes(2);
     });
-    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
-    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
+    expect(mockUploadFileAtPath).toHaveBeenNthCalledWith(1, firstFile, 'first.csv');
+    expect(mockUploadFileAtPath).toHaveBeenNthCalledWith(2, secondFile, 'second.csv');
+  });
+
+  it('offers a single-folder picker alongside the multi-file picker', () => {
+    renderWithProviders(<DataLoaderFeature />);
+
+    const fileInput = screen.getAllByLabelText('Upload files', { selector: 'input' }).at(-1);
+    const folderInput = screen.getAllByLabelText('Upload folder', { selector: 'input' }).at(-1);
+
+    expect(fileInput).toHaveAttribute('multiple');
+    expect(folderInput).not.toHaveAttribute('multiple');
+    expect(folderInput).toHaveAttribute('webkitdirectory');
+    expect(screen.getAllByRole('button', { name: 'Upload folder' }).at(-1)).toBeEnabled();
+  });
+
+  it('shows every preflight conflict and uploads nothing', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DataLoaderFeature />);
+    const uploadInput = screen.getAllByLabelText('Upload files', { selector: 'input' }).at(-1)!;
+    const firstFile = new File(['old'], 'docs.csv');
+    Object.defineProperty(firstFile, 'webkitRelativePath', {
+      value: 'sample_data/ADO/docs.csv',
+    });
+    const secondFile = new File(['old'], 'no-readme.csv');
+    Object.defineProperty(secondFile, 'webkitRelativePath', {
+      value: 'sample_data/Other/no-readme.csv',
+    });
+
+    await user.upload(uploadInput, [firstFile, secondFile]);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Upload conflicts' });
+    expect(within(dialog).getByText('sample_data/ADO/docs.csv')).toBeInTheDocument();
+    expect(within(dialog).getByText('sample_data/Other/no-readme.csv')).toBeInTheDocument();
+    expect(mockUploadFileAtPath).not.toHaveBeenCalled();
+    expect(mockCreateUploadDirectory).not.toHaveBeenCalled();
+  });
+
+  it('announces upload progress and offers cooperative cancellation', async () => {
+    let finishUpload!: () => void;
+    mockUploadFileAtPath.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DataLoaderFeature />);
+    const uploadInput = screen.getAllByLabelText('Upload files', { selector: 'input' }).at(-1)!;
+
+    await user.upload(uploadInput, new File(['new'], 'new.csv'));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Uploading file 1 of 1: new.csv');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => finishUpload());
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  });
+
+  it('guides users to the folder picker when folder drop entries are unavailable', async () => {
+    renderWithProviders(<DataLoaderFeature />);
+    const uploadArea = screen.getAllByRole('region', { name: /files upload area/i }).at(-1)!;
+
+    fireEvent.drop(uploadArea, {
+      dataTransfer: {
+        files: [],
+        items: [
+          {
+            kind: 'file',
+            getAsFile: () => null,
+          },
+        ],
+        types: ['Files'],
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        'Folder drop is not supported here. Use Upload folder instead.',
+        expect.any(Object),
+      );
+    });
+    expect(mockUploadFileAtPath).not.toHaveBeenCalled();
   });
 
   it('uploads multiple dropped files from the files area', async () => {
@@ -893,9 +987,9 @@ describe('DataLoaderFeature citation UI', () => {
     });
 
     await waitFor(() => {
-      expect(mockHandleUploadFile).toHaveBeenCalledTimes(2);
+      expect(mockUploadFileAtPath).toHaveBeenCalledTimes(2);
     });
-    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
-    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
+    expect(mockUploadFileAtPath).toHaveBeenNthCalledWith(1, firstFile, 'dragged-a.csv');
+    expect(mockUploadFileAtPath).toHaveBeenNthCalledWith(2, secondFile, 'dragged-b.csv');
   });
 });

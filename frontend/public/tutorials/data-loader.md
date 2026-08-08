@@ -58,11 +58,28 @@ The workspace manager lists all saved workspaces, enabling you to switch between
 
 ![Files section screenshot](tutorials/assets/data_loader/files_section.png)
 
-This panel is used to bring data into the application. It supports file uploads, sample data imports, LDaCA imports, and add-to-workspace operations. You can also create subfolder structures, reorganise files via drag-and-drop, and remove files that are no longer needed.
+This panel is used to bring data into the application. It supports file and folder uploads, sample data imports, LDaCA imports, and add-to-workspace operations. You can also create subfolder structures, reorganise files via drag-and-drop, and remove files that are no longer needed.
 
-<h2 id="help-data-loader-upload-button">Upload file</h2>
+<h2 id="help-data-loader-upload-button">Upload files and folders</h2>
 
-Click this button to upload a file from your local machine. Supported formats:
+Use **Upload files** to select one or more loose files. Use **Upload folder** to
+select one folder and preserve its root and nested structure. You can also drop
+loose files, folders, or a mixture of both onto the file list. If folder drop is
+not supported in the current browser, use **Upload folder** instead.
+
+Before uploading, Wordflow checks the complete selection for invalid paths,
+duplicate destinations, and conflicts with existing User Files. If any path
+conflicts, nothing is uploaded and the dialog lists every path to resolve.
+Existing folders can be reused, but existing files are never overwritten.
+
+During a large upload, the panel shows whether it is preparing, creating
+folders, or uploading files. **Cancel** finishes the current request and stops
+before the next one. Files and folders already created are retained if an
+upload is cancelled or fails. Dot-prefixed files and folders and `Thumbs.db`
+files are skipped and reported in the completion message. Source folders that
+contain no uploadable files are not created.
+
+Supported loadable formats:
 
 - Delimited tables: `.csv`, `.tsv`
 - JSON: `.json`, `.jsonl`, `.ndjson`

@@ -6,16 +6,20 @@ import { useFiles } from '../useFiles';
 import { queryKeys } from '@/lib/queryKeys';
 
 const mocks = vi.hoisted(() => ({
+  createFolder: vi.fn(),
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
+  getUserFileResource: vi.fn(),
   listUserFiles: vi.fn(),
   uploadFile: vi.fn(),
 }));
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
+  createFolder: mocks.createFolder,
   deleteFile: mocks.deleteFile,
   downloadFile: mocks.downloadFile,
+  getUserFileResource: mocks.getUserFileResource,
   listUserFiles: mocks.listUserFiles,
   uploadFile: mocks.uploadFile,
 }));
@@ -32,10 +36,14 @@ describe('useFiles cache policy', () => {
     vi.clearAllMocks();
     mocks.listUserFiles.mockResolvedValue({ data: [] });
     mocks.uploadFile.mockResolvedValue({ data: { message: 'uploaded' } });
+    mocks.createFolder.mockResolvedValue({ data: { type: 'directory', path: 'corpus' } });
+    mocks.getUserFileResource.mockResolvedValue({
+      data: { type: 'directory', path: 'corpus' },
+    });
     mocks.deleteFile.mockResolvedValue({ data: { message: 'deleted' } });
   });
 
-  it('invalidates once per rapid upload and exposes manual refresh as a distinct command', async () => {
+  it('keeps coordinated uploads path-aware and defers refresh until the batch ends', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -50,15 +58,28 @@ describe('useFiles cache policy', () => {
     });
 
     await act(async () => {
-      await Promise.all([
-        result.current.handleUploadFile(new File(['a'], 'a.csv')),
-        result.current.handleUploadFile(new File(['b'], 'b.csv')),
-      ]);
+      await result.current.uploadFileAtPath(new File(['a'], 'a.csv'), 'corpus/a.csv');
+      await result.current.createUploadDirectory('corpus/nested');
+      await result.current.getUploadResource('corpus');
     });
 
-    expect(invalidateQueries).toHaveBeenCalledTimes(2);
-    expect(queryClient.getQueryData(replacedPreviewKey)).toBeUndefined();
-    expect(result.current).not.toHaveProperty('refetchFiles');
+    expect(mocks.uploadFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.any(File),
+        query: { path: 'corpus/a.csv' },
+        throwOnError: true,
+      }),
+    );
+    expect(mocks.createFolder).toHaveBeenCalledWith({
+      body: { name: 'nested', parent_path: 'corpus' },
+      throwOnError: true,
+    });
+    expect(mocks.getUserFileResource).toHaveBeenCalledWith({
+      query: { path: 'corpus' },
+      throwOnError: true,
+    });
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(replacedPreviewKey)).toEqual({ rows: [{ stale: true }] });
     expect(result.current).toHaveProperty('refreshFiles');
 
     invalidateQueries.mockClear();
@@ -118,6 +139,7 @@ describe('useFiles cache policy', () => {
     });
 
     await waitFor(() => {
+      expect(result.current.completeFileTree).toHaveLength(2);
       expect(result.current.fileTree).toEqual([
         {
           name: 'figures',
