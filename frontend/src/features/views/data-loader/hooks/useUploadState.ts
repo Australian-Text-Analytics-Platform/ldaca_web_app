@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { isExternalFileDrag } from '@/lib/externalFileDropGuard';
 
 type Notify = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -7,17 +8,6 @@ type UploadFile = (file: File) => Promise<boolean>;
 interface UseUploadStateParams {
   uploadFile: UploadFile;
   notify: Notify;
-}
-
-/**
- * Detects native file drags so Data Loader does not intercept unrelated text or
- * internal file-tree move drags.
- * Called by the upload area's drag-over, drag-leave, and drop handlers.
- */
-function isFileDrag(event: DragEvent<HTMLElement>) {
-  // dataTransfer/types are typed non-null by React but can be absent on some browsers/synthetic drags
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  return Array.from(event.dataTransfer?.types ?? []).includes('Files');
 }
 
 /**
@@ -107,7 +97,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
    * Attached to the upload area's `onDragOver` prop.
    */
   const handleFileAreaDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
+    if (!isExternalFileDrag(event.dataTransfer)) {
       return;
     }
 
@@ -122,7 +112,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
    * Attached to the upload area's `onDragLeave` prop.
    */
   const handleFileAreaDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
+    if (!isExternalFileDrag(event.dataTransfer)) {
       return;
     }
 
@@ -140,7 +130,7 @@ export function useUploadState({ uploadFile, notify }: UseUploadStateParams) {
    * Attached to the upload area's `onDrop` prop.
    */
   const handleFileAreaDrop = async (event: DragEvent<HTMLDivElement>) => {
-    if (!isFileDrag(event)) {
+    if (!isExternalFileDrag(event.dataTransfer)) {
       return;
     }
 
