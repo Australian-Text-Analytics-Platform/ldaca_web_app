@@ -18,6 +18,9 @@ describe('useAnnotationTabSettings', () => {
           aiPrompt: 'Classify stance.',
           aiTemperature: '0.7',
           aiMaxRetriesPerBatch: '4',
+          aiMaxExamplesPerClass: '7',
+          aiExampleSamplingMethod: 'last_n',
+          aiExampleRandomSeed: '42',
           aiBatchSize: '17',
           aiProcessingMode: 'fill_missing',
           aiReasoningEnabled: 'true',
@@ -49,6 +52,9 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.aiPrompt).toBe('Classify stance.');
     expect(result.current.aiTemperature).toBe(0.7);
     expect(result.current.aiMaxRetriesPerBatch).toBe(4);
+    expect(result.current.aiMaxExamplesPerClass).toBe(7);
+    expect(result.current.aiExampleSamplingMethod).toBe('last_n');
+    expect(result.current.aiExampleRandomSeed).toBe(42);
     expect(result.current.aiBatchSize).toBe(17);
     expect(result.current.aiProcessingMode).toBe('fill_missing');
     expect(result.current.aiReasoningEnabled).toBe(true);
@@ -87,6 +93,9 @@ describe('useAnnotationTabSettings', () => {
       result.current.commitAiPrompt('Use concise labels.');
       result.current.commitAiTemperature(0.3);
       result.current.commitAiMaxRetriesPerBatch(2);
+      result.current.commitAiMaxExamplesPerClass(12);
+      result.current.setAiExampleSamplingMethod('first_n');
+      result.current.commitAiExampleRandomSeed(9);
       result.current.commitAiBatchSize(25);
       result.current.setAiProcessingMode('fill_missing');
       result.current.setAiReasoningEnabled(true);
@@ -113,6 +122,9 @@ describe('useAnnotationTabSettings', () => {
     expect(onTabSettingChange).toHaveBeenCalledWith('aiPrompt', 'Use concise labels.');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiTemperature', '0.3');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiMaxRetriesPerBatch', '2');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiMaxExamplesPerClass', '12');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiExampleSamplingMethod', 'first_n');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiExampleRandomSeed', '9');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiBatchSize', '25');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiProcessingMode', 'fill_missing');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEnabled', 'true');

@@ -85,7 +85,11 @@ is persisted immediately in the Tab and captured as an immutable provenance
 snapshot in every Preview or Run All request. Hydrating a historical request
 does not overwrite newer Tab state. **Clear Results** clears both the Analysis
 forest and this Tab selection without deleting the column or its values. The Example
-Data Block selector stays in the main parameter panel. The collapsed
+Data Block selector stays in the main parameter panel. Directly below it, the
+Tab retains maximum examples per class, sampling method, and random seed
+settings. The controls remain disabled until both example columns are selected
+and while Analysis parameters are locked; their intrinsic grid wraps with the
+card width. Retained Analysis requests restore all three values. The collapsed
 **Advanced** row summarizes Provider and Model; its expanded content keeps those
 controls side by side with prompt and inference settings below. The Run All
 processing mode, batch size, and per-batch retry limit are captured in the

@@ -220,6 +220,14 @@ export type AnnotationAnalysisRequest = {
      */
     example_node_id?: string | null;
     /**
+     * Example Random Seed
+     */
+    example_random_seed?: number;
+    /**
+     * Example Sampling Method
+     */
+    example_sampling_method?: 'random' | 'first_n' | 'last_n';
+    /**
      * Example Text Column
      */
     example_text_column?: string | null;
@@ -231,6 +239,10 @@ export type AnnotationAnalysisRequest = {
      * Kind
      */
     kind?: 'annotation';
+    /**
+     * Max Examples Per Class
+     */
+    max_examples_per_class?: number;
     /**
      * Max Retries Per Batch
      */
@@ -312,6 +324,14 @@ export type AnnotationAnalysisSubmission = {
      */
     example_node_id?: string | null;
     /**
+     * Example Random Seed
+     */
+    example_random_seed?: number;
+    /**
+     * Example Sampling Method
+     */
+    example_sampling_method?: 'random' | 'first_n' | 'last_n';
+    /**
      * Example Text Column
      */
     example_text_column?: string | null;
@@ -323,6 +343,10 @@ export type AnnotationAnalysisSubmission = {
      * Kind
      */
     kind?: 'annotation';
+    /**
+     * Max Examples Per Class
+     */
+    max_examples_per_class?: number;
     /**
      * Max Retries Per Batch
      */
@@ -4847,6 +4871,14 @@ export type AnnotationAnalysisSubmissionWritable = {
      */
     example_node_id?: string | null;
     /**
+     * Example Random Seed
+     */
+    example_random_seed?: number;
+    /**
+     * Example Sampling Method
+     */
+    example_sampling_method?: 'random' | 'first_n' | 'last_n';
+    /**
      * Example Text Column
      */
     example_text_column?: string | null;
@@ -4858,6 +4890,10 @@ export type AnnotationAnalysisSubmissionWritable = {
      * Kind
      */
     kind?: 'annotation';
+    /**
+     * Max Examples Per Class
+     */
+    max_examples_per_class?: number;
     /**
      * Max Retries Per Batch
      */

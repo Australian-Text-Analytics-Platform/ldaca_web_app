@@ -128,6 +128,13 @@ read-only columns after the optional correction column. Their headers show
 the selected reliability measure with its conventional `%`, `κ`, or `α` sign
 and expose the exact current-page confusion-matrix counts on hover or focus.
 
+An optional Example Data Block supplies a pool of reviewed text-label pairs.
+The immutable request owns a maximum per exact, case-sensitive label, a first,
+last, or seeded-random method, and the seed. Preparation trims and removes blank
+pairs, keeps label groups in first-seen order even when a label is absent from
+the Codebook, and concatenates each selected group. Preview deterministically
+reconstructs the same subset from its retained snapshot for every page query.
+
 Annotation Run All is an independent Run-All-scoped Analysis. It processes the
 complete snapshot and writes the selected annotation column in place. The
 correction column never changes Run All predictions. **Reprocess all rows**
@@ -139,6 +146,8 @@ otherwise valid rows. A terminal provider batch contributes null labels while
 successful batches are still committed, keeping every output row aligned.
 The durable Result records attempted rows, failed terminal batches, and failed
 rows so partial completion remains explicit after the commit.
+Run All prepares the request's example subset once before batching and reuses
+it unchanged for every provider batch, retry, and recursive split.
 Submitting it replaces the current Annotation Preview or Run All immediately;
 a later Run All likewise replaces the earlier Run All.
 
@@ -205,7 +214,7 @@ Results preserve them.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 16 and portable archive format 15 accept only this
+Native Workspace schema 17 and portable archive format 16 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

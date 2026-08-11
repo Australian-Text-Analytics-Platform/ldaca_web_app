@@ -35,7 +35,11 @@ useful source context in the table.
 Expand AI settings and choose a named provider configuration and model. Provider
 credentials stay in Settings and are attached only when the request is sent.
 An **Example Data Block** is optional; if used, choose both its text column and
-an existing annotation column containing reviewed labels.
+an existing annotation column containing reviewed labels. Set **Max examples
+per class**, then choose **Random**, **First N**, or **Last N**. Random sampling
+also accepts a nonnegative seed and defaults to 0. The same Data Block snapshot,
+maximum, method, and seed produce the same per-class subset throughout one
+Analysis; groups with fewer examples contribute every usable row.
 
 Advanced settings include the instruction prompt, processing mode, batch size,
 retry count, temperature, and supported reasoning controls. Defaults are a good

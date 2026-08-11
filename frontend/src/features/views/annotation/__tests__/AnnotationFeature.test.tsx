@@ -22,8 +22,24 @@ const mocks = vi.hoisted(() => ({
   setExampleColumn: vi.fn(),
   setNodeColor: vi.fn(),
   ensureNodeColors: vi.fn(),
+  submitPreview: vi.fn(),
+  submitRunAll: vi.fn(),
   exampleSelected: false,
+  classSelected: false,
+  classRows: [] as { class: string; description: string }[],
+  providerConfigurations: [] as {
+    id: string;
+    name: string;
+    provider: 'openai';
+    base_url: null;
+    has_api_key: boolean;
+  }[],
   sourceColumnNames: ['text'] as string[],
+}));
+
+vi.mock('@/features/provider-credentials/providerCredentialRequests', () => ({
+  submitTabAnalysisWithProviderCredential: mocks.submitPreview,
+  submitAnnotationRunAllWithProviderCredential: mocks.submitRunAll,
 }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
@@ -62,19 +78,26 @@ vi.mock('@/features/views/common/nodeInputs', async (importOriginal) => ({
   ...(await importOriginal()),
   useTabNodeInputs: ({ selectorId }: { selectorId: string }) => {
     const sourceSelected = selectorId === 'source';
+    const classSelected = selectorId === 'classDescriptions' && mocks.classSelected;
     const exampleSelected = selectorId === 'exampleNodes' && mocks.exampleSelected;
-    const selected = sourceSelected || exampleSelected;
-    const nodeId = sourceSelected ? 'source-1' : 'example-1';
+    const selected = sourceSelected || classSelected || exampleSelected;
+    const nodeId = sourceSelected ? 'source-1' : classSelected ? 'class-1' : 'example-1';
+    const column = classSelected ? 'class' : 'text';
+    const columnNames = classSelected
+      ? ['class', 'description']
+      : exampleSelected
+        ? ['text', 'class']
+        : mocks.sourceColumnNames;
     return {
-      inputs: selected ? [{ node_id: nodeId, column: 'text' }] : [],
+      inputs: selected ? [{ node_id: nodeId, column }] : [],
       resolvedNodes: selected
         ? [
             {
               id: nodeId,
-              name: sourceSelected ? 'Source' : 'Example',
-              column: 'text',
+              name: sourceSelected ? 'Source' : classSelected ? 'Codebook' : 'Example',
+              column,
               node: { shape: [2380, 21] },
-              columnOptions: mocks.sourceColumnNames.map((name) => ({ name })),
+              columnOptions: columnNames.map((name) => ({ name })),
             },
           ]
         : [],
@@ -155,20 +178,27 @@ vi.mock('@/features/views/common/components/AnalysisCardLayout', () => ({
   }: {
     children: ReactNode;
     footer?: ReactNode;
-    actions?: { onClear: () => void | Promise<void> };
+    actions?: {
+      onPreview: () => void | Promise<void>;
+      onRunAll: () => void | Promise<void>;
+      onClear: () => void | Promise<void>;
+    };
   }) => (
     <div>
       {children}
       {footer}
       {actions ? (
-        <button
-          type="button"
-          onClick={() => {
-            void actions.onClear();
-          }}
-        >
-          Clear Results
-        </button>
+        <>
+          <button type="button" onClick={() => void actions.onPreview()}>
+            Preview
+          </button>
+          <button type="button" onClick={() => void actions.onRunAll()}>
+            Run All
+          </button>
+          <button type="button" onClick={() => void actions.onClear()}>
+            Clear Results
+          </button>
+        </>
       ) : null}
     </div>
   ),
@@ -176,6 +206,10 @@ vi.mock('@/features/views/common/components/AnalysisCardLayout', () => ({
 
 vi.mock('../components/AnnotationClassDescriptionsEditor', () => ({
   AnnotationClassDescriptionsEditor: () => null,
+}));
+
+vi.mock('../components/AnnotationAiSettings', () => ({
+  AnnotationAiSettings: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('../components/AnnotationResultsPanel', () => ({
@@ -194,11 +228,14 @@ vi.mock('../components/AnnotationResultsPanel', () => ({
 }));
 
 vi.mock('../hooks/useAnnotationClassDescriptions', () => ({
-  useAnnotationClassDescriptions: () => ({ rows: [], query: {} }),
+  useAnnotationClassDescriptions: () => ({ rows: mocks.classRows, query: {} }),
 }));
 
 vi.mock('@/features/provider-credentials/useProviderCredentials', () => ({
-  useProviderCredentials: () => ({ annotationProviders: [], revision: 0 }),
+  useProviderCredentials: () => ({
+    annotationProviders: mocks.providerConfigurations,
+    revision: 0,
+  }),
 }));
 
 vi.mock('../../common/hooks/useAnalysisFeature', () => ({
@@ -240,12 +277,84 @@ describe('AnnotationFeature', () => {
     mocks.setExampleColumn.mockReset();
     mocks.setNodeColor.mockReset();
     mocks.ensureNodeColors.mockReset();
+    mocks.submitPreview.mockReset();
+    mocks.submitRunAll.mockReset();
     mocks.exampleSelected = false;
+    mocks.classSelected = false;
+    mocks.classRows = [];
+    mocks.providerConfigurations = [];
     mocks.sourceColumnNames = ['text'];
     mocks.createSqlDataBlock.mockResolvedValue({ id: 'class-node-1' });
     mocks.polarsExpressionApply.mockResolvedValue(undefined);
     mocks.clearResults.mockResolvedValue(undefined);
     mocks.ensureNodeColors.mockResolvedValue(undefined);
+    mocks.submitPreview.mockResolvedValue({ data: { id: 'analysis-1' } });
+    mocks.submitRunAll.mockResolvedValue({ data: { id: 'run-all-1' } });
+  });
+
+  it('propagates persisted example sampling settings to Preview and Run All', async () => {
+    const user = userEvent.setup();
+    mocks.exampleSelected = true;
+    mocks.classSelected = true;
+    mocks.classRows = [{ class: 'support', description: 'Supports the claim' }];
+    mocks.providerConfigurations = [
+      {
+        id: 'provider-1',
+        name: 'OpenAI',
+        provider: 'openai',
+        base_url: null,
+        has_api_key: true,
+      },
+    ];
+    mocks.sourceColumnNames = ['text', 'annotation'];
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: {
+            annotationMode: 'ai',
+            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
+            aiProviderConfigurationId: 'provider-1',
+            aiProviderType: 'openai',
+            aiProviderModels: JSON.stringify({ 'provider-1': 'gpt-test' }),
+            aiMaxExamplesPerClass: '3',
+            aiExampleSamplingMethod: 'random',
+            aiExampleRandomSeed: '42',
+          },
+          correctionColumns: {},
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    await user.click(screen.getAllByLabelText('Annotation Column')[1]);
+    await user.click(screen.getByRole('option', { name: 'class' }));
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    await waitFor(() => expect(mocks.submitPreview).toHaveBeenCalledOnce());
+    const previewRequest = mocks.submitPreview.mock.calls[0]?.[0].request;
+    expect(previewRequest).toMatchObject({
+      example_node_id: 'example-1',
+      example_text_column: 'text',
+      example_annotation_column: 'class',
+      max_examples_per_class: 3,
+      example_sampling_method: 'random',
+      example_random_seed: 42,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Run All' }));
+    await waitFor(() => expect(mocks.submitRunAll).toHaveBeenCalledOnce());
+    expect(mocks.submitRunAll.mock.calls[0]?.[0].source).toEqual(previewRequest);
   });
 
   it('persists manual text-column choices for source and example Data Blocks', async () => {

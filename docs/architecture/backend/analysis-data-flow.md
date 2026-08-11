@@ -68,13 +68,16 @@ request and snapshot.
 Preview Analyses retain queryable input snapshots. `GET result` returns their
 ready marker; `POST result/query` computes a fresh page without persisting a
 page cache. Annotation Preview queries rerun provider inference for every page
-request.
+request. Its shared example-preparation helper deterministically reconstructs
+the request's per-label subset from the retained Example Data Block snapshot.
 
 Run All Analyses process the complete snapshot. Concordance and Quotation store
 complete immutable table Results. Annotation is the explicit in-place
 exception and edits its selected Data Block through the Workspace mutation
 boundary. The Run All request owns its batch size and processing mode while its
-source request owns shared inference settings. Run All groups rows into batches
+source request owns shared inference settings and the maximum, method, and seed
+for per-label example selection. The worker prepares that subset once and every
+provider batch, retry, or recursive split receives the same list. Run All groups rows into batches
 of 20 by default, with a maximum configurable size of 100. One batch loop owns
 all provider attempts; native SDK retries are disabled, so the default two
 retries mean at most three calls for that batch. Each call has a 4,096-token
@@ -206,7 +209,7 @@ enter Workspaces, Tabs, Results, provenance, logs, query keys, or telemetry.
 Terminal Analysis forests, Results, Artifacts, and queryable snapshots persist
 with the Workspace. Annotation query snapshots materialize only the source and
 optional Example Data Block because the validated class list is already part of
-the immutable request. Native schema 16 and portable archive format 15 validate
+the immutable request. Native schema 17 and portable archive format 16 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

@@ -262,8 +262,8 @@ tables without requiring a created Data Block.
 _Avoid_: preview result
 
 **Example Data Block**:
-An optional Annotation input whose nonblank text and label pairs are supplied
-as verbatim examples to Preview and Run All.
+An optional Annotation input containing the pool from which nonblank reviewed
+text and label pairs are selected as verbatim examples for Preview and Run All.
 _Avoid_: training data, cached prompt
 
 **Codebook**:

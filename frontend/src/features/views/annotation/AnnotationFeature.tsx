@@ -63,6 +63,7 @@ import { canAnnotate, resolveAnnotationProviderConfiguration } from './aiProvide
 import { AnnotationAiPreviewPanel } from './components/AnnotationAiPreviewPanel';
 import { AnnotationAiSettings } from './components/AnnotationAiSettings';
 import { AnnotationClassDescriptionsEditor } from './components/AnnotationClassDescriptionsEditor';
+import { AnnotationExampleSamplingControls } from './components/AnnotationExampleSamplingControls';
 import { AnnotationInferenceSettings } from './components/AnnotationInferenceSettings';
 import {
   AnnotationPromptInput,
@@ -213,6 +214,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     commitAiTemperature,
     aiMaxRetriesPerBatch,
     commitAiMaxRetriesPerBatch,
+    aiMaxExamplesPerClass,
+    commitAiMaxExamplesPerClass,
+    aiExampleSamplingMethod,
+    setAiExampleSamplingMethod,
+    aiExampleRandomSeed,
+    commitAiExampleRandomSeed,
     aiBatchSize,
     commitAiBatchSize,
     aiProcessingMode,
@@ -643,6 +650,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           instruction: resolvedSystemPrompt,
           temperature: aiTemperature,
           max_retries_per_batch: aiMaxRetriesPerBatch,
+          max_examples_per_class: aiMaxExamplesPerClass,
+          example_sampling_method: aiExampleSamplingMethod,
+          example_random_seed: aiExampleRandomSeed,
           reasoning_enabled: aiReasoningEnabled,
           reasoning_effort: normalizedReasoningEffort,
         }
@@ -725,6 +735,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       commitAiPrompt(request.instruction);
       commitAiTemperature(request.temperature ?? 0);
       commitAiMaxRetriesPerBatch(request.max_retries_per_batch ?? 2);
+      commitAiMaxExamplesPerClass(request.max_examples_per_class ?? 10);
+      setAiExampleSamplingMethod(request.example_sampling_method ?? 'random');
+      commitAiExampleRandomSeed(request.example_random_seed ?? 0);
       if (!latestPreview && annotationRunAll?.request.kind === 'annotation_run_all') {
         commitAiBatchSize(annotationRunAll.request.batch_size ?? 20);
         setAiProcessingMode(annotationRunAll.request.processing_mode ?? 'reprocess_all');
@@ -1173,6 +1186,15 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                         columnLabel="Text Column"
                         renderColumnAddon={renderExampleAnnotationColumnPicker}
                         disabled={controlsLocked}
+                      />
+                      <AnnotationExampleSamplingControls
+                        maxExamplesPerClass={aiMaxExamplesPerClass}
+                        onMaxExamplesPerClassCommit={commitAiMaxExamplesPerClass}
+                        samplingMethod={aiExampleSamplingMethod}
+                        onSamplingMethodChange={setAiExampleSamplingMethod}
+                        randomSeed={aiExampleRandomSeed}
+                        onRandomSeedCommit={commitAiExampleRandomSeed}
+                        disabled={controlsLocked || !hasCompleteExample}
                       />
                     </div>
                   </AnnotationAiSettings>

@@ -465,6 +465,22 @@
             ],
             "title": "Example Node Id"
           },
+          "example_random_seed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Example Random Seed",
+            "type": "integer"
+          },
+          "example_sampling_method": {
+            "default": "random",
+            "enum": [
+              "random",
+              "first_n",
+              "last_n"
+            ],
+            "title": "Example Sampling Method",
+            "type": "string"
+          },
           "example_text_column": {
             "anyOf": [
               {
@@ -489,6 +505,12 @@
             "default": "annotation",
             "title": "Kind",
             "type": "string"
+          },
+          "max_examples_per_class": {
+            "default": 10,
+            "minimum": 1.0,
+            "title": "Max Examples Per Class",
+            "type": "integer"
           },
           "max_retries_per_batch": {
             "default": 2,
@@ -671,6 +693,22 @@
             ],
             "title": "Example Node Id"
           },
+          "example_random_seed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Example Random Seed",
+            "type": "integer"
+          },
+          "example_sampling_method": {
+            "default": "random",
+            "enum": [
+              "random",
+              "first_n",
+              "last_n"
+            ],
+            "title": "Example Sampling Method",
+            "type": "string"
+          },
           "example_text_column": {
             "anyOf": [
               {
@@ -695,6 +733,12 @@
             "default": "annotation",
             "title": "Kind",
             "type": "string"
+          },
+          "max_examples_per_class": {
+            "default": 10,
+            "minimum": 1.0,
+            "title": "Max Examples Per Class",
+            "type": "integer"
           },
           "max_retries_per_batch": {
             "default": 2,

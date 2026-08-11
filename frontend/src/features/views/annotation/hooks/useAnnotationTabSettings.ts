@@ -8,6 +8,7 @@ import type { AnnotationDifferenceFilter } from '../annotationDifferenceQuery';
 
 export type AnnotationMode = 'manual' | 'ai';
 export type AnnotationProcessingMode = 'reprocess_all' | 'fill_missing';
+export type AnnotationExampleSamplingMethod = 'random' | 'first_n' | 'last_n';
 
 interface UseAnnotationTabSettingsArgs {
   tabSettings: Record<string, string>;
@@ -196,6 +197,34 @@ export function useAnnotationTabSettings({
     onTabSettingChange('aiMaxRetriesPerBatch', String(value));
   };
 
+  const [aiMaxExamplesPerClass, setAiMaxExamplesPerClassState] = useState<number>(() => {
+    const parsed = Number(tabSettings.aiMaxExamplesPerClass);
+    return Number.isInteger(parsed) && parsed >= 1 ? parsed : 10;
+  });
+  const commitAiMaxExamplesPerClass = (value: number) => {
+    setAiMaxExamplesPerClassState(value);
+    onTabSettingChange('aiMaxExamplesPerClass', String(value));
+  };
+
+  const [aiExampleSamplingMethod, setAiExampleSamplingMethodState] =
+    useState<AnnotationExampleSamplingMethod>(() => {
+      const value = tabSettings.aiExampleSamplingMethod;
+      return value === 'first_n' || value === 'last_n' ? value : 'random';
+    });
+  const setAiExampleSamplingMethod = (value: AnnotationExampleSamplingMethod) => {
+    setAiExampleSamplingMethodState(value);
+    onTabSettingChange('aiExampleSamplingMethod', value);
+  };
+
+  const [aiExampleRandomSeed, setAiExampleRandomSeedState] = useState<number>(() => {
+    const parsed = Number(tabSettings.aiExampleRandomSeed);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+  });
+  const commitAiExampleRandomSeed = (value: number) => {
+    setAiExampleRandomSeedState(value);
+    onTabSettingChange('aiExampleRandomSeed', String(value));
+  };
+
   const [aiBatchSize, setAiBatchSizeState] = useState<number>(() => {
     const parsed = Number(tabSettings.aiBatchSize);
     return Number.isInteger(parsed) && parsed >= 1 && parsed <= 100 ? parsed : 20;
@@ -337,6 +366,12 @@ export function useAnnotationTabSettings({
     commitAiTemperature,
     aiMaxRetriesPerBatch,
     commitAiMaxRetriesPerBatch,
+    aiMaxExamplesPerClass,
+    commitAiMaxExamplesPerClass,
+    aiExampleSamplingMethod,
+    setAiExampleSamplingMethod,
+    aiExampleRandomSeed,
+    commitAiExampleRandomSeed,
     aiBatchSize,
     commitAiBatchSize,
     aiProcessingMode,

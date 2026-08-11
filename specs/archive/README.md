@@ -7,6 +7,9 @@ current system documentation.
 
 ## Completed changes
 
+- [Focused per-class Annotation example sampling](48-example-sampling/spec.md)
+  ([issue #48](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/48)),
+  completed 2026-08-12.
 - [Document-level Concordance and Quotation Results](19-document-level-analysis-results/spec.md)
   ([issue #19](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/19)),
   completed 2026-07-28.

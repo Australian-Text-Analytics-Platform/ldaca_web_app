@@ -155,8 +155,8 @@ other reasons return those fields as null. Create, direct read, open, update,
 and import continue to return strict `WorkspaceResource` responses. Delete
 continues to authorize from the canonical directory and ownership sidecar.
 
-Native Workspace snapshots use schema version 16 and portable archives use
-format version 15. Readers accept only those exact versions; import and open do
+Native Workspace snapshots use schema version 17 and portable archives use
+format version 16. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks

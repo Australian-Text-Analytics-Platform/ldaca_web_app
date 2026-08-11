@@ -81,7 +81,7 @@ Issue: [#56](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflo
 
 - `polars-text` source metadata becomes 0.5.0 and the backend requires
   `polars-text>=0.5.0`.
-- Native Workspace schema 16 and archive format 15 strictly reject older
+- Native Workspace schema 17 and archive format 16 strictly reject older
   versions. No adapter or migration is provided.
 - Package publication is deferred. Editable-workspace verification is the
   delivery gate; the standalone backend change remains blocked until 0.5.0 is
