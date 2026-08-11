@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  formatStopWords,
-  mergeStopWordsText,
-  parseStopWordsText,
-} from '../tokenFrequencyStopWords';
+import { formatStopWords, mergeStopWordsText, parseStopWordsText } from '../stopWords';
 
-describe('tokenFrequencyStopWords', () => {
+describe('stopWords', () => {
   it('parses comma and newline separated stop words with stable lower-case dedupe', () => {
     expect(parseStopWordsText('About, the\nABOUT\r\n  and ,, the')).toEqual([
       'about',

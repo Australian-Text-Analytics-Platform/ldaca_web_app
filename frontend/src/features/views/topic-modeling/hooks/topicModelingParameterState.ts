@@ -15,8 +15,6 @@ export interface TopicModelingParameterState {
   topicSizeUserSet: boolean;
   randomSeed: number;
   randomSeedUserSet: boolean;
-  representativeWordsCount: number;
-  representativeWordsCountUserSet: boolean;
   segmentationMethod: TopicSegmentationMethod;
   maxSegmentTokens: number;
 }
@@ -26,7 +24,6 @@ type TopicModelingParameterAction =
   | { type: 'updateCorpusSample'; index: number; update: Partial<CorpusSample> }
   | { type: 'setTopicSizeFromUser'; value: number }
   | { type: 'setRandomSeedFromUser'; value: number }
-  | { type: 'setRepresentativeWordsCountFromUser'; value: number }
   | { type: 'setSegmentationMethod'; value: TopicSegmentationMethod }
   | { type: 'setMaxSegmentTokens'; value: number }
   | { type: 'hydrateRequest'; request: Record<string, unknown>; nodeDocCounts: number[] }
@@ -45,8 +42,6 @@ export const createTopicModelingParameterState = (): TopicModelingParameterState
   topicSizeUserSet: false,
   randomSeed: 0,
   randomSeedUserSet: false,
-  representativeWordsCount: 15,
-  representativeWordsCountUserSet: false,
   segmentationMethod: 'automatic',
   maxSegmentTokens: DEFAULT_MAX_SEGMENT_TOKENS,
 });
@@ -148,12 +143,6 @@ export const topicModelingParameterReducer = (
       return { ...state, topicSizeValue: action.value, topicSizeUserSet: true };
     case 'setRandomSeedFromUser':
       return { ...state, randomSeed: action.value, randomSeedUserSet: true };
-    case 'setRepresentativeWordsCountFromUser':
-      return {
-        ...state,
-        representativeWordsCount: action.value,
-        representativeWordsCountUserSet: true,
-      };
     case 'setSegmentationMethod':
       return { ...state, segmentationMethod: action.value };
     case 'setMaxSegmentTokens':
@@ -164,8 +153,6 @@ export const topicModelingParameterReducer = (
         ...state,
         randomSeed: Number(action.request.random_seed ?? 0),
         randomSeedUserSet: true,
-        representativeWordsCount: Number(action.request.representative_words_count ?? 15),
-        representativeWordsCountUserSet: true,
         topicSizeValue: Number(action.request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
         topicSizeUserSet: true,
         segmentationMethod: normalizeSegmentationMethod(action.request.segmentation_method),
@@ -185,7 +172,6 @@ export const topicModelingParameterReducer = (
         topicSizeValue: DEFAULT_TOPIC_SIZE_VALUE,
         topicSizeUserSet: false,
         randomSeedUserSet: false,
-        representativeWordsCountUserSet: false,
       };
   }
 };

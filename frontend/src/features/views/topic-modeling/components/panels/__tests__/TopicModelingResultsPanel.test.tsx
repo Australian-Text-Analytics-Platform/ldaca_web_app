@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -8,6 +8,30 @@ import { TopicModelingResultsPanel } from '../TopicModelingResultsPanel';
 vi.mock('../results/TopicModelingBubbleChartSection', () => ({
   TopicModelingBubbleChartSection: ({ controlRowSlot }: { controlRowSlot?: React.ReactNode }) => (
     <div data-testid="topic-bubble-chart-section">{controlRowSlot}</div>
+  ),
+}));
+
+vi.mock('../../TopicModelingStopWordsControl', () => ({
+  TopicModelingStopWordsControl: ({
+    enabled,
+    onEnabledChange,
+  }: {
+    enabled: boolean;
+    onEnabledChange: (enabled: boolean) => void;
+  }) => (
+    <>
+      <button
+        type="button"
+        role="switch"
+        aria-label="Filter stop words"
+        aria-checked={enabled}
+        onClick={() => {
+          onEnabledChange(!enabled);
+        }}
+      />
+      <button type="button" aria-label="Stop words language" />
+      <button type="button" aria-label="Edit stop words" />
+    </>
   ),
 }));
 
@@ -29,7 +53,10 @@ const baseProps = {
       topics: [
         {
           id: 1,
-          label: 'alpha beta',
+          representative_words: [
+            { word: 'alpha', occurrence_count: 4 },
+            { word: 'beta', occurrence_count: 2 },
+          ],
           size: [4],
           total_size: 4,
           x: 0,
@@ -44,7 +71,10 @@ const baseProps = {
   topics: [
     {
       id: 1,
-      label: 'alpha beta',
+      representative_words: [
+        { word: 'alpha', occurrence_count: 4 },
+        { word: 'beta', occurrence_count: 2 },
+      ],
       size: [4],
       total_size: 4,
       x: 0,
@@ -72,6 +102,11 @@ const baseProps = {
   maxSegmentTokens: 256,
   onAddToWorkspace: vi.fn(),
   isAddingToWorkspace: false,
+  stopWordsEnabled: false,
+  onStopWordsEnabledChange: vi.fn(),
+  stopWords: [],
+  stopWordsDetectionTarget: { workspaceId: 'workspace-1', nodeId: 'node-1', column: 'text' },
+  onStopWordsChange: vi.fn().mockResolvedValue(undefined),
 };
 
 describe('TopicModelingResultsPanel', () => {
@@ -98,6 +133,32 @@ describe('TopicModelingResultsPanel', () => {
     expect(screen.getByText('Topic Modelling Results')).toBeInTheDocument();
     expect(screen.getByText('Topics (1)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add to Workspace' })).toBeInTheDocument();
+  });
+
+  it('keeps filtering off while stop-word configuration remains editable', () => {
+    const onWordsPerTopicChange = vi.fn();
+    const onStopWordsEnabledChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          wordsPerTopic={15}
+          onWordsPerTopicChange={onWordsPerTopicChange}
+          stopWordsEnabled={false}
+          onStopWordsEnabledChange={onStopWordsEnabledChange}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByLabelText('Stop words language')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Edit stop words' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('switch', { name: 'Filter stop words' }));
+    expect(onStopWordsEnabledChange).toHaveBeenCalledWith(true);
+
+    const count = screen.getByLabelText('Words per topic');
+    fireEvent.change(count, { target: { value: '101' } });
+    fireEvent.blur(count);
+    expect(onWordsPerTopicChange).toHaveBeenCalledWith(100);
   });
 
   it('warns when later text was truncated from Topic Segments', () => {

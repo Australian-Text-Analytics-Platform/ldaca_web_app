@@ -42,7 +42,6 @@ const emptyAnalysisResult = {
     node_ids: [],
     node_tokenizer_models: {},
     server_limit: 1,
-    stop_words: [],
     token_limit: 1,
   },
   metadata: {

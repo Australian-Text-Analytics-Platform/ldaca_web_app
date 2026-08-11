@@ -42,9 +42,6 @@ export interface UseTopicModelingParametersResult {
   randomSeed: number;
   randomSeedUserSet: boolean;
   setRandomSeedFromUser: (value: number) => void;
-  representativeWordsCount: number;
-  representativeWordsCountUserSet: boolean;
-  setRepresentativeWordsCountFromUser: (value: number) => void;
   segmentationMethod: TopicSegmentationMethod;
   setSegmentationMethod: (value: TopicSegmentationMethod) => void;
   maxSegmentTokens: number;
@@ -96,8 +93,6 @@ export function useTopicModelingParameters({
     topicSizeUserSet,
     randomSeed,
     randomSeedUserSet,
-    representativeWordsCount,
-    representativeWordsCountUserSet,
     segmentationMethod,
     maxSegmentTokens,
   } = parameterState;
@@ -155,12 +150,6 @@ export function useTopicModelingParameters({
   // Called by: TopicModelingParameterPanel because changed seed values should be shown as user-set.
   const setRandomSeedFromUser = (value: number) => {
     dispatchParameters({ type: 'setRandomSeedFromUser', value });
-  };
-
-  /** Records the representative-words display cap from an explicit user edit. */
-  // Called by: TopicModelingParameterPanel because changed word caps should be shown as user-set.
-  const setRepresentativeWordsCountFromUser = (value: number) => {
-    dispatchParameters({ type: 'setRepresentativeWordsCountFromUser', value });
   };
 
   const setSegmentationMethod = (value: TopicSegmentationMethod) => {
@@ -227,9 +216,6 @@ export function useTopicModelingParameters({
     randomSeed,
     randomSeedUserSet,
     setRandomSeedFromUser,
-    representativeWordsCount,
-    representativeWordsCountUserSet,
-    setRepresentativeWordsCountFromUser,
     segmentationMethod,
     setSegmentationMethod,
     maxSegmentTokens,

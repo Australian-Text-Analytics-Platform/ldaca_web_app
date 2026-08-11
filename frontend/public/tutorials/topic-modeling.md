@@ -66,14 +66,6 @@ Controls stochastic dimensionality reduction. The default is 0. Keep the same
 seed to reproduce a configuration, or compare several seeds to assess topic
 stability.
 
-<h4 id="help-topic-modeling-words-per-topic">Words per topic</h4>
-
-Controls how many representative words are shown. The default is 15. The native
-pipeline ranks words using class-based TF-IDF (c-TF-IDF): it combines the Topic
-Segments assigned to each topic, counts the selected vectorizer's terms, and
-weights terms that are frequent in that topic but less frequent across all
-topics. These words describe a cluster; they are not human-authored labels.
-
 <h2 id="help-topic-modeling-run">Step 4 — Run the analysis</h2>
 
 Choose **Run Analysis**. The native pipeline constructs Topic Segments, embeds
@@ -90,6 +82,18 @@ selected.
 
 ![Topic modelling results](tutorials/assets/topic_modelling/results.png)
 
+<h3 id="help-topic-modeling-words-per-topic">Words per topic and stop words</h3>
+
+**Words per topic** controls how many representative words appear in the topic
+list, search, and hover cloud. The default is 15 and the range is 3-100. Enable
+the stopword filter to apply the Tab's saved list. You can choose a language or
+edit that list while filtering is off; the switch controls filtering only.
+Opening the language menu detects a recommendation from the first selected Data
+Block. Choosing a language replaces the saved list, while **Clear stop words**
+empties it. The menu returns to **Saved list (N words)** after a language is
+chosen. These controls change presentation without rerunning or refetching the
+Result.
+
 <h3 id="help-topic-modeling-bubble-chart">Bubble chart</h3>
 
 Each bubble is a discovered topic. Bubble size reflects the documents whose
@@ -97,7 +101,10 @@ dominant assignment is that topic; in a two-corpus run, colour composition
 shows the corpus split. Nearby bubbles have more similar topic representations.
 Topic −1 contains outlier documents that did not fit a discovered cluster.
 
-Hover for representative words and counts. Select topics, search the topic
+Hover for a representative-word cloud. Word order reflects c-TF-IDF
+distinctiveness, while word size reflects occurrences in assigned Topic
+Segments; automatic overlap can therefore count repeated source text. These are
+not source-document frequencies. Select topics, search the topic
 list, reset the zoom, or choose **Add to Workspace** to publish selected topic
 data and linked topic meanings as Derived Data Blocks.
 

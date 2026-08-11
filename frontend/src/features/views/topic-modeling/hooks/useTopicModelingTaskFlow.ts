@@ -13,7 +13,6 @@ interface TopicModelingState {
   panelHasMissingColumns: boolean;
   effectiveNodeColumnSelections: NodeColumnSelection[];
   randomSeed: number;
-  representativeWordsCount: number;
   sampleFractions?: (number | null)[] | null;
   minTopicSize?: number;
   segmentationMethod: TopicSegmentationMethod;
@@ -42,7 +41,6 @@ export function useTopicModelingTaskFlow({
     panelHasMissingColumns,
     effectiveNodeColumnSelections,
     randomSeed,
-    representativeWordsCount,
     sampleFractions,
     minTopicSize,
     segmentationMethod,
@@ -69,7 +67,6 @@ export function useTopicModelingTaskFlow({
       node_ids: requestNodeIds,
       node_columns: nodeColumns,
       random_seed: randomSeed,
-      representative_words_count: representativeWordsCount,
       min_topic_size: minTopicSize ?? DEFAULT_TOPIC_SIZE_VALUE,
       segmentation_method: segmentationMethod,
       max_segment_tokens: maxSegmentTokens,

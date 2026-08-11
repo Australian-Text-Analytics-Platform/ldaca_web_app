@@ -61,6 +61,25 @@ const resolvePanelColor = (
   return fallback;
 };
 
+const positionTooltip = (event: React.MouseEvent, bounds: DOMRect) => {
+  const cursorX = event.clientX - bounds.left;
+  const cursorY = event.clientY - bounds.top;
+  const tooltipWidth = 288;
+  const tooltipHeight = 240;
+  const gap = 12;
+  const edge = 8;
+  return {
+    x:
+      cursorX + gap + tooltipWidth <= bounds.width - edge
+        ? cursorX + gap
+        : Math.max(edge, cursorX - tooltipWidth - gap),
+    y:
+      cursorY + gap + tooltipHeight <= bounds.height - edge
+        ? cursorY + gap
+        : Math.max(edge, cursorY - tooltipHeight - gap),
+  };
+};
+
 /**
  * Builds topic bubble-chart SVG elements and the size-composition renderer.
  * Used by: TopicModelingFeature, which passes both results through TopicModelingResultsPanel.
@@ -238,7 +257,11 @@ export function useTopicModelingBubbleChart({
           const isHovered = hoveredTopicId === topic.id;
           const isSelected = selectedTopicIds.has(topic.id);
           const isFilteredOut =
-            hasSearchFilter && !matchChecklistOption(topic.label, topicSearchQuery);
+            hasSearchFilter &&
+            !matchChecklistOption(
+              topic.representative_words.map((term) => term.word).join(', '),
+              topicSearchQuery,
+            );
           const displayRadius = isHovered && !isFilteredOut ? radius + 2 : radius;
 
           return (
@@ -252,9 +275,9 @@ export function useTopicModelingBubbleChart({
                 setHoveredTopicId(topic.id);
                 const bounds = chartRef.current?.getBoundingClientRect();
                 if (bounds) {
+                  const position = positionTooltip(event, bounds);
                   setTooltip({
-                    x: event.clientX - bounds.left + 12,
-                    y: event.clientY - bounds.top + 12,
+                    ...position,
                     topic,
                   });
                 }
@@ -262,11 +285,11 @@ export function useTopicModelingBubbleChart({
               onMouseMove={(event) => {
                 if (isBrushing || isFilteredOut || !chartRef.current) return;
                 const bounds = chartRef.current.getBoundingClientRect();
+                const position = positionTooltip(event, bounds);
                 setTooltip((previous) =>
                   previous.topic?.id === topic.id
                     ? {
-                        x: event.clientX - bounds.left + 12,
-                        y: event.clientY - bounds.top + 12,
+                        ...position,
                         topic,
                       }
                     : previous,

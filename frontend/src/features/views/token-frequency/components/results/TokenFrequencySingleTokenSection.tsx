@@ -4,10 +4,8 @@ import { memo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
-import { Wordcloud } from '@visx/wordcloud';
-import { Text } from '@visx/text';
-import { useElementWidth } from '@/lib/useElementWidth';
 import { toBgColor } from '@/features/views/common/vizPalette';
+import { ResponsiveWordCloud } from '@/features/views/common/components/ResponsiveWordCloud';
 
 interface TokenFrequencySingleTokenSectionProps {
   nodeDisplayResults: NodeResultView[];
@@ -40,18 +38,6 @@ const BAR_LIST_MAX_HEIGHT_REM =
 
 // Aspect ratio applied when the per-card cloud is sized from the container
 // width — keeps the cloud landscape-ish without dominating tall layouts.
-const SINGLE_CLOUD_ASPECT_RATIO = 0.6;
-// Floor on the SVG width so the cloud stays legible in a narrow column.
-const SINGLE_CLOUD_MIN_WIDTH = 280;
-// Largest font size as a fraction of the cloud width. d3-cloud's spiral
-// starts from the centre — if the max word is small relative to the canvas
-// you end up with a tight cluster of words and a wide margin of white space
-// around it. Setting the cap as a fraction of width lets the cloud fill its
-// container as the panel resizes.
-const SINGLE_CLOUD_MAX_FONT_FRACTION = 0.14;
-const SINGLE_CLOUD_MIN_FONT_PX = 11;
-const SINGLE_CLOUD_MAX_FONT_FLOOR = 36;
-const SINGLE_CLOUD_MAX_FONT_CEILING = 160;
 
 interface SingleNodeWordCloudProps {
   nodeKey: string;
@@ -76,85 +62,17 @@ const SingleNodeWordCloud = memo(
     onTokenClick,
     onTokenRightClick,
   }: SingleNodeWordCloudProps) => {
-    const containerRef = useRef<HTMLDivElement | null>(null);
-    const measuredWidth = useElementWidth(containerRef);
-    const cloudWidth = Math.max(SINGLE_CLOUD_MIN_WIDTH, measuredWidth || SINGLE_CLOUD_MIN_WIDTH);
-    const cloudHeight = Math.round(cloudWidth * SINGLE_CLOUD_ASPECT_RATIO);
-    const wordCount = words.length;
-    // Font-size envelope tied to the cloud width: the biggest word claims
-    // ~14 % of the canvas width, which gives the spiral algorithm enough room
-    // to spread its placements out across the SVG rather than clustering in
-    // the centre. The floor and ceiling stop the cap from collapsing in tiny
-    // panels or going absurd in ultrawide layouts.
-    const maxFontSize = Math.max(
-      SINGLE_CLOUD_MAX_FONT_FLOOR,
-      Math.min(
-        SINGLE_CLOUD_MAX_FONT_CEILING,
-        Math.round(cloudWidth * SINGLE_CLOUD_MAX_FONT_FRACTION),
-      ),
-    );
-    const minFontSize = Math.max(SINGLE_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
-    const maxFrequency = Math.max(1, ...words.map((w) => w.value));
-    /** Used by: SingleNodeWordCloud Wordcloud prop to scale each cloud word by frequency. */
-    const fontSizeSetter = (datum: { value: number }) =>
-      Math.max(
-        minFontSize,
-        Math.min(
-          maxFontSize,
-          (datum.value / maxFrequency) * (maxFontSize - minFontSize) + minFontSize,
-        ),
-      );
     return (
-      <div ref={containerRef} className="w-full">
-        <svg
-          ref={(element) => {
-            registerWordCloudRef(nodeKey, element);
-          }}
-          width={cloudWidth}
-          height={cloudHeight}
-          className="overflow-visible"
-          style={{ overflow: 'visible' }}
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <Wordcloud
-            words={words}
-            width={cloudWidth}
-            height={cloudHeight}
-            fontSize={fontSizeSetter}
-            font="Segoe UI, Roboto, sans-serif"
-            padding={wordCount > 60 ? 1 : 2}
-            spiral="archimedean"
-            rotate={0}
-            random={() => 0.5}
-          >
-            {(cloudWords) =>
-              cloudWords.map((word) => (
-                <Text
-                  key={word.text}
-                  fill={color}
-                  textAnchor="middle"
-                  transform={`translate(${String(word.x)}, ${String(word.y)}) rotate(${String(word.rotate)})`}
-                  fontSize={word.size}
-                  fontFamily={word.font}
-                  className="cursor-pointer transition-colors"
-                  onClick={() => {
-                    if (word.text) onTokenClick(word.text);
-                  }}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    if (word.text) {
-                      onTokenRightClick(word.text, event);
-                    }
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {word.text ?? ''}
-                </Text>
-              ))
-            }
-          </Wordcloud>
-        </svg>
-      </div>
+      <ResponsiveWordCloud
+        words={words}
+        color={color}
+        minWidth={280}
+        svgRef={(element) => {
+          registerWordCloudRef(nodeKey, element);
+        }}
+        onWordClick={onTokenClick}
+        onWordContextMenu={onTokenRightClick}
+      />
     );
   },
 );

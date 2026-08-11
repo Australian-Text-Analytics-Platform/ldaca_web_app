@@ -31,7 +31,11 @@ result struct per source document. Its segmentation arguments are:
 
 The result includes `n_chunks` and `truncated_segment_count` as replicated
 run-level fields. `n_chunks` retains its lower-level name but counts Topic
-Segments.
+Segments. `representative_words` is a list of
+`{word: String, occurrence_count: UInt64}` structs, fixed at at most 100 terms
+in descending c-TF-IDF order. Counts are over assigned model Topic Segments, so
+automatic overlap can count the same source text more than once. Stopwords and
+display limits are not expression arguments.
 
 ## Direct Functions
 

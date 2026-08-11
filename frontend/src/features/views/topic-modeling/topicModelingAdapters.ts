@@ -7,6 +7,34 @@ export interface ZoomDomain {
   yMax: number;
 }
 
+export function topicRepresentativeText(topic: TopicModelingTopic): string {
+  return topic.representative_words.map((term) => term.word).join(', ');
+}
+
+export function filterTopicRepresentativeWords(
+  topics: TopicModelingTopic[],
+  stopWords: ReadonlySet<string>,
+): TopicModelingTopic[] {
+  if (stopWords.size === 0) return topics;
+  return topics.map((topic) => ({
+    ...topic,
+    representative_words: topic.representative_words.filter(
+      (term) => !stopWords.has(term.word.toLocaleLowerCase()),
+    ),
+  }));
+}
+
+export function sliceTopicRepresentativeWords(
+  topics: TopicModelingTopic[],
+  count: number,
+): TopicModelingTopic[] {
+  const limit = Math.min(100, Math.max(3, Math.round(count)));
+  return topics.map((topic) => ({
+    ...topic,
+    representative_words: topic.representative_words.slice(0, limit),
+  }));
+}
+
 /**
  * Interpolates between two hex colours for topic bubble intensity scales.
  * Used by: useTopicModelingBubbleChart to blend two corpus colours for each bubble.

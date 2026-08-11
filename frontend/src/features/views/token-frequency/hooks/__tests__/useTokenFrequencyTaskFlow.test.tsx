@@ -59,7 +59,6 @@ describe('useTokenFrequencyTaskFlow', () => {
           setIsRunning,
           runningRef: { current: false },
           setLastCompareNodeIds: vi.fn(),
-          setAppliedStopSet: vi.fn(),
           setStopWords: vi.fn(),
           onSubmitted,
         },
@@ -84,11 +83,11 @@ describe('useTokenFrequencyTaskFlow', () => {
             node_ids: ['node-1'],
             node_columns: { 'node-1': 'text' },
             node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
-            stop_words: ['and', 'the'],
           }),
         }),
       }),
     );
+    expect(submitTabAnalysisMock.mock.calls[0]?.[0].body.request).not.toHaveProperty('stop_words');
     expect(submitTabAnalysisMock.mock.calls[0]?.[0]?.body).not.toHaveProperty('tab_id');
     expect(setLocalTaskId).toHaveBeenCalledWith('analysis-1');
     expect(onSubmitted).toHaveBeenCalledOnce();

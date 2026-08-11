@@ -206,7 +206,7 @@ enter Workspaces, Tabs, Results, provenance, logs, query keys, or telemetry.
 Terminal Analysis forests, Results, Artifacts, and queryable snapshots persist
 with the Workspace. Annotation query snapshots materialize only the source and
 optional Example Data Block because the validated class list is already part of
-the immutable request. Native schema 15 and portable archive format 14 validate
+the immutable request. Native schema 16 and portable archive format 15 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

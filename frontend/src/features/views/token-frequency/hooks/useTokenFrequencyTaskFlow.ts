@@ -26,7 +26,6 @@ interface AnalysisActions {
   setIsRunning: (value: boolean) => void;
   runningRef: React.RefObject<boolean>;
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
   onSubmitted: () => void;
 }
@@ -64,7 +63,6 @@ export const useTokenFrequencyTaskFlow = ({
     setIsRunning,
     runningRef,
     setLastCompareNodeIds,
-    setAppliedStopSet,
     setStopWords,
     onSubmitted,
   },
@@ -106,13 +104,6 @@ export const useTokenFrequencyTaskFlow = ({
       return;
     }
 
-    const stopWordsArray = stopWords.trim()
-      ? stopWords
-          .split(',')
-          .map((word) => word.trim().toLowerCase())
-          .filter((word) => word.length > 0)
-      : undefined;
-
     const nodeColumns: Record<string, string> = {};
     effectiveNodeColumnSelections.forEach((selection) => {
       if (selection.column) nodeColumns[selection.nodeId] = selection.column;
@@ -124,7 +115,6 @@ export const useTokenFrequencyTaskFlow = ({
       node_tokenizer_models: Object.fromEntries(
         requestNodeIds.map((nodeId) => [nodeId, (tokenizerModelsByNode[nodeId] ?? '').trim()]),
       ),
-      stop_words: stopWordsArray,
     };
 
     await runAnalysisTaskEnvelope<Analysis>({
@@ -145,11 +135,6 @@ export const useTokenFrequencyTaskFlow = ({
       },
       onSuccess: () => {
         setLastCompareNodeIds(request.node_ids);
-        const normalizedStops = (request.stop_words ?? [])
-          .map((word: string) => word.trim().toLowerCase())
-          .filter(Boolean);
-        setAppliedStopSet(new Set(normalizedStops));
-        setStopWords(normalizedStops.join(', '));
       },
       onError: (error) => {
         console.error('Error calculating token frequencies:', error);

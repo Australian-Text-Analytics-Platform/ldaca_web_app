@@ -8,6 +8,7 @@ import {
   updateTab as updateServerTab,
 } from '@/api';
 import type { AnalysisKind, Tab } from '@/api';
+import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -41,6 +42,12 @@ export interface UseWorkspaceTabsResult {
     column: string | null,
   ) => Promise<void>;
   clearAnnotationCorrectionColumns: (tabId: string) => Promise<void>;
+  setPresentationSettings: (tabId: string, patch: TabPresentationPatch) => Promise<void>;
+}
+
+interface TabPresentationPatch {
+  stop_words?: string[];
+  topic_modeling_words_per_topic?: number | null;
 }
 
 interface LocalTabState {
@@ -379,6 +386,51 @@ export function useWorkspaceTabs(
     [saveCorrectionColumn],
   );
 
+  const presentationMutation = useMutation({
+    mutationFn: async ({ tabId, patch }: { tabId: string; patch: TabPresentationPatch }) => {
+      if (!workspaceId) throw new Error('Workspace is required');
+      const { data } = await updateServerTab({
+        path: { workspace_id: workspaceId, tab_id: tabId },
+        body: patch,
+        throwOnError: true,
+      });
+      return data;
+    },
+    onMutate: async ({ tabId, patch }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<Tab[]>(queryKey);
+      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
+        current?.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)),
+      );
+      return { previous };
+    },
+    onError: (cause, variables, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+      toast.error('Failed to save Tab settings.', {
+        description: cause instanceof Error ? cause.message : String(cause),
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            presentationMutation.mutate(variables);
+          },
+        },
+      });
+    },
+    onSuccess: (tab) => {
+      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
+        current?.map((item) => (item.id === tab.id ? tab : item)),
+      );
+    },
+  });
+  const { mutateAsync: savePresentationSettings } = presentationMutation;
+
+  const setPresentationSettings = useCallback(
+    async (tabId: string, patch: TabPresentationPatch) => {
+      await savePresentationSettings({ tabId, patch });
+    },
+    [savePresentationSettings],
+  );
+
   return {
     tabs: orderedTabs,
     activeTabId: resolvedActiveId,
@@ -392,5 +444,6 @@ export function useWorkspaceTabs(
     setTabSetting,
     setAnnotationCorrectionColumn,
     clearAnnotationCorrectionColumns,
+    setPresentationSettings,
   };
 }

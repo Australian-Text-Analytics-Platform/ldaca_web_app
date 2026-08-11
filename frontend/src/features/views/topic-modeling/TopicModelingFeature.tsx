@@ -37,6 +37,10 @@ import {
 import { useTopicModelingResultControls } from './hooks/useTopicModelingResultControls';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
+import {
+  filterTopicRepresentativeWords,
+  sliceTopicRepresentativeWords,
+} from './topicModelingAdapters';
 
 /**
  * Renders the native topic-modelling workflow and Result exploration.
@@ -94,9 +98,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     randomSeed,
     randomSeedUserSet,
     setRandomSeedFromUser,
-    representativeWordsCount,
-    representativeWordsCountUserSet,
-    setRepresentativeWordsCountFromUser,
     segmentationMethod,
     setSegmentationMethod,
     maxSegmentTokens,
@@ -181,7 +182,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     node_columns?: Record<string, string>;
     min_topic_size?: number;
     random_seed?: number;
-    representative_words_count?: number;
     sample_fractions?: (number | null)[];
     segmentation_method?: 'automatic' | 'paragraph' | 'sentence';
     max_segment_tokens?: number;
@@ -298,25 +298,20 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     void persistDocumentColumn(nodeId, column);
   };
 
+  const resultKey = tabTaskId ?? (result ? '__hydrated__' : null);
+  const [stopWordsEnabledForResult, setStopWordsEnabledForResult] = useState<string | null>(null);
+  const stopWordsEnabled = resultKey !== null && stopWordsEnabledForResult === resultKey;
+  const firstNodeId = panelNodeIds[0] ?? null;
+  const firstColumn =
+    effectiveNodeColumnSelections.find((selection) => selection.nodeId === firstNodeId)?.column ??
+    null;
+  const representativeWordsCount = host.topicModelingWordsPerTopic ?? 15;
   const rawTopics: TopicModelingTopic[] = result?.data.topics ?? [];
-  // Rebuild each topic's label from its representative_words sliced to the
-  // current "Words per topic" display cap, so changing that input updates
-  // the bottom list without a rerun. Falls back to the server-built label
-  // when representative_words is missing.
-  const topics: TopicModelingTopic[] = (() => {
-    const cap = Math.max(1, Math.floor(representativeWordsCount));
-    const filtered: TopicModelingTopic[] = [];
-    for (const topic of rawTopics) {
-      const words = Array.isArray(topic.representative_words) ? topic.representative_words : null;
-      if (!words || words.length === 0) {
-        filtered.push(topic);
-        continue;
-      }
-      const sliced = words.slice(0, cap).join(', ');
-      filtered.push(sliced ? { ...topic, label: sliced } : { ...topic });
-    }
-    return filtered;
-  })();
+  const effectiveStopWords = stopWordsEnabled
+    ? new Set(host.stopWords.map((word) => word.toLocaleLowerCase()))
+    : new Set<string>();
+  const exportTopics = filterTopicRepresentativeWords(rawTopics, effectiveStopWords);
+  const topics = sliceTopicRepresentativeWords(exportTopics, representativeWordsCount);
   const addToWorkspaceSources: TopicModelingAddToWorkspaceSource[] = (
     result?.artifacts.nodes ?? []
   ).map((node) => ({
@@ -360,9 +355,9 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           nodeIds.map((nodeId) => [nodeId, addToWorkspaceNames[nodeId]?.trim() ?? '']),
         ),
         topic_ids: selectedTopicIds.size > 0 ? [...selectedTopicIds] : null,
-        topic_meanings_override: topics.map((topic) => ({
+        topic_meanings_override: exportTopics.map((topic) => ({
           topic_id: topic.id,
-          words: topic.representative_words.slice(0, representativeWordsCount),
+          words: topic.representative_words.map((term) => term.word),
         })),
       });
       setAddToWorkspaceDialogOpen(false);
@@ -384,7 +379,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       panelHasMissingColumns,
       effectiveNodeColumnSelections,
       randomSeed,
-      representativeWordsCount,
       sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
       minTopicSize: topicSizeValue,
       segmentationMethod,
@@ -487,12 +481,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         randomSeed={randomSeed}
         randomSeedUserSet={randomSeedUserSet}
         onRandomSeedChange={setRandomSeedFromUser}
-        representativeWordsCount={representativeWordsCount}
-        representativeWordsCountUserSet={representativeWordsCountUserSet}
-        representativeWordsCountServerMax={
-          typedServerRequest ? Number(typedServerRequest.representative_words_count) || null : null
-        }
-        onRepresentativeWordsCountChange={setRepresentativeWordsCountFromUser}
         segmentationMethod={segmentationMethod}
         onSegmentationMethodChange={setSegmentationMethod}
         maxSegmentTokens={maxSegmentTokens}
@@ -521,6 +509,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           error={error ?? analysisError}
           result={result}
           topics={topics}
+          exportTopics={exportTopics}
           containerRef={containerRef}
           chartRef={chartRef}
           handleResetZoom={handleResetZoom}
@@ -541,6 +530,24 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           maxSegmentTokens={maxSegmentTokens}
           onAddToWorkspace={openAddToWorkspaceDialog}
           isAddingToWorkspace={isAddingToWorkspace}
+          wordsPerTopic={representativeWordsCount}
+          onWordsPerTopicChange={(value) => {
+            void host.setPresentationSettings({ topic_modeling_words_per_topic: value });
+          }}
+          stopWordsEnabled={stopWordsEnabled}
+          onStopWordsEnabledChange={(enabled) => {
+            if (!resultKey) return;
+            setStopWordsEnabledForResult(enabled ? resultKey : null);
+          }}
+          stopWords={host.stopWords}
+          stopWordsDetectionTarget={{
+            workspaceId: currentWorkspaceId,
+            nodeId: firstNodeId,
+            column: firstColumn,
+          }}
+          onStopWordsChange={(words) => {
+            return host.setPresentationSettings({ stop_words: words });
+          }}
         />
       )}
       <TopicModelingAddToWorkspaceDialog

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
@@ -7,6 +7,7 @@ import type { ZoomDomain } from '../../topicModelingAdapters';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Plus } from 'lucide-react';
+import { TopicModelingStopWordsControl } from '../TopicModelingStopWordsControl';
 
 interface Props {
   topicWaitingBanner: {
@@ -24,6 +25,7 @@ interface Props {
   result: TopicModelingResponse | null;
   error?: string | null;
   topics: TopicModelingTopic[];
+  exportTopics?: TopicModelingTopic[];
   containerRef: React.RefObject<HTMLDivElement | null>;
   chartRef: React.RefObject<HTMLDivElement | null>;
   handleResetZoom: () => void;
@@ -45,6 +47,50 @@ interface Props {
   maxSegmentTokens: number;
   onAddToWorkspace: () => void;
   isAddingToWorkspace: boolean;
+  wordsPerTopic?: number;
+  onWordsPerTopicChange?: (value: number) => void;
+  stopWordsEnabled: boolean;
+  onStopWordsEnabledChange: (enabled: boolean) => void;
+  stopWords: string[];
+  stopWordsDetectionTarget: {
+    workspaceId: string | null;
+    nodeId: string | null;
+    column: string | null;
+  };
+  onStopWordsChange: (words: string[]) => Promise<void>;
+}
+
+function WordsPerTopicControl({
+  value,
+  onCommit,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState({ source: value, value: String(value) });
+  const displayed = draft.source === value ? draft.value : String(value);
+  return (
+    <label className="grid gap-1 text-xs text-muted-foreground">
+      Words per topic
+      <input
+        aria-label="Words per topic"
+        type="number"
+        min={3}
+        max={100}
+        value={displayed}
+        className="h-8 w-24 rounded-md border border-input bg-background px-2 text-right text-sm"
+        onChange={(event) => {
+          setDraft({ source: value, value: event.target.value });
+        }}
+        onBlur={(event) => {
+          const raw = Number(event.currentTarget.value);
+          const next = Math.min(100, Math.max(3, Number.isFinite(raw) ? Math.round(raw) : 15));
+          setDraft({ source: next, value: String(next) });
+          onCommit(next);
+        }}
+      />
+    </label>
+  );
 }
 
 /**
@@ -59,6 +105,7 @@ export function TopicModelingResultsPanel({
   error,
   result,
   topics,
+  exportTopics = topics,
   containerRef,
   chartRef,
   handleResetZoom,
@@ -80,6 +127,13 @@ export function TopicModelingResultsPanel({
   maxSegmentTokens,
   onAddToWorkspace,
   isAddingToWorkspace,
+  wordsPerTopic = 15,
+  onWordsPerTopicChange = () => undefined,
+  stopWordsEnabled,
+  onStopWordsEnabledChange,
+  stopWords,
+  stopWordsDetectionTarget,
+  onStopWordsChange,
 }: Props) {
   const isRunningState = Boolean(topicWaitingBanner);
   const runningMessage =
@@ -140,6 +194,7 @@ export function TopicModelingResultsPanel({
             ) : null}
             <TopicModelingBubbleChartSection
               topics={topics}
+              exportTopics={exportTopics}
               chartRef={chartRef}
               handleResetZoom={handleResetZoom}
               isAtGlobalZoom={isAtGlobalZoom}
@@ -158,8 +213,20 @@ export function TopicModelingResultsPanel({
               topicSizeValue={topicSizeValue}
               randomSeed={randomSeed}
               controlRowSlot={
-                <div className="flex w-full items-center justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">Topics ({topics.length})</p>
+                <div className="flex w-full flex-wrap items-end justify-between gap-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <p className="pb-2 text-sm text-muted-foreground">Topics ({topics.length})</p>
+                    <WordsPerTopicControl value={wordsPerTopic} onCommit={onWordsPerTopicChange} />
+                    <TopicModelingStopWordsControl
+                      enabled={stopWordsEnabled}
+                      onEnabledChange={onStopWordsEnabledChange}
+                      savedWords={stopWords}
+                      workspaceId={stopWordsDetectionTarget.workspaceId}
+                      nodeId={stopWordsDetectionTarget.nodeId}
+                      column={stopWordsDetectionTarget.column}
+                      onSavedWordsChange={onStopWordsChange}
+                    />
+                  </div>
                   <DisabledReasonTooltip
                     reason={
                       isAddingToWorkspace

@@ -77,13 +77,11 @@ describe('useTopicModelingParameters', () => {
       result.current.updateCorpusSample(0, { percent: '25' });
       result.current.setTopicSizeValueFromUser(6);
       result.current.setRandomSeedFromUser(99);
-      result.current.setRepresentativeWordsCountFromUser(25);
     });
 
     expect(result.current.corpusSamplesUserSet).toBe(true);
     expect(result.current.topicSizeUserSet).toBe(true);
     expect(result.current.randomSeedUserSet).toBe(true);
-    expect(result.current.representativeWordsCountUserSet).toBe(true);
     expect(result.current.sampleFractionsForRequest).toEqual([0.25]);
 
     act(() => {
@@ -95,8 +93,6 @@ describe('useTopicModelingParameters', () => {
     expect(result.current.topicSizeUserSet).toBe(false);
     expect(result.current.randomSeed).toBe(99);
     expect(result.current.randomSeedUserSet).toBe(false);
-    expect(result.current.representativeWordsCount).toBe(25);
-    expect(result.current.representativeWordsCountUserSet).toBe(false);
   });
 
   it('hydrates saved request parameters and sampling fractions', () => {
@@ -112,7 +108,6 @@ describe('useTopicModelingParameters', () => {
     act(() => {
       result.current.hydrateParameters({
         random_seed: 7,
-        representative_words_count: 30,
         min_topic_size: 12,
         sample_fractions: [0.2, null],
       });
@@ -120,8 +115,6 @@ describe('useTopicModelingParameters', () => {
 
     expect(result.current.randomSeed).toBe(7);
     expect(result.current.randomSeedUserSet).toBe(true);
-    expect(result.current.representativeWordsCount).toBe(30);
-    expect(result.current.representativeWordsCountUserSet).toBe(true);
     expect(result.current.topicSizeValue).toBe(12);
     expect(result.current.topicSizeUserSet).toBe(true);
     expect(result.current.corpusSamples).toEqual([{ percent: '20' }, { percent: '100' }]);
@@ -154,7 +147,6 @@ describe('useTopicModelingParameters', () => {
     act(() => {
       result.current.hydrateParameters({
         random_seed: 7,
-        representative_words_count: 30,
         min_topic_size: 12,
         sample_fractions: [0.2],
       });

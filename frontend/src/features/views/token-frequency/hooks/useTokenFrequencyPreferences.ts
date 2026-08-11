@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useReducer } from 'react';
 import type { TokenFrequencyResponse } from '@/api';
 import { loadMergedStopwords } from '@/lib/loadMergedStopwords';
-import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common/utils';
 import {
   formatStopWords,
   mergeStopWordsText,
   parseStopWordsText,
-} from '../tokenFrequencyStopWords';
+} from '../../common/utils/stopWords';
+import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common/utils';
 import {
   createTokenFrequencyPreferenceState,
   tokenFrequencyPreferenceReducer,

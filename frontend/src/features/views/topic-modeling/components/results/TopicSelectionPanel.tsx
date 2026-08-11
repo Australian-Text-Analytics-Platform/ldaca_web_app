@@ -2,7 +2,7 @@ import React from 'react';
 import type { TopicModelingTopic } from '@/api';
 import { Search, X } from 'lucide-react';
 import { matchChecklistOption } from '@/features/views/common/checklistSearch';
-import type { ZoomDomain } from '../../topicModelingAdapters';
+import { topicRepresentativeText, type ZoomDomain } from '../../topicModelingAdapters';
 
 interface Props {
   topics: TopicModelingTopic[];
@@ -55,7 +55,7 @@ export function TopicSelectionPanel({
       return false;
     }
     if (topicSearchQuery.trim()) {
-      return matchChecklistOption(topic.label, topicSearchQuery);
+      return matchChecklistOption(topicRepresentativeText(topic), topicSearchQuery);
     }
     return true;
   });
@@ -101,8 +101,11 @@ export function TopicSelectionPanel({
                 >
                   <div className="min-w-0 flex-1">
                     <span className="text-sm font-medium text-foreground">Topic {topic.id}</span>
-                    <div className="truncate text-xs text-muted-foreground" title={topic.label}>
-                      {topic.label}
+                    <div
+                      className="truncate text-xs text-muted-foreground"
+                      title={topicRepresentativeText(topic)}
+                    >
+                      {topicRepresentativeText(topic)}
                     </div>
                   </div>
                   <button
@@ -173,8 +176,11 @@ export function TopicSelectionPanel({
                   <span className="text-sm font-medium text-foreground">Topic {topic.id}</span>
                   {renderSizeComposition(topic.size, topic.total_size)}
                 </div>
-                <div className="mt-0.5 truncate text-xs text-muted-foreground" title={topic.label}>
-                  {topic.label}
+                <div
+                  className="mt-0.5 truncate text-xs text-muted-foreground"
+                  title={topicRepresentativeText(topic)}
+                >
+                  {topicRepresentativeText(topic)}
                 </div>
               </div>
             );

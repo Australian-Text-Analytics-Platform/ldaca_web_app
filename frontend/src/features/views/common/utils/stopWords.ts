@@ -1,12 +1,8 @@
 // Accept commas and newlines so pasted grouped stop-word lists survive a round
-// trip through the editor.
+// trip through any analysis editor.
 const STOPWORD_SEPARATOR_RE = /[,\n\r]+/;
 
-/**
- * Parses editable stop-word text into normalized unique words.
- * Used by: useTokenFrequencyPreferences and tests because applying, sorting,
- * and default-language appends must share one lower-case/dedupe rule.
- */
+/** Normalizes editable stop-word text with stable, lower-case deduplication. */
 export function parseStopWordsText(text: string): string[] {
   const seen = new Set<string>();
   const words: string[] = [];
@@ -24,20 +20,12 @@ export function parseStopWordsText(text: string): string[] {
   return words;
 }
 
-/**
- * Formats stop-word arrays for the editable textarea.
- * Used by: useTokenFrequencyPreferences after parsing/sorting/default appends
- * so all callers render the same comma-separated representation.
- */
+/** Formats normalized stop words for comma-separated editors. */
 export function formatStopWords(words: string[]): string {
   return words.join(', ');
 }
 
-/**
- * Merges existing editor text with newly loaded default stop words.
- * Used by: the default-language stop-word flow so multi-language appends reuse
- * the same parser and dedupe behavior as manual Apply.
- */
+/** Appends default stop words to editable text without adding duplicates. */
 export function mergeStopWordsText(existingText: string, appendedWords: string[]): string[] {
   return parseStopWordsText(formatStopWords([existingText, formatStopWords(appendedWords)]));
 }

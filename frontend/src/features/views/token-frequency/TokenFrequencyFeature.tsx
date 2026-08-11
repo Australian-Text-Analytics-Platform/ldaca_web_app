@@ -29,7 +29,6 @@ import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
 import {
   buildNodeIdDisplayNameMap,
   buildSelectionNameById,
-  deriveBackendStopWordsKey,
   deriveBackendTokenLimit,
   derivePanelNodeIds,
   deriveStudyNodeOrder,
@@ -40,6 +39,7 @@ import {
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;
+const EMPTY_STOP_SET = new Set<string>();
 
 /** Coordinates token-frequency selection, execution, and export wiring for the analysis tab. */
 /**
@@ -182,14 +182,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       applyTokenLimitState(
         typeof requestData.token_limit === 'number' ? requestData.token_limit : null,
       );
-      const requestedStopWords = Array.isArray(requestData.stop_words)
-        ? requestData.stop_words.filter((word): word is string => typeof word === 'string')
-        : [];
-      const normalizedStops = requestedStopWords
-        .map((word) => word.trim().toLowerCase())
-        .filter(Boolean);
-      setAppliedStopSet(new Set(normalizedStops));
-      setStopWords(normalizedStops.join(', '));
     },
     /** Clears local result and selection state when the feature reset action runs. */
     onCleared: () => {
@@ -225,7 +217,10 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   );
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
-  const backendStopWordsKey = deriveBackendStopWordsKey(serverRequest);
+  const frequencyResultKey = tabTaskId ?? (results ? '__hydrated__' : null);
+  const [stopWordsEnabledForResult, setStopWordsEnabledForResult] = useState<string | null>(null);
+  const stopWordsEnabled =
+    frequencyResultKey !== null && stopWordsEnabledForResult === frequencyResultKey;
   const savedTokenLimit = Number(host.settings['tokenFrequency.tokenLimit']);
   // Primary node/column the "Add Default" dialog samples to guess a language.
   // Language is not stored per column (a column may mix languages), so the guess
@@ -242,7 +237,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     setStopWords,
     isLoadingStopWords,
     appliedStopSet,
-    setAppliedStopSet,
     tokenLimitInput,
     tokenLimitError,
     isApplyingTokenLimit,
@@ -258,17 +252,18 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   } = useTokenFrequencyPreferences({
     results,
     backendTokenLimit,
-    backendStopWordsKey,
+    backendStopWordsKey: '',
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
     savedTokenLimit: Number.isFinite(savedTokenLimit) ? savedTokenLimit : undefined,
-    savedStopWordsJson: host.settings['tokenFrequency.stopWords'],
+    savedStopWordsJson: JSON.stringify(host.stopWords),
     onTokenLimitChange: (value) => {
       host.setSetting('tokenFrequency.tokenLimit', String(value));
     },
     onStopWordsChange: (words) => {
-      host.setSetting('tokenFrequency.stopWords', JSON.stringify(words));
+      void host.setPresentationSettings({ stop_words: words });
     },
   });
+  const effectiveAppliedStopSet = stopWordsEnabled ? appliedStopSet : EMPTY_STOP_SET;
 
   const lockedNodeNameMap = useMemo(
     () =>
@@ -300,7 +295,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       setIsRunning,
       runningRef,
       setLastCompareNodeIds,
-      setAppliedStopSet,
       setStopWords,
       onSubmitted: refreshAnalyses,
     },
@@ -333,7 +327,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     nodeColumnSelections: effectiveNodeColumnSelections,
     lockedNodeNameMap,
     nodeIdToName,
-    appliedStopSet,
+    appliedStopSet: effectiveAppliedStopSet,
     effectiveTokenLimit,
     stopWords,
   });
@@ -484,24 +478,29 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
           setFillDialogOpen(true);
         }}
         onSortStopWords={sortStopWords}
+        stopWordsEnabled={stopWordsEnabled}
+        onStopWordsEnabledChange={(enabled) => {
+          if (!frequencyResultKey) return;
+          setStopWordsEnabledForResult(enabled ? frequencyResultKey : null);
+        }}
         tokenLimitInput={tokenLimitInput}
         onTokenLimitInputChange={handleTokenLimitInputChange}
         onTokenLimitBlur={handleTokenLimitBlur}
         applyCloudTokenLimit={applyTokenLimit}
         tokenLimitError={tokenLimitError}
         isApplyingTokenLimit={isApplyingTokenLimit}
-        appliedStopCount={appliedStopSet.size}
+        appliedStopCount={effectiveAppliedStopSet.size}
         normalizedNodeResults={normalizedNodeResults}
         nodeDisplayResults={nodeDisplayResults}
         lastCompareNodeIds={lastCompareNodeIds}
-        appliedStopSet={appliedStopSet}
+        appliedStopSet={effectiveAppliedStopSet}
         effectiveTokenLimit={effectiveTokenLimit}
         defaultTokenLimit={DEFAULT_TOKEN_LIMIT}
         computeDisplayName={computeDisplayName}
         getColorForNode={getColorForNode}
         onDownloadWordCloud={openWordCloudDownload}
         onTokenClick={handleTokenClick}
-        onTokenRightClick={handleTokenRightClick}
+        onTokenRightClick={stopWordsEnabled ? handleTokenRightClick : () => undefined}
         unifiedCloudWidth={UNIFIED_WORDCLOUD_WIDTH}
         unifiedCloudHeight={UNIFIED_WORDCLOUD_HEIGHT}
         unifiedCloudContainerRef={unifiedCloudContainerRef}

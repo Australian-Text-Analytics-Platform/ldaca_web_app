@@ -26,7 +26,6 @@ describe('topicModelingParameterReducer', () => {
       type: 'hydrateRequest',
       request: {
         random_seed: 7,
-        representative_words_count: 30,
         min_topic_size: 12,
         segmentation_method: 'paragraph',
         max_segment_tokens: 64,
@@ -38,8 +37,6 @@ describe('topicModelingParameterReducer', () => {
     expect(state).toMatchObject({
       randomSeed: 7,
       randomSeedUserSet: true,
-      representativeWordsCount: 30,
-      representativeWordsCountUserSet: true,
       topicSizeValue: 12,
       topicSizeUserSet: true,
       segmentationMethod: 'paragraph',
@@ -54,7 +51,6 @@ describe('topicModelingParameterReducer', () => {
       type: 'hydrateRequest',
       request: {
         random_seed: 99,
-        representative_words_count: 25,
         min_topic_size: 6,
         segmentation_method: 'sentence',
         max_segment_tokens: 128,
@@ -73,8 +69,6 @@ describe('topicModelingParameterReducer', () => {
     expect(cleared.topicSizeUserSet).toBe(false);
     expect(cleared.randomSeed).toBe(99);
     expect(cleared.randomSeedUserSet).toBe(false);
-    expect(cleared.representativeWordsCount).toBe(25);
-    expect(cleared.representativeWordsCountUserSet).toBe(false);
     expect(cleared.segmentationMethod).toBe('sentence');
     expect(cleared.maxSegmentTokens).toBe(128);
   });

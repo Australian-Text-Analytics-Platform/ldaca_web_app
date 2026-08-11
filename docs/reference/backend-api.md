@@ -155,8 +155,8 @@ other reasons return those fields as null. Create, direct read, open, update,
 and import continue to return strict `WorkspaceResource` responses. Delete
 continues to authorize from the canonical directory and ownership sidecar.
 
-Native Workspace snapshots use schema version 15 and portable archives use
-format version 14. Readers accept only those exact versions; import and open do
+Native Workspace snapshots use schema version 16 and portable archives use
+format version 15. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks
@@ -214,6 +214,11 @@ reset after load, clone, import, close/reopen, or backend restart.
 | `GET /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `list_tab_analyses` | 200 | Read the complete ordered Analysis forest |
 | `POST /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `submit_tab_analysis` | 201 | Create one scoped Analysis, optionally with a parent and supersession targets |
 | `DELETE /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `clear_tab_analysis` | 204 | Cancel and remove the complete Analysis forest |
+
+Token Frequency and Topic Modelling Tabs expose normalized `stop_words`.
+Topic Modelling Tabs additionally expose `topic_modeling_words_per_topic`
+(3-100, default 15). These settings change only through Tab PATCH and survive
+Analysis and Result lifecycle operations.
 
 ## Analyses
 

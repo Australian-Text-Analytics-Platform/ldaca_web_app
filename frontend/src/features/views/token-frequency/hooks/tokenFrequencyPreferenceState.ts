@@ -1,6 +1,6 @@
 import type { SetStateAction } from 'react';
 
-import { formatStopWords } from '../tokenFrequencyStopWords';
+import { formatStopWords } from '../../common/utils/stopWords';
 
 export interface TokenFrequencyPreferenceState {
   stopWords: string;

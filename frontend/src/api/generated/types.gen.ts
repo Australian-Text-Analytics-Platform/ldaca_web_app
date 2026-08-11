@@ -3109,6 +3109,20 @@ export type ReplaceNodeEditRequest = {
 };
 
 /**
+ * RepresentativeWord
+ */
+export type RepresentativeWord = {
+    /**
+     * Occurrence Count
+     */
+    occurrence_count: number;
+    /**
+     * Word
+     */
+    word: string;
+};
+
+/**
  * ResultColumnMetadata
  */
 export type ResultColumnMetadata = {
@@ -3776,6 +3790,14 @@ export type Tab = {
      * Revision
      */
     revision: number;
+    /**
+     * Stop Words
+     */
+    stop_words?: Array<string>;
+    /**
+     * Topic Modeling Words Per Topic
+     */
+    topic_modeling_words_per_topic?: number | null;
 };
 
 /**
@@ -3803,6 +3825,14 @@ export type TabUpdate = {
      * Name
      */
     name?: string | null;
+    /**
+     * Stop Words
+     */
+    stop_words?: Array<string> | null;
+    /**
+     * Topic Modeling Words Per Topic
+     */
+    topic_modeling_words_per_topic?: number | null;
 };
 
 /**
@@ -3843,10 +3873,6 @@ export type TokenFrequencyAnalysisRequest = {
     node_tokenizer_models: {
         [key: string]: string;
     };
-    /**
-     * Stop Words
-     */
-    stop_words?: Array<string>;
     /**
      * Token Limit
      */
@@ -3906,13 +3932,9 @@ export type TopicItem = {
      */
     id: number;
     /**
-     * Label
-     */
-    label: string;
-    /**
      * Representative Words
      */
-    representative_words: Array<string>;
+    representative_words: Array<RepresentativeWord>;
     /**
      * Size
      */
@@ -3994,10 +4016,6 @@ export type TopicMetadata = {
      */
     random_state?: number | null;
     /**
-     * Representative Words Count
-     */
-    representative_words_count?: number | null;
-    /**
      * Stage Timings Ms
      */
     stage_timings_ms?: Array<TopicStageTiming> | null;
@@ -4045,10 +4063,6 @@ export type TopicModelingAnalysisRequest = {
      * Random Seed
      */
     random_seed?: number;
-    /**
-     * Representative Words Count
-     */
-    representative_words_count?: number;
     /**
      * Sample Fractions
      */

@@ -1,6 +1,5 @@
 import { useState, type FocusEvent } from 'react';
 import { CircleHelp } from 'lucide-react';
-import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -53,17 +52,6 @@ interface Props {
   randomSeed: number;
   randomSeedUserSet: boolean;
   onRandomSeedChange: (value: number) => void;
-  representativeWordsCount: number;
-  representativeWordsCountUserSet: boolean;
-  /**
-   * When locked, the maximum display value the user can pick for "Words per
-   * topic" without re-running — the originally-fitted count. `null` means
-   * unlocked (no server-side cap).
-   */
-  representativeWordsCountServerMax?: number | null;
-  /** Override for the tooltip on the locked "Words per topic" input. */
-  representativeWordsCountLockedReason?: string;
-  onRepresentativeWordsCountChange: (value: number) => void;
   segmentationMethod: TopicSegmentationMethod;
   onSegmentationMethodChange: (value: TopicSegmentationMethod) => void;
   maxSegmentTokens: number;
@@ -102,11 +90,6 @@ export function TopicModelingParameterPanel({
   randomSeed,
   randomSeedUserSet,
   onRandomSeedChange,
-  representativeWordsCount,
-  representativeWordsCountUserSet,
-  representativeWordsCountServerMax = null,
-  representativeWordsCountLockedReason,
-  onRepresentativeWordsCountChange,
   segmentationMethod,
   onSegmentationMethodChange,
   maxSegmentTokens,
@@ -138,38 +121,6 @@ export function TopicModelingParameterPanel({
     const next = Math.max(2, isNaN(raw) ? 2 : Math.round(raw));
     setTopicSizeDraft({ source: next, value: String(next) });
     onTopicSizeValueChange(next); // always call — even unchanged — to solidify grey placeholder
-  };
-
-  const [representativeWordsDraft, setRepresentativeWordsDraft] = useState<NumericInputDraft>(
-    () => ({
-      source: representativeWordsCount,
-      value: String(representativeWordsCount),
-    }),
-  );
-  const representativeWordsCountDraft =
-    representativeWordsDraft.source === representativeWordsCount
-      ? representativeWordsDraft.value
-      : String(representativeWordsCount);
-  // Called by: words-per-topic input change handler before validation on blur.
-  const setRepresentativeWordsCountDraft = (value: string) => {
-    setRepresentativeWordsDraft({ source: representativeWordsCount, value });
-  };
-
-  // Backend now fits with at least 50 representative words and serves up to
-  // 2× the originally-fitted count, so post-fit we can let the user scale
-  // up without rerunning. Pre-fit cap stays at 50 since there's no fitted
-  // count to double yet.
-  const representativeWordsCountCap = representativeWordsCountServerMax
-    ? Math.max(50, 2 * representativeWordsCountServerMax)
-    : 50;
-
-  // Called by: words-per-topic input blur handler to commit within the backend-supported cap.
-  const handleRepresentativeWordsCountBlur = (event: FocusEvent<HTMLInputElement>) => {
-    const raw = Number(event.currentTarget.value);
-    const rounded = Number.isFinite(raw) ? Math.round(raw) : 3;
-    const clamped = Math.min(representativeWordsCountCap, Math.max(3, rounded));
-    setRepresentativeWordsDraft({ source: clamped, value: String(clamped) });
-    onRepresentativeWordsCountChange(clamped);
   };
 
   const [maxSegmentTokensDraft, setMaxSegmentTokensDraft] = useState<NumericInputDraft>(() => ({
@@ -421,38 +372,6 @@ export function TopicModelingParameterPanel({
                 onRandomSeedChange(Math.max(0, Number(e.target.value) || 0));
               }}
             />
-          </div>
-
-          {/* Words per topic */}
-          <div className="min-w-[10rem] space-y-1">
-            <Label
-              htmlFor="representative-words-count"
-              className="block whitespace-nowrap text-xs font-medium text-muted-foreground"
-            >
-              Words per topic
-            </Label>
-            <DisabledReasonTooltip
-              reason={
-                representativeWordsCountServerMax
-                  ? (representativeWordsCountLockedReason ??
-                    `Adjustable up to ${String(representativeWordsCountCap)} after modelling. Clear Results to fit with a higher count.`)
-                  : undefined
-              }
-            >
-              <Input
-                id="representative-words-count"
-                type="number"
-                min={3}
-                max={representativeWordsCountCap}
-                step={1}
-                value={representativeWordsCountDraft}
-                className={`h-9 w-full text-right text-sm${!representativeWordsCountUserSet ? ' text-muted-foreground' : ''}`}
-                onChange={(e) => {
-                  setRepresentativeWordsCountDraft(e.target.value);
-                }}
-                onBlur={handleRepresentativeWordsCountBlur}
-              />
-            </DisabledReasonTooltip>
           </div>
         </div>
       </div>

@@ -73,7 +73,6 @@ export const analysisResponse = (overrides: Partial<Analysis> = {}): Analysis =>
     node_ids: ['node-1'],
     node_columns: { 'node-1': 'text' },
     node_tokenizer_models: { 'node-1': 'native:plain_words_en' },
-    stop_words: [],
     token_limit: 20,
   },
   ...overrides,

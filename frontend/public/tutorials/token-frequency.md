@@ -32,8 +32,8 @@ The reference block provides the baseline for the statistical keyword analysis: 
 
 Stop words are terms you want to exclude from the frequency count — commonly words like _the_, _and_, or domain-specific filler that would otherwise dominate the results.
 
-- Type words separated by spaces into the stop words field. Matching is case-insensitive.
-- Click **Fill Default** to populate the field with default stop words for the saved language of each selected column.
+- Enable the filter, then type words separated by commas or newlines. Matching is case-insensitive. Disabling the filter keeps the saved list read-only.
+- Click **Add Default** to choose a language. The first selected Data Block supplies a recommendation, but you confirm or override it.
 - Click **Sort** to sort the current stop-word list alphabetically.
 - Click **Apply Stop Words** to apply the current list to the results. Removing stop words does not change the statistical measures of remaining tokens — they are excluded as a post-processing step.
 - Right-click any word in the word cloud or frequency list to add it directly to the stop-word list. Words added this way are **inserted at the start of the list** so they are easy to find and remove. The list is not re-sorted until you click **Sort**.
@@ -44,7 +44,7 @@ Click **Run** to start. After the tab has an Analysis, the button changes to **R
 
 <h2 id="help-token-frequency-results">Result panel</h2>
 
-The results panel shows controls for stop words and display limits at the top, followed by a **Cloud view / List view** tab to switch between the two output modes.
+The results panel shows controls for stop words and display limits at the top, followed by a **Cloud view / List view** tab to switch between the two output modes. The stopword switch resets off whenever a Result is loaded; re-enabling immediately applies the saved Tab list.
 
 <h3 id="help-token-frequency-token-limit">Cloud display limit</h3>
 

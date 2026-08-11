@@ -170,27 +170,3 @@ export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null)
     ? results.metadata.effective_token_limit
     : null;
 };
-
-/** Reads the immutable stop-word list from the canonical Analysis request. */
-/**
- * Used by: tokenFrequencyUtils.test.ts.
- */
-export const deriveBackendStopWords = (
-  request?: Record<string, unknown> | null,
-): string[] | null => {
-  if (!request || !Array.isArray(request.stop_words)) return null;
-  return request.stop_words.filter((word): word is string => typeof word === 'string');
-};
-
-/** Builds a stable stop-word key for effects that sync backend preferences into UI state. */
-/**
- * Used by: tokenFrequencyUtils.test.ts, TokenFrequencyFeature.tsx.
- */
-export const deriveBackendStopWordsKey = (request?: Record<string, unknown> | null): string => {
-  const stopWords = deriveBackendStopWords(request);
-  if (!Array.isArray(stopWords) || stopWords.length === 0) return '';
-  return stopWords
-    .map((item) => item.trim().toLowerCase())
-    .filter((item) => item.length > 0)
-    .join('|');
-};

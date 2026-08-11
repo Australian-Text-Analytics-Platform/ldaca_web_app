@@ -8,3 +8,4 @@ issue backlogs here.
 ## Current implementation work
 
 - [Issue 25: Derived Data Block Creation](25-derived-data-block-creation/spec.md)
+- [Issue 56: Topic Representative Words and Result Controls](56-topic-representative-words/spec.md)

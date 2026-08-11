@@ -255,9 +255,18 @@ failed imports do not expire automatically.
 
 Presentation-only settings use browser-local storage partitioned by user,
 Workspace, and analysis kind or Tab as appropriate. They include the active
-Tab, quotation context length, token-frequency display preferences, and
+Tab, quotation context length, token-frequency token limits, and
 sequential chart state. These values can be lost without changing the durable
 Analysis or Result and are not exported with a Workspace.
+
+Stopword lists for Token Frequency and Topic Modelling and the Topic Modelling
+Words-per-topic cap are backend-owned Tab presentation settings. Features patch
+them optimistically in the shared Tab Query cache, roll back on failure, and do
+not refetch the immutable Result. Stopword enablement and detected language are
+Result-scoped transient state and reset when a Result hydrates. In Topic
+Modelling, the saved list remains visible and editable while filtering is off;
+opening its language action menu starts first-input language detection without
+persisting the detected or selected language.
 
 Hydration and deletion prune device-only references to missing Workspaces,
 Tabs, Data Blocks, file paths, presets, and preprocessing inputs. Pruning never

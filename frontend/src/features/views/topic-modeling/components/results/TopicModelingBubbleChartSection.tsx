@@ -13,9 +13,12 @@ import {
   type ChartExportHeaderItem,
 } from '@/lib/chartExport';
 import { saveBlob } from '@/lib/download';
+import { ResponsiveWordCloud } from '@/features/views/common/components/ResponsiveWordCloud';
+import { buildTopicsCSV } from './topicModelingCsv';
 
 interface Props {
   topics: TopicModelingTopic[];
+  exportTopics?: TopicModelingTopic[];
   chartRef: React.RefObject<HTMLDivElement | null>;
   handleResetZoom: () => void;
   isAtGlobalZoom: boolean;
@@ -42,50 +45,6 @@ interface Props {
 const OVERLAY_BTN =
   'flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
-// Used by: buildTopicsCSV to escape topic labels and representative words for optional CSV export.
-const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
-
-// Used by: topic-modeling chart downloads because optional CSV bundles must mirror selected-topic ordering and visible corpus columns. Flow: sort selected topics first, build topic/corpus headers, escape cells, then join rows as CSV.
-const buildTopicsCSV = (
-  topics: TopicModelingTopic[],
-  selectedTopicIds: Set<number>,
-  nodeNames: string[],
-): string => {
-  const sorted = [...topics].sort((a, b) => {
-    const aSelected = selectedTopicIds.has(a.id) ? 0 : 1;
-    const bSelected = selectedTopicIds.has(b.id) ? 0 : 1;
-    if (aSelected !== bSelected) return aSelected - bSelected;
-    return a.id - b.id;
-  });
-
-  // Column layout mirrors the All Topics pane:
-  //   Selected | Topic No | Representative Words | [NodeName...] | Total (multi-corpus only)
-  const hasMultiCorpora = nodeNames.length >= 2;
-  const headerCols = ['Selected', 'Topic No', 'Representative Words', ...nodeNames];
-  if (hasMultiCorpora) headerCols.push('Total');
-
-  const header = headerCols.map(escapeCsv).join(',');
-
-  const rows = sorted.map((t) => {
-    const cols = [
-      escapeCsv(selectedTopicIds.has(t.id) ? 'Yes' : 'No'),
-      escapeCsv(String(t.id)),
-      escapeCsv(t.representative_words.join(', ')),
-    ];
-    // Per-node document counts
-    for (let i = 0; i < nodeNames.length; i++) {
-      cols.push(escapeCsv(String(t.size[i] ?? 0)));
-    }
-    // Total only when there are multiple corpora (otherwise it equals the single count)
-    if (hasMultiCorpora) {
-      cols.push(escapeCsv(String(t.total_size)));
-    }
-    return cols.join(',');
-  });
-
-  return [header, ...rows].join('\r\n');
-};
-
 const TM_CSV_OPTION = {
   id: 'includeCSV',
   label: 'Include representative words (CSV)',
@@ -100,6 +59,7 @@ const TM_CSV_OPTION = {
  */
 export function TopicModelingBubbleChartSection({
   topics,
+  exportTopics = topics,
   chartRef,
   handleResetZoom,
   isAtGlobalZoom,
@@ -168,7 +128,7 @@ export function TopicModelingBubbleChartSection({
         const zip = new JSZip();
         zip.file(imageFilename, imageBlob);
 
-        const csvContent = buildTopicsCSV(topics, selectedTopicIds, nodeNames ?? []);
+        const csvContent = buildTopicsCSV(exportTopics, selectedTopicIds, nodeNames ?? []);
         zip.file(
           `${safeBaseName}_tm_topics.csv`,
           new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }),
@@ -228,14 +188,30 @@ export function TopicModelingBubbleChartSection({
         </div>
         {tooltip.topic && (
           <div
-            className="pointer-events-none absolute z-30 max-w-xs rounded-md border border-border bg-card p-3 text-xs shadow-lg"
+            className="pointer-events-none absolute z-30 w-[min(18rem,calc(100%-1rem))] rounded-md border border-border bg-card p-3 text-xs shadow-lg"
             data-testid="topic-bubble-chart-tooltip"
-            style={{ left: tooltip.x, top: tooltip.y }}
+            role="tooltip"
+            style={{
+              left: tooltip.x,
+              top: tooltip.y,
+            }}
           >
             <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
-            <div className="mt-1 wrap-break-word text-[10px] leading-snug text-muted-foreground">
-              {tooltip.topic.label}
+            <div className="mt-1 max-h-36 overflow-hidden text-muted-foreground">
+              <ResponsiveWordCloud
+                words={tooltip.topic.representative_words.map((term) => ({
+                  text: term.word,
+                  value: term.occurrence_count,
+                }))}
+                minWidth={180}
+                aspectRatio={0.48}
+              />
             </div>
+            <span className="sr-only">
+              {tooltip.topic.representative_words
+                .map((term) => `${term.word}, ${String(term.occurrence_count)} occurrences`)
+                .join('; ')}
+            </span>
             <div className="mt-2">
               {renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}
             </div>

@@ -6220,6 +6220,26 @@
         "title": "ReplaceNodeEditRequest",
         "type": "object"
       },
+      "RepresentativeWord": {
+        "additionalProperties": false,
+        "properties": {
+          "occurrence_count": {
+            "exclusiveMinimum": 0.0,
+            "title": "Occurrence Count",
+            "type": "integer"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "word",
+          "occurrence_count"
+        ],
+        "title": "RepresentativeWord",
+        "type": "object"
+      },
       "ResultColumnMetadata": {
         "additionalProperties": false,
         "properties": {
@@ -7529,6 +7549,26 @@
             "minimum": 1.0,
             "title": "Revision",
             "type": "integer"
+          },
+          "stop_words": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stop Words",
+            "type": "array"
+          },
+          "topic_modeling_words_per_topic": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 3.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Modeling Words Per Topic"
           }
         },
         "required": [
@@ -7596,6 +7636,33 @@
               }
             ],
             "title": "Name"
+          },
+          "stop_words": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Words"
+          },
+          "topic_modeling_words_per_topic": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 3.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Modeling Words Per Topic"
           }
         },
         "title": "TabUpdate",
@@ -7662,13 +7729,6 @@
             },
             "title": "Node Tokenizer Models",
             "type": "object"
-          },
-          "stop_words": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Stop Words",
-            "type": "array"
           },
           "token_limit": {
             "default": 25,
@@ -7768,13 +7828,9 @@
             "title": "Id",
             "type": "integer"
           },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
           "representative_words": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/RepresentativeWord"
             },
             "title": "Representative Words",
             "type": "array"
@@ -7802,7 +7858,6 @@
         },
         "required": [
           "id",
-          "label",
           "representative_words",
           "size",
           "total_size",
@@ -7963,18 +8018,6 @@
             ],
             "title": "Random State"
           },
-          "representative_words_count": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Representative Words Count"
-          },
           "stage_timings_ms": {
             "anyOf": [
               {
@@ -8074,13 +8117,6 @@
           "random_seed": {
             "default": 0,
             "title": "Random Seed",
-            "type": "integer"
-          },
-          "representative_words_count": {
-            "default": 5,
-            "maximum": 100.0,
-            "minimum": 1.0,
-            "title": "Representative Words Count",
             "type": "integer"
           },
           "sample_fractions": {

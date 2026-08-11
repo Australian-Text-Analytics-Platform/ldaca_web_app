@@ -58,7 +58,9 @@ Sub-Analysis when orchestration requires it.
 The immutable request, execution scope, parent, explicit supersession targets,
 lifecycle, safe Failure, terminal Result, Artifact references, and ordered
 unique `output_node_ids` persist in each strict Analysis record. Draft
-parameters and presentation preferences remain client-only Tab state.
+parameters remain client-only. Persisted kind-specific presentation
+preferences belong to the Tab and are never copied into an immutable request
+or Result.
 
 ## Submission, Supersession, Cancellation, And Clearing
 
@@ -192,11 +194,18 @@ Automatic segmentation may split and overlap text; Paragraph and Sentence
 segmentation preserve their respective Unicode text boundaries and truncate an
 oversized segment on the right.
 
+Topic Results retain 100 Representative Words per topic in c-TF-IDF order,
+each with its model-segment occurrence count. Token Frequency and Topic
+Modelling Tabs may own one normalized stopword list; Topic Modelling Tabs also
+own a 3-100 Words-per-topic cap initialized to 15. Only explicit Tab PATCH
+operations change these settings. Analysis lifecycle operations and Clear
+Results preserve them.
+
 ## Persistence
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 15 and portable archive format 14 accept only this
+Native Workspace schema 16 and portable archive format 15 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

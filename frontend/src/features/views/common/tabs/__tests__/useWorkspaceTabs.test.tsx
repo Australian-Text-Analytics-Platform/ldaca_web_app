@@ -32,7 +32,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 
 const serverTab = (
   id = 'tab-1',
-  kind: 'annotation' | 'concordance' | 'quotation' = 'concordance',
+  kind: 'annotation' | 'concordance' | 'quotation' | 'topic_modeling' = 'concordance',
 ) => ({
   id,
   name: id,
@@ -44,6 +44,8 @@ const serverTab = (
   input_sets: {},
   settings: {},
   annotation_correction_columns: {},
+  stop_words: [],
+  topic_modeling_words_per_topic: kind === 'topic_modeling' ? 15 : null,
 });
 
 describe('useWorkspaceTabs', () => {
@@ -276,6 +278,27 @@ describe('useWorkspaceTabs', () => {
     });
 
     expect(result.current.tabs[0]?.annotation_correction_columns).toEqual({});
+  });
+
+  it('optimistically patches and rolls back backend-owned presentation settings', async () => {
+    mocks.listTabs.mockResolvedValue({ data: [serverTab('tab-1', 'topic_modeling')] });
+    mocks.updateTab.mockRejectedValue(new Error('save failed'));
+    const { result } = renderHook(() => useWorkspaceTabs('workspace-1', 'topic_modeling'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+
+    await act(async () => {
+      await expect(
+        result.current.setPresentationSettings('tab-1', {
+          stop_words: ['the'],
+          topic_modeling_words_per_topic: 25,
+        }),
+      ).rejects.toThrow('save failed');
+    });
+
+    expect(result.current.tabs[0]?.stop_words).toEqual([]);
+    expect(result.current.tabs[0]?.topic_modeling_words_per_topic).toBe(15);
   });
 
   it('shares one all-tabs request between analysis kinds', async () => {

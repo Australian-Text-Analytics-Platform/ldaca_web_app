@@ -20,6 +20,8 @@ export interface AnalysisTab {
   input_sets: AnalysisTabInputSets;
   settings: Record<string, string>;
   annotation_correction_columns: Record<string, string>;
+  stop_words: string[];
+  topic_modeling_words_per_topic: number | null;
   created_at?: string;
   modified_at?: string;
   revision?: number;
@@ -35,6 +37,8 @@ export function tabFromResource(tab: Tab, local?: Partial<AnalysisTab>): Analysi
     input_sets: local?.input_sets ?? { [DEFAULT_TAB_INPUT_SET_ID]: [] },
     settings: local?.settings ?? {},
     annotation_correction_columns: tab.annotation_correction_columns ?? {},
+    stop_words: tab.stop_words ?? [],
+    topic_modeling_words_per_topic: tab.topic_modeling_words_per_topic ?? null,
     created_at: tab.created_at,
     modified_at: tab.modified_at,
     revision: tab.revision,

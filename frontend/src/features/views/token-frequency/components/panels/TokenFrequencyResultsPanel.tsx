@@ -13,6 +13,7 @@ import type { NodeResultView, NormalizedNodeResult } from '../../tokenFrequencyA
 import { TokenFrequencySingleTokenSection } from '../results/TokenFrequencySingleTokenSection';
 import { TokenFrequencyUnifiedTokenSection } from '../results/TokenFrequencyUnifiedTokenSection';
 import { useTokenFrequencyListLimit } from '../../hooks/useTokenFrequencyListLimit';
+import { StopWordsEnabledSwitch } from '@/features/views/common/components/StopWordsEnabledSwitch';
 
 type ResultsView = 'cloud' | 'list';
 
@@ -35,6 +36,8 @@ interface TokenFrequencyResultsPanelProps {
   isLoadingStopWords: boolean;
   onFillDefaultStopWords: () => void;
   onSortStopWords: () => void;
+  stopWordsEnabled: boolean;
+  onStopWordsEnabledChange: (enabled: boolean) => void;
 
   tokenLimitInput: string;
   onTokenLimitInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -82,6 +85,8 @@ export const TokenFrequencyResultsPanel = ({
   isLoadingStopWords,
   onFillDefaultStopWords,
   onSortStopWords,
+  stopWordsEnabled,
+  onStopWordsEnabledChange,
   tokenLimitInput,
   onTokenLimitInputChange,
   onTokenLimitBlur,
@@ -161,7 +166,13 @@ export const TokenFrequencyResultsPanel = ({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="stop-words">Stop words filter ({appliedStopCount})</Label>
+                <div className="flex items-center gap-3">
+                  <Label htmlFor="stop-words">Stop words filter ({appliedStopCount})</Label>
+                  <StopWordsEnabledSwitch
+                    checked={stopWordsEnabled}
+                    onCheckedChange={onStopWordsEnabledChange}
+                  />
+                </div>
                 <HelpIcon
                   targetKey="analysis.token-frequency.stop-words"
                   label="Stop words"
@@ -177,7 +188,7 @@ export const TokenFrequencyResultsPanel = ({
                 }}
                 onBlur={onStopWordsApply}
                 placeholder="the, and, of"
-                disabled={isLoadingStopWords}
+                disabled={isLoadingStopWords || !stopWordsEnabled}
                 className="w-full resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
               />
               <div className="flex items-center gap-2">
@@ -186,7 +197,7 @@ export const TokenFrequencyResultsPanel = ({
                   variant="outline"
                   size="sm"
                   onClick={onStopWordsApply}
-                  disabled={isLoadingStopWords}
+                  disabled={isLoadingStopWords || !stopWordsEnabled}
                 >
                   Apply Stop Words
                 </Button>
@@ -195,7 +206,7 @@ export const TokenFrequencyResultsPanel = ({
                   variant="outline"
                   size="sm"
                   onClick={onFillDefaultStopWords}
-                  disabled={isLoadingStopWords}
+                  disabled={isLoadingStopWords || !stopWordsEnabled}
                 >
                   Add Default
                 </Button>
@@ -204,7 +215,7 @@ export const TokenFrequencyResultsPanel = ({
                   variant="outline"
                   size="sm"
                   onClick={onSortStopWords}
-                  disabled={isLoadingStopWords || !stopWords.trim()}
+                  disabled={isLoadingStopWords || !stopWordsEnabled || !stopWords.trim()}
                 >
                   Sort
                 </Button>

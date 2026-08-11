@@ -73,7 +73,9 @@ _Avoid_: derivation, lineage update, saved edit history
 **Tab**:
 A named Workspace-owned analysis slot with a fixed analysis kind and an ordered
 Analysis Forest. Kind-specific presentation settings may belong to the Tab;
-Active Analysis Drafts do not.
+Active Analysis Drafts do not. Tab presentation settings are changed only by
+an explicit Tab update; Analysis lifecycle operations and Result clearing
+preserve them.
 _Avoid_: frontend-only tab, singleton analysis slot
 
 **Analysis**:
@@ -86,8 +88,8 @@ _Avoid_: task, job, analysis endpoint
 **Result**:
 The output-only typed outcome of a successful Analysis. Lifecycle, immutable
 request parameters, and ownership remain on the Analysis. A Result is distinct
-from any retained file that carries its large data and from browser-local
-presentation settings.
+from any retained file that carries its large data and from Tab presentation
+settings.
 _Avoid_: payload, artifact when referring to the typed outcome
 
 **Derived Data Block Creation**:
@@ -126,6 +128,13 @@ Topic Modelling. A document may contribute one or many Topic Segments, whose
 assignments are rolled up into its Topic Distribution. In code and lower-level
 interfaces this unit may retain the established name `Chunk` or `n_chunks`.
 _Avoid_: document when referring to the model input, chunk in product copy
+
+**Representative Word**:
+A term retained for a Topic in descending c-TF-IDF distinctiveness order. Its
+occurrence count is the number of tokens in assigned model Topic Segments,
+including repeated text introduced by automatic-segmentation overlap. It is not
+source-document frequency or a human-authored topic label.
+_Avoid_: label, document count, source occurrence
 
 **Artifact**:
 A named retained file owned by an Analysis and exposed without revealing its

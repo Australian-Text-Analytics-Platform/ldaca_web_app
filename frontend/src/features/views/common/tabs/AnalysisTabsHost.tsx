@@ -42,10 +42,16 @@ interface AnalysisFeatureHost {
   inputSets: AnalysisTabInputSets;
   settings: Record<string, string>;
   correctionColumns: Record<string, string>;
+  stopWords: string[];
+  topicModelingWordsPerTopic: number | null;
   setInputSet: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   setSetting: (key: string, value: string) => void;
   setCorrectionColumn: (nodeId: string, column: string | null) => Promise<void>;
   clearCorrectionColumns: () => Promise<void>;
+  setPresentationSettings: (patch: {
+    stop_words?: string[];
+    topic_modeling_words_per_topic?: number | null;
+  }) => Promise<void>;
   refreshAnalyses: () => void;
 }
 
@@ -91,6 +97,7 @@ export function AnalysisTabsHost({
     setTabSetting,
     setAnnotationCorrectionColumn,
     clearAnnotationCorrectionColumns,
+    setPresentationSettings,
   } = useWorkspaceTabs(currentWorkspaceId, tabGroup);
 
   // Requirement: entering an empty analysis view presents one ready tab, but
@@ -161,6 +168,8 @@ export function AnalysisTabsHost({
             inputSets: activeTab.input_sets,
             settings: activeTab.settings,
             correctionColumns: activeTab.annotation_correction_columns,
+            stopWords: activeTab.stop_words,
+            topicModelingWordsPerTopic: activeTab.topic_modeling_words_per_topic,
             setInputSet: (selectorId, inputs) => {
               setTabInputSet(activeTab.tab_id, selectorId, inputs);
             },
@@ -172,6 +181,9 @@ export function AnalysisTabsHost({
             },
             clearCorrectionColumns: () => {
               return clearAnnotationCorrectionColumns(activeTab.tab_id);
+            },
+            setPresentationSettings: (patch) => {
+              return setPresentationSettings(activeTab.tab_id, patch);
             },
             refreshAnalyses: () => {
               analysisForest.refresh();

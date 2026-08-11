@@ -4,8 +4,6 @@ import {
   buildNodeIdDisplayNameMap,
   buildSelectionNameById,
   buildSelectionNameKey,
-  deriveBackendStopWords,
-  deriveBackendStopWordsKey,
   deriveBackendTokenLimit,
   derivePanelNodeIds,
   deriveStudyNodeOrder,
@@ -21,14 +19,6 @@ describe('tokenFrequencyUtils', () => {
     };
 
     expect(deriveBackendTokenLimit(result)).toBe(42);
-  });
-
-  it('derives stop words from the immutable analysis request', () => {
-    expect(deriveBackendStopWords({ stop_words: ['ignored'] })).toEqual(['ignored']);
-  });
-
-  it('deriveBackendStopWordsKey normalizes and joins stop words deterministically', () => {
-    expect(deriveBackendStopWordsKey({ stop_words: [' The ', 'AND', '', '  '] })).toBe('the|and');
   });
 
   it('buildSelectionNameById merges selected + panel nodes with panel precedence', () => {
