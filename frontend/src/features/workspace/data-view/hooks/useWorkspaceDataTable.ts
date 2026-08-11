@@ -59,7 +59,7 @@ const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
   page_size: 20,
   rows: [],
   columns: [],
-  columnKinds: {},
+  columnFields: {},
   has_next: false,
 });
 
@@ -251,8 +251,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
         page_size: nodeTableRequest.page_size,
         rows: nodeDataQuery.data.rows,
         columns: nodeDataQuery.data.columns,
-        columnKinds: Object.fromEntries(
-          nodeDataQuery.data.schema.map((column) => [column.name, column.kind]),
+        columnFields: Object.fromEntries(
+          nodeDataQuery.data.schema.map((column) => [column.name, column.field]),
         ),
         has_next: nodeDataQuery.data.hasNext,
       }
@@ -351,7 +351,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const table: WorkspaceTableProps = {
     data: nodeData.rows,
     columns: nodeData.columns,
-    columnKinds: nodeData.columnKinds,
+    columnFields: nodeData.columnFields,
     loading: nodeDataQuery.isLoading,
     workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,

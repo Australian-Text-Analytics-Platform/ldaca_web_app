@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { Field, Utf8 } from 'apache-arrow';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TokenFrequencyParameterPanel } from '../TokenFrequencyParameterPanel';
@@ -91,14 +92,14 @@ const nodeInputsFixture = (): UseTabNodeInputsResult => {
         name: 'Corpus A',
         node: nodeA,
         column: 'text',
-        columnOptions: [{ name: 'text', dataType: 'string' }],
+        columnOptions: [{ name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) }],
       },
       {
         id: 'node-b',
         name: 'Corpus B',
         node: nodeB,
         column: 'text',
-        columnOptions: [{ name: 'text', dataType: 'string' }],
+        columnOptions: [{ name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) }],
       },
     ],
     selectedNodes: [nodeA, nodeB],

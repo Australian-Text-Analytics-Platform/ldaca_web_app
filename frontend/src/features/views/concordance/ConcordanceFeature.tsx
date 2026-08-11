@@ -47,6 +47,7 @@ import type { ConcordanceRunAllReviewSource } from './concordanceRunAllReview';
 import { queryKeys } from '@/lib/queryKeys';
 import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { CONCORDANCE_COMBINED_NODE_KEY } from './concordanceTableDomain';
 
 /** Orchestrates the full Concordance Preview and Run All lifecycle. */
@@ -102,7 +103,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: {
-      allowedDataTypes: ['string'],
+      fieldPredicate: isArrowStringField,
       maxNodes: 2,
       docTypeOnly: true,
     },

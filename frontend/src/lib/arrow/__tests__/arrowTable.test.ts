@@ -17,12 +17,13 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  columnKind,
+  arrowExtensionName,
+  arrowTypeName,
   decodeArrowPage,
   decodeArrowTable,
   fetchArrowTable,
-  TOPIC_DISTRIBUTION_EXTENSION,
 } from '../arrowTable';
+import { isTopicDistributionField, TOPIC_DISTRIBUTION_EXTENSION } from '../semanticTypes';
 
 const stream = (table: ReturnType<typeof tableFromArrays>): Uint8Array =>
   tableToIPC(table, 'stream');
@@ -41,9 +42,11 @@ describe('Arrow table transport', () => {
 
     const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
 
-    expect(decoded.schema.map(({ name, kind }) => ({ name, kind }))).toEqual([
-      { name: 'token', kind: 'string' },
-      { name: 'count', kind: 'integer' },
+    expect(
+      decoded.schema.map(({ name, field }) => ({ name, typeName: arrowTypeName(field) })),
+    ).toEqual([
+      { name: 'token', typeName: 'Utf8' },
+      { name: 'count', typeName: 'Int64' },
     ]);
     expect(decoded.rows).toEqual([
       { token: 'one', count: '1' },
@@ -61,11 +64,13 @@ describe('Arrow table transport', () => {
 
     const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
 
-    expect(decoded.schema[0]?.kind).toBe('datetime');
+    expect(decoded.schema[0] && arrowTypeName(decoded.schema[0].field)).toBe(
+      'Timestamp<MICROSECOND, UTC>',
+    );
     expect(decoded.rows).toEqual([{ created_at: '2020-10-16T15:20:22.000Z' }]);
   });
 
-  it('classifies Utf8View and LargeList<Utf8View> from native Arrow types', async () => {
+  it('retains Utf8View and LargeList<Utf8View> native Arrow type names', async () => {
     const strings = vectorFromArray(['one', 'two'], new Utf8View());
     const stringListType = new LargeList(new Field('item', new Utf8View(), true));
     const stringLists = vectorFromArray([['one', 'two'], ['three']], stringListType);
@@ -73,9 +78,11 @@ describe('Arrow table transport', () => {
 
     const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
 
-    expect(decoded.schema.map(({ name, kind }) => ({ name, kind }))).toEqual([
-      { name: 'strings', kind: 'string' },
-      { name: 'stringLists', kind: 'string-list' },
+    expect(
+      decoded.schema.map(({ name, field }) => ({ name, typeName: arrowTypeName(field) })),
+    ).toEqual([
+      { name: 'strings', typeName: 'Utf8View' },
+      { name: 'stringLists', typeName: 'LargeList<Utf8View>' },
     ]);
     expect(decoded.rows).toEqual([
       { strings: 'one', stringLists: ['one', 'two'] },
@@ -95,7 +102,8 @@ describe('Arrow table transport', () => {
       new Map([['ARROW:extension:name', TOPIC_DISTRIBUTION_EXTENSION]]),
     );
 
-    expect(columnKind(distribution)).toBe('topic-distribution');
+    expect(arrowTypeName(distribution)).toBe(TOPIC_DISTRIBUTION_EXTENSION);
+    expect(isTopicDistributionField(distribution)).toBe(true);
   });
 
   it('preserves the exact identity of an unknown foreign extension', () => {
@@ -109,7 +117,8 @@ describe('Arrow table transport', () => {
       ]),
     );
 
-    expect(columnKind(foreign)).toBe('extension:org.example.foreign_measure.v2');
+    expect(arrowExtensionName(foreign)).toBe('org.example.foreign_measure.v2');
+    expect(arrowTypeName(foreign)).toBe('org.example.foreign_measure.v2');
     expect(foreign.metadata.get('ARROW:extension:metadata')).toBe('{"unit":"widgets"}');
   });
 
@@ -138,7 +147,9 @@ describe('Arrow table transport', () => {
 
     const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
 
-    expect(decoded.schema[0]?.kind).toBe('topic-distribution');
+    expect(decoded.schema[0] && arrowTypeName(decoded.schema[0].field)).toBe(
+      TOPIC_DISTRIBUTION_EXTENSION,
+    );
     expect(decoded.rows).toEqual([
       {
         distribution: [

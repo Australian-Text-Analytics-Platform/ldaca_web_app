@@ -46,6 +46,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { cn } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryKeys';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { getAnalysisOutputResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import AnalysisTaskBanner from '../common/components/AnalysisTaskBanner';
@@ -73,11 +74,11 @@ import { useAnnotationClassDescriptions } from './hooks/useAnnotationClassDescri
 import { useAnnotationTabSettings } from './hooks/useAnnotationTabSettings';
 
 const SOURCE_NODE_CONSTRAINTS: NodeInputConstraints = {
-  allowedDataTypes: ['string'],
+  fieldPredicate: isArrowStringField,
   maxNodes: 1,
 };
 const CLASS_DESCRIPTION_NODE_CONSTRAINTS: NodeInputConstraints = {
-  allowedDataTypes: ['string'],
+  fieldPredicate: isArrowStringField,
   maxNodes: 1,
 };
 const CLASS_DESCRIPTION_SELECTOR_ID = 'classDescriptions';
@@ -85,7 +86,7 @@ const CLASS_DESCRIPTION_SELECTOR_ID = 'classDescriptions';
 // annotation columns can later seed few-shot examples for AI annotation.
 const EXAMPLE_NODE_SELECTOR_ID = 'exampleNodes';
 const EXAMPLE_NODE_CONSTRAINTS: NodeInputConstraints = {
-  allowedDataTypes: ['string'],
+  fieldPredicate: isArrowStringField,
   maxNodes: 1,
 };
 const CREATE_ANNOTATION_COLUMN_ACTION = '__create_annotation_column__';

@@ -2,7 +2,13 @@ import { useState, type ReactNode } from 'react';
 import { queryWorkspaceSqlTable, sqlIdentifier, sqlTable } from '@/api';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { getOperatorsForType } from '../../utils/typeUtils';
+import {
+  isArrowDictionaryField,
+  isArrowStringField,
+  isArrowStringListField,
+} from '@/lib/arrow/arrowTable';
+import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { getOperatorsForField } from '../../utils/typeUtils';
 import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
 import {
   useNodePreviewWithRawFallback,
@@ -56,7 +62,7 @@ interface FilterConditionBuilderConfig {
   renderValueInput: (condition: FilterConditionWithId, disabled: boolean) => ReactNode;
   renderConditionMetadata: (condition: FilterConditionWithId, rowDisabled: boolean) => ReactNode;
   shouldHideOperatorSelect: (condition: FilterConditionWithId) => boolean;
-  getOperatorOptions: (condition: FilterConditionWithId) => ReturnType<typeof getOperatorsForType>;
+  getOperatorOptions: (condition: FilterConditionWithId) => ReturnType<typeof getOperatorsForField>;
 }
 
 interface FilterPreviewConfig {
@@ -182,12 +188,7 @@ export const useFilterSubTabSections = (
     });
   };
 
-  const availableColumns = columnOptions
-    .filter((option) => option.name.length > 0)
-    .map((option) => ({
-      ...option,
-      dataType: option.dataType,
-    }));
+  const availableColumns = columnOptions.filter((option) => option.name.length > 0);
 
   const hasSelection = Boolean(selectedNodeId);
   const hasSchema = availableColumns.length > 0;
@@ -331,32 +332,34 @@ export const useFilterSubTabSections = (
         <span>negate</span>
       </label>
 
-      {condition.dataType === 'string' && condition.operator === 'contains' && (
-        <>
-          <label className="flex items-center gap-1.5">
-            <Checkbox
-              id={`regex-${condition.id}`}
-              checked={Boolean(condition.regex)}
-              onCheckedChange={(checked) => {
-                handleConditionChange(condition.id, 'regex', checked === true);
-              }}
-              disabled={rowDisabled}
-            />
-            <span>regex</span>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <Checkbox
-              id={`case-sensitive-${condition.id}`}
-              checked={Boolean(condition.caseSensitive)}
-              onCheckedChange={(checked) => {
-                handleConditionChange(condition.id, 'caseSensitive', checked === true);
-              }}
-              disabled={rowDisabled}
-            />
-            <span>case sensitive</span>
-          </label>
-        </>
-      )}
+      {condition.field &&
+        isArrowStringField(condition.field) &&
+        condition.operator === 'contains' && (
+          <>
+            <label className="flex items-center gap-1.5">
+              <Checkbox
+                id={`regex-${condition.id}`}
+                checked={Boolean(condition.regex)}
+                onCheckedChange={(checked) => {
+                  handleConditionChange(condition.id, 'regex', checked === true);
+                }}
+                disabled={rowDisabled}
+              />
+              <span>regex</span>
+            </label>
+            <label className="flex items-center gap-1.5">
+              <Checkbox
+                id={`case-sensitive-${condition.id}`}
+                checked={Boolean(condition.caseSensitive)}
+                onCheckedChange={(checked) => {
+                  handleConditionChange(condition.id, 'caseSensitive', checked === true);
+                }}
+                disabled={rowDisabled}
+              />
+              <span>case sensitive</span>
+            </label>
+          </>
+        )}
     </div>
   );
 
@@ -365,20 +368,18 @@ export const useFilterSubTabSections = (
    * Returned as `conditionBuilder.shouldHideOperatorSelect`.
    */
   const shouldHideOperatorSelect = (condition: FilterConditionWithId) =>
-    condition.dataType === 'categorical' ||
-    condition.dataType === 'string-list' ||
+    (condition.field !== undefined &&
+      (isArrowDictionaryField(condition.field) || isArrowStringListField(condition.field))) ||
     // Topic Distribution renders its own topic + operator + value controls together so the
     // topic dropdown can sit before the operator.
-    condition.dataType === 'topic-distribution';
+    isTopicDistributionField(condition.field);
 
   /**
    * Supplies type-aware operator options to the shared ConditionBuilder.
    * Returned as `conditionBuilder.getOperatorOptions`.
    */
   const getConditionOperatorOptions = (condition: FilterConditionWithId) =>
-    // Empty dataType should fall back to 'string', so keep `||`.
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    getOperatorsForType(condition.dataType || 'string');
+    getOperatorsForField(condition.field);
 
   /**
    * Prefills datetime filters from column stats to reduce empty preview states.

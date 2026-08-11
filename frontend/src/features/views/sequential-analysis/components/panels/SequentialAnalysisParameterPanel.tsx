@@ -22,7 +22,7 @@ type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custo
 
 interface ColumnLike {
   name: string;
-  dataType: string;
+  typeName: string;
 }
 
 const FREQUENCY_LABELS: Record<SequentialFrequency, string> = {
@@ -294,7 +294,7 @@ export function SequentialAnalysisParameterPanel({
                 <SelectContent>
                   {availableColumns.map((col) => (
                     <SelectItem key={col.name} value={col.name}>
-                      {col.name} ({col.dataType})
+                      {col.name} ({col.typeName})
                     </SelectItem>
                   ))}
                 </SelectContent>

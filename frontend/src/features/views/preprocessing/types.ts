@@ -58,9 +58,10 @@ export type ConditionValue =
 
 export interface ConditionColumnOption {
   name: string;
-  dataType: string;
+  /** Exact extension identity or native Arrow type name decoded from IPC. */
+  typeName: string;
   label?: string;
-  field?: ArrowField;
+  field: ArrowField;
 }
 
 /**
@@ -76,8 +77,9 @@ export interface FilterConditionWithId {
   negate?: boolean;
   regex?: boolean;
   caseSensitive?: boolean;
-  dataType?: string;
-  [key: string]: ConditionValue | undefined;
+  /** Authoritative decoded field for operator and value-editor behavior. */
+  field?: ArrowField;
+  [key: string]: ConditionValue | ArrowField | undefined;
 }
 
 export interface PreviewPagination {

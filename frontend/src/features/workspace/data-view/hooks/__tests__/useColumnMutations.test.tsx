@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { Field, TimestampMillisecond } from 'apache-arrow';
+import { Field, Int64, TimestampMillisecond, Utf8 } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const toastMock = vi.hoisted(() => ({ error: vi.fn() }));
@@ -15,11 +15,12 @@ describe('useColumnMutations', () => {
 
   it('loads canonical dtypes and runs string-to-datetime casts through the format modal', async () => {
     const onCast = vi.fn().mockResolvedValue(undefined);
+    const initialField = new Field('published_at', new Utf8());
+    const datetimeField = new Field('published_at', new TimestampMillisecond());
     const onRefreshSchema = vi.fn().mockResolvedValueOnce([
       {
         name: 'published_at',
-        kind: 'datetime',
-        field: new Field('published_at', new TimestampMillisecond()),
+        field: datetimeField,
       },
     ]);
 
@@ -28,14 +29,14 @@ describe('useColumnMutations', () => {
         workspaceId: 'workspace-1',
         nodeId: 'node-1',
         columns: ['published_at'],
-        columnKinds: { published_at: 'string' },
+        columnFields: { published_at: initialField },
         onCast,
         onRefreshSchema,
       }),
     );
 
     await waitFor(() => {
-      expect(result.current.columnTypes.published_at).toBe('string');
+      expect(result.current.columnFields.published_at).toBe(initialField);
     });
 
     act(() => {
@@ -53,19 +54,20 @@ describe('useColumnMutations', () => {
 
     await waitFor(() => {
       expect(onCast).toHaveBeenCalledWith('published_at', 'datetime', '%Y-%m-%d');
-      expect(result.current.columnTypes.published_at).toBe('datetime');
+      expect(result.current.columnFields.published_at).toBe(datetimeField);
     });
     expect(result.current.datetimeModal.isOpen).toBe(false);
   });
 
   it('reports cast failures without leaving a column marked busy', async () => {
     const onCast = vi.fn().mockRejectedValue(new Error('invalid date'));
+    const publishedAt = new Field('published_at', new Utf8());
     const { result } = renderHook(() =>
       useColumnMutations({
         workspaceId: 'workspace-1',
         nodeId: 'node-1',
         columns: ['published_at'],
-        columnKinds: { published_at: 'string' },
+        columnFields: { published_at: publishedAt },
         onCast,
       }),
     );
@@ -85,12 +87,14 @@ describe('useColumnMutations', () => {
   it('renames and deletes columns through the edit callbacks', async () => {
     const onRenameColumn = vi.fn().mockResolvedValue(undefined);
     const onDeleteColumn = vi.fn().mockResolvedValue(undefined);
+    const title = new Field('title', new Utf8());
+    const count = new Field('count', new Int64());
     const { result } = renderHook(() =>
       useColumnMutations({
         workspaceId: 'workspace-1',
         nodeId: 'node-1',
         columns: ['title', 'count'],
-        columnKinds: { title: 'string', count: 'integer' },
+        columnFields: { title, count },
         onRenameColumn,
         onDeleteColumn,
       }),
@@ -114,6 +118,6 @@ describe('useColumnMutations', () => {
     });
     expect(onDeleteColumn).toHaveBeenCalledWith('count');
     expect(result.current.deleteColumnDialogOpen).toBe(false);
-    expect(result.current.columnTypes).not.toHaveProperty('count');
+    expect(result.current.columnFields).not.toHaveProperty('count');
   });
 });

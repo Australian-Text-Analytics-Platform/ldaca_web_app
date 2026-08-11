@@ -8,6 +8,7 @@ import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/Analy
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useUIStore } from '@/stores/uiStore';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { getAnalysisResultResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
@@ -76,7 +77,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     tabInputSets,
     onTabInputSetChange,
     constraints: {
-      allowedDataTypes: ['string'],
+      fieldPredicate: isArrowStringField,
       docTypeOnly: true,
       maxNodes: 2,
     },

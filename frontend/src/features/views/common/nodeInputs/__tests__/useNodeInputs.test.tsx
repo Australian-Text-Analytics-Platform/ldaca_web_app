@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { NodeInput } from '../nodeInputsCore';
 import { useNodeInputs } from '../useNodeInputs';
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 
 describe('useNodeInputs', () => {
   it.each([
@@ -30,7 +31,7 @@ describe('useNodeInputs', () => {
         value,
         onChange: setValue,
         allNodes,
-        constraints: { allowedDataTypes: ['string'], maxNodes },
+        constraints: { fieldPredicate: isArrowStringField, maxNodes },
       });
     });
 

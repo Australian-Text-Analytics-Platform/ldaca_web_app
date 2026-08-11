@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Field, Int64, Utf8 } from 'apache-arrow';
 import { type ComponentProps, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
@@ -35,13 +36,16 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
           'record_id',
         ],
         schema: [
-          { name: '__wordflow_annotation_source_row_index', kind: 'integer' },
-          { name: 'text', kind: 'string' },
-          { name: 'annotation', kind: 'string' },
-          { name: 'correction', kind: 'string' },
-          { name: 'reviewer', kind: 'string' },
-          { name: 'username', kind: 'string' },
-          { name: 'record_id', kind: 'integer' },
+          {
+            name: '__wordflow_annotation_source_row_index',
+            field: new Field('__wordflow_annotation_source_row_index', new Int64()),
+          },
+          { name: 'text', field: new Field('text', new Utf8()) },
+          { name: 'annotation', field: new Field('annotation', new Utf8()) },
+          { name: 'correction', field: new Field('correction', new Utf8()) },
+          { name: 'reviewer', field: new Field('reviewer', new Utf8()) },
+          { name: 'username', field: new Field('username', new Utf8()) },
+          { name: 'record_id', field: new Field('record_id', new Int64()) },
         ],
       },
       isLoading: false,

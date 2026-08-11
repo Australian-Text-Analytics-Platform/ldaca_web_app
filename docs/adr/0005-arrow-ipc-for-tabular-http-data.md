@@ -34,13 +34,17 @@ client can still read the physical storage value.
 
 The backend writes native Polars Arrow IPC without downgrading its compatibility
 level or rewriting valid Arrow storage types for a particular client. The
-frontend uses the official `apache-arrow` JavaScript implementation and derives
-UI column behavior from decoded Arrow types and extension metadata. Known
-extensions may select specialized renderers. Unknown foreign extensions retain
-their exact name and metadata while using their decoded storage values; they
-are not mislabeled as an unknown physical type. A type that the decoder cannot
-decode fails that table request clearly; there is no JSON fallback, backend
-type profile, or alternate decoder.
+frontend uses the official `apache-arrow` JavaScript implementation and carries
+each decoded `Field` through schema, selector, table, and preprocessing flows.
+It does not translate fields into a parallel registry of Wordflow column-kind
+names. UI type labels are the exact `ARROW:extension:name` metadata value when
+present, otherwise Apache Arrow's native type spelling. Feature compatibility
+is tested directly against decoded fields. Known extensions may select
+specialized renderers by exact extension identity. Unknown foreign extensions
+retain their exact name and metadata while using their decoded storage values;
+they are not mislabeled as an unknown physical type. A type that the decoder
+cannot decode fails that table request clearly; there is no JSON fallback,
+backend type profile, or alternate decoder.
 
 Topic Distribution uses extension name
 `org.ldaca.wordflow.topic_distribution.v1` over
@@ -48,4 +52,4 @@ Topic Distribution uses extension name
 entries are outlier `-1` followed by real topics `0..N-1`. Fixed-size storage
 expresses that domain invariant; it is not a client-compatibility workaround.
 Frontend code dispatches semantic rendering from the extension name and does
-not redefine the storage type.
+not redefine the storage type or substitute a second display name.

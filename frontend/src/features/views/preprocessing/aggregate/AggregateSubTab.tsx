@@ -91,11 +91,11 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
                       type="button"
                       draggable={!basicBuilder.disabled}
                       onDragStart={(event) => {
-                        basicBuilder.handlers.columnDragStart(event, col.name, col.dataType);
+                        basicBuilder.handlers.columnDragStart(event, col.name, col.typeName);
                       }}
                       onDragEnd={basicBuilder.handlers.paletteDragEnd}
                       onClick={() => {
-                        basicBuilder.addColumnToken(col.name, col.dataType);
+                        basicBuilder.addColumnToken(col.name, col.typeName);
                       }}
                       className={cn(
                         'select-none rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',

@@ -12,6 +12,7 @@ import {
   resolveNodeInputs,
   validateAdd,
 } from '../nodeInputsCore';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 
 const stringNode = (id: string, extra?: Partial<WorkspaceNodeMetadata>): WorkspaceNodeMetadata => ({
   ...projectWorkspaceNodeMetadata({ id, name: id }),
@@ -28,7 +29,7 @@ const columnInfos = (node: WorkspaceNodeMetadata) => {
   const names = node.id === 'n1' ? ['text', 'id'] : node.id === 'n2' ? ['body'] : ['count'];
   return names.map((name) => ({
     name,
-    dataType: node.id === 'n3' ? ('integer' as const) : ('string' as const),
+    typeName: node.id === 'n3' ? 'Int64' : 'Utf8',
     field: new Field(name, node.id === 'n3' ? new Int64() : new Utf8()),
   }));
 };
@@ -66,29 +67,31 @@ describe('validateAdd', () => {
   });
 
   it('allows nodes without matching columns so the picker can stay empty', () => {
-    expect(validateAdd('n3', [], map, { allowedDataTypes: ['string'] })).toBeNull();
+    expect(validateAdd('n3', [], map, { fieldPredicate: isArrowStringField })).toBeNull();
   });
 
   it('allows a valid string node', () => {
-    expect(validateAdd('n1', [], map, { allowedDataTypes: ['string'] })).toBeNull();
+    expect(validateAdd('n1', [], map, { fieldPredicate: isArrowStringField })).toBeNull();
   });
 });
 
 describe('defaultColumnForNode', () => {
   it('prefers the document column when allowed', () => {
-    expect(defaultColumnForNode(nodes[1]!, { allowedDataTypes: ['string'] }, columnInfos)).toBe(
-      'body',
-    );
+    expect(
+      defaultColumnForNode(nodes[1]!, { fieldPredicate: isArrowStringField }, columnInfos),
+    ).toBe('body');
   });
 
   it('falls back to first allowed column when not document-only', () => {
-    expect(defaultColumnForNode(nodes[0]!, { allowedDataTypes: ['string'] }, columnInfos)).toBe(
-      'text',
-    );
+    expect(
+      defaultColumnForNode(nodes[0]!, { fieldPredicate: isArrowStringField }, columnInfos),
+    ).toBe('text');
   });
 
   it('leaves the column empty when no allowed column exists', () => {
-    expect(defaultColumnForNode(nodes[2]!, { allowedDataTypes: ['string'] }, columnInfos)).toBe('');
+    expect(
+      defaultColumnForNode(nodes[2]!, { fieldPredicate: isArrowStringField }, columnInfos),
+    ).toBe('');
   });
 
   it('returns empty when document-only and no document column', () => {
@@ -109,13 +112,23 @@ describe('resolveNodeInputs', () => {
 
   it('re-defaults a column that is no longer valid', () => {
     const inputs: NodeInput[] = [{ node_id: 'n1', column: 'nope' }];
-    const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] }, columnInfos);
+    const resolved = resolveNodeInputs(
+      inputs,
+      map,
+      { fieldPredicate: isArrowStringField },
+      columnInfos,
+    );
     expect(resolved[0]!.column).toBe('text');
   });
 
   it('resolves an added node with empty options when no allowed column exists', () => {
     const inputs: NodeInput[] = [{ node_id: 'n3', column: null }];
-    const resolved = resolveNodeInputs(inputs, map, { allowedDataTypes: ['string'] }, columnInfos);
+    const resolved = resolveNodeInputs(
+      inputs,
+      map,
+      { fieldPredicate: isArrowStringField },
+      columnInfos,
+    );
 
     expect(resolved[0]!.column).toBe('');
     expect(resolved[0]!.columnOptions).toEqual([]);

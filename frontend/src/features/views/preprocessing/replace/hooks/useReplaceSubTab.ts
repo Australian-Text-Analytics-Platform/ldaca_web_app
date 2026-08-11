@@ -16,6 +16,7 @@ import {
 } from './replaceRequestModel';
 import type { ReplaceRequest } from './replaceRequestModel';
 import type { PreprocessingApplyMode } from '../../preprocessingApplyMode';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 
 export interface ReplaceSubTabProps {
   currentWorkspaceId: string | null;
@@ -63,7 +64,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const stringColumns = activeNode
     ? props
         .getColumnInfos(activeNode)
-        .filter((column) => column.dataType === 'string')
+        .filter((column) => isArrowStringField(column.field))
         .map((column) => column.name)
     : [];
   const firstStringColumn = stringColumns[0] ?? '';

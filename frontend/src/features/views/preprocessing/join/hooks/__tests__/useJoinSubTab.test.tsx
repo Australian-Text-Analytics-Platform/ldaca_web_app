@@ -56,7 +56,7 @@ describe('useJoinSubTab preview adapter', () => {
           currentWorkspaceId: workspaceId,
           workspaceNodes,
           getColumnInfos: () => [
-            { name: 'id', dataType: 'string', field: new Field('id', new Utf8()) },
+            { name: 'id', typeName: 'Utf8', field: new Field('id', new Utf8()) },
           ],
           joinNodes: vi.fn(),
           isLoading: { operations: false },
@@ -133,20 +133,20 @@ describe('useJoinSubTab preview adapter', () => {
               ? [
                   {
                     name: 'tweet_id',
-                    dataType: 'string',
+                    typeName: 'Utf8',
                     field: new Field('tweet_id', new Utf8()),
                   },
                   {
                     name: 'username',
-                    dataType: 'string',
+                    typeName: 'Utf8',
                     field: new Field('username', new Utf8()),
                   },
                 ]
               : [
-                  { name: 'party', dataType: 'string', field: new Field('party', new Utf8()) },
+                  { name: 'party', typeName: 'Utf8', field: new Field('party', new Utf8()) },
                   {
                     name: 'username',
-                    dataType: 'string',
+                    typeName: 'Utf8',
                     field: new Field('username', new Utf8()),
                   },
                 ],

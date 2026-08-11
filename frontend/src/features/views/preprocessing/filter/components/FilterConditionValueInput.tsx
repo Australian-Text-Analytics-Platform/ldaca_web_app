@@ -7,8 +7,17 @@ import {
 } from '@/components/ui/select';
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
-import { getOperatorsForType } from '../../utils/typeUtils';
+import { getOperatorsForField } from '../../utils/typeUtils';
 import type { ConditionColumnOption, ConditionRange, FilterConditionWithId } from '../../types';
+import {
+  isArrowBooleanField,
+  isArrowDictionaryField,
+  isArrowFloatField,
+  isArrowIntegerField,
+  isArrowStringListField,
+  isArrowTemporalField,
+} from '@/lib/arrow/arrowTable';
+import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
 import { FilterValueChecklist, type FilterChecklistOption } from './FilterValueChecklist';
 import {
   getCategoricalOptionKey,
@@ -39,9 +48,9 @@ interface FilterConditionValueInputProps {
  * Renders the value editor for one Filter condition row.
  * Rendered by: useFilterSubTabSections through ConditionBuilder's
  * `renderValueInput` slot so the hook owns data/state while this component
- * owns branchy form controls for categorical, topic-distribution, datetime,
+ * owns branchy form controls for dictionary, Topic Distribution, datetime,
  * boolean, numeric, and text conditions.
- * Flow: choose the editor by normalized data type, translate user input into
+ * Flow: choose the editor from the decoded Arrow field, translate user input into
  * `FilterConditionWithId.value`, and delegate lazy categorical retries/search
  * back to the hook-owned option loader.
  */
@@ -56,15 +65,12 @@ export function FilterConditionValueInput({
   onOptionSearchQueryChange,
   onConditionChange,
 }: FilterConditionValueInputProps) {
-  // Empty dataType should fall back to 'string', so keep `||`.
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-  const dataType = condition.dataType || 'string';
+  const field = condition.field;
   const searchQuery = optionSearchQueries[condition.id] ?? '';
   const optionState = useFilterCategoricalOptionQuery({
     workspaceId,
     nodeId,
     column: condition.column,
-    dataType,
     searchQuery,
     columnOption,
   });
@@ -83,8 +89,8 @@ export function FilterConditionValueInput({
     );
   }
 
-  if (dataType === 'topic-distribution') {
-    // Topic-distribution column: render [topic dropdown] [operator] [value %].
+  if (isTopicDistributionField(field)) {
+    // Topic Distribution extension: render [topic dropdown] [operator] [value %].
     // The generic operator select is hidden in the parent ConditionBuilder so
     // the topic dropdown can sit before the operator here.
     const current =
@@ -99,7 +105,7 @@ export function FilterConditionValueInput({
       .map((opt) => Number(opt.value))
       .filter((n) => Number.isFinite(n))
       .sort((a, b) => a - b);
-    const operatorOptions = getOperatorsForType('topic-distribution');
+    const operatorOptions = getOperatorsForField(field);
 
     return (
       <div className="flex flex-1 flex-wrap items-center gap-1.5">
@@ -160,7 +166,7 @@ export function FilterConditionValueInput({
     );
   }
 
-  if (dataType === 'categorical' || dataType === 'string-list') {
+  if (field && (isArrowDictionaryField(field) || isArrowStringListField(field))) {
     const column = condition.column;
     const optionEntries = optionState.options;
     const selectedValues = Array.isArray(condition.value)
@@ -263,7 +269,7 @@ export function FilterConditionValueInput({
     );
   }
 
-  if (dataType === 'boolean') {
+  if (field && isArrowBooleanField(field)) {
     return (
       <Select
         // condition.value is a boolean in this branch; String() coerces it.
@@ -285,7 +291,7 @@ export function FilterConditionValueInput({
     );
   }
 
-  if (dataType === 'datetime') {
+  if (field && isArrowTemporalField(field)) {
     if (condition.operator === 'between') {
       const rangeValue: ConditionRange =
         condition.value && typeof condition.value === 'object' && 'start' in condition.value
@@ -349,11 +355,12 @@ export function FilterConditionValueInput({
     );
   }
 
-  if (dataType === 'integer' || dataType === 'float') {
+  if (field && (isArrowIntegerField(field) || isArrowFloatField(field))) {
+    const integer = isArrowIntegerField(field);
     return (
       <input
         type="number"
-        step={dataType === 'float' ? 'any' : '1'}
+        step={integer ? '1' : 'any'}
         // condition.value is a primitive in this branch; String() coerces it.
         // eslint-disable-next-line @typescript-eslint/no-base-to-string
         value={condition.value === null ? '' : String(condition.value)}
@@ -363,7 +370,7 @@ export function FilterConditionValueInput({
             onConditionChange(condition.id, 'value', '');
             return;
           }
-          const parsed = dataType === 'integer' ? parseInt(raw, 10) : parseFloat(raw);
+          const parsed = integer ? parseInt(raw, 10) : parseFloat(raw);
           onConditionChange(condition.id, 'value', Number.isNaN(parsed) ? '' : parsed);
         }}
         placeholder="Enter number"

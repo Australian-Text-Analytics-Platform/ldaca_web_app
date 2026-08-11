@@ -10,6 +10,7 @@ import { useProgressiveContextualHints } from '@/features/guidance/useProgressiv
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { getAnalysisResultResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
@@ -71,7 +72,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: {
-      allowedDataTypes: ['string'],
+      fieldPredicate: isArrowStringField,
       maxNodes: 2,
       docTypeOnly: true,
     },

@@ -1,8 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
+import { Field, Utf8 } from 'apache-arrow';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RecentSelectionsStore } from '@/stores/recentSelectionsStore';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { useTabNodeInputs } from '../useTabNodeInputs';
 
 const mocks = vi.hoisted(() => ({
@@ -44,6 +46,12 @@ function recentSelectionsStore(overrides: Partial<RecentSelectionsStore> = {}) {
   return store;
 }
 
+const stringColumnInfo = (name: string) => ({
+  name,
+  typeName: 'Utf8',
+  field: new Field(name, new Utf8()),
+});
+
 describe('useTabNodeInputs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,7 +66,7 @@ describe('useTabNodeInputs', () => {
     });
     mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({
-      getColumnInfos: () => [{ name: 'text', dataType: 'string' }],
+      getColumnInfos: () => [stringColumnInfo('text')],
       nodeInfoById: {},
     });
     recentSelectionsStore();
@@ -93,12 +101,7 @@ describe('useTabNodeInputs', () => {
         : undefined;
       return {
         getColumnInfos: () =>
-          nodeInfo
-            ? [
-                { name: 'document', dataType: 'string' },
-                { name: 'speaker', dataType: 'string' },
-              ]
-            : [],
+          nodeInfo ? [stringColumnInfo('document'), stringColumnInfo('speaker')] : [],
         getNodeInfo: () => nodeInfo,
         nodeInfoById: nodeInfo ? { 'node-a': nodeInfo } : {},
       };
@@ -108,7 +111,7 @@ describe('useTabNodeInputs', () => {
         useTabNodeInputs({
           tabInputSets: { source },
           onTabInputSetChange,
-          constraints: { allowedDataTypes: ['string'], maxNodes: 1, docTypeOnly: true },
+          constraints: { fieldPredicate: isArrowStringField, maxNodes: 1, docTypeOnly: true },
         }),
       {
         initialProps: {
@@ -138,7 +141,7 @@ describe('useTabNodeInputs', () => {
     }));
     const rawInputs = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
     const tabInputSets = { source: rawInputs };
-    const constraints = { allowedDataTypes: ['string'], maxNodes };
+    const constraints = { fieldPredicate: isArrowStringField, maxNodes };
     const onTabInputSetChange = vi.fn();
     mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
 
@@ -189,7 +192,7 @@ describe('useTabNodeInputs', () => {
       name: `Node ${String(index + 1)}`,
     }));
     const source = nodes.map((node) => ({ node_id: node.id, column: 'text' }));
-    const constraints = { allowedDataTypes: ['string'], maxNodes: 2 };
+    const constraints = { fieldPredicate: isArrowStringField, maxNodes: 2 };
     const firstOwner = vi.fn();
     const secondOwner = vi.fn();
     mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
@@ -221,7 +224,7 @@ describe('useTabNodeInputs', () => {
       id: `node-${String(index + 1)}`,
       name: `Node ${String(index + 1)}`,
     }));
-    const constraints = { allowedDataTypes: ['string'], maxNodes: 2 };
+    const constraints = { fieldPredicate: isArrowStringField, maxNodes: 2 };
     const onTabInputSetChange = vi.fn();
     mocks.useWorkspaceData.mockReturnValue({ currentWorkspaceId: 'workspace-1', nodes });
 
@@ -262,7 +265,7 @@ describe('useTabNodeInputs', () => {
         selectorId: 'classDescriptions',
         tabInputSets: { classDescriptions: [] },
         onTabInputSetChange,
-        constraints: { allowedDataTypes: ['string'], maxNodes: 1 },
+        constraints: { fieldPredicate: isArrowStringField, maxNodes: 1 },
       }),
     );
 

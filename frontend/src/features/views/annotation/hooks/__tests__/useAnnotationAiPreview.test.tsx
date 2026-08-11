@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { Dictionary, Field, Int32, Int64, Utf8 } from 'apache-arrow';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -51,10 +52,13 @@ describe('useAnnotationAiPreview', () => {
       rows: [{ text: 'hello', label: null, review: 'greeting', tweet_id: 1 }],
       columns: ['text', 'label', 'review', 'tweet_id'],
       schema: [
-        { name: 'text', kind: 'string' },
-        { name: 'label', kind: 'string' },
-        { name: 'review', kind: 'categorical' },
-        { name: 'tweet_id', kind: 'integer' },
+        { name: 'text', field: new Field('text', new Utf8()) },
+        { name: 'label', field: new Field('label', new Utf8()) },
+        {
+          name: 'review',
+          field: new Field('review', new Dictionary(new Utf8(), new Int32())),
+        },
+        { name: 'tweet_id', field: new Field('tweet_id', new Int64()) },
       ],
       hasNext: false,
     });

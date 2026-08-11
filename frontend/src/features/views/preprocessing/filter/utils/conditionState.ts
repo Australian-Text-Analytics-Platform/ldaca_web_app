@@ -1,12 +1,19 @@
-import { getOperatorsForType } from '../../utils/typeUtils';
+import {
+  isArrowDictionaryField,
+  isArrowFloatField,
+  isArrowIntegerField,
+  isArrowStringListField,
+  isArrowTemporalField,
+  type ArrowField,
+} from '@/lib/arrow/arrowTable';
+import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { getOperatorsForField } from '../../utils/typeUtils';
 import type {
   ConditionColumnOption,
   ConditionValue,
   FilterCondition,
   FilterConditionWithId,
 } from '../../types';
-
-type ChecklistDataType = 'categorical' | 'string-list' | 'topic-distribution';
 
 interface FilterConditionPrefillRequest {
   kind: 'datetime' | 'numeric';
@@ -17,7 +24,6 @@ interface FilterConditionPrefillRequest {
 
 interface FilterConditionLoadRequest {
   column: string;
-  dataType: ChecklistDataType;
 }
 
 export interface FilterConditionChangeResult {
@@ -33,34 +39,40 @@ export interface FilterConditionChangeResult {
  * Used by: useFilterSubTabSections and condition-state tests so row creation
  * and row updates share one defaulting rule.
  */
-const getDefaultOperatorForFilterType = (dataType: string): FilterCondition['operator'] => {
-  const operators = getOperatorsForType(dataType);
+const getDefaultOperatorForFilterField = (
+  field: ArrowField | undefined,
+): FilterCondition['operator'] => {
+  const operators = getOperatorsForField(field);
   return (operators[0]?.value as FilterCondition['operator'] | undefined) ?? 'eq';
 };
 
-const isChecklistDataType = (dataType: string | undefined): dataType is ChecklistDataType =>
-  dataType === 'categorical' || dataType === 'string-list' || dataType === 'topic-distribution';
+const isChecklistField = (field: ArrowField | undefined): boolean =>
+  field !== undefined &&
+  (isArrowDictionaryField(field) ||
+    isArrowStringListField(field) ||
+    isTopicDistributionField(field));
 
 const getDefaultValueForColumn = (
-  dataType: string,
+  field: ArrowField | undefined,
   operator: FilterCondition['operator'],
 ): ConditionValue => {
-  if (dataType === 'topic-distribution') return { topic_id: 0, threshold: 0.05 };
+  if (isTopicDistributionField(field)) return { topic_id: 0, threshold: 0.05 };
   return operator === 'in' ? [] : '';
 };
 
 const getPrefillRequest = (
   conditionId: string,
-  dataType: string | undefined,
+  field: ArrowField | undefined,
   column: string | undefined,
   operator: FilterCondition['operator'],
 ): FilterConditionPrefillRequest | null => {
   if (!column || operator === 'is_null') return null;
-  if (dataType === 'datetime') {
+  if (field && isArrowTemporalField(field)) {
     return { kind: 'datetime', conditionId, column, operator };
   }
   if (
-    (dataType === 'integer' || dataType === 'float') &&
+    field &&
+    (isArrowIntegerField(field) || isArrowFloatField(field)) &&
     (operator === 'gte' || operator === 'lte')
   ) {
     return { kind: 'numeric', conditionId, column, operator };
@@ -77,14 +89,14 @@ export const createFilterCondition = (
   id: string,
   firstColumn: ConditionColumnOption | undefined,
 ): FilterConditionWithId => {
-  const dataType = firstColumn?.dataType ?? 'string';
-  const operator = getDefaultOperatorForFilterType(dataType);
+  const field = firstColumn?.field;
+  const operator = getDefaultOperatorForFilterField(field);
   return {
     id,
     column: firstColumn?.name ?? '',
     operator,
-    value: getDefaultValueForColumn(dataType, operator),
-    dataType,
+    value: getDefaultValueForColumn(field, operator),
+    field,
     negate: false,
     regex: false,
     caseSensitive: false,
@@ -118,22 +130,17 @@ export const applyFilterConditionFieldChange = <Key extends keyof FilterConditio
   if (field === 'column') {
     const columnInfo = availableColumns.find((column) => column.name === value);
     if (columnInfo) {
-      const operator = getDefaultOperatorForFilterType(columnInfo.dataType);
-      updated.dataType = columnInfo.dataType;
+      const operator = getDefaultOperatorForFilterField(columnInfo.field);
+      updated.field = columnInfo.field;
       updated.operator = operator;
-      updated.value = getDefaultValueForColumn(columnInfo.dataType, operator);
+      updated.value = getDefaultValueForColumn(columnInfo.field, operator);
       updated.regex = false;
       updated.caseSensitive = false;
 
-      if (isChecklistDataType(columnInfo.dataType)) {
-        checklistLoadRequest = { column: columnInfo.name, dataType: columnInfo.dataType };
+      if (isChecklistField(columnInfo.field)) {
+        checklistLoadRequest = { column: columnInfo.name };
       }
-      prefillRequest = getPrefillRequest(
-        condition.id,
-        columnInfo.dataType,
-        columnInfo.name,
-        operator,
-      );
+      prefillRequest = getPrefillRequest(condition.id, columnInfo.field, columnInfo.name, operator);
     }
   }
 
@@ -141,17 +148,21 @@ export const applyFilterConditionFieldChange = <Key extends keyof FilterConditio
     const operator = value as FilterCondition['operator'];
     if (operator === 'in') {
       updated.value = Array.isArray(updated.value) ? updated.value : [];
-      if (isChecklistDataType(updated.dataType) && updated.column) {
-        checklistLoadRequest = { column: updated.column, dataType: updated.dataType };
+      if (isChecklistField(updated.field) && updated.column) {
+        checklistLoadRequest = { column: updated.column };
       }
-    } else if (updated.dataType === 'categorical' && Array.isArray(updated.value)) {
+    } else if (
+      updated.field &&
+      isArrowDictionaryField(updated.field) &&
+      Array.isArray(updated.value)
+    ) {
       updated.value = updated.value[0] ?? '';
     }
 
-    if (updated.dataType === 'datetime' && updated.column) {
+    if (updated.field && isArrowTemporalField(updated.field) && updated.column) {
       updated.value = '';
     }
-    prefillRequest = getPrefillRequest(condition.id, updated.dataType, updated.column, operator);
+    prefillRequest = getPrefillRequest(condition.id, updated.field, updated.column, operator);
   }
 
   return {

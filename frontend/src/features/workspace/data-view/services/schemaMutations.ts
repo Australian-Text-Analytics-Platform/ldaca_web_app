@@ -1,4 +1,4 @@
-import type { ArrowColumn, ColumnKind } from '@/lib/arrow/arrowTable';
+import { arrowTypeName, type ArrowColumn, type ArrowField } from '@/lib/arrow/arrowTable';
 
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },
@@ -9,20 +9,17 @@ export const DATA_TYPES = [
 ] as const;
 
 /**
- * Projects Arrow schema fields into UI semantic kinds for headers.
+ * Indexes decoded Arrow schema fields for headers.
  * Used by useColumnMutations after schema refreshes to update cast controls.
  */
-export const extractColumnTypes = (
+export const extractColumnFields = (
   schema: ArrowColumn[] | null | undefined,
-): Record<string, ColumnKind> =>
-  Object.fromEntries((schema ?? []).map((column) => [column.name, column.kind]));
+): Record<string, ArrowField> =>
+  Object.fromEntries((schema ?? []).map((column) => [column.name, column.field]));
 
 /**
- * Displays known dtype values with UI labels while preserving unknown types.
+ * Displays the exact extension identity or native Arrow type carried by IPC.
  * Used by WorkspaceTable's column header cast menu.
  */
-export const getTypeDisplayName = (type: string): string => {
-  const dataType = DATA_TYPES.find((entry) => entry.value === type);
-  if (dataType) return dataType.label;
-  return type.startsWith('extension:') ? type.slice('extension:'.length) : type;
-};
+export const getTypeDisplayName = (field: ArrowField | undefined): string =>
+  field ? arrowTypeName(field) : 'unknown';

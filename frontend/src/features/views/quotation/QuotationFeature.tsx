@@ -48,7 +48,7 @@ import { useQuotationResultControls } from './hooks/useQuotationResultControls';
 import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
-import { fetchArrowTablePage } from '@/lib/arrow/arrowTable';
+import { fetchArrowTablePage, isArrowStringField } from '@/lib/arrow/arrowTable';
 import {
   projectQuotationRunAllReviewPage,
   type QuotationReviewRowUnit,
@@ -87,7 +87,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     tabInputSets,
     onTabInputSetChange,
     constraints: {
-      allowedDataTypes: ['string'],
+      fieldPredicate: isArrowStringField,
       maxNodes: 1,
       docTypeOnly: true,
     },

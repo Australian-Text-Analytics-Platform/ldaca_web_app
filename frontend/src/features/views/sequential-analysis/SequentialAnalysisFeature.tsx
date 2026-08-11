@@ -7,7 +7,13 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useSchemaManagement } from '@/features/workspace/common/hooks/useSchemaManagement';
 
-import { arrowSchemaToKinds } from '@/features/workspace/common/hooks/useSchemaManagement';
+import { arrowSchemaToFields } from '@/features/workspace/common/hooks/useSchemaManagement';
+import {
+  type ArrowField,
+  isArrowFloatField,
+  isArrowIntegerField,
+  isArrowTemporalField,
+} from '@/lib/arrow/arrowTable';
 import { fetchNodeSchema } from '@/lib/nodeSchema';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
@@ -36,8 +42,8 @@ import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateO
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import type { SequentialAnalysisRequest, SequentialAnalysisResponse } from '@/api';
 
-const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
-const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
+const isTimeCompatibleField = (field: ArrowField): boolean =>
+  isArrowTemporalField(field) || isArrowIntegerField(field) || isArrowFloatField(field);
 
 /**
  * Renders the sequential-analysis workflow for live trends and result exploration.
@@ -71,7 +77,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     tabInputSets,
     onTabInputSetChange,
     constraints: {
-      allowedDataTypes: [...TIME_COMPATIBLE_TYPES],
+      fieldPredicate: isTimeCompatibleField,
       maxNodes: 1,
       docTypeOnly: false,
     },
@@ -178,7 +184,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
             workspaceId: currentWorkspaceId,
             nodeId: nodeIdStr,
           });
-          setLockedSchema(arrowSchemaToKinds(schema));
+          setLockedSchema(arrowSchemaToFields(schema));
         }
       } finally {
         setHydratingSelection(false);
@@ -195,16 +201,18 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   });
 
   const timeCompatibleColumns = availableColumns
-    .filter((column) =>
-      TIME_COMPATIBLE_TYPES.includes(column.dataType as (typeof TIME_COMPATIBLE_TYPES)[number]),
+    .filter(
+      (column) =>
+        isArrowTemporalField(column.field) ||
+        isArrowIntegerField(column.field) ||
+        isArrowFloatField(column.field),
     )
     .sort((a, b) => {
       // Prioritizes datetime columns before numeric fallbacks in the default selector.
       /**
        * Called by the selectable-column sort comparator below.
        */
-      const priority = (type: string) => (type === 'datetime' ? 0 : 1);
-      return priority(a.dataType) - priority(b.dataType);
+      return Number(!isArrowTemporalField(a.field)) - Number(!isArrowTemporalField(b.field));
     });
 
   const timeColumnOptions = timeCompatibleColumns.map((column) => column.name);
@@ -218,11 +226,12 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   })();
 
   const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
-  const activeColumnType =
-    activeColumnInfo?.dataType ?? timeCompatibleColumns[0]?.dataType ?? 'datetime';
-  const derivedColumnType: 'datetime' | 'numeric' = NUMERIC_TYPE_SET.has(activeColumnType)
-    ? 'numeric'
-    : 'datetime';
+  const activeColumnField = activeColumnInfo?.field ?? timeCompatibleColumns[0]?.field;
+  const derivedColumnType: 'datetime' | 'numeric' =
+    activeColumnField &&
+    (isArrowIntegerField(activeColumnField) || isArrowFloatField(activeColumnField))
+      ? 'numeric'
+      : 'datetime';
   const {
     numericOriginValue,
     numericIntervalValue,

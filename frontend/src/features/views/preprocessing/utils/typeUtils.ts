@@ -1,57 +1,69 @@
+import {
+  isArrowBooleanField,
+  isArrowDictionaryField,
+  isArrowFloatField,
+  isArrowIntegerField,
+  isArrowStringField,
+  isArrowStringListField,
+  isArrowTemporalField,
+  type ArrowField,
+} from '@/lib/arrow/arrowTable';
+import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+
 /**
- * Supplies condition operators for the Filter tab based on normalized dtype.
+ * Supplies condition operators directly from the decoded IPC field.
  * Used by filter condition state and rendering to choose dtype-aware operators.
- * Flow: normalize the dtype, choose operator sets for numeric/datetime/string/boolean/list
- * types, and return filter-builder options.
+ * Flow: inspect extension identity and native Arrow predicates, choose the
+ * matching operator set, and return filter-builder options.
  */
-export const getOperatorsForType = (dataType: string) => {
-  switch (dataType) {
-    case 'string':
-      return [
-        { value: 'contains', label: 'contains' },
-        { value: 'eq', label: 'equals' },
-        { value: 'startswith', label: 'starts with' },
-        { value: 'endswith', label: 'ends with' },
-        { value: 'is_null', label: 'is null' },
-      ];
-    case 'categorical':
-      return [{ value: 'in', label: 'is one of' }];
-    case 'string-list':
-      return [{ value: 'in', label: 'contains any of' }];
-    case 'topic-distribution':
-      // Topic-distribution: compare one topic's proportion against a threshold.
-      return [
-        { value: 'gte', label: '≥' },
-        { value: 'gt', label: '>' },
-        { value: 'lte', label: '≤' },
-        { value: 'lt', label: '<' },
-      ];
-    case 'integer':
-    case 'float':
-      return [
-        { value: 'eq', label: 'equals' },
-        { value: 'gte', label: 'greater than or equal' },
-        { value: 'lte', label: 'less than or equal' },
-        { value: 'is_null', label: 'is null' },
-      ];
-    case 'boolean':
-      return [
-        { value: 'eq', label: 'equals' },
-        { value: 'is_null', label: 'is null' },
-      ];
-    case 'datetime':
-      return [
-        { value: 'gte', label: 'after or equal' },
-        { value: 'lte', label: 'before or equal' },
-        { value: 'between', label: 'between' },
-        { value: 'is_null', label: 'is null' },
-      ];
-    default:
-      return [
-        { value: 'eq', label: 'equals' },
-        { value: 'is_null', label: 'is null' },
-      ];
+export const getOperatorsForField = (field: ArrowField | undefined) => {
+  if (isTopicDistributionField(field)) {
+    return [
+      { value: 'gte', label: '≥' },
+      { value: 'gt', label: '>' },
+      { value: 'lte', label: '≤' },
+      { value: 'lt', label: '<' },
+    ];
   }
+  if (field && isArrowDictionaryField(field)) return [{ value: 'in', label: 'is one of' }];
+  if (field && isArrowStringListField(field)) {
+    return [{ value: 'in', label: 'contains any of' }];
+  }
+  if (field && isArrowStringField(field)) {
+    return [
+      { value: 'contains', label: 'contains' },
+      { value: 'eq', label: 'equals' },
+      { value: 'startswith', label: 'starts with' },
+      { value: 'endswith', label: 'ends with' },
+      { value: 'is_null', label: 'is null' },
+    ];
+  }
+  if (field && (isArrowIntegerField(field) || isArrowFloatField(field))) {
+    return [
+      { value: 'eq', label: 'equals' },
+      { value: 'gte', label: 'greater than or equal' },
+      { value: 'lte', label: 'less than or equal' },
+      { value: 'is_null', label: 'is null' },
+    ];
+  }
+  if (field && isArrowBooleanField(field)) {
+    return [
+      { value: 'eq', label: 'equals' },
+      { value: 'is_null', label: 'is null' },
+    ];
+  }
+  if (field && isArrowTemporalField(field)) {
+    return [
+      { value: 'gte', label: 'after or equal' },
+      { value: 'lte', label: 'before or equal' },
+      { value: 'between', label: 'between' },
+      { value: 'is_null', label: 'is null' },
+    ];
+  }
+  return [
+    { value: 'eq', label: 'equals' },
+    { value: 'is_null', label: 'is null' },
+  ];
 };
 
 /**

@@ -10,6 +10,7 @@ import {
 } from '@/api';
 import { queryAnnotationPreviewWithProviderCredential } from '@/features/provider-credentials/providerCredentialRequests';
 import { queryKeys } from '@/lib/queryKeys';
+import { isArrowDictionaryField, isArrowStringField } from '@/lib/arrow/arrowTable';
 
 const AI_PREVIEW_PAGE_SIZE = 10;
 export type AnnotationPreviewRow = Record<string, unknown>;
@@ -132,11 +133,13 @@ export function useAnnotationAiPreview({
     sourceColumns: sourcePageQuery.data?.columns ?? [],
     sourceStringColumns:
       sourcePageQuery.data?.schema
-        .filter((column) => column.kind === 'string')
+        .filter((column) => isArrowStringField(column.field))
         .map((column) => column.name) ?? null,
     sourceComparableColumns:
       sourcePageQuery.data?.schema
-        .filter((column) => column.kind === 'string' || column.kind === 'categorical')
+        .filter(
+          (column) => isArrowStringField(column.field) || isArrowDictionaryField(column.field),
+        )
         .map((column) => column.name) ?? [],
     page: {
       rows,

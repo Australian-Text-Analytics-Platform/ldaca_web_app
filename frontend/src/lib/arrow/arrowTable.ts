@@ -11,28 +11,12 @@ import { getApiBase } from '@/lib/backend/env';
 const ARROW_STREAM_MEDIA_TYPE = 'application/vnd.apache.arrow.stream';
 const ARROW_EXTENSION_NAME = 'ARROW:extension:name';
 
-export const TOPIC_DISTRIBUTION_EXTENSION = 'org.ldaca.wordflow.topic_distribution.v1';
-
-type ArrowDataType = DataType<Type, TypeMap>;
+/** Every concrete Arrow type supplies its native schema spelling via `toString`. */
+export type ArrowDataType = DataType<Type, TypeMap> & { toString(): string };
 export type ArrowField = Field<ArrowDataType>;
-
-/** Product-facing column categories derived from Arrow fields, never wire-format strings. */
-export type ColumnKind =
-  | 'string'
-  | 'string-list'
-  | 'topic-distribution'
-  | 'datetime'
-  | 'boolean'
-  | 'integer'
-  | 'float'
-  | 'categorical'
-  | 'structured'
-  | 'unknown'
-  | `extension:${string}`;
 
 export interface ArrowColumn {
   name: string;
-  kind: ColumnKind;
   field: ArrowField;
 }
 
@@ -49,48 +33,53 @@ export interface ArrowTablePage extends ArrowTableData {
   etag: string | null;
 }
 
-const isStringType = (type: ArrowDataType): boolean =>
+const isArrowStringType = (type: ArrowDataType): boolean =>
   DataType.isUtf8(type) || DataType.isLargeUtf8(type) || DataType.isUtf8View(type);
 
-const listChild = (type: ArrowDataType): ArrowField | undefined => {
+const arrowListChild = (type: ArrowDataType): ArrowField | undefined => {
   if (!DataType.isList(type) && !DataType.isLargeList(type) && !DataType.isFixedSizeList(type)) {
     return undefined;
   }
   return type.children[0];
 };
 
-/** Classify one decoded Arrow field for UI behavior without parsing dtype spellings. */
-export const columnKind = (field: ArrowField): ColumnKind => {
-  const extensionName = field.metadata.get(ARROW_EXTENSION_NAME);
-  if (extensionName) {
-    return extensionName === TOPIC_DISTRIBUTION_EXTENSION
-      ? 'topic-distribution'
-      : `extension:${extensionName}`;
-  }
+/** Returns the exact extension identity carried by the IPC field metadata. */
+export const arrowExtensionName = (field: ArrowField): string | null =>
+  field.metadata.get(ARROW_EXTENSION_NAME) ?? null;
 
-  const type = field.type;
-  if (DataType.isDictionary(type)) return 'categorical';
-  if (isStringType(type)) return 'string';
-  if (DataType.isInt(type)) return 'integer';
-  if (DataType.isFloat(type) || DataType.isDecimal(type)) return 'float';
-  if (DataType.isBool(type)) return 'boolean';
-  if (
-    DataType.isDate(type) ||
-    DataType.isTime(type) ||
-    DataType.isTimestamp(type) ||
-    DataType.isDuration(type) ||
-    DataType.isInterval(type)
-  ) {
-    return 'datetime';
-  }
+/**
+ * Names a decoded field without translating it into a Wordflow-specific type.
+ * Used by schema controls and diagnostics: semantic extensions retain the
+ * exact identity published in IPC metadata; ordinary fields use Apache
+ * Arrow's own native type spelling.
+ */
+export const arrowTypeName = (field: ArrowField): string =>
+  arrowExtensionName(field) ?? field.type.toString();
 
-  const child = listChild(type);
-  if (child) return isStringType(child.type) ? 'string-list' : 'unknown';
-  if (DataType.isStruct(type) || DataType.isMap(type) || DataType.isUnion(type)) {
-    return 'structured';
-  }
-  return 'unknown';
+/** Native Arrow predicates used by feature-specific behavior at its call site. */
+export const isArrowStringField = (field: ArrowField): boolean => isArrowStringType(field.type);
+
+export const isArrowStringListField = (field: ArrowField): boolean => {
+  const child = arrowListChild(field.type);
+  return child !== undefined && isArrowStringType(child.type);
 };
+
+export const isArrowDictionaryField = (field: ArrowField): boolean =>
+  DataType.isDictionary(field.type);
+
+export const isArrowIntegerField = (field: ArrowField): boolean => DataType.isInt(field.type);
+
+export const isArrowFloatField = (field: ArrowField): boolean =>
+  DataType.isFloat(field.type) || DataType.isDecimal(field.type);
+
+export const isArrowBooleanField = (field: ArrowField): boolean => DataType.isBool(field.type);
+
+export const isArrowTemporalField = (field: ArrowField): boolean =>
+  DataType.isDate(field.type) ||
+  DataType.isTime(field.type) ||
+  DataType.isTimestamp(field.type) ||
+  DataType.isDuration(field.type) ||
+  DataType.isInterval(field.type);
 
 const normalizeArrowValue = (value: unknown, type?: ArrowDataType): unknown => {
   if (type && DataType.isTimestamp(type) && typeof value === 'number') {
@@ -119,7 +108,6 @@ export const decodeArrowTable = async (source: Blob | ArrayBuffer): Promise<Arro
     const table = tableFromIPC<TypeMap>(buffer);
     const schema = table.schema.fields.map((field) => ({
       name: field.name,
-      kind: columnKind(field as ArrowField),
       field: field as ArrowField,
     }));
     const columns = schema.map((column) => column.name);

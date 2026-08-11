@@ -43,6 +43,7 @@ import { toBgColor } from '@/features/views/common/vizPalette';
 import { AnnotationCorrectionColumnControl } from '@/features/views/annotation/components/AnnotationCorrectionColumnControl';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { queryKeys } from '@/lib/queryKeys';
+import { isArrowDictionaryField, isArrowStringField } from '@/lib/arrow/arrowTable';
 
 const DEFAULT_PAGE_SIZE = 10;
 const NO_CORRECTION_VALUE = '__no_correction__';
@@ -134,12 +135,12 @@ export function RunAllReviewTable({
   const comparableColumnSet = new Set(
     data?.schema
       .filter((column) => column.name !== sourceRowIndexColumn)
-      .filter((column) => column.kind === 'string' || column.kind === 'categorical')
+      .filter((column) => isArrowStringField(column.field) || isArrowDictionaryField(column.field))
       .map((column) => column.name) ?? [],
   );
   const stringColumnSet = new Set(
     data?.schema
-      .filter((column) => column.name !== sourceRowIndexColumn && column.kind === 'string')
+      .filter((column) => column.name !== sourceRowIndexColumn && isArrowStringField(column.field))
       .map((column) => column.name) ?? [],
   );
   const availableCorrectionColumns = data

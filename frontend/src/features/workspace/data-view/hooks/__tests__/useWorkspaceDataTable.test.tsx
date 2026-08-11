@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Field, Utf8 } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -36,13 +37,15 @@ const reorderSelectedNodes = vi.fn();
 const removeNode = vi.fn();
 
 const makeArrowPage = (
-  columns: { name: string; kind: 'string' | 'integer' }[] = [{ name: 'text', kind: 'string' }],
+  columns: { name: string; field: Field }[] = [
+    { name: 'text', field: new Field('text', new Utf8()) },
+  ],
   rows: Record<string, unknown>[] = [{ text: 'row' }],
 ) => ({
   table: {},
   rows,
   columns: columns.map((column) => column.name),
-  schema: columns.map((column) => ({ ...column, field: {} })),
+  schema: columns,
   hasNext: false,
   etag: 'etag-1',
 });
@@ -169,7 +172,7 @@ describe('useWorkspaceDataTable', () => {
 
     expect(result.current.table.data).toEqual([{ text: 'row' }]);
     expect(result.current.table.columns).toEqual(['text']);
-    expect(result.current.table.columnKinds).toEqual({ text: 'string' });
+    expect(result.current.table.columnFields.text?.type.toString()).toBe('Utf8');
   });
 
   it('preserves the schema of an empty class-description Data Block', () => {
@@ -180,8 +183,8 @@ describe('useWorkspaceDataTable', () => {
       queryKeys.workspaceSql('workspace-1', ['node-b'], 'SELECT * FROM "node-b"', 1, 20),
       makeArrowPage(
         [
-          { name: 'class', kind: 'string' },
-          { name: 'description', kind: 'string' },
+          { name: 'class', field: new Field('class', new Utf8()) },
+          { name: 'description', field: new Field('description', new Utf8()) },
         ],
         [],
       ),
@@ -194,9 +197,7 @@ describe('useWorkspaceDataTable', () => {
     expect(result.current.header.isEmptyTable).toBe(true);
     expect(result.current.table.data).toEqual([]);
     expect(result.current.table.columns).toEqual(['class', 'description']);
-    expect(result.current.table.columnKinds).toEqual({
-      class: 'string',
-      description: 'string',
-    });
+    expect(result.current.table.columnFields.class?.type.toString()).toBe('Utf8');
+    expect(result.current.table.columnFields.description?.type.toString()).toBe('Utf8');
   });
 });

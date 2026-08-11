@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Field, Utf8 } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Analysis } from '@/api';
 
@@ -70,7 +71,7 @@ vi.mock('../../common/nodeInputs', () => ({
         name: 'Node 1',
         node: { id: 'node-1', name: 'Node 1' },
         column: 'text',
-        columnOptions: [{ name: 'text', dataType: 'string' }],
+        columnOptions: [{ name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) }],
       },
     ],
     inputs: [{ node_id: 'node-1', column: 'text' }],
@@ -90,7 +91,9 @@ vi.mock('../../common/nodeInputs', () => ({
         tokenizer_model: mockTokenizerModel,
       },
     },
-    getColumnInfos: vi.fn(() => [{ name: 'text', dataType: 'string' }]),
+    getColumnInfos: vi.fn(() => [
+      { name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) },
+    ]),
     getNodeInfo: vi.fn(() => ({
       id: 'node-1',
       name: 'Node 1',
@@ -246,7 +249,9 @@ vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   /** Supplies the text column needed for auto-selection and parameter rendering. */
   useNodeColumnInfos: () => ({
     /** Reports a single string column so concordance has a valid target. */
-    getColumnInfos: () => [{ name: 'text' }],
+    getColumnInfos: () => [
+      { name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) },
+    ],
   }),
 }));
 

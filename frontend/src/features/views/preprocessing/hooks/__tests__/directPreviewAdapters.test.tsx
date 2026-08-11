@@ -1,4 +1,5 @@
 import { renderHook } from '@testing-library/react';
+import { Field, Utf8 } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const previewNodeCreationTableMock = vi.hoisted(() => vi.fn());
@@ -52,7 +53,9 @@ describe('direct preprocessing preview adapters', () => {
         setSelectedNodeColumns: vi.fn(),
         currentWorkspaceId: 'closure-workspace',
         workspaceNodes,
-        getColumnInfos: () => [{ name: 'id', dataType: 'string' }],
+        getColumnInfos: () => [
+          { name: 'id', typeName: 'Utf8', field: new Field('id', new Utf8()) },
+        ],
         joinNodes: vi.fn(),
         isLoading: { operations: false },
         onAlert: vi.fn(),
@@ -104,7 +107,9 @@ describe('direct preprocessing preview adapters', () => {
         selectedNodeIds: ['node-1', 'node-2'],
         currentWorkspaceId: 'closure-workspace',
         workspaceNodes,
-        getColumnInfos: () => [{ name: 'id', dataType: 'string' }],
+        getColumnInfos: () => [
+          { name: 'id', typeName: 'Utf8', field: new Field('id', new Utf8()) },
+        ],
         concatPreview,
         concatNodes: vi.fn(),
         isLoading: { operations: false },

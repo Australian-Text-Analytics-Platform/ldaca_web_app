@@ -4,6 +4,12 @@ import { DataType } from 'apache-arrow';
 
 import { queryWorkspaceSqlTable, sqlGlobPattern, sqlIdentifier, sqlString, sqlTable } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
+import {
+  arrowTypeName,
+  isArrowDictionaryField,
+  isArrowStringListField,
+} from '@/lib/arrow/arrowTable';
+import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
 import type { ConditionColumnOption } from '../../types';
 import {
   buildCategoricalOptionEntries,
@@ -26,7 +32,7 @@ const mergeOptions = (
 };
 
 const topicIds = (column: ConditionColumnOption | undefined): number[] => {
-  const type = column?.field?.type;
+  const type = column?.field.type;
   if (!type || !DataType.isFixedSizeList(type)) return [];
   return Array.from({ length: type.listSize }, (_value, index) => index - 1);
 };
@@ -34,15 +40,14 @@ const topicIds = (column: ConditionColumnOption | undefined): number[] => {
 const optionSql = (
   nodeId: string,
   column: string,
-  dataType: string,
+  unwrapList: boolean,
   searchQuery: string,
 ): string => {
   const value = sqlIdentifier('value');
   const count = sqlIdentifier('count');
-  const source =
-    dataType === 'string-list'
-      ? `SELECT UNNEST(${sqlIdentifier(column)}) AS ${value} FROM ${sqlTable(nodeId)}`
-      : `SELECT ${sqlIdentifier(column)} AS ${value} FROM ${sqlTable(nodeId)}`;
+  const source = unwrapList
+    ? `SELECT UNNEST(${sqlIdentifier(column)}) AS ${value} FROM ${sqlTable(nodeId)}`
+    : `SELECT ${sqlIdentifier(column)} AS ${value} FROM ${sqlTable(nodeId)}`;
   const trimmedSearch = searchQuery.trim();
   const where = trimmedSearch
     ? ` WHERE CAST(${value} AS VARCHAR) ~* ${sqlString(sqlGlobPattern(trimmedSearch))}`
@@ -63,7 +68,6 @@ interface UseFilterCategoricalOptionQueryArgs {
   workspaceId: string | null;
   nodeId: string | null;
   column: string;
-  dataType: string;
   searchQuery: string;
   columnOption?: ConditionColumnOption;
 }
@@ -73,12 +77,17 @@ export function useFilterCategoricalOptionQuery({
   workspaceId,
   nodeId,
   column,
-  dataType,
   searchQuery,
   columnOption,
 }: UseFilterCategoricalOptionQueryArgs) {
   const queryClient = useQueryClient();
-  const identity = JSON.stringify([workspaceId, nodeId, column, dataType]);
+  const field = columnOption?.field;
+  const identity = JSON.stringify([
+    workspaceId,
+    nodeId,
+    column,
+    field ? arrowTypeName(field) : null,
+  ]);
   const [debouncedState, setDebouncedState] = useState({ identity, value: searchQuery });
   const debouncedSearch = debouncedState.identity === identity ? debouncedState.value : '';
 
@@ -91,11 +100,11 @@ export function useFilterCategoricalOptionQuery({
     };
   }, [identity, searchQuery]);
 
-  const isTopicDistribution = dataType === 'topic-distribution';
-  const canQuery =
-    Boolean(workspaceId && nodeId && column) &&
-    (dataType === 'categorical' || dataType === 'string-list');
-  const sql = nodeId && column ? optionSql(nodeId, column, dataType, debouncedSearch) : '';
+  const isTopicDistribution = isTopicDistributionField(field);
+  const isDictionary = field !== undefined && isArrowDictionaryField(field);
+  const isStringList = field !== undefined && isArrowStringListField(field);
+  const canQuery = Boolean(workspaceId && nodeId && column) && (isDictionary || isStringList);
+  const sql = nodeId && column ? optionSql(nodeId, column, isStringList, debouncedSearch) : '';
   const queryKey = useMemo(
     () =>
       queryKeys.workspaceSqlInfinite(
@@ -156,7 +165,7 @@ export function useFilterCategoricalOptionQuery({
       }),
     );
     const hasNull =
-      dataType === 'categorical' &&
+      isDictionary &&
       debouncedSearch.trim().length === 0 &&
       rawValues.some((value) => value === null);
     return buildCategoricalOptionEntries(rawValues, hasNull).map((option) => ({

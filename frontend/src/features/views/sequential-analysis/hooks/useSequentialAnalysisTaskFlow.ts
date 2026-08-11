@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
 import type { Analysis, SequentialAnalysisRequest } from '@/api';
-import type { ColumnKind } from '@/lib/arrow/arrowTable';
+import type { ArrowField } from '@/lib/arrow/arrowTable';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { ChartTypeOption } from './sequentialChartModel';
 
@@ -32,7 +32,7 @@ interface SequentialAnalysisActions {
   runningRef: { current: boolean };
   setNodeColumnSelections: (selections: { nodeId: string; column: string }[]) => void;
   setTimeColumn: (value: string) => void;
-  lockCurrentSchema: (schema?: Record<string, ColumnKind>) => void;
+  lockCurrentSchema: (schema?: Record<string, ArrowField>) => void;
   clearResults: () => Promise<boolean>;
   onSubmitted: () => void;
 }

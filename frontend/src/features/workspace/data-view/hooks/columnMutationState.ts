@@ -1,3 +1,5 @@
+import type { ArrowField } from '@/lib/arrow/arrowTable';
+
 export interface DatetimeModalState {
   isOpen: boolean;
   column: string;
@@ -5,7 +7,7 @@ export interface DatetimeModalState {
 }
 
 export interface ColumnMutationState {
-  columnTypes: Record<string, string>;
+  columnFields: Record<string, ArrowField>;
   loadingCast: Record<string, boolean>;
   columnActionLoading: Record<string, boolean>;
   renamingColumn: string | null;
@@ -14,7 +16,7 @@ export interface ColumnMutationState {
 }
 
 export type ColumnMutationAction =
-  | { type: 'schemaApplied'; columnTypes: Record<string, string> }
+  | { type: 'schemaApplied'; columnFields: Record<string, ArrowField> }
   | { type: 'castLoadingChanged'; column: string; active: boolean }
   | { type: 'columnActionLoadingChanged'; column: string; active: boolean }
   | { type: 'datetimeRequested'; column: string; targetType: string }
@@ -23,7 +25,7 @@ export type ColumnMutationAction =
   | { type: 'renameClosed' }
   | { type: 'deleteRequested'; column: string }
   | { type: 'deleteDialogChanged'; open: boolean }
-  | { type: 'columnTypeRemoved'; column: string };
+  | { type: 'columnFieldRemoved'; column: string };
 
 const closedDatetimeModal: DatetimeModalState = {
   isOpen: false,
@@ -32,7 +34,7 @@ const closedDatetimeModal: DatetimeModalState = {
 };
 
 export const createColumnMutationState = (): ColumnMutationState => ({
-  columnTypes: {},
+  columnFields: {},
   loadingCast: {},
   columnActionLoading: {},
   renamingColumn: null,
@@ -57,12 +59,12 @@ export const columnMutationReducer = (
 ): ColumnMutationState => {
   switch (action.type) {
     case 'schemaApplied': {
-      const currentEntries = Object.entries(state.columnTypes);
-      const nextEntries = Object.entries(action.columnTypes);
+      const currentEntries = Object.entries(state.columnFields);
+      const nextEntries = Object.entries(action.columnFields);
       const unchanged =
         currentEntries.length === nextEntries.length &&
-        nextEntries.every(([column, type]) => state.columnTypes[column] === type);
-      return unchanged ? state : { ...state, columnTypes: action.columnTypes };
+        nextEntries.every(([column, field]) => state.columnFields[column] === field);
+      return unchanged ? state : { ...state, columnFields: action.columnFields };
     }
     case 'castLoadingChanged': {
       const loadingCast = setColumnFlag(state.loadingCast, action.column, action.active);
@@ -99,12 +101,12 @@ export const columnMutationReducer = (
       return action.open || state.columnToDelete === null
         ? state
         : { ...state, columnToDelete: null };
-    case 'columnTypeRemoved': {
-      if (!(action.column in state.columnTypes)) return state;
-      const { [action.column]: _, ...columnTypes } = state.columnTypes;
+    case 'columnFieldRemoved': {
+      if (!(action.column in state.columnFields)) return state;
+      const { [action.column]: _, ...columnFields } = state.columnFields;
       return {
         ...state,
-        columnTypes,
+        columnFields,
         renamingColumn: state.renamingColumn === action.column ? null : state.renamingColumn,
       };
     }

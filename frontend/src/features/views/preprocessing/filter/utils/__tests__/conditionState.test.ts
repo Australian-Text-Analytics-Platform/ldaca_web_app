@@ -1,12 +1,43 @@
+import {
+  Dictionary,
+  Field,
+  FixedSizeList,
+  Float64,
+  Int32,
+  Int64,
+  Struct,
+  TimestampMillisecond,
+  Utf8,
+} from 'apache-arrow';
 import { describe, expect, it } from 'vitest';
+import { arrowTypeName } from '@/lib/arrow/arrowTable';
+import { TOPIC_DISTRIBUTION_EXTENSION } from '@/lib/arrow/semanticTypes';
 import { applyFilterConditionFieldChange, createFilterCondition } from '../conditionState';
 import type { ConditionColumnOption, FilterConditionWithId } from '../../../types';
 
+const categoryField = new Field('Category', new Dictionary(new Utf8(), new Int32()));
+const topicEntry = new Field(
+  'item',
+  new Struct([new Field('topic_id', new Int64()), new Field('proportion', new Float64())]),
+);
+const topicField = new Field(
+  'Topics',
+  new FixedSizeList(2, topicEntry),
+  true,
+  new Map([['ARROW:extension:name', TOPIC_DISTRIBUTION_EXTENSION]]),
+);
+const createdField = new Field('Created', new TimestampMillisecond());
+const scoreField = new Field('Score', new Float64());
+const column = (name: string, field: Field): ConditionColumnOption => ({
+  name,
+  typeName: arrowTypeName(field),
+  field,
+});
 const columns: ConditionColumnOption[] = [
-  { name: 'Category', dataType: 'categorical' },
-  { name: 'Topics', dataType: 'topic-distribution' },
-  { name: 'Created', dataType: 'datetime' },
-  { name: 'Score', dataType: 'float' },
+  column('Category', categoryField),
+  column('Topics', topicField),
+  column('Created', createdField),
+  column('Score', scoreField),
 ];
 
 const baseCondition: FilterConditionWithId = {
@@ -14,7 +45,7 @@ const baseCondition: FilterConditionWithId = {
   column: 'Category',
   operator: 'eq',
   value: '',
-  dataType: 'categorical',
+  field: categoryField,
   negate: false,
   regex: false,
   caseSensitive: false,
@@ -25,13 +56,13 @@ describe('conditionState', () => {
     expect(createFilterCondition('next', columns[0])).toMatchObject({
       id: 'next',
       column: 'Category',
-      dataType: 'categorical',
       operator: 'in',
       value: [],
+      field: categoryField,
     });
   });
 
-  it('resets topic-distribution value and requests checklist options on column change', () => {
+  it('resets Topic Distribution value and requests checklist options on column change', () => {
     const result = applyFilterConditionFieldChange({
       condition: baseCondition,
       field: 'column',
@@ -41,14 +72,13 @@ describe('conditionState', () => {
 
     expect(result.condition).toMatchObject({
       column: 'Topics',
-      dataType: 'topic-distribution',
+      field: topicField,
       value: { topic_id: 0, threshold: 0.05 },
       regex: false,
       caseSensitive: false,
     });
     expect(result.checklistLoadRequest).toEqual({
       column: 'Topics',
-      dataType: 'topic-distribution',
     });
     expect(result.shouldResetSearch).toBe(true);
   });
@@ -62,7 +92,7 @@ describe('conditionState', () => {
     });
 
     expect(result.condition.value).toEqual([]);
-    expect(result.checklistLoadRequest).toEqual({ column: 'Category', dataType: 'categorical' });
+    expect(result.checklistLoadRequest).toEqual({ column: 'Category' });
   });
 
   it('turns categorical array values back into scalars for non-list operators', () => {
@@ -78,13 +108,13 @@ describe('conditionState', () => {
 
   it('requests datetime and numeric prefill when operators can use stats', () => {
     const datetimeResult = applyFilterConditionFieldChange({
-      condition: { ...baseCondition, column: 'Created', dataType: 'datetime' },
+      condition: { ...baseCondition, column: 'Created', field: createdField },
       field: 'operator',
       value: 'gte',
       availableColumns: columns,
     });
     const numericResult = applyFilterConditionFieldChange({
-      condition: { ...baseCondition, column: 'Score', dataType: 'float' },
+      condition: { ...baseCondition, column: 'Score', field: scoreField },
       field: 'operator',
       value: 'lte',
       availableColumns: columns,

@@ -17,16 +17,14 @@ vi.mock('@/lib/nodeSchema', async (importOriginal) => {
   };
 });
 
-import { arrowSchemaToKinds, useSchemaManagement } from '../useSchemaManagement';
+import { arrowSchemaToFields, useSchemaManagement } from '../useSchemaManagement';
 
 const integerColumn = {
   name: 'col_a',
-  kind: 'integer' as const,
   field: new Field('col_a', new Int64()),
 };
 const stringColumn = {
   name: 'col_b',
-  kind: 'string' as const,
   field: new Field('col_b', new Utf8()),
 };
 
@@ -38,11 +36,11 @@ const renderWithClient = <T,>(callback: () => T) => {
   return { queryClient, ...renderHook(callback, { wrapper: Wrapper }) };
 };
 
-describe('arrowSchemaToKinds', () => {
-  it('projects only UI semantic kinds from authoritative Arrow fields', () => {
-    expect(arrowSchemaToKinds([integerColumn, stringColumn])).toEqual({
-      col_a: 'integer',
-      col_b: 'string',
+describe('arrowSchemaToFields', () => {
+  it('indexes authoritative Arrow fields without translating them', () => {
+    expect(arrowSchemaToFields([integerColumn, stringColumn])).toEqual({
+      col_a: integerColumn.field,
+      col_b: stringColumn.field,
     });
   });
 });
@@ -58,8 +56,8 @@ describe('useSchemaManagement', () => {
 
     await waitFor(() => {
       expect(result.current.availableColumns).toEqual([
-        { name: 'col_a', dataType: 'integer' },
-        { name: 'col_b', dataType: 'string' },
+        { name: 'col_a', typeName: 'Int64', field: integerColumn.field },
+        { name: 'col_b', typeName: 'Utf8', field: stringColumn.field },
       ]);
     });
   });
@@ -78,23 +76,30 @@ describe('useSchemaManagement', () => {
       useSchemaManagement({ nodeId: 'node-1', isLocked, workspaceId: 'ws-1' }),
     );
     await waitFor(() => {
-      expect(result.current.availableColumns).toEqual([{ name: 'col_a', dataType: 'integer' }]);
+      expect(result.current.availableColumns).toEqual([
+        { name: 'col_a', typeName: 'Int64', field: integerColumn.field },
+      ]);
     });
     act(() => result.current.lockCurrentSchema());
     isLocked = true;
     rerender();
-    expect(result.current.availableColumns).toEqual([{ name: 'col_a', dataType: 'integer' }]);
+    expect(result.current.availableColumns).toEqual([
+      { name: 'col_a', typeName: 'Int64', field: integerColumn.field },
+    ]);
   });
 
-  it('accepts an explicitly restored semantic schema', () => {
+  it('accepts an explicitly restored Arrow schema', () => {
     let isLocked = false;
     const { result, rerender } = renderWithClient(() =>
       useSchemaManagement({ nodeId: null, isLocked, workspaceId: undefined }),
     );
-    act(() => result.current.setLockedSchema({ explicit: 'integer' }));
+    const explicit = new Field('explicit', new Int64());
+    act(() => result.current.setLockedSchema({ explicit }));
     isLocked = true;
     rerender();
-    expect(result.current.availableColumns).toEqual([{ name: 'explicit', dataType: 'integer' }]);
+    expect(result.current.availableColumns).toEqual([
+      { name: 'explicit', typeName: 'Int64', field: explicit },
+    ]);
   });
 
   it('does not fetch without a selected node or while locked', async () => {

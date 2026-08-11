@@ -39,8 +39,9 @@ flowchart LR
 - `src/api/` is the public barrel for generated SDK functions and types.
 - `src/lib/backend/` owns generated-client runtime configuration and API-base
   resolution.
-- `src/lib/arrow/` owns official Apache Arrow IPC decoding and semantic field
-  classification; `src/api/tableApi.ts` is the narrow
+- `src/lib/arrow/` owns official Apache Arrow IPC decoding and lossless field
+  inspection; it does not maintain a parallel column-kind naming registry.
+  `src/api/tableApi.ts` is the narrow
   generated-client adapter for binary row pages.
 - `src/features/` owns user workflows; `views/` contains sidebar features and
   `workspace/` contains the persistent graph, data, and background-work

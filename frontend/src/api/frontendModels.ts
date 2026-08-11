@@ -28,7 +28,7 @@ import type {
   ListWorkspacesResponse,
   UnavailableWorkspaceListItem,
 } from './generated/types.gen';
-import type { ColumnKind } from '@/lib/arrow/arrowTable';
+import type { ArrowField } from '@/lib/arrow/arrowTable';
 
 export type ConcordanceNodeResult = Omit<ConcordancePage, 'metadata'> & {
   metadata: ResultColumnMetadata & {
@@ -117,7 +117,7 @@ export interface NodeDataResponse {
   page_size: number;
   rows: Record<string, unknown>[];
   columns: string[];
-  columnKinds: Record<string, ColumnKind>;
+  columnFields: Record<string, ArrowField>;
   has_next: boolean;
 }
 export interface SourceRowPagination {

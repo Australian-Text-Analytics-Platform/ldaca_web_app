@@ -15,6 +15,7 @@ import {
   usePreprocessingInputsStore,
 } from '@/stores/preprocessingInputsStore';
 import { useAuthStore } from '@/stores/authStore';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -104,7 +105,7 @@ function DataPreprocessingFeature() {
     },
     constraints: {
       maxNodes: maxInputNodes,
-      ...(activeSubtab === 'find' ? { allowedDataTypes: ['string'] } : {}),
+      ...(activeSubtab === 'find' ? { fieldPredicate: isArrowStringField } : {}),
     },
   });
   const selectedNodes = nodeInputs.selectedNodes;

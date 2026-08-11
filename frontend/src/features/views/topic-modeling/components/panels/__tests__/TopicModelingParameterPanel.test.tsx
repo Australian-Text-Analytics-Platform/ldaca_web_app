@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { Field, Utf8 } from 'apache-arrow';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TopicModelingParameterPanel } from '../TopicModelingParameterPanel';
@@ -68,7 +69,7 @@ const nodeInputsFixture = (
       name: node.name,
       node,
       column: 'text',
-      columnOptions: [{ name: 'text', dataType: 'string' }],
+      columnOptions: [{ name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) }],
     })),
     selectedNodes,
     nodeColumnSelections: selectedNodes.map((node) => ({ nodeId: node.id, column: 'text' })),

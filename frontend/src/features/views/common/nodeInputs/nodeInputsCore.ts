@@ -13,10 +13,8 @@
  *   default-column reducers before it commits changes to its backing store
  *   (tab input sets, the preprocessing inputs store, or local state).
  */
-import {
-  type ColumnInfo,
-  filterColumnsByType,
-} from '@/features/workspace/data-view/utils/columnTypes';
+import type { ColumnInfo } from '@/features/workspace/data-view/utils/columnTypes';
+import type { ArrowField } from '@/lib/arrow/arrowTable';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 /** One node selected as input for a view. Mirrors backend ``AnalysisTabInput``. */
@@ -33,11 +31,11 @@ export interface NodeSelectionInput {
 /** Per-view constraints that gate which nodes/columns are valid inputs. */
 export interface NodeInputConstraints {
   /**
-   * Canonical column types the view's column picker should offer
-   * (e.g. ``['string']``). Empty = any. This never blocks adding a node; an
-   * empty filtered set leaves the selected column blank for the user to resolve.
+   * Tests the decoded IPC field for compatibility with this view. Omit to
+   * accept every Arrow field. This never blocks adding a node; an empty
+   * filtered set leaves the selected column blank for the user to resolve.
    */
-  allowedDataTypes?: string[];
+  fieldPredicate?: (field: ArrowField) => boolean;
   /** Maximum number of input nodes the view supports. Undefined = unbounded. */
   maxNodes?: number;
   /** When true, only a backend-declared document column is an acceptable pick. */
@@ -93,10 +91,9 @@ export function buildNodeMap(
  * Computes the typed columns a view will accept for a node.
  * Called by: defaultColumnForNode, validateAdd, and resolveNodeInputs because
  * column options drive both add-time validation and the per-node picker.
- * Flow: read the authoritative Arrow-backed getter, then filter by
- * ``allowedDataTypes`` (keeping the unfiltered set only when the
- * filter would empty an otherwise non-empty list is NOT desired — an empty
- * filtered set means the column picker should render empty).
+ * Flow: read the authoritative Arrow-backed getter, then apply the feature's
+ * predicate directly to each decoded field. An empty filtered set means the
+ * column picker should render empty.
  */
 function allowedColumnsForNode(
   node: WorkspaceNodeMetadata,
@@ -104,8 +101,9 @@ function allowedColumnsForNode(
   getColumnInfos?: ColumnInfoGetter,
 ): ColumnInfo[] {
   const infos = getColumnInfos?.(node) ?? [];
-  if (!constraints.allowedDataTypes?.length) return infos;
-  return filterColumnsByType(infos, constraints.allowedDataTypes);
+  const { fieldPredicate } = constraints;
+  if (!fieldPredicate) return infos;
+  return infos.filter((column) => fieldPredicate(column.field));
 }
 
 /**

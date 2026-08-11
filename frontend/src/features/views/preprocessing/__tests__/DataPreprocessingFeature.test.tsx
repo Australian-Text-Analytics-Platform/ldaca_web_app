@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Field, Int64, Utf8 } from 'apache-arrow';
 import type * as SdkGen from '@/api';
 
 import DataPreprocessingFeature from '../DataPreprocessingFeature';
@@ -161,8 +162,8 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
 vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   default: () => ({
     getColumnInfos: () => [
-      { name: 'Body', dataType: 'string' },
-      { name: 'Count', dataType: 'integer' },
+      { name: 'Body', typeName: 'Utf8', field: new Field('Body', new Utf8()) },
+      { name: 'Count', typeName: 'Int64', field: new Field('Count', new Int64()) },
     ],
     columnInfoCache: {},
     nodeInfoById: { 'node-1': mockSelectedNode },
@@ -170,8 +171,8 @@ vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   }),
   useNodeColumnInfos: () => ({
     getColumnInfos: () => [
-      { name: 'Body', dataType: 'string' },
-      { name: 'Count', dataType: 'integer' },
+      { name: 'Body', typeName: 'Utf8', field: new Field('Body', new Utf8()) },
+      { name: 'Count', typeName: 'Int64', field: new Field('Count', new Int64()) },
     ],
     columnInfoCache: {},
     nodeInfoById: { 'node-1': mockSelectedNode },

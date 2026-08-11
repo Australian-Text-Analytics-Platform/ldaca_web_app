@@ -50,7 +50,7 @@ describe('useConcatSubTab preview adapter', () => {
           currentWorkspaceId: workspaceId,
           workspaceNodes,
           getColumnInfos: () => [
-            { name: 'id', dataType: 'string', field: new Field('id', new Utf8()) },
+            { name: 'id', typeName: 'Utf8', field: new Field('id', new Utf8()) },
           ],
           concatPreview,
           concatNodes: vi.fn(),

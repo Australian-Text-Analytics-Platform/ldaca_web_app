@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { toast } from 'sonner';
 
-import type { ArrowColumn, ColumnKind } from '@/lib/arrow/arrowTable';
+import {
+  arrowTypeName,
+  isArrowStringField,
+  type ArrowColumn,
+  type ArrowField,
+} from '@/lib/arrow/arrowTable';
 
-import { extractColumnTypes } from '../services/schemaMutations';
+import { extractColumnFields } from '../services/schemaMutations';
 import {
   columnMutationReducer,
   createColumnMutationState,
@@ -17,7 +22,7 @@ interface UseColumnMutationsArgs {
   nodeId: string | undefined;
   /** Current visible column names, used for duplicate-name validation. */
   columns: string[];
-  columnKinds: Record<string, ColumnKind>;
+  columnFields: Record<string, ArrowField>;
   onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
   onRenameColumn?: (column: string, nextName: string) => Promise<void>;
   onDeleteColumn?: (column: string) => Promise<void>;
@@ -27,7 +32,7 @@ interface UseColumnMutationsArgs {
 
 export interface ColumnMutationsApi {
   // Read state
-  columnTypes: Record<string, string>;
+  columnFields: Record<string, ArrowField>;
   loadingCast: Record<string, boolean>;
   columnActionLoading: Record<string, boolean>;
   renamingColumn: string | null;
@@ -62,7 +67,7 @@ export const useColumnMutations = ({
   workspaceId,
   nodeId,
   columns,
-  columnKinds,
+  columnFields,
   onCast,
   onRenameColumn,
   onDeleteColumn,
@@ -70,7 +75,7 @@ export const useColumnMutations = ({
 }: UseColumnMutationsArgs): ColumnMutationsApi => {
   const [state, dispatch] = useReducer(columnMutationReducer, undefined, createColumnMutationState);
   const {
-    columnTypes,
+    columnFields: mutationColumnFields,
     loadingCast,
     columnActionLoading,
     renamingColumn,
@@ -78,13 +83,22 @@ export const useColumnMutations = ({
     columnToDelete,
   } = state;
   const deleteColumnDialogOpen = columnToDelete !== null;
-  const sourceSchemaSignature = JSON.stringify(Object.entries(columnKinds).toSorted());
+  const sourceSchemaSignature = JSON.stringify(
+    Object.entries(columnFields)
+      .toSorted(([left], [right]) => left.localeCompare(right))
+      .map(([column, field]) => [
+        column,
+        arrowTypeName(field),
+        field.nullable,
+        [...field.metadata.entries()].toSorted(([left], [right]) => left.localeCompare(right)),
+      ]),
+  );
   const appliedSourceSchemaRef = useRef<string | null>(null);
 
   /** Applies a fetched schema to local header dtype state. */
   const applySchema = useCallback((schema: unknown) => {
-    const mapping = extractColumnTypes(schema as ArrowColumn[] | null);
-    dispatch({ type: 'schemaApplied', columnTypes: mapping });
+    const mapping = extractColumnFields(schema as ArrowColumn[] | null);
+    dispatch({ type: 'schemaApplied', columnFields: mapping });
     return mapping;
   }, []);
 
@@ -92,8 +106,8 @@ export const useColumnMutations = ({
   useEffect(() => {
     if (appliedSourceSchemaRef.current === sourceSchemaSignature) return;
     appliedSourceSchemaRef.current = sourceSchemaSignature;
-    dispatch({ type: 'schemaApplied', columnTypes: columnKinds });
-  }, [workspaceId, nodeId, columnKinds, sourceSchemaSignature]);
+    dispatch({ type: 'schemaApplied', columnFields });
+  }, [workspaceId, nodeId, columnFields, sourceSchemaSignature]);
 
   /** Runs a dtype cast and refreshes schema so headers reflect the new type. */
   const performCast = useCallback(
@@ -120,16 +134,19 @@ export const useColumnMutations = ({
   const handleTypeChange = useCallback(
     (column: string, newType: string) => {
       if (!onCast) return;
-      const currentType = columnTypes[column] ?? 'unknown';
-      if (newType.toLowerCase() === currentType.toLowerCase()) return;
-      const isStringToDatetime = newType.toLowerCase() === 'datetime' && currentType === 'string';
+      const currentField = mutationColumnFields[column];
+      if (currentField && newType === arrowTypeName(currentField)) return;
+      const isStringToDatetime =
+        newType.toLowerCase() === 'datetime' &&
+        currentField !== undefined &&
+        isArrowStringField(currentField);
       if (isStringToDatetime) {
         dispatch({ type: 'datetimeRequested', column, targetType: newType });
         return;
       }
       void performCast(column, newType);
     },
-    [onCast, columnTypes, performCast],
+    [onCast, mutationColumnFields, performCast],
   );
 
   /** Applies the datetime format chosen in the confirmation panel. */
@@ -221,7 +238,7 @@ export const useColumnMutations = ({
       if (onRefreshSchema) {
         applySchema(await onRefreshSchema());
       } else {
-        dispatch({ type: 'columnTypeRemoved', column });
+        dispatch({ type: 'columnFieldRemoved', column });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -232,7 +249,7 @@ export const useColumnMutations = ({
   }, [applySchema, columnToDelete, onDeleteColumn, onRefreshSchema, setColumnBusy]);
 
   return {
-    columnTypes,
+    columnFields: mutationColumnFields,
     loadingCast,
     columnActionLoading,
     renamingColumn,

@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Field, Utf8 } from 'apache-arrow';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
@@ -77,7 +78,9 @@ describe('node input request bridge', () => {
     });
     mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({
-      getColumnInfos: () => [{ name: 'text', dataType: 'string' }],
+      getColumnInfos: () => [
+        { name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) },
+      ],
       nodeInfoById: {},
     });
     mocks.useUIStore.mockImplementation((selector: (state: { currentView: string }) => unknown) =>

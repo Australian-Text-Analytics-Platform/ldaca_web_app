@@ -15,7 +15,6 @@ export interface ConditionBuilderItem {
   id: string;
   column: string;
   operator: string;
-  dataType?: string;
   [key: string]: unknown;
 }
 
@@ -155,7 +154,7 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                       value={condition.column}
                       options={availableColumns.map((col) => ({
                         value: col.name,
-                        label: `${col.label ?? col.name} (${col.dataType})`,
+                        label: `${col.label ?? col.name} (${col.typeName})`,
                       }))}
                       onChange={(value) => {
                         onConditionChange(

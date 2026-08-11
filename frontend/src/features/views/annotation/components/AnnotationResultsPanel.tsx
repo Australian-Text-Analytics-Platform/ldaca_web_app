@@ -37,6 +37,7 @@ import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullC
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { queryKeys } from '@/lib/queryKeys';
+import { isArrowDictionaryField, isArrowStringField } from '@/lib/arrow/arrowTable';
 import { toBgColor } from '@/features/views/common/vizPalette';
 import {
   type AnnotationDifferenceFilter,
@@ -175,12 +176,12 @@ export function AnnotationResultsPanel({
   const comparableColumnSet = new Set(
     resultsQuery.data?.schema
       .filter((column) => column.name !== sourceRowIndexColumn)
-      .filter((column) => column.kind === 'string' || column.kind === 'categorical')
+      .filter((column) => isArrowStringField(column.field) || isArrowDictionaryField(column.field))
       .map((column) => column.name) ?? [],
   );
   const stringColumnSet = new Set(
     resultsQuery.data?.schema
-      .filter((column) => column.name !== sourceRowIndexColumn && column.kind === 'string')
+      .filter((column) => column.name !== sourceRowIndexColumn && isArrowStringField(column.field))
       .map((column) => column.name) ?? [],
   );
   const availableCorrectionColumns = resultsQuery.data

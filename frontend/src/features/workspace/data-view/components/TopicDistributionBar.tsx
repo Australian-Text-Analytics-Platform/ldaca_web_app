@@ -37,8 +37,8 @@ function parseEntries(value: unknown): DistributionEntry[] {
 }
 
 /**
- * Rendered by: WorkspaceTable for columns whose semantic kind is `topic-distribution`
- * (the topic-distribution semantic type). Shows the per-document soft topic
+ * Rendered by: WorkspaceTable when the decoded Arrow field carries the Topic
+ * Distribution extension identity. Shows the per-document soft topic
  * distribution as a single horizontal bar of end-to-end colored segments whose
  * widths are proportional to each topic's share. Each segment carries a native
  * tooltip ("Topic N: XX.X%"); a compact legend lists the top segments.

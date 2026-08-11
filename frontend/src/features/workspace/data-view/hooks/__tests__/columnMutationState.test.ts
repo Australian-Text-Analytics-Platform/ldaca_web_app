@@ -1,3 +1,4 @@
+import { Field, Int64, Utf8 } from 'apache-arrow';
 import { describe, expect, it } from 'vitest';
 
 import { columnMutationReducer, createColumnMutationState } from '../columnMutationState';
@@ -20,11 +21,15 @@ describe('columnMutationReducer', () => {
   });
 
   it('keeps canonical schema and datetime modal state together', () => {
+    const columnFields = {
+      title: new Field('title', new Utf8()),
+      count: new Field('count', new Int64()),
+    };
     const withSchema = columnMutationReducer(createColumnMutationState(), {
       type: 'schemaApplied',
-      columnTypes: { title: 'string', count: 'integer' },
+      columnFields,
     });
-    expect(withSchema.columnTypes).toEqual({ title: 'string', count: 'integer' });
+    expect(withSchema.columnFields).toEqual(columnFields);
 
     const requested = columnMutationReducer(withSchema, {
       type: 'datetimeRequested',

@@ -39,7 +39,8 @@ import { ServerPaginationFooter } from '@/features/views/common/components/Serve
 import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
 import { TopicDistributionBar } from './TopicDistributionBar';
 import type { DataRow, NodeTablePagination } from '../types';
-import type { ColumnKind } from '@/lib/arrow/arrowTable';
+import { arrowTypeName, type ArrowField } from '@/lib/arrow/arrowTable';
+import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
 import { DATA_TYPES, getTypeDisplayName } from '../services/schemaMutations';
 import { useColumnMutations } from '../hooks/useColumnMutations';
 
@@ -53,7 +54,7 @@ const WIDE_COLUMN_SAMPLE_LIMIT = 25;
 export interface WorkspaceTableProps {
   data: DataRow[];
   columns: string[];
-  columnKinds: Record<string, ColumnKind>;
+  columnFields: Record<string, ArrowField>;
   loading?: boolean;
   workspaceId?: string;
   nodeId?: string;
@@ -86,7 +87,7 @@ export interface WorkspaceTableProps {
 export function WorkspaceTable({
   data,
   columns: responseColumns,
-  columnKinds,
+  columnFields,
   loading = false,
   workspaceId,
   nodeId,
@@ -122,7 +123,7 @@ export function WorkspaceTable({
     workspaceId,
     nodeId,
     columns: backendColumns,
-    columnKinds,
+    columnFields,
     onCast,
     onRenameColumn,
     onDeleteColumn,
@@ -130,7 +131,7 @@ export function WorkspaceTable({
   });
 
   const {
-    columnTypes,
+    columnFields: mutationColumnFields,
     loadingCast,
     columnActionLoading,
     renamingColumn,
@@ -150,8 +151,8 @@ export function WorkspaceTable({
 
   const columns = useMemo(() => {
     if (backendColumns.length > 0) return backendColumns;
-    return Object.keys(columnTypes);
-  }, [backendColumns, columnTypes]);
+    return Object.keys(mutationColumnFields);
+  }, [backendColumns, mutationColumnFields]);
 
   const wideColumns = useMemo(() => {
     const sampleRows = sanitizedData.slice(0, WIDE_COLUMN_SAMPLE_LIMIT);
@@ -198,11 +199,12 @@ export function WorkspaceTable({
 
   // Build column definitions
   const columnDefs: ColumnDef<DataRow>[] = columns.map((column) => {
-    const currentType = columnTypes[column] ?? 'unknown';
+    const currentField = mutationColumnFields[column];
+    const currentType = currentField ? arrowTypeName(currentField) : 'unknown';
     const isColumnLoading = Boolean(loadingCast[column]);
     const isColumnMutating = Boolean(columnActionLoading[column]);
     const isColumnBusy = isColumnLoading || isColumnMutating;
-    const displayLabel = getTypeDisplayName(currentType);
+    const displayLabel = getTypeDisplayName(currentField);
     const availableTypes = [
       { value: currentType, label: displayLabel },
       ...DATA_TYPES.filter((t) => t.value !== currentType),
@@ -277,9 +279,9 @@ export function WorkspaceTable({
        */
       cell: ({ getValue }) => {
         const cellValue = getValue();
-        // Topic-distribution columns render as a stacked proportion bar rather
-        // than stringified struct text.
-        if (currentType === 'topic-distribution') {
+        // This renderer is selected by the exact extension identity published
+        // in IPC metadata, not by a second frontend dtype alias.
+        if (isTopicDistributionField(currentField)) {
           return <TopicDistributionBar value={cellValue} />;
         }
         // Cell values may be structs/objects; default stringification preserves prior display text.

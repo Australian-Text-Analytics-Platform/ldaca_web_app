@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Field, Utf8 } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { NodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
@@ -32,7 +33,7 @@ const resolvedNodes = [
       { id: 'node-1', name: 'Corpus A', shape: [100, 2] },
     ),
     column: 'body',
-    columnOptions: [{ name: 'body', dataType: 'string' }],
+    columnOptions: [{ name: 'body', typeName: 'Utf8', field: new Field('body', new Utf8()) }],
   },
 ];
 

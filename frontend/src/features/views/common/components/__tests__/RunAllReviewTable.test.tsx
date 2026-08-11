@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Dictionary, Field, Int32, Int64, Utf8 } from 'apache-arrow';
 import { type ComponentProps, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
@@ -16,6 +17,13 @@ vi.mock('@/api', async (importOriginal) => ({
 vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({ setCell }),
 }));
+
+const stringColumn = (name: string) => ({ name, field: new Field(name, new Utf8()) });
+const integerColumn = (name: string) => ({ name, field: new Field(name, new Int64()) });
+const categoricalColumn = (name: string) => ({
+  name,
+  field: new Field(name, new Dictionary(new Utf8(), new Int32())),
+});
 
 function ReviewTable({
   correctionColumn,
@@ -74,10 +82,7 @@ describe('RunAllReviewTable', () => {
   it('renders Review rows in the shared analysis table frame', async () => {
     queryWorkspaceSqlTable.mockResolvedValue({
       columns: ['text', 'annotation'],
-      schema: [
-        { name: 'text', kind: 'string' },
-        { name: 'annotation', kind: 'string' },
-      ],
+      schema: [stringColumn('text'), stringColumn('annotation')],
       rows: [{ text: 'Example', annotation: 'label' }],
       hasNext: false,
     });
@@ -118,10 +123,7 @@ describe('RunAllReviewTable', () => {
     queryWorkspaceSqlTable.mockImplementation(({ body }) =>
       Promise.resolve({
         columns: ['text', 'annotation'],
-        schema: [
-          { name: 'text', kind: 'string' },
-          { name: 'annotation', kind: 'string' },
-        ],
+        schema: [stringColumn('text'), stringColumn('annotation')],
         rows: [{ text: `Page ${String(body.page)}`, annotation: 'label' }],
         hasNext: body.page < 4,
       }),
@@ -160,11 +162,7 @@ describe('RunAllReviewTable', () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockResolvedValue({
       columns: ['text', 'annotation', 'username'],
-      schema: [
-        { name: 'text', kind: 'string' },
-        { name: 'annotation', kind: 'string' },
-        { name: 'username', kind: 'string' },
-      ],
+      schema: [stringColumn('text'), stringColumn('annotation'), stringColumn('username')],
       rows: [{ text: 'Example', annotation: 'label', username: 'alice' }],
       hasNext: false,
     });
@@ -210,11 +208,11 @@ describe('RunAllReviewTable', () => {
         'username',
       ],
       schema: [
-        { name: '__wordflow_annotation_source_row_index', kind: 'integer' },
-        { name: 'text', kind: 'string' },
-        { name: 'annotation', kind: 'string' },
-        { name: 'correction', kind: 'string' },
-        { name: 'username', kind: 'string' },
+        integerColumn('__wordflow_annotation_source_row_index'),
+        stringColumn('text'),
+        stringColumn('annotation'),
+        stringColumn('correction'),
+        stringColumn('username'),
       ],
       rows: [
         {
@@ -290,12 +288,12 @@ describe('RunAllReviewTable', () => {
       return Promise.resolve({
         columns: ['text', 'annotation', 'correction', 'reviewer_one', 'reviewer_two', 'record_id'],
         schema: [
-          { name: 'text', kind: 'string' },
-          { name: 'annotation', kind: 'string' },
-          { name: 'correction', kind: 'string' },
-          { name: 'reviewer_one', kind: 'string' },
-          { name: 'reviewer_two', kind: 'categorical' },
-          { name: 'record_id', kind: 'integer' },
+          stringColumn('text'),
+          stringColumn('annotation'),
+          stringColumn('correction'),
+          stringColumn('reviewer_one'),
+          categoricalColumn('reviewer_two'),
+          integerColumn('record_id'),
         ],
         rows: [
           {

@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { ArrowColumn, ColumnKind } from '@/lib/arrow/arrowTable';
+import { arrowTypeName, type ArrowColumn, type ArrowField } from '@/lib/arrow/arrowTable';
 import { nodeSchemaQueryOptions } from '@/lib/nodeSchema';
 
 /**
- * Normalizes the authoritative Arrow schema for sequential analysis.
+ * Indexes the authoritative Arrow schema for sequential analysis.
  * Used by the hook's schema query selector and SequentialAnalysisFeature
  * when it hydrates a saved task schema.
- * Flow: read the generated `{ column: dtype }` map and normalize each dtype for
- * the handwritten column controls.
+ * Flow: retain each decoded IPC field by column name without assigning a
+ * second frontend dtype.
  */
-export const arrowSchemaToKinds = (schema: ArrowColumn[]): Record<string, ColumnKind> =>
-  Object.fromEntries(schema.map(({ name, kind }) => [name, kind]));
+export const arrowSchemaToFields = (schema: ArrowColumn[]): Record<string, ArrowField> =>
+  Object.fromEntries(schema.map(({ name, field }) => [name, field]));
 
 interface SchemaManagementConfig {
   /**
@@ -50,8 +50,8 @@ interface SchemaManagementConfig {
 export function useSchemaManagement(config: SchemaManagementConfig) {
   const { nodeId, isLocked, workspaceId } = config;
 
-  const [currentSchema, setCurrentSchema] = useState<Record<string, ColumnKind>>({});
-  const [lockedSchema, setLockedSchema] = useState<Record<string, ColumnKind> | null>(null);
+  const [currentSchema, setCurrentSchema] = useState<Record<string, ArrowField>>({});
+  const [lockedSchema, setLockedSchema] = useState<Record<string, ArrowField> | null>(null);
 
   // Fetch through the shared node-schema query so every schema reader observes one resource.
   const schemaQuery = useQuery({
@@ -59,7 +59,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
       workspaceId: workspaceId ?? '',
       nodeId: nodeId ?? '',
     }),
-    select: arrowSchemaToKinds,
+    select: arrowSchemaToFields,
     /** Fetches Arrow schema so cast/preprocessing invalidations refresh column types. */
     /** Called by: TanStack Query inside useSchemaManagement. */
     enabled: !!nodeId && !isLocked && !!workspaceId,
@@ -82,16 +82,17 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   const effectiveSchema = isLocked ? (lockedSchema ?? currentSchema) : currentSchema;
 
   /** Column options for parameter panels, derived only from canonical Arrow schema. */
-  const availableColumns = Object.entries(effectiveSchema).map(([name, jsType]) => ({
+  const availableColumns = Object.entries(effectiveSchema).map(([name, field]) => ({
     name,
-    dataType: jsType,
+    typeName: arrowTypeName(field),
+    field,
   }));
 
   /**
    * Freezes the schema used by an in-flight task so late refetches do not change params.
    * Called by SequentialAnalysisFeature immediately before starting a run.
    */
-  const lockCurrentSchema = (schemaToLock?: Record<string, ColumnKind>) => {
+  const lockCurrentSchema = (schemaToLock?: Record<string, ArrowField>) => {
     setLockedSchema(schemaToLock ?? currentSchema);
   };
 

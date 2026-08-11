@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { Dictionary, Field, Int32, Utf8 } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryWorkspaceSqlTableMock = vi.hoisted(() => vi.fn());
@@ -29,8 +30,12 @@ const categoricalArgs = {
   workspaceId: 'workspace-1',
   nodeId: 'node-1',
   column: 'speaker',
-  dataType: 'categorical',
   searchQuery: '',
+  columnOption: {
+    name: 'speaker',
+    typeName: 'Dictionary<Int32, Utf8>',
+    field: new Field('speaker', new Dictionary(new Utf8(), new Int32())),
+  },
 } as const;
 
 describe('useFilterCategoricalOptionQuery', () => {

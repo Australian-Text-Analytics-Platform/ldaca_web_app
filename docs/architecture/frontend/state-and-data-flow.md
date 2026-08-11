@@ -42,14 +42,16 @@ flowchart TB
 Feature code consumes generated SDK functions and generated types through
 `@/api`. The narrow table adapter decodes generated-client binary responses
 with `apache-arrow`; complete Result table URLs use the same decoder directly.
-It classifies columns through official Arrow types, including view and
-large-offset representations emitted natively by Polars. Decoder failures stay
-ordinary errors on the affected table query and retain the underlying Arrow
-cause.
-Known semantic extension names select specialized behavior such as the Topic
-Distribution renderer. An unrecognized extension remains addressable as
-`extension:<exact-name>` and retains its Arrow field metadata instead of being
-collapsed into the generic `unknown` category.
+It carries decoded Arrow `Field` objects to consumers, including view and
+large-offset representations emitted natively by Polars, without creating a
+frontend column-kind registry. Type labels use the exact
+`ARROW:extension:name` value when present and Arrow's native type spelling
+otherwise. Feature selectors and preprocessing controls inspect those fields
+directly. Decoder failures stay ordinary errors on the affected table query and
+retain the underlying Arrow cause. Known semantic extension identities select
+specialized behavior such as the Topic Distribution renderer. An unrecognized
+extension remains addressable by its exact name and retains its Arrow field
+metadata instead of being collapsed into a generic category.
 Raw network calls are limited to boundaries the generator cannot express
 conveniently, such as complete table URLs, native downloads, or SSE, and still
 follow the backend's cookie, CSRF, Origin, and typed resource contracts. There
