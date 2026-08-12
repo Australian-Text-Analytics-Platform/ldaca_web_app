@@ -5,7 +5,7 @@ import {
   createAnnotationProviderConfiguration,
   deleteAnnotationProviderConfiguration,
   getProviderCredentials,
-  renameAnnotationProviderConfiguration,
+  updateAnnotationProviderConfiguration,
   updateDataPortalCredential,
 } from '@/api';
 import type {
@@ -17,6 +17,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   normalizeCustomProviderBaseUrl,
   type AnnotationProviderConfigurationInput,
+  type AnnotationProviderConfigurationUpdateInput,
   type AnnotationProviderConfigurationView,
   useBrowserProviderCredentialPresence,
   useProviderCredentialsStore,
@@ -35,9 +36,6 @@ const normalizedCreateInput = (input: AnnotationProviderConfigurationInput) => {
   if (!name) throw new Error('Enter a provider name');
   const trimmedApiKey = input.apiKey?.trim() ?? '';
   const apiKey = trimmedApiKey.length > 0 ? trimmedApiKey : undefined;
-  if (input.provider !== 'custom' && !apiKey) {
-    throw new Error('Built-in providers require an API key');
-  }
   const baseUrl =
     input.provider === 'custom'
       ? normalizeCustomProviderBaseUrl(input.baseUrl?.trim() ?? '')
@@ -81,6 +79,24 @@ export const useProviderCredentials = () => {
     );
   };
 
+  /** Drop only model and active Preview caches whose next request uses an edited key. */
+  const invalidateAnnotationCredentialConsumers = (configurationId: string) => {
+    queryClient.removeQueries({
+      queryKey: queryKeys.annotationModelsForConfiguration(configurationId),
+    });
+    queryClient.removeQueries({
+      predicate: (query) => {
+        const projection = query.queryKey.at(-1);
+        return (
+          typeof projection === 'object' &&
+          projection !== null &&
+          'provider_configuration_id' in projection &&
+          projection.provider_configuration_id === configurationId
+        );
+      },
+    });
+  };
+
   const addAnnotationProvider = async (
     input: AnnotationProviderConfigurationInput,
   ): Promise<AnnotationProviderConfigurationView> => {
@@ -106,18 +122,35 @@ export const useProviderCredentials = () => {
     return configurationView(data);
   };
 
-  const renameAnnotationProvider = async (configurationId: string, name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) throw new Error('Enter a provider name');
-    if (isMultiUserMode) {
-      useProviderCredentialsStore
-        .getState()
-        .renameAnnotationProvider(requireBrowserUser(), configurationId, trimmed);
-      return;
+  const updateAnnotationProvider = async (
+    configurationId: string,
+    input: AnnotationProviderConfigurationUpdateInput,
+  ) => {
+    const name = input.name?.trim();
+    if (input.name !== undefined && !name) throw new Error('Enter a provider name');
+    const apiKey = typeof input.apiKey === 'string' ? input.apiKey.trim() : input.apiKey;
+    if (typeof apiKey === 'string' && !apiKey) {
+      throw new Error('Enter an API key or use Remove saved key');
     }
-    const { data } = await renameAnnotationProviderConfiguration({
+    if (input.name === undefined && input.apiKey === undefined) {
+      throw new Error('Change the name or API key before saving');
+    }
+    if (isMultiUserMode) {
+      const updated = useProviderCredentialsStore
+        .getState()
+        .updateAnnotationProvider(requireBrowserUser(), configurationId, {
+          ...(name !== undefined ? { name } : {}),
+          ...(input.apiKey !== undefined ? { apiKey } : {}),
+        });
+      if (input.apiKey !== undefined) invalidateAnnotationCredentialConsumers(configurationId);
+      return updated;
+    }
+    const { data } = await updateAnnotationProviderConfiguration({
       path: { configuration_id: configurationId },
-      body: { name: trimmed },
+      body: {
+        ...(name !== undefined ? { name } : {}),
+        ...(input.apiKey !== undefined ? { api_key: apiKey } : {}),
+      },
       throwOnError: true,
     });
     setBackendConfigurations((configurations) =>
@@ -125,6 +158,8 @@ export const useProviderCredentials = () => {
         configuration.id === configurationId ? data : configuration,
       ),
     );
+    if (input.apiKey !== undefined) invalidateAnnotationCredentialConsumers(configurationId);
+    return configurationView(data);
   };
 
   const deleteAnnotationProvider = async (configurationId: string) => {
@@ -141,9 +176,7 @@ export const useProviderCredentials = () => {
         configurations.filter((configuration) => configuration.id !== configurationId),
       );
     }
-    queryClient.removeQueries({
-      queryKey: queryKeys.annotationModelsForConfiguration(configurationId),
-    });
+    invalidateAnnotationCredentialConsumers(configurationId);
   };
 
   const clearAnnotationProviders = async () => {
@@ -191,10 +224,11 @@ export const useProviderCredentials = () => {
       deploymentConfigured: statusQuery.data?.data_portal.deployment_configured ?? false,
     },
     revision: isMultiUserMode ? localPresence.revision : statusQuery.dataUpdatedAt,
-    isLoading: statusQuery.isLoading,
-    error: statusQuery.error,
+    isLoading: !isMultiUserMode && statusQuery.isLoading,
+    error: !isMultiUserMode ? statusQuery.error : null,
+    retry: statusQuery.refetch,
     addAnnotationProvider,
-    renameAnnotationProvider,
+    updateAnnotationProvider,
     deleteAnnotationProvider,
     clearAnnotationProviders,
     saveDataPortalCredential,

@@ -176,11 +176,9 @@ export function ModelNameCombobox({
               </div>
             ) : modelsQuery.isError ? (
               <div className="px-2 py-3 text-sm text-destructive">
-                {configuration.provider === 'custom'
-                  ? 'Could not list models; type a model name'
-                  : modelsQuery.error instanceof Error
-                    ? modelsQuery.error.message
-                    : 'Failed to load models'}
+                {modelsQuery.error instanceof Error
+                  ? modelsQuery.error.message
+                  : 'Failed to load models'}
               </div>
             ) : filtered.length === 0 ? (
               <div className="px-2 py-3 text-sm text-muted-foreground">No matching models</div>

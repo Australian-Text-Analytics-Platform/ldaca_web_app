@@ -23,6 +23,18 @@ check ambiguous or underrepresented codes, and interpret reliability measures
 in the context of the task. Provider calls may incur cost and send the selected
 text, Codebook, prompt, and examples to the configured service.
 
+Provider connections are managed under **Settings → AI**. Their provider type
+and Custom base URL stay fixed, while the display name and saved API key can be
+edited. Keys are optional: a keyless built-in remains visible but cannot list
+models or run Annotation until a key is added; a Custom endpoint may be
+keyless. Removing a connection does not remove completed Run All output, but
+Preview pages and future requests still need it.
+
+Provider failures are shown as safe actionable categories without revealing
+provider responses or credentials. A provider-wide Run All failure publishes no
+label changes. If only irreducible rows fail, Annotation publishes the other
+rows and shows the durable failed row and batch counts beside the result.
+
 Manual edits, AI Run All writes, and created correction columns participate in
 the Data Block's session Undo history. Preview results and Analyses can instead
 be removed with **Clear Results**.

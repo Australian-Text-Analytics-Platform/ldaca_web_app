@@ -148,8 +148,10 @@ export function useAnnotationTabSettings({
 
   const clearAiProvider = () => {
     setAiProviderConfigurationId(null);
+    setAiProviderType(null);
     setAiModel('');
     onTabSettingChange('aiProviderConfigurationId', '');
+    onTabSettingChange('aiProviderType', '');
   };
 
   const [aiPrompt, setAiPrompt] = useState(() => tabSettings.aiPrompt ?? '');

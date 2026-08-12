@@ -11,12 +11,16 @@ import {
 
 const FIRST_ID = '74a93227-c081-4db9-af2e-ad357b62278d';
 const SECOND_ID = 'aa0295d2-c879-40a0-95b5-24c33fd28a43';
+const THIRD_ID = 'c6c64e6b-5bd0-4d33-b409-a834c3274c31';
 
 describe('providerCredentialsStore', () => {
   beforeEach(() => {
     localStorage.clear();
     useProviderCredentialsStore.setState({ byUser: {} });
-    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce(FIRST_ID).mockReturnValueOnce(SECOND_ID);
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce(FIRST_ID)
+      .mockReturnValueOnce(SECOND_ID)
+      .mockReturnValueOnce(THIRD_ID);
   });
 
   it('persists ordered version 2 configurations in authenticated-user partitions', () => {
@@ -54,7 +58,7 @@ describe('providerCredentialsStore', () => {
     expect(Object.keys(persisted.state?.byUser ?? {})).toEqual(['user-a', 'user-b']);
   });
 
-  it('allows duplicate names but rejects duplicate semantic identities', () => {
+  it('allows duplicate names and duplicate semantic identities', () => {
     const store = useProviderCredentialsStore.getState();
     store.addAnnotationProvider('user-a', {
       name: 'OpenRouter',
@@ -68,13 +72,13 @@ describe('providerCredentialsStore', () => {
         apiKey: 'second-key',
       }),
     ).not.toThrow();
-    expect(() =>
+    expect(
       store.addAnnotationProvider('user-a', {
         name: 'Another name',
         provider: 'openrouter',
         apiKey: 'first-key',
       }),
-    ).toThrow('already configured');
+    ).toMatchObject({ name: 'Another name', has_api_key: true });
   });
 
   it('stores a normalized keyless Custom configuration', () => {
@@ -93,7 +97,7 @@ describe('providerCredentialsStore', () => {
     expect(getBrowserAnnotationProviderCredential('user-a', configuration.id)).toBeUndefined();
   });
 
-  it('renames, deletes, and clears without changing another account', () => {
+  it('updates, deletes, and clears without changing another account', () => {
     const store = useProviderCredentialsStore.getState();
     const first = store.addAnnotationProvider('user-a', {
       name: 'First',
@@ -111,7 +115,7 @@ describe('providerCredentialsStore', () => {
       apiKey: 'other-key',
     });
 
-    store.renameAnnotationProvider('user-a', second.id, 'First');
+    store.updateAnnotationProvider('user-a', second.id, { name: 'First' });
     expect(
       providerCredentialPresence('user-a').annotationProviders.map((item) => item.name),
     ).toEqual(['First', 'First']);
@@ -122,6 +126,28 @@ describe('providerCredentialsStore', () => {
     store.clearAnnotationProviders('user-a');
     expect(providerCredentialPresence('user-a').annotationProviders).toEqual([]);
     expect(providerCredentialPresence('user-b').annotationProviders).toEqual([other]);
+  });
+
+  it('rotates and removes keys while revising only credential changes', () => {
+    const store = useProviderCredentialsStore.getState();
+    const configuration = store.addAnnotationProvider('user-a', {
+      name: 'OpenAI',
+      provider: 'openai',
+    });
+    expect(configuration).toMatchObject({ has_api_key: false, credentialRevision: 1 });
+
+    const renamed = store.updateAnnotationProvider('user-a', configuration.id, {
+      name: 'OpenAI work',
+    });
+    expect(renamed.credentialRevision).toBe(1);
+    const keyed = store.updateAnnotationProvider('user-a', configuration.id, {
+      apiKey: 'new-secret',
+    });
+    expect(keyed).toMatchObject({ has_api_key: true, credentialRevision: 2 });
+    expect(getBrowserAnnotationProviderCredential('user-a', configuration.id)).toBe('new-secret');
+    const cleared = store.updateAnnotationProvider('user-a', configuration.id, { apiKey: null });
+    expect(cleared).toMatchObject({ has_api_key: false, credentialRevision: 3 });
+    expect(getBrowserAnnotationProviderCredential('user-a', configuration.id)).toBeUndefined();
   });
 
   it('rehydrates version 2 and ignores version 1 without migration', async () => {
@@ -188,8 +214,7 @@ describe('providerCredentialsStore', () => {
                     id: FIRST_ID,
                     name: 'Cross-tab',
                     provider: 'openrouter',
-                    apiKey: 'cross-tab-secret',
-                    credentialRevision: 1,
+                    credentialRevision: 2,
                   },
                 ],
                 revision: 4,
@@ -200,7 +225,11 @@ describe('providerCredentialsStore', () => {
         storageArea: localStorage,
       }),
     );
-    expect(getBrowserAnnotationProviderCredential('user-a', FIRST_ID)).toBe('cross-tab-secret');
+    expect(getBrowserAnnotationProviderCredential('user-a', FIRST_ID)).toBeUndefined();
+    expect(providerCredentialPresence('user-a').annotationProviders[0]).toMatchObject({
+      has_api_key: false,
+      credentialRevision: 2,
+    });
 
     applyProviderCredentialStorageEvent(
       new StorageEvent('storage', {

@@ -1,8 +1,15 @@
 ---
 status: accepted
+amended_by: 0020-stable-annotation-provider-configuration-identity
 ---
 
 # Model Annotation providers as named configurations
+
+The identity, credential requirement, duplicate-rejection, and key-rotation
+clauses below are superseded by
+[ADR 0020](0020-stable-annotation-provider-configuration-identity.md). The
+ownership, locator, request-snapshot, secret-handling, and Custom-destination
+decisions remain current.
 
 One credential slot per provider type could not represent two keys for the
 same service, a self-hosted OpenAI-compatible endpoint, or the exact provider

@@ -42,6 +42,11 @@ useful source context in the table.
 
 Expand AI settings and choose a named provider configuration and model. Provider
 credentials stay in Settings and are attached only when the request is sent.
+Create or edit connections under **Settings → AI**. API keys are optional when
+saving, but a built-in provider marked **Needs API key** cannot list models,
+Preview, or Run All until you add one. Custom endpoints may be keyless. Editing
+a key updates future requests; a Run All already queued or running keeps the key
+captured when it was submitted.
 An **Example Data Block** is optional; if used, choose both its text column and
 an existing annotation column containing reviewed labels. Set **Max examples
 per class**, then choose **Random**, **First N**, or **Last N**. Random sampling
@@ -70,6 +75,13 @@ comparisons, per-column differences, reliability, metadata, and correction
 controls. A reviewed
 correction column can also be selected as the Example annotation column for a
 later run.
+
+A provider-wide failure is shown in Annotation and Tasks and writes no labels.
+When only individual rows cannot fit the provider context or produce a valid
+response, successful rows are published and a warning reports failed rows and
+batches. Failed rows keep their existing values in **Reprocess all** and remain
+blank in **Fill missing**; a successful explicit empty prediction may still
+clear a value.
 
 <h2 id="help-annotation-results">Results, Clear Results, and Undo</h2>
 

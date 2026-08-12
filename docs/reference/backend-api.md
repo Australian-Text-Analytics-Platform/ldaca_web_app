@@ -24,7 +24,7 @@ proof, except provider callbacks with their own one-use validation.
 | `DELETE /api/provider-credentials` | `clear_provider_credentials` | 204 | Clear all single-user root Provider Credentials |
 | `POST /api/provider-credentials/annotation-providers` | `create_annotation_provider_configuration` | 201 | Create one single-user Annotation Provider Configuration |
 | `DELETE /api/provider-credentials/annotation-providers` | `clear_annotation_provider_configurations` | 204 | Clear all single-user Annotation Provider Configurations |
-| `PATCH /api/provider-credentials/annotation-providers/{configuration_id}` | `rename_annotation_provider_configuration` | 200 | Rename one single-user Annotation Provider Configuration |
+| `PATCH /api/provider-credentials/annotation-providers/{configuration_id}` | `update_annotation_provider_configuration` | 200 | Update one single-user Annotation Provider Configuration's name or credential |
 | `DELETE /api/provider-credentials/annotation-providers/{configuration_id}` | `delete_annotation_provider_configuration` | 204 | Delete one single-user Annotation Provider Configuration |
 | `GET /api/tokenizer-models` | `list_tokenizer_models` | 200 | List backend-supported tokenizer models |
 | `GET /api/storage` | `get_storage` | 200 | Fresh current-principal allocated-byte quota status |
@@ -54,12 +54,23 @@ required credential returns `409 provider_credential_missing`. The key is
 removed before an `AnnotationAnalysisRequest` is persisted. Display names are
 never part of the request.
 
-Built-in configuration identity is provider type plus API key. Custom identity
-is normalized base URL plus key-or-absence. Duplicate identities return a
-conflict, while duplicate names are valid. Only names can change in place.
+The configuration UUID is identity. Provider type and Custom base URL are
+immutable; name and credential may change in place. Omitted PATCH fields are
+unchanged and `api_key: null` removes the saved key. Empty PATCH, null name,
+empty key, unknown fields, `provider`, and `base_url` are rejected. All
+providers may be saved keyless and configurations may otherwise be identical.
 Custom bases must be absolute HTTP(S) URLs with a host and no user information,
 query, or fragment. Public, private, loopback, `localhost`, and `127.0.0.1`
 destinations are deliberately accepted for trusted authenticated users.
+
+Model-list and Preview provider failures return HTTP 502 with a fixed safe
+message and one of `annotation_provider_authentication_failed`,
+`annotation_provider_access_denied`, `annotation_provider_rate_limited`,
+`annotation_provider_request_rejected`, `annotation_provider_unavailable`,
+`annotation_provider_context_limit`, `annotation_provider_invalid_response`,
+or fallback `annotation_provider_failed`. Raw SDK messages, bodies, provider
+URLs, and credentials are never returned. A missing built-in credential remains
+HTTP 409 `provider_credential_missing`.
 
 ## User Files And External Data
 
