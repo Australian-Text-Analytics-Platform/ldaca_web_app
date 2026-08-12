@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ChevronDown, Filter } from 'lucide-react';
+import { ArrowDown, ArrowRight, ChevronDown, Eye, EyeOff, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,14 +27,16 @@ const displayLabel = (value: string): string => (value === '' ? '(blank)' : valu
 
 interface DifferenceFilterButtonProps {
   active: boolean;
+  disabled?: boolean;
   ariaLabel: string;
   tooltip: string;
   onActiveChange: (active: boolean) => void;
 }
 
 /** Prominent exclusive filter control used by Annotation table headers. */
-export function DifferenceFilterButton({
+function DifferenceFilterButton({
   active,
+  disabled = false,
   ariaLabel,
   tooltip,
   onActiveChange,
@@ -49,6 +51,7 @@ export function DifferenceFilterButton({
           className="size-7 p-0"
           aria-label={ariaLabel}
           aria-pressed={active}
+          disabled={disabled}
           onClick={() => {
             onActiveChange(!active);
           }}
@@ -69,11 +72,17 @@ interface ColumnComparisonHeaderProps {
   rows: ConfusionCount[] | undefined;
   isLoading: boolean;
   isError: boolean;
+  revealed: boolean;
+  onRevealedChange: (revealed: boolean) => void;
   differenceFilterActive?: boolean;
   onDifferenceFilterChange?: (active: boolean) => void;
 }
 
-/** Shows reliability beside a compared column and exact pair counts on hover or focus. */
+/**
+ * Presents one comparison column without exposing its coding until the user reveals it.
+ * Rendered by: Annotation Manual, Preview, and Review headers. Flow: always show the column name
+ * and disclosure control; only a revealed column adds reliability, matrix, and filtering.
+ */
 export function ColumnComparisonHeader({
   label,
   metric,
@@ -82,6 +91,8 @@ export function ColumnComparisonHeader({
   rows,
   isLoading,
   isError,
+  revealed,
+  onRevealedChange,
   differenceFilterActive = false,
   onDifferenceFilterChange,
 }: ColumnComparisonHeaderProps) {
@@ -116,88 +127,113 @@ export function ColumnComparisonHeader({
       <TooltipProvider delayDuration={120} skipDelayDuration={0}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge
-              asChild
+            <Button
+              type="button"
               variant="outline"
-              className="h-7 px-2.5 text-sm font-medium tabular-nums"
+              size="sm"
+              className="size-7 p-0"
+              aria-label={`${revealed ? 'Hide' : 'Show'} comparison values for ${comparisonColumn}`}
+              aria-pressed={revealed}
+              onClick={() => {
+                onRevealedChange(!revealed);
+              }}
             >
-              <button type="button" aria-label={scoreDescription}>
-                {score}
-              </button>
-            </Badge>
+              {revealed ? (
+                <EyeOff aria-hidden="true" className="size-3.5" />
+              ) : (
+                <Eye aria-hidden="true" className="size-3.5" />
+              )}
+            </Button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-none p-3">
-            {isLoading ? (
-              <p>Loading comparison...</p>
-            ) : isError || !rows ? (
-              <p>Could not load comparison.</p>
-            ) : labels.length === 0 ? (
-              <p>No rows contain values in both columns.</p>
-            ) : (
-              <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
-                <div
-                  aria-label={`${comparisonColumn} column axis`}
-                  className="col-start-2 row-start-1 flex items-center justify-center gap-1 border-b border-primary-foreground/25 pb-1 font-medium"
-                >
-                  <span>{comparisonColumn}</span>
-                  <ArrowRight aria-hidden="true" className="size-3" />
-                </div>
-                <div
-                  aria-label={`${referenceColumn} row axis`}
-                  className="col-start-1 row-start-2 flex flex-col items-center justify-center gap-1 border-r border-primary-foreground/25 pr-1.5 font-medium"
-                >
-                  <span className="rotate-180 [writing-mode:vertical-rl]">{referenceColumn}</span>
-                  <ArrowDown aria-hidden="true" className="size-3" />
-                </div>
-                <table
-                  aria-label={`${referenceColumn} versus ${comparisonColumn} confusion matrix`}
-                  className="col-start-2 row-start-2 border-separate border-spacing-x-2 border-spacing-y-1 text-xs tabular-nums"
-                >
-                  <caption className="sr-only">
-                    Rows are {referenceColumn}; columns are {comparisonColumn}.
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th className="px-1 font-normal" scope="col">
-                        <span className="sr-only">Row label</span>
-                      </th>
-                      {labels.map((comparisonLabel) => (
-                        <th
-                          key={comparisonLabel}
-                          className="px-1 text-center text-primary-foreground/80"
-                          scope="col"
-                        >
-                          {displayLabel(comparisonLabel)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {labels.map((referenceLabel) => (
-                      <tr key={referenceLabel}>
-                        <th className="pr-2 text-right text-primary-foreground/80" scope="row">
-                          {displayLabel(referenceLabel)}
+          <TooltipContent>{revealed ? 'Hide comparison' : 'Show comparison'}</TooltipContent>
+        </Tooltip>
+        {revealed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                asChild
+                variant="outline"
+                className="h-7 px-2.5 text-sm font-medium tabular-nums"
+              >
+                <button type="button" aria-label={scoreDescription}>
+                  {score}
+                </button>
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-none p-3">
+              {isLoading ? (
+                <p>Loading comparison...</p>
+              ) : isError || !rows ? (
+                <p>Could not load comparison.</p>
+              ) : labels.length === 0 ? (
+                <p>No rows contain values in both columns.</p>
+              ) : (
+                <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
+                  <div
+                    aria-label={`${comparisonColumn} column axis`}
+                    className="col-start-2 row-start-1 flex items-center justify-center gap-1 border-b border-primary-foreground/25 pb-1 font-medium"
+                  >
+                    <span>{comparisonColumn}</span>
+                    <ArrowRight aria-hidden="true" className="size-3" />
+                  </div>
+                  <div
+                    aria-label={`${referenceColumn} row axis`}
+                    className="col-start-1 row-start-2 flex flex-col items-center justify-center gap-1 border-r border-primary-foreground/25 pr-1.5 font-medium"
+                  >
+                    <span className="rotate-180 [writing-mode:vertical-rl]">{referenceColumn}</span>
+                    <ArrowDown aria-hidden="true" className="size-3" />
+                  </div>
+                  <table
+                    aria-label={`${referenceColumn} versus ${comparisonColumn} confusion matrix`}
+                    className="col-start-2 row-start-2 border-separate border-spacing-x-2 border-spacing-y-1 text-xs tabular-nums"
+                  >
+                    <caption className="sr-only">
+                      Rows are {referenceColumn}; columns are {comparisonColumn}.
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th className="px-1 font-normal" scope="col">
+                          <span className="sr-only">Row label</span>
                         </th>
                         {labels.map((comparisonLabel) => (
-                          <td
+                          <th
                             key={comparisonLabel}
-                            className="min-w-8 px-1 text-center font-medium"
+                            className="px-1 text-center text-primary-foreground/80"
+                            scope="col"
                           >
-                            {countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ??
-                              0}
-                          </td>
+                            {displayLabel(comparisonLabel)}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </TooltipContent>
-        </Tooltip>
+                    </thead>
+                    <tbody>
+                      {labels.map((referenceLabel) => (
+                        <tr key={referenceLabel}>
+                          <th className="pr-2 text-right text-primary-foreground/80" scope="row">
+                            {displayLabel(referenceLabel)}
+                          </th>
+                          {labels.map((comparisonLabel) => (
+                            <td
+                              key={comparisonLabel}
+                              className="min-w-8 px-1 text-center font-medium"
+                            >
+                              {countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ??
+                                0}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
         {onDifferenceFilterChange ? (
           <DifferenceFilterButton
             active={differenceFilterActive}
+            disabled={!revealed}
             ariaLabel={`Filter difference for ${comparisonColumn}`}
             tooltip="Filter difference"
             onActiveChange={onDifferenceFilterChange}
@@ -214,25 +250,35 @@ interface ColumnComparisonSelectorProps {
   onSelectedColumnsChange: (columns: string[]) => void;
   metric: IntercoderReliabilityMetric;
   onMetricChange: (metric: IntercoderReliabilityMetric) => void;
+  disabledColumns?: string[];
   disabled?: boolean;
 }
 
-/** Shared immediate multi-column checklist for Annotation comparison surfaces. */
+/**
+ * Shared immediate multi-column checklist for Annotation comparison surfaces.
+ * Used by: Manual, Preview, and Review toolbars. Columns owned by Show metadata remain visible but
+ * disabled, and Select all operates only on columns that have no opposing role.
+ */
 export function ColumnComparisonSelector({
   availableColumns,
   selectedColumns,
   onSelectedColumnsChange,
   metric,
   onMetricChange,
+  disabledColumns = [],
   disabled = false,
 }: ColumnComparisonSelectorProps) {
   const normalizedAvailableColumns = Array.from(new Set(availableColumns));
   const normalizedSelectedColumns = selectedColumns.filter((column) =>
     normalizedAvailableColumns.includes(column),
   );
+  const disabledColumnSet = new Set(disabledColumns);
+  const selectableColumns = normalizedAvailableColumns.filter(
+    (column) => !disabledColumnSet.has(column),
+  );
   const allSelected =
-    normalizedAvailableColumns.length > 0 &&
-    normalizedAvailableColumns.every((column) => normalizedSelectedColumns.includes(column));
+    selectableColumns.length > 0 &&
+    selectableColumns.every((column) => normalizedSelectedColumns.includes(column));
 
   const toggleColumn = (column: string, checked: boolean) => {
     onSelectedColumnsChange(
@@ -279,9 +325,9 @@ export function ColumnComparisonSelector({
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={allSelected}
-          disabled={normalizedAvailableColumns.length === 0}
+          disabled={selectableColumns.length === 0}
           onCheckedChange={(checked) => {
-            onSelectedColumnsChange(checked ? normalizedAvailableColumns : []);
+            onSelectedColumnsChange(checked ? selectableColumns : []);
           }}
           onSelect={(event) => {
             event.preventDefault();
@@ -294,6 +340,7 @@ export function ColumnComparisonSelector({
           <DropdownMenuCheckboxItem
             key={column}
             checked={normalizedSelectedColumns.includes(column)}
+            disabled={disabledColumnSet.has(column)}
             onCheckedChange={(checked) => {
               toggleColumn(column, checked);
             }}

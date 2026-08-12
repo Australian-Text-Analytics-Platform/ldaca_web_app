@@ -4,7 +4,6 @@ import {
   isIntercoderReliabilityMetric,
 } from '@/features/views/common/columnComparisonModel';
 import type { AnnotationProviderType } from '../aiProviders';
-import type { AnnotationDifferenceFilter } from '../annotationDifferenceQuery';
 
 export type AnnotationMode = 'manual' | 'ai';
 export type AnnotationProcessingMode = 'reprocess_all' | 'fill_missing';
@@ -13,14 +12,15 @@ export type AnnotationExampleSamplingMethod = 'random' | 'first_n' | 'last_n';
 interface UseAnnotationTabSettingsArgs {
   tabSettings: Record<string, string>;
   onTabSettingChange: (key: string, value: string) => void;
+  excludedRoleColumns?: Record<string, string | null | undefined>;
 }
 
 /**
  * Parse a persisted tab-setting string as a provider-configuration model map.
  *
  * Used by: useAnnotationTabSettings when hydrating the AI provider dropdown.
- * The value lives in the backend Tab resource as a string map because generic tab settings are
- * Record<string,string>; malformed user-edited JSON is ignored with a warning so
+ * The value lives in the device-local presentation store as a string map because generic tab
+ * settings are Record<string,string>; malformed stored JSON is ignored with a warning so
  * the tab still opens and the user can save a fresh provider configuration.
  */
 const parseStringMapSetting = (
@@ -77,42 +77,20 @@ const parseReliabilityMetricMapSetting = (
   );
 };
 
-const parseDifferenceFilterMapSetting = (
-  value: string | undefined,
-): Record<string, AnnotationDifferenceFilter> => {
-  if (!value) return {};
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    const filters: Record<string, AnnotationDifferenceFilter> = {};
-    for (const [nodeId, filter] of Object.entries(parsed)) {
-      if (!filter || typeof filter !== 'object' || Array.isArray(filter)) continue;
-      const candidate = filter as Record<string, unknown>;
-      if (candidate.kind === 'any') {
-        filters[nodeId] = { kind: 'any' };
-      } else if (candidate.kind === 'column' && typeof candidate.column === 'string') {
-        filters[nodeId] = { kind: 'column', column: candidate.column };
-      }
-    }
-    return filters;
-  } catch (error) {
-    console.warn('[annotation] Ignoring malformed difference-filter setting:', error);
-    return {};
-  }
-};
-
 /**
- * Owns Annotation's tab-persisted mode and AI settings.
+ * Owns Annotation's device-local mode, AI settings, and column-role selections.
  *
  * Used by: AnnotationFeature so the feature body can focus on selector/run UI
- * while this hook handles Tab-resource string hydration and write-through updates.
+ * while this hook handles presentation-store string hydration and write-through updates.
  * Flow: seed local state from the active tab's string settings, expose setters
- * that mirror discrete user actions, and write each committed value back through
+ * that mirror discrete user actions, remove the backend-owned active Correction
+ * column from both display roles, and write each committed value back through
  * AnalysisTabsHost's tab-setting sink.
  */
 export function useAnnotationTabSettings({
   tabSettings,
   onTabSettingChange,
+  excludedRoleColumns = {},
 }: UseAnnotationTabSettingsArgs) {
   const [annotationMode, setAnnotationModeState] = useState<AnnotationMode>(() =>
     tabSettings.annotationMode === 'ai' ? 'ai' : 'manual',
@@ -275,46 +253,61 @@ export function useAnnotationTabSettings({
     onTabSettingChange('annotationTargets', JSON.stringify(next));
   };
 
-  const [annotationDifferenceFilters, setAnnotationDifferenceFiltersState] = useState<
-    Record<string, AnnotationDifferenceFilter>
-  >(() => parseDifferenceFilterMapSetting(tabSettings.annotationDifferenceFilters));
-  const annotationDifferenceFiltersRef = useRef(annotationDifferenceFilters);
-  const setAnnotationDifferenceFilter = (
-    nodeId: string,
-    filter: AnnotationDifferenceFilter | null,
-  ) => {
-    const next = { ...annotationDifferenceFiltersRef.current };
-    if (filter) next[nodeId] = filter;
-    else Reflect.deleteProperty(next, nodeId);
-    annotationDifferenceFiltersRef.current = next;
-    setAnnotationDifferenceFiltersState(next);
-    onTabSettingChange('annotationDifferenceFilters', JSON.stringify(next));
-  };
-
-  const [annotationComparisonColumns, setAnnotationComparisonColumnsState] = useState<
-    Record<string, string[]>
-  >(() =>
-    parseStringArrayMapSetting(
-      tabSettings.annotationComparisonColumns,
-      '[annotation] Ignoring malformed comparison-column setting:',
-    ),
+  const savedComparisonColumns = Object.fromEntries(
+    Object.entries(
+      parseStringArrayMapSetting(
+        tabSettings.annotationComparisonColumns,
+        '[annotation] Ignoring malformed comparison-column setting:',
+      ),
+    ).flatMap(([nodeId, columns]) => {
+      const available = columns.filter((column) => column !== excludedRoleColumns[nodeId]);
+      return available.length > 0 ? [[nodeId, available] as const] : [];
+    }),
   );
+  const savedMetadataColumns = parseStringArrayMapSetting(
+    tabSettings.annotationMetadataColumns,
+    '[annotation] Ignoring malformed metadata-column setting:',
+  );
+  const initialMetadataColumns = Object.fromEntries(
+    Object.entries(savedMetadataColumns).flatMap(([nodeId, columns]) => {
+      const available = columns.filter(
+        (column) =>
+          column !== excludedRoleColumns[nodeId] &&
+          !savedComparisonColumns[nodeId]?.includes(column),
+      );
+      return available.length > 0 ? [[nodeId, available] as const] : [];
+    }),
+  );
+
+  const [annotationComparisonColumns, setAnnotationComparisonColumnsState] =
+    useState<Record<string, string[]>>(savedComparisonColumns);
   const annotationComparisonColumnsRef = useRef(annotationComparisonColumns);
+  const [annotationMetadataColumns, setAnnotationMetadataColumnsState] =
+    useState<Record<string, string[]>>(initialMetadataColumns);
+  const annotationMetadataColumnsRef = useRef(annotationMetadataColumns);
+
+  /** Selects comparison columns and removes the same columns from Show metadata. */
   const setAnnotationComparisonColumns = (nodeId: string, columns: string[]) => {
     const next = { ...annotationComparisonColumnsRef.current };
-    const uniqueColumns = Array.from(new Set(columns));
+    const uniqueColumns = Array.from(new Set(columns)).filter(
+      (column) => column !== excludedRoleColumns[nodeId],
+    );
     if (uniqueColumns.length > 0) next[nodeId] = uniqueColumns;
     else Reflect.deleteProperty(next, nodeId);
     annotationComparisonColumnsRef.current = next;
     setAnnotationComparisonColumnsState(next);
     onTabSettingChange('annotationComparisonColumns', JSON.stringify(next));
-    const activeFilter = annotationDifferenceFiltersRef.current[nodeId];
-    if (
-      activeFilter &&
-      (uniqueColumns.length === 0 ||
-        (activeFilter.kind === 'column' && !uniqueColumns.includes(activeFilter.column)))
-    ) {
-      setAnnotationDifferenceFilter(nodeId, null);
+
+    const metadataNext = { ...annotationMetadataColumnsRef.current };
+    const metadataColumns = (metadataNext[nodeId] ?? []).filter(
+      (column) => !uniqueColumns.includes(column),
+    );
+    if (metadataColumns.length > 0) metadataNext[nodeId] = metadataColumns;
+    else Reflect.deleteProperty(metadataNext, nodeId);
+    if (JSON.stringify(metadataNext) !== JSON.stringify(annotationMetadataColumnsRef.current)) {
+      annotationMetadataColumnsRef.current = metadataNext;
+      setAnnotationMetadataColumnsState(metadataNext);
+      onTabSettingChange('annotationMetadataColumns', JSON.stringify(metadataNext));
     }
   };
 
@@ -329,23 +322,29 @@ export function useAnnotationTabSettings({
     onTabSettingChange('annotationReliabilityMetrics', JSON.stringify(next));
   };
 
-  const [annotationMetadataColumns, setAnnotationMetadataColumnsState] = useState<
-    Record<string, string[]>
-  >(() =>
-    parseStringArrayMapSetting(
-      tabSettings.annotationMetadataColumns,
-      '[annotation] Ignoring malformed metadata-column setting:',
-    ),
-  );
-  const annotationMetadataColumnsRef = useRef(annotationMetadataColumns);
+  /** Selects metadata columns and removes the same columns from Compare To. */
   const setAnnotationMetadataColumns = (nodeId: string, columns: string[]) => {
     const next = { ...annotationMetadataColumnsRef.current };
-    const uniqueColumns = Array.from(new Set(columns));
+    const uniqueColumns = Array.from(new Set(columns)).filter(
+      (column) => column !== excludedRoleColumns[nodeId],
+    );
     if (uniqueColumns.length > 0) next[nodeId] = uniqueColumns;
     else Reflect.deleteProperty(next, nodeId);
     annotationMetadataColumnsRef.current = next;
     setAnnotationMetadataColumnsState(next);
     onTabSettingChange('annotationMetadataColumns', JSON.stringify(next));
+
+    const comparisonNext = { ...annotationComparisonColumnsRef.current };
+    const comparisonColumns = (comparisonNext[nodeId] ?? []).filter(
+      (column) => !uniqueColumns.includes(column),
+    );
+    if (comparisonColumns.length > 0) comparisonNext[nodeId] = comparisonColumns;
+    else Reflect.deleteProperty(comparisonNext, nodeId);
+    if (JSON.stringify(comparisonNext) !== JSON.stringify(annotationComparisonColumnsRef.current)) {
+      annotationComparisonColumnsRef.current = comparisonNext;
+      setAnnotationComparisonColumnsState(comparisonNext);
+      onTabSettingChange('annotationComparisonColumns', JSON.stringify(comparisonNext));
+    }
   };
 
   return {
@@ -382,8 +381,6 @@ export function useAnnotationTabSettings({
     setAiReasoningEffort,
     annotationTargets,
     setAnnotationTarget,
-    annotationDifferenceFilters,
-    setAnnotationDifferenceFilter,
     annotationComparisonColumns,
     setAnnotationComparisonColumns,
     annotationReliabilityMetrics,

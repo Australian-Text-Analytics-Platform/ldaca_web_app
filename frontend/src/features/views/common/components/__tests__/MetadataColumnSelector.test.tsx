@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest';
 
 import { MetadataColumnSelector } from '../MetadataColumnSelector';
 
-const TestHarness = ({ disabledReason }: { disabledReason?: string }) => {
+const TestHarness = ({
+  disabledReason,
+  disabledColumns,
+}: {
+  disabledReason?: string;
+  disabledColumns?: string[];
+}) => {
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
 
   return (
@@ -13,6 +19,7 @@ const TestHarness = ({ disabledReason }: { disabledReason?: string }) => {
       selectedColumns={selectedColumns}
       onSelectedColumnsChange={setSelectedColumns}
       disabledReason={disabledReason}
+      disabledColumns={disabledColumns}
     />
   );
 };
@@ -53,6 +60,26 @@ describe('MetadataColumnSelector', () => {
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /speaker/i }));
 
+    expect(screen.getByRole('menuitemcheckbox', { name: /document/i })).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
+    expect(screen.getByRole('menuitemcheckbox', { name: /speaker/i })).toHaveAttribute(
+      'data-state',
+      'unchecked',
+    );
+  });
+
+  it('disables opposite-role columns and skips them when selecting all', () => {
+    const { container } = render(<TestHarness disabledColumns={['speaker']} />);
+    const view = within(container);
+
+    fireEvent.pointerDown(view.getByRole('button', { name: /show metadata/i }), { button: 0 });
+    expect(screen.getByRole('menuitemcheckbox', { name: /speaker/i })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /select all/i }));
     expect(screen.getByRole('menuitemcheckbox', { name: /document/i })).toHaveAttribute(
       'data-state',
       'checked',

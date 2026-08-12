@@ -6,7 +6,6 @@ import { type ComponentProps, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
 import { toBgColor } from '@/features/views/common/vizPalette';
-import type { AnnotationDifferenceFilter } from '../../annotationDifferenceQuery';
 import { AnnotationResultsPanel } from '../AnnotationResultsPanel';
 
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
@@ -85,15 +84,12 @@ function ManualResults(
     | 'onMetadataColumnsChange'
     | 'reliabilityMetric'
     | 'onReliabilityMetricChange'
-    | 'differenceFilter'
-    | 'onDifferenceFilterChange'
   >,
 ) {
   const [comparisonColumns, setComparisonColumns] = useState(['reviewer']);
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
   const [reliabilityMetric, setReliabilityMetric] =
     useState<IntercoderReliabilityMetric>('cohens_kappa');
-  const [differenceFilter, setDifferenceFilter] = useState<AnnotationDifferenceFilter | null>(null);
   return (
     <AnnotationResultsPanel
       {...props}
@@ -103,8 +99,6 @@ function ManualResults(
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
-      differenceFilter={differenceFilter}
-      onDifferenceFilterChange={setDifferenceFilter}
     />
   );
 }
@@ -144,6 +138,7 @@ describe('AnnotationResultsPanel', () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     queryWorkspaceSqlTable.mockReset();
     setCell.mockReset();
+    setCell.mockResolvedValue(undefined);
     setPagination.mockReset();
   });
 
@@ -155,6 +150,12 @@ describe('AnnotationResultsPanel', () => {
       'correction',
     );
     expect(screen.queryByRole('button', { name: 'Use as example' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'correction' })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Show metadata' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'correction' })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
     await user.click(screen.getByRole('combobox', { name: 'Correction for row 1' }));
     await user.click(screen.getByRole('option', { name: 'job' }));
 
@@ -183,17 +184,25 @@ describe('AnnotationResultsPanel', () => {
     const headers = screen.getAllByRole('columnheader');
     expect(headers[0]).toHaveTextContent('text');
     expect(headers[1]).toHaveTextContent('annotation');
-    expect(
-      within(headers[1]).getByRole('button', { name: 'Filter any difference for annotation' }),
-    ).toHaveAttribute('aria-pressed', 'false');
     expect(within(headers[2]).getByText('reviewer')).toBeInTheDocument();
-    expect(within(headers[2]).getByRole('button', { name: /Cohen’s Kappa/ })).toBeInTheDocument();
+    expect(within(headers[2]).queryByRole('button', { name: /Cohen’s Kappa/ })).toBeNull();
+    expect(
+      within(headers[2]).getByRole('button', { name: 'Show comparison values for reviewer' }),
+    ).toBeInTheDocument();
     const filterToggle = within(headers[2]).getByRole('button', {
       name: 'Filter difference for reviewer',
     });
+    expect(filterToggle).toBeDisabled();
     expect(filterToggle).toHaveAttribute('aria-pressed', 'false');
-    const resultRow = screen.getByRole('row', { name: 'Example covid' });
-    expect(within(resultRow).getAllByRole('cell').at(-1)).toHaveTextContent('covid');
+    const resultRow = screen.getByRole('row', { name: 'Example Comparison value hidden' });
+    expect(within(resultRow).getAllByRole('cell').at(-1)).toHaveTextContent('•••');
+    expect(within(resultRow).getByLabelText('Comparison value hidden')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show metadata' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'reviewer' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await user.keyboard('{Escape}');
     expect(screen.getAllByRole('combobox', { name: /Class for row/ })).toHaveLength(1);
     expect(screen.getByRole('link', { name: '238' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Jump to page' }));
@@ -207,7 +216,7 @@ describe('AnnotationResultsPanel', () => {
     expect(setPagination).toHaveBeenCalledWith({ pageIndex: 99, pageSize: 10 });
   });
 
-  it('keeps the any-difference and per-column filters mutually exclusive', async () => {
+  it('enables the per-column filter only while its comparison is revealed', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockResolvedValue({
       columns: ['__reference', '__comparison', '__count'],
@@ -218,19 +227,18 @@ describe('AnnotationResultsPanel', () => {
 
     renderPanel();
 
-    const anyFilter = screen.getByRole('button', {
-      name: 'Filter any difference for annotation',
-    });
     const reviewerFilter = screen.getByRole('button', {
       name: 'Filter difference for reviewer',
     });
-    await user.click(anyFilter);
-    expect(anyFilter).toHaveAttribute('aria-pressed', 'true');
-    expect(reviewerFilter).toHaveAttribute('aria-pressed', 'false');
+    expect(reviewerFilter).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
+    expect(reviewerFilter).toBeEnabled();
 
     await user.click(reviewerFilter);
-    expect(anyFilter).toHaveAttribute('aria-pressed', 'false');
     expect(reviewerFilter).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: 'Hide comparison values for reviewer' }));
+    expect(reviewerFilter).toBeDisabled();
+    expect(reviewerFilter).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('shows selected metadata alongside manual annotations', async () => {
@@ -250,6 +258,11 @@ describe('AnnotationResultsPanel', () => {
 
     expect(screen.getByRole('columnheader', { name: 'username' })).toBeInTheDocument();
     expect(screen.getByText('alice')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'username' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('excludes non-label columns and applies a different reliability metric', async () => {
@@ -267,6 +280,7 @@ describe('AnnotationResultsPanel', () => {
     expect(screen.queryByRole('menuitemcheckbox', { name: 'record_id' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('menuitemradio', { name: 'Percent Agreement' }));
     await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
 
     expect(
       screen.getByRole('button', {
@@ -287,6 +301,7 @@ describe('AnnotationResultsPanel', () => {
 
     renderPanel();
 
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
     expect(
       await screen.findByRole('button', {
         name: 'Cohen’s Kappa unavailable for annotation versus reviewer',
@@ -322,6 +337,7 @@ describe('AnnotationResultsPanel', () => {
 
     renderPanel();
 
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
     await screen.findByRole('button', {
       name: 'Cohen’s Kappa unavailable for annotation versus reviewer',
     });

@@ -25,12 +25,6 @@ interface ReferenceComparisonEdit {
   comparison: string | null;
 }
 
-interface ComparisonValueEdit {
-  reference: string | null;
-  previousComparison: string | null;
-  nextComparison: string | null;
-}
-
 /** Applies one persisted reference-cell edit to an aggregate confusion matrix. */
 export const applyReferenceComparisonEdit = (
   rows: ConfusionCount[],
@@ -51,34 +45,6 @@ export const applyReferenceComparisonEdit = (
 
   if (previousReference !== null) adjust(previousReference, -1);
   if (nextReference !== null) adjust(nextReference, 1);
-
-  return Array.from(counts.values()).sort(
-    (left, right) =>
-      left.reference.localeCompare(right.reference) ||
-      left.comparison.localeCompare(right.comparison),
-  );
-};
-
-/** Applies one persisted comparison-cell edit to an aggregate confusion matrix. */
-export const applyComparisonValueEdit = (
-  rows: ConfusionCount[],
-  { reference, previousComparison, nextComparison }: ComparisonValueEdit,
-): ConfusionCount[] => {
-  if (reference === null || previousComparison === nextComparison) return rows;
-
-  const counts = new Map<string, ConfusionCount>(
-    rows.map((row) => [JSON.stringify([row.reference, row.comparison]), { ...row }] as const),
-  );
-  const adjust = (comparison: string, delta: number) => {
-    const key = JSON.stringify([reference, comparison]);
-    const current = counts.get(key);
-    const count = (current?.count ?? 0) + delta;
-    if (count <= 0) counts.delete(key);
-    else counts.set(key, { reference, comparison, count });
-  };
-
-  if (previousComparison !== null) adjust(previousComparison, -1);
-  if (nextComparison !== null) adjust(nextComparison, 1);
 
   return Array.from(counts.values()).sort(
     (left, right) =>

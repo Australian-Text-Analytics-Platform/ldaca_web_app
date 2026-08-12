@@ -76,8 +76,9 @@ interface AnnotationAiPreviewPanelProps {
  * Rendered by: `AnnotationFeature` while preview is open.
  * `useAnnotationAiPreview` supplies page data, fresh labels, and query state;
  * this component never writes preview labels into the selected annotation
- * column. A reviewer's explicit correction is a separate set_cell edit in the
- * configured correction column.
+ * column. Comparisons start masked and contribute to page-local reliability
+ * and tinting only after reveal. A reviewer's explicit correction is a separate
+ * set_cell edit in the configured correction column.
  */
 export function AnnotationAiPreviewPanel({
   preview,
@@ -90,16 +91,20 @@ export function AnnotationAiPreviewPanel({
   const { setCell } = useWorkspaceActions();
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
+  const [revealedComparisonColumns, setRevealedComparisonColumns] = useState<Set<string>>(
+    new Set(),
+  );
   const secondaryColumnOptions = preview.sourceColumns.filter(
     (column) => column !== columns.text && column !== columns.annotation,
   );
+  const correctionColumn = correction.column;
   const comparisonColumnOptions = preview.sourceComparableColumns.filter(
-    (column) => column !== columns.text && column !== columns.annotation,
+    (column) =>
+      column !== columns.text && column !== columns.annotation && column !== correctionColumn,
   );
   const activeComparisonColumns = comparison.columns.filter((column) =>
     comparisonColumnOptions.includes(column),
   );
-  const correctionColumn = correction.column;
   const showCorrectionColumn = Boolean(correctionColumn);
   const availableCorrectionColumns =
     preview.sourceStringColumns?.filter(
@@ -111,12 +116,13 @@ export function AnnotationAiPreviewPanel({
   const activeMetadataColumns = metadata.columns.filter((column) =>
     availableMetadataColumns.includes(column),
   );
-  const displayedSupplementalColumns = Array.from(
-    new Set([...activeComparisonColumns, ...activeMetadataColumns]),
-  ).filter((column) => column !== correctionColumn);
+  const revealedActiveComparisonColumns = activeComparisonColumns.filter((column) =>
+    revealedComparisonColumns.has(column),
+  );
+  const supplementalColumns = [...activeComparisonColumns, ...activeMetadataColumns];
   const previewColumn = `${columns.annotation} (preview)`;
   const comparisonRows = new Map<string, ConfusionCount[]>();
-  activeComparisonColumns.forEach((targetColumn) => {
+  revealedActiveComparisonColumns.forEach((targetColumn) => {
     const counts = new Map<string, ConfusionCount>();
     page.rows.forEach((row, index) => {
       const reference = predictions.labels[index];
@@ -149,7 +155,7 @@ export function AnnotationAiPreviewPanel({
           },
         ]
       : []),
-    ...displayedSupplementalColumns.map((column) => ({
+    ...supplementalColumns.map((column) => ({
       id: column,
       accessorFn: (row: AnnotationPreviewRow) => row[column],
     })),
@@ -214,15 +220,37 @@ export function AnnotationAiPreviewPanel({
           <ColumnComparisonSelector
             availableColumns={comparisonColumnOptions}
             selectedColumns={activeComparisonColumns}
-            onSelectedColumnsChange={comparison.onColumnsChange}
+            onSelectedColumnsChange={(selected) => {
+              const next = selected.filter((column) => column !== correctionColumn);
+              setRevealedComparisonColumns(
+                (current) => new Set([...current].filter((column) => next.includes(column))),
+              );
+              comparison.onColumnsChange(next);
+            }}
             metric={comparison.metric}
             onMetricChange={comparison.onMetricChange}
             disabled={predictions.query.isFetching || preview.comparison.query.isFetching}
+            disabledColumns={activeMetadataColumns}
           />
           <AnnotationCorrectionColumnControl
             value={correctionColumn}
             availableColumns={availableCorrectionColumns}
-            onValueChange={correction.onColumnChange}
+            onValueChange={(column) => {
+              if (column) {
+                comparison.onColumnsChange(
+                  activeComparisonColumns.filter((selected) => selected !== column),
+                );
+                metadata.onColumnsChange(
+                  activeMetadataColumns.filter((selected) => selected !== column),
+                );
+                setRevealedComparisonColumns((current) => {
+                  const next = new Set(current);
+                  next.delete(column);
+                  return next;
+                });
+              }
+              correction.onColumnChange(column);
+            }}
             onCreate={correction.onCreate}
             onUseAsExample={correction.onUseAsExample}
             disabled={correction.disabled}
@@ -231,6 +259,7 @@ export function AnnotationAiPreviewPanel({
             availableColumns={availableMetadataColumns}
             selectedColumns={activeMetadataColumns}
             onSelectedColumnsChange={metadata.onColumnsChange}
+            disabledColumns={activeComparisonColumns}
           />
         </div>
       </div>
@@ -297,23 +326,11 @@ export function AnnotationAiPreviewPanel({
                     <ArrowRight aria-hidden="true" className="mx-auto size-4" />
                   </TableHead>
                   <TableHead className="w-px whitespace-nowrap">
-                    {correction.column && activeComparisonColumns.includes(correction.column) ? (
-                      <ColumnComparisonHeader
-                        label={`Correction: ${correction.column}`}
-                        metric={comparison.metric}
-                        referenceColumn={previewColumn}
-                        comparisonColumn={correction.column}
-                        rows={comparisonRows.get(correction.column)}
-                        isLoading={comparisonLoading}
-                        isError={comparisonError}
-                      />
-                    ) : (
-                      <>Correction: {correction.column}</>
-                    )}
+                    <>Correction: {correction.column}</>
                   </TableHead>
                 </>
               ) : null}
-              {displayedSupplementalColumns.map((column) => (
+              {supplementalColumns.map((column) => (
                 <TableHead key={column} className="w-px whitespace-nowrap">
                   {activeComparisonColumns.includes(column) ? (
                     <ColumnComparisonHeader
@@ -323,6 +340,15 @@ export function AnnotationAiPreviewPanel({
                       rows={comparisonRows.get(column)}
                       isLoading={comparisonLoading}
                       isError={comparisonError}
+                      revealed={revealedComparisonColumns.has(column)}
+                      onRevealedChange={(revealed) => {
+                        setRevealedComparisonColumns((current) => {
+                          const next = new Set(current);
+                          if (revealed) next.add(column);
+                          else next.delete(column);
+                          return next;
+                        });
+                      }}
                     />
                   ) : (
                     column
@@ -368,7 +394,7 @@ export function AnnotationAiPreviewPanel({
                   if (column !== correction.column) return row[column];
                   return correctionValue || null;
                 };
-                const predictionDiffers = activeComparisonColumns.some((column) =>
+                const predictionDiffers = revealedActiveComparisonColumns.some((column) =>
                   annotationValuesDiffer(value || null, comparisonValue(column)),
                 );
                 const differenceColor = toBgColor(sourceColor);
@@ -415,16 +441,7 @@ export function AnnotationAiPreviewPanel({
                             className="mx-auto size-4 text-muted-foreground"
                           />
                         </TableCell>
-                        <TableCell
-                          className="w-px"
-                          style={
-                            correction.column &&
-                            activeComparisonColumns.includes(correction.column) &&
-                            annotationValuesDiffer(value || null, correctionValue || null)
-                              ? { backgroundColor: differenceColor }
-                              : undefined
-                          }
-                        >
+                        <TableCell className="w-px">
                           <Select
                             value={correctionValue || NO_CORRECTION_VALUE}
                             disabled={savingRows.has(selectionKey)}
@@ -455,10 +472,12 @@ export function AnnotationAiPreviewPanel({
                         </TableCell>
                       </>
                     ) : null}
-                    {displayedSupplementalColumns.map((column) => {
-                      const comparisonDiffers =
+                    {supplementalColumns.map((column) => {
+                      const comparisonRevealed =
                         activeComparisonColumns.includes(column) &&
-                        annotationValuesDiffer(value || null, row[column]);
+                        revealedComparisonColumns.has(column);
+                      const comparisonDiffers =
+                        comparisonRevealed && annotationValuesDiffer(value || null, row[column]);
                       return (
                         <TableCell
                           key={column}
@@ -467,7 +486,11 @@ export function AnnotationAiPreviewPanel({
                             comparisonDiffers ? { backgroundColor: differenceColor } : undefined
                           }
                         >
-                          {cellText(row[column]) || '—'}
+                          {activeComparisonColumns.includes(column) && !comparisonRevealed ? (
+                            <span aria-label="Comparison value hidden">•••</span>
+                          ) : (
+                            cellText(row[column]) || '—'
+                          )}
                         </TableCell>
                       );
                     })}

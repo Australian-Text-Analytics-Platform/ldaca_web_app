@@ -17,11 +17,8 @@ interface AnnotationDifferenceQueryArgs {
   sourceSql: string;
   sourceColumns: readonly string[];
   annotationColumn: string;
-  comparisonColumns: readonly string[];
-  differenceFilter: AnnotationDifferenceFilter | null;
+  differenceColumn: string | null;
 }
-
-export type AnnotationDifferenceFilter = { kind: 'any' } | { kind: 'column'; column: string };
 
 export interface AnnotationDifferenceQuery {
   pageSql: string;
@@ -29,32 +26,31 @@ export interface AnnotationDifferenceQuery {
   sourceRowIndexColumn: string;
 }
 
-/** Builds the server-side page/count projections shared by Manual and Review. */
+/**
+ * Builds the server-side page/count projections for one revealed comparison column.
+ * Used by: useAnnotationNodePage so Manual and Review filter before server pagination while the
+ * active filter itself remains mount-local frontend state.
+ */
 export function buildAnnotationDifferenceQuery({
   sourceSql,
   sourceColumns,
   annotationColumn,
-  comparisonColumns,
-  differenceFilter,
+  differenceColumn,
 }: AnnotationDifferenceQueryArgs): AnnotationDifferenceQuery {
   const sourceRowIndexColumn = uniqueColumnName(SOURCE_ROW_INDEX, sourceColumns);
   const sourceName = sqlIdentifier(SOURCE_CTE);
   const indexedName = sqlIdentifier(INDEXED_CTE);
   const filteredName = sqlIdentifier(FILTERED_CTE);
   const rowIndexName = sqlIdentifier(sourceRowIndexColumn);
-  const selectedComparisonColumns = comparisonColumns.filter(
-    (column) => column !== annotationColumn && sourceColumns.includes(column),
-  );
-  const differenceColumns =
-    differenceFilter?.kind === 'any'
-      ? selectedComparisonColumns
-      : differenceFilter?.kind === 'column' &&
-          selectedComparisonColumns.includes(differenceFilter.column)
-        ? [differenceFilter.column]
-        : [];
-  const predicate = differenceColumns
-    .map((column) => `${sqlIdentifier(annotationColumn)} != ${sqlIdentifier(column)}`)
-    .join(' OR ');
+  const validDifferenceColumn =
+    differenceColumn &&
+    differenceColumn !== annotationColumn &&
+    sourceColumns.includes(differenceColumn)
+      ? differenceColumn
+      : null;
+  const predicate = validDifferenceColumn
+    ? `${sqlIdentifier(annotationColumn)} != ${sqlIdentifier(validDifferenceColumn)}`
+    : '';
   const common = [
     `WITH ${sourceName} AS (${sourceSql})`,
     `${indexedName} AS (SELECT ROW_NUMBER() OVER () - 1 AS ${rowIndexName}, * FROM ${sourceName})`,

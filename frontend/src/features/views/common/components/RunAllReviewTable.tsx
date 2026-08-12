@@ -1,5 +1,4 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -18,31 +17,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import {
   ColumnComparisonHeader,
   ColumnComparisonSelector,
-  DifferenceFilterButton,
 } from '@/features/views/common/components/ColumnComparison';
-import {
-  applyComparisonValueEdit,
-  type ConfusionCount,
-  type IntercoderReliabilityMetric,
-} from '@/features/views/common/columnComparisonModel';
+import { type IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
-import {
-  type AnnotationDifferenceFilter,
-  annotationValuesDiffer,
-} from '@/features/views/annotation/annotationDifferenceQuery';
+import { annotationValuesDiffer } from '@/features/views/annotation/annotationDifferenceQuery';
 import { useAnnotationNodePage } from '@/features/views/annotation/hooks/useAnnotationNodePage';
 import { toBgColor } from '@/features/views/common/vizPalette';
 import { AnnotationCorrectionColumnControl } from '@/features/views/annotation/components/AnnotationCorrectionColumnControl';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { queryKeys } from '@/lib/queryKeys';
 import { isArrowDictionaryField, isArrowStringField } from '@/lib/arrow/arrowTable';
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -67,8 +56,6 @@ interface RunAllReviewTableProps {
   comparisonColumn: string;
   comparisonColumns: string[];
   onComparisonColumnsChange: (columns: string[]) => void;
-  differenceFilter: AnnotationDifferenceFilter | null;
-  onDifferenceFilterChange: (filter: AnnotationDifferenceFilter | null) => void;
   reliabilityMetric: IntercoderReliabilityMetric;
   onReliabilityMetricChange: (metric: IntercoderReliabilityMetric) => void;
   metadataColumns: string[];
@@ -84,7 +71,12 @@ interface RunAllReviewTableProps {
   rowCount: number;
 }
 
-/** Renders a current Data Block projection for the durable Review phase. */
+/**
+ * Renders a current Data Block projection for the durable Review phase.
+ * Used by: AnnotationFeature after Run All. Flow: query the server-paginated Data Block, keep
+ * comparisons masked until revealed, and enable full-table reliability, tint, and one mount-local
+ * server-side difference filter only for revealed comparison columns.
+ */
 export function RunAllReviewTable({
   workspaceId,
   nodeId,
@@ -97,8 +89,6 @@ export function RunAllReviewTable({
   comparisonColumn,
   comparisonColumns,
   onComparisonColumnsChange,
-  differenceFilter,
-  onDifferenceFilterChange,
   reliabilityMetric,
   onReliabilityMetricChange,
   metadataColumns,
@@ -108,19 +98,21 @@ export function RunAllReviewTable({
 }: RunAllReviewTableProps) {
   const correctionColumn = correction.column;
   const { setCell } = useWorkspaceActions();
-  const queryClient = useQueryClient();
   const [correctionSelections, setCorrectionSelections] = useState<Record<string, string | null>>(
     {},
   );
   const [savingCorrectionRows, setSavingCorrectionRows] = useState<Set<string>>(new Set());
+  const [revealedComparisonColumns, setRevealedComparisonColumns] = useState<Set<string>>(
+    new Set(),
+  );
+  const [differenceColumn, setDifferenceColumn] = useState<string | null>(null);
   const page = useAnnotationNodePage({
     workspaceId,
     nodeId,
     sourceSql: sql,
     sourceColumns,
     annotationColumn: comparisonColumn,
-    comparisonColumns,
-    differenceFilter,
+    differenceColumn,
     rowCount,
     pageSize: DEFAULT_PAGE_SIZE,
   });
@@ -151,7 +143,11 @@ export function RunAllReviewTable({
           stringColumnSet.has(column),
       ) ?? [])
     : null;
-  const comparisonExcludedColumns = new Set([requiredColumns[0], comparisonColumn]);
+  const comparisonExcludedColumns = new Set([
+    requiredColumns[0],
+    comparisonColumn,
+    correctionColumn,
+  ]);
   const availableComparisonColumns =
     dataColumns?.filter(
       (column) => !comparisonExcludedColumns.has(column) && comparableColumnSet.has(column),
@@ -159,37 +155,30 @@ export function RunAllReviewTable({
   const activeComparisonColumns = comparisonColumns.filter((column) =>
     availableComparisonColumns.includes(column),
   );
-  const activeDifferenceFilter =
-    differenceFilter?.kind === 'any'
-      ? activeComparisonColumns.length > 0
-        ? differenceFilter
-        : null
-      : differenceFilter?.kind === 'column' &&
-          activeComparisonColumns.includes(differenceFilter.column)
-        ? differenceFilter
-        : null;
   const activeMetadataColumns = metadataColumns.filter(
     (column) => availableMetadataColumns.includes(column) && column !== correctionColumn,
   );
-  const displayedComparisonColumns = activeComparisonColumns.filter(
-    (column) => column !== correctionColumn,
+  const revealedActiveComparisonColumns = activeComparisonColumns.filter((column) =>
+    revealedComparisonColumns.has(column),
   );
+  const activeDifferenceColumn =
+    differenceColumn && revealedActiveComparisonColumns.includes(differenceColumn)
+      ? differenceColumn
+      : null;
   const comparisonQueries = useFullColumnComparisons({
     workspaceId,
     nodeIds: [nodeId],
     sql,
     referenceColumn: comparisonColumn,
-    comparisonColumns: activeComparisonColumns,
+    comparisonColumns: revealedActiveComparisonColumns,
   });
   const comparisonQueryByColumn = new Map(
-    activeComparisonColumns.map((column, index) => [column, comparisonQueries[index]]),
+    revealedActiveComparisonColumns.map((column, index) => [column, comparisonQueries[index]]),
   );
   const visibleRequiredColumns = requiredColumns.filter(
     (column) => dataColumns?.includes(column) && column !== correctionColumn,
   );
-  const supplementalColumns = Array.from(
-    new Set([...displayedComparisonColumns, ...activeMetadataColumns]),
-  );
+  const supplementalColumns = [...activeComparisonColumns, ...activeMetadataColumns];
   const tableColumns: ColumnDef<Record<string, unknown>>[] = [
     ...visibleRequiredColumns.map((column) => ({
       id: column,
@@ -229,14 +218,40 @@ export function RunAllReviewTable({
             <ColumnComparisonSelector
               availableColumns={availableComparisonColumns}
               selectedColumns={activeComparisonColumns}
-              onSelectedColumnsChange={onComparisonColumnsChange}
+              onSelectedColumnsChange={(columns) => {
+                const selected = columns.filter((column) => column !== correctionColumn);
+                setRevealedComparisonColumns(
+                  (current) => new Set([...current].filter((column) => selected.includes(column))),
+                );
+                if (differenceColumn && !selected.includes(differenceColumn)) {
+                  setDifferenceColumn(null);
+                }
+                onComparisonColumnsChange(selected);
+              }}
               metric={reliabilityMetric}
               onMetricChange={onReliabilityMetricChange}
+              disabledColumns={activeMetadataColumns}
             />
             <AnnotationCorrectionColumnControl
               value={correctionColumn}
               availableColumns={availableCorrectionColumns}
-              onValueChange={correction.onColumnChange}
+              onValueChange={(column) => {
+                if (column) {
+                  onComparisonColumnsChange(
+                    activeComparisonColumns.filter((selected) => selected !== column),
+                  );
+                  onMetadataColumnsChange(
+                    activeMetadataColumns.filter((selected) => selected !== column),
+                  );
+                  setRevealedComparisonColumns((current) => {
+                    const next = new Set(current);
+                    next.delete(column);
+                    return next;
+                  });
+                  if (differenceColumn === column) setDifferenceColumn(null);
+                }
+                correction.onColumnChange(column);
+              }}
               onCreate={correction.onCreate}
               onUseAsExample={correction.onUseAsExample}
               disabled={correction.disabled}
@@ -245,6 +260,7 @@ export function RunAllReviewTable({
               availableColumns={availableMetadataColumns}
               selectedColumns={activeMetadataColumns}
               onSelectedColumnsChange={onMetadataColumnsChange}
+              disabledColumns={activeComparisonColumns}
             />
           </div>
         ) : null}
@@ -271,21 +287,7 @@ export function RunAllReviewTable({
               <TableRow>
                 {visibleRequiredColumns.map((column) => (
                   <TableHead key={column}>
-                    {column === comparisonColumn ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span>{column}</span>
-                        <TooltipProvider delayDuration={120} skipDelayDuration={0}>
-                          <DifferenceFilterButton
-                            active={activeDifferenceFilter?.kind === 'any'}
-                            ariaLabel={`Filter any difference for ${comparisonColumn}`}
-                            tooltip="Filter any difference"
-                            onActiveChange={(active) => {
-                              onDifferenceFilterChange(active ? { kind: 'any' } : null);
-                            }}
-                          />
-                        </TooltipProvider>
-                      </span>
-                    ) : activeComparisonColumns.includes(column) ? (
+                    {activeComparisonColumns.includes(column) ? (
                       <ColumnComparisonHeader
                         metric={reliabilityMetric}
                         referenceColumn={comparisonColumn}
@@ -293,12 +295,21 @@ export function RunAllReviewTable({
                         rows={comparisonQueryByColumn.get(column)?.data}
                         isLoading={comparisonQueryByColumn.get(column)?.isLoading ?? true}
                         isError={comparisonQueryByColumn.get(column)?.isError ?? false}
-                        differenceFilterActive={
-                          activeDifferenceFilter?.kind === 'column' &&
-                          activeDifferenceFilter.column === column
-                        }
+                        revealed={revealedComparisonColumns.has(column)}
+                        onRevealedChange={(revealed) => {
+                          setRevealedComparisonColumns((current) => {
+                            const next = new Set(current);
+                            if (revealed) next.add(column);
+                            else next.delete(column);
+                            return next;
+                          });
+                          if (!revealed && differenceColumn === column) {
+                            setDifferenceColumn(null);
+                          }
+                        }}
+                        differenceFilterActive={activeDifferenceColumn === column}
                         onDifferenceFilterChange={(active) => {
-                          onDifferenceFilterChange(active ? { kind: 'column', column } : null);
+                          setDifferenceColumn(active ? column : null);
                         }}
                       />
                     ) : (
@@ -312,30 +323,7 @@ export function RunAllReviewTable({
                       <ArrowRight aria-hidden="true" className="mx-auto size-4" />
                     </TableHead>
                     <TableHead className="w-px whitespace-nowrap">
-                      {activeComparisonColumns.includes(correctionColumn) ? (
-                        <ColumnComparisonHeader
-                          label={`Correction: ${correctionColumn}`}
-                          metric={reliabilityMetric}
-                          referenceColumn={comparisonColumn}
-                          comparisonColumn={correctionColumn}
-                          rows={comparisonQueryByColumn.get(correctionColumn)?.data}
-                          isLoading={
-                            comparisonQueryByColumn.get(correctionColumn)?.isLoading ?? true
-                          }
-                          isError={comparisonQueryByColumn.get(correctionColumn)?.isError ?? false}
-                          differenceFilterActive={
-                            activeDifferenceFilter?.kind === 'column' &&
-                            activeDifferenceFilter.column === correctionColumn
-                          }
-                          onDifferenceFilterChange={(active) => {
-                            onDifferenceFilterChange(
-                              active ? { kind: 'column', column: correctionColumn } : null,
-                            );
-                          }}
-                        />
-                      ) : (
-                        <>Correction: {correctionColumn}</>
-                      )}
+                      <>Correction: {correctionColumn}</>
                     </TableHead>
                   </>
                 ) : null}
@@ -349,12 +337,21 @@ export function RunAllReviewTable({
                         rows={comparisonQueryByColumn.get(column)?.data}
                         isLoading={comparisonQueryByColumn.get(column)?.isLoading ?? true}
                         isError={comparisonQueryByColumn.get(column)?.isError ?? false}
-                        differenceFilterActive={
-                          activeDifferenceFilter?.kind === 'column' &&
-                          activeDifferenceFilter.column === column
-                        }
+                        revealed={revealedComparisonColumns.has(column)}
+                        onRevealedChange={(revealed) => {
+                          setRevealedComparisonColumns((current) => {
+                            const next = new Set(current);
+                            if (revealed) next.add(column);
+                            else next.delete(column);
+                            return next;
+                          });
+                          if (!revealed && differenceColumn === column) {
+                            setDifferenceColumn(null);
+                          }
+                        }}
+                        differenceFilterActive={activeDifferenceColumn === column}
                         onDifferenceFilterChange={(active) => {
-                          onDifferenceFilterChange(active ? { kind: 'column', column } : null);
+                          setDifferenceColumn(active ? column : null);
                         }}
                       />
                     ) : (
@@ -382,7 +379,7 @@ export function RunAllReviewTable({
                   : seededCorrection;
                 const comparisonValue = (column: string): unknown =>
                   column === correctionColumn ? correctionValue : row[column];
-                const referenceDiffers = activeComparisonColumns.some((column) =>
+                const referenceDiffers = revealedActiveComparisonColumns.some((column) =>
                   annotationValuesDiffer(referenceValue, comparisonValue(column)),
                 );
                 const differenceColor = toBgColor(sourceColor);
@@ -390,7 +387,7 @@ export function RunAllReviewTable({
                   <TableRow key={rowPosition}>
                     {visibleRequiredColumns.map((column) => {
                       const comparisonDiffers =
-                        activeComparisonColumns.includes(column) &&
+                        revealedActiveComparisonColumns.includes(column) &&
                         annotationValuesDiffer(referenceValue, row[column]);
                       const highlighted =
                         (column === comparisonColumn && referenceDiffers) || comparisonDiffers;
@@ -413,28 +410,13 @@ export function RunAllReviewTable({
                             className="mx-auto size-4 text-muted-foreground"
                           />
                         </TableCell>
-                        <TableCell
-                          className="w-px"
-                          style={
-                            activeComparisonColumns.includes(correctionColumn) &&
-                            annotationValuesDiffer(referenceValue, correctionValue)
-                              ? { backgroundColor: differenceColor }
-                              : undefined
-                          }
-                        >
+                        <TableCell className="w-px">
                           <Select
                             value={correctionValue ?? NO_CORRECTION_VALUE}
                             disabled={savingCorrectionRows.has(correctionKey)}
                             onValueChange={(next) => {
                               const resolved = next === NO_CORRECTION_VALUE ? null : next;
                               const previous = correctionValue;
-                              const queryKey = queryKeys.annotationColumnComparison(
-                                workspaceId,
-                                [nodeId],
-                                sql,
-                                comparisonColumn,
-                                correctionColumn,
-                              );
                               setCorrectionSelections((current) => ({
                                 ...current,
                                 [correctionKey]: resolved,
@@ -442,35 +424,7 @@ export function RunAllReviewTable({
                               setSavingCorrectionRows((current) =>
                                 new Set(current).add(correctionKey),
                               );
-                              void queryClient
-                                .cancelQueries({ queryKey, exact: true })
-                                .then(() =>
-                                  setCell(nodeId, correctionColumn, rowPosition, resolved),
-                                )
-                                .then(() => {
-                                  const current =
-                                    queryClient.getQueryData<ConfusionCount[]>(queryKey);
-                                  if (current) {
-                                    queryClient.setQueryData<ConfusionCount[]>(
-                                      queryKey,
-                                      applyComparisonValueEdit(current, {
-                                        reference:
-                                          referenceValue == null
-                                            ? null
-                                            : displayCell(referenceValue),
-                                        previousComparison: previous,
-                                        nextComparison: resolved,
-                                      }),
-                                    );
-                                  } else {
-                                    void queryClient.refetchQueries({
-                                      queryKey,
-                                      exact: true,
-                                      type: 'active',
-                                    });
-                                  }
-                                  return page.refreshFilteredRows();
-                                })
+                              void setCell(nodeId, correctionColumn, rowPosition, resolved)
                                 .catch((error: unknown) => {
                                   setCorrectionSelections((current) => {
                                     const nextSelections = { ...current };
@@ -515,8 +469,11 @@ export function RunAllReviewTable({
                       </>
                     ) : null}
                     {supplementalColumns.map((column) => {
-                      const comparisonDiffers =
+                      const comparisonRevealed =
                         activeComparisonColumns.includes(column) &&
+                        revealedComparisonColumns.has(column);
+                      const comparisonDiffers =
+                        comparisonRevealed &&
                         annotationValuesDiffer(referenceValue, comparisonValue(column));
                       return (
                         <TableCell
@@ -526,7 +483,11 @@ export function RunAllReviewTable({
                             comparisonDiffers ? { backgroundColor: differenceColor } : undefined
                           }
                         >
-                          {displayCell(comparisonValue(column))}
+                          {activeComparisonColumns.includes(column) && !comparisonRevealed ? (
+                            <span aria-label="Comparison value hidden">•••</span>
+                          ) : (
+                            displayCell(comparisonValue(column))
+                          )}
                         </TableCell>
                       );
                     })}

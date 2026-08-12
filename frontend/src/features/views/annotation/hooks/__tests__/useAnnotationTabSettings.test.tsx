@@ -29,14 +29,11 @@ describe('useAnnotationTabSettings', () => {
           annotationComparisonColumns: JSON.stringify({
             'source-node': ['reviewer_one', 'reviewer_two'],
           }),
-          annotationDifferenceFilters: JSON.stringify({
-            'source-node': { kind: 'column', column: 'reviewer_two' },
-          }),
           annotationReliabilityMetrics: JSON.stringify({
             'source-node': 'krippendorffs_alpha',
           }),
           annotationMetadataColumns: JSON.stringify({
-            'source-node': ['username', 'created_at'],
+            'source-node': ['username', 'reviewer_two', 'created_at'],
           }),
         },
       }),
@@ -62,9 +59,6 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.annotationTargets).toEqual({ 'source-node': 'annotation' });
     expect(result.current.annotationComparisonColumns).toEqual({
       'source-node': ['reviewer_one', 'reviewer_two'],
-    });
-    expect(result.current.annotationDifferenceFilters).toEqual({
-      'source-node': { kind: 'column', column: 'reviewer_two' },
     });
     expect(result.current.annotationReliabilityMetrics).toEqual({
       'source-node': 'krippendorffs_alpha',
@@ -147,38 +141,78 @@ describe('useAnnotationTabSettings', () => {
     );
   });
 
-  it('persists one exclusive filter per Data Block and prunes a deselected target', () => {
+  it('gives Compare To precedence when legacy settings overlap', () => {
+    const onTabSettingChange = vi.fn();
+    const { result } = renderHook(() =>
+      useAnnotationTabSettings({
+        onTabSettingChange,
+        tabSettings: {
+          annotationComparisonColumns: JSON.stringify({
+            'source-node': ['reviewer_one'],
+          }),
+          annotationMetadataColumns: JSON.stringify({
+            'source-node': ['reviewer_one', 'username'],
+          }),
+        },
+      }),
+    );
+
+    expect(result.current.annotationComparisonColumns).toEqual({
+      'source-node': ['reviewer_one'],
+    });
+    expect(result.current.annotationMetadataColumns).toEqual({
+      'source-node': ['username'],
+    });
+  });
+
+  it('excludes the active Correction column from both column roles', () => {
+    const { result } = renderHook(() =>
+      useAnnotationTabSettings({
+        onTabSettingChange: vi.fn(),
+        excludedRoleColumns: { 'source-node': 'correction' },
+        tabSettings: {
+          annotationComparisonColumns: JSON.stringify({
+            'source-node': ['reviewer_one', 'correction'],
+          }),
+          annotationMetadataColumns: JSON.stringify({
+            'source-node': ['username', 'correction'],
+          }),
+        },
+      }),
+    );
+
+    expect(result.current.annotationComparisonColumns).toEqual({
+      'source-node': ['reviewer_one'],
+    });
+    expect(result.current.annotationMetadataColumns).toEqual({
+      'source-node': ['username'],
+    });
+  });
+
+  it('keeps comparison and metadata roles mutually exclusive', () => {
     const onTabSettingChange = vi.fn();
     const { result } = renderHook(() =>
       useAnnotationTabSettings({ tabSettings: {}, onTabSettingChange }),
     );
 
     act(() => {
-      result.current.setAnnotationComparisonColumns('source-node', [
-        'reviewer_one',
-        'reviewer_two',
-      ]);
-      result.current.setAnnotationDifferenceFilter('source-node', { kind: 'any' });
+      result.current.setAnnotationMetadataColumns('source-node', ['username', 'reviewer_one']);
+      result.current.setAnnotationComparisonColumns('source-node', ['reviewer_one']);
     });
-    expect(result.current.annotationDifferenceFilters).toEqual({
-      'source-node': { kind: 'any' },
+    expect(result.current.annotationComparisonColumns).toEqual({
+      'source-node': ['reviewer_one'],
     });
-
-    act(() => {
-      result.current.setAnnotationDifferenceFilter('source-node', {
-        kind: 'column',
-        column: 'reviewer_one',
-      });
-    });
-    expect(result.current.annotationDifferenceFilters).toEqual({
-      'source-node': { kind: 'column', column: 'reviewer_one' },
+    expect(result.current.annotationMetadataColumns).toEqual({
+      'source-node': ['username'],
     });
 
     act(() => {
-      result.current.setAnnotationComparisonColumns('source-node', ['reviewer_two']);
+      result.current.setAnnotationMetadataColumns('source-node', ['reviewer_one']);
     });
-    expect(result.current.annotationDifferenceFilters).toEqual({});
-    expect(onTabSettingChange).toHaveBeenLastCalledWith('annotationDifferenceFilters', '{}');
+    expect(result.current.annotationComparisonColumns).toEqual({});
+    expect(result.current.annotationMetadataColumns).toEqual({
+      'source-node': ['reviewer_one'],
+    });
   });
 
   it('retains every target when two selectors persist before React rerenders', () => {

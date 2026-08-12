@@ -34,6 +34,8 @@ interface MetadataColumnSelectorProps {
   availableColumns: string[];
   selectedColumns: string[];
   onSelectedColumnsChange: (columns: string[]) => void;
+  /** Columns owned by another control remain visible but cannot be selected here. */
+  disabledColumns?: string[];
   /**
    * Optional grouping of `availableColumns`. When provided and there is more
    * than one section, the dropdown renders each group with a divider so
@@ -61,6 +63,7 @@ export function MetadataColumnSelector({
   availableColumns,
   selectedColumns,
   onSelectedColumnsChange,
+  disabledColumns = [],
   sections,
   disabledReason,
 }: MetadataColumnSelectorProps) {
@@ -69,6 +72,7 @@ export function MetadataColumnSelector({
     normalizedAvailableColumns.includes(column),
   );
   const useSections = Array.isArray(sections) && sections.length > 1;
+  const disabledColumnSet = new Set(disabledColumns);
 
   // Columns that the user is allowed to toggle from this dropdown. Items in
   // sections marked `disabled` are excluded — they're shown but inert.
@@ -78,10 +82,10 @@ export function MetadataColumnSelector({
           sections
             .filter((s) => !s.disabled)
             .flatMap((s) => normalizeMetadataColumns(s.columns))
-            .filter((c) => normalizedAvailableColumns.includes(c)),
+            .filter((c) => normalizedAvailableColumns.includes(c) && !disabledColumnSet.has(c)),
         ),
       )
-    : normalizedAvailableColumns;
+    : normalizedAvailableColumns.filter((column) => !disabledColumnSet.has(column));
 
   const allSelectableSelected =
     selectableColumns.length > 0 &&
@@ -163,7 +167,7 @@ export function MetadataColumnSelector({
                       onSelect={(event) => {
                         event.preventDefault();
                       }}
-                      disabled={section.disabled}
+                      disabled={(section.disabled ?? false) || disabledColumnSet.has(column)}
                       style={section.color ? { color: section.color } : undefined}
                     >
                       {column}
@@ -176,6 +180,7 @@ export function MetadataColumnSelector({
                 <DropdownMenuCheckboxItem
                   key={column}
                   checked={normalizedSelectedColumns.includes(column)}
+                  disabled={disabledColumnSet.has(column)}
                   onCheckedChange={(checked) => {
                     toggleColumn(column, checked);
                   }}

@@ -73,6 +73,8 @@ describe('ColumnComparison', () => {
         rows={rows}
         isLoading={false}
         isError={false}
+        revealed
+        onRevealedChange={vi.fn()}
       />,
     );
 
@@ -127,6 +129,8 @@ describe('ColumnComparison', () => {
         rows={rows}
         isLoading={false}
         isError={false}
+        revealed
+        onRevealedChange={vi.fn()}
       />,
     );
 
@@ -144,6 +148,8 @@ describe('ColumnComparison', () => {
         rows={rows}
         isLoading={false}
         isError={false}
+        revealed
+        onRevealedChange={vi.fn()}
       />,
     );
 
@@ -165,6 +171,8 @@ describe('ColumnComparison', () => {
         rows={rows}
         isLoading={false}
         isError={false}
+        revealed
+        onRevealedChange={vi.fn()}
         differenceFilterActive={false}
         onDifferenceFilterChange={onDifferenceFilterChange}
       />,
@@ -185,12 +193,37 @@ describe('ColumnComparison', () => {
         rows={rows}
         isLoading={false}
         isError={false}
+        revealed
+        onRevealedChange={vi.fn()}
         differenceFilterActive
         onDifferenceFilterChange={onDifferenceFilterChange}
       />,
     );
     const activeToggle = screen.getByRole('button', { name: 'Filter difference for review' });
     expect(activeToggle.textContent).toBe('');
+  });
+
+  it('keeps reliability and filtering unavailable until the comparison is revealed', async () => {
+    const user = userEvent.setup();
+    const onRevealedChange = vi.fn();
+    render(
+      <ColumnComparisonHeader
+        metric="cohens_kappa"
+        referenceColumn="annotation"
+        comparisonColumn="review"
+        rows={rows}
+        isLoading={false}
+        isError={false}
+        revealed={false}
+        onRevealedChange={onRevealedChange}
+        onDifferenceFilterChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /Cohen’s Kappa/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter difference for review' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for review' }));
+    expect(onRevealedChange).toHaveBeenCalledWith(true);
   });
 
   it('offers all reliability metrics above the comparison checklist', async () => {
@@ -218,5 +251,28 @@ describe('ColumnComparison', () => {
 
     await user.click(screen.getByRole('menuitemradio', { name: 'Krippendorff’s Alpha' }));
     expect(onMetricChange).toHaveBeenCalledWith('krippendorffs_alpha');
+  });
+
+  it('disables opposite-role columns and skips them when selecting all', async () => {
+    const user = userEvent.setup();
+    const onSelectedColumnsChange = vi.fn();
+    render(
+      <ColumnComparisonSelector
+        availableColumns={['review', 'username']}
+        selectedColumns={[]}
+        onSelectedColumnsChange={onSelectedColumnsChange}
+        metric="cohens_kappa"
+        onMetricChange={vi.fn()}
+        disabledColumns={['username']}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    expect(screen.getByRole('menuitemcheckbox', { name: 'username' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Select all' }));
+    expect(onSelectedColumnsChange).toHaveBeenCalledWith(['review']);
   });
 });

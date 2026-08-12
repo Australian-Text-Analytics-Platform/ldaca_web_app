@@ -189,6 +189,13 @@ describe('AnnotationAiPreviewPanel', () => {
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
     await user.keyboard('{Escape}');
 
+    expect(screen.queryByRole('button', { name: /Cohen’s Kappa/ })).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('Comparison value hidden')).toHaveLength(2);
+    expect(
+      screen.getByRole('button', { name: 'Show comparison values for review' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for review' }));
+
     expect(
       await screen.findByRole('button', {
         name: 'Cohen’s Kappa 0.333 for annotation (preview) versus review',
@@ -238,6 +245,7 @@ describe('AnnotationAiPreviewPanel', () => {
     await user.click(screen.getByRole('menuitemradio', { name: 'Krippendorff’s Alpha' }));
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
     await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for review' }));
 
     expect(
       screen.getByRole('button', {
@@ -256,8 +264,13 @@ describe('AnnotationAiPreviewPanel', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'correction' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
     await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Show metadata' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'correction' })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for review' }));
 
     const previewTable = screen.getAllByRole('table')[0];
     const headers = within(previewTable).getAllByRole('columnheader');

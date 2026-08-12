@@ -102,41 +102,51 @@ re-run change detection rather than rewriting a historical request.
 
 Annotation comparison columns, reliability metric, and metadata selections are
 presentation state keyed by source Data Block and are shared by Manual, Preview,
-and Review in the same Tab. Comparison choices are restricted to string and
-categorical schema columns. Cohen's Kappa is the default metric; Percent
-Agreement and nominal Krippendorff's Alpha use the same grouped counts.
-Manual and Review retain one exclusive difference filter per source Data Block:
-either any selected comparison or one named comparison column. Removing the
-named comparison removes its filter, while Preview ignores filter state. Each
-filtered page and its exact row count are separate Workspace SQL Query
-resources keyed by the generated predicate and pagination. The backend applies
-the selected-column predicate, or OR across every selected comparison for the
-any-difference choice, before pagination. Manual pages carry a transient
-absolute source-row number created before filtering so an edit still targets
-the original Data Block row; that transport column is never shown or persisted.
-After a successful edit, the page and filtered count refresh immediately and
-pagination clamps if the final page becomes empty.
+and Review in the same Tab. Compare To and Show metadata selections are
+mutually exclusive; selector items already owned by the opposite role are
+disabled, Select all skips them, legacy overlap resolves to Compare To, and the
+active correction column is removed from both roles. Comparison choices are
+restricted to string and categorical schema columns. Cohen's Kappa is the
+default metric; Percent Agreement and nominal Krippendorff's Alpha use the same
+grouped counts. Reveal state is mount-local, so each selected comparison starts
+masked after remount. Only revealed comparisons participate in reliability
+queries, difference tinting, or filters.
+
+Manual and Review retain at most one mount-local named-column difference
+filter. Its funnel stays visible but disabled while the comparison is hidden;
+hiding or deselecting the column clears it. Each filtered page and its exact row
+count are separate Workspace SQL Query resources keyed by the generated
+single-column predicate and pagination. Workspace SQL applies that predicate
+before server pagination. Manual pages carry a transient absolute source-row
+number created before filtering so an edit still targets the original Data
+Block row; that transport column is never shown or persisted. Changing the
+filter resets pagination to page one. After a successful edit, the page and
+filtered count refresh immediately and pagination clamps if the final page
+becomes empty.
 When selected, the correction column is always present and editable. Manual
 edits annotation and correction cells; Preview and Review edit only correction
 cells and keep their prediction or submitted annotation read-only. Each write
 uses the transient absolute source-row number, disables only the affected cell,
 and rolls back its local value on failure. Preview compares only its current
-page. Manual and Review use a dedicated full-table grouped-count Query resource keyed by
-Workspace, Data Block dependencies, source SQL, reference column, and target
-column. Compared columns project that resource as the selected reliability
-value beside the table header and a plain count matrix on hover or focus; no
-separate comparison card owns state. A successful Manual label edit applies its
-old and new count pairs to that resource after persistence; it does not
-invalidate and rescan the aggregate. A missing baseline is fetched once, and
-ordinary refetch-on-mount or focus reconciles edits made elsewhere.
+page. Revealed Manual and Review comparisons use a dedicated full-table
+grouped-count Query resource keyed by Workspace, Data Block dependencies,
+source SQL, reference column, and target column. A revealed column projects
+that resource as the selected reliability value beside the table header and a
+plain count matrix on hover or focus; no separate comparison card owns state. A
+successful Manual label edit applies its old and new count pairs to that
+resource after persistence; it does not invalidate and rescan the aggregate. A
+missing baseline is fetched once, and ordinary refetch-on-mount or focus
+reconciles edits made elsewhere.
 Difference filtering never changes those aggregate resources, so reliability
 continues to describe the complete Data Block. Manual and Review header filter
 toggles control only the displayed rows and pagination. Preview, Manual, and
 Review all use the selected Data Block's previewed color as a light difference
-tint: the annotation or prediction cell is tinted when any selected comparison
-differs, and an individual comparison cell is tinted only when that value
-differs. Null pairs follow ordinary SQL inequality semantics and are neither
-filtered nor highlighted. The shared color control commits `Node.color` before
+tint: the annotation or prediction cell is tinted when any revealed comparison
+differs, and a revealed comparison cell is tinted only when that value differs.
+Hidden cells render the uniform `•••` mask without exposing the underlying
+value, emptiness, score, matrix, or tint. Null pairs follow ordinary SQL
+inequality semantics and are neither filtered nor highlighted. The shared
+color control commits `Node.color` before
 Preview, Run All, or Manual Start; a failed commit aborts that action.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten

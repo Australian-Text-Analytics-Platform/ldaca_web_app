@@ -109,14 +109,19 @@ Manual Annotation also provides **Compare To**. Select one or more other label
 columns to add them as read-only table columns. Non-string columns are omitted
 from this checklist; string and categorical columns remain eligible. At the top, choose
 **Percent Agreement**, **Cohen's Kappa** (the default), or **Krippendorff's
-Alpha**. Each compared column header shows the selected score with `%`, `κ`, or
-`α`; hover or focus the score to inspect the exact confusion-matrix counts.
+Alpha**. Each compared column starts hidden when the table opens. Use its eye
+button to reveal or hide it. Revealing shows values, difference colors, and the
+selected score with `%`, `κ`, or `α`; hover or focus the score to inspect the
+exact confusion-matrix counts.
 Preview scores use only the current page, while Manual and Review scores use
 the whole Data Block. The same comparison columns and reliability choice remain
 selected in all three modes, and each successfully saved Manual label updates
 its scores and counts immediately. **Show metadata** is available beside
 **Compare To** in Manual, Preview, and Review; its per-Data-Block checklist
-selection also remains the same across all three modes. The selected correction
+selection also remains the same across all three modes. A column cannot serve
+as both a comparison and metadata column: a selection in one menu is disabled
+in the other, and **Select all** skips disabled columns. The active correction
+column is offered in neither menu. The selected correction
 column is always shown and editable. Manual permits editing both the annotation
 and correction columns; Preview and Review keep the prediction or completed
 annotation read-only and permit correction edits. The live selection is retained
@@ -124,19 +129,19 @@ by the Tab, while each submitted Analysis keeps the selection it captured as
 immutable provenance. **Clear Results** resets the live selection to **None**
 without deleting the column or its values.
 
-In Manual and Review, the Annotation Column and each compared-column header
-have a visible filter toggle. The Annotation Column toggle shows rows where any
-selected comparison differs. A compared-column toggle shows rows differing
-from that column only. These controls are mutually exclusive, so selecting one
-turns off the previous filter. Filtering is performed before pagination, while
-reliability scores still describe the whole Data Block. Resolving a difference
-in Manual mode removes that row immediately when it no longer matches. Preview
-shows no filter toggles.
+In Manual and Review, each compared-column header has a visible filter toggle.
+It is disabled while the column is hidden and filters rows differing from that
+revealed column only. Only one column filter can be active. Hiding or
+deselecting that column clears the filter. Filtering is performed before
+server pagination, while reliability scores still describe the whole Data
+Block. Resolving a difference in Manual mode removes that row immediately when
+it no longer matches. Preview shows no filter toggles.
 
 The color picker on the **Annotation Data Block** card controls difference
 highlighting in all three modes. The annotation or prediction cell is tinted
-when any selected comparison differs, and each comparison cell is tinted only
-when that particular value differs. A null value is not treated as a
+when any revealed comparison differs, and each revealed comparison cell is
+tinted only when that particular value differs. Hidden comparisons use the
+same `•••` mask for every row and show no value, score, matrix, or tint. A null value is not treated as a
 difference. The chosen color is saved to the Data Block when you start Preview,
 Run All, or Manual Start; if saving fails, the action does not start.
 

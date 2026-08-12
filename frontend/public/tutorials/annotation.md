@@ -24,9 +24,17 @@ Choose **Start** to open the annotation table. Select a Codebook value for each
 row; each change is written directly to the annotation column as a Data Block
 Edit. Choose **Close** to hide the table without discarding saved labels.
 
-Use comparison columns and the difference filter to compare another coder or
-model with the active annotation column. Reliability statistics summarize
-agreement but do not explain why labels differ. Add a correction column when
+Use **Compare To** to add another coder or model. Each comparison starts masked
+as `•••`; reveal it from the eye button in its header to show values,
+difference colours, reliability, and its per-column difference filter. Hidden
+columns have a disabled filter, and hiding or removing the filtered column
+clears the filter. Filtered rows and counts are calculated before server
+pagination. Reliability statistics summarize agreement but do not explain why
+labels differ.
+
+**Compare To** and **Show metadata** are exclusive roles: a selected column is
+disabled in the other menu, and **Select all** skips disabled columns. The
+active correction column appears in neither menu. Add a correction column when
 you want reviewed decisions kept separately, and use metadata columns to retain
 useful source context in the table.
 
@@ -57,8 +65,9 @@ Codebook, examples, model, or settings when the errors show a pattern.
 
 Choose **Run All** only after Preview is satisfactory. Run All executes from the
 saved Preview snapshot and writes labels to the selected annotation column. The
-Review table reflects the current Data Block and supports comparison,
-differences, reliability, metadata, and correction controls. A reviewed
+Review table reflects the current Data Block and supports the same hidden-first
+comparisons, per-column differences, reliability, metadata, and correction
+controls. A reviewed
 correction column can also be selected as the Example annotation column for a
 later run.
 

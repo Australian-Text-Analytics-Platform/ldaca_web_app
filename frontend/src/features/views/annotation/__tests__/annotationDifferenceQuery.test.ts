@@ -6,20 +6,17 @@ import {
 } from '../annotationDifferenceQuery';
 
 describe('annotationDifferenceQuery', () => {
-  it('builds indexed any-comparison filtering plus a matching count projection', () => {
+  it('builds indexed per-column filtering plus a matching count projection', () => {
     const query = buildAnnotationDifferenceQuery({
       sourceSql: 'SELECT * FROM "node-1"',
       sourceColumns: ['text', 'annotation', 'reviewer_one', 'reviewer_two'],
       annotationColumn: 'annotation',
-      comparisonColumns: ['reviewer_one', 'reviewer_two'],
-      differenceFilter: { kind: 'any' },
+      differenceColumn: 'reviewer_two',
     });
 
     expect(query.sourceRowIndexColumn).toBe('__wordflow_annotation_source_row_index');
     expect(query.pageSql).toContain('ROW_NUMBER() OVER () - 1');
-    expect(query.pageSql).toContain(
-      'WHERE "annotation" != "reviewer_one" OR "annotation" != "reviewer_two"',
-    );
+    expect(query.pageSql).toContain('WHERE "annotation" != "reviewer_two"');
     expect(query.pageSql).toContain('ORDER BY "__wordflow_annotation_source_row_index"');
     expect(query.countSql).toContain('COUNT(*) AS "__wordflow_annotation_filtered_row_count"');
   });
@@ -29,21 +26,19 @@ describe('annotationDifferenceQuery', () => {
       sourceSql: 'SELECT * FROM "node-1"',
       sourceColumns: ['text', 'annotation', 'reviewer_one', 'reviewer_two'],
       annotationColumn: 'annotation',
-      comparisonColumns: ['reviewer_one', 'reviewer_two'],
-      differenceFilter: { kind: 'column', column: 'reviewer_two' },
+      differenceColumn: 'reviewer_two',
     });
 
     expect(query.pageSql).toContain('WHERE "annotation" != "reviewer_two"');
     expect(query.pageSql).not.toContain('"annotation" != "reviewer_one"');
   });
 
-  it('does not filter against a column outside the selected comparisons', () => {
+  it('does not filter against a column outside the source schema', () => {
     const query = buildAnnotationDifferenceQuery({
       sourceSql: 'SELECT * FROM "node-1"',
       sourceColumns: ['text', 'annotation', 'reviewer_one'],
       annotationColumn: 'annotation',
-      comparisonColumns: ['reviewer_one'],
-      differenceFilter: { kind: 'column', column: 'unselected_column' },
+      differenceColumn: 'unselected_column',
     });
 
     expect(query.countSql).toBeNull();
@@ -55,8 +50,7 @@ describe('annotationDifferenceQuery', () => {
       sourceSql: 'SELECT * FROM "node-1"',
       sourceColumns: ['__wordflow_annotation_source_row_index'],
       annotationColumn: 'annotation',
-      comparisonColumns: [],
-      differenceFilter: null,
+      differenceColumn: null,
     });
 
     expect(query.sourceRowIndexColumn).toBe('___wordflow_annotation_source_row_index');

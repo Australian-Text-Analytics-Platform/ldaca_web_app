@@ -230,15 +230,17 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAiReasoningEffort,
     annotationTargets,
     setAnnotationTarget,
-    annotationDifferenceFilters,
-    setAnnotationDifferenceFilter,
     annotationComparisonColumns,
     setAnnotationComparisonColumns,
     annotationReliabilityMetrics,
     setAnnotationReliabilityMetric,
     annotationMetadataColumns,
     setAnnotationMetadataColumns,
-  } = useAnnotationTabSettings({ tabSettings, onTabSettingChange });
+  } = useAnnotationTabSettings({
+    tabSettings,
+    onTabSettingChange,
+    excludedRoleColumns: host.correctionColumns,
+  });
   const providerCredentials = useProviderCredentials();
   const selectedAiProvider =
     providerCredentials.annotationProviders.find(
@@ -1379,10 +1381,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           onComparisonColumnsChange={(columns) => {
             setAnnotationComparisonColumns(sourceNode.id, columns);
           }}
-          differenceFilter={annotationDifferenceFilters[sourceNode.id] ?? null}
-          onDifferenceFilterChange={(filter) => {
-            setAnnotationDifferenceFilter(sourceNode.id, filter);
-          }}
           reliabilityMetric={
             annotationReliabilityMetrics[sourceNode.id] ?? DEFAULT_INTERCODER_RELIABILITY_METRIC
           }
@@ -1427,10 +1425,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           comparisonColumns={annotationComparisonColumns[annotationRunAllSource.node_id] ?? []}
           onComparisonColumnsChange={(columns) => {
             setAnnotationComparisonColumns(annotationRunAllSource.node_id, columns);
-          }}
-          differenceFilter={annotationDifferenceFilters[annotationRunAllSource.node_id] ?? null}
-          onDifferenceFilterChange={(filter) => {
-            setAnnotationDifferenceFilter(annotationRunAllSource.node_id, filter);
           }}
           reliabilityMetric={
             annotationReliabilityMetrics[annotationRunAllSource.node_id] ??

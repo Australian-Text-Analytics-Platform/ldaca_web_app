@@ -5,7 +5,6 @@ import { Dictionary, Field, Int32, Int64, Utf8 } from 'apache-arrow';
 import { type ComponentProps, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntercoderReliabilityMetric } from '@/features/views/common/columnComparisonModel';
-import type { AnnotationDifferenceFilter } from '@/features/views/annotation/annotationDifferenceQuery';
 import { RunAllReviewTable } from '../RunAllReviewTable';
 
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
@@ -37,8 +36,6 @@ function ReviewTable({
   | 'reliabilityMetric'
   | 'onReliabilityMetricChange'
   | 'correction'
-  | 'differenceFilter'
-  | 'onDifferenceFilterChange'
 > & { correctionColumn?: string }) {
   const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
@@ -47,7 +44,6 @@ function ReviewTable({
   );
   const [reliabilityMetric, setReliabilityMetric] =
     useState<IntercoderReliabilityMetric>('cohens_kappa');
-  const [differenceFilter, setDifferenceFilter] = useState<AnnotationDifferenceFilter | null>(null);
   return (
     <RunAllReviewTable
       {...props}
@@ -57,8 +53,6 @@ function ReviewTable({
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
-      differenceFilter={differenceFilter}
-      onDifferenceFilterChange={setDifferenceFilter}
       correction={{
         column: selectedCorrectionColumn,
         classOptions: ['label', 'corrected'],
@@ -249,6 +243,9 @@ describe('RunAllReviewTable', () => {
       await screen.findByRole('columnheader', { name: 'Correction: correction' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Use as example' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'correction' })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
     await user.click(screen.getByRole('combobox', { name: 'Correction for row 1' }));
     await user.click(screen.getByRole('option', { name: 'label' }));
     await waitFor(() => {
@@ -268,6 +265,13 @@ describe('RunAllReviewTable', () => {
   it('compares the full annotation column with multiple selected columns', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockImplementation(({ body }) => {
+      if (body.sql.includes('__wordflow_annotation_filtered_row_count')) {
+        return Promise.resolve({
+          columns: ['__wordflow_annotation_filtered_row_count'],
+          rows: [{ __wordflow_annotation_filtered_row_count: 1 }],
+          hasNext: false,
+        });
+      }
       if (body.sql.includes('COUNT(*)')) {
         const targetColumn = body.sql.includes('"reviewer_two"') ? 'reviewer_two' : 'reviewer_one';
         return Promise.resolve({
@@ -341,16 +345,22 @@ describe('RunAllReviewTable', () => {
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'reviewer_two' }));
     await user.keyboard('{Escape}');
 
+    expect(screen.getAllByLabelText('Comparison value hidden')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /Cohen’s Kappa/ })).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Show comparison values for reviewer_one' }),
+    );
+
     expect(
       await screen.findByRole('button', {
         name: 'Cohen’s Kappa 0.727 for annotation versus reviewer_one',
       }),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', {
+      screen.queryByRole('button', {
         name: 'Cohen’s Kappa 0.000 for annotation versus reviewer_two',
       }),
-    ).toBeVisible();
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: /annotation vs reviewer/ }),
     ).not.toBeInTheDocument();
@@ -364,34 +374,29 @@ describe('RunAllReviewTable', () => {
     expect(
       within(headers[3]).getByRole('button', { name: 'Filter difference for reviewer_one' }),
     ).toHaveAttribute('aria-pressed', 'false');
-    const anyFilter = within(headers[1]).getByRole('button', {
-      name: 'Filter any difference for annotation',
-    });
-    await user.click(anyFilter);
-    await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Filter any difference for annotation' }),
-      ).toHaveAttribute('aria-pressed', 'true');
-    });
+    expect(
+      within(headers[4]).getByRole('button', { name: 'Filter difference for reviewer_two' }),
+    ).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Filter difference for reviewer_one' }));
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Filter any difference for annotation' }),
-      ).toHaveAttribute('aria-pressed', 'false');
       expect(
         screen.getByRole('button', { name: 'Filter difference for reviewer_one' }),
       ).toHaveAttribute('aria-pressed', 'true');
     });
     const filteredReviewTable = screen.getAllByRole('table')[0];
     expect(
-      within(filteredReviewTable).getByRole('row', { name: 'Example covid job job other' }),
+      within(filteredReviewTable).getByRole('row', {
+        name: 'Example covid job job Comparison value hidden',
+      }),
     ).toBeInTheDocument();
     const resultCells = within(
-      within(filteredReviewTable).getByRole('row', { name: 'Example covid job job other' }),
+      within(filteredReviewTable).getByRole('row', {
+        name: 'Example covid job job Comparison value hidden',
+      }),
     ).getAllByRole('cell');
     expect(resultCells[1]).toHaveAttribute('style', expect.stringContaining('background-color'));
     expect(resultCells[3]).toHaveAttribute('style', expect.stringContaining('background-color'));
-    expect(resultCells[4]).toHaveAttribute('style', expect.stringContaining('background-color'));
+    expect(resultCells[4]).not.toHaveAttribute('style');
     expect(queryWorkspaceSqlTable).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({ page: 1, page_size: 500 }),

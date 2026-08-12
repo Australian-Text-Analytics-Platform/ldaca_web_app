@@ -101,17 +101,19 @@ the per-user content-addressed cache.
 Manual Annotation is not an Analysis. Creating an annotation column, choosing a
 code, and saving a Codebook are ordinary Data Block Edits. Its
 **Compare To** selection is shared with Preview and Review for the same Data
-Block. Each selected comparison column is projected into the table with its
-selected reliability score in the header and exact confusion-matrix counts
-available on hover or focus. Only string and categorical columns are comparison
-targets. Percent Agreement, Cohen's Kappa, and nominal Krippendorff's Alpha are
-available; Cohen's Kappa is the default. The metric choice is presentation
-state keyed by source Data Block and shared across all three modes. The initial
-counts and score cover the whole current Data Block. After a manual label is
-saved, the frontend adjusts the affected aggregate pairs and recalculates the
-selected score without rescanning the Data Block; failed saves do not change
-the comparison. Changes made through another surface are reconciled when the
-comparison resource next refetches.
+Block. Compare To and Show metadata are disjoint roles, and the active
+correction column is eligible for neither. A selected comparison is masked
+when each table mounts and contributes no reliability query, score, matrix,
+difference tint, or filter until explicitly revealed from its header. Only
+string and categorical columns are comparison targets. Percent Agreement,
+Cohen's Kappa, and nominal Krippendorff's Alpha are available; Cohen's Kappa is
+the default. The selections and metric are device-local presentation state
+keyed by source Data Block and shared across all three modes; reveal and filter
+state are mount-local. Revealed Manual comparisons cover the whole current Data
+Block. After a manual label is saved, the frontend adjusts the affected
+aggregate pairs and recalculates the selected score without rescanning the Data
+Block; failed saves do not change the comparison. Changes made through another
+surface are reconciled when the comparison resource next refetches.
 
 AI Annotation Preview is a Preview-scoped Analysis. Each requested page is
 fresh inference over the retained snapshot. Predictions are never written
@@ -121,12 +123,13 @@ retains the selection captured at submission for provenance, but never
 overwrites newer Tab state. Selecting **None** or using **Clear Results** clears
 the live selection without deleting the column or its values. Preview renders
 the prediction and selected editable correction as separate columns with an
-intervening arrow. Preview comparisons reuse the same header-level presentation as
-Review, but count only the fresh predictions and selected comparison-column
-values on the current Preview page. Selected comparison columns appear as
-read-only columns after the optional correction column. Their headers show
-the selected reliability measure with its conventional `%`, `κ`, or `α` sign
-and expose the exact current-page confusion-matrix counts on hover or focus.
+intervening arrow. Preview comparisons reuse the same header-level presentation
+as Review, but count only the fresh predictions and selected comparison-column
+values on the current Preview page after reveal. Selected comparison columns
+appear masked and read-only after the optional correction column. Revealing a
+header shows its values and the selected reliability measure with its
+conventional `%`, `κ`, or `α` sign, and exposes the exact current-page
+confusion-matrix counts on hover or focus.
 
 An optional Example Data Block supplies a pool of reviewed text-label pairs.
 The immutable request owns a maximum per exact, case-sensitive label, a first,
@@ -159,10 +162,14 @@ correction as the Example Data Block; Manual intentionally omits that shortcut.
 The shared table footer provides rows-per-page selection and direct numbered pagination.
 **Compare To** accepts one or more other columns and adds them as read-only
 table columns after the optional correction column in Manual and Run All
-Review. Each selected column header shows the selected reliability score and
-exposes its exact confusion-matrix counts on hover or focus. The metric is
-shared with Manual and Preview. Its counts and score cover the complete current
-Data Block rather than only the visible Review page.
+Review. Each selected column starts masked; its header can reveal the values,
+selected reliability score, exact confusion-matrix counts, difference tint,
+and per-column difference filter. A hidden column's filter remains visible but
+disabled. Hiding or deselecting the filtered column clears that mount-local
+filter. Filtered pages and counts are evaluated by Workspace SQL before server
+pagination. The metric is shared with Manual and Preview. Revealed-column
+counts and scores cover the complete current Data Block rather than only the
+visible Review page.
 
 ## Concordance And Quotation
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,8 +36,7 @@ describe('useAnnotationNodePage', () => {
           sourceSql: 'SELECT * FROM "node-1"',
           sourceColumns: ['text', 'annotation', 'reviewer'],
           annotationColumn: 'annotation',
-          comparisonColumns: [],
-          differenceFilter: null,
+          differenceColumn: null,
           rowCount: 2380,
           pageSize: 10,
         }),
@@ -60,7 +59,7 @@ describe('useAnnotationNodePage', () => {
     expect(result.current.rowCount).toBe(2380);
   });
 
-  it('keys filtered pages and counts by the server-side OR predicate', async () => {
+  it('keys filtered pages and counts by the server-side column predicate', async () => {
     queryWorkspaceSqlTable.mockImplementation(({ body }) =>
       Promise.resolve(
         body.sql.includes('COUNT(*)')
@@ -77,8 +76,7 @@ describe('useAnnotationNodePage', () => {
           sourceSql: 'SELECT * FROM "node-1"',
           sourceColumns: ['text', 'annotation', 'reviewer_one', 'reviewer_two'],
           annotationColumn: 'annotation',
-          comparisonColumns: ['reviewer_one', 'reviewer_two'],
-          differenceFilter: { kind: 'any' },
+          differenceColumn: 'reviewer_two',
           rowCount: 2380,
           pageSize: 10,
         }),
@@ -89,10 +87,44 @@ describe('useAnnotationNodePage', () => {
     const sqlRequests = queryWorkspaceSqlTable.mock.calls.map(([request]) => request.body.sql);
     expect(sqlRequests).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('"annotation" != "reviewer_one" OR "annotation" != "reviewer_two"'),
+        expect.stringContaining('"annotation" != "reviewer_two"'),
         expect.stringContaining('COUNT(*)'),
       ]),
     );
     expect(result.current.rows[0]?.__wordflow_annotation_source_row_index).toBe(12);
+  });
+
+  it('resets server pagination when the active difference column changes', async () => {
+    const { result, rerender } = renderHook(
+      ({ differenceColumn }: { differenceColumn: string | null }) =>
+        useAnnotationNodePage({
+          workspaceId: 'workspace-1',
+          nodeId: 'node-1',
+          sourceSql: 'SELECT * FROM "node-1"',
+          sourceColumns: ['text', 'annotation', 'reviewer'],
+          annotationColumn: 'annotation',
+          differenceColumn,
+          rowCount: 100,
+          pageSize: 10,
+        }),
+      { initialProps: { differenceColumn: null }, wrapper },
+    );
+
+    await waitFor(() => expect(queryWorkspaceSqlTable).toHaveBeenCalled());
+    act(() => {
+      result.current.setPagination({ pageIndex: 4, pageSize: 10 });
+    });
+    await waitFor(() =>
+      expect(queryWorkspaceSqlTable).toHaveBeenCalledWith(
+        expect.objectContaining({ body: expect.objectContaining({ page: 5 }) }),
+      ),
+    );
+
+    rerender({ differenceColumn: 'reviewer' });
+    await waitFor(() => {
+      const lastRequest = queryWorkspaceSqlTable.mock.calls.at(-1)?.[0];
+      expect(lastRequest?.body.page).toBe(1);
+      expect(lastRequest?.body.sql).toContain('"annotation" != "reviewer"');
+    });
   });
 });
