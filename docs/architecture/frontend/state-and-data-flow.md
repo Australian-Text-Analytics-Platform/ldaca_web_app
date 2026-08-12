@@ -315,8 +315,13 @@ Data Block resets the choice; it is not an account or device preference.
 Sample, Join, and Stack expose no update mode. Successful edits and history
 commands invalidate the graph, dependent row and preview data, and schema
 queries together.
-Data View and graph menus derive Undo/Redo disabled state only from the
-backend's `can_undo` and `can_redo` flags.
+Data View uses the selected Data Block's graph-owned shape as its exact row
+count, so its compact pagination can expose the last page and a validated page
+jump without another query. If that shape is unavailable, Data View keeps the
+Arrow page's one-row lookahead and renders compact ellipses as inert markers;
+it does not count or materialize the complete table just to enable a jump. Data
+View and graph menus derive Undo/Redo disabled state only from the backend's
+`can_undo` and `can_redo` flags.
 
 ## Data Block Preferences
 

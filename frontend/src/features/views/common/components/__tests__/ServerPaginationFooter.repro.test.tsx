@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useServerTable } from '../../hooks/useServerTable';
 import { ServerPaginationFooter } from '../ServerPaginationFooter';
 
@@ -29,7 +30,56 @@ function ControlledHarness() {
   );
 }
 
+/**
+ * Models a transport that can cheaply report only whether another page exists.
+ * Used by: the unknown-total regression to ensure the footer does not expose an
+ * exact-page action without a trustworthy upper bound.
+ */
+function LookaheadHarness() {
+  const table = useServerTable<Row>({
+    data: [{ id: 1 }],
+    columns: [{ id: 'id', accessorKey: 'id', header: 'ID' }],
+    rowCount: 40,
+    pageIndex: 0,
+    pageSize: 20,
+  });
+
+  return <ServerPaginationFooter table={table} pageIndex={0} pageSize={20} hasNext />;
+}
+
 describe('ServerPaginationFooter controlled pagination', () => {
+  it('shows a non-clickable ellipsis when only page lookahead is known', () => {
+    render(<LookaheadHarness />);
+
+    expect(screen.queryByRole('button', { name: 'Jump to page' })).not.toBeInTheDocument();
+    expect(screen.getByText('More pages')).toBeInTheDocument();
+  });
+
+  it('validates and jumps to an exact page when the total is known', async () => {
+    const user = userEvent.setup();
+    render(<ControlledHarness />);
+
+    await user.click(screen.getByRole('button', { name: 'Jump to page' }));
+    const pageInput = screen.getByRole('textbox');
+    await user.type(pageInput, '51');
+    await user.click(screen.getByRole('button', { name: 'Go' }));
+
+    expect(screen.getByText('Enter a value between 1 and 50')).toBeInTheDocument();
+
+    await user.clear(pageInput);
+    await user.type(pageInput, '0');
+    await user.click(screen.getByRole('button', { name: 'Go' }));
+
+    expect(screen.getByText('Enter a value between 1 and 50')).toBeInTheDocument();
+
+    await user.clear(pageInput);
+    await user.type(pageInput, '50');
+    await user.click(screen.getByRole('button', { name: 'Go' }));
+
+    expect(screen.getByTestId('page-source')).toHaveTextContent('50');
+    expect(screen.getByRole('link', { current: 'page' })).toHaveTextContent('50');
+  });
+
   // Regression guard for the React Compiler memoization bug: the footer receives
   // a referentially stable TanStack `table`, so its DISPLAY must be driven by the
   // real `pageIndex` prop. If the footer ever reads `table.getState()` again, the

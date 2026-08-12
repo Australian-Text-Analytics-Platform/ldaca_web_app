@@ -66,9 +66,9 @@ export interface WorkspaceTableProps {
 
   /** Server-side pagination info (1-indexed page from backend). */
   pagination?: NodeTablePagination;
-  /** Total row count from backend (used by TanStack for page count). */
+  /** Trustworthy total row count used by TanStack for exact page bounds. */
   rowCount?: number;
-  /** Whether the Arrow page lookahead found another page. */
+  /** Arrow page lookahead used only when the Data Block row count is unknown. */
   hasNext?: boolean;
 
   // Server-side state callbacks
@@ -315,6 +315,9 @@ export function WorkspaceTable({
   const pageIndex = pagination ? pagination.page - 1 : 0;
   const pageSize = pagination?.page_size ?? 20;
   const totalRows = rowCount;
+  // Known graph metadata wins when both signals exist. Otherwise TanStack gets
+  // one page of lookahead without being given an invented total row count.
+  const usesLookaheadPagination = rowCount === undefined && hasNext !== undefined;
 
   /**
    * Bridges TanStack pagination updates to server pagination callbacks.
@@ -348,8 +351,10 @@ export function WorkspaceTable({
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
-    rowCount: totalRows,
-    pageCount: hasNext === undefined ? undefined : pageIndex + 1 + (hasNext ? 1 : 0),
+    rowCount: usesLookaheadPagination ? undefined : totalRows,
+    pageCount: usesLookaheadPagination
+      ? pageIndex + 1 + (hasNext ? 1 : 0)
+      : undefined,
     state: {
       pagination: { pageIndex, pageSize },
       sorting,
@@ -520,8 +525,8 @@ export function WorkspaceTable({
           table={tableInstance}
           pageIndex={pageIndex}
           pageSize={pageSize}
-          rowCount={totalRows}
-          hasNext={hasNext}
+          rowCount={usesLookaheadPagination ? undefined : totalRows}
+          hasNext={usesLookaheadPagination ? hasNext : undefined}
           compact
         />
       </div>

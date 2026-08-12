@@ -41,12 +41,13 @@ const makeArrowPage = (
     { name: 'text', field: new Field('text', new Utf8()) },
   ],
   rows: Record<string, unknown>[] = [{ text: 'row' }],
+  hasNext = false,
 ) => ({
   table: {},
   rows,
   columns: columns.map((column) => column.name),
   schema: columns,
-  hasNext: false,
+  hasNext,
   etag: 'etag-1',
 });
 
@@ -66,9 +67,9 @@ describe('useWorkspaceDataTable', () => {
       currentWorkspaceId: 'workspace-1',
     });
     const selectedNodes = [
-      { id: 'node-a', name: 'A' },
-      { id: 'node-b', name: 'B' },
-      { id: 'node-c', name: 'C' },
+      { id: 'node-a', name: 'A', shape: [100, 1] },
+      { id: 'node-b', name: 'B', shape: [1_000, 1] },
+      { id: 'node-c', name: 'C', shape: [50, 1] },
     ];
     useWorkspaceSelectionMock.mockReturnValue({
       activeNodeId: 'node-b',
@@ -199,5 +200,41 @@ describe('useWorkspaceDataTable', () => {
     expect(result.current.table.columns).toEqual(['class', 'description']);
     expect(result.current.table.columnFields.class?.type.toString()).toBe('Utf8');
     expect(result.current.table.columnFields.description?.type.toString()).toBe('Utf8');
+  });
+
+  it('uses the selected Data Block shape as the exact Data View row count', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const { result } = renderHook(() => useWorkspaceDataTable(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.table.rowCount).toBe(1_000);
+    expect(result.current.table.hasNext).toBeUndefined();
+  });
+
+  it('falls back to Arrow lookahead when the Data Block row count is unknown', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const selectedNode = { id: 'node-b', name: 'B', shape: [null, 1] };
+    useWorkspaceSelectionMock.mockReturnValue({
+      activeNodeId: selectedNode.id,
+      selectedNode,
+      selectedNodes: [selectedNode],
+      selectedNodeIds: [selectedNode.id],
+    });
+    queryWorkspaceSqlTableMock.mockResolvedValue(makeArrowPage(undefined, undefined, true));
+
+    const { result } = renderHook(() => useWorkspaceDataTable(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.table.hasNext).toBe(true);
+    });
+    expect(result.current.table.rowCount).toBeUndefined();
   });
 });

@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationJump,
   PaginationLink,
@@ -36,9 +37,9 @@ export interface ServerPaginationFooterProps<TData> {
   pageIndex: number;
   /** Current page size (real changing value from the consumer). */
   pageSize: number;
-  /** Total row count used to derive the page count (documents, for analysis tables). */
+  /** Trustworthy total row count used to derive exact page bounds. */
   rowCount?: number;
-  /** Lookahead result for transports that deliberately do not calculate totals. */
+  /** Cheap page lookahead used only when an exact total is unavailable. */
   hasNext?: boolean;
   /** Options shown in the page-size dropdown. */
   pageSizeOptions?: number[];
@@ -79,6 +80,10 @@ export interface ServerPaginationFooterProps<TData> {
  * "documents per batch" pagination even though each page renders a different
  * number of hit rows.
  *
+ * Exact totals render compact ranges whose ellipses open `PaginationJump`.
+ * Lookahead-only transports render the same range with inert ellipses because
+ * they cannot validate an arbitrary destination without counting the result.
+ *
  * Rendered by: WorkspaceTable (compact), ConcordanceTableNodeBlock,
  * QuotationNodeBlock, ConcordanceDispersionNodeBlock, PreviewTable because
  * every on-demand paginated table needs one consistent
@@ -104,24 +109,25 @@ export function ServerPaginationFooter<TData>({
 }: ServerPaginationFooterProps<TData>) {
   // Derived from real props (not `table.getState()`) so the component re-renders
   // when the consumer's controlled pagination advances.
-  const pageCount =
-    hasNext === undefined
-      ? pageSize > 0
-        ? Math.ceil((rowCount ?? 0) / pageSize)
-        : 0
-      : pageIndex + 1 + (hasNext ? 1 : 0);
+  const totalPages =
+    rowCount === undefined ? undefined : pageSize > 0 ? Math.ceil(rowCount / pageSize) : 0;
+  const pageCount = totalPages ?? pageIndex + 1 + (hasNext ? 1 : 0);
 
-  if (compact && pageCount <= 0) return null;
+  if (compact && totalPages === 0) return null;
 
   const currentPage = pageIndex + 1; // 0-indexed → 1-indexed for display
   const safeTotalPages = Math.max(pageCount, 1);
   const normalizedOptions = Array.from(new Set([...pageSizeOptions, pageSize])).sort(
     (a, b) => a - b,
   );
-  const paginationRange = buildPaginationRange(currentPage, safeTotalPages);
+  const paginationRange = buildPaginationRange(
+    currentPage,
+    totalPages === undefined ? undefined : safeTotalPages,
+    hasNext,
+  );
 
   const canPrev = pageIndex > 0;
-  const canNext = pageIndex < pageCount - 1;
+  const canNext = totalPages === undefined ? Boolean(hasNext) : pageIndex < pageCount - 1;
 
   /** Converts a display page number back into TanStack's zero-based page index. */
   const goToPage = (page: number) => {
@@ -173,13 +179,15 @@ export function ServerPaginationFooter<TData>({
             </PaginationItem>
             {paginationRange.map((item, index) => (
               <PaginationItem key={`${String(item)}-${String(index)}`}>
-                {item === 'dots' ? (
+                {item === 'dots' && totalPages !== undefined ? (
                   <PaginationJump
                     totalPages={safeTotalPages}
                     onPageChange={goToPage}
                     triggerClassName="size-8"
                     showPageLabel={false}
                   />
+                ) : item === 'dots' ? (
+                  <PaginationEllipsis className="size-8" />
                 ) : (
                   <PaginationLink
                     href="#"
@@ -274,8 +282,10 @@ export function ServerPaginationFooter<TData>({
 
           {paginationRange.map((item, index) => (
             <PaginationItem key={`${String(item)}-${String(index)}`}>
-              {item === 'dots' ? (
+              {item === 'dots' && totalPages !== undefined ? (
                 <PaginationJump totalPages={safeTotalPages} onPageChange={goToPage} />
+              ) : item === 'dots' ? (
+                <PaginationEllipsis />
               ) : (
                 <PaginationLink
                   href="#"

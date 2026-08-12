@@ -42,8 +42,8 @@ type PaginationLinkProps = {
   Omit<React.ComponentProps<'a'>, 'size'>;
 
 interface PaginationJumpProps {
-  /** Known total pages. Omit for source-row pagination with unknown totals. */
-  totalPages?: number;
+  /** Known total pages used to validate the destination. */
+  totalPages: number;
   onPageChange: (page: number) => void;
   /** Override the trigger button's classes (e.g. `size-8` for tighter footers). */
   triggerClassName?: string;
@@ -53,9 +53,10 @@ interface PaginationJumpProps {
 
 /**
  * Clickable page-jump control used by pagination footers when page ranges are
- * compacted. It lets users enter an exact page while keeping unknown-total
- * server pagination supported.
- * Why: compact table pagers need an exact-page popover without assuming every backend can report total pages.
+ * compacted. It is intentionally available only when an exact total lets the
+ * caller validate the destination.
+ * Why: compact known-total table pagers need an exact-page popover, while
+ * lookahead-only pagers must keep their ellipsis non-interactive.
  * Flow: manage popover/input/error state, handle outside click and focus reset, validate page input, then call onPageChange and close.
  */
 export function PaginationJump({
@@ -117,19 +118,13 @@ export function PaginationJump({
     event.preventDefault();
     const trimmed = value.trim();
     if (!/^\d+$/.test(trimmed)) {
-      setError(
-        totalPages ? `Enter a number between 1 and ${String(totalPages)}` : 'Enter a page number',
-      );
+      setError(`Enter a number between 1 and ${String(totalPages)}`);
       return;
     }
 
     const target = Number.parseInt(trimmed, 10);
-    if (Number.isNaN(target) || target < 1 || (totalPages && target > totalPages)) {
-      setError(
-        totalPages
-          ? `Enter a value between 1 and ${String(totalPages)}`
-          : 'Enter a valid page number',
-      );
+    if (Number.isNaN(target) || target < 1 || target > totalPages) {
+      setError(`Enter a value between 1 and ${String(totalPages)}`);
       return;
     }
 
@@ -171,7 +166,7 @@ export function PaginationJump({
               }}
               type="text"
               inputMode="numeric"
-              placeholder={totalPages ? String(totalPages) : '…'}
+              placeholder={String(totalPages)}
               aria-invalid={error ? 'true' : undefined}
               aria-describedby={error ? errorId : undefined}
               className={cn(
@@ -247,6 +242,25 @@ function PaginationNext({ className, ...props }: React.ComponentProps<typeof Pag
   );
 }
 
+/**
+ * Displays an inert compact-range marker when no exact page bound is known.
+ * Used by: ServerPaginationFooter for lookahead-only pagination, where an
+ * arbitrary jump cannot be validated without counting or materializing rows.
+ */
+function PaginationEllipsis({ className, ...props }: React.ComponentProps<'span'>) {
+  return (
+    <span
+      aria-hidden
+      data-slot="pagination-ellipsis"
+      className={cn('flex size-9 items-center justify-center', className)}
+      {...props}
+    >
+      <MoreHorizontal className="size-4" />
+      <span className="sr-only">More pages</span>
+    </span>
+  );
+}
+
 export {
   Pagination,
   PaginationContent,
@@ -254,6 +268,7 @@ export {
   PaginationItem,
   PaginationPrevious,
   PaginationNext,
+  PaginationEllipsis,
   // buildPaginationRange and PaginationJump are exported inline above as
   // top-level `export const` so consumers can import them directly.
 };

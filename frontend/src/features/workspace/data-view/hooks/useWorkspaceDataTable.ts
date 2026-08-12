@@ -348,6 +348,11 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     return await refreshNodeSchema(selectedNodeIdForCallbacks);
   }, [selectedNodeIdForCallbacks, refreshNodeSchema]);
 
+  // The graph already carries the Data Block shape, so Data View can expose an
+  // exact last page and validated jump without issuing a count query. Missing
+  // shape metadata deliberately retains the Arrow page's cheap lookahead.
+  const nodeRowCount = selectedNode?.shape?.[0] ?? undefined;
+
   const table: WorkspaceTableProps = {
     data: nodeData.rows,
     columns: nodeData.columns,
@@ -361,7 +366,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onDeleteColumn: selectedNodeIdForCallbacks ? handleDeleteColumn : undefined,
     onRefreshSchema: selectedNodeIdForCallbacks ? handleRefreshSchema : undefined,
     pagination: { page: nodeData.page, page_size: nodeData.page_size },
-    hasNext: nodeData.has_next,
+    rowCount: nodeRowCount,
+    hasNext: nodeRowCount === undefined ? nodeData.has_next : undefined,
     sorting,
     onSortingChange,
     onPageChange: (page) => {
