@@ -88,6 +88,14 @@ The User File collection remains complete; `loadable` is a consumer signal,
 not a storage or upload filter. `file_type` remains `unknown` for unsupported
 files.
 
+File preview reports the preview loader's own schema. Delimited previews
+(`.csv` and `.tsv`) expose raw String fields and preserve source lexemes;
+JSON-family previews use full-file type inference. Creating a Source Data Block
+performs full-file inference for every row-oriented format before Parquet
+staging, so its authoritative schema may intentionally differ from a delimited
+preview. Parser failures encountered while producing either a preview page or
+schema return `400 invalid_input`.
+
 Loadable filename extensions are:
 
 - delimited: `.csv`, `.tsv`;
