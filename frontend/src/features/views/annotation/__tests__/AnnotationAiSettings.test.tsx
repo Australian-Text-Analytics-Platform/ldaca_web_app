@@ -8,8 +8,33 @@ import type { AnnotationProviderConfigurationView } from '@/features/provider-cr
 import { AnnotationAiSettings } from '../components/AnnotationAiSettings';
 
 vi.mock('../components/AddAnnotationProviderDialog', () => ({
-  AddAnnotationProviderDialog: ({ open }: { open: boolean }) =>
-    open ? <div role="dialog">Add provider form</div> : null,
+  AddAnnotationProviderDialog: ({
+    open,
+    onCreated,
+  }: {
+    open: boolean;
+    onCreated: (configuration: AnnotationProviderConfigurationView) => void;
+  }) =>
+    open ? (
+      <div role="dialog">
+        Add provider form
+        <button
+          type="button"
+          onClick={() =>
+            onCreated({
+              id: 'keyless-provider',
+              name: 'Key later',
+              provider: 'openrouter',
+              base_url: null,
+              has_api_key: false,
+              credentialRevision: 1,
+            })
+          }
+        >
+          Finish keyless provider
+        </button>
+      </div>
+    ) : null,
 }));
 
 const configurations: AnnotationProviderConfigurationView[] = [
@@ -133,5 +158,44 @@ describe('AnnotationAiSettings', () => {
 
     await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
     expect(onAdvancedOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('retains an incomplete selected provider but disables using it', async () => {
+    const user = userEvent.setup();
+    const incomplete = { ...configurations[0]!, has_api_key: false };
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AnnotationAiSettings
+          configurations={[incomplete, configurations[1]!]}
+          selectedConfigurationId={incomplete.id}
+          onProviderChange={vi.fn()}
+          onModelChange={vi.fn()}
+          onModelCommit={vi.fn()}
+          providerModels={{}}
+          model=""
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByText('Needs API key')).not.toHaveLength(0);
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    expect(screen.getByText(/Settings → AI/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Model')).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
+    expect(screen.getByRole('button', { name: /OpenRouter personal/ })).toBeDisabled();
+  });
+
+  it('saves but does not auto-select a newly added keyless built-in', async () => {
+    const user = userEvent.setup();
+    const onProviderChange = vi.fn();
+    renderSettings(onProviderChange);
+
+    await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    await user.click(screen.getByRole('button', { name: 'Provider' }));
+    await user.click(screen.getByRole('button', { name: 'Add Provider' }));
+    await user.click(screen.getByRole('button', { name: 'Finish keyless provider' }));
+
+    expect(onProviderChange).not.toHaveBeenCalled();
   });
 });

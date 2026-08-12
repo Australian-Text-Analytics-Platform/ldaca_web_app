@@ -528,7 +528,7 @@ export type AnnotationPreviewLabel = {
 /**
  * AnnotationProviderConfigurationCreate
  *
- * Create command containing one write-only provider credential.
+ * Create one stable provider connection with an optional credential.
  */
 export type AnnotationProviderConfigurationCreate = {
     /**
@@ -547,16 +547,6 @@ export type AnnotationProviderConfigurationCreate = {
      * Provider
      */
     provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
-};
-
-/**
- * AnnotationProviderConfigurationRename
- */
-export type AnnotationProviderConfigurationRename = {
-    /**
-     * Name
-     */
-    name: string;
 };
 
 /**
@@ -585,6 +575,26 @@ export type AnnotationProviderConfigurationResource = {
      * Provider
      */
     provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+};
+
+/**
+ * AnnotationProviderConfigurationUpdate
+ *
+ * Patch mutable connection details without accepting immutable locators.
+ *
+ * Used by the provider-credential route in single-user mode. Omission keeps a
+ * value unchanged, while an explicit null credential removes the saved key.
+ * Names cannot be cleared and an empty object is never a meaningful update.
+ */
+export type AnnotationProviderConfigurationUpdate = {
+    /**
+     * Api Key
+     */
+    api_key?: null;
+    /**
+     * Name
+     */
+    name?: string | null;
 };
 
 /**
@@ -4963,7 +4973,7 @@ export type AnnotationModelsRequestWritable = {
 /**
  * AnnotationProviderConfigurationCreate
  *
- * Create command containing one write-only provider credential.
+ * Create one stable provider connection with an optional credential.
  */
 export type AnnotationProviderConfigurationCreateWritable = {
     /**
@@ -4982,6 +4992,26 @@ export type AnnotationProviderConfigurationCreateWritable = {
      * Provider
      */
     provider: 'openai' | 'openrouter' | 'anthropic' | 'google' | 'custom';
+};
+
+/**
+ * AnnotationProviderConfigurationUpdate
+ *
+ * Patch mutable connection details without accepting immutable locators.
+ *
+ * Used by the provider-credential route in single-user mode. Omission keeps a
+ * value unchanged, while an explicit null credential removes the saved key.
+ * Names cannot be cleared and an empty object is never a meaningful update.
+ */
+export type AnnotationProviderConfigurationUpdateWritable = {
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
 };
 
 /**
@@ -5733,8 +5763,8 @@ export type DeleteAnnotationProviderConfigurationResponses = {
 
 export type DeleteAnnotationProviderConfigurationResponse = DeleteAnnotationProviderConfigurationResponses[keyof DeleteAnnotationProviderConfigurationResponses];
 
-export type RenameAnnotationProviderConfigurationData = {
-    body: AnnotationProviderConfigurationRename;
+export type UpdateAnnotationProviderConfigurationData = {
+    body: AnnotationProviderConfigurationUpdateWritable;
     path: {
         /**
          * Configuration Id
@@ -5745,7 +5775,7 @@ export type RenameAnnotationProviderConfigurationData = {
     url: '/api/provider-credentials/annotation-providers/{configuration_id}';
 };
 
-export type RenameAnnotationProviderConfigurationErrors = {
+export type UpdateAnnotationProviderConfigurationErrors = {
     /**
      * Invalid request
      */
@@ -5772,16 +5802,16 @@ export type RenameAnnotationProviderConfigurationErrors = {
     500: ApiError;
 };
 
-export type RenameAnnotationProviderConfigurationError = RenameAnnotationProviderConfigurationErrors[keyof RenameAnnotationProviderConfigurationErrors];
+export type UpdateAnnotationProviderConfigurationError = UpdateAnnotationProviderConfigurationErrors[keyof UpdateAnnotationProviderConfigurationErrors];
 
-export type RenameAnnotationProviderConfigurationResponses = {
+export type UpdateAnnotationProviderConfigurationResponses = {
     /**
      * Successful Response
      */
     200: AnnotationProviderConfigurationResource;
 };
 
-export type RenameAnnotationProviderConfigurationResponse = RenameAnnotationProviderConfigurationResponses[keyof RenameAnnotationProviderConfigurationResponses];
+export type UpdateAnnotationProviderConfigurationResponse = UpdateAnnotationProviderConfigurationResponses[keyof UpdateAnnotationProviderConfigurationResponses];
 
 export type ListSampleCollectionsData = {
     body?: never;

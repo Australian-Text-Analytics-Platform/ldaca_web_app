@@ -66,10 +66,6 @@ export function AddAnnotationProviderDialog({
 
   const addProvider = async () => {
     const resolvedName = name.trim() || definition.label;
-    if (definition.requiresApiKey && !apiKey.trim()) {
-      setError('Enter an API key');
-      return;
-    }
     if (provider === 'custom' && !baseUrl.trim()) {
       setError('Enter a Custom Base URL');
       return;
@@ -149,9 +145,7 @@ export function AddAnnotationProviderDialog({
           <div className="space-y-1.5">
             <Label htmlFor="annotation-provider-api-key">
               API Key
-              {provider === 'custom' ? (
-                <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
-              ) : null}
+              <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
             </Label>
             <Input
               id="annotation-provider-api-key"
@@ -164,6 +158,11 @@ export function AddAnnotationProviderDialog({
                 setError(null);
               }}
             />
+            <p className="text-xs text-muted-foreground">
+              {definition.requiresApiKey
+                ? 'You can save this provider now, but an API key is required before use.'
+                : 'Leave blank when the Custom endpoint does not require authentication.'}
+            </p>
           </div>
 
           <div className="space-y-1.5">

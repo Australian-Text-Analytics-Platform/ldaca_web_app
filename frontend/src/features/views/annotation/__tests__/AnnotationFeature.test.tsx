@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Analysis } from '@/api';
+
 vi.mock('@/features/guidance/GuidanceContext', () => ({
   useGuidance: () => ({ reachContextualHint: vi.fn(), startGuidedTour: vi.fn() }),
 }));
@@ -35,6 +37,8 @@ const mocks = vi.hoisted(() => ({
     has_api_key: boolean;
   }[],
   sourceColumnNames: ['text'] as string[],
+  workspaceNodes: [] as { id: string; color: string; shape: [number, number] }[],
+  runAllResult: null as { failed_row_count: number; failed_batch_count: number } | null,
 }));
 
 vi.mock('@/features/provider-credentials/providerCredentialRequests', () => ({
@@ -45,10 +49,11 @@ vi.mock('@/features/provider-credentials/providerCredentialRequests', () => ({
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
   ...(await importOriginal()),
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
+  useQuery: () => ({ data: mocks.runAllResult }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1', nodes: [] }),
+  useWorkspaceData: () => ({ currentWorkspaceId: 'workspace-1', nodes: mocks.workspaceNodes }),
 }));
 vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   useNodeColumnInfos: () => ({ columnInfoCache: {} }),
@@ -227,6 +232,10 @@ vi.mock('../components/AnnotationResultsPanel', () => ({
   ),
 }));
 
+vi.mock('@/features/views/common/components/RunAllReviewTable', () => ({
+  RunAllReviewTable: () => <div>Run All review table</div>,
+}));
+
 vi.mock('../hooks/useAnnotationClassDescriptions', () => ({
   useAnnotationClassDescriptions: () => ({ rows: mocks.classRows, query: {} }),
 }));
@@ -260,6 +269,33 @@ vi.mock('../hooks/useAnnotationAiPreview', () => ({
 
 import AnnotationFeature from '../AnnotationFeature';
 
+const runAllAnalysis = (state: 'succeeded' | 'failed', message?: string): Analysis =>
+  ({
+    id: `run-all-${state}`,
+    state,
+    error: message ? { code: 'annotation_provider_authentication_failed', message } : null,
+    progress: { completed: 0, total: 0, message: null },
+    request: {
+      kind: 'annotation_run_all',
+      source: {
+        kind: 'annotation',
+        node_id: 'source-1',
+        text_column: 'text',
+        annotation_column: 'annotation',
+        class_node_id: 'class-1',
+        class_column: 'class',
+        description_column: 'description',
+        classes: [{ name: 'support', description: 'Supports the claim' }],
+        instruction: '',
+        model: 'gpt-test',
+        provider: 'openai',
+        provider_configuration_id: 'provider-1',
+      },
+      batch_size: 20,
+      processing_mode: 'reprocess_all',
+    },
+  }) as Analysis;
+
 describe('AnnotationFeature', () => {
   beforeEach(() => {
     window.HTMLElement.prototype.hasPointerCapture = vi.fn();
@@ -284,6 +320,8 @@ describe('AnnotationFeature', () => {
     mocks.classRows = [];
     mocks.providerConfigurations = [];
     mocks.sourceColumnNames = ['text'];
+    mocks.workspaceNodes = [];
+    mocks.runAllResult = null;
     mocks.createSqlDataBlock.mockResolvedValue({ id: 'class-node-1' });
     mocks.polarsExpressionApply.mockResolvedValue(undefined);
     mocks.clearResults.mockResolvedValue(undefined);
@@ -693,5 +731,59 @@ describe('AnnotationFeature', () => {
       expect(mocks.clearResults).toHaveBeenCalledTimes(1);
       expect(clearCorrectionColumns).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('shows a fatal classified Run All error inline', () => {
+    const message = 'The provider rejected the saved credential. Update the API key in Settings.';
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: runAllAnalysis('failed', message),
+          activeAnalysis: null,
+          inputSets: {},
+          settings: { annotationMode: 'ai' },
+          correctionColumns: {},
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+  });
+
+  it('shows durable partial-success counts beside the Annotation result', () => {
+    mocks.workspaceNodes = [{ id: 'source-1', color: '#2563eb', shape: [3, 2] }];
+    mocks.runAllResult = { failed_row_count: 2, failed_batch_count: 1 };
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: runAllAnalysis('succeeded'),
+          activeAnalysis: null,
+          inputSets: {},
+          settings: { annotationMode: 'ai' },
+          correctionColumns: {},
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Annotation completed with 2 failed rows across 1 failed batch',
+    );
+    expect(screen.getByText('Run All review table')).toBeInTheDocument();
   });
 });

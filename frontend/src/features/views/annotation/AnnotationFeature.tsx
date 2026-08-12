@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { Analysis, AnnotationAnalysisRequest, AnnotationResult } from '@/api';
+import type {
+  Analysis,
+  AnnotationAnalysisRequest,
+  AnnotationResult,
+  AnnotationRunAllResult,
+} from '@/api';
 import { sqlIdentifier, sqlTable } from '@/api';
 import { Button } from '@/components/ui/button';
 import { useGuidance } from '@/features/guidance/GuidanceContext';
@@ -59,7 +64,7 @@ import { acceptPlaceholderOnTab } from '../common/placeholderTabFill';
 import { getRerunActionState } from '../common/rerunActionState';
 import { getAnalysisActionLifecycle } from '../common/analysisActionLifecycle';
 import { runAnalysisTaskEnvelope } from '../common/tasks/runAnalysisTaskEnvelope';
-import { canAnnotate, resolveAnnotationProviderConfiguration } from './aiProviders';
+import { canAnnotate, canListModels, resolveAnnotationProviderConfiguration } from './aiProviders';
 import { AnnotationAiPreviewPanel } from './components/AnnotationAiPreviewPanel';
 import { AnnotationAiSettings } from './components/AnnotationAiSettings';
 import { AnnotationClassDescriptionsEditor } from './components/AnnotationClassDescriptionsEditor';
@@ -781,6 +786,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     hasChanges: !serverAiRequest || hasParameterDiff(currentAiRequest, serverAiRequest),
     isBusy: isAiRunning,
   });
+  const selectedProviderNeedsKey = Boolean(
+    selectedAiProvider && !canListModels(selectedAiProvider),
+  );
+  const providerDisabledReason = selectedProviderNeedsKey
+    ? 'Add an API key in Settings → AI before running Annotation'
+    : aiActionState.runDisabledReason;
   const analysisActionLifecycle = getAnalysisActionLifecycle({
     isPreviewing: isAiRunning,
     isSubmittingRunAll,
@@ -877,6 +888,21 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     annotationColumn: serverAiRequest?.annotation_column ?? '',
     enabled: Boolean(aiResult),
   });
+  const annotationRunAllResult = useQuery<AnnotationRunAllResult | null>({
+    queryKey:
+      currentWorkspaceId && annotationRunAll
+        ? queryKeys.analysisResult(currentWorkspaceId, annotationRunAll.id)
+        : ['inactive', 'annotation-run-all-result'],
+    enabled: Boolean(currentWorkspaceId && annotationRunAll?.state === 'succeeded'),
+    queryFn: async () => {
+      if (!currentWorkspaceId || !annotationRunAll) return null;
+      const result = await getAnalysisOutputResource(currentWorkspaceId, annotationRunAll.id);
+      if (result.kind !== 'annotation_run_all') {
+        throw new Error('Annotation Run All returned the wrong Result kind');
+      }
+      return result;
+    },
+  });
 
   const sourceReady = Boolean(sourceNode && selectedAnnotationColumnExists);
   const codebookReady = Boolean(
@@ -942,9 +968,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     previewDisabledReason:
                       isCreatingAnnotationColumn || isCreatingCorrectionColumn
                         ? 'Wait for the column to finish creating'
-                        : aiActionState.runDisabledReason,
+                        : providerDisabledReason,
                     runAllDisabled: !currentAiRequest || analysisActionLifecycle.runAllDisabled,
-                    runAllDisabledReason: aiActionState.runDisabledReason,
+                    runAllDisabledReason: providerDisabledReason,
                     clearDisabled:
                       analyses.length === 0 ||
                       analysisActionLifecycle.isPreviewing ||
@@ -1364,6 +1390,14 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           message={annotationRunAll.progress.message ?? undefined}
         />
       ) : null}
+      {annotationMode === 'ai' && annotationRunAll?.state === 'failed' ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          {annotationRunAll.error?.message ?? 'Annotation Run All failed.'}
+        </div>
+      ) : null}
       {annotationMode === 'manual' && hasRun && sourceNode ? (
         <AnnotationResultsPanel
           key={`${sourceNode.id}:${resolvedAnnotationColumn}`}
@@ -1408,58 +1442,72 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       annotationRunAllSource &&
       currentWorkspaceId &&
       reviewSourceNode ? (
-        <RunAllReviewTable
-          workspaceId={currentWorkspaceId}
-          nodeId={annotationRunAllSource.node_id}
-          sql={`SELECT * FROM ${sqlTable(annotationRunAllSource.node_id)}`}
-          sourceColumns={reviewSourceColumns}
-          sourceColor={reviewSourceNode.color ?? GREY}
-          rowCount={reviewSourceNode.shape?.[0] ?? 0}
-          title="Annotation"
-          guidanceTarget="annotation-ai-run-all-results"
-          requiredColumns={[
-            annotationRunAllSource.text_column,
-            annotationRunAllSource.annotation_column,
-          ]}
-          comparisonColumn={annotationRunAllSource.annotation_column}
-          comparisonColumns={annotationComparisonColumns[annotationRunAllSource.node_id] ?? []}
-          onComparisonColumnsChange={(columns) => {
-            setAnnotationComparisonColumns(annotationRunAllSource.node_id, columns);
-          }}
-          reliabilityMetric={
-            annotationReliabilityMetrics[annotationRunAllSource.node_id] ??
-            DEFAULT_INTERCODER_RELIABILITY_METRIC
-          }
-          onReliabilityMetricChange={(metric) => {
-            setAnnotationReliabilityMetric(annotationRunAllSource.node_id, metric);
-          }}
-          metadataColumns={annotationMetadataColumns[annotationRunAllSource.node_id] ?? []}
-          onMetadataColumnsChange={(columns) => {
-            setAnnotationMetadataColumns(annotationRunAllSource.node_id, columns);
-          }}
-          correction={{
-            column: reviewCorrectionColumn,
-            classOptions: annotationRunAllSource.classes.map((item) => item.name),
-            onColumnChange: (column) => {
-              setLiveCorrectionColumn(annotationRunAllSource.node_id, column);
-            },
-            onCreate: () => {
-              openCorrectionColumnDialog(
-                annotationRunAllSource.node_id,
-                annotationRunAllSource.annotation_column,
-                reviewSourceColumns,
-              );
-            },
-            onUseAsExample: () => {
-              handleUseCorrectionColumnAsExample(
-                annotationRunAllSource.node_id,
-                annotationRunAllSource.text_column,
-                reviewCorrectionColumn,
-              );
-            },
-            disabled: isCreatingCorrectionColumn,
-          }}
-        />
+        <>
+          {(annotationRunAllResult.data?.failed_row_count ?? 0) > 0 ? (
+            <div
+              role="status"
+              className="mt-5 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+            >
+              Annotation completed with {annotationRunAllResult.data?.failed_row_count} failed row
+              {annotationRunAllResult.data?.failed_row_count === 1 ? '' : 's'} across{' '}
+              {annotationRunAllResult.data?.failed_batch_count} failed batch
+              {annotationRunAllResult.data?.failed_batch_count === 1 ? '' : 'es'}. Failed rows kept
+              their existing values when reprocessing and remain blank when filling missing values.
+            </div>
+          ) : null}
+          <RunAllReviewTable
+            workspaceId={currentWorkspaceId}
+            nodeId={annotationRunAllSource.node_id}
+            sql={`SELECT * FROM ${sqlTable(annotationRunAllSource.node_id)}`}
+            sourceColumns={reviewSourceColumns}
+            sourceColor={reviewSourceNode.color ?? GREY}
+            rowCount={reviewSourceNode.shape?.[0] ?? 0}
+            title="Annotation"
+            guidanceTarget="annotation-ai-run-all-results"
+            requiredColumns={[
+              annotationRunAllSource.text_column,
+              annotationRunAllSource.annotation_column,
+            ]}
+            comparisonColumn={annotationRunAllSource.annotation_column}
+            comparisonColumns={annotationComparisonColumns[annotationRunAllSource.node_id] ?? []}
+            onComparisonColumnsChange={(columns) => {
+              setAnnotationComparisonColumns(annotationRunAllSource.node_id, columns);
+            }}
+            reliabilityMetric={
+              annotationReliabilityMetrics[annotationRunAllSource.node_id] ??
+              DEFAULT_INTERCODER_RELIABILITY_METRIC
+            }
+            onReliabilityMetricChange={(metric) => {
+              setAnnotationReliabilityMetric(annotationRunAllSource.node_id, metric);
+            }}
+            metadataColumns={annotationMetadataColumns[annotationRunAllSource.node_id] ?? []}
+            onMetadataColumnsChange={(columns) => {
+              setAnnotationMetadataColumns(annotationRunAllSource.node_id, columns);
+            }}
+            correction={{
+              column: reviewCorrectionColumn,
+              classOptions: annotationRunAllSource.classes.map((item) => item.name),
+              onColumnChange: (column) => {
+                setLiveCorrectionColumn(annotationRunAllSource.node_id, column);
+              },
+              onCreate: () => {
+                openCorrectionColumnDialog(
+                  annotationRunAllSource.node_id,
+                  annotationRunAllSource.annotation_column,
+                  reviewSourceColumns,
+                );
+              },
+              onUseAsExample: () => {
+                handleUseCorrectionColumnAsExample(
+                  annotationRunAllSource.node_id,
+                  annotationRunAllSource.text_column,
+                  reviewCorrectionColumn,
+                );
+              },
+              disabled: isCreatingCorrectionColumn,
+            }}
+          />
+        </>
       ) : annotationMode === 'ai' && aiResult && serverAiRequest ? (
         <AnnotationAiPreviewPanel
           preview={aiPreview}

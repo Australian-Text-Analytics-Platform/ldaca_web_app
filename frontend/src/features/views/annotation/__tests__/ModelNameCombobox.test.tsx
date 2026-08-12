@@ -92,7 +92,7 @@ describe('ModelNameCombobox', () => {
     const { onChange } = renderCombobox('', customConfiguration);
     const input = screen.getByPlaceholderText('Search or type a model name');
     fireEvent.focus(input);
-    expect(await screen.findByText('Could not list models; type a model name')).toBeInTheDocument();
+    expect(await screen.findByText('offline')).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'local-model' } });
     expect(onChange).toHaveBeenCalledWith('local-model');
   });

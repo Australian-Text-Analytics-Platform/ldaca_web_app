@@ -34,14 +34,24 @@ describe('resolveAnnotationProviderConfiguration', () => {
     );
   });
 
-  it('falls back to the first remaining configuration of the deleted provider type', () => {
+  it('clears a deleted configuration instead of switching to another account', () => {
     expect(
       resolveAnnotationProviderConfiguration(
         configurations.slice(1),
         configurations[0]!.id,
         'openrouter',
+      ),
+    ).toBeNull();
+  });
+
+  it('skips keyless built-ins when choosing a provider for a fresh tab', () => {
+    expect(
+      resolveAnnotationProviderConfiguration(
+        [{ ...configurations[0]!, has_api_key: false }, configurations[1]!],
+        null,
+        null,
       )?.id,
-    ).toBe(configurations[2]!.id);
+    ).toBe(configurations[1]!.id);
   });
 
   it('does not fall across provider types when the selected type disappears', () => {

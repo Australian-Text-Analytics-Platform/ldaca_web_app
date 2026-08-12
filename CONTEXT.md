@@ -220,9 +220,10 @@ _Avoid_: API-key preference, Analysis parameter, Workspace secret
 **Annotation Provider Configuration**:
 An ordered, user-named Annotation connection with an opaque identity, provider
 type, immutable provider locator, and one optional write-only Provider
-Credential. Multiple configurations may use the same provider type or display
-name. An Analysis retains the selected safe identity, type, and Custom base URL,
-but never the display name or credential.
+Credential. Its UUID is stable while its name or credential changes. Multiple
+configurations may repeat the same name, type, locator, or credential. An
+Analysis retains the selected safe identity, type, and Custom base URL, but
+never the display name or credential.
 _Avoid_: provider type, credential slot, model preference
 
 **Analysis Execution Scope**:

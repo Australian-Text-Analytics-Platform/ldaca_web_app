@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { AnnotationProviderConfigurationView } from '@/features/provider-credentials/providerCredentialsStore';
-import { providerConfigurationSecondaryText } from '../aiProviders';
+import { canListModels, providerConfigurationSecondaryText } from '../aiProviders';
 import { AddAnnotationProviderDialog } from './AddAnnotationProviderDialog';
 import { ModelNameCombobox } from './ModelNameCombobox';
 
@@ -44,8 +44,9 @@ export function AnnotationAiSettings({
   const selected =
     configurations.find((configuration) => configuration.id === selectedConfigurationId) ?? null;
   const selectedModel = selected ? model : '';
+  const selectedNeedsKey = Boolean(selected && !canListModels(selected));
   const selectedProviderSummary = selected
-    ? `${selected.name} ${providerConfigurationSecondaryText(selected)}`
+    ? `${selected.name} ${selectedNeedsKey ? 'Needs API key' : providerConfigurationSecondaryText(selected)}`
     : 'No provider selected';
   const selectedModelSummary = selectedModel || 'No model selected';
 
@@ -77,7 +78,9 @@ export function AnnotationAiSettings({
                   <>
                     <span className="truncate font-medium">{selected.name}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {providerConfigurationSecondaryText(selected)}
+                      {selectedNeedsKey
+                        ? 'Needs API key'
+                        : providerConfigurationSecondaryText(selected)}
                     </span>
                   </>
                 ) : (
@@ -127,7 +130,9 @@ export function AnnotationAiSettings({
                           <span className="flex min-w-0 items-baseline gap-2">
                             <span className="truncate font-medium">{selected.name}</span>
                             <span className="truncate text-xs text-muted-foreground">
-                              {providerConfigurationSecondaryText(selected)}
+                              {selectedNeedsKey
+                                ? 'Needs API key'
+                                : providerConfigurationSecondaryText(selected)}
                             </span>
                           </span>
                         ) : (
@@ -149,7 +154,8 @@ export function AnnotationAiSettings({
                             <button
                               key={configuration.id}
                               type="button"
-                              className="flex min-w-0 items-baseline gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground"
+                              disabled={!canListModels(configuration)}
+                              className="flex min-w-0 items-baseline gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-inherit"
                               onClick={() => {
                                 onProviderChange(
                                   configuration,
@@ -162,7 +168,9 @@ export function AnnotationAiSettings({
                                 {configuration.name}
                               </span>
                               <span className="truncate text-xs text-muted-foreground">
-                                {providerConfigurationSecondaryText(configuration)}
+                                {canListModels(configuration)
+                                  ? providerConfigurationSecondaryText(configuration)
+                                  : 'Needs API key'}
                               </span>
                             </button>
                           ))
@@ -196,8 +204,13 @@ export function AnnotationAiSettings({
                       onCommit={(next) => {
                         onModelCommit(selected.id, next);
                       }}
-                      disabled={disabled}
+                      disabled={(disabled ?? false) || selectedNeedsKey}
                     />
+                    {selectedNeedsKey ? (
+                      <p className="text-xs text-destructive">
+                        Add an API key in Settings → AI before listing models or running Annotation.
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -211,7 +224,9 @@ export function AnnotationAiSettings({
         open={addOpen}
         onOpenChange={setAddOpen}
         onCreated={(configuration) => {
-          onProviderChange(configuration, providerModels[configuration.id] ?? '');
+          if (canListModels(configuration)) {
+            onProviderChange(configuration, providerModels[configuration.id] ?? '');
+          }
         }}
       />
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -13,39 +14,22 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import type { AnnotationProviderConfigurationView } from '@/features/provider-credentials/providerCredentialsStore';
 import { useProviderCredentials } from '@/features/provider-credentials/useProviderCredentials';
 import { providerConfigurationSecondaryText } from '../aiProviders';
 import { AddAnnotationProviderDialog } from './AddAnnotationProviderDialog';
+import { EditAnnotationProviderDialog } from './EditAnnotationProviderDialog';
 
 /** Ordered management UI for named Annotation provider configurations. */
 export function AiProvidersPreferencesPanel() {
   const credentials = useProviderCredentials();
   const [addOpen, setAddOpen] = useState(false);
-  const [renameTarget, setRenameTarget] = useState<AnnotationProviderConfigurationView | null>(
-    null,
-  );
-  const [renameDraft, setRenameDraft] = useState('');
+  const [editTarget, setEditTarget] = useState<AnnotationProviderConfigurationView | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AnnotationProviderConfigurationView | null>(
     null,
   );
   const [clearOpen, setClearOpen] = useState(false);
   const [pending, setPending] = useState(false);
-
-  const rename = async () => {
-    if (!renameTarget || !renameDraft.trim()) return;
-    setPending(true);
-    try {
-      await credentials.renameAnnotationProvider(renameTarget.id, renameDraft);
-      setRenameTarget(null);
-      toast.success('Provider renamed');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not rename provider');
-    } finally {
-      setPending(false);
-    }
-  };
 
   const remove = async () => {
     if (!deleteTarget) return;
@@ -85,12 +69,34 @@ export function AiProvidersPreferencesPanel() {
               : 'Configurations are stored by the local backend. Saved secrets are never returned to the browser.'}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            To change a provider type, URL, or API key, add a new configuration and then delete the
-            old one.
+            Names and saved keys can be edited. Provider type and Custom Base URL stay fixed.
           </p>
         </div>
 
-        {credentials.annotationProviders.length === 0 ? (
+        {credentials.isLoading ? (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-md border px-3 py-4 text-sm text-muted-foreground"
+          >
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            Loading Annotation providers…
+          </div>
+        ) : credentials.error ? (
+          <div
+            role="alert"
+            className="space-y-3 rounded-md border border-destructive/40 px-3 py-4 text-sm"
+          >
+            <p>Could not load Annotation providers.</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void credentials.retry()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : credentials.annotationProviders.length === 0 ? (
           <p className="rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground">
             No Annotation providers configured.
           </p>
@@ -98,29 +104,27 @@ export function AiProvidersPreferencesPanel() {
           <div className="space-y-2">
             {credentials.annotationProviders.map((configuration) => (
               <div key={configuration.id} className="rounded-md border border-border/70 px-3 py-3">
-                {renameTarget?.id === configuration.id ? (
-                  <div className="flex gap-2">
-                    <Input
-                      aria-label={`Rename ${configuration.name}`}
-                      value={renameDraft}
-                      disabled={pending}
-                      onChange={(event) => {
-                        setRenameDraft(event.target.value);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') void rename();
-                        if (event.key === 'Escape') setRenameTarget(null);
-                      }}
-                    />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{configuration.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {providerConfigurationSecondaryText(configuration)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant="outline">
+                      {configuration.has_api_key ? 'Key saved' : 'No key'}
+                    </Badge>
                     <Button
                       type="button"
                       size="sm"
-                      disabled={pending || !renameDraft.trim()}
+                      variant="outline"
+                      disabled={pending}
                       onClick={() => {
-                        void rename();
+                        setEditTarget(configuration);
                       }}
                     >
-                      Save
+                      Edit
                     </Button>
                     <Button
                       type="button"
@@ -128,50 +132,13 @@ export function AiProvidersPreferencesPanel() {
                       variant="outline"
                       disabled={pending}
                       onClick={() => {
-                        setRenameTarget(null);
+                        setDeleteTarget(configuration);
                       }}
                     >
-                      Cancel
+                      Delete
                     </Button>
                   </div>
-                ) : (
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{configuration.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {providerConfigurationSecondaryText(configuration)}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Badge variant="outline">
-                        {configuration.has_api_key ? 'Key saved' : 'No key'}
-                      </Badge>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={pending}
-                        onClick={() => {
-                          setRenameTarget(configuration);
-                          setRenameDraft(configuration.name);
-                        }}
-                      >
-                        Rename
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={pending}
-                        onClick={() => {
-                          setDeleteTarget(configuration);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
@@ -201,6 +168,23 @@ export function AiProvidersPreferencesPanel() {
       </div>
 
       <AddAnnotationProviderDialog open={addOpen} onOpenChange={setAddOpen} />
+      <EditAnnotationProviderDialog
+        configuration={editTarget}
+        pending={pending}
+        onOpenChange={() => {
+          setEditTarget(null);
+        }}
+        onSave={async (configurationId, input) => {
+          setPending(true);
+          try {
+            await credentials.updateAnnotationProvider(configurationId, input);
+            setEditTarget(null);
+            toast.success('Provider updated');
+          } finally {
+            setPending(false);
+          }
+        }}
+      />
 
       <AlertDialog
         open={deleteTarget !== null}
@@ -212,8 +196,9 @@ export function AiProvidersPreferencesPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete provider?</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete {deleteTarget?.name ?? 'this provider configuration'}? Historical Results
-              remain readable.
+              Delete {deleteTarget?.name ?? 'this provider configuration'}? Completed Run All output
+              remains readable. Preview pages and future requests that use this provider will no
+              longer work.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -236,7 +221,8 @@ export function AiProvidersPreferencesPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Clear all providers?</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete every configured Annotation provider. Historical Results remain readable.
+              Delete every configured Annotation provider. Completed Run All output remains
+              readable, but Preview pages and future provider requests will no longer work.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

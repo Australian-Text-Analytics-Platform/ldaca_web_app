@@ -48,7 +48,11 @@ export function canAnnotate(
   return canListModels(configuration) && model.trim().length > 0;
 }
 
-/** Resolve a saved selection, then the first same-type fallback, then a fresh default. */
+/** Resolve a saved selection without silently switching a tab to another account.
+ *
+ * A missing persisted UUID means its configuration was deleted, so callers clear
+ * that tab. Only a genuinely fresh tab may choose the first usable connection.
+ */
 export function resolveAnnotationProviderConfiguration(
   configurations: AnnotationProviderConfigurationResource[],
   selectedId: string | null,
@@ -56,8 +60,6 @@ export function resolveAnnotationProviderConfiguration(
 ): AnnotationProviderConfigurationResource | null {
   const selected = configurations.find((configuration) => configuration.id === selectedId);
   if (selected) return selected;
-  if (selectedType) {
-    return configurations.find((configuration) => configuration.provider === selectedType) ?? null;
-  }
-  return configurations[0] ?? null;
+  if (selectedId || selectedType) return null;
+  return configurations.find((configuration) => canListModels(configuration)) ?? null;
 }

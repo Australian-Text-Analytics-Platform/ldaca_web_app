@@ -16,6 +16,12 @@ export interface AnnotationProviderConfigurationInput {
   apiKey?: string | null;
 }
 
+export interface AnnotationProviderConfigurationUpdateInput {
+  name?: string;
+  /** Omission keeps the key; null removes it; a non-empty string replaces it. */
+  apiKey?: string | null;
+}
+
 export interface AnnotationProviderConfigurationView
   extends AnnotationProviderConfigurationResource {
   credentialRevision: number;
@@ -45,7 +51,11 @@ interface ProviderCredentialsActions {
     userId: string,
     input: AnnotationProviderConfigurationInput,
   ) => AnnotationProviderConfigurationView;
-  renameAnnotationProvider: (userId: string, configurationId: string, name: string) => void;
+  updateAnnotationProvider: (
+    userId: string,
+    configurationId: string,
+    input: AnnotationProviderConfigurationUpdateInput,
+  ) => AnnotationProviderConfigurationView;
   deleteAnnotationProvider: (userId: string, configurationId: string) => void;
   clearAnnotationProviders: (userId: string) => void;
   setDataPortalCredential: (userId: string, value: string) => void;
@@ -132,9 +142,7 @@ const normalizeConfigurationInput = (
   if (!name || name.length > 200) throw new Error('Enter a provider name');
   const trimmedApiKey = input.apiKey?.trim() ?? '';
   const apiKey = trimmedApiKey.length > 0 ? trimmedApiKey : undefined;
-  if (input.provider !== 'custom' && !apiKey) {
-    throw new Error('Built-in providers require an API key');
-  }
+  if (trimmedApiKey.length > 4_000) throw new Error('API key is too long');
   if (input.provider === 'custom') {
     if (!input.baseUrl?.trim()) throw new Error('Enter a Custom Base URL');
     return {
@@ -148,15 +156,6 @@ const normalizeConfigurationInput = (
   return { name, provider: input.provider, apiKey };
 };
 
-const sameIdentity = (
-  left: Pick<StoredAnnotationProviderConfiguration, 'provider' | 'baseUrl' | 'apiKey'>,
-  right: Pick<StoredAnnotationProviderConfiguration, 'provider' | 'baseUrl' | 'apiKey'>,
-): boolean => {
-  if (left.provider !== right.provider) return false;
-  if (left.provider === 'custom' && left.baseUrl !== right.baseUrl) return false;
-  return (left.apiKey ?? '') === (right.apiKey ?? '');
-};
-
 /** Browser-owned provider secrets, intentionally kept outside Zustand devtools. */
 export const useProviderCredentialsStore = create<ProviderCredentialsStore>()(
   persist(
@@ -167,13 +166,6 @@ export const useProviderCredentialsStore = create<ProviderCredentialsStore>()(
         if (!userId) throw new Error('No authenticated user is available');
         const normalized = normalizeConfigurationInput(input);
         const current = get().byUser[userId] ?? emptyEntry();
-        if (
-          current.annotationProviders.some((configuration) =>
-            sameIdentity(configuration, normalized),
-          )
-        ) {
-          throw new Error('This Annotation provider identity is already configured');
-        }
         const configuration: StoredAnnotationProviderConfiguration = {
           ...normalized,
           id: crypto.randomUUID(),
@@ -192,19 +184,42 @@ export const useProviderCredentialsStore = create<ProviderCredentialsStore>()(
         return configurationView(configuration);
       },
 
-      renameAnnotationProvider: (userId, configurationId, name) => {
-        const trimmed = name.trim();
-        if (!trimmed || trimmed.length > 200) throw new Error('Enter a provider name');
+      updateAnnotationProvider: (userId, configurationId, input) => {
+        if (input.name === undefined && input.apiKey === undefined) {
+          throw new Error('Change the name or API key before saving');
+        }
+        const trimmedName = input.name?.trim();
+        if (input.name !== undefined && (!trimmedName || trimmedName.length > 200)) {
+          throw new Error('Enter a provider name');
+        }
+        const trimmedApiKey = typeof input.apiKey === 'string' ? input.apiKey.trim() : input.apiKey;
+        if (typeof trimmedApiKey === 'string' && !trimmedApiKey) {
+          throw new Error('Enter an API key or use Remove saved key');
+        }
+        if (typeof trimmedApiKey === 'string' && trimmedApiKey.length > 4_000) {
+          throw new Error('API key is too long');
+        }
         const current = get().byUser[userId];
         if (!current) throw new Error('Annotation provider configuration not found');
-        if (
-          !current.annotationProviders.some((configuration) => configuration.id === configurationId)
-        ) {
+        const existing = current.annotationProviders.find(
+          (configuration) => configuration.id === configurationId,
+        );
+        if (!existing) {
           throw new Error('Annotation provider configuration not found');
         }
         const annotationProviders = current.annotationProviders.map((configuration) => {
           if (configuration.id !== configurationId) return configuration;
-          return { ...configuration, name: trimmed };
+          const apiKey =
+            trimmedApiKey === null ? undefined : (trimmedApiKey ?? configuration.apiKey);
+          const credentialChanged = input.apiKey !== undefined && apiKey !== configuration.apiKey;
+          return {
+            ...configuration,
+            name: trimmedName ?? configuration.name,
+            apiKey,
+            credentialRevision: credentialChanged
+              ? configuration.credentialRevision + 1
+              : configuration.credentialRevision,
+          };
         });
         set((state) => ({
           byUser: {
@@ -212,6 +227,11 @@ export const useProviderCredentialsStore = create<ProviderCredentialsStore>()(
             [userId]: { ...current, annotationProviders, revision: current.revision + 1 },
           },
         }));
+        const updated = annotationProviders.find(
+          (configuration) => configuration.id === configurationId,
+        );
+        if (!updated) throw new Error('Annotation provider configuration not found');
+        return configurationView(updated);
       },
 
       deleteAnnotationProvider: (userId, configurationId) => {
@@ -338,7 +358,6 @@ const sanitizeConfiguration = (value: unknown): StoredAnnotationProviderConfigur
     typeof source.apiKey === 'string' && source.apiKey.length > 0 && source.apiKey.length <= 4_000
       ? source.apiKey
       : undefined;
-  if (source.provider !== 'custom' && !apiKey) return null;
   let baseUrl: string | undefined;
   if (source.provider === 'custom') {
     if (typeof source.baseUrl !== 'string') return null;
@@ -367,12 +386,7 @@ const sanitizeEntry = (value: unknown): StoredUserProviderCredentials | null => 
   const annotationProviders = source.annotationProviders.map(sanitizeConfiguration);
   if (annotationProviders.some((item) => item === null)) return null;
   const configurations = annotationProviders as StoredAnnotationProviderConfiguration[];
-  if (
-    new Set(configurations.map((item) => item.id)).size !== configurations.length ||
-    configurations.some((item, index) =>
-      configurations.slice(0, index).some((existing) => sameIdentity(existing, item)),
-    )
-  ) {
+  if (new Set(configurations.map((item) => item.id)).size !== configurations.length) {
     return null;
   }
   const dataPortal =

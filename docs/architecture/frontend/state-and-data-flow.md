@@ -65,7 +65,9 @@ configuration metadata. A request facade reads the selected configuration's
 secret synchronously by UUID inside the final generated SDK call. Model-list
 queries are keyed by configuration UUID, immutable safe locator metadata, and a
 safe credential revision; secret values never enter query keys, mutation state,
-Tab state, hydrated requests, errors, or telemetry. Logout does not delete
+Tab state, hydrated requests, errors, or telemetry. Name-only edits preserve
+cached inference, while credential replacement or removal invalidates model and
+active Preview queries. Logout does not delete
 another account's browser partition, and browser storage events synchronize
 replacement and deletion across tabs. In single-user mode, the same facade
 projects the backend-owned collection and invokes its write-only CRUD
@@ -73,9 +75,11 @@ operations without creating a browser credential entry.
 
 Annotation Tab presentation state retains the selected configuration UUID,
 provider type, a per-configuration model map, and the selected AI Preview
-correction column per source Data Block. Fresh Tabs choose the first configured
-provider entry. If the selected entry disappears, the first remaining entry of
-the same provider type is chosen; otherwise the selection is cleared. Preview
+correction column per source Data Block. Fresh Tabs choose the first usable
+provider entry. Keyless built-ins remain visible but disabled. If the selected
+entry becomes keyless it remains selected with Settings guidance; if it is
+deleted, the selected UUID, type, and current model are cleared without choosing
+another account. Other configurations' remembered models remain. Preview
 inference is a page query against a Preview-scoped Analysis and its pages use
 zero-lifetime Query entries. Labels are not written into the source.
 Choosing a correction is instead an explicit Workspace `set_cell`

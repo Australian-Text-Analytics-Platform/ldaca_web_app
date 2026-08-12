@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   createAnnotationProviderConfiguration: vi.fn(),
   deleteAnnotationProviderConfiguration: vi.fn(),
   getProviderCredentials: vi.fn(),
-  renameAnnotationProviderConfiguration: vi.fn(),
+  updateAnnotationProviderConfiguration: vi.fn(),
   updateDataPortalCredential: vi.fn(),
 }));
 
@@ -35,7 +35,7 @@ vi.mock('@/api', async (importOriginal) => ({
   createAnnotationProviderConfiguration: mocks.createAnnotationProviderConfiguration,
   deleteAnnotationProviderConfiguration: mocks.deleteAnnotationProviderConfiguration,
   getProviderCredentials: mocks.getProviderCredentials,
-  renameAnnotationProviderConfiguration: mocks.renameAnnotationProviderConfiguration,
+  updateAnnotationProviderConfiguration: mocks.updateAnnotationProviderConfiguration,
   updateDataPortalCredential: mocks.updateDataPortalCredential,
 }));
 
@@ -83,7 +83,7 @@ describe('useProviderCredentials', () => {
     mocks.createAnnotationProviderConfiguration.mockResolvedValue({
       data: backendConfiguration,
     });
-    mocks.renameAnnotationProviderConfiguration.mockResolvedValue({
+    mocks.updateAnnotationProviderConfiguration.mockResolvedValue({
       data: { ...backendConfiguration, name: 'Renamed' },
     });
     mocks.deleteAnnotationProviderConfiguration.mockResolvedValue({ data: undefined });
@@ -150,10 +150,45 @@ describe('useProviderCredentials', () => {
     expect(queryClient.getMutationCache().getAll()).toEqual([]);
     expect(useProviderCredentialsStore.getState().byUser).toEqual({});
 
-    await act(() => result.current.renameAnnotationProvider(CONFIGURATION_ID, 'Renamed'));
+    await act(() =>
+      result.current.updateAnnotationProvider(CONFIGURATION_ID, {
+        name: 'Renamed',
+        apiKey: 'replacement-secret',
+      }),
+    );
+    expect(mocks.updateAnnotationProviderConfiguration).toHaveBeenCalledWith({
+      path: { configuration_id: CONFIGURATION_ID },
+      body: { name: 'Renamed', api_key: 'replacement-secret' },
+      throwOnError: true,
+    });
     await waitFor(() => expect(result.current.annotationProviders[0]?.name).toBe('Renamed'));
     await act(() => result.current.deleteAnnotationProvider(CONFIGURATION_ID));
     await waitFor(() => expect(result.current.annotationProviders).toEqual([]));
+  });
+
+  it('updates and clears browser credentials without exposing them to Query state', async () => {
+    const { result, queryClient } = setup();
+    let createdId = '';
+    await act(async () => {
+      createdId = (
+        await result.current.addAnnotationProvider({
+          name: 'OpenAI keyless',
+          provider: 'openai',
+        })
+      ).id;
+      await result.current.updateAnnotationProvider(createdId, { apiKey: 'rotated-secret' });
+    });
+    expect(getBrowserAnnotationProviderCredential('user-a', createdId)).toBe('rotated-secret');
+    await act(() => result.current.updateAnnotationProvider(createdId, { apiKey: null }));
+    expect(getBrowserAnnotationProviderCredential('user-a', createdId)).toBeUndefined();
+    expect(
+      JSON.stringify(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .map((query) => query.queryKey),
+      ),
+    ).not.toContain('rotated-secret');
   });
 
   it('retains browser configurations when the facade unmounts for logout', async () => {

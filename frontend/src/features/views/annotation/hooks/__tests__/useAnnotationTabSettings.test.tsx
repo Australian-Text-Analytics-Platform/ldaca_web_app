@@ -263,7 +263,7 @@ describe('useAnnotationTabSettings', () => {
     warnSpy.mockRestore();
   });
 
-  it('clears a missing configuration without erasing its provider type', () => {
+  it('clears a missing configuration, provider type, and current model', () => {
     const onTabSettingChange = vi.fn();
     const { result } = renderHook(() =>
       useAnnotationTabSettings({
@@ -280,7 +280,9 @@ describe('useAnnotationTabSettings', () => {
     });
 
     expect(result.current.aiProviderConfigurationId).toBeNull();
-    expect(result.current.aiProviderType).toBe('openrouter');
+    expect(result.current.aiProviderType).toBeNull();
+    expect(result.current.aiModel).toBe('');
     expect(onTabSettingChange).toHaveBeenCalledWith('aiProviderConfigurationId', '');
+    expect(onTabSettingChange).toHaveBeenCalledWith('aiProviderType', '');
   });
 });

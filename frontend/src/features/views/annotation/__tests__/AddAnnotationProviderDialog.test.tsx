@@ -44,7 +44,7 @@ describe('AddAnnotationProviderDialog', () => {
     expect(name).toHaveValue('OpenRouter');
     expect(name).toHaveFocus();
 
-    await user.type(screen.getByLabelText('API Key'), 'personal-key');
+    await user.type(screen.getByLabelText(/API Key/), 'personal-key');
     await user.click(screen.getByRole('button', { name: 'Add Provider' }));
 
     await waitFor(() =>
@@ -56,6 +56,32 @@ describe('AddAnnotationProviderDialog', () => {
       }),
     );
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  it('allows a keyless built-in provider and explains that it cannot be used yet', async () => {
+    const user = userEvent.setup();
+    mocks.addAnnotationProvider.mockResolvedValueOnce({
+      id: '74a93227-c081-4db9-af2e-ad357b62278d',
+      name: 'OpenRouter',
+      provider: 'openrouter',
+      base_url: null,
+      has_api_key: false,
+      credentialRevision: 1,
+    });
+    render(<AddAnnotationProviderDialog open onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('Name'), 'OpenRouter key later');
+    expect(screen.getByText(/an API key is required before use/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add Provider' }));
+
+    await waitFor(() =>
+      expect(mocks.addAnnotationProvider).toHaveBeenCalledWith({
+        name: 'OpenRouter key later',
+        provider: 'openrouter',
+        baseUrl: null,
+        apiKey: '',
+      }),
+    );
   });
 
   it('allows a keyless Custom provider and preserves a failed draft', async () => {

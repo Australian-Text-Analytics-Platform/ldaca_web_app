@@ -201,8 +201,21 @@ path.
 Annotation requests retain only the safe provider configuration UUID, provider
 type, and normalized Custom base URL. Single-user execution resolves the
 write-only stored credential by UUID. Multi-user execution receives the
-browser-owned key only at the request boundary. Names and credentials do not
-enter Workspaces, Tabs, Results, provenance, logs, query keys, or telemetry.
+browser-owned key only at the request boundary. A configuration may be keyless;
+built-in execution then stops with `provider_credential_missing`, while Custom
+execution may proceed. Credential edits affect later resolution, but a queued
+or running Run All retains the credential captured when submitted. Names and
+credentials do not enter Workspaces, Tabs, Results, provenance, query keys, or
+telemetry.
+
+Provider adapters normalize failures to a fixed safe code and message. Model
+discovery and Preview return those failures as safe 502 responses. Run All
+passes fatal failures through a private structured worker envelope and publishes
+no artifact or Data Block mutation. Only irreducible single-row context-limit
+or invalid-response failures may publish partial output. Their separate failed
+row mask preserves prior values during reprocessing, leaves fill-missing rows
+blank, and remains distinct from successful explicit-null predictions. Raw SDK
+causes are retained only in request- or Analysis-correlated logs.
 
 ## Persistence
 

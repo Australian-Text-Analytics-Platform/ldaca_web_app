@@ -1089,7 +1089,7 @@
       },
       "AnnotationProviderConfigurationCreate": {
         "additionalProperties": false,
-        "description": "Create command containing one write-only provider credential.",
+        "description": "Create one stable provider connection with an optional credential.",
         "properties": {
           "api_key": {
             "anyOf": [
@@ -1143,22 +1143,6 @@
         "title": "AnnotationProviderConfigurationCreate",
         "type": "object"
       },
-      "AnnotationProviderConfigurationRename": {
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "AnnotationProviderConfigurationRename",
-        "type": "object"
-      },
       "AnnotationProviderConfigurationResource": {
         "additionalProperties": false,
         "description": "Safe provider-configuration metadata returned to clients.",
@@ -1209,6 +1193,42 @@
           "has_api_key"
         ],
         "title": "AnnotationProviderConfigurationResource",
+        "type": "object"
+      },
+      "AnnotationProviderConfigurationUpdate": {
+        "additionalProperties": false,
+        "description": "Patch mutable connection details without accepting immutable locators.\n\nUsed by the provider-credential route in single-user mode. Omission keeps a\nvalue unchanged, while an explicit null credential removes the saved key.\nNames cannot be cleared and an empty object is never a meaningful update.",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "AnnotationProviderConfigurationUpdate",
         "type": "object"
       },
       "AnnotationResult": {
@@ -10782,7 +10802,7 @@
         ]
       },
       "patch": {
-        "operationId": "rename_annotation_provider_configuration",
+        "operationId": "update_annotation_provider_configuration",
         "parameters": [
           {
             "in": "path",
@@ -10799,7 +10819,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnnotationProviderConfigurationRename"
+                "$ref": "#/components/schemas/AnnotationProviderConfigurationUpdate"
               }
             }
           },
@@ -10882,7 +10902,7 @@
             "WordflowSession": []
           }
         ],
-        "summary": "Rename Annotation Provider Configuration",
+        "summary": "Update Annotation Provider Configuration",
         "tags": [
           "provider-credentials"
         ]
