@@ -27,9 +27,19 @@ analysis without materializing a whole-corpus result in the browser.
   they do not re-run against a mutable Data Block.
 
 - What can I sort?
-  Source metadata headers are sortable in separated per-Data-Block tables.
-  Generated `CONC_*` headers and combined-table headers are display-only because
-  those values are produced after source paging.
+  In separated Preview tables, selected source metadata is sortable and
+  generated scalar headers explain that Run All is required. After Run All,
+  separated Review tables also sort materialized matched text, L1/R1, their
+  frequencies, and match offsets. String ordering is case-sensitive and equal
+  values have no guaranteed secondary order. Full document and left/right
+  context strings remain display-only, as do all combined-table headers.
+
+- What are L1 and R1?
+  **L1** is the token immediately left of a match; **R1** is the token immediately
+  right. Their frequency columns count those values across the complete Run All
+  Result. Table View highlights the direct L1/R1 cells with a soft source colour
+  and gives matched text stronger emphasis. **Highlight L1/R1** is on by default
+  and controls only the softer L1/R1 tint for the current tab session.
 
 - What do Preview, Run All, and Review do?
   **Preview** creates a Preview Analysis and computes only the page you request.

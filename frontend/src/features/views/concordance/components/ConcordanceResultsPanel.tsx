@@ -37,6 +37,8 @@ interface ConcordanceResultsShell {
 interface ConcordanceResultsDisplay {
   concordanceView: 'table' | 'dispersion';
   setConcordanceView: Dispatch<SetStateAction<'table' | 'dispersion'>>;
+  highlightL1R1: boolean;
+  setHighlightL1R1: Dispatch<SetStateAction<boolean>>;
   proportionalDispersionBars: boolean;
   setProportionalDispersionBars: Dispatch<SetStateAction<boolean>>;
   dispersionChartMode: ConcordanceDispersionChartMode;
@@ -112,6 +114,9 @@ export interface ConcordanceResultsPanelProps {
 
 /**
  * Rendered by: ConcordanceFeature to coordinate table and dispersion result blocks.
+ * Flow: render phase/view controls, keep the local L1/R1 display toggle beside
+ * table metadata controls, resolve each source's colour/context, and dispatch to
+ * table or dispersion blocks without changing Analysis inputs.
  */
 export function ConcordanceResultsPanel({
   title = 'Search Results',
@@ -129,6 +134,8 @@ export function ConcordanceResultsPanel({
   display: {
     concordanceView,
     setConcordanceView,
+    highlightL1R1,
+    setHighlightL1R1,
     proportionalDispersionBars,
     setProportionalDispersionBars,
     dispersionChartMode,
@@ -252,6 +259,19 @@ export function ConcordanceResultsPanel({
               </TabsList>
             </Tabs>
             <div className="flex flex-wrap items-center gap-4">
+              {!showDispersion ? (
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={highlightL1R1}
+                    onChange={(event) => {
+                      setHighlightL1R1(event.target.checked);
+                    }}
+                    className="h-4 w-4"
+                  />
+                  <span>Highlight L1/R1</span>
+                </label>
+              ) : null}
               <MetadataColumnSelector
                 availableColumns={availableMetadataColumns}
                 selectedColumns={selectedMetadataColumns}
@@ -340,6 +360,7 @@ export function ConcordanceResultsPanel({
                     combinedLoading,
                     nodeLoading,
                     reviewRowUnit: isReview ? ('documents' as const) : null,
+                    highlightL1R1,
                     interactiveFilters: isReview,
                     excludedMatchedTexts,
                     onToggleMatchedText,

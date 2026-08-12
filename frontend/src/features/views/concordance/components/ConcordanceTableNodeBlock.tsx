@@ -5,12 +5,13 @@ import { useServerTable } from '@/features/views/common/hooks/useServerTable';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
-import { CONCORDANCE_PRESENTATION_COLUMN_SET } from '../../common/generatedColumns';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { batchProcessedCount } from '../concordanceDispersionDomain';
 import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
+import { concordanceHeaderMode } from '../concordanceTablePresentation';
+import { GREY } from '../../common/vizPalette';
 import { ConcordancePlainHeader, ConcordanceRowsTable } from './ConcordanceRowsTable';
 import {
   buildConcordanceTableModel,
@@ -36,6 +37,7 @@ export interface ConcordanceTableNodeBlockProps {
   showMetadata: boolean;
   selectedMetadataColumns: string[];
   reviewRowUnit: 'documents' | 'matches' | null;
+  highlightL1R1: boolean;
 
   // Workspace selection
   panelSelectedNodes: WorkspaceNodeMetadata[];
@@ -106,6 +108,7 @@ function CombinedConcordanceTable({
   handleRowClick,
   setCombinedPage,
   reviewRowUnit,
+  highlightL1R1,
 }: ConcordanceTableNodeBlockProps) {
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
     nodeData,
@@ -177,6 +180,11 @@ function CombinedConcordanceTable({
           tableColumns={tableColumns}
           searchWord={searchWord}
           loading={combinedLoading}
+          highlightL1R1={highlightL1R1}
+          getSourceColor={(row) => {
+            if (!row.__source_node) return defaultPalette[0] ?? GREY;
+            return getConcordanceSourceColor(row.__source_node, sourceColorMap, defaultPalette);
+          }}
           renderHeader={(header) => <ConcordancePlainHeader key={header.id} header={header} />}
           getRowClassName={() => 'cursor-pointer'}
           getRowStyle={(row) => {
@@ -208,8 +216,9 @@ function CombinedConcordanceTable({
  *
  * Preview pagination walks source documents while Review table pagination
  * walks matches. `total_source_rows` already carries the projection's unit.
- * Flow: derive display columns, build the server table, render generated KWIC
- * headers plus sortable source metadata, then render the shared footer.
+ * Flow: derive display columns, apply the shared phase-aware header policy to
+ * both rendering and click dispatch, tint direct match/L1/R1 cells with the
+ * source colour, then render the server-paginated table and footer.
  */
 function PerNodeConcordanceTable({
   nodeKey,
@@ -219,6 +228,7 @@ function PerNodeConcordanceTable({
   showMetadata,
   selectedMetadataColumns,
   panelSelectedNodes,
+  defaultPalette,
   nodePagination,
   globalPageSize,
   onPageSizeChange,
@@ -227,6 +237,7 @@ function PerNodeConcordanceTable({
   handlePageChange,
   handleRowClick,
   reviewRowUnit,
+  highlightL1R1,
 }: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
@@ -240,6 +251,20 @@ function PerNodeConcordanceTable({
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
+  const fallbackSourceColor = defaultPalette.find((color) => color.length > 0) ?? GREY;
+  const isReview = reviewRowUnit !== null;
+  const headerMode = (columnKey: string) =>
+    concordanceHeaderMode({
+      columnKey,
+      documentColumn: column,
+      metadataColumns: nodeData.metadata.metadata_columns,
+      isCombined: false,
+      isReview,
+    });
+  const handleEligibleSort = (columnKey: string) => {
+    if (headerMode(columnKey) !== 'sortable') return;
+    handleSort(columnKey, paginationKey, requestNodeId);
+  };
 
   const table = useServerTable<ConcordanceRow>({
     data: rows,
@@ -321,10 +346,11 @@ function PerNodeConcordanceTable({
           tableColumns={tableColumns}
           searchWord={searchWord}
           loading={nodeIsLoading}
-          renderHeader={(header) =>
-            CONCORDANCE_PRESENTATION_COLUMN_SET.has(header.column.id) ? (
-              <ConcordancePlainHeader key={header.id} header={header} />
-            ) : (
+          highlightL1R1={highlightL1R1}
+          getSourceColor={() => context.nodeColor ?? fallbackSourceColor}
+          renderHeader={(header) => {
+            const mode = headerMode(header.column.id);
+            return mode === 'sortable' ? (
               <SortableHeader
                 key={header.id}
                 columnKey={header.column.id}
@@ -332,10 +358,16 @@ function PerNodeConcordanceTable({
                 paginationKey={paginationKey}
                 requestNodeId={requestNodeId}
                 nodePagination={nodePagination}
-                onSort={handleSort}
+                onSort={handleEligibleSort}
               />
-            )
-          }
+            ) : (
+              <ConcordancePlainHeader
+                key={header.id}
+                header={header}
+                hint={mode === 'preview-review-hint' ? 'Run All to enable sorting' : undefined}
+              />
+            );
+          }}
           getRowClassName={(_row, index) =>
             `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
           }

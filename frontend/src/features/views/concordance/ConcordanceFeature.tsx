@@ -234,6 +234,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     currentParams: currentConcordanceParams,
   } = concordanceParameters;
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
+  // Table-only presentation state: remounting the Concordance feature restores
+  // the default L1/R1 tint without changing the immutable Analysis request.
+  const [highlightL1R1, setHighlightL1R1] = useState(true);
   const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
   const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
   const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
@@ -820,6 +823,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           display={{
             concordanceView,
             setConcordanceView,
+            highlightL1R1,
+            setHighlightL1R1,
             proportionalDispersionBars,
             setProportionalDispersionBars,
             dispersionChartMode,

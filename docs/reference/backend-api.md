@@ -240,7 +240,7 @@ Analysis and Result lifecycle operations.
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
-| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows` | `get_analysis_table_projection_rows` | 200 Arrow | Deterministic document or match page from a nested Run All Result |
+| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows` | `get_analysis_table_projection_rows` | 200 Arrow | Document or match page from a nested Run All Result, with optional `sort_by` and `descending` |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/documents/query` | `query_concordance_document_projection` | 200 Arrow | Exact-term/bin-filtered Concordance document page with filtered total-row header |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/schema` | `get_analysis_table_projection_schema` | 200 Arrow | Zero-row schema for a document or match projection |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/density` | `get_concordance_table_density` | 200 JSON | Whole-Result Concordance density in 100 fixed bins |
@@ -275,6 +275,15 @@ requests select columns. Document Data Block Creation carries the exact Review
 filter and optional metadata while document and extraction are implicit
 required columns. Successful creation atomically commits the requested Derived
 Data Blocks; only the Data Block Creation Result carries their output IDs.
+
+Without `sort_by`, projected rows use stable source order and match offsets.
+Concordance `matches` projections additionally accept any declared public scalar
+artifact field, including source metadata, L1/R1, frequencies, matched text, and
+offsets. Internal, unknown, and nested fields are rejected. Explicit Concordance
+match sorts use direct case-sensitive Polars ordering with its default null
+placement and no secondary tie-breakers, so equal-key order is unspecified.
+Concordance document projections and Quotation projections retain their narrower
+document/metadata sort contract.
 
 `TokenFrequencyAnalysisRequest.node_tokenizer_models` must contain exactly the
 selected Data Block IDs. `ConcordanceAnalysisRequest.node_tokenizer_models`

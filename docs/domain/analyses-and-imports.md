@@ -189,6 +189,15 @@ is never stored as a backend column. Concordance Table View reads matches;
 Dispersion View filters and pages documents. Quotation retains its existing
 document or match Review projections.
 
+Each Concordance Match records L1 (`CONC_l1`), the token immediately left of the
+match, and R1 (`CONC_r1`), the token immediately right of it, together with their
+whole-Result frequencies. Separated Preview sorts only selected source metadata;
+generated scalar headers point readers to Run All. Separated Review may sort the
+materialized match projection by public scalar Result fields using direct,
+case-sensitive Polars ordering. The table intentionally leaves the document and
+full left/right context headers plain, while combined tables remain unsorted.
+Equal values in an explicit Review sort have no secondary ordering contract.
+
 **Add to Workspace** submits a typed Supporting Analysis under the successful
 Run All parent. Concordance Match Data Block Creation emits selected flat match
 columns. Concordance Document Data Block Creation emits the required document

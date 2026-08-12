@@ -18,9 +18,13 @@ contains source fields, an internal stable source-row ID, and a nested list of
 Concordance Matches or quotation extracts. Documents without a match are not
 stored.
 
-The backend exposes explicit document and match projections. Both use stable
-source order; match projections additionally order by the Concordance start
-offset or quotation row index. Generated analysis fields are not sortable.
+The backend exposes explicit document and match projections. Without a requested
+sort, both use stable source order; match projections additionally order by the
+Concordance start offset or quotation row index. Non-materialized Concordance
+Preview pages sort only by selected source metadata. A materialized Concordance
+match projection may instead sort directly by any public scalar Result field.
+That direct sort uses Polars' case-sensitive ordering and null defaults, adds no
+hidden secondary keys, and therefore leaves equal-key order unspecified.
 Quotation Result Data Block Creation and Concordance Match Data Block Creation explode the
 nested Result. Concordance Document Data Block Creation instead filters the nested
 matches by exact surface form and relative-position bins, keeps source-row
@@ -39,8 +43,8 @@ Older layouts are rejected without a compatibility reader or runtime migration.
 - Concordance Table View is match-wise and Dispersion View is document-wise
   without rewriting the canonical Result.
 - Concordance density is stable across table pagination and sorting.
-- The internal source-row ID remains hidden but gives projections deterministic
-  order.
+- The internal source-row ID remains hidden and gives unsorted projections
+  deterministic order without changing an explicit Concordance match sort.
 - Concordance Match Data Block Creation preserves the one-occurrence-per-row
   contract; Concordance Document Data Block Creation creates a distinct
   one-source-row-per-document contract.

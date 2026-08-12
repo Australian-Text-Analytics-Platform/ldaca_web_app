@@ -21,7 +21,6 @@ import { queryConcordanceDocumentProjectionTable } from '@/api/tableApi';
 import { projectConcordanceResult } from '../../common/analysisApi';
 import { VIZ_PALETTE } from '../../common/vizPalette';
 import { buildCombinedSlice, CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
-import { CONCORDANCE_PRESENTATION_COLUMN_SET } from '../../common/generatedColumns';
 import {
   buildConcordanceNodeColorMap,
   buildConcordanceSourceColorMap,
@@ -435,7 +434,7 @@ export function useConcordanceResultSession({
     reviewDensityByNode,
     resolveNodeIdForKey,
     handleReviewSort: (columnKey: string, paginationKey: string) => {
-      if (!isReview || CONCORDANCE_PRESENTATION_COLUMN_SET.has(columnKey)) return;
+      if (!isReview) return;
       dispatch({
         type: 'set-node-pagination',
         value: (current) => {

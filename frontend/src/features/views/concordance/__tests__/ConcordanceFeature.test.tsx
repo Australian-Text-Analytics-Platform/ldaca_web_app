@@ -610,7 +610,7 @@ describe('ConcordanceFeature', () => {
           analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
           internal_columns: ['__wordflow_source_row_id'],
           document_count: 1,
-          match_count: 1,
+          match_count: 25,
           table: {
             delivery: 'projected',
             table_id: 'concordance-run-all',
@@ -639,7 +639,7 @@ describe('ConcordanceFeature', () => {
           CONC_extraction: 'Queensland example',
         },
       ],
-      hasNext: false,
+      hasNext: true,
       etag: 'review-etag',
     });
 
@@ -651,6 +651,10 @@ describe('ConcordanceFeature', () => {
     expect(screen.getByText('Queensland')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Table View' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Dispersion View' })).toBeInTheDocument();
+    const highlightToggle = screen.getByRole('checkbox', { name: 'Highlight L1/R1' });
+    expect(highlightToggle).toBeChecked();
+    fireEvent.click(highlightToggle);
+    expect(highlightToggle).not.toBeChecked();
     expect(
       queryWorkspaceSqlTableMock.mock.calls.some(([options]) =>
         String((options as { body?: { sql?: string } }).body?.sql).includes('LEFT JOIN'),
@@ -662,6 +666,31 @@ describe('ConcordanceFeature', () => {
       sortBy: null,
       descending: false,
     });
+
+    fireEvent.click(screen.getByRole('columnheader', { name: 'CONC_matched_text▲▼' }));
+    await waitFor(
+      () => {
+        expect(fetchArrowTablePageMock).toHaveBeenCalledWith('/analysis-match-rows', {
+          page: 1,
+          pageSize: 20,
+          sortBy: 'CONC_matched_text',
+          descending: false,
+        });
+      },
+      { timeout: 5_000 },
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Go to next page' }));
+    await waitFor(
+      () => {
+        expect(fetchArrowTablePageMock).toHaveBeenCalledWith('/analysis-match-rows', {
+          page: 2,
+          pageSize: 20,
+          sortBy: 'CONC_matched_text',
+          descending: false,
+        });
+      },
+      { timeout: 5_000 },
+    );
 
     unmount();
   });
