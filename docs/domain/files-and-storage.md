@@ -12,6 +12,14 @@ A User File is mutable import material. Adding one to a Workspace snapshots it
 into an immutable Workspace-owned source, so later moves or deletion in the
 user file area cannot rewrite an existing Source Data Block.
 
+File preview is a value-inspection contract, not a promise of the eventual
+Source Data Block schema. CSV and TSV preview pages and schemas expose every
+field as raw text, preserving lexemes such as `001`. JSON, JSONL, and NDJSON
+preview types come from full-file inference. When a Source Data Block is
+created, all five row-oriented formats use full-file inference before canonical
+dtype normalization and immutable Parquet staging; a numeric CSV lexeme such as
+`001` may therefore be stored as integer `1`.
+
 The User File area accepts arbitrary regular files. Loadability is a separate
 property derived from one backend-owned, case-insensitive extension allowlist.
 The complete User File tree therefore includes assets such as images even
