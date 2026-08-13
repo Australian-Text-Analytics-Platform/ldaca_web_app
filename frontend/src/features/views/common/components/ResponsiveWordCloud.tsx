@@ -3,7 +3,7 @@ import { Text } from '@visx/text';
 import { Wordcloud } from '@visx/wordcloud';
 import { useElementWidth } from '@/lib/useElementWidth';
 
-export interface WordCloudDatum {
+interface WordCloudDatum {
   text: string;
   value: number;
 }

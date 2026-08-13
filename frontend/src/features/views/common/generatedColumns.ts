@@ -37,10 +37,6 @@ export const CONCORDANCE_PRESENTATION_COLUMNS = [
   CONCORDANCE_DISPERSION_COLUMN,
 ] as const;
 
-export const CONCORDANCE_PRESENTATION_COLUMN_SET: ReadonlySet<string> = new Set(
-  CONCORDANCE_PRESENTATION_COLUMNS,
-);
-
 export const QUOTATION_COLUMN_KEYS = {
   // Canonical name for the per-quote-row raw source-document text.
   // A created Data Block may include `QUOTE_extraction`; the live Result table

@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ldaca-wordflow-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository with source dependencies
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Run frontend checks
+        run: pnpm -C frontend check
+
+      - name: Check engineering documentation links
+        run: pnpm docs:links
+
+      - name: Upload compiled frontend
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-build
+          path: frontend/build
+          if-no-files-found: error
+          retention-days: 1
+
+  backend:
+    name: Backend ${{ matrix.name }}
+    needs: frontend
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+          - name: macOS
+            os: macos-latest
+          - name: Windows
+            os: windows-latest
+
+    steps:
+      - name: Check out repository with source dependencies
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Download compiled frontend
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-build
+          path: frontend/build
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Stage frontend for backend packaging
+        run: node scripts/deploy-frontend-to-backend.mjs
+
+      - name: Set up Rust nightly for source dependencies
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          python-version: "3.14"
+          enable-cache: true
+          cache-python: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Synchronize backend from checked-out sources
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Run Ruff
+        working-directory: backend
+        run: uv run --no-sync ruff check .
+
+      - name: Run Ty
+        working-directory: backend
+        run: uv run --no-sync ty check
+
+      - name: Run pytest
+        working-directory: backend
+        run: uv run --no-sync pytest -q
+
+      - name: Export OpenAPI without runtime startup
+        working-directory: backend
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          uv run --no-sync python scripts/export_openapi.py --output "$RUNNER_TEMP/openapi.json"
+          uv run --no-sync python - "$RUNNER_TEMP/openapi.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          schema = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          operations = [
+              operation
+              for path in schema["paths"].values()
+              for method, operation in path.items()
+              if method in {"get", "post", "put", "patch", "delete"}
+          ]
+          operation_ids = [operation["operationId"] for operation in operations]
+          assert len(operation_ids) == len(set(operation_ids))
+          assert schema["paths"]["/health"]["get"]["responses"]["200"]["content"]
+          PY
+
+      - name: Build and inspect backend distributions
+        working-directory: backend
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          uv build
+          uv run --no-sync python ../scripts/verify_backend_distribution.py dist

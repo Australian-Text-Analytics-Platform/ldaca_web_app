@@ -10,9 +10,11 @@ a packaged desktop app, and a Python package that can serve the bundled SPA.
 - `polars-text/` contains Rust/PyO3 Polars text-processing extensions.
 - `polars-source-utils/` contains Rust/PyO3 serialized-plan path utilities.
 
-The three non-frontend package roots are Git submodules with their own
-manifests, tests, and release workflows. The root project coordinates local
-source resolution, frontend packaging, desktop builds, and version stamping.
+The backend is tracked directly in this repository, which owns its CI and
+`ldaca-wordflow` release workflow. The two compiled package roots remain Git
+submodules with their own manifests and release workflows. The root project
+coordinates local source resolution, frontend packaging, desktop builds, and
+version stamping.
 
 ```mermaid
 flowchart LR

@@ -1,0 +1,88 @@
+{
+    "tables": {
+        "Place": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type",
+                "asWKT_1"
+             ]
+        },
+        "Book": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type",
+                "@type_1"
+             ]
+        },
+        "CreativeWork": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type",
+                "conformsTo",
+                "conformsTo_1",
+                "@type_1",
+                "isPartOf"
+             ]
+        },
+        "Dataset": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type",
+                "license",
+                "ldac:hasCollectionProtocol",
+                "@type_1",
+                "isBasedOn",
+                "conformsTo",
+                "ldac:subjectLanguage"
+             ]
+        },
+        "File": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type",
+                "license",
+                "encodingFormat",
+                "@type_1",
+                "encodingFormat_1",
+                "ldac:annotationOf"
+             ]
+        },
+        "DefinedTerm": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type",
+                "inDefinedTermSet",
+                "sameAs",
+                "rdfs:label",
+                "rdfs:subClassOf"
+             ]
+        },
+        "RepositoryCollection": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type",
+                "@type_1",
+                "dct:rightsHolder",
+                "license",
+                "ldac:hasCollectionProtocol",
+                "isBasedOn",
+                "conformsTo",
+                "ldac:subjectLanguage"
+             ]
+        },
+        "PeopleAudience": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [ 
+                "@type"
+             ]
+        }
+    }
+}

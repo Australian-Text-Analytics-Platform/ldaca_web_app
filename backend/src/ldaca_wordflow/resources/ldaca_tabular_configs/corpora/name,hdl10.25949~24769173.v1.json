@@ -1,0 +1,48 @@
+{
+    "tables": {
+        "CreativeWork": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "identifier",
+                "conformsTo"
+            ]
+        },
+        "Dataset": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "@type_1",
+                "conformsTo",
+                "ldac:compiler",
+                "license",
+                "identifier",
+                "pcdm:memberOf"
+            ]
+        },
+        "File": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "encodingFormat",
+                "encodingFormat_1",
+                "dac:hasDerivation",
+                "ldac:derivationOf"
+            ]
+        },
+        "DefinedTerm": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "sameAs",
+                "rdfs:label",
+                "rdfs:subClassOf",
+                "inDefinedTermSet"
+            ]
+        }
+}
+}

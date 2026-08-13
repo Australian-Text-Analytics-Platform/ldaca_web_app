@@ -1,0 +1,120 @@
+[project]
+name = "ldaca-wordflow"
+version = "0.7.1"
+description = "LDaCA Wordflow - FastAPI backend with bundled production frontend for the Language Data Commons of Australia"
+readme = "README.md"
+requires-python = ">=3.14"
+license = { text = "MIT" }
+authors = [{ name = "Australian Text Analytics Platform" }]
+keywords = [
+    "ldaca",
+    "text-analytics",
+    "corpus",
+    "linguistics",
+    "fastapi",
+    "web-app",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "aiosqlite>=0.21.0",
+    "duckdb>=1.4.0",
+    "fastapi>=0.138.0",
+    "fastexcel>=0.18.0",
+    "google-auth[requests]>=2.38.0",            # Google ID-token verification
+    "httpx>=0.27.0",
+    "pydantic-settings>=2.0.0",
+    "python-multipart>=0.0.20",                 # OAuth form callbacks
+    "psutil>=6.1.0",                            # Process management for proper cleanup of child processes
+    "polars-text>=0.5.0",
+    "polars-source-utils>=0.2.0",
+    "tbb>=2022.3.1 ; sys_platform != 'darwin'",
+    "tzdata>=2025.2 ; sys_platform == 'win32'",
+    "openai>=2.26.0",                           # AsyncOpenAI: OpenAI/OpenRouter/OpenAI-compatible custom annotation calls
+    "anthropic>=0.40.0",                        # AsyncAnthropic: server-side Claude annotation calls
+    "google-genai>=1.0.0",                      # google-genai aio: server-side Gemini annotation calls
+    "spacy>=3.7.0",
+    "rtoml>=0.12.0",
+    "uvicorn[standard]>=0.35.0",
+]
+
+[project.optional-dependencies]
+deploy = ["jupyter-server-proxy>=4.4.0", "ipython>=9.5.0"]
+
+[project.scripts]
+ldaca-wordflow = "ldaca_wordflow.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow"
+Repository = "https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow"
+Documentation = "https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/tree/main/docs"
+
+[tool.pytest.ini_options]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "workspace: marks tests related to workspace functionality",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.custom]
+path = "scripts/hatch_build.py"
+
+[dependency-groups]
+dev = [
+    "twine>=6.2.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx2>=2.0.0",
+    "ruff>=0.15.1",
+    "ty>=0.0.59",
+]
+
+[tool.ty.src]
+exclude = ["**/_vendor/"]
+
+[tool.ty.analysis]
+allowed-unresolved-imports = [
+    "hatchling.builders.hooks.plugin.interface",
+    "pytest",
+    "_pytest.**",
+]
+
+[tool.hatch.build]
+# The generated build/ dir is ignored; force-include its ready-to-serve SPA in
+# built distributions after the root workflow stages it.
+artifacts = ["src/ldaca_wordflow/resources/frontend/build/**"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/scripts/hatch_build.py",
+    "/src/ldaca_wordflow/resources/**",
+    "/src/ldaca_wordflow/_vendor/gender_gap_tracker/**",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ldaca_wordflow"]
+include = [
+    "src/ldaca_wordflow/resources/**",
+    "src/ldaca_wordflow/_vendor/gender_gap_tracker/**",
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.uv.sources]
+polars-text = { path = "../polars-text", editable = true }
+polars-source-utils = { path = "../polars-source-utils", editable = true }

@@ -46,9 +46,10 @@ testing. It is not a partial path override and is never silently ignored.
 ## Desktop CI
 
 `.github/workflows/desktop-build.yml` is the single reusable Windows and macOS
-packaging workflow. The release workflow invokes it once per platform after
-version validation. Backend Ruff, Ty, and Pytest gates belong to backend CI;
-desktop CI retains only supervisor, bundle, and packaged-runtime checks.
+packaging workflow. `.github/workflows/desktop-release.yml` invokes it manually
+once per platform after version validation. Backend Ruff, Ty, and Pytest gates
+belong to the root CI workflow; desktop CI retains only supervisor, bundle, and
+packaged-runtime checks.
 
 The reusable build workflow owns all compilation and packaging. It preserves
 the source-aware backend-runtime build, then:
@@ -61,7 +62,7 @@ the source-aware backend-runtime build, then:
 - creates and signs the updater `.app.tar.gz` from that final application;
 - creates, signs, notarizes, and staples the direct-download DMG.
 
-The release workflow does not rebuild. It downloads both build artifacts,
+The desktop release workflow does not rebuild. It downloads both build artifacts,
 creates `latest.json`, and publishes the MSI, DMG, updater archives, signatures,
 and manifest to the matching GitHub Release. Publication requires the release
 tag and checked-out ref to peel to the same commit.

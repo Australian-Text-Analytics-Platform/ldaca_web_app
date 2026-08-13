@@ -352,9 +352,7 @@ export function WorkspaceTable({
     manualPagination: true,
     manualSorting: true,
     rowCount: usesLookaheadPagination ? undefined : totalRows,
-    pageCount: usesLookaheadPagination
-      ? pageIndex + 1 + (hasNext ? 1 : 0)
-      : undefined,
+    pageCount: usesLookaheadPagination ? pageIndex + 1 + (hasNext ? 1 : 0) : undefined,
     state: {
       pagination: { pageIndex, pageSize },
       sorting,

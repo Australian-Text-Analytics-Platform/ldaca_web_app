@@ -14,3 +14,8 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
+
+# Preserve these byte-for-byte legacy backend snapshot files while excluding
+# their pre-existing whitespace from migration-wide `git diff --check` output.
+backend/.coveragerc -whitespace
+backend/src/ldaca_wordflow/resources/ldaca_tabular_configs/corpora/name,hdl10.26180~23961609.json -whitespace

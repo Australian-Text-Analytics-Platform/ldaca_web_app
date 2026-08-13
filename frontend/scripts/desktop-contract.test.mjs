@@ -31,9 +31,9 @@ describe('desktop configuration contracts', () => {
     expect(packageJson.scripts['desktop:build:mac']).toContain('--target aarch64-apple-darwin');
   });
 
-  it('builds signed updater artifacts and delegates publication to the release workflow', () => {
+  it('builds signed updater artifacts and delegates publication to the manual desktop workflow', () => {
     const buildWorkflow = read('.github/workflows/desktop-build.yml');
-    const releaseWorkflow = read('.github/workflows/release.yml');
+    const releaseWorkflow = read('.github/workflows/desktop-release.yml');
 
     for (const action of [
       'actions/checkout@v7.0.1',

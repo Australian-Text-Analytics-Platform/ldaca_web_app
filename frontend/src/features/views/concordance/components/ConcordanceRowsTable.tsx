@@ -165,10 +165,7 @@ export function ConcordanceRowsTable({
                 {tableRow.getVisibleCells().map((cell) => {
                   const sourceColor = getSourceColor?.(row);
                   const presentation = concordanceCellPresentation(cell.column.id, sourceColor);
-                  const renderedCell = flexRender(
-                    cell.column.columnDef.cell,
-                    cell.getContext(),
-                  );
+                  const renderedCell = flexRender(cell.column.columnDef.cell, cell.getContext());
                   return (
                     <TableCell
                       key={cell.id}

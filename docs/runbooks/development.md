@@ -10,9 +10,27 @@ uv sync
 pnpm install
 ```
 
+The backend is an ordinary tracked directory. The recursive submodule update
+initializes the supporting package, documentation, and sample-data repositories.
 Do not set `PYTHONPATH` for normal development. Root uv sources resolve the
 local backend and supporting packages; package-specific checks run from the
 package root.
+
+### Existing clones from before the backend integration
+
+Before pulling the commit that replaces the backend submodule, first preserve
+or publish any backend-local work, then run:
+
+```bash
+git -C backend status --short --branch
+git submodule deinit -- backend
+git pull --ff-only
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+Do not force deinitialization. Stop if the first command reports local changes
+or commits that have not been backed up or pushed.
 
 ## Backend
 
@@ -67,3 +85,7 @@ Some tokenizer and embedding features download model assets on first use.
 Run the nearest targeted check while editing and the complete affected-package
 checks before handoff. Update architecture, domain, reference, runbook, ADR, or
 specification documents in the same change whenever their truth changes.
+Root CI runs the complete frontend suite and a Linux, macOS, and Windows backend
+matrix from the same commit. Its backend sync is source-aware, so
+`backend/pyproject.toml` remains the authority for local versus registry
+dependencies.

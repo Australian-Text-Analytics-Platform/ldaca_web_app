@@ -1,0 +1,1 @@
+"""Framework-neutral storage primitives."""

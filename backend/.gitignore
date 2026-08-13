@@ -1,0 +1,15 @@
+.DS_Store
+._*
+.coverage
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+.venv/
+/build/
+dist/
+
+# Frontend build assets are generated from the root frontend during packaging.
+src/ldaca_wordflow/resources/frontend/build/
+src/ldaca_wordflow/resources/frontend/build.tar.gz

@@ -1,0 +1,35 @@
+{
+    "tables": {
+        "Dataset": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "@type_1",
+                "conformsTo",
+                "license",
+                "identifier"
+            ]
+        },
+        "DefinedTerm": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "inDefinedTermSet",
+                "sameAs"
+            ]
+        },
+        "File": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "@type_1",
+                "license",
+                "encodingFormat",
+                "encodingFormat_1"
+            ]
+        }
+    }
+}

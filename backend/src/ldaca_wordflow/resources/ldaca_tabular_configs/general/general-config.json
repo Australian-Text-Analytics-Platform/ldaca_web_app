@@ -1,0 +1,74 @@
+{
+    "tables": {
+        "RepositoryObject": {
+    "all_props": [],
+    "expand_props": [
+        "author",
+        "register",
+        "textType",
+        "ldac:linguisticGenre",
+        "recipient",
+        "ldac:communicationMode",
+        "ldac:indexableText",
+        "ldac:mainText",
+        "ldac:annotationType"
+    ],
+    "ignore_props": [
+        "@type",
+        "conformsTo",
+        "conformsTo_id",
+        "identifier",
+
+        "author_id",
+        "register_id",
+        "textType_id",
+        "locationCreated_id",
+        "ldac:linguisticGenre_id",
+        "citation_id",
+        "recipient_id",
+        "ldac:communicationMode_id",
+        "inLanguage_id",
+        "ldac:indexableText_id",
+        "ldac:mainText_id",
+
+        "hasPart",
+        "hasPart_id",
+        "hasPart_id_1",
+
+        "pcdm:memberOf",
+        "license"
+    ]
+},
+        "Person": {
+            "all_props": [],
+            "expand_props": [],
+            "ignore_props": [
+                "@type",
+                "conformsTo",
+                "entity_id",
+                "birthPlace_id",
+                "local:arrivalDate",
+                "local:socialClass_id",
+                "prov:specializationOf",
+                "prov:specializationOf_id",
+                "socialClass_id",
+                "homeLocation_id",
+                "description"
+            ]
+        },
+        "Organization": {
+            "all_props": [],
+            "ignore_props": [
+                "entity_id",
+                "@type"
+            ]
+        },
+        "Speaker": {
+            "all_props": [],
+            "ignore_props": [
+                "entity_id",
+                "@type"
+            ]
+        }
+    }
+}

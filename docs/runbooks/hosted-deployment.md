@@ -17,11 +17,12 @@ pnpm deploy_frontend_to_backend
 uv sync --project backend --frozen --no-dev --no-editable
 ```
 
-The current submodules are `backend`, `polars-text`, `polars-source-utils`, and
-`ldaca-analytics-sample-data`. A pull that advances a submodule pointer must be
-followed by the sync/update commands before restart. The backend fetches sample
-data from the repository's published raw GitHub URLs at runtime; it does not
-read the submodule checkout.
+The backend is tracked directly in the root repository. The current submodules
+are `polars-text`, `polars-source-utils`, `ldaca-analytics-sample-data`, and the
+published documentation mirror. A pull that advances one of those pointers
+must be followed by the sync/update commands before restart. The backend
+fetches sample data from the repository's published raw GitHub URLs at runtime;
+it does not read the sample-data submodule checkout.
 
 ## Backend Environment
 

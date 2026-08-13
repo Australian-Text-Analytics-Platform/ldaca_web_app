@@ -1,0 +1,547 @@
+"""Lifespan-owned backend runtime and request-state dependencies.
+
+Used by:
+- ``main.create_app`` to allocate stateful resources only while ASGI lifespan is
+  active,
+- API dependencies that need the runtime/settings snapshot owned by the current
+  app instance, and
+- tests that run multiple applications without global state leakage.
+
+Flow:
+- ``runtime_context`` initializes storage and database state, creates the
+  runtime-owned AnyIO task group and capacity limiters, and warms executors;
+- FastAPI copies the yielded ``LifespanState`` into each request's state; and
+- shutdown rejects submissions, drains application-owned work, closes
+  executors, then releases the runtime task group in reverse order.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import sys
+import tempfile
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal, TypedDict, cast
+
+import anyio
+from anyio.abc import TaskGroup
+from anyio.to_thread import run_sync as run_sync_in_worker_thread
+from fastapi import Request
+
+from .services.user_files import UserFileStore
+from .services.workspace_archives import WorkspaceArchiveLimits, WorkspaceArchiveService
+from .infrastructure.database import Database
+from .infrastructure.providers.quotation_client import QuotationProviderClient
+from .settings import Settings
+from .services.sessions import SessionService
+from .services.oauth import OAuthService
+from .services.file_preview import FileReadService
+from .services.maintenance import MaintenanceService
+from .services.events import EventHub
+from .infrastructure.storage.layout import (
+    deployment_database_path,
+    user_cache_root,
+    user_files_root,
+    user_imports_root,
+    user_root,
+    workspace_staging_root,
+    workspace_trash_root,
+    workspaces_root,
+)
+from .infrastructure.storage.durable_fs import mkdir_durable
+from .services.storage_admission import StorageAdmissionService
+from .services.quota import QuotaService
+from .services.response_snapshots import ResponseSnapshotService
+from .infrastructure.storage.user_file_import_store import UserFileImportStore
+from .services.analysis_results import AnalysisResultService
+from .services.analyses import AnalysisService
+from .services.analysis_execution import AnalysisExecutionRuntime
+from .services.analysis_executor import AnalysisProcessExecutor
+from .services.analysis_preparation import AnalysisExecutionPreparer
+from .services.analysis_artifacts import AnalysisArtifactService
+from .services.annotations import AnnotationService
+from .services.provider_credentials import ProviderCredentialStore
+from .services.user_preferences import UserPreferenceStore
+from .services.sample_data import SampleDataService
+from .services.data_portal import DataPortalService
+from .services.user_file_import_executor import UserFileImportProcessExecutor
+from .services.user_file_imports import UserFileImportService
+from .services.nodes import NodeService
+from .services.data_block_exports import DataBlockExportService
+from .services.workspace_sql import WorkspaceSqlService
+from .services.workspace import WorkspaceService
+from .infrastructure.storage.workspace_store import WorkspaceStore
+from .services.workspace_lifecycle import WorkspaceLifecycleService
+
+logger = logging.getLogger(__name__)
+ReadinessStatus = Literal["ready", "stopping"]
+ExecutionShutdown = Callable[[float], Awaitable[None]]
+
+
+@dataclass(slots=True)
+class RuntimeReadiness:
+    """Process readiness changed only by the lifespan shutdown owner."""
+
+    _status: ReadinessStatus = "ready"
+
+    @property
+    def status(self) -> ReadinessStatus:
+        return self._status
+
+    def mark_stopping(self) -> None:
+        self._status = "stopping"
+
+
+def _initialize_storage(settings: Settings) -> None:
+    """Create and durably probe the immutable data root before service startup."""
+
+    root = settings.get_data_root()
+    mkdir_durable(root)
+    mkdir_durable(settings.get_users_root_folder())
+    mkdir_durable(workspaces_root(settings))
+    mkdir_durable(workspace_staging_root(settings))
+    mkdir_durable(workspace_trash_root(settings))
+    descriptor, raw_probe = tempfile.mkstemp(prefix=".wordflow-probe.", dir=root)
+    probe = Path(raw_probe)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(b"wordflow")
+            handle.flush()
+            os.fsync(handle.fileno())
+    finally:
+        probe.unlink(missing_ok=True)
+
+
+@dataclass(slots=True)
+class Runtime:
+    """Stateful resources owned by one FastAPI application lifespan.
+
+    Used by request dependencies, completion callbacks, and the lifespan
+    shutdown sequence. Every field is fully constructed before the runtime is
+    yielded; there are no optional service placeholders or module fallbacks.
+    """
+
+    settings: Settings
+    readiness: RuntimeReadiness
+    database: Database
+    task_group: TaskGroup
+    io_limiter: anyio.CapacityLimiter
+    quota_service: QuotaService
+    storage_admission: StorageAdmissionService
+    response_snapshot_service: ResponseSnapshotService
+    workspace_service: WorkspaceService
+    workspace_lifecycle_service: WorkspaceLifecycleService
+    user_file_store: UserFileStore
+    file_read_service: FileReadService
+    session_service: SessionService
+    oauth_service: OAuthService
+    event_hub: EventHub
+    quotation_client: QuotationProviderClient
+    analysis_service: AnalysisService
+    analysis_execution: AnalysisExecutionRuntime
+    analysis_result_service: AnalysisResultService
+    annotation_service: AnnotationService
+    user_preference_store: UserPreferenceStore
+    provider_credential_store: ProviderCredentialStore
+    sample_data_service: SampleDataService
+    data_portal_service: DataPortalService
+    user_file_import_service: UserFileImportService
+    node_service: NodeService
+    data_block_export_service: DataBlockExportService
+    workspace_sql_service: WorkspaceSqlService
+    workspace_archive_service: WorkspaceArchiveService
+    maintenance_service: MaintenanceService
+
+
+@dataclass(slots=True)
+class _RuntimeTaskGroupOwner:
+    """Stop runtime work under one deadline before dependencies unwind."""
+
+    task_group: TaskGroup
+    readiness: RuntimeReadiness
+    shutdown_grace_seconds: float
+    admission_stoppers: list[Callable[[], None]] = field(default_factory=list)
+    execution_shutdowns: list[ExecutionShutdown] = field(default_factory=list)
+    maintenance_shutdowns: list[Callable[[], Awaitable[None]]] = field(
+        default_factory=list
+    )
+    closed: bool = False
+
+    def register_admission_stopper(self, callback: Callable[[], None]) -> None:
+        """Register a synchronous new-work boundary."""
+
+        if self.closed:
+            raise RuntimeError("Runtime task group is already closed")
+        self.admission_stoppers.append(callback)
+
+    def register_execution_shutdown(self, callback: ExecutionShutdown) -> None:
+        """Register one execution owner governed by the shared deadline."""
+
+        if self.closed:
+            raise RuntimeError("Runtime task group is already closed")
+        self.execution_shutdowns.append(callback)
+
+    def register_maintenance_shutdown(
+        self,
+        callback: Callable[[], Awaitable[None]],
+    ) -> None:
+        """Register a maintenance loop that must stop before execution drains."""
+
+        if self.closed:
+            raise RuntimeError("Runtime task group is already closed")
+        self.maintenance_shutdowns.append(callback)
+
+    @staticmethod
+    async def _close_execution_safely(
+        callback: ExecutionShutdown,
+        deadline: float,
+    ) -> None:
+        try:
+            await callback(deadline)
+        except Exception:
+            logger.exception("Runtime execution service failed during shutdown")
+
+    async def close(self) -> None:
+        """Close admission, interrupt execution concurrently, and join once."""
+
+        if self.closed:
+            return
+        self.closed = True
+        self.readiness.mark_stopping()
+        for stop_accepting in self.admission_stoppers:
+            stop_accepting()
+        for close_maintenance in reversed(self.maintenance_shutdowns):
+            try:
+                await close_maintenance()
+            except Exception:
+                logger.exception("Runtime maintenance failed during shutdown")
+
+        deadline = anyio.current_time() + self.shutdown_grace_seconds
+        try:
+            with anyio.move_on_after(self.shutdown_grace_seconds) as shutdown_scope:
+                async with anyio.create_task_group() as shutdown:
+                    for close_execution in self.execution_shutdowns:
+                        shutdown.start_soon(
+                            self._close_execution_safely,
+                            close_execution,
+                            deadline,
+                        )
+            if shutdown_scope.cancel_called:
+                logger.warning("Runtime execution shutdown reached its deadline")
+        finally:
+            self.task_group.cancel_scope.cancel()
+            await self.task_group.__aexit__(None, None, None)
+
+
+class LifespanState(TypedDict):
+    """Typed state copied by Starlette onto every request in a lifespan."""
+
+    runtime: Runtime
+
+
+def get_runtime(request: Request) -> Runtime:
+    """Return the current app's lifespan runtime from request state.
+
+    Used by:
+    - API dependencies and tests. A missing runtime is a programming/startup
+      error, so it fails explicitly instead of falling back to a global.
+    """
+
+    runtime = getattr(request.state, "runtime", None)
+    if runtime is None:
+        raise RuntimeError("Application lifespan is not active")
+    return cast(Runtime, runtime)
+
+
+def get_workspace_service(request: Request) -> WorkspaceService:
+    """Return the current application's sole workspace mutation service."""
+
+    return get_runtime(request).workspace_service
+
+
+def get_workspace_archive_service(request: Request) -> WorkspaceArchiveService:
+    """Return the bounded archive validation and staging service."""
+
+    return get_runtime(request).workspace_archive_service
+
+
+@asynccontextmanager
+async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
+    """Build and tear down the production runtime in dependency order.
+
+    Called by:
+    - the default ``create_app`` lifespan factory.
+
+    Flow:
+    1. initialize storage and database state,
+    2. initialize the app-owned database,
+    3. enter the runtime task group and construct capacity limiters,
+    4. reconcile retained resources and start private execution plus maintenance,
+    5. on shutdown reject submissions, drain services, stop executors, and let
+       ``AsyncExitStack`` unwind the runtime task group in reverse order.
+    """
+
+    async with AsyncExitStack() as stack:
+        resources = AsyncExitStack()
+        await resources.__aenter__()
+        stack.push_async_callback(resources.aclose)
+        io_limiter = anyio.CapacityLimiter(4)
+        await run_sync_in_worker_thread(
+            _initialize_storage,
+            settings,
+            abandon_on_cancel=False,
+            limiter=io_limiter,
+        )
+        database = Database(deployment_database_path(settings))
+        await database.initialize()
+
+        task_group = anyio.create_task_group()
+        await task_group.__aenter__()
+        readiness = RuntimeReadiness()
+        task_group_owner = _RuntimeTaskGroupOwner(
+            task_group,
+            readiness,
+            settings.shutdown_grace_seconds,
+        )
+        stack.push_async_callback(task_group_owner.close)
+        quota_service = QuotaService(
+            database,
+            data_root=settings.get_data_root(),
+            user_root=lambda user_id: user_root(settings, user_id),
+            workspaces_root=workspaces_root(settings),
+            limiter=io_limiter,
+        )
+        await quota_service.initialize(require_finite_capability=settings.multi_user)
+        storage_admission = StorageAdmissionService(
+            settings.get_data_root(),
+            quota_service,
+            min_free_disk_bytes=settings.min_free_disk_bytes,
+            limiter=io_limiter,
+        )
+        response_snapshot_service = ResponseSnapshotService(
+            settings.get_data_root() / ".response-snapshots" / "resources",
+            storage_admission,
+            max_snapshot_bytes=settings.max_response_snapshot_bytes,
+            max_concurrent_snapshots=settings.max_concurrent_response_snapshots,
+            limiter=io_limiter,
+        )
+        await response_snapshot_service.reconcile()
+        event_hub = EventHub()
+        resources.push_async_callback(event_hub.close)
+        workspace_store = WorkspaceStore(
+            max_nodes=settings.max_workspace_nodes,
+            max_snapshot_bytes=settings.max_workspace_snapshot_bytes,
+        )
+        workspace_service = WorkspaceService(
+            settings,
+            store=workspace_store,
+            storage_admission=storage_admission,
+            events=event_hub,
+            io_limiter=io_limiter,
+        )
+        resources.push_async_callback(workspace_service.close)
+        await workspace_service.reconcile_transient_storage()
+        workspace_archive_service = WorkspaceArchiveService(
+            workspace_service,
+            workspace_store=workspace_store,
+            response_snapshots=response_snapshot_service,
+            storage_admission=storage_admission,
+            max_export_bytes=settings.max_workspace_export_bytes,
+            max_concurrent_imports=settings.max_concurrent_workspace_imports,
+            limits=WorkspaceArchiveLimits(
+                max_archive_bytes=settings.max_workspace_archive_bytes
+            ),
+            limiter=io_limiter,
+        )
+        user_file_store = UserFileStore(
+            lambda user_id: user_files_root(settings, user_id),
+            storage_admission=storage_admission,
+            max_upload_bytes=settings.max_file_upload_bytes,
+            max_tree_response_bytes=settings.max_user_file_tree_response_bytes,
+            limiter=io_limiter,
+            all_users_root=settings.get_users_root_folder(),
+            response_snapshots=response_snapshot_service,
+        )
+        file_read_service = FileReadService(
+            user_file_store,
+            limiter=io_limiter,
+            max_preview_bytes=settings.max_preview_source_bytes,
+            max_text_bytes=settings.max_text_response_bytes,
+        )
+        node_service = NodeService(
+            workspace_service,
+            user_file_store,
+            storage_admission=storage_admission,
+            io_limiter=io_limiter,
+            max_source_bytes=settings.max_preview_source_bytes,
+            max_storage_bytes=settings.max_node_storage_bytes,
+        )
+        data_block_export_service = DataBlockExportService(
+            workspace_service,
+            response_snapshot_service,
+            max_export_bytes=min(
+                settings.max_workspace_export_bytes,
+                settings.max_response_snapshot_bytes,
+            ),
+        )
+        workspace_sql_service = WorkspaceSqlService(
+            workspace_service,
+            io_limiter=io_limiter,
+        )
+        session_service = SessionService(
+            settings,
+            database,
+            io_limiter=io_limiter,
+        )
+        await session_service.initialize()
+        user_preference_store = UserPreferenceStore(
+            settings,
+            io_limiter=io_limiter,
+        )
+        provider_credential_store = ProviderCredentialStore(
+            settings,
+            io_limiter=io_limiter,
+        )
+        oauth_service = OAuthService(settings, session_service)
+        resources.push_async_callback(oauth_service.close)
+        quotation_client = QuotationProviderClient(
+            default_timeout=settings.quotation_service_timeout,
+        )
+        resources.push_async_callback(quotation_client.close)
+        analysis_preparer = AnalysisExecutionPreparer(
+            settings,
+            limiter=io_limiter,
+            cache_root=lambda user_id: user_cache_root(settings, user_id),
+        )
+        analysis_executor = AnalysisProcessExecutor()
+        analysis_execution = AnalysisExecutionRuntime(
+            capacity=settings.analysis_execution_capacity,
+            preparer=analysis_preparer,
+            executor=analysis_executor,
+            limiter=io_limiter,
+            workspaces=workspace_service,
+            storage_reservation_bytes=settings.max_analysis_storage_bytes,
+            storage_reservation_files=settings.max_analysis_storage_files,
+        )
+        analysis_artifacts = AnalysisArtifactService(
+            limiter=io_limiter,
+            response_snapshots=response_snapshot_service,
+            max_node_bytes=settings.max_node_storage_bytes,
+            max_snapshot_bytes=settings.max_analysis_storage_bytes,
+        )
+        analysis_service = AnalysisService(
+            workspace_service,
+            analysis_execution,
+            analysis_artifacts,
+            credentials=provider_credential_store,
+        )
+        await analysis_service.reconcile_interrupted_analyses()
+        analysis_execution.bind(analysis_service, task_group)
+        task_group_owner.register_admission_stopper(analysis_service.stop_accepting)
+        task_group_owner.register_execution_shutdown(analysis_execution.close)
+        annotation_service = AnnotationService(
+            credentials=provider_credential_store,
+        )
+        sample_data_service = SampleDataService(
+            user_file_store,
+            limiter=io_limiter,
+            max_import_bytes=settings.max_user_file_import_bytes,
+            max_import_files=settings.max_user_file_import_files,
+        )
+        resources.push_async_callback(sample_data_service.close)
+        data_portal_service = DataPortalService(
+            settings,
+            user_file_store,
+            provider_credential_store,
+        )
+        resources.push_async_callback(data_portal_service.close)
+        user_file_import_store = UserFileImportStore(
+            lambda user_id: user_imports_root(settings, user_id),
+            all_users_root=settings.get_users_root_folder(),
+            max_record_bytes=settings.max_user_file_import_record_bytes,
+            limiter=io_limiter,
+        )
+        user_file_import_service = UserFileImportService(
+            user_file_import_store,
+            sample_data_service,
+            data_portal_service,
+            UserFileImportProcessExecutor(),
+            storage_admission,
+            event_hub,
+            capacity=settings.user_file_import_capacity,
+            max_storage_bytes=settings.max_user_file_import_bytes,
+            max_storage_files=settings.max_user_file_import_files,
+            max_record_bytes=settings.max_user_file_import_record_bytes,
+        )
+        await user_file_import_service.start(task_group)
+        task_group_owner.register_admission_stopper(
+            user_file_import_service.stop_accepting
+        )
+        task_group_owner.register_execution_shutdown(user_file_import_service.close)
+        await user_file_store.reconcile_transient_storage(set())
+        workspace_lifecycle_service = WorkspaceLifecycleService(
+            workspace_service,
+            analysis_execution,
+        )
+        analysis_result_service = AnalysisResultService(
+            analysis_service,
+            analysis_artifacts,
+            storage_admission,
+            settings,
+            quotation_client,
+            provider_credential_store,
+            query_root=(
+                settings.get_data_root() / ".analysis-result-queries" / "resources"
+            ),
+            cache_root=lambda user_id: user_cache_root(settings, user_id),
+            limiter=io_limiter,
+        )
+        await analysis_result_service.reconcile()
+        maintenance_service = MaintenanceService(session_service.cleanup_expired)
+        task_group_owner.register_maintenance_shutdown(maintenance_service.close)
+        maintenance_service.start(task_group)
+        runtime = Runtime(
+            settings=settings,
+            readiness=readiness,
+            database=database,
+            task_group=task_group,
+            io_limiter=io_limiter,
+            quota_service=quota_service,
+            storage_admission=storage_admission,
+            response_snapshot_service=response_snapshot_service,
+            workspace_service=workspace_service,
+            workspace_lifecycle_service=workspace_lifecycle_service,
+            workspace_archive_service=workspace_archive_service,
+            user_file_store=user_file_store,
+            file_read_service=file_read_service,
+            node_service=node_service,
+            data_block_export_service=data_block_export_service,
+            workspace_sql_service=workspace_sql_service,
+            session_service=session_service,
+            oauth_service=oauth_service,
+            event_hub=event_hub,
+            quotation_client=quotation_client,
+            analysis_service=analysis_service,
+            analysis_execution=analysis_execution,
+            analysis_result_service=analysis_result_service,
+            annotation_service=annotation_service,
+            user_preference_store=user_preference_store,
+            provider_credential_store=provider_credential_store,
+            sample_data_service=sample_data_service,
+            data_portal_service=data_portal_service,
+            user_file_import_service=user_file_import_service,
+            maintenance_service=maintenance_service,
+        )
+        logger.info(
+            "Starting LDaCA Wordflow (platform=%s, python=%s)",
+            sys.platform,
+            sys.version.split()[0],
+        )
+
+        yield runtime
+
+    logger.info("LDaCA Wordflow runtime stopped")
