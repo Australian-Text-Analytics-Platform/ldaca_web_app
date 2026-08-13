@@ -110,6 +110,13 @@ const buildProps = (handleSort: ConcordanceTableNodeBlockProps['handleSort']) =>
     setCombinedPage: vi.fn(),
   }) satisfies ConcordanceTableNodeBlockProps;
 
+const cellFor = (columnName: string): HTMLTableCellElement => {
+  const columnIndex = screen
+    .getAllByRole('columnheader')
+    .findIndex((header) => header.textContent?.startsWith(columnName));
+  return screen.getAllByRole('cell')[columnIndex] as HTMLTableCellElement;
+};
+
 describe('ConcordanceTableNodeBlock', () => {
   it('keeps generated Preview headers plain with a Run All hint while metadata sorts', async () => {
     const user = userEvent.setup();
@@ -144,10 +151,39 @@ describe('ConcordanceTableNodeBlock', () => {
     expect(handleSort).toHaveBeenCalledTimes(2);
   });
 
-  it('tints direct L1/R1 cells and keeps matched text emphasized when toggled off', () => {
+  it('highlights left-last and right-first anchors while direct L1/R1 cells stay plain', () => {
+    const repeatedData: ConcordanceNodeResult = {
+      ...nodeData,
+      data: [
+        [
+          {
+            ...nodeData.data[0]![0]!,
+            CONC_left_context: 'before x before',
+            CONC_right_context: 'after x after',
+          },
+        ],
+      ],
+    };
+    render(<ConcordanceTableNodeBlock {...buildProps(vi.fn())} nodeData={repeatedData} />);
+
+    const leftMark = screen.getByText('before', { selector: 'mark' });
+    const rightMark = screen.getByText('after', { selector: 'mark' });
+    expect(leftMark).toHaveTextContent('before');
+    expect(leftMark).toHaveAttribute('data-match-index', '9');
+    expect(rightMark).toHaveTextContent('after');
+    expect(rightMark).toHaveAttribute('data-match-index', '0');
+    expect(cellFor('CONC_l1')).not.toHaveStyle({
+      backgroundColor: toBgColor('#2563eb', 0.12),
+    });
+    expect(cellFor('CONC_r1')).not.toHaveStyle({
+      backgroundColor: toBgColor('#2563eb', 0.12),
+    });
+  });
+
+  it('removes inline anchor highlights when toggled off but keeps matched text emphasized', () => {
     const { rerender } = render(<ConcordanceTableNodeBlock {...buildProps(vi.fn())} />);
 
-    expect(screen.getAllByText('before', { selector: 'td' })[1]).toHaveStyle({
+    expect(screen.getByText('before', { selector: 'mark' })).toHaveStyle({
       backgroundColor: toBgColor('#2563eb', 0.12),
     });
     expect(screen.getByText('alpha', { selector: 'td' })).toHaveStyle({
@@ -156,10 +192,32 @@ describe('ConcordanceTableNodeBlock', () => {
 
     rerender(<ConcordanceTableNodeBlock {...buildProps(vi.fn())} highlightL1R1={false} />);
 
-    expect(screen.getAllByText('before', { selector: 'td' })[1]).not.toHaveStyle({
-      backgroundColor: toBgColor('#2563eb', 0.12),
-    });
+    expect(screen.queryByText('before', { selector: 'mark' })).not.toBeInTheDocument();
     expect(screen.getByText('alpha', { selector: 'td' })).toHaveClass('font-semibold');
+  });
+
+  it.each([
+    ['empty', '', 'after'],
+    ['missing', 'missing', 'after'],
+    ['case mismatch', 'Before', 'after'],
+  ])('leaves %s anchors unmarked', (_caseName, leftAnchor, rightAnchor) => {
+    const fallbackData: ConcordanceNodeResult = {
+      ...nodeData,
+      data: [
+        [
+          {
+            ...nodeData.data[0]![0]!,
+            CONC_l1: leftAnchor,
+            CONC_r1: rightAnchor,
+            CONC_right_context: 'AFTER',
+          },
+        ],
+      ],
+    };
+    render(<ConcordanceTableNodeBlock {...buildProps(vi.fn())} nodeData={fallbackData} />);
+
+    expect(screen.queryByText('before', { selector: 'mark' })).not.toBeInTheDocument();
+    expect(screen.queryByText('AFTER', { selector: 'mark' })).not.toBeInTheDocument();
   });
 
   it('uses the palette fallback for highlighted cells in combined tables', () => {
@@ -178,6 +236,9 @@ describe('ConcordanceTableNodeBlock', () => {
 
     expect(screen.getByText('alpha', { selector: 'td' })).toHaveStyle({
       backgroundColor: toBgColor('#dc2626', 0.24),
+    });
+    expect(screen.getByText('before', { selector: 'mark' })).toHaveStyle({
+      backgroundColor: toBgColor('#dc2626', 0.12),
     });
     expect(
       screen

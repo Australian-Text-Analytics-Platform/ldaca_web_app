@@ -269,7 +269,7 @@ export function ConcordanceResultsPanel({
                     }}
                     className="h-4 w-4"
                   />
-                  <span>Highlight L1/R1</span>
+                  <span>Highlight L1/R1 in context</span>
                 </label>
               ) : null}
               <MetadataColumnSelector

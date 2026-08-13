@@ -2792,6 +2792,11 @@
             "title": "Case Sensitive",
             "type": "boolean"
           },
+          "ignore_punctuation": {
+            "default": false,
+            "title": "Ignore Punctuation",
+            "type": "boolean"
+          },
           "kind": {
             "const": "concordance",
             "default": "concordance",

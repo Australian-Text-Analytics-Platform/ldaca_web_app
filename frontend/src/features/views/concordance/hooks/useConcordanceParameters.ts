@@ -27,8 +27,15 @@ export function useConcordanceParameters() {
     concordanceParameterReducer,
     createConcordanceParameterState(),
   );
-  const { searchWord, numLeftTokens, numRightTokens, regex, wholeWord, caseSensitive } =
-    parameterState;
+  const {
+    searchWord,
+    numLeftTokens,
+    numRightTokens,
+    regex,
+    wholeWord,
+    caseSensitive,
+    ignorePunctuation,
+  } = parameterState;
 
   /**
    * Updates the search phrase while preserving the React set-state signature
@@ -59,6 +66,10 @@ export function useConcordanceParameters() {
     dispatchParameters({ type: 'setCaseSensitive', value });
   };
 
+  const setIgnorePunctuation: Dispatch<SetStateAction<boolean>> = (value) => {
+    dispatchParameters({ type: 'setIgnorePunctuation', value });
+  };
+
   const currentParams: ConcordanceRequestParams = {
     search_word: searchWord,
     num_left_tokens: numLeftTokens,
@@ -66,6 +77,7 @@ export function useConcordanceParameters() {
     regex,
     whole_word: wholeWord,
     case_sensitive: caseSensitive,
+    ignore_punctuation: ignorePunctuation,
   };
 
   /**
@@ -107,6 +119,8 @@ export function useConcordanceParameters() {
     setWholeWord,
     caseSensitive,
     setCaseSensitive,
+    ignorePunctuation,
+    setIgnorePunctuation,
     currentParams,
     applyHydratedRequest,
   };

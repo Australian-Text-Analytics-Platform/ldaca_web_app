@@ -13,6 +13,7 @@ describe('readConcordanceServerParams', () => {
         regex: false,
         whole_word: false,
         case_sensitive: true,
+        ignore_punctuation: true,
       }),
     ).toEqual({
       search_word: 'alpha',
@@ -21,6 +22,7 @@ describe('readConcordanceServerParams', () => {
       regex: false,
       whole_word: false,
       case_sensitive: true,
+      ignore_punctuation: true,
     });
   });
 
@@ -52,6 +54,7 @@ describe('useConcordanceParameters', () => {
       regex: false,
       whole_word: true,
       case_sensitive: false,
+      ignore_punctuation: true,
     });
   });
 
@@ -82,6 +85,7 @@ describe('useConcordanceParameters', () => {
         regex: true,
         whole_word: true,
         case_sensitive: true,
+        ignore_punctuation: true,
       });
     });
 
@@ -95,5 +99,17 @@ describe('useConcordanceParameters', () => {
     expect(result.current.regex).toBe(true);
     expect(result.current.wholeWord).toBe(false);
     expect(result.current.caseSensitive).toBe(true);
+    expect(result.current.ignorePunctuation).toBe(true);
+  });
+
+  it('hydrates a missing historical punctuation field as false', () => {
+    const { result } = renderHook(() => useConcordanceParameters());
+
+    act(() => {
+      result.current.applyHydratedRequest({ search_word: 'historical' });
+    });
+
+    expect(result.current.ignorePunctuation).toBe(false);
+    expect(result.current.currentParams.ignore_punctuation).toBe(false);
   });
 });

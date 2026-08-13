@@ -60,7 +60,12 @@ distinct.
 <h3 id="help-concordance-context">Step 3 — Set the context window</h3>
 
 **Left context** and **Right context** control how many tokens appear around a
-match. Both default to 10 and accept values from 0 to 50.
+match. Both default to 10 and accept values from 0 to 50. In Text mode,
+**Ignore punctuation** is on by default: punctuation and symbol-only tokens do
+not consume those counts or become L1/R1, but the original punctuation and
+whitespace remain visible in each context. This option does not change which
+text or regular-expression matches are found. Tokens mode already applies its
+tokenizer's punctuation filtering and does not show this option.
 
 <h3 id="help-concordance-batch-size">Step 4 — Choose documents per page</h3>
 
@@ -102,10 +107,12 @@ the table.
 **L1** (`CONC_l1`) is the token immediately left of the match and **R1**
 (`CONC_r1`) is the token immediately right. Their frequency columns count each
 value across the complete Run All Result. The matched-text cell always uses
-strong source-colour emphasis. L1/R1 cells use a softer tint; turn off
-**Highlight L1/R1** to hide only that softer tint for the current tab session.
-These direct cells are highlighted in Preview and Review, separated and
-combined tables. Full context strings are never token-highlighted.
+strong source-colour emphasis. The last exact, case-sensitive L1 occurrence in
+the left context and the first R1 occurrence in the right context use a softer
+source-colour tint. Empty or unmatched anchors remain plain. Turn off
+**Highlight L1/R1 in context** to hide only those inline tints for the current
+tab session. The direct L1/R1 cells remain plain and available for sorting,
+frequencies, export, and Data Block Creation.
 
 <h4 id="help-concordance-dispersion-view">Dispersion view</h4>
 
@@ -250,9 +257,10 @@ forest, including after failure or cancellation.
 | Whole Word | Off | Text mode only |
 | Regular expression | Off | Text mode only |
 | Case Sensitive | Off | Text mode only |
+| Ignore punctuation | On | Text mode only; punctuation remains visible but does not consume context tokens |
 | Documents per page | 20 | Controls source documents evaluated per Preview page |
 | View | Table | Returning to Concordance starts in Table View |
-| Highlight L1/R1 | On | Local table-display state; matched text remains emphasized when off |
+| Highlight L1/R1 in context | On | Local table-display state; matched text remains emphasized when off |
 | Bin No. | 20 | 4, 5, 10, 20, 25, 50, or 100 |
 | Chart type | Line | Line, Bar, or Area |
 | Review term visibility | All terms | Exact, case-sensitive labels |

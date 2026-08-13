@@ -469,6 +469,9 @@ describe('ConcordanceFeature', () => {
     mockTokenizerModel = 'native:plain_words_en';
     const { unmount } = renderConcordanceFeature();
 
+    const ignorePunctuation = screen.getByRole('checkbox', { name: 'Ignore punctuation' });
+    expect(ignorePunctuation).toBeChecked();
+
     const tokenizerSelectors = screen.getAllByRole('combobox', { name: 'Tokenizer model' });
     expect(tokenizerSelectors.length).toBeGreaterThan(0);
     tokenizerSelectors.forEach((selector) => {
@@ -480,6 +483,10 @@ describe('ConcordanceFeature', () => {
     screen.getAllByRole('combobox', { name: 'Tokenizer model' }).forEach((selector) => {
       expect(selector).toBeEnabled();
     });
+    expect(screen.queryByRole('checkbox', { name: 'Ignore punctuation' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('tab', { name: 'Text' })[0]!);
+    expect(screen.getByRole('checkbox', { name: 'Ignore punctuation' })).toBeChecked();
 
     unmount();
   });
@@ -651,7 +658,9 @@ describe('ConcordanceFeature', () => {
     expect(screen.getByText('Queensland')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Table View' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Dispersion View' })).toBeInTheDocument();
-    const highlightToggle = screen.getByRole('checkbox', { name: 'Highlight L1/R1' });
+    const highlightToggle = screen.getByRole('checkbox', {
+      name: 'Highlight L1/R1 in context',
+    });
     expect(highlightToggle).toBeChecked();
     fireEvent.click(highlightToggle);
     expect(highlightToggle).not.toBeChecked();

@@ -14,6 +14,7 @@ describe('concordanceParameterReducer', () => {
       regex: false,
       wholeWord: true,
       caseSensitive: false,
+      ignorePunctuation: true,
     });
   });
 
@@ -41,6 +42,7 @@ describe('concordanceParameterReducer', () => {
         regex: true,
         whole_word: true,
         case_sensitive: true,
+        ignore_punctuation: false,
       },
     });
 
@@ -51,6 +53,7 @@ describe('concordanceParameterReducer', () => {
       regex: true,
       wholeWord: false,
       caseSensitive: true,
+      ignorePunctuation: false,
     });
   });
 });

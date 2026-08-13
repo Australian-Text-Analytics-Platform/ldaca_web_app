@@ -9,6 +9,7 @@ export interface ConcordanceRequestParams {
   regex: boolean;
   whole_word: boolean;
   case_sensitive: boolean;
+  ignore_punctuation: boolean;
 }
 
 export interface ConcordanceParameterState {
@@ -18,6 +19,7 @@ export interface ConcordanceParameterState {
   regex: boolean;
   wholeWord: boolean;
   caseSensitive: boolean;
+  ignorePunctuation: boolean;
 }
 
 type ConcordanceParameterAction =
@@ -27,6 +29,7 @@ type ConcordanceParameterAction =
   | { type: 'setRegex'; value: ConcordanceParameterUpdate<boolean> }
   | { type: 'setWholeWord'; value: ConcordanceParameterUpdate<boolean> }
   | { type: 'setCaseSensitive'; value: ConcordanceParameterUpdate<boolean> }
+  | { type: 'setIgnorePunctuation'; value: ConcordanceParameterUpdate<boolean> }
   | { type: 'hydrateParams'; params: ConcordanceRequestParams };
 
 const resolveUpdate = <T>(value: ConcordanceParameterUpdate<T>, previous: T): T =>
@@ -45,6 +48,7 @@ export const createConcordanceParameterState = (): ConcordanceParameterState => 
   regex: false,
   wholeWord: true,
   caseSensitive: false,
+  ignorePunctuation: true,
 });
 
 /**
@@ -64,6 +68,8 @@ export function readConcordanceServerParams(
     regex,
     whole_word: regex ? false : typeof request.whole_word === 'boolean' ? request.whole_word : true,
     case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : false,
+    ignore_punctuation:
+      typeof request.ignore_punctuation === 'boolean' ? request.ignore_punctuation : false,
   };
 }
 
@@ -101,6 +107,11 @@ export const concordanceParameterReducer = (
       };
     case 'setCaseSensitive':
       return { ...state, caseSensitive: resolveUpdate(action.value, state.caseSensitive) };
+    case 'setIgnorePunctuation':
+      return {
+        ...state,
+        ignorePunctuation: resolveUpdate(action.value, state.ignorePunctuation),
+      };
     case 'hydrateParams':
       return {
         searchWord: toCellText(action.params.search_word),
@@ -109,6 +120,7 @@ export const concordanceParameterReducer = (
         regex: action.params.regex,
         wholeWord: action.params.regex ? false : action.params.whole_word,
         caseSensitive: action.params.case_sensitive,
+        ignorePunctuation: action.params.ignore_punctuation,
       };
   }
 };

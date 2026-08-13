@@ -191,7 +191,12 @@ document or match Review projections.
 
 Each Concordance Match records L1 (`CONC_l1`), the token immediately left of the
 match, and R1 (`CONC_r1`), the token immediately right of it, together with their
-whole-Result frequencies. Separated Preview sorts only selected source metadata;
+whole-Result frequencies. Text-mode requests may ignore punctuation for context
+selection: tokens containing no Unicode alphanumeric characters do not consume
+the left/right limits or become L1/R1, while contexts and extraction retain the
+original source punctuation and whitespace. This option does not alter literal
+or regular-expression match selection. Tokens mode retains its tokenizer-owned
+punctuation filtering. Separated Preview sorts only selected source metadata;
 generated scalar headers point readers to Run All. Separated Review may sort the
 materialized match projection by public scalar Result fields using direct,
 case-sensitive Polars ordering. The table intentionally leaves the document and

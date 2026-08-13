@@ -13,6 +13,7 @@ import { GREY, toBgColor } from '@/features/views/common/vizPalette';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { alignmentClassForColumn, type ConcordanceRow } from './concordanceTableModel';
 import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
+import { toCellText } from '../concordanceTableDomain';
 
 interface Props {
   table: TanStackTable<ConcordanceRow>;
@@ -29,15 +30,13 @@ interface Props {
 }
 
 /**
- * Returns direct-cell emphasis for Concordance sort anchors.
- * Used by: ConcordanceRowsTable in every table mode. Matched text always keeps
- * strong source-colour emphasis; the local display toggle controls only the
- * softer L1/R1 backgrounds and never parses tokens out of context strings.
+ * Returns direct-cell emphasis for Concordance matched text.
+ * Used by: ConcordanceRowsTable in every table mode. L1/R1 columns remain
+ * plain because their softer emphasis is rendered within the context columns.
  */
 function concordanceCellPresentation(
   columnId: string,
   sourceColor: string | undefined,
-  highlightL1R1: boolean,
 ): { className?: string; style?: CSSProperties } {
   const color = sourceColor ?? GREY;
   if (columnId === CONCORDANCE_COLUMN_KEYS.matchedText) {
@@ -46,16 +45,66 @@ function concordanceCellPresentation(
       style: { backgroundColor: toBgColor(color, 0.24), color: '#111827' },
     };
   }
-  if (
-    highlightL1R1 &&
-    (columnId === CONCORDANCE_COLUMN_KEYS.leftToken ||
-      columnId === CONCORDANCE_COLUMN_KEYS.rightToken)
-  ) {
-    return {
-      style: { backgroundColor: toBgColor(color, 0.12), color: '#111827' },
-    };
-  }
   return {};
+}
+
+function renderContextWithAnchor(
+  context: unknown,
+  anchor: unknown,
+  occurrence: 'first' | 'last',
+  sourceColor: string | undefined,
+  enabled: boolean,
+): ReactNode {
+  const contextText = toCellText(context);
+  const anchorText = toCellText(anchor);
+  if (!enabled || !anchorText) return contextText;
+
+  const matchIndex =
+    occurrence === 'last' ? contextText.lastIndexOf(anchorText) : contextText.indexOf(anchorText);
+  if (matchIndex < 0) return contextText;
+
+  return (
+    <>
+      {contextText.slice(0, matchIndex)}
+      <mark
+        data-concordance-context-anchor={occurrence}
+        data-match-index={matchIndex}
+        className="rounded-sm px-0 font-medium"
+        style={{ backgroundColor: toBgColor(sourceColor ?? GREY, 0.12), color: '#111827' }}
+      >
+        {contextText.slice(matchIndex, matchIndex + anchorText.length)}
+      </mark>
+      {contextText.slice(matchIndex + anchorText.length)}
+    </>
+  );
+}
+
+function renderConcordanceCell(
+  columnId: string,
+  row: ConcordanceRow,
+  renderedCell: ReactNode,
+  sourceColor: string | undefined,
+  highlightL1R1: boolean,
+): ReactNode {
+  if (columnId === CONCORDANCE_COLUMN_KEYS.leftContext) {
+    return renderContextWithAnchor(
+      row[CONCORDANCE_COLUMN_KEYS.leftContext],
+      row[CONCORDANCE_COLUMN_KEYS.leftToken],
+      'last',
+      sourceColor,
+      highlightL1R1,
+    );
+  }
+  if (columnId === CONCORDANCE_COLUMN_KEYS.rightContext) {
+    return renderContextWithAnchor(
+      row[CONCORDANCE_COLUMN_KEYS.rightContext],
+      row[CONCORDANCE_COLUMN_KEYS.rightToken],
+      'first',
+      sourceColor,
+      highlightL1R1,
+    );
+  }
+  return renderedCell;
 }
 
 /**
@@ -114,10 +163,11 @@ export function ConcordanceRowsTable({
                 }}
               >
                 {tableRow.getVisibleCells().map((cell) => {
-                  const presentation = concordanceCellPresentation(
-                    cell.column.id,
-                    getSourceColor?.(row),
-                    highlightL1R1,
+                  const sourceColor = getSourceColor?.(row);
+                  const presentation = concordanceCellPresentation(cell.column.id, sourceColor);
+                  const renderedCell = flexRender(
+                    cell.column.columnDef.cell,
+                    cell.getContext(),
                   );
                   return (
                     <TableCell
@@ -125,7 +175,13 @@ export function ConcordanceRowsTable({
                       className={`${alignmentClassForColumn(cell.column.id)} ${presentation.className ?? ''}`}
                       style={presentation.style}
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {renderConcordanceCell(
+                        cell.column.id,
+                        row,
+                        renderedCell,
+                        sourceColor,
+                        highlightL1R1,
+                      )}
                     </TableCell>
                   );
                 })}

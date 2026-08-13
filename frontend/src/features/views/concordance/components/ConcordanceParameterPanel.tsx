@@ -35,6 +35,8 @@ export interface ConcordanceParameterPanelProps {
   setWholeWord: Dispatch<SetStateAction<boolean>>;
   caseSensitive: boolean;
   setCaseSensitive: Dispatch<SetStateAction<boolean>>;
+  ignorePunctuation: boolean;
+  setIgnorePunctuation: Dispatch<SetStateAction<boolean>>;
   /**
    * Selected concordance engine. ``tokens`` mode walks the tokenization column
    * prepared by the selected tokenizer model. It becomes selectable after
@@ -79,6 +81,8 @@ export function ConcordanceParameterPanel({
   setWholeWord,
   caseSensitive,
   setCaseSensitive,
+  ignorePunctuation,
+  setIgnorePunctuation,
   searchMode,
   setSearchMode,
   tokensModeAvailable,
@@ -302,6 +306,17 @@ export function ConcordanceParameterPanel({
                       className="h-4 w-4"
                     />
                     <span className="text-sm text-foreground">Case sensitive</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={ignorePunctuation}
+                      onChange={(e) => {
+                        setIgnorePunctuation(e.target.checked);
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm text-foreground">Ignore punctuation</span>
                   </label>
                 </>
               )}

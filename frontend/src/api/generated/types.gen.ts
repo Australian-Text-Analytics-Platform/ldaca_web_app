@@ -1286,6 +1286,10 @@ export type ConcordanceAnalysisRequest = {
      */
     case_sensitive?: boolean;
     /**
+     * Ignore Punctuation
+     */
+    ignore_punctuation?: boolean;
+    /**
      * Kind
      */
     kind?: 'concordance';

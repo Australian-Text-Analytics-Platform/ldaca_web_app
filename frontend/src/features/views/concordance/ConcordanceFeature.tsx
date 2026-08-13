@@ -231,6 +231,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     setWholeWord,
     caseSensitive,
     setCaseSensitive,
+    ignorePunctuation,
+    setIgnorePunctuation,
     currentParams: currentConcordanceParams,
   } = concordanceParameters;
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
@@ -458,6 +460,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         regex,
         wholeWord,
         caseSensitive,
+        ignorePunctuation,
         searchMode,
         tokenizerModelsByNode: effectiveTokenizerModelsByNode,
         supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
@@ -620,6 +623,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       regex,
       whole_word: wholeWord,
       case_sensitive: caseSensitive,
+      ignore_punctuation: ignorePunctuation,
       search_mode: searchMode,
     };
     setIsSubmittingRunAll(true);
@@ -721,6 +725,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         setWholeWord={setWholeWord}
         caseSensitive={caseSensitive}
         setCaseSensitive={setCaseSensitive}
+        ignorePunctuation={ignorePunctuation}
+        setIgnorePunctuation={setIgnorePunctuation}
         searchMode={searchMode}
         setSearchMode={setSearchModeFromUser}
         tokensModeAvailable={tokensModeAvailable}

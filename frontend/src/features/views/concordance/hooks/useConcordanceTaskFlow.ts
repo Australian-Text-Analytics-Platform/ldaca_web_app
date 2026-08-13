@@ -23,6 +23,7 @@ interface ConcordanceState {
   regex: boolean;
   wholeWord: boolean;
   caseSensitive: boolean;
+  ignorePunctuation: boolean;
   /** Selected concordance engine. */
   searchMode: 'regex' | 'tokens';
   tokenizerModelsByNode: Record<string, string>;
@@ -67,6 +68,7 @@ export function useConcordanceTaskFlow({
     tokenizerModelsByNode,
     supersedesAnalysisIds,
     caseSensitive,
+    ignorePunctuation,
   },
   actions: { setNodePagination, setIsSearching, setLocalTaskId, runningRef, onSubmitted },
 }: Params) {
@@ -138,6 +140,7 @@ export function useConcordanceTaskFlow({
       regex,
       whole_word: wholeWord,
       case_sensitive: caseSensitive,
+      ignore_punctuation: ignorePunctuation,
       search_mode: searchMode,
       node_tokenizer_models: nodeTokenizerModels,
     };

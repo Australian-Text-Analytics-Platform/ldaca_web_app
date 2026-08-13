@@ -303,6 +303,12 @@ all selected IDs in Tokens mode. Execution and later Result projections use
 these immutable request mappings and the retained input snapshot; current Data
 Block preferences are never fallbacks.
 
+`ConcordanceAnalysisRequest.ignore_punctuation` is an optional boolean that
+defaults to `false` for backward compatibility. In Text mode, `true` excludes
+punctuation/symbol-only tokens from context counts and L1/R1 while preserving
+their original source text in context and extraction strings. Tokens mode
+ignores this field because tokenization already removes punctuation.
+
 ## Readiness And Common Semantics
 
 `GET /health` (`health_check`) is public. It returns `200` with `status: ready`

@@ -10,7 +10,7 @@ editable environment cannot load a stale ABI sibling.
 - `word_count(expr)`
 - `char_count(expr)`
 - `sentence_count(expr)`
-- `concordance(expr, ...)`
+- `concordance(expr, search_word, num_left_tokens=5, num_right_tokens=5, regex=False, case_sensitive=False, remove_punct=False)`
 - `embedding(expr, ...)`
 - `topic_modeling(expr, ...)`
 - `pl.col("text").text.tokenize(model=..., lowercase=..., remove_punct=..., cache=...)`
@@ -19,6 +19,12 @@ Tokenization returns `List[Struct[token: String, start: Int64, end: Int64]]`
 with Unicode character offsets. Supported model namespaces are `native:`,
 `huggingface:`, and `lindera:`. A cache path enables the Rust-owned DuckDB
 cache; `None` computes directly.
+
+`concordance(..., remove_punct=True)` excludes tokens containing no Unicode
+alphanumeric characters when selecting left/right context and L1/R1. Context
+strings are sliced from the original text offsets, so punctuation and
+whitespace between retained tokens and the match remain visible. Match
+selection itself is unchanged.
 
 Embedding accepts string or list-of-string input and returns a vector or nested
 vectors per row. `topic_modeling` is a whole-column expression that returns one
