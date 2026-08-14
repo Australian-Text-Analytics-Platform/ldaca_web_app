@@ -316,8 +316,8 @@ export function TopicModelingParameterPanel({
             >
               Minimum topic size
               <span
-                aria-label="Minimum topic size is the smallest number of documents that can form a topic; smaller values yield more, finer-grained topics"
-                title="Minimum topic size is the smallest number of documents that can form a topic. Smaller values yield more, finer-grained topics; the total number of topics is determined automatically."
+                aria-label="Minimum topic size is the smallest number of Topic Segments that can form a topic; smaller values yield more, finer-grained topics"
+                title="Minimum topic size is the smallest number of Topic Segments that can form a topic. Smaller values yield more, finer-grained topics; the total number of topics is determined automatically."
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
               >
                 <CircleHelp className="h-4 w-4" />
@@ -332,9 +332,9 @@ export function TopicModelingParameterPanel({
               value={topicSizeValueDraft}
               title={
                 topicSizeWarning === 'red'
-                  ? 'Fewer than 3 documents per topic — results will likely be unusable'
+                  ? 'Fewer than 3 Topic Segments per topic — results will likely be unusable'
                   : topicSizeWarning === 'orange'
-                    ? 'Fewer than 10 documents per topic — topics may be noisy or unstable'
+                    ? 'Fewer than 10 Topic Segments per topic — topics may be noisy or unstable'
                     : undefined
               }
               className={`h-9 w-full px-2 text-right text-sm${

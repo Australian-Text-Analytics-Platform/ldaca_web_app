@@ -5,8 +5,9 @@ Issue: [#56](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflo
 ## Representative-word contract
 
 - `polars-text` ranks a fixed 100 candidates for each topic by c-TF-IDF and
-  emits `representative_words` as `{word, occurrence_count}` structs. Scores
-  remain internal and are not duplicated in public parallel arrays.
+  emits `representative_words` as `{word, occurrence_count}` structs inside the
+  scalar topic-modeling run result's complete `topics[]` list. Scores remain
+  internal and are not duplicated in public parallel arrays.
 - `occurrence_count` is the positive token count in the model Topic Segments
   assigned to the topic. Automatic segmentation overlap therefore contributes
   repeated occurrences. It is neither source-document frequency nor a

@@ -113,10 +113,8 @@ def test_sample_corpus_min_k_is_one():
 
 def _fake_topic_modeling_expr_factory(
     *,
-    dominant: list[int],
-    words: list[list[str]],
-    xs: list[float],
-    ys: list[float],
+    documents: list[dict[str, Any]],
+    topics: list[dict[str, Any]],
     n_chunks: int,
     truncated_segment_count: int = 0,
     distribution: list[list[dict[str, Any]]] | None = None,
@@ -125,54 +123,80 @@ def _fake_topic_modeling_expr_factory(
 ):
     """Build a fake ``.text.topic_modeling`` method returning a canned struct.
 
-    The real expression returns one struct per input document with the per-topic
-    metadata replicated onto each row under its dominant topic; the fake mirrors
-    that exact shape from literal Series so ``_run_rust_topic_modeling``'s
-    reconstruction can be tested offline without running the Rust pipeline.
+    The real expression returns one scalar run result with independent document
+    outcomes and complete topic metadata. The fake mirrors that nested shape so
+    backend validation can be tested without running the Rust pipeline.
     """
 
-    n = len(dominant)
-    # Default each row's distribution to a single entry at its dominant topic
-    # (proportion 1.0); outliers (-1) get an empty distribution.
-    dist = distribution
-    if dist is None:
-        dist = [
-            ([{"topic_id": int(t), "proportion": 1.0}] if t >= 0 else [])
-            for t in dominant
-        ]
+    documents = [
+        {
+            **document,
+            "topic_distribution": (
+                distribution[index]
+                if distribution is not None
+                else document.get(
+                    "topic_distribution",
+                    [
+                        {
+                            "topic_id": int(document["dominant_topic"]),
+                            "proportion": 1.0,
+                        }
+                    ]
+                    if int(document["dominant_topic"]) >= 0
+                    else [],
+                )
+            ),
+        }
+        for index, document in enumerate(documents)
+    ]
     timings = stage_timings if stage_timings is not None else _STAGE_TIMINGS
 
     def _fake(self, **kwargs):  # noqa: ANN001 - mirrors namespace method shape
         if seen_kwargs is not None:
             seen_kwargs.update(kwargs)
         return pl.struct(
-            pl.Series("dominant_topic", dominant, dtype=pl.Int32),
             pl.Series(
-                "topic_distribution",
-                dist,
+                "documents",
+                [documents],
                 dtype=pl.List(
-                    pl.Struct({"topic_id": pl.Int32, "proportion": pl.Float32})
+                    pl.Struct(
+                        {
+                            "doc_index": pl.UInt32,
+                            "dominant_topic": pl.Int32,
+                            "topic_distribution": pl.List(
+                                pl.Struct(
+                                    {"topic_id": pl.Int32, "proportion": pl.Float32}
+                                )
+                            ),
+                        }
+                    )
                 ),
             ),
             pl.Series(
-                "representative_words",
-                [[{"word": word, "occurrence_count": 1} for word in row] for row in words],
+                "topics",
+                [topics],
                 dtype=pl.List(
-                    pl.Struct({"word": pl.String, "occurrence_count": pl.UInt64})
+                    pl.Struct(
+                        {
+                            "id": pl.Int32,
+                            "representative_words": pl.List(
+                                pl.Struct(
+                                    {"word": pl.String, "occurrence_count": pl.UInt64}
+                                )
+                            ),
+                            "x": pl.Float32,
+                            "y": pl.Float32,
+                        }
+                    )
                 ),
             ),
-            pl.Series("x", xs, dtype=pl.Float32),
-            pl.Series("y", ys, dtype=pl.Float32),
-            pl.Series("n_topics", [0] * n, dtype=pl.UInt32),
-            pl.Series("n_chunks", [n_chunks] * n, dtype=pl.UInt32),
-            pl.Series(
-                "truncated_segment_count",
-                [truncated_segment_count] * n,
-                dtype=pl.UInt32,
+            pl.lit(n_chunks, dtype=pl.UInt32).alias("n_chunks"),
+            pl.lit(truncated_segment_count, dtype=pl.UInt32).alias(
+                "truncated_segment_count"
             ),
             pl.Series(
                 "stage_timings_ms",
-                [timings] * n,
+                [timings],
                 dtype=pl.List(
                     pl.Struct({"stage": pl.String, "elapsed_ms": pl.Float64})
                 ),
@@ -189,10 +213,26 @@ def test_run_rust_topic_modeling_reconstructs_result_dict(monkeypatch):
         TextNamespace,
         "topic_modeling",
         _fake_topic_modeling_expr_factory(
-            dominant=[0, 0, 1, -1],
-            words=[["alpha", "beta"], ["alpha", "beta"], ["gamma"], []],
-            xs=[1.0, 1.0, 2.0, 0.0],
-            ys=[3.0, 3.0, 4.0, 0.0],
+            documents=[
+                {"doc_index": 0, "dominant_topic": 0},
+                {"doc_index": 1, "dominant_topic": 0},
+                {"doc_index": 2, "dominant_topic": 0},
+                {"doc_index": 3, "dominant_topic": -1},
+            ],
+            topics=[
+                {
+                    "id": 0,
+                    "representative_words": _terms("alpha", "beta"),
+                    "x": 1.0,
+                    "y": 3.0,
+                },
+                {
+                    "id": 1,
+                    "representative_words": _terms("gamma"),
+                    "x": 2.0,
+                    "y": 4.0,
+                },
+            ],
             n_chunks=5,
             distribution=[
                 [
@@ -200,7 +240,10 @@ def test_run_rust_topic_modeling_reconstructs_result_dict(monkeypatch):
                     {"topic_id": 1, "proportion": 0.1},
                 ],
                 [{"topic_id": 0, "proportion": 1.0}],
-                [{"topic_id": 1, "proportion": 1.0}],
+                [
+                    {"topic_id": 0, "proportion": 0.2},
+                    {"topic_id": 1, "proportion": 0.8},
+                ],
                 [],
             ],
         ),
@@ -241,11 +284,11 @@ def test_run_rust_topic_modeling_reconstructs_result_dict(monkeypatch):
         },
         {
             "doc_index": 2,
-            "dominant_topic": 1,
+            "dominant_topic": 0,
             "topic_distribution": [
                 {"topic_id": -1, "proportion": pytest.approx(0.0)},
-                {"topic_id": 0, "proportion": pytest.approx(0.0)},
-                {"topic_id": 1, "proportion": pytest.approx(1.0)},
+                {"topic_id": 0, "proportion": pytest.approx(0.2)},
+                {"topic_id": 1, "proportion": pytest.approx(0.8)},
             ],
         },
         {
@@ -258,21 +301,19 @@ def test_run_rust_topic_modeling_reconstructs_result_dict(monkeypatch):
             ],
         },
     ]
-    # Outlier topic (-1) is excluded; topics are sorted by id and carry the
-    # replicated representative words and coordinates.
+    # Topic 1 is preserved even though it never dominates a document.
     assert result["topics"] == [
         {"id": 0, "representative_words": _terms("alpha", "beta"), "x": 1.0, "y": 3.0},
         {"id": 1, "representative_words": _terms("gamma"), "x": 2.0, "y": 4.0},
     ]
-    # n_topics is the count of topics with at least one dominant document, not
-    # the (zeroed) replicated field.
     assert result["n_topics"] == 2
     assert result["n_chunks"] == 5
     assert result["stage_timings_ms"] == _STAGE_TIMINGS
 
 
-def test_run_rust_topic_modeling_forwards_segmentation_and_reports_truncation(
-    monkeypatch,
+@pytest.mark.parametrize("segmentation_method", ["automatic", "paragraph", "sentence"])
+def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipeline(
+    monkeypatch, segmentation_method: str
 ) -> None:
     from polars_text.namespace import TextNamespace
 
@@ -281,10 +322,15 @@ def test_run_rust_topic_modeling_forwards_segmentation_and_reports_truncation(
         TextNamespace,
         "topic_modeling",
         _fake_topic_modeling_expr_factory(
-            dominant=[0],
-            words=[["alpha"]],
-            xs=[0.0],
-            ys=[0.0],
+            documents=[{"doc_index": 0, "dominant_topic": 0}],
+            topics=[
+                {
+                    "id": 0,
+                    "representative_words": _terms("alpha"),
+                    "x": 0.0,
+                    "y": 0.0,
+                }
+            ],
             n_chunks=3,
             truncated_segment_count=2,
             seen_kwargs=seen_kwargs,
@@ -296,7 +342,7 @@ def test_run_rust_topic_modeling_forwards_segmentation_and_reports_truncation(
         seed=0,
         min_cluster_size=2,
         vectorizer_model="native:plain_words_en",
-        segmentation_method="paragraph",
+        segmentation_method=segmentation_method,
         max_segment_tokens=64,
     )
 
@@ -305,7 +351,96 @@ def test_run_rust_topic_modeling_forwards_segmentation_and_reports_truncation(
         seen_kwargs["max_tokens"],
         seen_kwargs["overlap"],
         result["truncated_segment_count"],
-    ) == ("paragraph", 64, 8, 2)
+    ) == (segmentation_method, 64, 8, 2)
+
+
+@pytest.mark.parametrize(
+    ("documents", "topics", "message"),
+    [
+        (
+            [
+                {
+                    "doc_index": 0,
+                    "dominant_topic": 1,
+                    "topic_distribution": [{"topic_id": 1, "proportion": 1.0}],
+                }
+            ],
+            [
+                {
+                    "id": 1,
+                    "representative_words": [],
+                    "x": 0.0,
+                    "y": 0.0,
+                }
+            ],
+            "topic ids must be contiguous",
+        ),
+        (
+            [
+                {
+                    "doc_index": 3,
+                    "dominant_topic": 0,
+                    "topic_distribution": [{"topic_id": 0, "proportion": 1.0}],
+                }
+            ],
+            [
+                {
+                    "id": 0,
+                    "representative_words": [],
+                    "x": 0.0,
+                    "y": 0.0,
+                }
+            ],
+            "document indices are invalid",
+        ),
+        (
+            [
+                {
+                    "doc_index": 0,
+                    "dominant_topic": 0,
+                    "topic_distribution": [
+                        {"topic_id": 0, "proportion": 0.5},
+                        {"topic_id": 0, "proportion": 0.5},
+                    ],
+                }
+            ],
+            [
+                {
+                    "id": 0,
+                    "representative_words": [],
+                    "x": 0.0,
+                    "y": 0.0,
+                }
+            ],
+            "duplicate topic id",
+        ),
+    ],
+)
+def test_run_rust_topic_modeling_rejects_invalid_native_identity_contracts(
+    monkeypatch,
+    documents: list[dict[str, Any]],
+    topics: list[dict[str, Any]],
+    message: str,
+) -> None:
+    from polars_text.namespace import TextNamespace
+
+    monkeypatch.setattr(
+        TextNamespace,
+        "topic_modeling",
+        _fake_topic_modeling_expr_factory(
+            documents=documents,
+            topics=topics,
+            n_chunks=1,
+        ),
+    )
+
+    with pytest.raises(ValueError, match=message):
+        topic_pipeline._run_rust_topic_modeling(
+            all_docs=["one document"],
+            seed=0,
+            min_cluster_size=2,
+            vectorizer_model="native:plain_words_en",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -411,9 +546,7 @@ def test__compute_topic_modeling_writes_parquet_and_meaning_lists(
     assert assignments["TOPIC_topic"].to_list() == [0, 0]
     distribution_dtype = assignments.schema["TOPIC_topic_distribution"]
     assert isinstance(distribution_dtype, pl.Extension)
-    assert distribution_dtype.ext_name() == (
-        "org.ldaca.wordflow.topic_distribution.v1"
-    )
+    assert distribution_dtype.ext_name() == ("org.ldaca.wordflow.topic_distribution.v1")
     assert distribution_dtype.ext_storage() == pl.Array(
         pl.Struct({"topic_id": pl.Int64, "proportion": pl.Float64}), 3
     )
@@ -465,7 +598,14 @@ def test__compute_topic_modeling_payload_keeps_all_ranked_candidates(
     def fake_run(**_kwargs):
         return _canned_rust_result(
             documents=[{"doc_index": 0, "dominant_topic": 0}],
-            topics=[{"id": 0, "representative_words": _terms(*many_words), "x": 0.0, "y": 0.0}],
+            topics=[
+                {
+                    "id": 0,
+                    "representative_words": _terms(*many_words),
+                    "x": 0.0,
+                    "y": 0.0,
+                }
+            ],
         )
 
     monkeypatch.setattr(topic_modeling, "_run_rust_topic_modeling", fake_run)

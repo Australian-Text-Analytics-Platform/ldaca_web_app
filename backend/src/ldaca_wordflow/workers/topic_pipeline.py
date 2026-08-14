@@ -192,99 +192,96 @@ def _run_rust_topic_modeling(
     embedder_model: str | None = None,
     embedding_cache: str | os.PathLike[str] | None = None,
 ) -> dict:
-    """Run the Rust topic-modeling pipeline via the Polars expression and
-    reconstruct the result dict the payload builder consumes.
+    """Run the scalar Rust topic-modeling expression and validate its payload.
 
-    Topic modeling is exposed by ``polars-text`` as a first-class Polars
-    expression in the ``.text`` namespace (``pl.col(...).text.topic_modeling``),
-    mirroring ``tokenize``/``concordance``. The Rust side owns chunking, ORT
-    segmentation, ORT embedding, PaCMAP reduction, HDBSCAN clustering, and
-    c-TF-IDF labeling. The
-    number of topics is whatever HDBSCAN yields for ``min_cluster_size`` (the
-    only native topic-count control). The expression returns one struct **per
-    input document** with the document's ``dominant_topic`` and
-    ``topic_distribution`` plus the per-topic metadata
-    (``representative_words``/``x``/``y``) replicated onto each row under its
-    dominant topic, and the run-level ``n_topics`` / ``n_chunks`` /
-    ``stage_timings_ms`` replicated on every row.
-
-    Flow:
-    1. Wrap ``all_docs`` in a one-column frame and evaluate the expression,
-       unnesting the per-row struct into flat columns.
-    2. Rebuild ``documents`` as ``[{doc_index, dominant_topic}]`` in input order.
-    3. Rebuild ``topics`` by grouping the rows whose ``dominant_topic >= 0`` and
-       taking the (replicated) ``representative_words``/``x``/``y`` once per
-       topic. ``n_topics`` is the number of topics with at least one dominant
-       document, so the displayed count matches the bubble chart; ``n_chunks`` is
-    read from the first row. ``stage_timings_ms`` is also read from the first
-    row because it describes the whole native run.
+    Rust owns the shared segment → embed → cluster → c-TF-IDF → length-weighted
+    rollup pipeline. Its scalar result contains complete ``documents`` and
+    ``topics`` lists, so topic metadata does not depend on whether a topic is
+    dominant for any document. This boundary pads distributions for persisted
+    Topic Distribution values and rejects malformed native output.
 
     Called by:
     - ``_compute_topic_payload`` in ``topic_modeling`` for the initial run.
     """
     import polars_text  # noqa: F401  (registers the ``.text`` expr namespace)
 
-    result = (
-        pl.DataFrame({"__doc__": all_docs})
-        .select(
-            cast(Any, pl.col("__doc__"))
-            .text.topic_modeling(
-                embedder_model=embedder_model,
-                cache=embedding_cache,
-                segmentation_method=segmentation_method,
-                max_tokens=max_segment_tokens,
-                overlap=_automatic_segment_overlap(max_segment_tokens),
-                seed=int(seed),
-                min_cluster_size=int(min_cluster_size),
-                vectorizer_model=vectorizer_model,
-                lowercase=True,
-            )
-            .alias("__topic__")
+    result_frame = pl.DataFrame({"__doc__": all_docs}).select(
+        cast(Any, pl.col("__doc__"))
+        .text.topic_modeling(
+            embedder_model=embedder_model,
+            cache=embedding_cache,
+            segmentation_method=segmentation_method,
+            max_tokens=max_segment_tokens,
+            overlap=_automatic_segment_overlap(max_segment_tokens),
+            seed=int(seed),
+            min_cluster_size=int(min_cluster_size),
+            vectorizer_model=vectorizer_model,
+            lowercase=True,
         )
-        .unnest("__topic__")
+        .alias("__topic__")
     )
+    if result_frame.height != 1:
+        raise ValueError("Topic modeling native result must contain exactly one run")
+    raw_result = result_frame["__topic__"][0]
+    if not isinstance(raw_result, dict):
+        raise ValueError("Topic modeling native result is malformed")
 
-    # ``topic_distribution`` is the per-document soft assignment: a fixed set of
-    # ``{topic_id, proportion}`` (proportions sum to ~1 across the doc's
-    # chunks). It powers the Topic Distribution filter ("keep docs where
-    # topic N proportion >= x"), so it is carried through to the assignment
-    # parquet rather than dropped. Each document's distribution is padded to
-    # include *every* non-negative topic id (0.0 when the doc has no chunk in
-    # that topic) so the persisted column has a complete, uniform key set the
-    # frontend can render and offer as filter options.
-    dominant_list = result["dominant_topic"].to_list()
-    distribution_list = result["topic_distribution"].to_list()
-
-    topics_frame = (
-        result.filter(pl.col("dominant_topic") >= 0)
-        .group_by("dominant_topic")
-        .agg(
-            pl.col("representative_words").first(),
-            pl.col("x").first(),
-            pl.col("y").first(),
+    raw_topics = raw_result.get("topics")
+    if not isinstance(raw_topics, list):
+        raise ValueError("Topic modeling native topics are malformed")
+    topics = []
+    for raw_topic in raw_topics:
+        if not isinstance(raw_topic, dict):
+            raise ValueError("Topic modeling native topic is malformed")
+        try:
+            topic_id = int(raw_topic["id"])
+            representative_words = [
+                word for word in (raw_topic["representative_words"] or []) if word
+            ]
+            x = float(raw_topic["x"])
+            y = float(raw_topic["y"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Topic modeling native topic is malformed") from exc
+        topics.append(
+            {
+                "id": topic_id,
+                "representative_words": representative_words,
+                "x": x,
+                "y": y,
+            }
         )
-        .sort("dominant_topic")
-    )
-    topics = [
-        {
-            "id": int(row["dominant_topic"]),
-            "representative_words": [
-                word for word in (row["representative_words"] or []) if word
-            ],
-            "x": float(row["x"]),
-            "y": float(row["y"]),
-        }
-        for row in topics_frame.iter_rows(named=True)
-    ]
+    all_topic_ids = [cast(int, topic["id"]) for topic in topics]
+    if all_topic_ids != list(range(len(topics))):
+        raise ValueError("Topic modeling native topic ids must be contiguous")
 
-    all_topic_ids: list[int] = sorted(cast(int, topic["id"]) for topic in topics)
+    raw_documents = raw_result.get("documents")
+    if not isinstance(raw_documents, list) or len(raw_documents) != len(all_docs):
+        raise ValueError("Topic modeling native documents are malformed")
     documents = []
-    for index, topic in enumerate(dominant_list):
+    for index, raw_document in enumerate(raw_documents):
+        if not isinstance(raw_document, dict):
+            raise ValueError("Topic modeling native document is malformed")
+        document_data = cast(dict[str, object], raw_document)
+        try:
+            doc_index = int(cast(Any, document_data["doc_index"]))
+            dominant_topic = int(cast(Any, document_data["dominant_topic"]))
+            raw_distribution = document_data["topic_distribution"] or []
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Topic modeling native document is malformed") from exc
+        if doc_index != index:
+            raise ValueError("Topic modeling native document indices are invalid")
+        if dominant_topic not in {-1, *all_topic_ids}:
+            raise ValueError("Topic modeling native dominant topic is unknown")
+        if not isinstance(raw_distribution, list):
+            raise ValueError("Topic Distribution is malformed")
         present: dict[int, float] = {}
-        for entry in distribution_list[index] or []:
+        for entry in raw_distribution:
+            if not isinstance(entry, dict):
+                raise ValueError("Topic Distribution entry is malformed")
+            distribution_entry = cast(dict[str, object], entry)
             try:
-                topic_id = int(entry["topic_id"])
-                proportion = float(entry["proportion"])
+                topic_id = int(cast(Any, distribution_entry["topic_id"]))
+                proportion = float(cast(Any, distribution_entry["proportion"]))
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError("Topic Distribution entry is malformed") from exc
             if topic_id in present:
@@ -299,7 +296,7 @@ def _run_rust_topic_modeling(
         documents.append(
             {
                 "doc_index": index,
-                "dominant_topic": int(topic),
+                "dominant_topic": dominant_topic,
                 "topic_distribution": [
                     {"topic_id": topic_id, "proportion": padded[topic_id]}
                     for topic_id in sorted(padded)
@@ -307,17 +304,12 @@ def _run_rust_topic_modeling(
             }
         )
 
-    n_chunks = int(result["n_chunks"][0]) if result.height else 0
-    truncated_segment_count = (
-        int(result["truncated_segment_count"][0])
-        if result.height and "truncated_segment_count" in result.columns
-        else 0
-    )
-    raw_stage_timings = (
-        result["stage_timings_ms"].to_list()[0]
-        if result.height and "stage_timings_ms" in result.columns
-        else []
-    )
+    try:
+        n_chunks = int(raw_result["n_chunks"])
+        truncated_segment_count = int(raw_result["truncated_segment_count"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Topic modeling native run metadata is malformed") from exc
+    raw_stage_timings = raw_result.get("stage_timings_ms") or []
     stage_timings_ms = []
     for timing in raw_stage_timings or []:
         if not isinstance(timing, dict):

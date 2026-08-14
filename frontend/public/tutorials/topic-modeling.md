@@ -55,10 +55,10 @@ of the cap, up to 32 tokens.
 
 <h4 id="help-topic-modeling-min-topic-size">Minimum topic size</h4>
 
-The smallest cluster that can become a topic. The default is 10. Higher values
-usually create fewer, broader topics and more outliers; lower values allow
-smaller themes but can create noisier topics. The final topic count is
-determined by the data rather than requested directly.
+The smallest number of Topic Segments that can form a topic. The default is 10.
+Higher values usually create fewer, broader topics and more outliers; lower
+values allow smaller themes but can create noisier topics. The final topic
+count is determined by the data rather than requested directly.
 
 <h4 id="help-topic-modeling-random-seed">Random seed</h4>
 
@@ -73,6 +73,12 @@ them with the configured sentence-transformer model, reduces the embeddings
 with PaCMAP, clusters them with HDBSCAN, calculates c-TF-IDF representative
 words, and saves the Result. The first run can be slower while model resources
 are loaded or downloaded.
+
+Every mode uses this same downstream pipeline. Each Topic Segment is one equal
+clustering observation. When assignments are rolled back to documents, each
+segment is weighted by the Unicode-character length of its retained text;
+Automatic overlap therefore counts repeated source text again. Outlier weight
+remains part of the normalized Topic Distribution.
 
 Parameters are locked while a Result exists. **Clear Results** removes the
 Analysis and unlocks the controls; your segmentation method and token cap stay

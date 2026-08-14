@@ -34,6 +34,12 @@ flowchart LR
   reduction, clustering, document roll-up, and c-TF-IDF topic-label
   computation.
 
+Topic modelling is one non-elementwise scalar expression. It consumes the full
+document column and returns one run result with independent `documents[]` and
+complete `topics[]` lists plus run metadata. Segmentation is the only
+mode-specific stage; the shared rollup weights retained segment text by Unicode
+character count without changing the equal-observation clustering input.
+
 Expression APIs preserve lazy execution. Direct PyO3 functions are reserved
 for operations that are not natural expressions, such as model inventory,
 prefetch, and token-frequency dictionaries.

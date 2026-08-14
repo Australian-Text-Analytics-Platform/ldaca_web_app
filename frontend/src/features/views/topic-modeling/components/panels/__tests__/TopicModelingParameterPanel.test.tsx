@@ -250,7 +250,7 @@ describe('TopicModelingParameterPanel', () => {
     const input = screen.getByLabelText('Minimum topic size');
     expect(tooltipIcon).toHaveAttribute(
       'title',
-      expect.stringMatching(/smallest number of documents that can form a topic/i),
+      expect.stringMatching(/smallest number of Topic Segments that can form a topic/i),
     );
     expect(input).toBeInTheDocument();
   });

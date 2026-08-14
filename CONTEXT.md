@@ -118,8 +118,12 @@ _Avoid_: document hit, dispersion row, cached line
 **Topic Distribution**:
 The ordered per-document proportions for the outlier topic `-1` followed by
 every real topic in ascending ID order. Every entry is present, absent
-proportions are zero, and the proportions sum to approximately one. It is
-distinct from the single dominant topic assigned to the document.
+proportions are zero, and the proportions sum to approximately one. Each Topic
+Segment contributes the Unicode-character length of its retained text;
+automatic overlap therefore contributes repeated weight. Outlier weight stays
+in the denominator. The dominant topic is the highest-weight real topic, or
+`-1` only when no real topic is present. Topic Distribution is distinct from
+that single dominant topic.
 _Avoid_: variable topic list, dominant topic
 
 **Topic Segment**:

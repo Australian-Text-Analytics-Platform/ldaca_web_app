@@ -224,6 +224,17 @@ Automatic segmentation may split and overlap text; Paragraph and Sentence
 segmentation preserve their respective Unicode text boundaries and truncate an
 oversized segment on the right.
 
+Every segmentation method then uses the same embedding, reduction, clustering,
+c-TF-IDF, and Result-construction pipeline. HDBSCAN treats each Topic Segment
+as one observation, so Minimum topic size counts Topic Segments. Document Topic
+Distributions are a separate rollup: each retained segment contributes its
+Unicode-character length, including repeated observations from Automatic
+overlap. Outlier weight remains in the normalization denominator. The highest-
+weight real topic is dominant, with smaller topic IDs breaking ties; `-1` is
+dominant only when the document has no real-topic segment. Bubble sizes remain
+integer counts of documents by dominant topic rather than weighted segment
+mass.
+
 Topic Results retain 100 Representative Words per topic in c-TF-IDF order,
 each with its model-segment occurrence count. Token Frequency and Topic
 Modelling Tabs may own one normalized stopword list; Topic Modelling Tabs also

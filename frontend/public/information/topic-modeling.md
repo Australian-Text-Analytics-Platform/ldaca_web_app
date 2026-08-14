@@ -17,7 +17,8 @@ assignments into a distribution for the source document.
 2. A sentence-transformer model converts each segment into an embedding.
 3. PaCMAP reduces the embeddings and HDBSCAN discovers clusters and outliers.
 4. Class-based TF-IDF (c-TF-IDF) ranks representative words for each topic.
-5. Segment assignments are rolled up to document-level topic distributions.
+5. Segment assignments are rolled up to document-level topic distributions,
+   weighted by the Unicode-character length of each retained segment.
 
 For keyword extraction, c-TF-IDF combines all Topic Segments assigned to a
 topic into one class-level text. The configured vectorizer tokenises that text
@@ -33,6 +34,8 @@ text with limited overlap. Paragraph and Sentence segmentation preserve chosen
 semantic boundaries, but an oversized unit keeps only its beginning. The
 Maximum tokens per segment control therefore trades local focus against wider
 context. Wordflow reports explicit-mode truncation above the Result chart.
+Automatic overlap counts repeated text as another observation. All three modes
+then use the same downstream modelling pipeline.
 
 <h3 id="info-topic-modeling-what-you-can-do">What you can do</h3>
 
@@ -49,6 +52,10 @@ document length, or data-cleaning artefacts. Topic −1 is the expected outlier
 group rather than an error. Sampling, segmentation, minimum topic size, and the
 random seed can all affect the result, so compare configurations and return to
 the source documents when naming or interpreting a topic.
+
+Minimum topic size counts Topic Segments, because those are the observations
+clustered by HDBSCAN. Bubble size instead remains the integer number of source
+documents whose weighted dominant assignment is that topic.
 
 The term *topic* is technical rather than authorial. A critical overview is
 available in [this open-access article](https://doi.org/10.1177/14614456241293075)

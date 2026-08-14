@@ -27,17 +27,32 @@ whitespace between retained tokens and the match remain visible. Match
 selection itself is unchanged.
 
 Embedding accepts string or list-of-string input and returns a vector or nested
-vectors per row. `topic_modeling` is a whole-column expression that returns one
-result struct per source document. Its segmentation arguments are:
+vectors per row. `topic_modeling` is a scalar whole-column expression that
+returns exactly one run result. Its segmentation arguments are:
 
 - `segmentation_method`: `"automatic"`, `"paragraph"`, or `"sentence"`;
 - `max_tokens`: maximum model tokens per Topic Segment; and
 - `overlap`: the automatic-mode overlap. Paragraph and Sentence modes ignore
   overlap, preserve semantic units, and right-truncate units over `max_tokens`.
 
-The result includes `n_chunks` and `truncated_segment_count` as replicated
-run-level fields. `n_chunks` retains its lower-level name but counts Topic
-Segments. `representative_words` is a list of
+The result contract is:
+
+```text
+{
+  documents: [{doc_index, dominant_topic, topic_distribution}],
+  topics: [{id, representative_words, x, y}],
+  n_chunks,
+  truncated_segment_count,
+  stage_timings_ms
+}
+```
+
+`documents` and `topics` are independent, so metadata is complete even when a
+topic never dominates a document. Topic Distribution proportions are weighted
+by retained Topic Segment Unicode-character length; Automatic overlap counts
+each repeated observation. Clustering remains one equal observation per Topic
+Segment. `n_chunks` retains its lower-level name but counts Topic Segments.
+`representative_words` is a list of
 `{word: String, occurrence_count: UInt64}` structs, fixed at at most 100 terms
 in descending c-TF-IDF order. Counts are over assigned model Topic Segments, so
 automatic overlap can count the same source text more than once. Stopwords and
