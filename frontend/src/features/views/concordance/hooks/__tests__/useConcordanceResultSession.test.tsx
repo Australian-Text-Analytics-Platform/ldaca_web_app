@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ConcordanceAnalysisResponse } from '@/api';
+import type { ConcordanceRunAllReviewSource } from '../../concordanceRunAllReview';
 import { useConcordanceResultSession } from '../useConcordanceResultSession';
 
 const result: ConcordanceAnalysisResponse = {
@@ -46,6 +47,28 @@ const createWrapper = () => {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   };
+};
+
+const reviewSource: ConcordanceRunAllReviewSource = {
+  analysisId: 'review-analysis-1',
+  source: {
+    analysis_columns: ['CONC_matched_text'],
+    color: null,
+    document_column: 'text',
+    document_count: 25,
+    internal_columns: ['__wordflow_source_row_id'],
+    match_count: 25,
+    metadata_columns: [],
+    node_id: 'node-1',
+    node_name: 'Corpus',
+    table: {
+      delivery: 'projected',
+      table_id: 'concordance-run-all',
+      documents: { rows_url: '/documents/rows', schema_url: '/documents/schema' },
+      matches: { rows_url: '/matches/rows', schema_url: '/matches/schema' },
+      density_url: '/density',
+    },
+  },
 };
 
 describe('useConcordanceResultSession', () => {
@@ -97,5 +120,36 @@ describe('useConcordanceResultSession', () => {
     expect(hook.current.results).toBeNull();
     expect(hook.current.nodePagination).toEqual({});
     expect(hook.current.nodeLoading).toEqual({});
+  });
+
+  it('keeps a new Dispersion Review page unsorted', () => {
+    const { result: hook } = renderHook(
+      () =>
+        useConcordanceResultSession({
+          workspaceId: null,
+          analysisId: null,
+          baseResult: null,
+          viewMode: 'separated',
+          combinedPage: 1,
+          selectedNodes: [],
+          showDispersion: true,
+          reviewSources: [reviewSource],
+          selectedBinIndices: {},
+          excludedMatchedTexts: {},
+          binCount: 20,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      hook.current.handleReviewPageChange(2, 'node-1');
+    });
+
+    expect(hook.current.nodePagination['node-1']).toEqual({
+      currentPage: 2,
+      pageSize: 20,
+      sortBy: undefined,
+      descending: false,
+    });
   });
 });

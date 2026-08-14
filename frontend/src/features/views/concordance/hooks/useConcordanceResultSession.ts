@@ -216,7 +216,10 @@ export function useConcordanceResultSession({
       node_id: nodeId,
       page: viewMode === 'combined' ? combinedPage : (stateForNode?.currentPage ?? 1),
       page_size: pageSize,
-      sort_by: viewMode === 'combined' ? null : (stateForNode?.sortBy ?? null),
+      sort_by:
+        viewMode === 'combined' || stateForNode?.sortBy === ''
+          ? null
+          : (stateForNode?.sortBy ?? null),
       descending: viewMode === 'combined' ? false : (stateForNode?.descending ?? false),
     };
     const matchesBase =
@@ -441,7 +444,7 @@ export function useConcordanceResultSession({
           const previous = current[paginationKey] ?? {
             currentPage: 1,
             pageSize: state.globalPageSize,
-            sortBy: '',
+            sortBy: undefined,
             descending: false,
           };
           const sameColumn = previous.sortBy === columnKey;
@@ -466,7 +469,7 @@ export function useConcordanceResultSession({
           [paginationKey]: {
             ...(current[paginationKey] ?? {
               pageSize: state.globalPageSize,
-              sortBy: '',
+              sortBy: undefined,
               descending: false,
             }),
             currentPage: newPage,
