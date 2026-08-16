@@ -117,8 +117,23 @@ class UnavailableWorkspaceRecord:
         "configured_limit",
     ]
     message: str
+    name: str | None = None
+    description: str | None = None
+    created_at: str | None = None
+    modified_at: str | None = None
     stored_schema_version: int | None = None
     supported_schema_version: int | None = None
+
+
+def _incompatible_metadata_text(
+    error: WorkspaceSchemaVersionError,
+    field: str,
+) -> str | None:
+    """Read one descriptive text field without weakening the load gate."""
+
+    metadata = error.workspace_metadata
+    value = metadata.get(field) if metadata is not None else None
+    return value if isinstance(value, str) else None
 
 
 WorkspaceListRecord = WorkspaceRecord | UnavailableWorkspaceRecord
@@ -518,6 +533,10 @@ class WorkspaceService:
                             f"Workspace format {exc.stored_version} is incompatible "
                             f"with supported format {exc.supported_version}."
                         ),
+                        name=_incompatible_metadata_text(exc, "name"),
+                        description=_incompatible_metadata_text(exc, "description"),
+                        created_at=_incompatible_metadata_text(exc, "created_at"),
+                        modified_at=_incompatible_metadata_text(exc, "modified_at"),
                         stored_schema_version=exc.stored_version,
                         supported_schema_version=exc.supported_version,
                     )
@@ -1567,12 +1586,12 @@ class WorkspaceService:
             )
             return lease.path
 
-    async def resolve_owned_workspace_dir_for_maintenance(
+    async def resolve_owned_workspace_dir(
         self,
         user_id: str,
         workspace_id: str,
     ) -> Path:
-        """Resolve closed storage only for startup reconciliation."""
+        """Resolve one owned Workspace directory without opening its snapshot."""
 
         path = await self._path(user_id, workspace_id)
         if path is None:

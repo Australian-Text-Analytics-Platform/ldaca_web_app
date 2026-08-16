@@ -79,7 +79,7 @@ async def import_workspace_archive(
             "content": {
                 "application/zip": {"schema": {"type": "string", "format": "binary"}}
             },
-            "description": "Workspace ZIP archive",
+            "description": "Portable Workspace ZIP archive or raw archival copy",
         },
     },
 )
@@ -88,16 +88,17 @@ async def export_workspace_archive(
     principal: Annotated[SessionPrincipal, Security(get_current_session)],
     archive_service: WorkspaceArchiveService = Depends(get_workspace_archive_service),
 ) -> FileResponse:
-    """Return a stable ZIP snapshot and clean it after the response closes."""
+    """Return a portable ZIP, or a raw archival copy for an incompatible Workspace."""
 
     snapshot, filename, revision = await archive_service.export_archive(
         principal.user.id,
         str(workspace_id),
     )
+    headers = {"ETag": workspace_etag(revision)} if revision is not None else {}
     return FileResponse(
         snapshot.path,
         filename=filename,
         media_type="application/zip",
-        headers={"ETag": workspace_etag(revision)},
+        headers=headers,
         background=BackgroundTask(snapshot.cleanup),
     )

@@ -1279,7 +1279,7 @@ export const exportWorkspaceArchiveQueryKey = (options: Options<ExportWorkspaceA
 /**
  * Export Workspace Archive
  *
- * Return a stable ZIP snapshot and clean it after the response closes.
+ * Return a portable ZIP, or a raw archival copy for an incompatible Workspace.
  */
 export const exportWorkspaceArchiveOptions = (options: Options<ExportWorkspaceArchiveData>) => queryOptions<ExportWorkspaceArchiveResponse, ExportWorkspaceArchiveError, ExportWorkspaceArchiveResponse, ReturnType<typeof exportWorkspaceArchiveQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

@@ -4344,13 +4344,21 @@ export type UnaryExpressionOutput = {
 /**
  * UnavailableWorkspaceListItem
  *
- * ID-only catalogue entry for an owned Workspace that cannot open.
+ * Catalogue entry for an owned Workspace that cannot open.
  */
 export type UnavailableWorkspaceListItem = {
     /**
      * Availability
      */
     availability?: 'unavailable';
+    /**
+     * Created At
+     */
+    created_at?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
     /**
      * Id
      */
@@ -4359,6 +4367,14 @@ export type UnavailableWorkspaceListItem = {
      * Message
      */
     message: string;
+    /**
+     * Modified At
+     */
+    modified_at?: string | null;
+    /**
+     * Name
+     */
+    name?: string | null;
     /**
      * Reason
      */
@@ -7993,7 +8009,7 @@ export type ExportWorkspaceArchiveError = ExportWorkspaceArchiveErrors[keyof Exp
 
 export type ExportWorkspaceArchiveResponses = {
     /**
-     * Workspace ZIP archive
+     * Portable Workspace ZIP archive or raw archival copy
      */
     200: Blob | File;
 };

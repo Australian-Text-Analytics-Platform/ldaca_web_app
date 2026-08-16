@@ -273,6 +273,10 @@ def test_corrupt_workspace_is_catalogued_but_directly_reported_and_deletable(
                 "id": workspace_id,
                 "reason": "corrupt_snapshot",
                 "message": "Workspace data is corrupt.",
+                "name": None,
+                "description": None,
+                "created_at": None,
+                "modified_at": None,
                 "stored_schema_version": None,
                 "supported_schema_version": None,
             }
@@ -289,6 +293,50 @@ def test_corrupt_workspace_is_catalogued_but_directly_reported_and_deletable(
         )
         assert deleted.status_code == 204
         assert not workspace_path.exists()
+
+
+def test_incompatible_workspace_lists_metadata_and_supports_archival_download(
+    tmp_path: Path,
+) -> None:
+    with _client(tmp_path) as client:
+        unsafe = _unsafe_headers(client)
+        created = client.post(
+            "/api/workspaces",
+            json={"name": "Archived workshop", "description": "Workshop notes"},
+            headers=unsafe,
+        ).json()
+        workspace_id = created["id"]
+        workspace_path = tmp_path / "workspaces" / workspace_id
+        metadata_path = workspace_path / "workspace.json"
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        payload["workspace_metadata"]["version"] = 16
+        payload["workspace_metadata"]["created_at"] = "2024-01-01T00:00:00+00:00"
+        payload["workspace_metadata"]["modified_at"] = "2024-01-02T00:00:00+00:00"
+        metadata_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        listed = client.get("/api/workspaces")
+        assert listed.status_code == 200
+        assert listed.json() == [
+            {
+                "availability": "unavailable",
+                "id": workspace_id,
+                "reason": "incompatible_format",
+                "message": "Workspace format 16 is incompatible with supported format 17.",
+                "name": "Archived workshop",
+                "description": "Workshop notes",
+                "created_at": "2024-01-01T00:00:00+00:00",
+                "modified_at": "2024-01-02T00:00:00+00:00",
+                "stored_schema_version": 16,
+                "supported_schema_version": 17,
+            }
+        ]
+
+        exported = client.get(f"/api/workspaces/{workspace_id}/archive")
+        assert exported.status_code == 200
+        with zipfile.ZipFile(BytesIO(exported.content)) as archive:
+            assert archive.namelist() == ["workspace/workspace.json"]
+            assert archive.read("workspace/workspace.json") == metadata_path.read_bytes()
+            assert "workspace/access.json" not in archive.namelist()
 
 
 def test_archive_import_gets_fresh_identity_owner_and_timestamps(

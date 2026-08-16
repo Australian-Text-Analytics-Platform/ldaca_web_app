@@ -58,6 +58,10 @@ interface MockWorkspaceState {
         id: string;
         reason: 'incompatible_format' | 'corrupt_snapshot' | 'configured_limit';
         message: string;
+        name?: string | null;
+        description?: string | null;
+        created_at?: string | null;
+        modified_at?: string | null;
         stored_schema_version?: number | null;
         supported_schema_version?: number | null;
       }
@@ -506,7 +510,7 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
   });
 
-  it('renders unavailable UUID cards last with only safe disabled actions and Delete', async () => {
+  it('renders unavailable workspace metadata and keeps archive download available', async () => {
     const user = userEvent.setup();
     const unavailableId = '0a120442-2f33-4474-9d09-9adbdfea7ebc';
     mockWorkspaceState.workspaceCatalogue = [
@@ -515,6 +519,10 @@ describe('DataLoaderFeature citation UI', () => {
         id: unavailableId,
         reason: 'incompatible_format',
         message: 'Workspace format 14 is incompatible with supported format 15.',
+        name: 'Archived workshop workspace',
+        description: 'Workspace from the winter workshop.',
+        created_at: '2024-01-01T00:00:00Z',
+        modified_at: '2024-01-02T00:00:00Z',
         stored_schema_version: 14,
         supported_schema_version: 15,
       },
@@ -526,13 +534,15 @@ describe('DataLoaderFeature citation UI', () => {
     const cards = screen.getAllByTestId(/^workspace-manager-item-/);
     expect(cards.at(-1)).toHaveAttribute('data-testid', `workspace-manager-item-${unavailableId}`);
     const unavailable = within(cards.at(-1)!);
-    expect(unavailable.getByText('Unavailable Workspace')).toBeInTheDocument();
+    expect(unavailable.getByText('Archived workshop workspace')).toBeInTheDocument();
     expect(unavailable.getByText(unavailableId)).toBeInTheDocument();
+    expect(unavailable.getByText('Workspace from the winter workshop.')).toBeInTheDocument();
+    expect(unavailable.getByText(/Created/)).toBeInTheDocument();
     expect(
       unavailable.getByText('Workspace format 14 is incompatible with supported format 15.'),
     ).toBeInTheDocument();
     expect(unavailable.getByRole('button', { name: 'Load' })).toBeDisabled();
-    expect(unavailable.getByRole('button', { name: 'Download' })).toBeDisabled();
+    expect(unavailable.getByRole('button', { name: 'Download archive' })).toBeEnabled();
     expect(unavailable.getByRole('button', { name: 'Delete' })).toBeEnabled();
     expect(unavailable.queryByLabelText(/favorites/i)).not.toBeInTheDocument();
     expect(unavailable.queryByLabelText(/workspace description/i)).not.toBeInTheDocument();

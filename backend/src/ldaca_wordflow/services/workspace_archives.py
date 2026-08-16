@@ -47,7 +47,12 @@ from ..domain.workspace import (
     analysis_snapshot_input_ids,
     referenced_node_ids,
 )
-from ..infrastructure.storage.workspace_store import WorkspaceStore
+from ..infrastructure.storage.workspace_store import (
+    WorkspaceCapacityError,
+    WorkspaceSchemaVersionError,
+    WorkspaceSnapshotInvalidError,
+    WorkspaceStore,
+)
 from pydantic import ValidationError
 from ..shared.json_data import JsonData
 from ..shared.portable_names import portable_relative_path_parts
@@ -59,6 +64,7 @@ from anyio.to_thread import run_sync as run_sync_in_worker_thread
 from ..shared.errors import (
     InvalidWorkspaceArchiveError,
     UploadTooLargeError,
+    WorkspaceNotOpenError,
 )
 from ..infrastructure.storage.bounded_io import write_parquet_bounded
 from ..infrastructure.storage.durable_fs import (
@@ -93,6 +99,12 @@ class WorkspaceArchiveStorage(Protocol):
         user_id: str,
         workspace_id: str,
     ) -> AbstractAsyncContextManager[Any]: ...
+
+    async def resolve_owned_workspace_dir(
+        self,
+        user_id: str,
+        workspace_id: str,
+    ) -> Path: ...
 
     async def install_staged_archive(
         self,
@@ -176,8 +188,8 @@ class WorkspaceArchiveService:
         self,
         user_id: str,
         workspace_id: str,
-    ) -> tuple[ResponseSnapshot, str, int]:
-        """Snapshot one workspace into a temporary ZIP under its read gate.
+    ) -> tuple[ResponseSnapshot, str, int | None]:
+        """Export one Workspace, falling back to a raw ZIP when its schema is incompatible.
 
         The returned file is immutable and independent of the live workspace,
         so the HTTP adapter releases the gate before ``FileResponse`` streams
@@ -189,35 +201,66 @@ class WorkspaceArchiveService:
         )
         source_snapshot: Path | None = None
         try:
-            async with self._storage.submission_context(
-                user_id,
-                workspace_id,
-            ) as lease:
-                workspace_name = lease.workspace.name
-                revision = int(lease.revision)
-                source_snapshot = await self._run_sync(
-                    _snapshot_workspace_tree,
-                    lease.path,
-                    self._max_export_bytes,
-                )
-            await self._run_sync(
-                self._workspace_store.rebase_snapshot_sources,
-                source_snapshot,
-            )
-            loaded = await self._run_sync(self._workspace_store.load, source_snapshot)
-            detached = loaded.workspace
-            snapshot = await self._response_snapshots.create_generated(
-                suffix=".zip",
-                max_output_bytes=self._max_export_bytes,
-                reservation_bytes=self._max_export_bytes * 2,
-                producer=partial(
-                    _create_workspace_export,
-                    detached,
+            try:
+                async with self._storage.submission_context(
+                    user_id,
+                    workspace_id,
+                ) as lease:
+                    workspace_name = lease.workspace.name
+                    revision = int(lease.revision)
+                    source_snapshot = await self._run_sync(
+                        _snapshot_workspace_tree,
+                        lease.path,
+                        self._max_export_bytes,
+                    )
+                await self._run_sync(
+                    self._workspace_store.rebase_snapshot_sources,
                     source_snapshot,
-                ),
-            )
-            filename = f"{_safe_export_name(workspace_name)}.zip"
-            return snapshot, filename, revision
+                )
+                loaded = await self._run_sync(self._workspace_store.load, source_snapshot)
+                detached = loaded.workspace
+                snapshot = await self._response_snapshots.create_generated(
+                    suffix=".zip",
+                    max_output_bytes=self._max_export_bytes,
+                    reservation_bytes=self._max_export_bytes * 2,
+                    producer=partial(
+                        _create_workspace_export,
+                        detached,
+                        source_snapshot,
+                    ),
+                )
+                filename = f"{_safe_export_name(workspace_name)}.zip"
+                return snapshot, filename, revision
+            except WorkspaceNotOpenError as not_open:
+                path = await self._storage.resolve_owned_workspace_dir(
+                    user_id,
+                    workspace_id,
+                )
+                try:
+                    self._workspace_store.inspect(path)
+                except WorkspaceSchemaVersionError as incompatible:
+                    metadata = incompatible.workspace_metadata or {}
+                    workspace_name = metadata.get("name")
+                    if not isinstance(workspace_name, str) or not workspace_name:
+                        workspace_name = workspace_id
+                    source_snapshot = await self._run_sync(
+                        _snapshot_workspace_tree,
+                        path,
+                        self._max_export_bytes,
+                    )
+                    snapshot = await self._response_snapshots.create_generated(
+                        suffix=".zip",
+                        max_output_bytes=self._max_export_bytes,
+                        reservation_bytes=self._max_export_bytes * 2,
+                        producer=partial(
+                            _create_raw_workspace_archive,
+                            source_snapshot,
+                        ),
+                    )
+                    return snapshot, f"{_safe_export_name(workspace_name)}.zip", None
+                except (WorkspaceCapacityError, WorkspaceSnapshotInvalidError):
+                    raise not_open
+                raise not_open
         finally:
             if source_snapshot is not None:
                 await self._run_sync(shutil.rmtree, source_snapshot, True)
@@ -858,6 +901,54 @@ def _snapshot_workspace_tree(source: Path, max_bytes: int) -> Path:
         return destination
     except BaseException:
         shutil.rmtree(destination, ignore_errors=True)
+        raise
+
+
+def _create_raw_workspace_archive(
+    source: Path,
+    target: Path,
+    max_output_bytes: int,
+) -> None:
+    """Zip an incompatible Workspace tree without reading its schema payload."""
+
+    try:
+        with target.open("xb") as output:
+            bounded = cast(BinaryIO, _BoundedSeekableWriter(output, max_output_bytes))
+            with zipfile.ZipFile(
+                bounded,
+                mode="w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=6,
+            ) as archive:
+                for current_root, directory_names, file_names in os.walk(
+                    source,
+                    topdown=True,
+                    followlinks=False,
+                ):
+                    current = Path(current_root)
+                    directory_names[:] = [
+                        name
+                        for name in directory_names
+                        if not (current / name).is_symlink()
+                    ]
+                    for name in sorted(file_names):
+                        candidate = current / name
+                        if candidate == source / "access.json":
+                            continue
+                        metadata = candidate.lstat()
+                        if not stat.S_ISREG(metadata.st_mode) or candidate.is_symlink():
+                            raise InvalidWorkspaceArchiveError(
+                                "Workspace export source is unsafe"
+                            )
+                        relative = candidate.relative_to(source)
+                        archive.write(
+                            candidate,
+                            (Path("workspace") / relative).as_posix(),
+                        )
+            output.flush()
+            os.fsync(output.fileno())
+    except BaseException:
+        target.unlink(missing_ok=True)
         raise
 
 

@@ -8759,13 +8759,35 @@
       },
       "UnavailableWorkspaceListItem": {
         "additionalProperties": false,
-        "description": "ID-only catalogue entry for an owned Workspace that cannot open.",
+        "description": "Catalogue entry for an owned Workspace that cannot open.",
         "properties": {
           "availability": {
             "const": "unavailable",
             "default": "unavailable",
             "title": "Availability",
             "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           },
           "id": {
             "format": "uuid",
@@ -8775,6 +8797,28 @@
           "message": {
             "title": "Message",
             "type": "string"
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           },
           "reason": {
             "enum": [
@@ -15276,7 +15320,7 @@
     },
     "/api/workspaces/{workspace_id}/archive": {
       "get": {
-        "description": "Return a stable ZIP snapshot and clean it after the response closes.",
+        "description": "Return a portable ZIP, or a raw archival copy for an incompatible Workspace.",
         "operationId": "export_workspace_archive",
         "parameters": [
           {
@@ -15300,7 +15344,7 @@
                 }
               }
             },
-            "description": "Workspace ZIP archive"
+            "description": "Portable Workspace ZIP archive or raw archival copy"
           },
           "401": {
             "content": {

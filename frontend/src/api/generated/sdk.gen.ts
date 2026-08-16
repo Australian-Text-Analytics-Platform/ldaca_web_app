@@ -896,7 +896,7 @@ export const getAnalysisTableSchema = <ThrowOnError extends boolean = false>(opt
 /**
  * Export Workspace Archive
  *
- * Return a stable ZIP snapshot and clean it after the response closes.
+ * Return a portable ZIP, or a raw archival copy for an incompatible Workspace.
  */
 export const exportWorkspaceArchive = <ThrowOnError extends boolean = false>(options: Options<ExportWorkspaceArchiveData, ThrowOnError>): RequestResult<ExportWorkspaceArchiveResponses, ExportWorkspaceArchiveErrors, ThrowOnError> => (options.client ?? client).get<ExportWorkspaceArchiveResponses, ExportWorkspaceArchiveErrors, ThrowOnError>({
     security: [{

@@ -66,13 +66,21 @@ class WorkspaceSnapshotInvalidError(WorkspaceStoreError):
 class WorkspaceSchemaVersionError(WorkspaceSnapshotInvalidError):
     """The persisted native Workspace schema is not supported by this build."""
 
-    def __init__(self, stored_version: int, supported_version: int) -> None:
+    def __init__(
+        self,
+        stored_version: int,
+        supported_version: int,
+        workspace_metadata: Mapping[str, Any] | None = None,
+    ) -> None:
         super().__init__(
             "Workspace schema version "
             f"{stored_version} is incompatible with supported version {supported_version}"
         )
         self.stored_version = stored_version
         self.supported_version = supported_version
+        self.workspace_metadata = (
+            dict(workspace_metadata) if workspace_metadata is not None else None
+        )
 
 
 class TabSnapshotInvalidError(WorkspaceStoreError):
@@ -813,7 +821,11 @@ def _read_workspace_metadata(path: str | Path) -> dict[str, Any]:
         raise ValueError("Workspace metadata envelope is invalid")
     stored_version = workspace_metadata.get("version")
     if type(stored_version) is int and stored_version != WORKSPACE_SCHEMA_VERSION:
-        raise WorkspaceSchemaVersionError(stored_version, WORKSPACE_SCHEMA_VERSION)
+        raise WorkspaceSchemaVersionError(
+            stored_version,
+            WORKSPACE_SCHEMA_VERSION,
+            workspace_metadata,
+        )
     if set(payload) != _WORKSPACE_ENVELOPE_FIELDS:
         raise ValueError("Workspace metadata envelope fields are invalid")
     nodes = payload.get("nodes")

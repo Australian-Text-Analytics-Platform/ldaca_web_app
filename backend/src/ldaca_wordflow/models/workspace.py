@@ -77,7 +77,7 @@ class AvailableWorkspaceListItem(WorkspaceResource):
 
 
 class UnavailableWorkspaceListItem(_StrictModel):
-    """ID-only catalogue entry for an owned Workspace that cannot open."""
+    """Catalogue entry for an owned Workspace that cannot open."""
 
     availability: Literal["unavailable"] = "unavailable"
     id: uuid.UUID
@@ -87,6 +87,10 @@ class UnavailableWorkspaceListItem(_StrictModel):
         "configured_limit",
     ]
     message: str
+    name: str | None = None
+    description: str | None = None
+    created_at: str | None = None
+    modified_at: str | None = None
     stored_schema_version: int | None = None
     supported_schema_version: int | None = None
 

@@ -71,6 +71,9 @@ flowchart TB
   UTF-8 become one document row each; undecodable members are ignored.
 - Downloads stream response-owned snapshots so concurrent source mutation
   cannot truncate an accepted response.
+- Incompatible Workspace downloads preserve stored content in a bounded raw ZIP
+  without deployment-only `access.json`; they do not relax the strict load or
+  portable-import gates.
 - Workspace archives are inspected and extracted into staging before
   publication. The remaining crash window around final publication and plan
   rebasing is tracked in the

@@ -147,7 +147,7 @@ is removed before a User File Import request is retained.
 | `DELETE /api/workspaces/{workspace_id}` | `delete_workspace_by_id` | 204 | Stop owned execution and atomically remove the Workspace |
 | `PUT /api/workspaces/{workspace_id}/open` | `open_workspace_by_id` | 200 | Validate and make this the user's sole open Workspace |
 | `DELETE /api/workspaces/{workspace_id}/open` | `close_workspace_by_id` | 204/202 | Close now or enter closing state until Analysis work drains |
-| `GET /api/workspaces/{workspace_id}/archive` | `export_workspace_archive` | 200 ZIP | Snapshot and export portable Workspace content |
+| `GET /api/workspaces/{workspace_id}/archive` | `export_workspace_archive` | 200 ZIP | Snapshot and export portable Workspace content, or emit a raw archival ZIP for an incompatible owned Workspace |
 | `POST /api/workspaces/{workspace_id}/sql` | `execute_workspace_sql` | 200 Arrow / 201 JSON | Query declared Data Blocks or create a SQL-derived Data Block |
 
 Workspace SQL query mode accepts unique `node_ids`, nonblank `sql`, and

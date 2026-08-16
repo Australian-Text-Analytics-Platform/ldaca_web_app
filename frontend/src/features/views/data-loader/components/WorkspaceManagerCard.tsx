@@ -158,6 +158,13 @@ export function WorkspaceManagerCard({
             {workspaces.map((workspace) => {
               const workspaceId = workspace.id;
               if (workspace.availability === 'unavailable') {
+                const isIncompatible = workspace.reason === 'incompatible_format';
+                const workspaceName = workspace.name?.trim()
+                  ? workspace.name.trim()
+                  : 'Unnamed workspace';
+                const workspaceDescription = workspace.description?.trim()
+                  ? workspace.description.trim()
+                  : 'No description available.';
                 return (
                   <div
                     key={workspaceId}
@@ -167,10 +174,18 @@ export function WorkspaceManagerCard({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-medium text-destructive">
                         <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span>Unavailable Workspace</span>
+                        <span>{workspaceName}</span>
                       </div>
-                      <div className="mt-1 break-all font-mono text-xs text-foreground">
-                        {workspaceId}
+                      <div className="mt-1 break-all text-[11px] text-muted-foreground">
+                        <span>Workspace ID: </span>
+                        <span>{workspaceId}</span>
+                      </div>
+                      <div className="mt-2 max-w-prose whitespace-pre-wrap text-xs text-foreground">
+                        {workspaceDescription}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        Created {formatTimestamp(workspace.created_at)} | Updated{' '}
+                        {formatTimestamp(workspace.modified_at)}
                       </div>
                       <div className="mt-2 max-w-prose text-xs text-muted-foreground">
                         {workspace.message}
@@ -182,9 +197,23 @@ export function WorkspaceManagerCard({
                           Load
                         </Button>
                       </DisabledReasonTooltip>
-                      <DisabledReasonTooltip reason={workspace.message}>
-                        <Button size="sm" variant="outline" disabled>
-                          <DownloadIcon className="mr-1.5 h-4 w-4" /> Download
+                      <DisabledReasonTooltip reason={isIncompatible ? undefined : workspace.message}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void downloads.startDownload(workspaceId, workspaceName)}
+                          disabled={
+                            !isIncompatible ||
+                            downloads.isStarting(workspaceId) ||
+                            downloads.isPending(workspaceId)
+                          }
+                        >
+                          <DownloadIcon className="mr-1.5 h-4 w-4" />
+                          {downloads.isPending(workspaceId)
+                            ? 'Preparing…'
+                            : downloads.isStarting(workspaceId)
+                              ? 'Starting…'
+                              : 'Download archive'}
                         </Button>
                       </DisabledReasonTooltip>
                       <Button

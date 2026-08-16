@@ -23,7 +23,7 @@ flowchart TB
     ACCESS -->|"different owner or invalid sidecar"| HIDDEN["workspace_not_found"]
     ACCESS -->|"current owner"| SNAPSHOT["Lightweight metadata, reference, format, and limit validation"]
     SNAPSHOT -->|"valid"| RESOURCE["Available Workspace list item"]
-    SNAPSHOT -->|"incompatible, corrupt, or over limit"| UNAVAILABLE["ID-only Unavailable Workspace list item"]
+    SNAPSHOT -->|"incompatible, corrupt, or over limit"| UNAVAILABLE["Unavailable Workspace list item"]
     SNAPSHOT -->|"corrupt direct access"| CORRUPT["workspace_corrupt"]
 ```
 
@@ -32,8 +32,12 @@ sidecars are logged and skipped without blocking valid siblings. Collection
 discovery validates metadata, graph and plan references, native format, and
 configured limits without reconstructing every Tab, Analysis, or lazy plan. An
 incompatible, corrupt, or over-limit Workspace with a valid current-owner
-sidecar appears as an ID-only Unavailable Workspace with a safe reason. It
-still fails direct access with `500 workspace_corrupt`. Other users receive a
+sidecar appears as an Unavailable Workspace with a safe reason. Incompatible
+entries also retain best-effort name, description, and timestamp text read from
+the parsed metadata envelope; strict opening still fails with
+`500 workspace_corrupt`. Their archive action emits a bounded raw ZIP of the
+stored content while omitting deployment-only `access.json`, so the bytes can
+be preserved even though this build cannot load them. Other users receive a
 concealed 404 before portable data is parsed. The valid sidecar is sufficient
 to authorize deletion of unavailable content.
 
