@@ -197,7 +197,9 @@ export function WorkspaceManagerCard({
                           Load
                         </Button>
                       </DisabledReasonTooltip>
-                      <DisabledReasonTooltip reason={isIncompatible ? undefined : workspace.message}>
+                      <DisabledReasonTooltip
+                        reason={isIncompatible ? undefined : workspace.message}
+                      >
                         <Button
                           size="sm"
                           variant="outline"

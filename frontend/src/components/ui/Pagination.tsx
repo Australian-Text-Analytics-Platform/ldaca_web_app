@@ -98,11 +98,8 @@ export function PaginationJump({
 
   React.useEffect(() => {
     if (!open) return;
-    // rAF defer avoids the react-hooks/set-state-in-effect lint while still
-    // resetting the form and focusing the input the moment the popover opens.
+    // Defer focus until the input has mounted with the open popover.
     const id = requestAnimationFrame(() => {
-      setValue('');
-      setError(null);
       inputRef.current?.focus();
     });
     return () => {
@@ -141,7 +138,13 @@ export function PaginationJump({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => {
-          setOpen((prev) => !prev);
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          setValue('');
+          setError(null);
+          setOpen(true);
         }}
         className={cn('size-9 text-muted-foreground hover:text-foreground', triggerClassName)}
       >
