@@ -1,4 +1,5 @@
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
+import type { ReactNode } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
@@ -56,6 +57,7 @@ export interface ConcordanceDispersionNodeBlockProps {
   onToggleMatchedTexts: (matchedTexts: readonly string[]) => void;
   termColors: Record<string, string>;
   resultsViewportWidth: number;
+  resultSummary?: ReactNode;
 
   // Workspace selection
   panelSelectedNodes: WorkspaceNodeMetadata[];
@@ -141,6 +143,7 @@ export function ConcordanceDispersionNodeBlock({
   onUncasedMatchedTextsChange,
   onToggleMatchedTexts,
   termColors,
+  resultSummary,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
@@ -210,6 +213,7 @@ export function ConcordanceDispersionNodeBlock({
           loading={combinedLoading}
           showPageSize
         />
+        {resultSummary ? <div className="border-t border-border">{resultSummary}</div> : null}
       </>
     );
 
@@ -359,6 +363,7 @@ export function ConcordanceDispersionNodeBlock({
         loading={nodeIsLoading}
         showPageSize
       />
+      {resultSummary ? <div className="border-t border-border">{resultSummary}</div> : null}
     </>
   );
 

@@ -670,6 +670,7 @@ describe('ConcordanceFeature', () => {
           metadata_columns: [],
           analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
           internal_columns: ['__wordflow_source_row_id'],
+          source_document_count: 80,
           document_count: 1,
           match_count: 25,
           table: {
@@ -712,6 +713,18 @@ describe('ConcordanceFeature', () => {
     expect(screen.getByText('Queensland')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Table View' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Dispersion View' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Concordance result summary')).toHaveTextContent(
+      'Found 25 matches in 1 document out of 80 documents.',
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Dispersion View' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Concordance result summary')).toHaveTextContent(
+        'Found 25 matches in 1 document out of 80 documents.',
+      );
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Table View' }));
     const highlightToggle = screen.getByRole('checkbox', {
       name: 'Highlight L1/R1 in context',
     });
@@ -782,6 +795,7 @@ describe('ConcordanceFeature', () => {
             metadata_columns: [],
             analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
             internal_columns: ['__wordflow_source_row_id'],
+            source_document_count: 20,
             document_count: 10,
             match_count: 20,
             table: {

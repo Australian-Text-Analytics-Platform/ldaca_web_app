@@ -1,4 +1,5 @@
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
+import type { ReactNode } from 'react';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
@@ -38,6 +39,7 @@ export interface ConcordanceTableNodeBlockProps {
   selectedMetadataColumns: string[];
   reviewRowUnit: 'documents' | 'matches' | null;
   highlightL1R1: boolean;
+  resultSummary?: ReactNode;
 
   // Workspace selection
   panelSelectedNodes: WorkspaceNodeMetadata[];
@@ -109,6 +111,7 @@ function CombinedConcordanceTable({
   setCombinedPage,
   reviewRowUnit,
   highlightL1R1,
+  resultSummary,
 }: ConcordanceTableNodeBlockProps) {
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
     nodeData,
@@ -162,6 +165,7 @@ function CombinedConcordanceTable({
         loading={combinedLoading}
         showPageSize
       />
+      {resultSummary ? <div className="border-t border-border">{resultSummary}</div> : null}
     </>
   );
 
@@ -238,6 +242,7 @@ function PerNodeConcordanceTable({
   handleRowClick,
   reviewRowUnit,
   highlightL1R1,
+  resultSummary,
 }: ConcordanceTableNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
@@ -314,6 +319,7 @@ function PerNodeConcordanceTable({
         loading={nodeIsLoading}
         showPageSize
       />
+      {resultSummary ? <div className="border-t border-border">{resultSummary}</div> : null}
     </>
   );
 

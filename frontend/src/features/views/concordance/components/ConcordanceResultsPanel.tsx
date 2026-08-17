@@ -80,6 +80,12 @@ interface ConcordanceResultsSources {
 
 interface ConcordanceResultsSession {
   results: ConcordanceAnalysisResponse;
+  nodeSummaries: {
+    nodeId: string;
+    matchCount: number;
+    documentCount: number;
+    sourceDocumentCount: number;
+  }[];
   nodePagination: PaginationState;
   globalPageSize: number;
   /** Changes the single shared page size used by every result table footer. */
@@ -88,6 +94,42 @@ interface ConcordanceResultsSession {
   setCombinedPage: Dispatch<SetStateAction<number>>;
   nodeLoading: Record<string, boolean>;
   reviewDensityByNode: Record<string, ConcordanceDensityResult>;
+}
+
+interface ConcordanceSourceSummary {
+  nodeId: string;
+  matchCount: number;
+  documentCount: number;
+  sourceDocumentCount: number;
+}
+
+/** Displays one immutable Run All coverage line for each source Data Block. */
+function ConcordanceSourceSummaries({ summaries }: { summaries: ConcordanceSourceSummary[] }) {
+  return (
+    <div className="divide-y divide-border">
+      {summaries.map(({ nodeId, matchCount, documentCount, sourceDocumentCount }) => (
+        <p
+          key={nodeId}
+          aria-label="Concordance result summary"
+          className="px-4 py-2.5 text-sm leading-5 text-muted-foreground"
+        >
+          <span>Found </span>
+          <span className="font-semibold tabular-nums text-foreground">
+            {matchCount.toLocaleString()} {matchCount === 1 ? 'match' : 'matches'}
+          </span>
+          <span> in </span>
+          <span className="font-semibold tabular-nums text-foreground">
+            {documentCount.toLocaleString()} {documentCount === 1 ? 'document' : 'documents'}
+          </span>
+          <span> out of </span>
+          <span className="font-semibold tabular-nums text-foreground">
+            {sourceDocumentCount.toLocaleString()}{' '}
+            {sourceDocumentCount === 1 ? 'document' : 'documents'}.
+          </span>
+        </p>
+      ))}
+    </div>
+  );
 }
 
 interface ConcordanceResultsCommands {
@@ -171,6 +213,7 @@ export function ConcordanceResultsPanel({
   },
   session: {
     results,
+    nodeSummaries,
     nodePagination,
     globalPageSize,
     onPageSizeChange,
@@ -355,6 +398,10 @@ export function ConcordanceResultsPanel({
                     displayName: nodeDisplayName,
                     nodeColor,
                   };
+                  const blockSummaries =
+                    nodeName === CONCORDANCE_COMBINED_NODE_KEY
+                      ? nodeSummaries
+                      : nodeSummaries.filter((summary) => summary.nodeId === paginationKey);
                   const sharedProps = {
                     nodeKey: nodeName,
                     nodeData,
@@ -380,6 +427,10 @@ export function ConcordanceResultsPanel({
                     onUncasedMatchedTextsChange,
                     onToggleMatchedTexts,
                     termColors,
+                    resultSummary:
+                      blockSummaries.length > 0 ? (
+                        <ConcordanceSourceSummaries summaries={blockSummaries} />
+                      ) : undefined,
                     densitySeries: isReview
                       ? nodeName === CONCORDANCE_COMBINED_NODE_KEY
                         ? Object.entries(reviewDensityByNode).flatMap(([nodeId, density]) => {

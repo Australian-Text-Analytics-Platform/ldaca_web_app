@@ -189,6 +189,14 @@ is never stored as a backend column. Concordance Table View reads matches;
 Dispersion View filters and pages documents. Quotation retains its existing
 document or match Review projections.
 
+Each new Concordance Run All source Result records the total source documents,
+matching documents, and Concordance Matches. Review presents one source-specific
+summary in the footer of its result shell in both Table View and Dispersion View;
+these totals do not change with pagination or Review filters. Combined View
+retains separate source summaries rather than aggregating them. Older retained
+Results without the source total remain loadable and omit that source's summary
+rather than infer a denominator.
+
 Each Concordance Match records L1 (`CONC_l1`), the token immediately left of the
 match, and R1 (`CONC_r1`), the token immediately right of it, together with their
 whole-Result frequencies. Text-mode requests may ignore punctuation for context

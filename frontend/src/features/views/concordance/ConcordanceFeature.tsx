@@ -391,6 +391,20 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     excludedMatchedTexts,
     binCount,
   });
+  const nodeSummaries = isReview
+    ? concordanceReviewSources.flatMap(({ source }) =>
+        source.source_document_count == null
+          ? []
+          : [
+              {
+                nodeId: source.node_id,
+                matchCount: source.match_count,
+                documentCount: source.document_count,
+                sourceDocumentCount: source.source_document_count,
+              },
+            ],
+      )
+    : [];
 
   useEffect(() => {
     setConcordanceView('table');
@@ -884,6 +898,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           }}
           session={{
             results,
+            nodeSummaries,
             nodePagination,
             globalPageSize,
             onPageSizeChange: handleGlobalPageSizeChange,
