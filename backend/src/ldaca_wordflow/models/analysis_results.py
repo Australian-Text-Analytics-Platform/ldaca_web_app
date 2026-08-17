@@ -383,6 +383,7 @@ class RunAllSourceDescriptor(_StrictModel):
     metadata_columns: list[str]
     analysis_columns: list[str]
     internal_columns: list[str]
+    source_document_count: int | None = Field(default=None, ge=0)
     document_count: int = Field(ge=0)
     match_count: int = Field(ge=0)
 

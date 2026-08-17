@@ -513,6 +513,7 @@ def run_concordance_run_all(
         output_columns = output_columns + [CONC_L1_FREQ_COLUMN, CONC_R1_FREQ_COLUMN]
         result = result.sort([SOURCE_ROW_ID_COLUMN, CONC_START_IDX_COLUMN])
         match_count = result.height
+        source_document_count = len(node_corpus)
         source_columns = [
             column
             for column in output_columns
@@ -575,6 +576,7 @@ def run_concordance_run_all(
                     "artifact": str(result_path),
                     "supports_density": True,
                 },
+                "source_document_count": source_document_count,
                 "document_count": result.height,
                 "match_count": match_count,
             },

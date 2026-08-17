@@ -1747,6 +1747,10 @@ export type ConcordanceRunAllGroupSource = {
      * Node Name
      */
     node_name: string;
+    /**
+     * Source Document Count
+     */
+    source_document_count?: number | null;
 };
 
 /**
@@ -3326,6 +3330,10 @@ export type RunAllSourceTableResource = {
      * Node Name
      */
     node_name: string;
+    /**
+     * Source Document Count
+     */
+    source_document_count?: number | null;
     table: ProjectedTableResource;
 };
 

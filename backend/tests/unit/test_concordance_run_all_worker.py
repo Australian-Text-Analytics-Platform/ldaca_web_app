@@ -48,6 +48,7 @@ def test_concordance_run_all_writes_complete_analysis_table_artifact(
     ]
     assert source["table"]["table_id"] == "concordance-run-all"
     assert source["table"]["supports_density"] is True
+    assert source["source_document_count"] == 2
     assert source["document_count"] == 1
     assert source["match_count"] == 2
     assert "data_block" not in source

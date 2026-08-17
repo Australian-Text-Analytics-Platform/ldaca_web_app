@@ -3471,6 +3471,18 @@
             "minLength": 1,
             "title": "Node Name",
             "type": "string"
+          },
+          "source_document_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Document Count"
           }
         },
         "required": [
@@ -6656,6 +6668,18 @@
             "minLength": 1,
             "title": "Node Name",
             "type": "string"
+          },
+          "source_document_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Document Count"
           },
           "table": {
             "$ref": "#/components/schemas/ProjectedTableResource"
