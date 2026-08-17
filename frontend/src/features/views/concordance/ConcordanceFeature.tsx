@@ -257,7 +257,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     setDispersionChartMode,
     selectedBinIndices,
     excludedMatchedTexts,
-    toggleMatchedText,
+    uncasedMatchedTexts,
+    setUncasedMatchedTexts,
+    toggleMatchedTexts,
     handleBinSelect,
     handleBinRangeSelect,
     handleClearBinSelection,
@@ -656,7 +658,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
               selected_metadata_columns: source.selected_columns.filter((column) =>
                 descriptor?.metadata_columns.includes(column),
               ),
-              excluded_matched_texts: Array.from(excludedMatchedTexts[filterKey] ?? []).sort(),
+              excluded_matched_texts: Array.from(excludedMatchedTexts).sort(),
               bin_count: selectedBins.length > 0 ? binCount : null,
               selected_bins: selectedBins.length > 0 ? selectedBins : null,
             };
@@ -837,9 +839,14 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             setDispersionChartMode,
             selectedBinIndices,
             excludedMatchedTexts,
-            onToggleMatchedText: (blockKey, matchedText) => {
-              if (blockKey === CONCORDANCE_COMBINED_NODE_KEY) setCombinedPage(1);
-              toggleMatchedText(blockKey, matchedText);
+            uncasedMatchedTexts,
+            onUncasedMatchedTextsChange: (value) => {
+              setCombinedPage(1);
+              setUncasedMatchedTexts(value);
+            },
+            onToggleMatchedTexts: (matchedTexts) => {
+              setCombinedPage(1);
+              toggleMatchedTexts(matchedTexts);
             },
             onBinSelect: (blockKey, index, shiftHeld) => {
               if (blockKey === CONCORDANCE_COMBINED_NODE_KEY) setCombinedPage(1);

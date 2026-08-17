@@ -114,7 +114,7 @@ interface UseConcordanceResultSessionOptions {
   nodeColorOverrides?: Record<string, string>;
   reviewSources?: ConcordanceRunAllReviewSource[];
   selectedBinIndices: Record<string, Set<number>>;
-  excludedMatchedTexts: Record<string, Set<string>>;
+  excludedMatchedTexts: ReadonlySet<string>;
   binCount: DispersionDisplayBinCount;
 }
 
@@ -186,9 +186,7 @@ export function useConcordanceResultSession({
         Array.from(values).sort((left, right) => left - right),
       ]),
     ),
-    excludedTerms: Object.fromEntries(
-      Object.entries(excludedMatchedTexts).map(([key, values]) => [key, Array.from(values).sort()]),
-    ),
+    excludedTerms: Array.from(excludedMatchedTexts).sort(),
   });
   useEffect(() => {
     if (!isReview) return;
@@ -230,7 +228,7 @@ export function useConcordanceResultSession({
       base?.sorting.descending === query.descending;
     const reviewSource = reviewSources.find((review) => review.source.node_id === nodeId) ?? null;
     const filterKey = viewMode === 'combined' ? CONCORDANCE_COMBINED_NODE_KEY : nodeId;
-    const excludedTerms = Array.from(excludedMatchedTexts[filterKey] ?? []).sort();
+    const excludedTerms = Array.from(excludedMatchedTexts).sort();
     const selectedBins = Array.from(selectedBinIndices[filterKey] ?? []).sort(
       (left, right) => left - right,
     );

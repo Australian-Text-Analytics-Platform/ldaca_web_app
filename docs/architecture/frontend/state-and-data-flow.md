@@ -240,10 +240,16 @@ Concordance Review fetches whole-Result density only while Dispersion View is
 active. Its TanStack Query key is Workspace, child Analysis, and table identity,
 excluding page and sort. The frontend reaggregates the backend's exact-term
 100-bin series into the selected display resolution. Exact, case-sensitive
-term exclusions and selected bins are included in each document-projection
-query key, reset that source to page one, and filter before sorting, counting,
-and paging. Separated mode keeps those filters per source. Combined mode owns
-one frontend-only filter and sends it independently to each source.
+term exclusions are shared across every source and Combined View, while selected
+bins remain view-block-specific. A shared, session-only Uncased flag optionally
+case-folds exact labels and aggregates their density series, counts, and colours;
+changing that mode clears term exclusions so a partially hidden case group
+cannot survive the semantic switch. Grouped legend actions expand back to every
+exact spelling before projection or Data Block Creation. Both exclusions and
+selected bins are included in each document-projection query key, reset that
+source to page one, and filter before sorting, counting, and paging. Separated
+mode keeps those filters per source. Combined mode owns one frontend-only filter
+and sends it independently to each source.
 
 Two-source Concordance Run All appears as one thin Run All root with one
 Supporting Analysis per source. The forest projection keeps that relationship

@@ -18,14 +18,8 @@ import {
 } from 'recharts';
 
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   ChartContainer,
@@ -88,7 +82,9 @@ interface Props {
   densitySeries?: ConcordanceDensitySeriesInput[];
   termColors?: Record<string, string>;
   excludedMatchedTexts?: ReadonlySet<string>;
-  onToggleMatchedText?: (matchedText: string) => void;
+  uncasedMatchedTexts?: boolean;
+  onUncasedMatchedTextsChange?: (value: boolean) => void;
+  onToggleMatchedTexts?: (matchedTexts: readonly string[]) => void;
 }
 
 interface DispersionChartSeries {
@@ -100,7 +96,7 @@ interface DispersionChartSeries {
   label?: string;
   /** Recharts `strokeDasharray` string. Undefined = solid. */
   dash?: string;
-  matchedText: string;
+  matchedTexts: string[];
   hidden: boolean;
   countLabel: string;
 }
@@ -122,6 +118,7 @@ const AGGREGATE_DEFAULT_COLOR = '#0284c7';
 const X_AXIS_TICKS = [0, 20, 40, 60, 80, 100];
 const CHART_HEIGHT = 240;
 const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
+const GROUPED_BAR_MAX_BIN_COUNT = 10;
 const CHART_MODE_LABELS: Record<ConcordanceDispersionChartMode, string> = {
   'density-line': 'Density: line',
   'density-bar': 'Density: bar',
@@ -212,7 +209,9 @@ export function ConcordanceDispersionSummary({
   densitySeries,
   termColors = {},
   excludedMatchedTexts = new Set<string>(),
-  onToggleMatchedText,
+  uncasedMatchedTexts = false,
+  onUncasedMatchedTextsChange,
+  onToggleMatchedTexts,
 }: Props) {
   const controlId = useId();
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -222,16 +221,18 @@ export function ConcordanceDispersionSummary({
   const [chartMenuOpen, setChartMenuOpen] = useState(false);
   const [cumulativeOptionOpen, setCumulativeOptionOpen] = useState(false);
 
-  const { bins, totalsByKey, labelsByKey, sources } = useMemo(() => {
+  const { bins, totalsByKey, labelsByKey, matchedTextsByKey, sources } = useMemo(() => {
     if (densitySeries) {
       return buildDispersionBinsFromDensitySeries(densitySeries, binCount, {
         splitBySource,
+        uncased: uncasedMatchedTexts,
       });
     }
     return buildDispersionBins(rows, textColumn, binCount, {
       splitBySource,
+      uncased: uncasedMatchedTexts,
     });
-  }, [rows, textColumn, binCount, splitBySource, densitySeries]);
+  }, [rows, textColumn, binCount, splitBySource, densitySeries, uncasedMatchedTexts]);
 
   const scopeText = densitySeries
     ? 'exact-term matches at relative locations across the entire Result'
@@ -244,6 +245,7 @@ export function ConcordanceDispersionSummary({
     return Object.entries(labelsByKey)
       .sort((left, right) => left[1].localeCompare(right[1]))
       .map(([key, matchedText], index) => {
+        const matchedTexts = matchedTextsByKey[key] ?? [matchedText];
         const total = totalsByKey[key] ?? 0;
         const selectedTotal =
           selected.size === 0
@@ -254,14 +256,14 @@ export function ConcordanceDispersionSummary({
               );
         return {
           key,
-          matchedText,
+          matchedTexts,
           color:
-            termColors[matchedText] ??
+            termColors[matchedTexts[0] ?? matchedText] ??
             VIZ_PALETTE[index % VIZ_PALETTE.length] ??
             sourceColor ??
             AGGREGATE_DEFAULT_COLOR,
           label: matchedText,
-          hidden: excludedMatchedTexts.has(matchedText),
+          hidden: matchedTexts.every((value) => excludedMatchedTexts.has(value)),
           countLabel:
             selected.size === 0
               ? `${matchedText} (${String(total)})`
@@ -272,6 +274,7 @@ export function ConcordanceDispersionSummary({
     bins,
     excludedMatchedTexts,
     labelsByKey,
+    matchedTextsByKey,
     selection?.selectedIndices,
     sourceColor,
     termColors,
@@ -297,6 +300,8 @@ export function ConcordanceDispersionSummary({
 
   const lineType = chartMode === 'cumulative' ? 'step' : 'natural';
   const hasSelection = !!selection && selection.selectedIndices.size > 0;
+  const usesGroupedBars = chartMode === 'density-bar' && binCount <= GROUPED_BAR_MAX_BIN_COUNT;
+  const usesStackedBars = chartMode === 'density-bar' && !usesGroupedBars;
 
   /** Starts a chart drag-selection from the nearest Recharts tooltip point. */
   const handleDragStart = selection
@@ -440,6 +445,20 @@ export function ConcordanceDispersionSummary({
 
   const chartContents = (
     <>
+      {usesGroupedBars &&
+        chartData.map((_, index) =>
+          index % 2 === 0 ? (
+            <ReferenceArea
+              key={`bar-bin-background-${String(index)}`}
+              x1={(index * 100) / binCount}
+              x2={((index + 1) * 100) / binCount}
+              fill="var(--muted)"
+              fillOpacity={0.45}
+              strokeOpacity={0}
+              ifOverflow="hidden"
+            />
+          ) : null,
+        )}
       <CartesianGrid vertical={false} />
       <XAxis
         dataKey="binCenter"
@@ -485,7 +504,8 @@ export function ConcordanceDispersionSummary({
               dataKey={item.key}
               name={item.label ?? item.key}
               fill={chartColorVar(item.key)}
-              radius={[4, 4, 0, 0]}
+              stackId={usesStackedBars ? 'density' : undefined}
+              radius={usesStackedBars ? 0 : [4, 4, 0, 0]}
               isAnimationActive={false}
             >
               {selection
@@ -546,12 +566,13 @@ export function ConcordanceDispersionSummary({
   };
 
   return (
-    <Card className="mt-4 shadow-sm">
+    <Card
+      data-testid="concordance-dispersion-chart"
+      className="mt-4 shadow-sm"
+      style={sourceColor ? { borderLeftWidth: '3px', borderLeftColor: sourceColor } : undefined}
+    >
       <CardHeader className="gap-3 pb-2 md:flex-row md:items-start md:justify-between">
-        <div className="flex flex-col gap-1">
-          <CardTitle className="text-base">{chartTitle}</CardTitle>
-          <CardDescription>{titleText}</CardDescription>
-        </div>
+        <CardTitle className="text-base">{chartTitle}</CardTitle>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {selection && selection.selectedIndices.size > 0 && (
             <Button type="button" variant="outline" size="sm" onClick={selection.onClear}>
@@ -681,7 +702,13 @@ export function ConcordanceDispersionSummary({
             }}
           >
             {chartMode === 'density-bar' ? (
-              <BarChart {...chartProps}>{chartContents}</BarChart>
+              <BarChart
+                {...chartProps}
+                barGap={usesGroupedBars ? 1 : 0}
+                barCategoryGap={usesGroupedBars ? '8%' : '4%'}
+              >
+                {chartContents}
+              </BarChart>
             ) : chartMode === 'density-area' ? (
               <AreaChart {...chartProps}>{chartContents}</AreaChart>
             ) : (
@@ -691,9 +718,6 @@ export function ConcordanceDispersionSummary({
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-        <div className="flex flex-wrap items-center gap-2 text-foreground">
-          <span>{titleText}</span>
-        </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {allSeries.map((item) => (
             <button
@@ -702,10 +726,10 @@ export function ConcordanceDispersionSummary({
               className={`flex items-center gap-2 rounded px-1 py-0.5 ${
                 item.hidden ? 'opacity-50 line-through' : ''
               }`}
-              disabled={!onToggleMatchedText}
+              disabled={!onToggleMatchedTexts}
               aria-pressed={item.hidden}
               onClick={() => {
-                onToggleMatchedText?.(item.matchedText);
+                onToggleMatchedTexts?.(item.matchedTexts);
               }}
             >
               <span
@@ -717,6 +741,21 @@ export function ConcordanceDispersionSummary({
             </button>
           ))}
         </div>
+        {onUncasedMatchedTextsChange ? (
+          <label
+            htmlFor={`${controlId}-uncased`}
+            className="flex items-center gap-2 text-xs text-foreground"
+          >
+            <Checkbox
+              id={`${controlId}-uncased`}
+              checked={uncasedMatchedTexts}
+              onCheckedChange={(checked) => {
+                onUncasedMatchedTextsChange(checked === true);
+              }}
+            />
+            <span>Uncased</span>
+          </label>
+        ) : null}
       </CardFooter>
       <ChartImageDownloadDialog
         open={downloadDialogOpen}

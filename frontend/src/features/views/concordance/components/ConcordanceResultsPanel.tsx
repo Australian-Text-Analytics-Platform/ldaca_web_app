@@ -44,8 +44,10 @@ interface ConcordanceResultsDisplay {
   dispersionChartMode: ConcordanceDispersionChartMode;
   setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
-  excludedMatchedTexts: Record<string, Set<string>>;
-  onToggleMatchedText: (blockKey: string, matchedText: string) => void;
+  excludedMatchedTexts: ReadonlySet<string>;
+  uncasedMatchedTexts: boolean;
+  onUncasedMatchedTextsChange: (value: boolean) => void;
+  onToggleMatchedTexts: (matchedTexts: readonly string[]) => void;
   onBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
   onBinRangeSelect: (
     blockKey: string,
@@ -142,7 +144,9 @@ export function ConcordanceResultsPanel({
     setDispersionChartMode,
     selectedBinIndices,
     excludedMatchedTexts,
-    onToggleMatchedText,
+    uncasedMatchedTexts,
+    onUncasedMatchedTextsChange,
+    onToggleMatchedTexts,
     onBinSelect,
     onBinRangeSelect,
     onClearBinSelection,
@@ -186,18 +190,27 @@ export function ConcordanceResultsPanel({
       }),
     ),
   );
-  const termColors = Object.fromEntries(
-    Array.from(
-      new Set(
-        isReview
-          ? Object.values(reviewDensityByNode).flatMap((density) =>
-              density.series.map((item) => item.label),
-            )
-          : previewTermLabels,
-      ),
-    )
+  const termLabels = Array.from(
+    new Set(
+      isReview
+        ? Object.values(reviewDensityByNode).flatMap((density) =>
+            density.series.map((item) => item.label),
+          )
+        : previewTermLabels,
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+  const uncasedGroupColors = new Map(
+    Array.from(new Set(termLabels.map((label) => label.toLowerCase())))
       .sort((left, right) => left.localeCompare(right))
       .map((label, index) => [label, defaultPalette[index % defaultPalette.length] ?? '#0284c7']),
+  );
+  const termColors = Object.fromEntries(
+    termLabels.map((label, index) => [
+      label,
+      uncasedMatchedTexts
+        ? (uncasedGroupColors.get(label.toLowerCase()) ?? '#0284c7')
+        : (defaultPalette[index % defaultPalette.length] ?? '#0284c7'),
+    ]),
   );
 
   return (
@@ -363,7 +376,9 @@ export function ConcordanceResultsPanel({
                     highlightL1R1,
                     interactiveFilters: isReview,
                     excludedMatchedTexts,
-                    onToggleMatchedText,
+                    uncasedMatchedTexts,
+                    onUncasedMatchedTextsChange,
+                    onToggleMatchedTexts,
                     termColors,
                     densitySeries: isReview
                       ? nodeName === CONCORDANCE_COMBINED_NODE_KEY

@@ -14,25 +14,54 @@ describe('useConcordanceDispersionControls', () => {
     expect(result.current.binCount).toBe(DISPERSION_DEFAULT_BIN_COUNT);
     expect(result.current.dispersionChartMode).toBe('density-line');
     expect(result.current.selectedBinIndices).toEqual({});
-    expect(result.current.excludedMatchedTexts).toEqual({});
+    expect(result.current.excludedMatchedTexts).toEqual(new Set());
+    expect(result.current.uncasedMatchedTexts).toBe(false);
   });
 
-  it('tracks exact hidden terms per block and resets all Review filters', () => {
+  it('tracks one exact-case hidden-term set and resets all Review filters', () => {
     const { result } = renderHook(() => useConcordanceDispersionControls());
 
     act(() => {
-      result.current.toggleMatchedText('node-a', 'Alpha');
-      result.current.toggleMatchedText('node-b', 'alpha');
+      result.current.toggleMatchedTexts(['Alpha']);
+      result.current.toggleMatchedTexts(['alpha']);
       result.current.handleBinSelect('node-a', 2, false);
     });
-    expect(Array.from(result.current.excludedMatchedTexts['node-a'] ?? [])).toEqual(['Alpha']);
-    expect(Array.from(result.current.excludedMatchedTexts['node-b'] ?? [])).toEqual(['alpha']);
+    expect(Array.from(result.current.excludedMatchedTexts)).toEqual(['Alpha', 'alpha']);
+
+    act(() => {
+      result.current.toggleMatchedTexts(['Alpha']);
+    });
+    expect(Array.from(result.current.excludedMatchedTexts)).toEqual(['alpha']);
 
     act(() => {
       result.current.resetDispersionFilters();
     });
-    expect(result.current.excludedMatchedTexts).toEqual({});
+    expect(result.current.excludedMatchedTexts).toEqual(new Set());
     expect(result.current.selectedBinIndices).toEqual({});
+    expect(result.current.uncasedMatchedTexts).toBe(false);
+  });
+
+  it('toggles a grouped legend atomically and clears hidden terms when case mode changes', () => {
+    const { result } = renderHook(() => useConcordanceDispersionControls());
+
+    act(() => {
+      result.current.toggleMatchedTexts(['jobs', 'Jobs']);
+      result.current.handleBinSelect('node-a', 2, false);
+    });
+    expect(result.current.excludedMatchedTexts).toEqual(new Set(['jobs', 'Jobs']));
+
+    act(() => {
+      result.current.setUncasedMatchedTexts(true);
+    });
+    expect(result.current.uncasedMatchedTexts).toBe(true);
+    expect(result.current.excludedMatchedTexts).toEqual(new Set());
+    expect(result.current.selectedBinIndices['node-a']).toEqual(new Set([2]));
+
+    act(() => {
+      result.current.toggleMatchedTexts(['jobs', 'Jobs']);
+      result.current.toggleMatchedTexts(['jobs', 'Jobs']);
+    });
+    expect(result.current.excludedMatchedTexts).toEqual(new Set());
   });
 
   it('tracks bin selections per block and supports shift-range extension', () => {

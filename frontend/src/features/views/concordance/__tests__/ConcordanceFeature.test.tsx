@@ -20,7 +20,10 @@ const renderWithClient = (ui: React.ReactElement) => {
 const handleSearchMock = vi.fn();
 const queryWorkspaceSqlTableMock = vi.hoisted(() => vi.fn());
 const getAnalysisResultMock = vi.hoisted(() => vi.fn());
+const getConcordanceTableDensityMock = vi.hoisted(() => vi.fn());
+const queryConcordanceDocumentProjectionTableMock = vi.hoisted(() => vi.fn());
 const fetchArrowTablePageMock = vi.hoisted(() => vi.fn());
+const createResultDataBlocksMock = vi.hoisted(() => vi.fn());
 const clearResultsMock = vi.fn(async () => {
   /* mock: resolves immediately */
 });
@@ -28,6 +31,7 @@ let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
 let mockInitialResult: Record<string, unknown> | null = null;
 let mockAnalysisState: 'successful' | null = null;
 let mockRunAllAnalysis: Record<string, unknown> | null = null;
+let mockRunAllSupportingIds = ['run-all-child'];
 let mockIsPreviewRunning = false;
 let mockTokenizerModel: string | null = null;
 let latestAnalysisFeatureConfig: {
@@ -39,9 +43,14 @@ vi.mock('@/api', async (importOriginal) => {
   return {
     ...actual,
     getAnalysisResult: getAnalysisResultMock,
+    getConcordanceTableDensity: getConcordanceTableDensityMock,
     queryWorkspaceSqlTable: queryWorkspaceSqlTableMock,
   };
 });
+
+vi.mock('@/api/tableApi', () => ({
+  queryConcordanceDocumentProjectionTable: queryConcordanceDocumentProjectionTableMock,
+}));
 
 vi.mock('@/lib/arrow/arrowTable', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -161,6 +170,10 @@ vi.mock('@/components/ui/dialog', () => ({
   DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   /** Preserves dialog heading grouping without layout dependencies. */
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  /** Preserves dialog supporting copy for feature-level submission tests. */
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  /** Preserves dialog action grouping without layout dependencies. */
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   /** Renders dialog titles as plain text for screen queries. */
   DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -235,7 +248,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Stubs workspace mutations that are outside this feature-level test boundary. */
   useWorkspaceActions: () => ({
     runConcordanceAll: vi.fn(),
-    createResultDataBlocks: vi.fn(),
+    createResultDataBlocks: createResultDataBlocksMock,
     setNodeColor: vi.fn(),
   }),
 }));
@@ -345,6 +358,7 @@ import ConcordanceFeature from '../ConcordanceFeature';
 
 const renderConcordanceFeature = (taskId: string | null = null) => {
   const setInputSet = vi.fn();
+  const runAllNodeIds = mockRunAllSupportingIds.map((_, index) => `node-${String(index + 1)}`);
   const previewAnalysis: Analysis | null = taskId
     ? {
         cancellation_requested_at: null,
@@ -384,26 +398,45 @@ const renderConcordanceFeature = (taskId: string | null = null) => {
         created_at: '2026-07-25T00:01:00Z',
         execution_scope: 'run_all',
         id: 'run-all-root',
-        output_node_ids: [],
+        output_node_ids: mockRunAllSupportingIds,
         request: {
           kind: 'concordance_run_all',
-          source: previewAnalysis!.request,
+          source: {
+            ...previewAnalysis!.request,
+            node_ids: runAllNodeIds,
+            node_columns: Object.fromEntries(runAllNodeIds.map((nodeId) => [nodeId, 'text'])),
+            node_tokenizer_models: Object.fromEntries(
+              runAllNodeIds.map((nodeId) => [nodeId, 'native:plain_words_en']),
+            ),
+          },
         },
         supersedes_analysis_ids: taskId ? [taskId] : [],
       }
     : null;
-  const runAllChild: Analysis | null =
+  const runAllChildren: Analysis[] =
     runAllRoot && mockRunAllAnalysis
-      ? {
-          ...runAllRoot,
-          ...mockRunAllAnalysis,
-          execution_scope: 'supporting',
-          id: 'run-all-child',
-          parent_analysis_id: runAllRoot.id,
-          supersedes_analysis_ids: [],
-        }
-      : null;
-  const analyses = [previewAnalysis, runAllRoot, runAllChild].filter(
+      ? mockRunAllSupportingIds.map((id, index) => {
+          const nodeId = runAllNodeIds[index]!;
+          return {
+            ...runAllRoot,
+            ...mockRunAllAnalysis,
+            execution_scope: 'supporting',
+            id,
+            parent_analysis_id: runAllRoot.id,
+            request: {
+              kind: 'concordance_run_all',
+              source: {
+                ...runAllRoot.request.source,
+                node_ids: [nodeId],
+                node_columns: { [nodeId]: 'text' },
+                node_tokenizer_models: { [nodeId]: 'native:plain_words_en' },
+              },
+            },
+            supersedes_analysis_ids: [],
+          };
+        })
+      : [];
+  const analyses = [previewAnalysis, runAllRoot, ...runAllChildren].filter(
     (analysis): analysis is Analysis => analysis !== null,
   );
   const activeAnalysis =
@@ -440,12 +473,16 @@ describe('ConcordanceFeature', () => {
     mockInitialResult = null;
     mockAnalysisState = null;
     mockRunAllAnalysis = null;
+    mockRunAllSupportingIds = ['run-all-child'];
     mockIsPreviewRunning = false;
     mockTokenizerModel = null;
     latestAnalysisFeatureConfig = null;
     queryWorkspaceSqlTableMock.mockReset();
     getAnalysisResultMock.mockReset();
+    getConcordanceTableDensityMock.mockReset();
+    queryConcordanceDocumentProjectionTableMock.mockReset();
     fetchArrowTablePageMock.mockReset();
+    createResultDataBlocksMock.mockReset();
     queryWorkspaceSqlTableMock.mockResolvedValue({
       table: {},
       columns: ['text'],
@@ -462,6 +499,23 @@ describe('ConcordanceFeature', () => {
       hasNext: false,
       etag: 'default-etag',
     });
+    getConcordanceTableDensityMock.mockResolvedValue({
+      data: {
+        resolution: 100,
+        document_count: 0,
+        match_count: 0,
+        series: [],
+      },
+    });
+    queryConcordanceDocumentProjectionTableMock.mockResolvedValue({
+      table: {},
+      columns: [],
+      schema: [],
+      rows: [],
+      hasNext: false,
+      etag: 'default-document-etag',
+    });
+    createResultDataBlocksMock.mockResolvedValue(undefined);
     clearResultsMock.mockResolvedValue(true);
   });
 
@@ -700,6 +754,162 @@ describe('ConcordanceFeature', () => {
       },
       { timeout: 5_000 },
     );
+
+    unmount();
+  });
+
+  it('shares exact legend exclusions across sources and Combined View', async () => {
+    mockAnalysisState = 'successful';
+    mockInitialResult = { state: 'successful', message: 'ok', data: {} };
+    mockRunAllAnalysis = {
+      id: 'run-all-1',
+      state: 'succeeded',
+      output_node_ids: [],
+      progress: { message: null },
+    };
+    mockRunAllSupportingIds = ['run-all-child-1', 'run-all-child-2'];
+    getAnalysisResultMock.mockImplementation(({ path }: { path: { analysis_id: string } }) => {
+      const second = path.analysis_id === 'run-all-child-2';
+      const nodeId = second ? 'node-2' : 'node-1';
+      return Promise.resolve({
+        data: {
+          kind: 'concordance_run_all',
+          result_type: 'source',
+          source: {
+            node_id: nodeId,
+            node_name: second ? 'Node 2' : 'Node 1',
+            document_column: 'text',
+            metadata_columns: [],
+            analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
+            internal_columns: ['__wordflow_source_row_id'],
+            document_count: 10,
+            match_count: 20,
+            table: {
+              delivery: 'projected',
+              table_id: `concordance-${nodeId}`,
+              documents: {
+                rows_url: `/analysis-${nodeId}-document-rows`,
+                schema_url: `/analysis-${nodeId}-document-schema`,
+              },
+              matches: {
+                rows_url: `/analysis-${nodeId}-match-rows`,
+                schema_url: `/analysis-${nodeId}-match-schema`,
+              },
+              density_url: `/analysis-${nodeId}-density`,
+            },
+          },
+        },
+      });
+    });
+    getConcordanceTableDensityMock.mockResolvedValue({
+      data: {
+        resolution: 100,
+        document_count: 10,
+        match_count: 20,
+        series: [
+          { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
+          { label: 'Jobs', counts: Array.from({ length: 100 }, () => 1) },
+        ],
+      },
+    });
+
+    const { unmount } = renderConcordanceFeature('analysis-1');
+
+    await screen.findByText('Review');
+    fireEvent.click(screen.getByRole('tab', { name: 'Dispersion View' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /^jobs \(/ })).toHaveLength(2);
+    });
+    expect(screen.getAllByRole('button', { name: /^Jobs \(/ })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^jobs \(/ })[0]!);
+    await waitFor(() => {
+      for (const legend of screen.getAllByRole('button', { name: /^jobs \(/ })) {
+        expect(legend).toHaveAttribute('aria-pressed', 'true');
+      }
+    });
+    for (const legend of screen.getAllByRole('button', { name: /^Jobs \(/ })) {
+      expect(legend).toHaveAttribute('aria-pressed', 'false');
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Workspace' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add to Workspace' }).at(-1)!);
+    await waitFor(() => {
+      expect(createResultDataBlocksMock).toHaveBeenCalledTimes(1);
+    });
+    const creationRequest = createResultDataBlocksMock.mock.calls[0]?.[2] as {
+      sources: { excluded_matched_texts: string[] }[];
+    };
+    expect(creationRequest.sources).toHaveLength(2);
+    for (const source of creationRequest.sources) {
+      expect(source.excluded_matched_texts).toEqual(['jobs']);
+    }
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Combined' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^jobs \(/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^jobs \(/ }));
+    expect(screen.getByRole('button', { name: /^jobs \(/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Separated' }));
+    await waitFor(() => {
+      for (const legend of screen.getAllByRole('button', { name: /^jobs \(/ })) {
+        expect(legend).toHaveAttribute('aria-pressed', 'false');
+      }
+    });
+
+    const separatedUncasedControls = screen.getAllByRole('checkbox', { name: 'Uncased' });
+    expect(separatedUncasedControls).toHaveLength(2);
+    separatedUncasedControls.forEach((control) => {
+      expect(control).not.toBeChecked();
+    });
+
+    fireEvent.click(separatedUncasedControls[0]!);
+    await waitFor(() => {
+      for (const control of screen.getAllByRole('checkbox', { name: 'Uncased' })) {
+        expect(control).toBeChecked();
+      }
+    });
+    expect(screen.queryByRole('button', { name: /^jobs \(/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Jobs \(/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'jobs/Jobs (200)' })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'jobs/Jobs (200)' })[0]!);
+    await waitFor(() => {
+      for (const legend of screen.getAllByRole('button', { name: 'jobs/Jobs (200)' })) {
+        expect(legend).toHaveAttribute('aria-pressed', 'true');
+      }
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Workspace' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add to Workspace' }).at(-1)!);
+    await waitFor(() => {
+      expect(createResultDataBlocksMock).toHaveBeenCalledTimes(2);
+    });
+    const uncasedCreationRequest = createResultDataBlocksMock.mock.calls[1]?.[2] as {
+      sources: { excluded_matched_texts: string[] }[];
+    };
+    for (const source of uncasedCreationRequest.sources) {
+      expect(source.excluded_matched_texts).toEqual(['Jobs', 'jobs']);
+    }
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Combined' }));
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: 'Uncased' })).toBeChecked();
+      expect(screen.getByRole('button', { name: 'jobs/Jobs (400)' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
 
     unmount();
   });

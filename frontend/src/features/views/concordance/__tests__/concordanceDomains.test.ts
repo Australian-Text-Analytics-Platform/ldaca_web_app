@@ -93,6 +93,27 @@ describe('concordanceDomains', () => {
     expect(result.totalsByKey['term:Alpha']).toBe(5);
     expect(result.labelsByKey['term:Alpha']).toBe('Alpha');
   });
+
+  it('case-folds exact variants into one density series when uncased is enabled', () => {
+    const lowerCounts = Array.from({ length: 100 }, () => 0);
+    lowerCounts[0] = 35;
+    const titleCounts = Array.from({ length: 100 }, () => 0);
+    titleCounts[0] = 2;
+
+    const result = buildDispersionBinsFromDensitySeries(
+      [
+        { label: 'jobs', counts: lowerCounts },
+        { label: 'Jobs', counts: titleCounts },
+      ],
+      20,
+      { uncased: true },
+    );
+
+    expect(result.bins[0]?.['term:jobs']).toBe(37);
+    expect(result.totalsByKey).toEqual({ 'term:jobs': 37 });
+    expect(result.labelsByKey).toEqual({ 'term:jobs': 'jobs/Jobs' });
+    expect(result.matchedTextsByKey).toEqual({ 'term:jobs': ['jobs', 'Jobs'] });
+  });
 });
 describe('concordance source display helpers', () => {
   const sourceNodes = [

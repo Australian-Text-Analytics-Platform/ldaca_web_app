@@ -95,6 +95,7 @@ type DispersionBinDatum = {
 
 export interface BuildDispersionBinsOptions {
   splitBySource?: boolean;
+  uncased?: boolean;
 }
 
 /**
@@ -118,11 +119,34 @@ export interface BuildDispersionBinsResult {
   bins: DispersionBinDatum[];
   totalsByKey: Record<string, number>;
   labelsByKey: Record<string, string>;
+  matchedTextsByKey: Record<string, string[]>;
   sources: string[];
 }
 
-const dispersionTermSeriesKey = (matchedText: string): string =>
-  `term:${encodeURIComponent(matchedText)}`;
+const dispersionTermSeriesKey = (matchedText: string, uncased: boolean): string =>
+  `term:${encodeURIComponent(uncased ? matchedText.toLowerCase() : matchedText)}`;
+
+/** Records exact spellings for a display series and keeps the lowercase spelling first. */
+const registerMatchedText = (
+  matchedTextsByKey: Record<string, string[]>,
+  labelsByKey: Record<string, string>,
+  seriesKey: string,
+  matchedText: string,
+  uncased: boolean,
+): void => {
+  const variants = matchedTextsByKey[seriesKey] ?? [];
+  if (!variants.includes(matchedText)) variants.push(matchedText);
+  if (uncased) {
+    const lowercase = matchedText.toLowerCase();
+    variants.sort((left, right) => {
+      if (left === lowercase && right !== lowercase) return -1;
+      if (right === lowercase && left !== lowercase) return 1;
+      return left.localeCompare(right);
+    });
+  }
+  matchedTextsByKey[seriesKey] = variants;
+  labelsByKey[seriesKey] = variants.join('/');
+};
 
 /** Builds normalized hit-count bins from raw grouped rows for client-side previews. */
 /**
@@ -136,13 +160,14 @@ export function buildDispersionBins(
   binCount: number,
   options: BuildDispersionBinsOptions = {},
 ): BuildDispersionBinsResult {
-  void options;
+  const uncased = options.uncased ?? false;
   const safeBinCount = Math.max(1, Math.floor(binCount));
   const bins: DispersionBinDatum[] = Array.from({ length: safeBinCount }, (_, i) => ({
     binCenter: ((i + 0.5) / safeBinCount) * 100,
   }));
   const totalsByKey: Record<string, number> = {};
   const labelsByKey: Record<string, string> = {};
+  const matchedTextsByKey: Record<string, string[]> = {};
   const sourceSet = new Set<string>();
 
   for (const row of rows) {
@@ -159,8 +184,8 @@ export function buildDispersionBins(
       if (!rawText) continue;
       const source = rowSource || toCellText(hit.__source_node);
       if (source) sourceSet.add(source);
-      const seriesKey = dispersionTermSeriesKey(rawText);
-      labelsByKey[seriesKey] = rawText;
+      const seriesKey = dispersionTermSeriesKey(rawText, uncased);
+      registerMatchedText(matchedTextsByKey, labelsByKey, seriesKey, rawText, uncased);
       const bin = bins[binIdx];
       if (bin === undefined) continue;
       bin[seriesKey] = (bin[seriesKey] ?? 0) + 1;
@@ -169,7 +194,7 @@ export function buildDispersionBins(
   }
 
   fillEmptyBins(bins, totalsByKey);
-  return { bins, totalsByKey, labelsByKey, sources: [...sourceSet].sort() };
+  return { bins, totalsByKey, labelsByKey, matchedTextsByKey, sources: [...sourceSet].sort() };
 }
 
 /**
@@ -206,17 +231,18 @@ export function buildDispersionBinsFromDensitySeries(
   displayBinCount: DispersionDisplayBinCount,
   options: BuildDispersionBinsOptions = {},
 ): BuildDispersionBinsResult {
-  void options;
+  const uncased = options.uncased ?? false;
   const bins: DispersionBinDatum[] = Array.from({ length: displayBinCount }, (_, index) => ({
     binCenter: ((index + 0.5) / displayBinCount) * 100,
   }));
   const totalsByKey: Record<string, number> = {};
   const labelsByKey: Record<string, string> = {};
+  const matchedTextsByKey: Record<string, string[]> = {};
   const sources = new Set<string>();
   for (const item of series) {
     if (item.source) sources.add(item.source);
-    const seriesKey = dispersionTermSeriesKey(item.label);
-    labelsByKey[seriesKey] = item.label;
+    const seriesKey = dispersionTermSeriesKey(item.label, uncased);
+    registerMatchedText(matchedTextsByKey, labelsByKey, seriesKey, item.label, uncased);
     totalsByKey[seriesKey] ??= 0;
     item.counts.forEach((count, serverIndex) => {
       if (!Number.isFinite(count) || count <= 0) return;
@@ -231,7 +257,13 @@ export function buildDispersionBinsFromDensitySeries(
     });
   }
   fillEmptyBins(bins, totalsByKey);
-  return { bins, totalsByKey, labelsByKey, sources: Array.from(sources).sort() };
+  return {
+    bins,
+    totalsByKey,
+    labelsByKey,
+    matchedTextsByKey,
+    sources: Array.from(sources).sort(),
+  };
 }
 /**
  * How many source documents the engine actually considered to produce

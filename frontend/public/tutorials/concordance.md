@@ -142,7 +142,10 @@ page does not change the chart.
 <h4 id="help-concordance-chart-type">Chart type</h4>
 
 Choose **Line**, **Bar**, or **Area**. This presentation choice applies to the
-dispersion blocks in the current session.
+dispersion blocks in the current session. Bar charts use side-by-side series
+with alternating bin backgrounds at 4, 5, or 10 bins. At 20, 25, 50, or 100
+bins, the series stack into one bar per bin so the bars remain visible. Other
+chart types are unchanged by the selected bin count.
 
 <h4 id="help-concordance-bin-count">Bin count</h4>
 
@@ -158,7 +161,11 @@ hide or show it. Visible terms intersected with selected bins control the
 displayed documents, match markers, legend counts, and Concordance Document
 Data Block Creation.
 Documents without a surviving match disappear. Preview has a static legend and
-does not apply these filters.
+does not apply these filters. Select **Uncased** beside a chart legend to merge
+case variants into one series, colour, and summed legend count; for example,
+`jobs (35)` and `Jobs (2)` become `jobs/Jobs (37)`. This checkbox is shared by
+all separated charts and Combined View. Changing it restores all hidden legend
+terms while preserving selected bins.
 
 <h4 id="help-concordance-download">Download the plot</h4>
 

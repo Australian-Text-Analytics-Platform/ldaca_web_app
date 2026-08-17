@@ -1,12 +1,24 @@
 import type { ReactNode } from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { ConcordanceAnalysisResponse } from '@/api';
 import type { ConcordanceRunAllReviewSource } from '../../concordanceRunAllReview';
 import { useConcordanceResultSession } from '../useConcordanceResultSession';
+
+const getConcordanceTableDensityMock = vi.hoisted(() => vi.fn());
+const queryConcordanceDocumentProjectionTableMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/api', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getConcordanceTableDensity: getConcordanceTableDensityMock,
+}));
+
+vi.mock('@/api/tableApi', () => ({
+  queryConcordanceDocumentProjectionTable: queryConcordanceDocumentProjectionTableMock,
+}));
 
 const result: ConcordanceAnalysisResponse = {
   kind: 'concordance',
@@ -71,6 +83,20 @@ const reviewSource: ConcordanceRunAllReviewSource = {
   },
 };
 
+const secondReviewSource: ConcordanceRunAllReviewSource = {
+  ...reviewSource,
+  analysisId: 'review-analysis-2',
+  source: {
+    ...reviewSource.source,
+    node_id: 'node-2',
+    node_name: 'Second Corpus',
+    table: {
+      ...reviewSource.source.table,
+      table_id: 'concordance-run-all-2',
+    },
+  },
+};
+
 describe('useConcordanceResultSession', () => {
   it('projects the canonical analysis result into Data Block display colors', () => {
     const { result: hook } = renderHook(
@@ -84,7 +110,7 @@ describe('useConcordanceResultSession', () => {
           selectedNodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
           showDispersion: true,
           selectedBinIndices: {},
-          excludedMatchedTexts: {},
+          excludedMatchedTexts: new Set(),
           binCount: 20,
         }),
       { wrapper: createWrapper() },
@@ -106,7 +132,7 @@ describe('useConcordanceResultSession', () => {
           selectedNodes: [],
           showDispersion: false,
           selectedBinIndices: {},
-          excludedMatchedTexts: {},
+          excludedMatchedTexts: new Set(),
           binCount: 20,
         }),
       { wrapper: createWrapper() },
@@ -135,7 +161,7 @@ describe('useConcordanceResultSession', () => {
           showDispersion: true,
           reviewSources: [reviewSource],
           selectedBinIndices: {},
-          excludedMatchedTexts: {},
+          excludedMatchedTexts: new Set(),
           binCount: 20,
         }),
       { wrapper: createWrapper() },
@@ -151,5 +177,47 @@ describe('useConcordanceResultSession', () => {
       sortBy: undefined,
       descending: false,
     });
+  });
+
+  it('applies one exact-term exclusion set to every source projection', async () => {
+    queryConcordanceDocumentProjectionTableMock.mockResolvedValue({
+      table: {},
+      columns: [],
+      schema: [],
+      rows: [],
+      hasNext: false,
+      etag: 'document-page',
+    });
+    getConcordanceTableDensityMock.mockResolvedValue({
+      data: { resolution: 100, document_count: 0, match_count: 0, series: [] },
+    });
+
+    renderHook(
+      () =>
+        useConcordanceResultSession({
+          workspaceId: 'workspace-1',
+          analysisId: 'analysis-1',
+          baseResult: null,
+          viewMode: 'separated',
+          combinedPage: 1,
+          selectedNodes: [
+            projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' }),
+            projectWorkspaceNodeMetadata({ id: 'node-2', name: 'Second Corpus' }),
+          ],
+          showDispersion: true,
+          reviewSources: [reviewSource, secondReviewSource],
+          selectedBinIndices: {},
+          excludedMatchedTexts: new Set(['jobs']),
+          binCount: 20,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(queryConcordanceDocumentProjectionTableMock).toHaveBeenCalledTimes(2);
+    });
+    for (const [request] of queryConcordanceDocumentProjectionTableMock.mock.calls) {
+      expect(request.body.excluded_matched_texts).toEqual(['jobs']);
+    }
   });
 });

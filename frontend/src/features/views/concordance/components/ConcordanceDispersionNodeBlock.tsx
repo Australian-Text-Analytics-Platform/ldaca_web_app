@@ -50,8 +50,10 @@ export interface ConcordanceDispersionNodeBlockProps {
   reviewRowUnit: 'documents' | 'matches' | null;
   densitySeries?: ConcordanceDensitySeriesInput[];
   interactiveFilters: boolean;
-  excludedMatchedTexts: Record<string, Set<string>>;
-  onToggleMatchedText: (blockKey: string, matchedText: string) => void;
+  excludedMatchedTexts: ReadonlySet<string>;
+  uncasedMatchedTexts: boolean;
+  onUncasedMatchedTextsChange: (value: boolean) => void;
+  onToggleMatchedTexts: (matchedTexts: readonly string[]) => void;
   termColors: Record<string, string>;
   resultsViewportWidth: number;
 
@@ -135,7 +137,9 @@ export function ConcordanceDispersionNodeBlock({
   densitySeries,
   interactiveFilters,
   excludedMatchedTexts,
-  onToggleMatchedText,
+  uncasedMatchedTexts,
+  onUncasedMatchedTextsChange,
+  onToggleMatchedTexts,
   termColors,
 }: ConcordanceDispersionNodeBlockProps) {
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
@@ -298,16 +302,10 @@ export function ConcordanceDispersionNodeBlock({
                 }
                 densitySeries={densitySeries}
                 termColors={termColors}
-                excludedMatchedTexts={
-                  excludedMatchedTexts[CONCORDANCE_COMBINED_NODE_KEY] ?? new Set<string>()
-                }
-                onToggleMatchedText={
-                  interactiveFilters
-                    ? (matchedText) => {
-                        onToggleMatchedText(CONCORDANCE_COMBINED_NODE_KEY, matchedText);
-                      }
-                    : undefined
-                }
+                excludedMatchedTexts={excludedMatchedTexts}
+                uncasedMatchedTexts={uncasedMatchedTexts}
+                onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
+                onToggleMatchedTexts={interactiveFilters ? onToggleMatchedTexts : undefined}
               />
             );
           })()}
@@ -448,14 +446,10 @@ export function ConcordanceDispersionNodeBlock({
               }
               densitySeries={densitySeries}
               termColors={termColors}
-              excludedMatchedTexts={excludedMatchedTexts[nodeKey] ?? new Set<string>()}
-              onToggleMatchedText={
-                interactiveFilters
-                  ? (matchedText) => {
-                      onToggleMatchedText(nodeKey, matchedText);
-                    }
-                  : undefined
-              }
+              excludedMatchedTexts={excludedMatchedTexts}
+              uncasedMatchedTexts={uncasedMatchedTexts}
+              onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
+              onToggleMatchedTexts={interactiveFilters ? onToggleMatchedTexts : undefined}
             />
           );
         })()}

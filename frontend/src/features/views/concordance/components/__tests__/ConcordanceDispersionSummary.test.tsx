@@ -19,6 +19,8 @@ const { chartProps } = vi.hoisted(() => ({
       ) => void;
     }[],
     lineProps: [] as Record<string, unknown>[],
+    barChartProps: [] as Record<string, unknown>[],
+    barProps: [] as Record<string, unknown>[],
     referenceAreaProps: [] as Record<string, unknown>[],
     referenceLineProps: [] as Record<string, unknown>[],
   },
@@ -66,10 +68,16 @@ vi.mock('recharts', () => ({
   AreaChart: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="area-chart">{children}</div>
   ),
-  Bar: ({ children }: { children?: React.ReactNode }) => <div data-testid="bar">{children}</div>,
-  BarChart: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="bar-chart">{children}</div>
-  ),
+  Bar: (props: Record<string, unknown> & { children?: React.ReactNode }) => {
+    const { children, ...capturedProps } = props;
+    chartProps.barProps.push(capturedProps);
+    return <div data-testid="bar">{children}</div>;
+  },
+  BarChart: (props: Record<string, unknown> & { children?: React.ReactNode }) => {
+    const { children, ...capturedProps } = props;
+    chartProps.barChartProps.push(capturedProps);
+    return <div data-testid="bar-chart">{children}</div>;
+  },
   Cell: () => <div data-testid="cell" />,
 }));
 
@@ -90,6 +98,8 @@ describe('ConcordanceDispersionSummary', () => {
   afterEach(() => {
     chartProps.lineChartProps.length = 0;
     chartProps.lineProps.length = 0;
+    chartProps.barChartProps.length = 0;
+    chartProps.barProps.length = 0;
     chartProps.referenceAreaProps.length = 0;
     chartProps.referenceLineProps.length = 0;
   });
@@ -170,7 +180,66 @@ describe('ConcordanceDispersionSummary', () => {
     expect(screen.getByTestId('area')).toBeInTheDocument();
   });
 
-  it('labels immutable density series as covering the entire Result', () => {
+  it.each([
+    4, 5, 10,
+  ] as const)('groups bars closely and alternates bin backgrounds at %i bins', (binCount) => {
+    render(
+      <ConcordanceDispersionSummary
+        rows={[]}
+        textColumn="text"
+        binCount={binCount}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="jobs Jobs"
+        chartMode="density-bar"
+        densitySeries={[
+          { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
+          { label: 'Jobs', counts: Array.from({ length: 100 }, () => 2) },
+        ]}
+      />,
+    );
+
+    expect(chartProps.barChartProps.at(-1)).toMatchObject({
+      barGap: 1,
+      barCategoryGap: '8%',
+    });
+    expect(chartProps.barProps).toHaveLength(2);
+    expect(chartProps.barProps.every((props) => props.stackId === undefined)).toBe(true);
+    expect(chartProps.barProps.every((props) => Array.isArray(props.radius))).toBe(true);
+    expect(chartProps.referenceAreaProps).toHaveLength(Math.ceil(binCount / 2));
+    expect(chartProps.referenceAreaProps[0]).toMatchObject({
+      x1: 0,
+      x2: 100 / binCount,
+      fill: 'var(--muted)',
+    });
+  });
+
+  it.each([
+    20, 25, 50, 100,
+  ] as const)('stacks bar series without alternating backgrounds at %i bins', (binCount) => {
+    render(
+      <ConcordanceDispersionSummary
+        rows={[]}
+        textColumn="text"
+        binCount={binCount}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="jobs Jobs"
+        chartMode="density-bar"
+        densitySeries={[
+          { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
+          { label: 'Jobs', counts: Array.from({ length: 100 }, () => 2) },
+        ]}
+      />,
+    );
+
+    expect(chartProps.barProps).toHaveLength(2);
+    expect(chartProps.barProps.every((props) => props.stackId === 'density')).toBe(true);
+    expect(chartProps.barProps.every((props) => props.radius === 0)).toBe(true);
+    expect(chartProps.referenceAreaProps).toHaveLength(0);
+  });
+
+  it('uses the source color as a card edge without repeating the source description', () => {
     render(
       <ConcordanceDispersionSummary
         rows={baseRows}
@@ -179,15 +248,20 @@ describe('ConcordanceDispersionSummary', () => {
         splitBySource={false}
         dataBlockLabel="Corpus"
         searchWord="alpha"
+        sourceColor="#2563eb"
         densitySeries={[{ label: 'alpha', counts: Array.from({ length: 100 }, () => 1) }]}
       />,
     );
 
     expect(
-      screen.getAllByText(
+      screen.queryByText(
         'Corpus: exact-term matches at relative locations across the entire Result',
       ),
-    ).toHaveLength(2);
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('concordance-dispersion-chart')).toHaveStyle({
+      borderLeftWidth: '3px',
+      borderLeftColor: '#2563eb',
+    });
   });
 
   it('keeps hidden exact terms in the interactive legend with selected-bin counts', () => {
@@ -215,7 +289,7 @@ describe('ConcordanceDispersionSummary', () => {
           onClear: vi.fn(),
         }}
         excludedMatchedTexts={new Set(['alpha'])}
-        onToggleMatchedText={onToggle}
+        onToggleMatchedTexts={onToggle}
       />,
     );
 
@@ -227,7 +301,7 @@ describe('ConcordanceDispersionSummary', () => {
     expect(hidden).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByTestId('line')).toHaveLength(1);
     fireEvent.click(hidden);
-    expect(onToggle).toHaveBeenCalledWith('alpha');
+    expect(onToggle).toHaveBeenCalledWith(['alpha']);
   });
 
   it('uses deterministic matched-term colors for chart series', () => {
@@ -276,6 +350,48 @@ describe('ConcordanceDispersionSummary', () => {
         expect.objectContaining({ dataKey: 'term:Jobs', stroke: 'var(--color-term-Jobs)' }),
       ]),
     );
+  });
+
+  it('merges case variants into one series and grouped legend when uncased is enabled', () => {
+    const lowerCounts = Array.from({ length: 100 }, () => 0);
+    lowerCounts[0] = 35;
+    const titleCounts = Array.from({ length: 100 }, () => 0);
+    titleCounts[0] = 2;
+    const onToggle = vi.fn();
+    const onUncasedChange = vi.fn();
+
+    render(
+      <ConcordanceDispersionSummary
+        rows={[]}
+        textColumn="text"
+        binCount={20}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="jobs"
+        densitySeries={[
+          { label: 'jobs', counts: lowerCounts },
+          { label: 'Jobs', counts: titleCounts },
+        ]}
+        termColors={{ jobs: '#123456', Jobs: '#abcdef' }}
+        uncasedMatchedTexts
+        onUncasedMatchedTextsChange={onUncasedChange}
+        onToggleMatchedTexts={onToggle}
+      />,
+    );
+
+    expect(screen.getAllByTestId('line')).toHaveLength(1);
+    expect(chartProps.lineProps[0]).toMatchObject({
+      dataKey: 'term:jobs',
+      stroke: 'var(--color-term-jobs)',
+    });
+    const groupedLegend = screen.getByRole('button', { name: 'jobs/Jobs (37)' });
+    fireEvent.click(groupedLegend);
+    expect(onToggle).toHaveBeenCalledWith(['jobs', 'Jobs']);
+
+    const uncased = screen.getByRole('checkbox', { name: 'Uncased' });
+    expect(uncased).toBeChecked();
+    fireEvent.click(uncased);
+    expect(onUncasedChange).toHaveBeenCalledWith(false);
   });
 
   it('renders cumulative charts as stepped running totals pooled by exact term', () => {

@@ -16,8 +16,10 @@ export interface UseConcordanceDispersionControlsResult {
   dispersionChartMode: ConcordanceDispersionChartMode;
   setDispersionChartMode: Dispatch<SetStateAction<ConcordanceDispersionChartMode>>;
   selectedBinIndices: Record<string, Set<number>>;
-  excludedMatchedTexts: Record<string, Set<string>>;
-  toggleMatchedText: (blockKey: string, matchedText: string) => void;
+  excludedMatchedTexts: Set<string>;
+  uncasedMatchedTexts: boolean;
+  setUncasedMatchedTexts: (value: boolean) => void;
+  toggleMatchedTexts: (matchedTexts: readonly string[]) => void;
   handleBinSelect: (blockKey: string, index: number, shiftHeld: boolean) => void;
   handleBinRangeSelect: (
     blockKey: string,
@@ -50,7 +52,8 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
   const [dispersionChartMode, setDispersionChartMode] =
     useState<ConcordanceDispersionChartMode>('density-line');
   const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
-  const [excludedMatchedTexts, setExcludedMatchedTexts] = useState<Record<string, Set<string>>>({});
+  const [excludedMatchedTexts, setExcludedMatchedTexts] = useState<Set<string>>(new Set());
+  const [uncasedMatchedTexts, setRawUncasedMatchedTexts] = useState(false);
   const lastSelectedBinRef = useRef<Record<string, number | null>>({});
 
   /** Updates a block's bin set from a click or shift-click range gesture. */
@@ -112,20 +115,31 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     lastSelectedBinRef.current = {};
   };
 
-  const toggleMatchedText = (blockKey: string, matchedText: string) => {
+  /** Hides or restores every exact spelling represented by one legend entry. */
+  const toggleMatchedTexts = (matchedTexts: readonly string[]) => {
     setExcludedMatchedTexts((current) => {
-      const nextForBlock = new Set(current[blockKey] ?? []);
-      if (nextForBlock.has(matchedText)) nextForBlock.delete(matchedText);
-      else nextForBlock.add(matchedText);
-      return { ...current, [blockKey]: nextForBlock };
+      const next = new Set(current);
+      const restore = matchedTexts.every((matchedText) => next.has(matchedText));
+      for (const matchedText of matchedTexts) {
+        if (restore) next.delete(matchedText);
+        else next.add(matchedText);
+      }
+      return next;
     });
+  };
+
+  /** Changes case-grouping semantics and clears exact exclusions that cannot map unambiguously. */
+  const setUncasedMatchedTexts = (value: boolean) => {
+    setRawUncasedMatchedTexts(value);
+    setExcludedMatchedTexts(new Set());
   };
 
   // Stable identity is required because ConcordanceFeature resets filters from
   // an effect keyed only by the immutable Run All identity.
   const resetDispersionFilters = useCallback(() => {
     setSelectedBinIndices({});
-    setExcludedMatchedTexts({});
+    setExcludedMatchedTexts(new Set());
+    setRawUncasedMatchedTexts(false);
     lastSelectedBinRef.current = {};
   }, []);
 
@@ -141,7 +155,9 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     setDispersionChartMode,
     selectedBinIndices,
     excludedMatchedTexts,
-    toggleMatchedText,
+    uncasedMatchedTexts,
+    setUncasedMatchedTexts,
+    toggleMatchedTexts,
     handleBinSelect,
     handleBinRangeSelect,
     handleClearBinSelection,
