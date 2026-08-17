@@ -26,6 +26,8 @@ const mockReplacePreview = vi.fn();
 const mockReplaceText = vi.fn();
 const mockRefreshNodeSchema = vi.fn();
 const mockGetNodeDataByWorkspaceId = vi.hoisted(() => vi.fn());
+const mockQueryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
+const mockToastWarning = vi.hoisted(() => vi.fn());
 
 const mockSelectedNode = {
   id: 'node-1',
@@ -47,8 +49,13 @@ vi.mock('@/api', async (importOriginal) => {
   return {
     ...actual,
     getNodeDataByWorkspaceId: mockGetNodeDataByWorkspaceId,
+    queryWorkspaceSqlTable: mockQueryWorkspaceSqlTable,
   };
 });
+
+vi.mock('sonner', () => ({
+  toast: { warning: mockToastWarning },
+}));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
   useAuth: () => ({
@@ -214,6 +221,17 @@ describe('DataPreprocessingFeature replace tab', () => {
       },
     });
     mockFilterNode.mockResolvedValue(undefined);
+    mockQueryWorkspaceSqlTable.mockImplementation(({ body }: { body: { sql: string } }) =>
+      Promise.resolve(
+        body.sql.includes('missing_count')
+          ? { rows: [{ missing_count: 0 }] }
+          : {
+              rows: [{ Body: 'candidate tweet', Count: 1 }],
+              columns: ['Body', 'Count'],
+              pagination: { page: 1, page_size: 10, has_next: false },
+            },
+      ),
+    );
     mockSlicePreview.mockResolvedValue({
       columns: ['Body', 'Count'],
       data: [{ Body: 'Invoice 1', Count: 1 }],
@@ -521,6 +539,66 @@ describe('DataPreprocessingFeature replace tab', () => {
         },
       ]);
     });
+  });
+
+  it('warns when the selected filter column contains missing values', async () => {
+    const user = userEvent.setup();
+    mockQueryWorkspaceSqlTable.mockImplementation(({ body }: { body: { sql: string } }) =>
+      Promise.resolve(
+        body.sql.includes('missing_count')
+          ? { rows: [{ missing_count: 1_234 }] }
+          : {
+              rows: [{ Body: 'candidate tweet', Count: 1 }],
+              columns: ['Body', 'Count'],
+              pagination: { page: 1, page_size: 10, has_next: false },
+            },
+      ),
+    );
+
+    renderPreprocessingFeature();
+
+    const filterPanel = await waitForFilterSchema();
+    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    columnSelect!.focus();
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    await waitFor(() => {
+      expect(mockQueryWorkspaceSqlTable).toHaveBeenCalledWith({
+        path: { workspace_id: 'ws-1' },
+        body: {
+          mode: 'query',
+          node_ids: ['node-1'],
+          sql: 'SELECT COUNT(*) - COUNT("Body") AS missing_count FROM "node-1"',
+          page: 1,
+          page_size: 1,
+        },
+      });
+    });
+    expect(mockToastWarning).toHaveBeenCalledWith('Found 1,234 missing values in “Body”', {
+      description:
+        'Rows with missing values won’t match ordinary filter conditions. Choose “is null” to target them.',
+    });
+  });
+
+  it('does not warn when the selected filter column has no missing values', async () => {
+    const user = userEvent.setup();
+
+    renderPreprocessingFeature();
+
+    const filterPanel = await waitForFilterSchema();
+    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    columnSelect!.focus();
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    await waitFor(() => {
+      expect(mockQueryWorkspaceSqlTable).toHaveBeenCalledWith({
+        path: { workspace_id: 'ws-1' },
+        body: expect.objectContaining({
+          sql: 'SELECT COUNT(*) - COUNT("Body") AS missing_count FROM "node-1"',
+        }),
+      });
+    });
+    expect(mockToastWarning).not.toHaveBeenCalled();
   });
 
   it('keeps Create Data Block disabled until conditions are valid and preview rows exist', async () => {

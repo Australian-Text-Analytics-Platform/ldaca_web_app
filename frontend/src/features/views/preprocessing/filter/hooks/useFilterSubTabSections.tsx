@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import { queryWorkspaceSqlTable, sqlIdentifier, sqlTable } from '@/api';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
@@ -120,6 +121,22 @@ async function sampleColumnBounds(workspaceId: string, nodeId: string, column: s
   };
 }
 
+async function countColumnMissingValues(workspaceId: string, nodeId: string, column: string) {
+  const identifier = sqlIdentifier(column);
+  const data = await queryWorkspaceSqlTable({
+    path: { workspace_id: workspaceId },
+    body: {
+      mode: 'query',
+      node_ids: [nodeId],
+      sql: `SELECT COUNT(*) - COUNT(${identifier}) AS missing_count FROM ${sqlTable(nodeId)}`,
+      page: 1,
+      page_size: 1,
+    },
+  });
+  const count = Number(data.rows[0]?.missing_count ?? 0);
+  return Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+}
+
 /**
  * Owns the Filter sub-tab state and backend request wiring. `FilterSubTab`
  * consumes this hook for condition editing, preview fallback, and apply state.
@@ -160,6 +177,10 @@ export const useFilterSubTabSections = (
     value: string;
   }>({ nodeId: selectedNodeId, value: '' });
   const [isFiltering, setIsFiltering] = useState(false);
+  const latestMissingValueChecks = useRef(new Map<string, string>());
+  useEffect(() => {
+    latestMissingValueChecks.current.clear();
+  }, [currentWorkspaceId, selectedNodeId]);
   const optionSearchScope = `${currentWorkspaceId ?? ''}\0${selectedNodeId ?? ''}`;
   const [optionSearchState, setOptionSearchState] = useState<{
     scope: string;
@@ -258,6 +279,34 @@ export const useFilterSubTabSections = (
     if (conditions.length > 1) {
       setConditions(conditions.filter((c) => c.id !== id));
       removeOptionSearchQuery(id);
+      latestMissingValueChecks.current.delete(id);
+    }
+  };
+
+  const warnAboutMissingValues = async (conditionId: string, column: string) => {
+    if (!selectedNodeId || !currentWorkspaceId || !column) return;
+
+    const requestKey = `${currentWorkspaceId}\0${selectedNodeId}\0${column}`;
+    latestMissingValueChecks.current.set(conditionId, requestKey);
+
+    try {
+      const missingCount = await countColumnMissingValues(
+        currentWorkspaceId,
+        selectedNodeId,
+        column,
+      );
+      if (latestMissingValueChecks.current.get(conditionId) !== requestKey || missingCount === 0) {
+        return;
+      }
+      toast.warning(
+        `Found ${missingCount.toLocaleString()} missing ${missingCount === 1 ? 'value' : 'values'} in “${column}”`,
+        {
+          description:
+            'Rows with missing values won’t match ordinary filter conditions. Choose “is null” to target them.',
+        },
+      );
+    } catch {
+      // Missing-value counts are advisory and must not block filter configuration.
     }
   };
 
@@ -276,6 +325,10 @@ export const useFilterSubTabSections = (
   ) => {
     const targetCondition = conditions.find((condition) => condition.id === id);
     if (!targetCondition) return;
+
+    if (field === 'column' && typeof value === 'string') {
+      void warnAboutMissingValues(id, value);
+    }
 
     const { condition, prefillRequest, shouldResetSearch } = applyFilterConditionFieldChange({
       condition: targetCondition,
