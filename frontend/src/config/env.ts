@@ -19,7 +19,7 @@ export const DEPLOYMENT_ID: string = import.meta.env.VITE_DEPLOYMENT_ID ?? '';
 /** Explicit backend port override (defaults to 8001). */
 export const BACKEND_PORT: string = import.meta.env.VITE_BACKEND_PORT ?? '';
 
-/** Explicit backend API base path override. */
+/** Explicit backend API base URL override for split development only. */
 export const BACKEND_API_BASE: string = import.meta.env.VITE_BACKEND_API_BASE ?? '';
 
 /** Derives the mutable minor-version tag used by the online documentation. */

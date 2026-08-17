@@ -33,7 +33,8 @@ caller-owned handle, and can continue executing while the compiled frontend
 and backend are reachable through `jupyter-server-proxy`. The handle provides
 bounded graceful shutdown. This in-process background mode is part of the
 BinderHub contract; it is not the process model used by split browser
-development or hosted production.
+development or hosted production. The executable setup is documented in the
+[BinderHub runbook](../../runbooks/binderhub.md).
 
 ## Lifespan Ownership
 

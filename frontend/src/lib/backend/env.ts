@@ -8,8 +8,8 @@ import { BACKEND_PORT, BACKEND_API_BASE } from '@/config/env';
  * Priority order:
  *  1. Explicit override via function argument (tests)
  *  2. Tauri: window.__BACKEND_URL__ (cached after IPC discovery)
- *  3. Vite env var: VITE_BACKEND_API_BASE (full URL override)
- *  4. Runtime config injection (window.__WORDFLOW_CONFIG__.basePath)
+ *  3. Runtime config injection (window.__WORDFLOW_CONFIG__.basePath)
+ *  4. Vite dev-only env var: VITE_BACKEND_API_BASE (full URL override)
  *  5. Vite dev: localhost/127.0.0.1 -> backend at configured port
  *  6. Default: same-origin /api
  */
@@ -50,8 +50,8 @@ export function getRuntimeBasePath(): string | undefined {
  * Returns the `/api` base URL used by generated SDK clients and local fetches,
  * normalizing each runtime's way of telling the frontend where the backend is.
  * Used by: generated-client configuration and the backend-health startup gate.
- * Flow: prefer explicit, desktop, and build-time overrides; then resolve the
- * served runtime base path or local-development port before same-origin fallback.
+ * Flow: prefer explicit and desktop overrides, then resolve the served runtime
+ * base path before development-only configuration and same-origin fallback.
  */
 export function getApiBase(options: ApiEnvOptions = {}): string {
   // 1. Explicit override (tests / callers)
@@ -62,18 +62,22 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
     return `${window.__BACKEND_URL__}/api`.replace(/\/$/, '');
   }
 
-  // 3. Build-time env var override (e.g. VITE_BACKEND_API_BASE=http://host/api)
-  const explicit = BACKEND_API_BASE.trim();
-  if (explicit) {
-    return explicit.replace(/\/$/, '');
-  }
-
   if (typeof window === 'undefined') return '/api';
 
-  // 4. Runtime config base path (handles reverse proxy serving).
+  // 3. Runtime config base path (handles packaged and reverse-proxy serving).
   const runtimeBasePath = getRuntimeBasePath();
   if (typeof runtimeBasePath === 'string') {
     return `${window.location.origin}${runtimeBasePath}/api`;
+  }
+
+  // 4. Full URL overrides are a split-development convenience only. Keeping
+  // this branch compile-time gated prevents a local URL from entering a
+  // distributable SPA and overriding its request-time runtime configuration.
+  if (import.meta.env.DEV) {
+    const explicit = BACKEND_API_BASE.trim();
+    if (explicit) {
+      return explicit.replace(/\/$/, '');
+    }
   }
 
   const loc = options.windowLocation ?? window.location;

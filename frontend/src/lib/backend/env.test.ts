@@ -27,6 +27,12 @@ describe('getApiBase', () => {
     expect(getApiBase()).toBe(`${window.location.origin}/wordflow/api`);
   });
 
+  it('uses the current origin for a root-mounted packaged frontend', () => {
+    window.__WORDFLOW_CONFIG__ = { basePath: '' };
+
+    expect(getApiBase()).toBe(`${window.location.origin}/api`);
+  });
+
   it('does not guess a fixed backend port for the packaged Tauri origin', () => {
     expect(getApiBase({ windowLocation: locationFor('https://tauri.localhost/') })).toBe(
       'https://tauri.localhost/api',

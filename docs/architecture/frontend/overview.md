@@ -40,7 +40,11 @@ flowchart LR
 - `src/lib/backend/` owns generated-client runtime configuration and API-base
   resolution. Its connection gate resolves either browser configuration or the
   Tauri supervisor's current random-port URL, installs the generated-client
-  base, and verifies health before backend-dependent consumers mount.
+  base, and verifies health before backend-dependent consumers mount. A
+  packaged browser build treats the request-time `runtime-config.js` base path
+  as authoritative and otherwise uses the current origin. The full
+  `VITE_BACKEND_API_BASE` override exists only for split Vite development and
+  cannot define a distributable build's backend location.
 - `src/lib/arrow/` owns official Apache Arrow IPC decoding and lossless field
   inspection; it does not maintain a parallel column-kind naming registry.
   `src/api/tableApi.ts` is the narrow
