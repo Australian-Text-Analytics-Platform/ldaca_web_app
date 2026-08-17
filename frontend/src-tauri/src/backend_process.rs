@@ -215,7 +215,11 @@ fn runtime_command(runtime: &BackendRuntime) -> Command {
         .env("TRUSTED_HOSTS", format!(r#"["{BACKEND_HOST}"]"#))
         .env(
             "CORS_ALLOWED_ORIGINS",
-            format!(r#"["{}"]"#, desktop_origin()),
+            serde_json::to_string(&desktop_origins(
+                cfg!(debug_assertions),
+                cfg!(target_os = "windows"),
+            ))
+            .expect("desktop origins serialize"),
         )
         .env("MULTI_USER", "false");
     #[cfg(target_os = "windows")]
@@ -223,13 +227,16 @@ fn runtime_command(runtime: &BackendRuntime) -> Command {
     command
 }
 
-fn desktop_origin() -> &'static str {
-    if cfg!(debug_assertions) {
-        "http://127.0.0.1:3001"
-    } else if cfg!(target_os = "windows") {
+fn desktop_origins(debug: bool, windows: bool) -> Vec<&'static str> {
+    let packaged_origin = if windows {
         "https://tauri.localhost"
     } else {
         "tauri://localhost"
+    };
+    if debug {
+        vec!["http://127.0.0.1:3001", packaged_origin]
+    } else {
+        vec![packaged_origin]
     }
 }
 
@@ -350,6 +357,23 @@ mod packaged_runtime_test {
             .flatten();
 
         assert_eq!(value, Some(std::ffi::OsStr::new("1")));
+    }
+
+    #[test]
+    fn desktop_cors_origins_cover_dev_and_packaged_debug_modes() {
+        assert_eq!(
+            desktop_origins(true, false),
+            vec!["http://127.0.0.1:3001", "tauri://localhost"]
+        );
+        assert_eq!(
+            desktop_origins(true, true),
+            vec!["http://127.0.0.1:3001", "https://tauri.localhost"]
+        );
+        assert_eq!(desktop_origins(false, false), vec!["tauri://localhost"]);
+        assert_eq!(
+            desktop_origins(false, true),
+            vec!["https://tauri.localhost"]
+        );
     }
 
     /// Exercise the production manifest resolver and command environment.

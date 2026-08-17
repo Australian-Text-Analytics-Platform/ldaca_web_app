@@ -71,6 +71,17 @@ which the webview uses to rebind raw URL consumers, the generated client, and
 server-state queries. An unexpected child exit is surfaced as backend
 unavailability; the supervisor does not hide it behind speculative retry.
 
+Page zoom is owned by Tauri. The desktop shell leaves the webview at its default
+100% scale and enables Tauri's platform zoom shortcuts. On macOS and Linux, the
+injected shortcut handler requires the main webview's explicit
+`core:webview:allow-set-webview-zoom` capability. Wordflow does not add custom
+zoom controls or persist zoom state.
+
+Debug desktop builds allow both the fixed Vite development origin and the
+platform's packaged Tauri origin through backend CORS, so `tauri dev` and a
+packaged debug application use the same supervisor. Release builds allow only
+the packaged Tauri origin.
+
 Native downloads accept a relative backend API path and safe filename, reject
 redirects, stream to a temporary file, and publish without replacement. The
 webview cannot supply an arbitrary URL or privileged headers.

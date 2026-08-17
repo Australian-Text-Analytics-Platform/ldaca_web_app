@@ -387,7 +387,6 @@ pub fn run() {
             let window = app
                 .get_webview_window("main")
                 .ok_or_else(|| boxed_error("Main window not found"))?;
-            window.set_zoom(0.95)?;
             let layout = match runtime::locate_backend_runtime(app.handle()) {
                 Ok(layout) => layout,
                 Err(error) => {

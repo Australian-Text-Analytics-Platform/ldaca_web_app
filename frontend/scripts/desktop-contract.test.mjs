@@ -101,12 +101,29 @@ describe('desktop configuration contracts', () => {
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-docs-drift.yml'))).toBe(false);
   });
 
+  it('uses Tauri-native page zoom at the platform default scale', () => {
+    const tauri = JSON.parse(read('frontend/src-tauri/tauri.conf.json'));
+    const capability = JSON.parse(read('frontend/src-tauri/capabilities/default.json'));
+    const desktopShell = read('frontend/src-tauri/src/lib.rs');
+    const [mainWindow] = tauri.app.windows;
+    const explicitWindowPermissions = capability.permissions.filter(
+      (permission) =>
+        permission.startsWith('core:window:') || permission.startsWith('core:webview:'),
+    );
+
+    expect(tauri.app.windows).toHaveLength(1);
+    expect(mainWindow.zoomHotkeysEnabled).toBe(true);
+    expect(capability.windows).toEqual(['main']);
+    expect(explicitWindowPermissions).toEqual(['core:webview:allow-set-webview-zoom']);
+    expect(desktopShell).not.toMatch(/\.set_zoom\s*\(/);
+  });
+
   it('keeps retired JavaScript permissions, plugins, and globals absent', () => {
-    const capability = read('frontend/src-tauri/capabilities/default.json');
+    const capability = JSON.parse(read('frontend/src-tauri/capabilities/default.json'));
     const cargo = read('frontend/src-tauri/Cargo.toml');
     const main = read('frontend/src-tauri/src/main.rs');
 
-    expect(capability).not.toMatch(/core:(?:window|webview):|http:default/);
+    expect(capability.permissions).not.toContain('http:default');
     expect(cargo).not.toMatch(/tauri-plugin-http|dotenvy/);
     expect(main).not.toMatch(/tauri_plugin_http|__BACKEND_PORT__|load_runtime_env/);
   });
