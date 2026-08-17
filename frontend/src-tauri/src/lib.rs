@@ -428,14 +428,6 @@ pub fn run() {
                 }
             };
             let _ = std::fs::remove_file(&startup_file);
-            if let Err(error) = window.eval(format!(
-                r#"window.__BACKEND_URL__ = "{}";
-                console.log('[Tauri] Backend URL injected:', window.__BACKEND_URL__);"#,
-                ready.url
-            )) {
-                let _ = process.shutdown();
-                return Err(error.into());
-            }
             let state: State<'_, BackendState> = app.state();
             let mut supervisor = match state.supervisor.lock() {
                 Ok(supervisor) => supervisor,

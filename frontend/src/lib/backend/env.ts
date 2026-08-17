@@ -7,7 +7,7 @@ import { BACKEND_PORT, BACKEND_API_BASE } from '@/config/env';
  *
  * Priority order:
  *  1. Explicit override via function argument (tests)
- *  2. Tauri: window.__BACKEND_URL__ (injected by Rust)
+ *  2. Tauri: window.__BACKEND_URL__ (cached after IPC discovery)
  *  3. Vite env var: VITE_BACKEND_API_BASE (full URL override)
  *  4. Runtime config injection (window.__WORDFLOW_CONFIG__.basePath)
  *  5. Vite dev: localhost/127.0.0.1 -> backend at configured port
@@ -57,7 +57,7 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
   // 1. Explicit override (tests / callers)
   if (options.explicitBase) return options.explicitBase.replace(/\/$/, '');
 
-  // 2. Tauri desktop app: injected by Rust at startup
+  // 2. Tauri desktop app: cached after the connection gate resolves native state
   if (typeof window !== 'undefined' && window.__BACKEND_URL__) {
     return `${window.__BACKEND_URL__}/api`.replace(/\/$/, '');
   }
@@ -77,20 +77,18 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
   }
 
   const loc = options.windowLocation ?? window.location;
-  const { origin, hostname, port } = loc;
+  const { origin, hostname, port, protocol } = loc;
   const backendPort = getBackendPort();
 
-  // 5. Local dev: localhost/127.0.0.1/tauri.localhost/private IPs → backend at configured port
+  // 5. Browser development: local/private hosts → backend at the configured port
+  const isBrowserHttp = protocol === 'http:' || protocol === 'https:';
   const isLocalDev =
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === 'tauri.localhost' ||
-    /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
+    isBrowserHttp &&
+    (hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname));
   if (isLocalDev) {
     if (port === backendPort) return `${origin}/api`;
-    if (hostname === 'tauri.localhost') {
-      return `http://127.0.0.1:${backendPort}/api`;
-    }
     return `http://${hostname}:${backendPort}/api`;
   }
 

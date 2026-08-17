@@ -110,3 +110,12 @@ application menu, accept the standard system confirmation, and verify the app
 downloads, verifies, installs, and relaunches into the new version. In a current
 build, the same menu action must show the native up-to-date dialog. Failed checks
 must show a native error dialog within the Rust-owned 15-second request timeout.
+
+Verify the packaged application reaches the Workspace after startup, then
+reload the webview repeatedly and confirm each load discovers the current
+random-port backend and passes the health gate. Switch the Data Root to exercise
+the supervised backend restart, reload again, and confirm requests use the
+replacement URL rather than the retired port. Perform the reload check with
+Command-R on macOS and Ctrl-R on Windows. The packaged application must never
+fall back to port `8001`; that port remains only the documented split web
+development default.

@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { getApiBase } from '@/lib/backend/env';
-import { isTauri } from '@/lib/isTauri';
+import { resolveBackendConnection } from '@/lib/backend/backendConnection';
 
 /**
  * Polls `GET /health` until the backend responds successfully.
  *
- * In Tauri desktop builds the backend URL is injected at runtime (either on
- * `window.__BACKEND_URL__` or via the `get_backend_url` command). In the web
- * build we derive it from `getApiBase()` so dev proxies work unchanged.
+ * The shared connection resolver keeps browser environment/same-origin rules
+ * and Tauri IPC discovery behind one readiness boundary.
  *
  * Returns `{ ready, error }`. `ready` flips once the server answers 2xx with
  * `{ status: 'ready' }`; `error` surfaces the most recent
@@ -16,67 +14,21 @@ import { isTauri } from '@/lib/isTauri';
  * Backoff: six fast attempts (500 ms) then exponential up to 5 s.
  */
 
-/** Converts an API/backend base URL into the health endpoint URL the startup gate polls. */
-/** Called by: useBackendHealth in this hook module. */
-const normalizeToHealthUrl = (backendUrl: string) => {
-  const trimmed = backendUrl.replace(/\/$/, '');
-  return trimmed.endsWith('/api') ? trimmed.replace(/\/api$/, '/health') : `${trimmed}/health`;
-};
-
-/** Resolves the health URL from Tauri injection, Tauri command, or web API-base rules. */
-/**
- * Called by: useBackendHealth because the startup gate needs the same `/health` endpoint across web proxies and packaged desktop launches.
- * Flow: prefer the injected desktop backend URL, ask Tauri for one when needed, cache it on window, then derive the web fallback from getApiBase().
- */
-const resolveHealthUrl = async (): Promise<string> => {
-  if (typeof window !== 'undefined') {
-    if (window.__BACKEND_URL__) {
-      return `${window.__BACKEND_URL__.replace(/\/$/, '')}/health`;
-    }
-    if (isTauri()) {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const backendUrl = await invoke<string>('get_backend_url');
-      if (backendUrl) {
-        const normalized = backendUrl.replace(/\/$/, '');
-        window.__BACKEND_URL__ = normalized;
-        return `${normalized}/health`;
-      }
-    }
-  }
-  return normalizeToHealthUrl(getApiBase());
-};
-
 /** Polls backend readiness for the blocking startup screen. */
 /**
- * Used by: src/App.tsx because app startup must hold the UI until the local or remote backend can answer health checks.
- * Flow: resolve the health URL, poll it with startup backoff, then expose readiness and the latest error to the blocking screen.
+ * Used by: BackendConnectionGate because backend-dependent UI must not mount
+ * until the active runtime has configured the generated client and answered
+ * its canonical health check.
  */
 export const useBackendHealth = () => {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [healthUrl, setHealthUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    resolveHealthUrl()
-      .then((url) => {
-        if (!cancelled) setHealthUrl(url);
-      })
-      .catch((err: unknown) => {
-        console.error('Failed to resolve backend health URL', err);
-        if (!cancelled) setHealthUrl('/health');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!healthUrl) return;
-
     let cancelled = false;
     let attempt = 0;
     let timeoutId: number | null = null;
+    const isCancelled = () => cancelled;
 
     /** Applies the health-poll backoff after failed attempts. */
     /** Called by: `poll` after an unsuccessful health check. */
@@ -96,26 +48,34 @@ export const useBackendHealth = () => {
     const poll = async () => {
       attempt += 1;
       try {
-        const resp = await fetch(healthUrl, { cache: 'no-store' });
+        const connection = await resolveBackendConnection();
+        if (isCancelled()) return;
+        const resp = await fetch(connection.healthUrl, { cache: 'no-store' });
+        if (isCancelled()) return;
         if (resp.ok) {
           const body: unknown = await resp.json();
+          if (isCancelled()) return;
           const healthy =
             typeof body === 'object' &&
             body !== null &&
             'status' in body &&
             body.status === 'ready';
           if (healthy) {
-            if (!cancelled) {
-              setReady(true);
-              setError(null);
-            }
+            setReady(true);
+            setError(null);
             return;
           }
         }
         throw new Error(`HTTP ${String(resp.status)}`);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Backend not reachable');
+          setError(
+            err instanceof Error
+              ? err.message
+              : typeof err === 'string'
+                ? err
+                : 'Backend not reachable',
+          );
         }
         scheduleNext();
       }
@@ -127,7 +87,7 @@ export const useBackendHealth = () => {
       cancelled = true;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [healthUrl]);
+  }, []);
 
   return { ready, error };
 };

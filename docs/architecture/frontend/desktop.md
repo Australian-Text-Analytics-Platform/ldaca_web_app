@@ -26,8 +26,11 @@ sequenceDiagram
     Backend->>Backend: enter ASGI lifespan
     Backend-->>App: publish ready port, identity, and version
     App->>App: validate startup identity, version, and loopback address
-    App->>Webview: inject backend URL
     App->>Webview: show window
+    Webview->>App: request current backend URL
+    App-->>Webview: return ready URL from managed state
+    Webview->>Backend: configure generated client and check health
+    Webview->>Webview: mount authentication and Workspace consumers
     Webview->>App: request validated Data Root switch
     App->>Backend: bounded shutdown
     App->>Backend: launch candidate or roll back to previous root
@@ -41,7 +44,11 @@ sequenceDiagram
 At startup, Tauri loads the desktop Data Root, launches the backend with port
 zero and a private startup record, waits for
 ASGI lifespan readiness, validates process identity and package version,
-injects the assigned URL, and only then shows the window.
+installs the assigned URL in managed Rust state, and only then shows the window.
+The frontend connection gate obtains that URL through `get_backend_url`,
+configures the generated client, and verifies `/health` before mounting
+authentication or Workspace consumers. Reloading repeats IPC discovery, so a
+stale JavaScript value cannot select an old backend port.
 
 Each desktop process owns only its own backend child. The backend parent
 watchdog exits if that desktop process disappears, so multiple desktop
@@ -63,6 +70,13 @@ error dialog without blocking setup and exits after the user acknowledges it.
 This keeps startup failures visible even though the webview is not yet usable.
 
 ## Native Boundaries
+
+Backend connection discovery has one frontend gate and two runtime adapters.
+Browser builds retain the existing environment, runtime `basePath`, local
+development port, and same-origin rules without importing or invoking Tauri.
+Desktop builds dynamically load the Tauri API, treat `get_backend_url` as the
+source of truth, and retry both discovery and health checks with bounded
+backoff. Rust does not inject JavaScript or guess a fixed backend port.
 
 Data Root switching is a restart transaction: probe the candidate, stop the
 old backend, verify the candidate, persist configuration atomically, and roll

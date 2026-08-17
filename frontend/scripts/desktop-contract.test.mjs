@@ -118,6 +118,17 @@ describe('desktop configuration contracts', () => {
     expect(desktopShell).not.toMatch(/\.set_zoom\s*\(/);
   });
 
+  it('discovers the desktop backend through IPC without page-load injection', () => {
+    const desktopShell = read('frontend/src-tauri/src/lib.rs');
+    const backendEnvironment = read('frontend/src/lib/backend/env.ts');
+
+    expect(desktopShell).toContain('get_backend_url');
+    expect(desktopShell).not.toContain('window.__BACKEND_URL__');
+    expect(desktopShell).not.toMatch(/\.eval\s*\(/);
+    expect(desktopShell).not.toContain('on_page_load');
+    expect(backendEnvironment).not.toContain('http://127.0.0.1:${backendPort}/api');
+  });
+
   it('keeps retired JavaScript permissions, plugins, and globals absent', () => {
     const capability = JSON.parse(read('frontend/src-tauri/capabilities/default.json'));
     const cargo = read('frontend/src-tauri/Cargo.toml');

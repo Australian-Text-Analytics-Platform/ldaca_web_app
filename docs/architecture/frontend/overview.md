@@ -31,14 +31,16 @@ flowchart LR
     GUIDANCE --> JOYRIDE["React Joyride"]
     MODALS["Radix modal layer count"] -->|"inert below z-50"| GUIDANCE
 
-    TAURI["Tauri supervisor"] -. "injects runtime URL" .-> RUNTIME
+    TAURI["Tauri supervisor"] -. "serves runtime URL through IPC" .-> RUNTIME
 ```
 
 ## Boundaries
 
 - `src/api/` is the public barrel for generated SDK functions and types.
 - `src/lib/backend/` owns generated-client runtime configuration and API-base
-  resolution.
+  resolution. Its connection gate resolves either browser configuration or the
+  Tauri supervisor's current random-port URL, installs the generated-client
+  base, and verifies health before backend-dependent consumers mount.
 - `src/lib/arrow/` owns official Apache Arrow IPC decoding and lossless field
   inspection; it does not maintain a parallel column-kind naming registry.
   `src/api/tableApi.ts` is the narrow

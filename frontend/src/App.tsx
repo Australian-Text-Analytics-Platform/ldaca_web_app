@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { AuthBootstrap, useAuth } from '@/features/auth/hooks/useAuth';
-import { useBackendHealth } from '@/hooks/useBackendHealth';
-import { useUIStore } from '@/stores';
 import { getBlockingCopy } from '@/features/auth/authPhaseCopy';
 import BlockingScreen from '@/features/auth/components/BlockingScreen';
 import { LoginScreen } from '@/features/auth/components/LoginScreen';
@@ -9,6 +7,7 @@ import { LAG_HINT_DELAY_MS } from '@/config/timings';
 import { loadRemoteRegistry } from '@/tutorials/remoteRegistry';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 import { GlobalHosts } from '@/components/layout/GlobalHosts';
+import { BackendConnectionGate } from '@/components/layout/BackendConnectionGate';
 
 function App() {
   return <AppContent />;
@@ -19,39 +18,14 @@ function AppContent() {
     void loadRemoteRegistry();
   }, []);
 
-  const { ready: backendReady, error: backendError } = useBackendHealth();
-  const openFeedback = useUIStore((state) => state.openFeedback);
-
   return (
     <>
-      {!backendReady ? (
-        <BlockingScreen
-          title="Starting backend services"
-          description="Hang tight while we verify the backend is up and happy."
-          status="Checking /health…"
-          hint={
-            backendError
-              ? `Last error: ${backendError}`
-              : 'If this takes more than ~30s, check the backend logs.'
-          }
-          actions={
-            <button
-              type="button"
-              onClick={() => {
-                openFeedback();
-              }}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-            >
-              Send feedback
-            </button>
-          }
-        />
-      ) : (
+      <BackendConnectionGate>
         <>
           <AuthBootstrap />
           <AuthGate />
         </>
-      )}
+      </BackendConnectionGate>
       <GlobalHosts />
     </>
   );
