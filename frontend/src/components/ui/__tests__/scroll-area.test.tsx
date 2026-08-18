@@ -1,6 +1,7 @@
 /* eslint-disable testing-library/no-container, testing-library/no-node-access -- this primitive exposes no semantic scrollbar role */
-import { createRef } from 'react';
+
 import { render } from '@testing-library/react';
+import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { ScrollArea } from '../scroll-area';

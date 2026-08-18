@@ -43,11 +43,6 @@ interface Props {
   corpusSamples: CorpusSample[];
   nodeDocCounts: number[];
   onCorpusSampleChange: (idx: number, update: Partial<CorpusSample>) => void;
-  topicSizeValue: number;
-  topicSizeUserSet: boolean;
-  topicSizeWarning: 'orange' | 'red' | null;
-  onTopicSizeValueChange: (value: number) => void;
-  showSamplingWarning: boolean;
   randomSeed: number;
   randomSeedUserSet: boolean;
   onRandomSeedChange: (value: number) => void;
@@ -81,11 +76,6 @@ export function TopicModelingParameterPanel({
   corpusSamples,
   nodeDocCounts,
   onCorpusSampleChange,
-  topicSizeValue,
-  topicSizeUserSet,
-  topicSizeWarning,
-  onTopicSizeValueChange,
-  showSamplingWarning,
   randomSeed,
   randomSeedUserSet,
   onRandomSeedChange,
@@ -103,25 +93,6 @@ export function TopicModelingParameterPanel({
   hasResult,
   parametersLocked,
 }: Props) {
-  const [topicSizeDraft, setTopicSizeDraft] = useState<NumericInputDraft>(() => ({
-    source: topicSizeValue,
-    value: String(topicSizeValue),
-  }));
-  const topicSizeValueDraft =
-    topicSizeDraft.source === topicSizeValue ? topicSizeDraft.value : String(topicSizeValue);
-  // Called by: topic-size input change handler while preserving placeholder/user-set semantics.
-  const setTopicSizeValueDraft = (value: string) => {
-    setTopicSizeDraft({ source: topicSizeValue, value });
-  };
-
-  // Called by: topic-size input blur handler to commit bounded integer values.
-  const handleTopicSizeValueBlur = (event: FocusEvent<HTMLInputElement>) => {
-    const raw = Number(event.currentTarget.value);
-    const next = Math.max(2, isNaN(raw) ? 2 : Math.round(raw));
-    setTopicSizeDraft({ source: next, value: String(next) });
-    onTopicSizeValueChange(next); // always call — even unchanged — to solidify grey placeholder
-  };
-
   const [maxSegmentTokensDraft, setMaxSegmentTokensDraft] = useState<NumericInputDraft>(() => ({
     source: maxSegmentTokens,
     value: String(maxSegmentTokens),
@@ -231,12 +202,6 @@ export function TopicModelingParameterPanel({
         renderColumnAddon={renderSamplingInput}
       />
 
-      {showSamplingWarning && (
-        <p className="mx-3 mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs leading-tight text-amber-700">
-          Sampled corpus may be too small for the target topic count.
-        </p>
-      )}
-
       <div className="mt-4 px-3">
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-[11rem] space-y-1">
@@ -304,51 +269,6 @@ export function TopicModelingParameterPanel({
                 });
               }}
               onBlur={handleMaxSegmentTokensBlur}
-            />
-          </div>
-
-          {/* Minimum topic size (HDBSCAN min cluster size) */}
-          <div className="min-w-[11rem] space-y-1">
-            <Label
-              htmlFor="topic-size-value"
-              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
-            >
-              Minimum topic size
-              <span
-                aria-label="Minimum topic size is the smallest number of Topic Segments that can form a topic; smaller values yield more, finer-grained topics"
-                title="Minimum topic size is the smallest number of Topic Segments that can form a topic. Smaller values yield more, finer-grained topics; the total number of topics is determined automatically."
-                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
-              >
-                <CircleHelp className="h-4 w-4" />
-              </span>
-            </Label>
-            <Input
-              id="topic-size-value"
-              aria-label="Minimum topic size"
-              type="number"
-              min={2}
-              step={1}
-              value={topicSizeValueDraft}
-              title={
-                topicSizeWarning === 'red'
-                  ? 'Fewer than 3 Topic Segments per topic — results will likely be unusable'
-                  : topicSizeWarning === 'orange'
-                    ? 'Fewer than 10 Topic Segments per topic — topics may be noisy or unstable'
-                    : undefined
-              }
-              className={`h-9 w-full px-2 text-right text-sm${
-                topicSizeWarning === 'red'
-                  ? ' text-red-500'
-                  : topicSizeWarning === 'orange'
-                    ? ' text-orange-500'
-                    : !topicSizeUserSet
-                      ? ' text-muted-foreground'
-                      : ''
-              }`}
-              onChange={(e) => {
-                setTopicSizeValueDraft(e.target.value);
-              }}
-              onBlur={handleTopicSizeValueBlur}
             />
           </div>
 

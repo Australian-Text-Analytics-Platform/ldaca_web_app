@@ -765,24 +765,6 @@ export type ApiError = {
 };
 
 /**
- * ArtifactResource
- */
-export type ArtifactResource = {
-    /**
-     * Media Type
-     */
-    media_type?: string | null;
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Url
-     */
-    url: string;
-};
-
-/**
  * AuthProvider
  *
  * One configured hosted login provider.
@@ -2736,30 +2718,6 @@ export type NodeUpdateRequest = {
 };
 
 /**
- * PagedTableResource
- *
- * One open-ended table fetched as independent Arrow IPC pages.
- */
-export type PagedTableResource = {
-    /**
-     * Delivery
-     */
-    delivery?: 'paged';
-    /**
-     * Rows Url
-     */
-    rows_url: string;
-    /**
-     * Schema Url
-     */
-    schema_url: string;
-    /**
-     * Table Id
-     */
-    table_id: string;
-};
-
-/**
  * Progress
  *
  * Exact live and durable progress value shared by background resources.
@@ -3840,6 +3798,7 @@ export type Tab = {
      * Stop Words
      */
     stop_words?: Array<string>;
+    topic_modeling_cluster_selection?: TopicModelingClusterSelection | null;
     /**
      * Topic Modeling Words Per Topic
      */
@@ -3875,6 +3834,7 @@ export type TabUpdate = {
      * Stop Words
      */
     stop_words?: Array<string> | null;
+    topic_modeling_cluster_selection?: TopicModelingClusterSelection | null;
     /**
      * Topic Modeling Words Per Topic
      */
@@ -3970,6 +3930,32 @@ export type TokenizerModelResource = {
 };
 
 /**
+ * TopicClustering
+ */
+export type TopicClustering = {
+    /**
+     * Adjustable
+     */
+    adjustable: boolean;
+    /**
+     * Cluster Count
+     */
+    cluster_count: number;
+    /**
+     * Default Cluster Count
+     */
+    default_cluster_count: number;
+    /**
+     * Max Cluster Count
+     */
+    max_cluster_count: number;
+    /**
+     * Min Cluster Count
+     */
+    min_cluster_count: number;
+};
+
+/**
  * TopicItem
  */
 export type TopicItem = {
@@ -4042,10 +4028,6 @@ export type TopicMetadata = {
      */
     engine?: string | null;
     /**
-     * Min Topic Size
-     */
-    min_topic_size?: number | null;
-    /**
      * N Chunks
      */
     n_chunks?: number | null;
@@ -4092,10 +4074,6 @@ export type TopicModelingAnalysisRequest = {
      */
     max_segment_tokens?: number;
     /**
-     * Min Topic Size
-     */
-    min_topic_size?: number;
-    /**
      * Node Columns
      */
     node_columns: {
@@ -4117,9 +4095,27 @@ export type TopicModelingAnalysisRequest = {
 };
 
 /**
+ * TopicModelingClusterSelection
+ */
+export type TopicModelingClusterSelection = {
+    /**
+     * Analysis Id
+     */
+    analysis_id: string;
+    /**
+     * Cluster Count
+     */
+    cluster_count: number;
+};
+
+/**
  * TopicModelingDataBlockCreationAnalysisRequest
  */
 export type TopicModelingDataBlockCreationAnalysisRequest = {
+    /**
+     * Cluster Count
+     */
+    cluster_count: number;
     /**
      * Kind
      */
@@ -4154,6 +4150,10 @@ export type TopicModelingDataBlockCreationAnalysisRequest = {
  * TopicModelingDataBlockCreationDerivation
  */
 export type TopicModelingDataBlockCreationDerivation = {
+    /**
+     * Cluster Count
+     */
+    cluster_count: number;
     /**
      * Kind
      */
@@ -4216,7 +4216,7 @@ export type TopicModelingDataBlockCreationResult = {
  * TopicModelingResult
  */
 export type TopicModelingResult = {
-    artifacts: TopicArtifactsResource;
+    clustering: TopicClustering;
     /**
      * Corpus Sizes
      */
@@ -4235,6 +4235,10 @@ export type TopicModelingResult = {
     }> | null;
     query: TopicModelingResultQuery;
     /**
+     * Sources
+     */
+    sources: Array<TopicSource>;
+    /**
      * Topics
      */
     topics: Array<TopicItem>;
@@ -4244,6 +4248,10 @@ export type TopicModelingResult = {
  * TopicModelingResultQuery
  */
 export type TopicModelingResultQuery = {
+    /**
+     * Cluster Count
+     */
+    cluster_count?: number | null;
     /**
      * Descending
      */
@@ -4274,6 +4282,28 @@ export type TopicModelingResultQuery = {
  * TopicSegmentationMethod
  */
 export type TopicSegmentationMethod = 'automatic' | 'paragraph' | 'sentence';
+
+/**
+ * TopicSource
+ */
+export type TopicSource = {
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+    /**
+     * Original Columns
+     */
+    original_columns: Array<string>;
+    /**
+     * Text Column
+     */
+    text_column: string;
+};
 
 /**
  * TopicStageTiming
@@ -4779,44 +4809,6 @@ export type TokenTableResources = {
      * Version
      */
     version: 1;
-};
-
-/**
- * _TopicArtifactsResource
- */
-export type TopicArtifactsResource = {
-    /**
-     * Nodes
-     */
-    nodes: Array<TopicNodeArtifactResource>;
-    topic_meanings_parquet_path: ArtifactResource;
-    /**
-     * Version
-     */
-    version: 1;
-};
-
-/**
- * _TopicNodeArtifactResource
- */
-export type TopicNodeArtifactResource = {
-    assignments: PagedTableResource;
-    /**
-     * Node Id
-     */
-    node_id: string;
-    /**
-     * Node Name
-     */
-    node_name: string;
-    /**
-     * Original Columns
-     */
-    original_columns: Array<string>;
-    /**
-     * Text Column
-     */
-    text_column: string;
 };
 
 /**

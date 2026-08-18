@@ -1,30 +1,32 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { TopicModelingTopic } from '@/api';
 import JSZip from 'jszip';
-import { Download, Scan } from 'lucide-react';
 import { toast } from 'sonner';
-import { TopicSelectionPanel } from './TopicSelectionPanel';
-import type { ZoomDomain } from '../../topicModelingAdapters';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
+import { ResponsiveWordCloud } from '@/features/views/common/components/ResponsiveWordCloud';
+import { getReadableTextColor } from '../../topicModelingAdapters';
 import {
   buildChartBlob,
-  findSvgInContainer,
-  type ChartImageFormat,
   type ChartExportHeaderItem,
+  type ChartImageFormat,
 } from '@/lib/chartExport';
 import { saveBlob } from '@/lib/download';
-import { ResponsiveWordCloud } from '@/features/views/common/components/ResponsiveWordCloud';
 import { buildTopicsCSV } from './topicModelingCsv';
+import { TopicModelingFlowChart } from './TopicModelingFlowChart';
+import { buildTopicBubbleModels, resolveTopicCorpusColor } from './topicModelingGraph';
+import { TopicSelectionPanel } from './TopicSelectionPanel';
+
+interface TooltipState {
+  topic: TopicModelingTopic | null;
+  x: number;
+  y: number;
+}
 
 interface Props {
   topics: TopicModelingTopic[];
   exportTopics?: TopicModelingTopic[];
-  chartRef: React.RefObject<HTMLDivElement | null>;
-  handleResetZoom: () => void;
-  isAtGlobalZoom: boolean;
-  bubbleElements: React.ReactNode;
-  tooltip: { topic: TopicModelingTopic | null; x: number; y: number };
-  renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
+  tooltip: TooltipState;
+  setTooltip: React.Dispatch<React.SetStateAction<TooltipState>>;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
   selectedTopicIds: Set<number>;
@@ -32,40 +34,97 @@ interface Props {
   onClearSelection: () => void;
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
-  activeDomain: ZoomDomain | null;
+  corpusCount: number;
+  panelNodeIds: string[];
+  nodeColors: Record<string, string>;
+  defaultPalette: string[];
+  projectionKey: string;
+  onViewReady: (projectionKey: string) => void;
   nodeNames?: string[];
-  topicSizeValue?: number;
+  clusterCount?: number;
+  exportDisabled?: boolean;
   randomSeed?: number;
-  /** Rendered between the bubble chart and the topic list. Hosts the
-   * post-fit control row (topic count, re-aggregate
-   * slider, Add to Workspace). */
+  /** Result controls placed between the graph and the Topic lists. */
   controlRowSlot?: React.ReactNode;
 }
-
-const OVERLAY_BTN =
-  'flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
 
 const TM_CSV_OPTION = {
   id: 'includeCSV',
   label: 'Include representative words (CSV)',
   defaultChecked: true,
 } as const;
+const EMPTY_TOPIC_IDS = new Set<number>();
 
-/**
- * Composes the topic bubble chart, zoom/export overlay, tooltip, controls, and topic lists.
- * Rendered by: TopicModelingResultsPanel for successful task results.
- * Flow: host the SVG and tooltip, export the visible topic data with the
- * chart image, render post-fit controls, then pass shared interaction state to TopicSelectionPanel.
- */
+/** Renders corpus counts with the same persisted colours used by graph bubbles. */
+function TopicSizeComposition({
+  sizes,
+  total,
+  corpusCount,
+  panelNodeIds,
+  nodeColors,
+  defaultPalette,
+}: {
+  sizes: number[] | undefined;
+  total?: number | null;
+  corpusCount: number;
+  panelNodeIds: string[];
+  nodeColors: Record<string, string>;
+  defaultPalette: string[];
+}) {
+  if (corpusCount === 0 || !sizes) return null;
+  const colorA = resolveTopicCorpusColor(
+    0,
+    defaultPalette[0] ?? '#2563eb',
+    panelNodeIds,
+    nodeColors,
+    defaultPalette,
+  );
+  const colorB = resolveTopicCorpusColor(
+    1,
+    defaultPalette[1] ?? '#dc2626',
+    panelNodeIds,
+    nodeColors,
+    defaultPalette,
+  );
+  if (sizes.length === 1) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span
+          style={{ background: colorA, color: getReadableTextColor(colorA) }}
+          className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+        >
+          {sizes[0]}
+        </span>
+        <span className="text-[10px] text-gray-500">= {total}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span
+        style={{ background: colorA, color: getReadableTextColor(colorA) }}
+        className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+      >
+        {sizes[0]}
+      </span>
+      <span className="text-[10px] text-gray-500">+</span>
+      <span
+        style={{ background: colorB, color: getReadableTextColor(colorB) }}
+        className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+      >
+        {sizes[1]}
+      </span>
+      <span className="text-[10px] text-gray-500">= {total}</span>
+    </span>
+  );
+}
+
+/** Composes the React Flow topic graph, export dialog, result controls, and Topic lists. */
 export function TopicModelingBubbleChartSection({
   topics,
   exportTopics = topics,
-  chartRef,
-  handleResetZoom,
-  isAtGlobalZoom,
-  bubbleElements,
   tooltip,
-  renderSizeComposition,
+  setTooltip,
   hoveredTopicId,
   setHoveredTopicId,
   selectedTopicIds,
@@ -73,48 +132,67 @@ export function TopicModelingBubbleChartSection({
   onClearSelection,
   topicSearchQuery,
   onTopicSearchQueryChange,
-  activeDomain,
+  corpusCount,
+  panelNodeIds,
+  nodeColors,
+  defaultPalette,
+  projectionKey,
+  onViewReady,
   nodeNames,
-  topicSizeValue,
+  clusterCount,
+  exportDisabled = false,
   randomSeed,
   controlRowSlot,
 }: Props) {
+  const chartRef = useRef<HTMLDivElement | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [lassoMode, setLassoMode] = useState(false);
+  const [lassoFilter, setLassoFilter] = useState({
+    projectionKey,
+    topicIds: EMPTY_TOPIC_IDS,
+  });
+  const lassoTopicIds =
+    lassoFilter.projectionKey === projectionKey ? lassoFilter.topicIds : EMPTY_TOPIC_IDS;
+  const bubbles = buildTopicBubbleModels({
+    topics,
+    corpusCount,
+    panelNodeIds,
+    nodeColors,
+    defaultPalette,
+    selectedTopicIds,
+    lassoTopicIds,
+    hoveredTopicId,
+    topicSearchQuery,
+  });
 
-  const downloadExtraOptions = [TM_CSV_OPTION];
+  const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => (
+    <TopicSizeComposition
+      sizes={sizes}
+      total={total}
+      corpusCount={corpusCount}
+      panelNodeIds={panelNodeIds}
+      nodeColors={nodeColors}
+      defaultPalette={defaultPalette}
+    />
+  );
 
-  // Called by: TopicModelingBubbleChartSection download menu because chart exports may include SVG/bitmap, topic CSV, and active stopword lists. Flow: verify the chart SVG, build header and extra files, then download the chart bundle or show toast errors.
   const handleDownloadChart = async (format: ChartImageFormat, extras: Record<string, boolean>) => {
-    if (!chartRef.current) {
+    const svg = chartRef.current?.querySelector<SVGSVGElement>(
+      'svg[data-topic-modeling-export="true"]',
+    );
+    if (!svg) {
       toast.error('Chart not available for export.');
       return;
     }
-    const svg = findSvgInContainer(chartRef.current);
-    if (!svg) {
-      toast.error('Chart SVG not found.');
-      return;
-    }
-
-    // Join all node names with '_' so the filename reflects both data blocks
     const nodeName = (nodeNames ?? []).filter(Boolean).join('_') || 'data';
     const header: ChartExportHeaderItem[] = [
       { label: 'Data Block', value: nodeNames?.join(', ') ?? 'data' },
-      {
-        label: 'Minimum topic size',
-        value: topicSizeValue != null ? String(topicSizeValue) : '—',
-      },
+      { label: 'Clusters', value: clusterCount != null ? String(clusterCount) : '—' },
       { label: 'Random Seed', value: randomSeed != null ? String(randomSeed) : '—' },
       { label: 'Topics', value: String(topics.length) },
     ];
-
-    const includeCSV = extras.includeCSV ?? false;
-
     try {
-      // Anything beyond the image alone forces the zip path so the
-      // user gets one archive instead of N concurrent saveBlobs.
-      const wantsZip = includeCSV;
-
-      if (wantsZip) {
+      if (extras.includeCSV ?? false) {
         const { blob: imageBlob, filename: imageFilename } = await buildChartBlob(svg, {
           nodeName,
           toolSuffix: 'tm',
@@ -122,79 +200,76 @@ export function TopicModelingBubbleChartSection({
           header,
           legend: [],
         });
-
         const safeBaseName = nodeName.replace(/[<>:"\\|?*/\s]+/g, '_').slice(0, 60) || 'data';
-
         const zip = new JSZip();
         zip.file(imageFilename, imageBlob);
-
-        const csvContent = buildTopicsCSV(exportTopics, selectedTopicIds, nodeNames ?? []);
         zip.file(
           `${safeBaseName}_tm_topics.csv`,
-          new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }),
+          new Blob([buildTopicsCSV(exportTopics, selectedTopicIds, nodeNames ?? [])], {
+            type: 'text/csv;charset=utf-8;',
+          }),
         );
-
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        await saveBlob(zipBlob, `${safeBaseName}_tm.zip`);
+        await saveBlob(await zip.generateAsync({ type: 'blob' }), `${safeBaseName}_tm.zip`);
       } else {
-        // Image only — use the same path as Trends
-        await buildChartBlob(svg, {
+        const { blob, filename } = await buildChartBlob(svg, {
           nodeName,
           toolSuffix: 'tm',
           format,
           header,
           legend: [],
-        }).then(({ blob, filename }) => saveBlob(blob, filename));
+        });
+        await saveBlob(blob, filename);
       }
     } catch (error) {
-      const description = error instanceof Error ? error.message : String(error);
-      toast.error('Failed to export chart.', { description });
+      toast.error('Failed to export chart.', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
   return (
     <>
-      <div className="relative w-full" ref={chartRef}>
+      <div ref={chartRef} className="relative w-full" style={{ containerType: 'inline-size' }}>
         <div
           className="overflow-hidden rounded-lg border border-muted-foreground/30 bg-background"
           data-testid="topic-bubble-chart-shell"
+          style={{ height: 'clamp(320px, 55cqw, 520px)' }}
         >
-          {/* Top-right overlay: Reset view + Download — grouped so Download sits to the right of Reset view */}
-          <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
-            <button
-              type="button"
-              className={OVERLAY_BTN}
-              onClick={handleResetZoom}
-              disabled={isAtGlobalZoom}
-              title="Reset zoom to global view (or double-click chart)"
-              aria-label="Reset zoom to global view"
-            >
-              <Scan className="h-3.5 w-3.5" />
-              Reset view
-            </button>
-            <button
-              type="button"
-              className={OVERLAY_BTN}
-              onClick={() => {
-                setDownloadDialogOpen(true);
-              }}
-              title="Download chart"
-              aria-label="Download chart"
-            >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {bubbleElements}
+          <TopicModelingFlowChart
+            bubbles={bubbles}
+            chartRootRef={chartRef}
+            projectionKey={projectionKey}
+            lassoMode={lassoMode}
+            exportDisabled={exportDisabled}
+            onToggleLassoMode={() => {
+              setLassoMode((current) => !current);
+              setHoveredTopicId(null);
+              setTooltip((current) => ({ ...current, topic: null }));
+            }}
+            onAddLassoTopics={(topicIds) => {
+              setLassoFilter((current) => ({
+                projectionKey,
+                topicIds: new Set([
+                  ...(current.projectionKey === projectionKey ? current.topicIds : EMPTY_TOPIC_IDS),
+                  ...topicIds,
+                ]),
+              }));
+            }}
+            onDownload={() => {
+              setDownloadDialogOpen(true);
+            }}
+            onViewReady={onViewReady}
+            onToggleTopicSelection={onToggleTopicSelection}
+            setHoveredTopicId={setHoveredTopicId}
+            setTooltip={setTooltip}
+          />
         </div>
-        {tooltip.topic && (
+        {tooltip.topic ? (
           <div
             className="pointer-events-none absolute z-30 w-[min(18rem,calc(100%-1rem))] rounded-md border border-border bg-card p-3 text-xs shadow-lg"
             data-testid="topic-bubble-chart-tooltip"
             role="tooltip"
-            style={{
-              left: tooltip.x,
-              top: tooltip.y,
-            }}
+            style={{ left: tooltip.x, top: tooltip.y }}
           >
             <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
             <div className="mt-1 max-h-36 overflow-hidden text-muted-foreground">
@@ -216,7 +291,7 @@ export function TopicModelingBubbleChartSection({
               {renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {controlRowSlot ?? null}
@@ -228,8 +303,10 @@ export function TopicModelingBubbleChartSection({
         onClearSelection={onClearSelection}
         topicSearchQuery={topicSearchQuery}
         onTopicSearchQueryChange={onTopicSearchQueryChange}
-        activeDomain={activeDomain}
-        isAtGlobalZoom={isAtGlobalZoom}
+        lassoTopicIds={lassoTopicIds}
+        onClearLassoFilter={() => {
+          setLassoFilter({ projectionKey, topicIds: EMPTY_TOPIC_IDS });
+        }}
         renderSizeComposition={renderSizeComposition}
         hoveredTopicId={hoveredTopicId}
         setHoveredTopicId={setHoveredTopicId}
@@ -239,7 +316,7 @@ export function TopicModelingBubbleChartSection({
         open={downloadDialogOpen}
         onOpenChange={setDownloadDialogOpen}
         title="Download Topic Model Chart"
-        extraOptions={downloadExtraOptions}
+        extraOptions={[TM_CSV_OPTION]}
         onConfirm={(format, extras) => {
           void handleDownloadChart(format, extras);
         }}

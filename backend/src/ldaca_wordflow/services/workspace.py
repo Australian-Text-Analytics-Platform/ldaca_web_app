@@ -67,6 +67,7 @@ from ..models.workspace import (
     WorkspaceUpdateRequest,
 )
 from ..models.tabs import TabCreate, TabUpdate
+from ..models.analysis_results import TopicModelingStoredResult
 from ..infrastructure.storage.layout import (
     NODE_SOURCE_STAGING_PREFIX,
     NODE_SOURCE_STAGING_SUFFIX,
@@ -1215,6 +1216,38 @@ class WorkspaceService:
                     tab.topic_modeling_words_per_topic = (
                         request.topic_modeling_words_per_topic
                     )
+                    changed = True
+            if "topic_modeling_cluster_selection" in request.model_fields_set:
+                if tab.kind is not AnalysisKind.TOPIC_MODELING:
+                    raise InvalidInputError(
+                        "Topic cluster selection belongs only to Topic Modelling Tabs"
+                    )
+                selection = request.topic_modeling_cluster_selection
+                if selection is not None:
+                    record = lease.workspace.analyses.get(str(selection.analysis_id))
+                    if (
+                        record is None
+                        or record.tab_id != tab.id
+                        or record.state is not BackgroundState.SUCCEEDED
+                        or record.request.kind != "topic_modeling"
+                        or record.result_payload is None
+                    ):
+                        raise InvalidInputError(
+                            "Topic cluster selection Analysis is unavailable"
+                        )
+                    stored = TopicModelingStoredResult.model_validate(
+                        record.result_payload
+                    )
+                    if not (
+                        stored.clustering.min_cluster_count
+                        <= selection.cluster_count
+                        <= stored.clustering.max_cluster_count
+                    ):
+                        raise InvalidInputError(
+                            "Topic cluster selection is outside the supported range"
+                        )
+                if tab.topic_modeling_cluster_selection != selection:
+                    tab.topic_modeling_cluster_selection = selection
                     changed = True
             if changed:
                 tab.modified_at = datetime.now(UTC)

@@ -141,4 +141,46 @@ describe('useAnalysisSession', () => {
     expect(view.result.current.result).toBeNull();
     expect(view.result.current.isResultPlaceholderData).toBe(false);
   });
+
+  it('requests every no-store projection attempt without sending its request key', async () => {
+    const { wrapper } = setup();
+    const loadResult = vi.fn(
+      async (
+        _workspaceId: string,
+        _analysisId: string,
+        query?: Readonly<Record<string, unknown>>,
+      ) => ({ clusterCount: query?.cluster_count }),
+    );
+    const view = renderHook(
+      ({ resultRequestKey }: { resultRequestKey: number }) =>
+        useAnalysisSession({
+          workspaceId: 'workspace-1',
+          analysisId: 'analysis-1',
+          resultQuery: { kind: 'topic_modeling', cluster_count: 3 },
+          resultRequestKey,
+          resultCacheMode: 'no-store',
+          loadResult,
+        }),
+      { wrapper, initialProps: { resultRequestKey: 1 } },
+    );
+
+    await waitFor(() => expect(loadResult).toHaveBeenCalledTimes(1));
+    view.rerender({ resultRequestKey: 2 });
+    await waitFor(() => expect(loadResult).toHaveBeenCalledTimes(2));
+
+    expect(loadResult).toHaveBeenNthCalledWith(
+      1,
+      'workspace-1',
+      'analysis-1',
+      { kind: 'topic_modeling', cluster_count: 3 },
+      expect.any(AbortSignal),
+    );
+    expect(loadResult).toHaveBeenNthCalledWith(
+      2,
+      'workspace-1',
+      'analysis-1',
+      { kind: 'topic_modeling', cluster_count: 3 },
+      expect.any(AbortSignal),
+    );
+  });
 });

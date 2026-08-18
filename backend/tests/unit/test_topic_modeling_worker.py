@@ -194,6 +194,7 @@ def _fake_topic_modeling_expr_factory(
             pl.lit(truncated_segment_count, dtype=pl.UInt32).alias(
                 "truncated_segment_count"
             ),
+            pl.lit(b"context", dtype=pl.Binary).alias("clustering_context"),
             pl.Series(
                 "stage_timings_ms",
                 [timings],
@@ -463,6 +464,7 @@ def _canned_rust_result(
         "n_chunks": n_chunks,
         "truncated_segment_count": truncated_segment_count,
         "stage_timings_ms": stage_timings_ms or _STAGE_TIMINGS,
+        "clustering_context": b"context",
     }
 
 
@@ -475,7 +477,7 @@ def _node_info(node_id: str = "node-1") -> dict[str, Any]:
     }
 
 
-def test__compute_topic_modeling_writes_parquet_and_meaning_lists(
+def test__compute_topic_modeling_writes_only_clustering_context(
     tmp_path, monkeypatch
 ):
     progress: list[tuple[float, str]] = []
@@ -532,41 +534,10 @@ def test__compute_topic_modeling_writes_parquet_and_meaning_lists(
         progress_callback=lambda p, m: progress.append((p, m)),
     )
 
-    assignments = pl.read_parquet(tmp_path / "tm_test_topic_assignments_node-1.parquet")
-    meanings = pl.read_parquet(tmp_path / "tm_test_topic_meanings.parquet")
-
-    # The assignment parquet now carries the per-row soft distribution column
-    # used by the Data Block Creation distribution filter.
-    assert assignments.columns == [
-        "__row_nr__",
-        "TOPIC_topic",
-        "TOPIC_topic_distribution",
-    ]
-    assert assignments.schema["TOPIC_topic"] == pl.Int64
-    assert assignments["TOPIC_topic"].to_list() == [0, 0]
-    distribution_dtype = assignments.schema["TOPIC_topic_distribution"]
-    assert isinstance(distribution_dtype, pl.Extension)
-    assert distribution_dtype.ext_name() == ("org.ldaca.wordflow.topic_distribution.v1")
-    assert distribution_dtype.ext_storage() == pl.Array(
-        pl.Struct({"topic_id": pl.Int64, "proportion": pl.Float64}), 3
-    )
-    assert assignments["TOPIC_topic_distribution"].to_list() == [
-        [
-            {"topic_id": -1, "proportion": 0.0},
-            {"topic_id": 0, "proportion": 1.0},
-            {"topic_id": 1, "proportion": 0.0},
-        ],
-        [
-            {"topic_id": -1, "proportion": 0.0},
-            {"topic_id": 0, "proportion": 0.7},
-            {"topic_id": 1, "proportion": 0.3},
-        ],
-    ]
-    assert meanings.schema["TOPIC_topic_meaning"] == pl.List(pl.String)
-    assert meanings.to_dicts() == [
-        {"TOPIC_topic": 0, "TOPIC_topic_meaning": ["alpha", "beta", "gamma"]},
-        {"TOPIC_topic": 1, "TOPIC_topic_meaning": ["delta"]},
-    ]
+    context_path = tmp_path / "tm_test_topic_clustering_context.msgpack.zst"
+    assert context_path.read_bytes() == b"context"
+    assert not list(tmp_path.glob("*assignments*.parquet"))
+    assert not list(tmp_path.glob("*meanings*.parquet"))
 
     topic = result["topics"][0]
     assert topic["representative_words"] == _terms("alpha", "beta", "gamma")
@@ -620,8 +591,7 @@ def test__compute_topic_modeling_payload_keeps_all_ranked_candidates(
     )
 
     assert result["topics"][0]["representative_words"] == _terms(*many_words)
-    meanings = pl.read_parquet(tmp_path / "tm_cap_topic_meanings.parquet")
-    assert meanings.to_dicts()[0]["TOPIC_topic_meaning"] == many_words
+    assert result["clustering"]["cluster_count"] == 1
 
 
 def test__compute_topic_modeling_sampling_records_before_after_sizes(
@@ -657,11 +627,10 @@ def test__compute_topic_modeling_sampling_records_before_after_sizes(
     assert result["meta"]["corpus_sizes_after_sample"] == [10]
 
 
-def test__compute_topic_modeling_passes_min_topic_size_as_cluster_size(
+def test__compute_topic_modeling_uses_fixed_internal_cluster_size(
     tmp_path, monkeypatch
 ):
-    """``min_topic_size`` is forwarded to the expression as ``min_cluster_size``
-    (the only native topic-count control); there is no post-fit merge."""
+    """The removed public parameter cannot alter HDBSCAN leaf construction."""
     captured_kwargs: dict[str, Any] = {}
 
     def fake_run(**kwargs):
@@ -686,13 +655,8 @@ def test__compute_topic_modeling_passes_min_topic_size_as_cluster_size(
         artifact_dir=str(tmp_path),
         artifact_prefix="tm_min",
         embedding_cache_path=str(tmp_path / "embeddings.duckdb"),
-        min_topic_size=15,
     )
 
-    assert captured_kwargs["min_cluster_size"] == 15
-    assert "topic_size_mode" not in captured_kwargs
-    assert "topic_size_value" not in captured_kwargs
-    assert result["meta"]["min_topic_size"] == 15
-    # No exact re-aggregation context is persisted; manifest stays at version 1.
-    assert not (tmp_path / "tm_min_exact_reduction.json").exists()
-    assert result["artifacts"]["version"] == 1
+    assert captured_kwargs["min_cluster_size"] == 10
+    assert "min_topic_size" not in result["meta"]
+    assert result["clustering"]["max_cluster_count"] == 2

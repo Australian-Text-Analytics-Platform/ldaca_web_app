@@ -110,8 +110,8 @@ const decodeEscapedWildcards = (query: string): string => {
 /**
  * Matches a label with the shared literal/glob query language used by Filter
  * checklists and Topic Modeling topic search.
- * Used by: FilterValueChecklist, TopicSelectionPanel, and
- * useTopicModelingBubbleChart so cross-feature search semantics stay aligned.
+ * Used by: FilterValueChecklist and Topic Modelling graph/list search so
+ * cross-feature search semantics stay aligned.
  */
 export const matchChecklistOption = (optionLabel: string, query: string): boolean => {
   const normalizedQuery = query.trim();

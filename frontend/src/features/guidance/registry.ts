@@ -298,7 +298,7 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     CONTEXTUAL_HINT_IDS.topicModeling.run,
     '[data-guidance="topic-modeling-actions"]',
     'Control what becomes a topic',
-    'Segmentation, segment size, minimum topic size, sampling, and the random seed shape the model. Check the settings, then choose Run.',
+    'Segmentation, segment size, sampling, and the random seed shape the model. Check the settings, then choose Run.',
   ),
   hint(
     CONTEXTUAL_HINT_IDS.topicModeling.results,

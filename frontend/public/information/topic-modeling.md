@@ -15,9 +15,11 @@ assignments into a distribution for the source document.
 
 1. Automatic, Paragraph, or Sentence segmentation creates Topic Segments.
 2. A sentence-transformer model converts each segment into an embedding.
-3. PaCMAP reduces the embeddings and HDBSCAN discovers clusters and outliers.
-4. Class-based TF-IDF (c-TF-IDF) ranks representative words for each topic.
-5. Segment assignments are rolled up to document-level topic distributions,
+3. PaCMAP reduces the embeddings and HDBSCAN discovers natural clusters and
+   outliers.
+4. Wordflow builds a deterministic merge tree over the real clusters.
+5. Class-based TF-IDF (c-TF-IDF) ranks representative words for each topic.
+6. Segment assignments are rolled up to document-level topic distributions,
    weighted by the Unicode-character length of each retained segment.
 
 For keyword extraction, c-TF-IDF combines all Topic Segments assigned to a
@@ -41,7 +43,10 @@ then use the same downstream modelling pipeline.
 
 - Explore prominent and niche language patterns.
 - Compare the contribution of two corpora to the same discovered topics.
+- Adjust the displayed number of real Topics from the natural fit down to two.
 - Inspect representative words, topic sizes, similarity, and outliers.
+- Pan and zoom the fitted Topic graph, or cumulatively lasso Topics to filter
+  the All Topics list.
 - Publish selected topic data and meanings as Derived Data Blocks.
 
 <h3 id="info-topic-modeling-interpretation">Interpret with care</h3>
@@ -49,13 +54,16 @@ then use the same downstream modelling pipeline.
 Topic modelling is not a classifier or a definitive account of what a corpus
 is “about”. Clusters can reflect subject matter, genre, author, boilerplate,
 document length, or data-cleaning artefacts. Topic −1 is the expected outlier
-group rather than an error. Sampling, segmentation, minimum topic size, and the
-random seed can all affect the result, so compare configurations and return to
-the source documents when naming or interpreting a topic.
+group rather than an error. Sampling, segmentation, the displayed number of
+clusters, and the random seed can all affect the result, so compare
+configurations and return to the source documents when naming or interpreting
+a topic.
 
-Minimum topic size counts Topic Segments, because those are the observations
-clustered by HDBSCAN. Bubble size instead remains the integer number of source
-documents whose weighted dominant assignment is that topic.
+The Number of clusters Result control merges HDBSCAN's natural real Topics; it
+does not rerun the model and cannot split above that natural count. Topic −1 is
+never counted or merged. After each change Wordflow recalculates representative
+words, coordinates, and document assignments. Bubble size remains the integer
+number of source documents whose weighted dominant assignment is that topic.
 
 The term *topic* is technical rather than authorial. A critical overview is
 available in [this open-access article](https://doi.org/10.1177/14614456241293075)

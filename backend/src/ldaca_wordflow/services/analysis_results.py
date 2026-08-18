@@ -58,7 +58,6 @@ from ..models.analysis_results import (
     RunAllSourceTable,
     DataBlockCreationStoredResult,
     SequentialStoredResult,
-    PagedTableIdentity,
     ProjectedTableIdentity,
     StoredArtifactIdentity,
     TokenFrequencyStoredResult,
@@ -72,6 +71,7 @@ from ..shared.errors import (
     AnalysisResultUnavailableError,
     ArtifactGoneError,
     InvalidInputError,
+    InvalidClusterCountError,
     AnnotationProviderError,
     NodeNotFoundError,
 )
@@ -87,6 +87,8 @@ from ..workers.input_snapshots import (
     clone_worker_input_snapshot,
     load_snapshot_node,
 )
+from ..workers.topic_pipeline import _project_rust_topic_modeling
+from ..workers.topic_result import _build_topic_projection_payload
 from .analyses import AnalysisService
 from .analysis_artifacts import AnalysisArtifactService
 from .analysis_preparation import resolve_analysis_quotation_engine
@@ -524,11 +526,31 @@ class AnalysisResultService:
                     input_snapshot = await self._create_query_snapshot(lease, record)
 
             if isinstance(effective_query, TopicModelingResultQuery):
+                topic_stored = TopicModelingStoredResult.model_validate(stored)
+                context_path: Path | None = None
+                context_identity = topic_stored.clustering_context.artifact
+                if context_identity is not None:
+                    reference = next(
+                        (
+                            item
+                            for item in record.artifact_references
+                            if item.name == context_identity.name
+                        ),
+                        None,
+                    )
+                    if reference is not None:
+                        context_path = (
+                            lease.path
+                            / "analyses"
+                            / str(record.id)
+                            / reference.relative_path
+                        )
                 return ResultMaterialization(
                     payload=await self._run_sync(
                         _query_topics,
-                        TopicModelingStoredResult.model_validate(stored),
+                        topic_stored,
                         effective_query,
+                        context_path,
                     ),
                     stored=stored,
                 )
@@ -682,17 +704,6 @@ def _paged_table_artifact(
     stored: BaseModel,
     table_id: str,
 ) -> StoredArtifactIdentity:
-    if isinstance(stored, TopicModelingStoredResult):
-        table = next(
-            (
-                node.assignments
-                for node in stored.artifacts.nodes
-                if node.assignments.table_id == table_id
-            ),
-            None,
-        )
-        if isinstance(table, PagedTableIdentity):
-            return table.artifact
     raise ArtifactGoneError("Analysis Result table is unavailable")
 
 
@@ -988,11 +999,59 @@ def _json_sort_key(value: JsonData) -> tuple[int, int | float | str]:
 def _query_topics(
     stored: TopicModelingStoredResult,
     query: TopicModelingResultQuery,
+    context_path: Path | None,
 ) -> dict[str, JsonData]:
-    payload = cast(dict[str, JsonData], stored.model_dump(mode="json"))
+    requested_count = query.cluster_count
+    natural_count = stored.clustering.default_cluster_count
+    applied_count = natural_count if requested_count is None else requested_count
+    minimum = stored.clustering.min_cluster_count
+    maximum = stored.clustering.max_cluster_count
+    if applied_count < minimum or applied_count > maximum:
+        raise InvalidClusterCountError(
+            "Number of clusters is outside the supported range",
+            details={
+                "min_cluster_count": minimum,
+                "max_cluster_count": maximum,
+                "default_cluster_count": natural_count,
+            },
+        )
+    effective = stored
+    if requested_count is not None:
+        if context_path is None or not context_path.is_file():
+            raise ArtifactGoneError("Topic clustering context is unavailable")
+        try:
+            rust_result = _project_rust_topic_modeling(
+                clustering_context=context_path.read_bytes(),
+                cluster_count=applied_count,
+                document_count=sum(stored.corpus_sizes),
+            )
+            projection = _build_topic_projection_payload(
+                rust_result=rust_result,
+                node_infos=[source.model_dump(mode="json") for source in stored.sources],
+                corpus_sizes=stored.corpus_sizes,
+            )
+            effective = TopicModelingStoredResult.model_validate(
+                {
+                    **stored.model_dump(mode="json"),
+                    "topics": projection["topics"],
+                    "per_corpus_topic_counts": projection["per_corpus_topic_counts"],
+                    "clustering": {
+                        **stored.clustering.model_dump(mode="json"),
+                        "cluster_count": applied_count,
+                    },
+                }
+            )
+        except ArtifactGoneError:
+            raise
+        except Exception as exc:
+            raise AnalysisCorruptError("Topic clustering context is corrupt") from exc
+    payload = cast(
+        dict[str, JsonData],
+        effective.model_dump(mode="json", exclude={"clustering_context"}),
+    )
     rows = [
         cast(dict[str, JsonData], topic.model_dump(mode="json"))
-        for topic in stored.topics
+        for topic in effective.topics
     ]
     if query.topic_ids is not None:
         selected = set(query.topic_ids)
@@ -1000,8 +1059,8 @@ def _query_topics(
     columns = (
         set(rows[0])
         if rows
-        else set(type(stored.topics[0]).model_fields)
-        if stored.topics
+        else set(type(effective.topics[0]).model_fields)
+        if effective.topics
         else set()
     )
     page_rows, pagination = _sort_and_page(

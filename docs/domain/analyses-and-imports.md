@@ -233,9 +233,11 @@ segmentation preserve their respective Unicode text boundaries and truncate an
 oversized segment on the right.
 
 Every segmentation method then uses the same embedding, reduction, clustering,
-c-TF-IDF, and Result-construction pipeline. HDBSCAN treats each Topic Segment
-as one observation, so Minimum topic size counts Topic Segments. Document Topic
-Distributions are a separate rollup: each retained segment contributes its
+c-TF-IDF, and Result-construction pipeline. HDBSCAN privately uses minimum
+cluster size 10 and treats each Topic Segment as one equal observation. Its
+real Topics become the maximum-resolution leaves of a deterministic Ward merge
+tree; outlier `-1` is never merged. Document Topic Distributions are a separate
+rollup: each retained segment contributes its
 Unicode-character length, including repeated observations from Automatic
 overlap. Outlier weight remains in the normalization denominator. The highest-
 weight real topic is dominant, with smaller topic IDs breaking ties; `-1` is
@@ -244,17 +246,24 @@ integer counts of documents by dominant topic rather than weighted segment
 mass.
 
 Topic Results retain 100 Representative Words per topic in c-TF-IDF order,
-each with its model-segment occurrence count. Token Frequency and Topic
-Modelling Tabs may own one normalized stopword list; Topic Modelling Tabs also
-own a 3-100 Words-per-topic cap initialized to 15. Only explicit Tab PATCH
+each with its model-segment occurrence count. Result queries may cut the stored
+tree from the natural real-Topic count down to two and recompute all derived
+Topic JSON without changing the Analysis. Results with at most two real Topics
+are fixed. Canonical real Topic IDs are contiguous and ordered by smallest
+descendant leaf ID.
+
+Token Frequency and Topic Modelling Tabs may own one normalized stopword list;
+Topic Modelling Tabs also own a 3-100 Words-per-topic cap initialized to 15 and
+a nullable successful-Analysis cluster selection. Only explicit Tab PATCH
 operations change these settings. Analysis lifecycle operations and Clear
-Results preserve them.
+Results preserve the first two; removing or superseding the selected Topic
+Analysis clears its cluster selection.
 
 ## Persistence
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 17 and portable archive format 16 accept only this
+Native Workspace schema 18 and portable archive format 17 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

@@ -6,10 +6,7 @@ import {
   projectWorkspaceNodeMetadata,
   type WorkspaceNodeMetadata,
 } from '@/features/workspace/common/workspaceNodeMetadata';
-import {
-  DEFAULT_TOPIC_SIZE_VALUE,
-  useTopicModelingParameters,
-} from '../useTopicModelingParameters';
+import { useTopicModelingParameters } from '../useTopicModelingParameters';
 
 const nodes = (...counts: number[]): WorkspaceNodeMetadata[] =>
   counts.map((_count, index) =>
@@ -75,12 +72,10 @@ describe('useTopicModelingParameters', () => {
 
     act(() => {
       result.current.updateCorpusSample(0, { percent: '25' });
-      result.current.setTopicSizeValueFromUser(6);
       result.current.setRandomSeedFromUser(99);
     });
 
     expect(result.current.corpusSamplesUserSet).toBe(true);
-    expect(result.current.topicSizeUserSet).toBe(true);
     expect(result.current.randomSeedUserSet).toBe(true);
     expect(result.current.sampleFractionsForRequest).toEqual([0.25]);
 
@@ -89,8 +84,6 @@ describe('useTopicModelingParameters', () => {
     });
 
     expect(result.current.corpusSamples).toEqual([{ percent: '25' }]);
-    expect(result.current.topicSizeValue).toBe(DEFAULT_TOPIC_SIZE_VALUE);
-    expect(result.current.topicSizeUserSet).toBe(false);
     expect(result.current.randomSeed).toBe(99);
     expect(result.current.randomSeedUserSet).toBe(false);
   });
@@ -108,15 +101,12 @@ describe('useTopicModelingParameters', () => {
     act(() => {
       result.current.hydrateParameters({
         random_seed: 7,
-        min_topic_size: 12,
         sample_fractions: [0.2, null],
       });
     });
 
     expect(result.current.randomSeed).toBe(7);
     expect(result.current.randomSeedUserSet).toBe(true);
-    expect(result.current.topicSizeValue).toBe(12);
-    expect(result.current.topicSizeUserSet).toBe(true);
     expect(result.current.corpusSamples).toEqual([{ percent: '20' }, { percent: '100' }]);
     expect(result.current.corpusSamplesUserSet).toBe(true);
   });
@@ -147,7 +137,6 @@ describe('useTopicModelingParameters', () => {
     act(() => {
       result.current.hydrateParameters({
         random_seed: 7,
-        min_topic_size: 12,
         sample_fractions: [0.2],
       });
     });

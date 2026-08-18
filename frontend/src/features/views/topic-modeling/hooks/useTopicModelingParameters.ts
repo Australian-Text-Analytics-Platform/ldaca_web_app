@@ -2,7 +2,6 @@ import { useEffect, useReducer, useRef } from 'react';
 import type { TopicSegmentationMethod, WorkspaceNodeInfo } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import {
-  DEFAULT_TOPIC_SIZE_VALUE,
   DEFAULT_MAX_SEGMENT_TOKENS,
   createTopicModelingParameterState,
   defaultCorpusSample,
@@ -17,7 +16,6 @@ import {
 
 export {
   DEFAULT_MAX_SEGMENT_TOKENS,
-  DEFAULT_TOPIC_SIZE_VALUE,
   effectiveSampleDocumentCount,
   normalizeTopicSampleFractions,
   sanitizeSamplePercent,
@@ -36,9 +34,6 @@ export interface UseTopicModelingParametersResult {
   corpusSamples: CorpusSample[];
   corpusSamplesUserSet: boolean;
   updateCorpusSample: (index: number, update: Partial<CorpusSample>) => void;
-  topicSizeValue: number;
-  topicSizeUserSet: boolean;
-  setTopicSizeValueFromUser: (value: number) => void;
   randomSeed: number;
   randomSeedUserSet: boolean;
   setRandomSeedFromUser: (value: number) => void;
@@ -48,8 +43,6 @@ export interface UseTopicModelingParametersResult {
   setMaxSegmentTokens: (value: number) => void;
   nodeDocCounts: number[];
   effectiveDocCounts: number[];
-  topicSizeWarning: 'orange' | 'red' | null;
-  showSamplingWarning: boolean;
   sampleFractionsForRequest: (number | null)[];
   hasAnySampling: boolean;
   hydrateParameters: (request: Record<string, unknown>) => void;
@@ -89,8 +82,6 @@ export function useTopicModelingParameters({
   const {
     corpusSamples,
     corpusSamplesUserSet,
-    topicSizeValue,
-    topicSizeUserSet,
     randomSeed,
     randomSeedUserSet,
     segmentationMethod,
@@ -140,12 +131,6 @@ export function useTopicModelingParameters({
     dispatchParameters({ type: 'updateCorpusSample', index, update });
   };
 
-  /** Records the next-run minimum topic size from an explicit user edit. */
-  // Called by: TopicModelingParameterPanel because committing the field should stop rendering its placeholder style.
-  const setTopicSizeValueFromUser = (value: number) => {
-    dispatchParameters({ type: 'setTopicSizeFromUser', value });
-  };
-
   /** Records the random seed from an explicit user edit. */
   // Called by: TopicModelingParameterPanel because changed seed values should be shown as user-set.
   const setRandomSeedFromUser = (value: number) => {
@@ -192,16 +177,6 @@ export function useTopicModelingParameters({
   const effectiveDocCounts = nodeDocCounts.map((n, idx) =>
     effectiveSampleDocumentCount(corpusSamples[idx], n),
   );
-  const combinedEffective = effectiveDocCounts.reduce((a, b) => a + b, 0);
-  const topicSizeWarning: 'orange' | 'red' | null =
-    combinedEffective <= 0 || topicSizeValue <= 0
-      ? null
-      : topicSizeValue < 3
-        ? 'red'
-        : topicSizeValue < 10
-          ? 'orange'
-          : null;
-  const showSamplingWarning = combinedEffective > 0 && combinedEffective < 5 * topicSizeValue;
   const sampleFractionsForRequest = Array.from({ length: nodeDocCounts.length }, (_, index) =>
     sampleToFraction(corpusSamples[index], nodeDocCounts[index] ?? 0),
   );
@@ -210,9 +185,6 @@ export function useTopicModelingParameters({
     corpusSamples,
     corpusSamplesUserSet,
     updateCorpusSample,
-    topicSizeValue,
-    topicSizeUserSet,
-    setTopicSizeValueFromUser,
     randomSeed,
     randomSeedUserSet,
     setRandomSeedFromUser,
@@ -222,8 +194,6 @@ export function useTopicModelingParameters({
     setMaxSegmentTokens,
     nodeDocCounts,
     effectiveDocCounts,
-    topicSizeWarning,
-    showSamplingWarning,
     sampleFractionsForRequest,
     hasAnySampling: sampleFractionsForRequest.some((fraction) => fraction !== null),
     hydrateParameters,

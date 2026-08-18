@@ -184,6 +184,21 @@ Concordance density is a separate side-effect-free projection over the complete
 immutable child Result. It returns exact-match series in 100 fixed relative
 position bins and is independent of Review table page, sort, and row unit.
 
+Topic Modelling publishes its natural JSON Result plus one private versioned
+clustering-context Artifact. The context stores a weighted Ward tree over the
+real HDBSCAN leaves and additive term, coordinate, document, corpus, row, and
+retained-character facts; it stores neither source text nor embeddings. A
+`cluster_count` Result query reads that immutable Artifact, cuts only downward
+from the natural count, and rebuilds the complete JSON projection. Public
+Results expose ordered source metadata but no Artifact URL.
+
+Topic Modelling Data Block Creation is the only table-materialization path. Its
+Supporting request captures the displayed count and projected meaning
+overrides. The worker reads the parent's context and immutable input snapshot,
+runs the same projector, and atomically publishes matching assignment and
+meaning Data Blocks. A Result query itself never writes Artifacts, advances a
+revision, or emits lifecycle state.
+
 ## Tokenization
 
 Token Frequency requests map every selected Data Block to one tokenizer.
@@ -222,7 +237,7 @@ causes are retained only in request- or Analysis-correlated logs.
 Terminal Analysis forests, Results, Artifacts, and queryable snapshots persist
 with the Workspace. Annotation query snapshots materialize only the source and
 optional Example Data Block because the validated class list is already part of
-the immutable request. Native schema 17 and portable archive format 16 validate
+the immutable request. Native schema 18 and portable archive format 17 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

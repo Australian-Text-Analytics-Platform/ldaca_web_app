@@ -218,6 +218,7 @@ def test_tab_resources_are_exact_and_the_collection_is_unpaginated() -> None:
         "annotation_correction_columns",
         "stop_words",
         "topic_modeling_words_per_topic",
+        "topic_modeling_cluster_selection",
         "created_at",
         "modified_at",
         "revision",
@@ -227,6 +228,7 @@ def test_tab_resources_are_exact_and_the_collection_is_unpaginated() -> None:
         "annotation_correction_columns",
         "stop_words",
         "topic_modeling_words_per_topic",
+        "topic_modeling_cluster_selection",
     }
     collection = schema["paths"]["/api/workspaces/{workspace_id}/tabs"]["get"]
     assert [parameter["name"] for parameter in collection["parameters"]] == [

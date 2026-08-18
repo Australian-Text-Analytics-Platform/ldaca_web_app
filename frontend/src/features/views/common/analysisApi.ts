@@ -4,6 +4,7 @@ import type {
   ConcordanceResult,
   TokenFrequencyResult,
   TopicModelingResult,
+  TopicModelingResultQuery,
 } from '@/api';
 import { fetchArrowTable } from '@/lib/arrow/arrowTable';
 
@@ -66,11 +67,22 @@ export function projectConcordanceResult(
 export async function getAnalysisResultResource<TResult>(
   workspaceId: string,
   analysisId: string,
+  projectionQuery?: Readonly<Record<string, unknown>>,
+  signal?: AbortSignal,
 ): Promise<TResult> {
-  const { data: result } = await getAnalysisResult({
-    path: { workspace_id: workspaceId, analysis_id: analysisId },
-    throwOnError: true,
-  });
+  const topicProjection = projectionQuery as TopicModelingResultQuery | undefined;
+  const { data: result } = topicProjection
+    ? await queryAnalysisResult({
+        path: { workspace_id: workspaceId, analysis_id: analysisId },
+        body: { ...topicProjection, kind: 'topic_modeling' },
+        signal,
+        throwOnError: true,
+      })
+    : await getAnalysisResult({
+        path: { workspace_id: workspaceId, analysis_id: analysisId },
+        signal,
+        throwOnError: true,
+      });
   if (result.kind === 'concordance') {
     const page =
       result.sources == null
@@ -120,7 +132,8 @@ export async function getAnalysisResultResource<TResult>(
       const loadPage = async (page: number) => {
         const { data } = await queryAnalysisResult({
           path: { workspace_id: workspaceId, analysis_id: analysisId },
-          body: { kind: 'topic_modeling', page, page_size: 500 },
+          body: { ...topicProjection, kind: 'topic_modeling', page, page_size: 500 },
+          signal,
           throwOnError: true,
         });
         if (data.kind !== 'topic_modeling') {

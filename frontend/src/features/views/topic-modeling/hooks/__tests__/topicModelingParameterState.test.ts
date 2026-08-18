@@ -26,7 +26,6 @@ describe('topicModelingParameterReducer', () => {
       type: 'hydrateRequest',
       request: {
         random_seed: 7,
-        min_topic_size: 12,
         segmentation_method: 'paragraph',
         max_segment_tokens: 64,
         sample_fractions: [0.2, null],
@@ -37,8 +36,6 @@ describe('topicModelingParameterReducer', () => {
     expect(state).toMatchObject({
       randomSeed: 7,
       randomSeedUserSet: true,
-      topicSizeValue: 12,
-      topicSizeUserSet: true,
       segmentationMethod: 'paragraph',
       maxSegmentTokens: 64,
       corpusSamples: [{ percent: '20' }, { percent: '100' }],
@@ -51,7 +48,6 @@ describe('topicModelingParameterReducer', () => {
       type: 'hydrateRequest',
       request: {
         random_seed: 99,
-        min_topic_size: 6,
         segmentation_method: 'sentence',
         max_segment_tokens: 128,
         sample_fractions: [0.25],
@@ -65,8 +61,6 @@ describe('topicModelingParameterReducer', () => {
 
     expect(cleared.corpusSamples).toEqual([{ percent: '25' }]);
     expect(cleared.corpusSamplesUserSet).toBe(true);
-    expect(cleared.topicSizeValue).toBe(10);
-    expect(cleared.topicSizeUserSet).toBe(false);
     expect(cleared.randomSeed).toBe(99);
     expect(cleared.randomSeedUserSet).toBe(false);
     expect(cleared.segmentationMethod).toBe('sentence');

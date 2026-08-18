@@ -27,6 +27,7 @@ from ldaca_wordflow.domain.workspace import (
     Tab,
     TokenFrequencyAnalysisRequest,
     TopicModelingAnalysisRequest,
+    TopicModelingClusterSelection,
     ValidAnalysisIntegrity,
     Workspace,
     TopicModelingDataBlockCreationAnalysisRequest,
@@ -177,6 +178,7 @@ def test_topic_modeling_data_block_creation_request_preserves_ordered_sources() 
         selected_columns={first: ["text"], second: []},
         new_node_names={first: "First topics", second: "Second topics"},
         topic_ids=[3, 1],
+        cluster_count=4,
         topic_meanings_override=[
             {"topic_id": 3, "words": ["one", "two"]},
             {"topic_id": 1, "words": ["three"]},
@@ -195,6 +197,7 @@ def test_topic_modeling_data_block_creation_request_preserves_ordered_sources() 
             node_ids=[first, first],
             selected_columns={first: ["text"]},
             new_node_names={first: "Topics"},
+            cluster_count=2,
         )
 
     document_creation = ConcordanceDocumentDataBlockCreationAnalysisRequest(
@@ -217,6 +220,7 @@ def test_topic_modeling_data_block_creation_request_preserves_ordered_sources() 
             node_ids=[first, second],
             selected_columns={first: ["text"]},
             new_node_names={first: "Topics", second: "Other topics"},
+            cluster_count=2,
         )
     with pytest.raises(ValidationError):
         ConcordanceAnalysisRequest(
@@ -431,6 +435,37 @@ def test_workspace_supports_arbitrary_depth_analysis_forests_and_reservations() 
 
     assert workspace.analysis_descendants(str(root.id)) == [child, grandchild]
     assert tab.analysis_ids == [root.id, child.id, grandchild.id]
+
+
+def test_removing_topic_analysis_clears_its_tab_cluster_selection() -> None:
+    workspace = Workspace(name="topics")
+    tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.TOPIC_MODELING,
+            name="Topics",
+            timestamp=datetime.now(UTC),
+        )
+    )
+    node_id = uuid.uuid4()
+    analysis = workspace.add_analysis(
+        _analysis(
+            TopicModelingAnalysisRequest(
+                node_ids=[node_id],
+                node_columns={node_id: "text"},
+            ),
+            tab_id=tab.id,
+            execution_scope=AnalysisExecutionScope.RUN_ALL,
+            timestamp=datetime.now(UTC),
+        )
+    )
+    tab.topic_modeling_cluster_selection = TopicModelingClusterSelection(
+        analysis_id=analysis.id,
+        cluster_count=2,
+    )
+
+    workspace.remove_analysis(str(analysis.id))
+
+    assert tab.topic_modeling_cluster_selection is None
 
 
 def test_workspace_separates_live_visibility_from_detached_reservations() -> None:

@@ -4,8 +4,6 @@ import type { Analysis, TopicModelingRequest, TopicSegmentationMethod } from '@/
 import { runAnalysisTaskEnvelope } from '@/features/views/common/tasks/runAnalysisTaskEnvelope';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
-const DEFAULT_TOPIC_SIZE_VALUE = 10;
-
 interface TopicModelingState {
   currentWorkspaceId: string | null;
   tabId: string;
@@ -14,7 +12,6 @@ interface TopicModelingState {
   effectiveNodeColumnSelections: NodeColumnSelection[];
   randomSeed: number;
   sampleFractions?: (number | null)[] | null;
-  minTopicSize?: number;
   segmentationMethod: TopicSegmentationMethod;
   maxSegmentTokens: number;
 }
@@ -43,7 +40,6 @@ export function useTopicModelingTaskFlow({
     effectiveNodeColumnSelections,
     randomSeed,
     sampleFractions,
-    minTopicSize,
     segmentationMethod,
     maxSegmentTokens,
   },
@@ -68,7 +64,6 @@ export function useTopicModelingTaskFlow({
       node_ids: requestNodeIds,
       node_columns: nodeColumns,
       random_seed: randomSeed,
-      min_topic_size: minTopicSize ?? DEFAULT_TOPIC_SIZE_VALUE,
       segmentation_method: segmentationMethod,
       max_segment_tokens: maxSegmentTokens,
       ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),

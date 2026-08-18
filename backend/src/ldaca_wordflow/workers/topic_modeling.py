@@ -33,7 +33,7 @@ from .topic_pipeline import (
 )
 from .topic_result import (
     _build_empty_topic_payload,
-    _build_topic_result_payload,
+    _build_topic_projection_payload,
 )
 from .topic_types import _PreparedTopicPayload
 from .utils import process_entrypoint
@@ -42,6 +42,7 @@ from .utils import process_entrypoint
 # Recorded in result metadata so the API/frontend can report which model was
 # used; the actual download/loading is handled inside ``polars_text``.
 _DEFAULT_EMBEDDER_MODEL = "onnx-community/all-MiniLM-L6-v2-ONNX"
+_INTERNAL_MIN_CLUSTER_SIZE = 10
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,8 @@ def run_topic_modeling_data_block_creation(
     input_snapshot_dir: str,
     output_dir: str,
     request_payload: dict[str, Any],
-    assignment_paths: dict[str, str],
-    topic_meanings_path: str,
+    clustering_context_path: str,
+    source_projection: dict[str, dict[str, Any]],
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
     """Materialize selected Topic Modelling rows and meanings as Data Blocks."""
@@ -79,12 +80,19 @@ def run_topic_modeling_data_block_creation(
     request = TopicModelingDataBlockCreationAnalysisRequest.model_validate(request_payload)
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
-    meanings = pl.read_parquet(topic_meanings_path)
+    from .topic_pipeline import _project_rust_topic_modeling
+
+    projection = _project_rust_topic_modeling(
+        clustering_context=Path(clustering_context_path).read_bytes(),
+        cluster_count=request.cluster_count,
+        document_count=sum(int(item["size"]) for item in source_projection.values()),
+    )
     meaning_values = {
-        int(topic_id): list(words or [])
-        for topic_id, words in meanings.select(
-            TOPIC_COLUMN, TOPIC_MEANING_COLUMN
-        ).iter_rows()
+        int(topic["id"]): [
+            str(candidate["word"])
+            for candidate in topic.get("representative_words") or []
+        ]
+        for topic in projection["topics"]
     }
     meaning_values.update(
         {item.topic_id: list(item.words) for item in request.topic_meanings_override}
@@ -100,18 +108,30 @@ def run_topic_modeling_data_block_creation(
         missing = [column for column in selected_columns if column not in schema]
         if missing:
             raise ValueError(f"Topic Modelling Data Block Creation columns not found: {missing}")
-        assignment_path = assignment_paths.get(source_id)
-        if assignment_path is None:
-            raise ValueError("Topic Modelling assignment Artifact is unavailable")
-
-        assignments = pl.scan_parquet(assignment_path)
-        if TOPIC_DISTRIBUTION_COLUMN not in assignments.collect_schema():
-            assignments = assignments.with_columns(
-                pl.lit(
-                    None,
-                    dtype=topic_distribution_dtype(len(meaning_values)),
-                ).alias(TOPIC_DISTRIBUTION_COLUMN)
-            )
+        source_context = source_projection.get(source_id)
+        if source_context is None:
+            raise ValueError("Topic Modelling source projection is unavailable")
+        offset = int(source_context["offset"])
+        size = int(source_context["size"])
+        row_indices = list(source_context["row_indices"])
+        projected_documents = projection["documents"][offset : offset + size]
+        assignments = pl.DataFrame(
+            {
+                "__row_nr__": row_indices,
+                TOPIC_COLUMN: [
+                    int(document["dominant_topic"])
+                    for document in projected_documents
+                ],
+                TOPIC_DISTRIBUTION_COLUMN: pl.Series(
+                    TOPIC_DISTRIBUTION_COLUMN,
+                    [
+                        document["topic_distribution"]
+                        for document in projected_documents
+                    ],
+                    dtype=topic_distribution_dtype(request.cluster_count),
+                ),
+            }
+        ).lazy()
         if request.topic_ids is not None:
             assignments = assignments.filter(pl.col(TOPIC_COLUMN).is_in(request.topic_ids))
         joined = (
@@ -160,9 +180,10 @@ def run_topic_modeling_data_block_creation(
         topic_name = request.new_node_names[source_uuid]
         topic_data_provenance = {
             "type": "derivation",
-            "operation": {
-                "kind": "topic_modeling_data_block_creation",
-                "role": "topic_data",
+                "operation": {
+                    "kind": "topic_modeling_data_block_creation",
+                    "role": "topic_data",
+                    "cluster_count": request.cluster_count,
             },
             "inputs": [
                 {
@@ -173,9 +194,10 @@ def run_topic_modeling_data_block_creation(
         }
         topic_meanings_provenance = {
             "type": "derivation",
-            "operation": {
-                "kind": "topic_modeling_data_block_creation",
-                "role": "topic_meanings",
+                "operation": {
+                    "kind": "topic_modeling_data_block_creation",
+                    "role": "topic_meanings",
+                    "cluster_count": request.cluster_count,
             },
             "inputs": [
                 {
@@ -336,7 +358,6 @@ def _compute_topic_payload(
     random_seed: int,
     progress_callback: Callable[[float, str], None] | None,
     sample_fractions: list[float | None] | None,
-    min_topic_size: int,
     segmentation_method: str,
     max_segment_tokens: int,
 ) -> dict[str, Any]:
@@ -368,7 +389,7 @@ def _compute_topic_payload(
         raise ValueError("All corpora must contain at least one document.")
 
     random_state = int(random_seed)
-    min_cluster_size = max(2, int(min_topic_size))
+    min_cluster_size = _INTERNAL_MIN_CLUSTER_SIZE
 
     vectorizer_model = _resolve_vectorizer_model(sampled.all_docs)
 
@@ -395,14 +416,26 @@ def _compute_topic_payload(
     if progress_callback:
         progress_callback(0.85, "Assembling topic results...")
 
-    payload = _build_topic_result_payload(
+    payload = _build_topic_projection_payload(
         rust_result=rust_result,
         node_infos=node_infos,
         corpus_sizes=sampled.corpus_sizes,
-        active_corpora_indices=sampled.active_corpora_indices,
-        artifact_prefix=artifact_prefix,
-        artifact_root=artifact_root,
     )
+    context_path = artifact_root / f"{artifact_prefix}_topic_clustering_context.msgpack.zst"
+    context_path.write_bytes(rust_result["clustering_context"])
+    natural_count = len(payload["topics"])
+    payload["clustering"] = {
+        "cluster_count": natural_count,
+        "min_cluster_count": 2 if natural_count >= 2 else natural_count,
+        "max_cluster_count": natural_count,
+        "default_cluster_count": natural_count,
+        "adjustable": natural_count > 2,
+    }
+    payload["clustering_context"] = {
+        "version": 1,
+        "artifact": str(context_path),
+        "source_row_indices": sampled.active_corpora_indices,
+    }
     payload_meta = payload["meta"]
     payload_meta.update(
         {
@@ -410,7 +443,6 @@ def _compute_topic_payload(
             "engine": "rust",
             "embedding_model": _DEFAULT_EMBEDDER_MODEL,
             "embedding_backend": "ort",
-            "min_topic_size": min_cluster_size,
             "random_state": random_state,
             "vectorizer_model": vectorizer_model,
             "n_chunks": int(rust_result.get("n_chunks") or 0),
@@ -440,7 +472,6 @@ def _compute_topic_modeling(
     artifact_dir: str,
     artifact_prefix: str,
     embedding_cache_path: str,
-    min_topic_size: int = 10,
     input_snapshot_dir: str | None = None,
     corpora: list[list[str]] | None = None,
     random_seed: int = 0,
@@ -459,8 +490,7 @@ def _compute_topic_modeling(
             + PaCMAP + HDBSCAN + c-TF-IDF) out-of-process and returns an artifact
             manifest (Parquet outputs) for main-process lazy retrieval/finalization.
 
-    ``min_topic_size`` is the HDBSCAN minimum cluster size (the only native
-    topic-count control); the topic count is whatever emerges. The Rust pipeline
+    HDBSCAN uses the private fixed minimum cluster size. The Rust pipeline
     manages its own in-process embedder and DuckDB embedding cache.
 
     Flow: load workspace corpora, sample, run the Rust pipeline, build topic
@@ -499,7 +529,6 @@ def _compute_topic_modeling(
             random_seed=random_seed,
             progress_callback=progress_callback,
             sample_fractions=sample_fractions,
-            min_topic_size=min_topic_size,
             segmentation_method=segmentation_method,
             max_segment_tokens=max_segment_tokens,
         )
@@ -511,7 +540,9 @@ def _compute_topic_modeling(
             "topics": topic_payload["topics"],
             "corpus_sizes": topic_payload["corpus_sizes"],
             "per_corpus_topic_counts": topic_payload["per_corpus_topic_counts"],
-            "artifacts": topic_payload["artifacts"],
+            "sources": topic_payload["sources"],
+            "clustering": topic_payload["clustering"],
+            "clustering_context": topic_payload["clustering_context"],
             "meta": {
                 **topic_payload["meta"],
                 "node_names": prepared_payload.node_names,
@@ -536,7 +567,6 @@ def run_topic_modeling_analysis(
     artifact_prefix: str,
     input_snapshot_dir: str,
     embedding_cache_path: str,
-    min_topic_size: int = 10,
     random_seed: int = 0,
     segmentation_method: str = "automatic",
     max_segment_tokens: int = 256,
@@ -550,7 +580,6 @@ def run_topic_modeling_analysis(
         node_infos=node_infos,
         artifact_dir=artifact_dir,
         artifact_prefix=artifact_prefix,
-        min_topic_size=min_topic_size,
         input_snapshot_dir=input_snapshot_dir,
         corpora=None,
         random_seed=random_seed,

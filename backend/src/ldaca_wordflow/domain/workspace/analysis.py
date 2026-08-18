@@ -126,7 +126,6 @@ class TopicModelingAnalysisRequest(_StrictModel):
     kind: Literal["topic_modeling"] = "topic_modeling"
     node_ids: list[uuid.UUID] = Field(min_length=1, max_length=2)
     node_columns: dict[uuid.UUID, NonEmptyText]
-    min_topic_size: int = Field(default=10, ge=2)
     random_seed: int = 0
     sample_fractions: list[float | None] | None = None
     segmentation_method: TopicSegmentationMethod = TopicSegmentationMethod.AUTOMATIC
@@ -436,6 +435,7 @@ class TopicModelingDataBlockCreationAnalysisRequest(_StrictModel):
     selected_columns: dict[uuid.UUID, list[NonEmptyText]]
     new_node_names: dict[uuid.UUID, NonEmptyText]
     topic_ids: list[int] | None = None
+    cluster_count: int = Field(ge=0)
     topic_meanings_override: list[TopicMeaningOverride] = Field(default_factory=list)
 
     @model_validator(mode="after")

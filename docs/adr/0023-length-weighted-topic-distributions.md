@@ -33,7 +33,7 @@ proportions.
 ## Consequences
 
 - Segment length affects document-level topic proportions and dominance but not
-  clustering density or Minimum topic size.
+  the equal-observation HDBSCAN fit or Ward merge weights.
 - Unicode text is not biased by UTF-8 byte width.
 - Explicit-mode truncation changes weight because discarded tail text is not
   modelled.

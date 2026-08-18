@@ -31,14 +31,17 @@ flowchart LR
 - `src/concordance.rs` and `src/offsets.rs` own matching and Unicode offset
   conversion.
 - `src/topic_modeling/` owns Topic Segment construction, native embedding,
-  reduction, clustering, document roll-up, and c-TF-IDF topic-label
-  computation.
+  reduction, clustering, deterministic Ward projection, document roll-up, and
+  c-TF-IDF topic-label computation.
 
 Topic modelling is one non-elementwise scalar expression. It consumes the full
 document column and returns one run result with independent `documents[]` and
-complete `topics[]` lists plus run metadata. Segmentation is the only
-mode-specific stage; the shared rollup weights retained segment text by Unicode
-character count without changing the equal-observation clustering input.
+complete `topics[]` lists plus run metadata and an opaque clustering context.
+Segmentation is the only mode-specific stage; the shared rollup weights
+retained segment text by Unicode character count without changing the
+equal-observation clustering input. A direct PyO3 projector cuts the context's
+real-Topic Ward tree and recomputes the same output contract without rerunning
+embedding, PaCMAP, or HDBSCAN.
 
 Expression APIs preserve lazy execution. Direct PyO3 functions are reserved
 for operations that are not natural expressions, such as model inventory,

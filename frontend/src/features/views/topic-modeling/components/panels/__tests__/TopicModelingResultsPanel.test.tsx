@@ -1,13 +1,22 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { TopicModelingResultsPanel } from '../TopicModelingResultsPanel';
 
-vi.mock('../results/TopicModelingBubbleChartSection', () => ({
-  TopicModelingBubbleChartSection: ({ controlRowSlot }: { controlRowSlot?: React.ReactNode }) => (
-    <div data-testid="topic-bubble-chart-section">{controlRowSlot}</div>
+vi.mock('../../results/TopicModelingBubbleChartSection', () => ({
+  TopicModelingBubbleChartSection: ({
+    controlRowSlot,
+    topics,
+  }: {
+    controlRowSlot?: React.ReactNode;
+    topics: { id: number }[];
+  }) => (
+    <div data-testid="topic-bubble-chart-section">
+      {controlRowSlot}
+      <span>All Topics ({topics.length})</span>
+    </div>
   ),
 }));
 
@@ -82,12 +91,8 @@ const baseProps = {
     },
   ],
   containerRef: { current: null },
-  chartRef: { current: null },
-  handleResetZoom: vi.fn(),
-  isAtGlobalZoom: true,
-  bubbleElements: <svg />,
   tooltip: { topic: null, x: 0, y: 0 },
-  renderSizeComposition: vi.fn(() => null),
+  setTooltip: vi.fn(),
   hoveredTopicId: null,
   setHoveredTopicId: vi.fn(),
   selectedTopicIds: new Set<number>(),
@@ -95,13 +100,27 @@ const baseProps = {
   onClearSelection: vi.fn(),
   topicSearchQuery: '',
   onTopicSearchQueryChange: vi.fn(),
-  activeDomain: null,
+  corpusCount: 1,
+  panelNodeIds: ['node-1'],
+  nodeColors: { 'node-1': '#2563eb' },
+  defaultPalette: ['#2563eb'],
+  graphProjectionKey: 'analysis-1:result:4',
+  onGraphViewReady: vi.fn(),
   nodeNames: ['Corpus A'],
-  topicSizeValue: 10,
   randomSeed: 0,
   maxSegmentTokens: 256,
   onAddToWorkspace: vi.fn(),
   isAddingToWorkspace: false,
+  projectionPending: false,
+  projectionError: null,
+  clustering: {
+    cluster_count: 4,
+    min_cluster_count: 2,
+    max_cluster_count: 5,
+    default_cluster_count: 5,
+    adjustable: true,
+  },
+  onClusterCountCommit: vi.fn(),
   stopWordsEnabled: false,
   onStopWordsEnabledChange: vi.fn(),
   stopWords: [],
@@ -109,18 +128,241 @@ const baseProps = {
   onStopWordsChange: vi.fn().mockResolvedValue(undefined),
 };
 
+function prepareClusterSlider() {
+  const root = screen.getByTestId('topic-cluster-slider');
+  let captured = false;
+  Object.assign(root, {
+    hasPointerCapture: () => captured,
+    releasePointerCapture: () => {
+      captured = false;
+    },
+    setPointerCapture: () => {
+      captured = true;
+    },
+  });
+  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
+    bottom: 10,
+    height: 10,
+    left: 0,
+    right: 100,
+    top: 0,
+    width: 100,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  return {
+    root,
+    losePointerCapture: () => {
+      captured = false;
+    },
+  };
+}
+
+const interruptedPointerGestures: [string, (root: HTMLElement) => void][] = [
+  ['pointer cancellation', (root) => fireEvent.pointerCancel(root, { pointerId: 1 })],
+  ['lost pointer capture', (root) => fireEvent.lostPointerCapture(root, { pointerId: 1 })],
+  ['window blur', () => fireEvent(window, new Event('blur'))],
+];
+
 describe('TopicModelingResultsPanel', () => {
-  it('renders successful results without the removed exact-topic-count slider', () => {
+  it('renders the accessible cluster slider with server-provided bounds', () => {
     render(
       <TooltipProvider>
         <TopicModelingResultsPanel {...baseProps} />
       </TooltipProvider>,
     );
 
-    // The post-fit re-aggregation slider was removed along with target/exact
-    // topic-count modes; only the native min-cluster-size control remains.
-    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+    const slider = screen.getByRole('slider', { name: 'Number of clusters' });
+    expect(slider).toHaveAttribute('aria-valuemin', '2');
+    expect(slider).toHaveAttribute('aria-valuemax', '5');
+    expect(slider).toHaveAttribute('aria-valuenow', '4');
     expect(screen.getByText('Topics (1)')).toBeInTheDocument();
+  });
+
+  it('disables the fixed control when the natural result has two Topics', () => {
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          clustering={{
+            cluster_count: 2,
+            min_cluster_count: 2,
+            max_cluster_count: 2,
+            default_cluster_count: 2,
+            adjustable: false,
+          }}
+        />
+      </TooltipProvider>,
+    );
+    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toBeDisabled();
+  });
+
+  it('commits one cluster query immediately after a keyboard adjustment', () => {
+    const onClusterCountCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
+      </TooltipProvider>,
+    );
+
+    const slider = screen.getByRole('slider', { name: 'Number of clusters' });
+    fireEvent.keyDown(slider, { key: 'ArrowLeft' });
+    expect(onClusterCountCommit).toHaveBeenCalledTimes(1);
+    expect(onClusterCountCommit).toHaveBeenCalledWith(3);
+    fireEvent.keyUp(slider, { key: 'ArrowLeft' });
+    expect(onClusterCountCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits the latest draft once on release even after pointer capture is lost', () => {
+    const onClusterCountCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
+      </TooltipProvider>,
+    );
+
+    const { root, losePointerCapture } = prepareClusterSlider();
+
+    fireEvent.pointerDown(root, { button: 0, clientX: 0, pointerId: 1 });
+    expect(onClusterCountCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+      'aria-valuenow',
+      '2',
+    );
+    losePointerCapture();
+    fireEvent.pointerUp(root, { button: 0, clientX: 0, pointerId: 1 });
+
+    expect(onClusterCountCommit).toHaveBeenCalledTimes(1);
+    expect(onClusterCountCommit).toHaveBeenCalledWith(2);
+  });
+
+  it('commits the latest draft when movement and release complete before a render', () => {
+    const onClusterCountCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
+      </TooltipProvider>,
+    );
+
+    const { root } = prepareClusterSlider();
+    act(() => {
+      root.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 0, pointerId: 1 }),
+      );
+      root.dispatchEvent(
+        new PointerEvent('pointerup', { bubbles: true, button: 0, clientX: 0, pointerId: 1 }),
+      );
+    });
+
+    expect(onClusterCountCommit).toHaveBeenCalledTimes(1);
+    expect(onClusterCountCommit).toHaveBeenCalledWith(2);
+  });
+
+  it.each(
+    interruptedPointerGestures,
+  )('rolls the draft back without committing after %s', (_reason, interrupt) => {
+    const onClusterCountCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
+      </TooltipProvider>,
+    );
+
+    const { root } = prepareClusterSlider();
+    fireEvent.pointerDown(root, { button: 0, clientX: 0, pointerId: 1 });
+    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+      'aria-valuenow',
+      '2',
+    );
+
+    interrupt(root);
+
+    expect(onClusterCountCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+      'aria-valuenow',
+      '4',
+    );
+  });
+
+  it('does not commit when a pointer gesture finishes at the applied count', () => {
+    const onClusterCountCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
+      </TooltipProvider>,
+    );
+
+    const { root } = prepareClusterSlider();
+
+    fireEvent.pointerDown(root, { button: 0, clientX: 66, pointerId: 1 });
+    fireEvent.pointerUp(root, { button: 0, clientX: 66, pointerId: 1 });
+
+    expect(onClusterCountCommit).not.toHaveBeenCalled();
+  });
+
+  it('makes the complete Result content inert while a cluster projection is loading', () => {
+    const { rerender } = render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} projectionPending />
+      </TooltipProvider>,
+    );
+
+    const content = screen.getByTestId('topic-modeling-result-content');
+    expect(content).toHaveAttribute('inert');
+    expect(content).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('Updating topics…');
+
+    const projectedTopics = [...baseProps.topics, { ...baseProps.topics[0], id: 2, x: 1, y: 1 }];
+    rerender(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          topics={projectedTopics}
+          clustering={{ ...baseProps.clustering, cluster_count: 2 }}
+          projectionPending={false}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByTestId('topic-modeling-result-content')).not.toHaveAttribute('inert');
+    expect(screen.getByText('Topics (2)')).toBeInTheDocument();
+    expect(screen.getByText('All Topics (2)')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+      'aria-valuenow',
+      '2',
+    );
+  });
+
+  it('resets a stale slider draft when a different projection is applied', () => {
+    const { rerender } = render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} />
+      </TooltipProvider>,
+    );
+
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'Number of clusters' }), {
+      key: 'ArrowLeft',
+    });
+    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+      'aria-valuenow',
+      '3',
+    );
+
+    rerender(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          clustering={{ ...baseProps.clustering, cluster_count: 2 }}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+      'aria-valuenow',
+      '2',
+    );
   });
 
   it('offers the typed Add to Workspace action for successful results', () => {

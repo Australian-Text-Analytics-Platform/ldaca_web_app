@@ -7,7 +7,7 @@ deployment.
 
 ## Current Guarantees
 
-- Native Workspace schema 17 and portable archive format 16 are strict current
+- Native Workspace schema 18 and portable archive format 17 are strict current
   contracts. Older formats are rejected rather than guessed or migrated at
   runtime.
 - Workspace and User File data use private same-filesystem staging and atomic

@@ -57,8 +57,17 @@ export const queryKeys = {
     ['workspaces', workspaceId, 'analyses', analysisId, 'results'] as const,
 
   /** Output-only Result keyed by the complete projection query. */
-  analysisResult: (workspaceId: string, analysisId: string, query?: AnalysisResultQueryKey) =>
-    [...queryKeys.analysisResults(workspaceId, analysisId), query ?? { kind: 'default' }] as const,
+  analysisResult: (
+    workspaceId: string,
+    analysisId: string,
+    query?: AnalysisResultQueryKey,
+    requestKey?: number,
+  ) =>
+    [
+      ...queryKeys.analysisResults(workspaceId, analysisId),
+      query ?? { kind: 'default' },
+      ...(requestKey === undefined ? [] : [{ requestKey }]),
+    ] as const,
 
   /** One immutable paged table projection owned by a successful Analysis Result. */
   analysisTablePage: (
@@ -179,8 +188,13 @@ export const queryKeys = {
   inactiveAnalysis: ['inactive', 'analysis'] as const,
 
   /** Disabled Result key that retains projection identity for useQueries observers. */
-  inactiveAnalysisResult: (query?: AnalysisResultQueryKey) =>
-    ['inactive', 'analysis-result', query ?? { kind: 'default' }] as const,
+  inactiveAnalysisResult: (query?: AnalysisResultQueryKey, requestKey?: number) =>
+    [
+      'inactive',
+      'analysis-result',
+      query ?? { kind: 'default' },
+      ...(requestKey === undefined ? [] : [{ requestKey }]),
+    ] as const,
 
   /** Every preprocessing preview belonging to one Workspace. */
   preprocessingPreviews: (workspaceId: string) =>

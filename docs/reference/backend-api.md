@@ -236,8 +236,10 @@ reset after load, clone, import, close/reopen, or backend restart.
 
 Token Frequency and Topic Modelling Tabs expose normalized `stop_words`.
 Topic Modelling Tabs additionally expose `topic_modeling_words_per_topic`
-(3-100, default 15). These settings change only through Tab PATCH and survive
-Analysis and Result lifecycle operations.
+(3-100, default 15) and nullable `topic_modeling_cluster_selection`. The latter
+must identify a succeeded Topic Modelling Analysis in the same Tab and a count
+within that Result's bounds. It is cleared when that Analysis is removed or
+superseded.
 
 ## Analyses
 
@@ -247,7 +249,7 @@ Analysis and Result lifecycle operations.
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}` | `get_analysis` | 200 | Read one live valid Analysis |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/cancel` | `cancel_analysis` | 200/202 | Cancel queued work or request running cancellation |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result` | `get_analysis_result` | 200 | Stored canonical Result or durable Preview-ready marker |
-| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free page projection, including fresh Annotation, Concordance, and Quotation Preview work |
+| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free page projection, including Topic cluster-tree cuts and fresh Annotation, Concordance, and Quotation Preview work |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
@@ -262,6 +264,15 @@ The list is empty until a publishing Analysis succeeds. Existing single-output
 operations return one ID; Topic Modelling Data Block Creation returns topic-data then
 topic-meanings IDs for each source in request order. The removed singular field
 is not accepted.
+
+`TopicModelingAnalysisRequest` contains no cluster-size control. Its Result
+contains ordered `sources[]`, authoritative projected `topics[]`, and
+`clustering` bounds. `TopicModelingResultQuery.cluster_count` is nullable for
+the natural fit and otherwise accepts an integer from the advertised minimum to
+maximum. Invalid counts return 422 with the current bounds; a missing private
+clustering-context Artifact returns 410. Topic Modelling Data Block Creation
+requires the displayed `cluster_count` and materializes assignment and meaning
+tables from that projection.
 
 `AnalysisCreate` contains one discriminated Analysis request, one execution
 scope (`preview`, `run_all`, or `supporting`), an optional

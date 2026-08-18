@@ -2,7 +2,8 @@
 
 from datetime import date, datetime
 from io import BytesIO
-from typing import Literal
+from typing import Any, Literal, cast
+import uuid
 
 import polars as pl
 import pytest
@@ -12,6 +13,8 @@ from ldaca_wordflow.analysis.generated_columns import TOPIC_DISTRIBUTION_COLUMN
 from ldaca_wordflow.models.analysis_results import (
     ConcordanceDocumentProjectionQuery,
     QuotationResultQuery,
+    TopicModelingResultQuery,
+    TopicModelingStoredResult,
 )
 from ldaca_wordflow.shared.topic_types import (
     topic_distribution_dtype,
@@ -24,9 +27,15 @@ from ldaca_wordflow.services.analysis_results import (
     _paged_artifact_schema,
     _projected_artifact_page,
     _projected_artifact_schema,
+    _query_topics,
     _sort_and_page,
 )
-from ldaca_wordflow.shared.errors import AnalysisCorruptError, InvalidInputError
+from ldaca_wordflow.shared.errors import (
+    AnalysisCorruptError,
+    ArtifactGoneError,
+    InvalidClusterCountError,
+    InvalidInputError,
+)
 from ldaca_wordflow.shared.json_data import JsonData
 
 
@@ -35,6 +44,210 @@ def test_quotation_result_query_contains_only_page_and_sort_controls() -> None:
         QuotationResultQuery.model_validate(
             {"kind": "quotation", "context_length": 12}
         )
+
+
+def _topic_stored_result() -> TopicModelingStoredResult:
+    source_id = uuid.uuid4()
+    return TopicModelingStoredResult.model_validate(
+        {
+            "topics": [
+                {
+                    "id": topic_id,
+                    "representative_words": [
+                        {"word": f"word-{topic_id}", "occurrence_count": 1}
+                    ],
+                    "size": [1],
+                    "total_size": 1,
+                    "x": float(topic_id),
+                    "y": 0.0,
+                }
+                for topic_id in range(4)
+            ],
+            "corpus_sizes": [4],
+            "per_corpus_topic_counts": [{0: 1, 1: 1, 2: 1, 3: 1}],
+            "meta": {"n_chunks": 4},
+            "sources": [
+                {
+                    "node_id": source_id,
+                    "node_name": "Source",
+                    "text_column": "text",
+                    "original_columns": ["text"],
+                }
+            ],
+            "clustering": {
+                "cluster_count": 4,
+                "min_cluster_count": 2,
+                "max_cluster_count": 4,
+                "default_cluster_count": 4,
+                "adjustable": True,
+            },
+            "clustering_context": {
+                "version": 1,
+                "artifact": {
+                    "name": "topic_clustering_context",
+                    "media_type": "application/vnd.ldaca.topic-clustering-context",
+                },
+                "source_row_indices": [[0, 1, 2, 3]],
+            },
+        }
+    )
+
+
+def test_natural_topic_query_is_side_effect_free_and_hides_private_context() -> None:
+    stored = _topic_stored_result()
+    before = stored.model_dump(mode="json")
+
+    payload = _query_topics(
+        stored,
+        TopicModelingResultQuery(page=1, page_size=2),
+        None,
+    )
+
+    assert "clustering_context" not in payload
+    clustering = cast(dict[str, Any], payload["clustering"])
+    topics = cast(list[dict[str, Any]], payload["topics"])
+    assert clustering["cluster_count"] == 4
+    assert [row["id"] for row in topics] == [0, 1]
+    assert stored.model_dump(mode="json") == before
+
+
+def test_explicit_natural_topic_query_runs_projector(tmp_path, monkeypatch) -> None:
+    context_path = tmp_path / "context.msgpack.zst"
+    context_path.write_bytes(b"context")
+    calls: list[int] = []
+
+    def fake_project(**kwargs):
+        calls.append(kwargs["cluster_count"])
+        return {
+            "topics": [
+                {
+                    "id": topic_id,
+                    "representative_words": [
+                        {"word": f"word-{topic_id}", "occurrence_count": 1}
+                    ],
+                    "x": float(topic_id),
+                    "y": 0.0,
+                }
+                for topic_id in range(4)
+            ],
+            "documents": [
+                {
+                    "doc_index": index,
+                    "dominant_topic": index,
+                    "topic_distribution": [
+                        {"topic_id": topic_id, "proportion": float(topic_id == index)}
+                        for topic_id in range(4)
+                    ],
+                }
+                for index in range(4)
+            ],
+        }
+
+    monkeypatch.setattr(
+        "ldaca_wordflow.services.analysis_results._project_rust_topic_modeling",
+        fake_project,
+    )
+
+    payload = _query_topics(
+        _topic_stored_result(),
+        TopicModelingResultQuery(cluster_count=4),
+        context_path,
+    )
+
+    assert calls == [4]
+    assert cast(dict[str, Any], payload["clustering"])["cluster_count"] == 4
+
+
+def test_topic_query_rejects_count_with_current_bounds() -> None:
+    with pytest.raises(InvalidClusterCountError) as exc_info:
+        _query_topics(
+            _topic_stored_result(),
+            TopicModelingResultQuery(cluster_count=1),
+            None,
+        )
+
+    assert exc_info.value.details == {
+        "min_cluster_count": 2,
+        "max_cluster_count": 4,
+        "default_cluster_count": 4,
+    }
+
+
+def test_topic_projection_requires_declared_context_file() -> None:
+    with pytest.raises(ArtifactGoneError):
+        _query_topics(
+            _topic_stored_result(),
+            TopicModelingResultQuery(cluster_count=2),
+            None,
+        )
+
+
+def test_topic_projection_marks_invalid_context_as_analysis_corrupt(
+    tmp_path, monkeypatch
+) -> None:
+    context_path = tmp_path / "context.msgpack.zst"
+    context_path.write_bytes(b"invalid")
+    monkeypatch.setattr(
+        "ldaca_wordflow.services.analysis_results._project_rust_topic_modeling",
+        lambda **_kwargs: (_ for _ in ()).throw(ValueError("invalid context")),
+    )
+
+    with pytest.raises(AnalysisCorruptError):
+        _query_topics(
+            _topic_stored_result(),
+            TopicModelingResultQuery(cluster_count=2),
+            context_path,
+        )
+
+
+def test_topic_projection_filters_and_pages_projected_topics(tmp_path, monkeypatch) -> None:
+    context_path = tmp_path / "context.msgpack.zst"
+    context_path.write_bytes(b"context")
+
+    def fake_project(**_kwargs):
+        return {
+            "topics": [
+                {
+                    "id": topic_id,
+                    "representative_words": [
+                        {"word": f"merged-{topic_id}", "occurrence_count": 2}
+                    ],
+                    "x": float(topic_id),
+                    "y": 0.0,
+                }
+                for topic_id in range(2)
+            ],
+            "documents": [
+                {
+                    "doc_index": index,
+                    "dominant_topic": index % 2,
+                    "topic_distribution": [
+                        {"topic_id": -1, "proportion": 0.0},
+                        {"topic_id": 0, "proportion": float(index % 2 == 0)},
+                        {"topic_id": 1, "proportion": float(index % 2 == 1)},
+                    ],
+                }
+                for index in range(4)
+            ],
+        }
+
+    monkeypatch.setattr(
+        "ldaca_wordflow.services.analysis_results._project_rust_topic_modeling",
+        fake_project,
+    )
+    payload = _query_topics(
+        _topic_stored_result(),
+        TopicModelingResultQuery(cluster_count=2, topic_ids=[1], page=1, page_size=1),
+        context_path,
+    )
+
+    clustering = cast(dict[str, Any], payload["clustering"])
+    topics = cast(list[dict[str, Any]], payload["topics"])
+    pagination = cast(dict[str, Any], payload["pagination"])
+    assert clustering["cluster_count"] == 2
+    assert [row["id"] for row in topics] == [1]
+    assert pagination["total_rows"] == 1
+    assert payload["per_corpus_topic_counts"] == [{"0": 2, "1": 2}]
 
 
 @pytest.mark.parametrize(

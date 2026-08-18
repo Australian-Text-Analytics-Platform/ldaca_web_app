@@ -77,6 +77,7 @@ def _data_block_creation_fixture(
         node_ids=[source_id],
         selected_columns={source_id: ["text"]},
         new_node_names={source_id: "Topic data"},
+        cluster_count=2,
     )
     child = AnalysisRecord.create(
         request,
@@ -114,13 +115,17 @@ def _data_block_creation_fixture(
         schema={"TOPIC_topic": pl.Int64, "TOPIC_topic_meaning": pl.List(pl.String)},
     ).write_parquet(meanings_path)
     topic_provenance = DerivationProvenance(
-        operation=TopicModelingDataBlockCreationDerivation(role="topic_data"),
+        operation=TopicModelingDataBlockCreationDerivation(
+            role="topic_data", cluster_count=2
+        ),
         inputs=[
             DerivationInput(role="source", value=node_reference(str(source_id)))
         ],
     )
     meanings_provenance = DerivationProvenance(
-        operation=TopicModelingDataBlockCreationDerivation(role="topic_meanings"),
+        operation=TopicModelingDataBlockCreationDerivation(
+            role="topic_meanings", cluster_count=2
+        ),
         inputs=[
             DerivationInput(
                 role="source", value=node_reference(str(topic_data_id))

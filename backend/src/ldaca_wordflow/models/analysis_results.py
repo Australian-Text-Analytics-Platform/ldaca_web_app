@@ -14,7 +14,7 @@ from ..domain.annotation import (
 from ..domain.workspace import NodeProvenance
 from ..shared.json_data import JsonData
 from .names import NodeName
-from .tables import CompleteTableResource, ProjectedTableResource, PagedTableResource
+from .tables import CompleteTableResource, ProjectedTableResource
 
 
 class _StrictModel(BaseModel):
@@ -31,6 +31,7 @@ class _PagedQuery(_StrictModel):
 class TopicModelingResultQuery(_PagedQuery):
     kind: Literal["topic_modeling"] = "topic_modeling"
     topic_ids: list[int] | None = None
+    cluster_count: int | None = Field(default=None, ge=0)
 
 
 class ConcordanceResultQuery(_PagedQuery):
@@ -221,32 +222,17 @@ class TopicItem(_StrictModel):
     y: float
 
 
-class _TopicNodeArtifact(_StrictModel, Generic[ArtifactValueT]):
+class TopicSource(_StrictModel):
     node_id: uuid.UUID
     node_name: NodeName
     text_column: str
     original_columns: list[str]
-    assignments: PagedTableIdentity[ArtifactValueT]
 
 
-class _TopicArtifacts(_StrictModel, Generic[ArtifactValueT]):
+class _TopicClusteringContext(_StrictModel, Generic[ArtifactValueT]):
     version: Literal[1]
-    topic_meanings_parquet_path: ArtifactValueT
-    nodes: list[_TopicNodeArtifact[ArtifactValueT]]
-
-
-class _TopicNodeArtifactResource(_StrictModel):
-    node_id: uuid.UUID
-    node_name: NodeName
-    text_column: str
-    original_columns: list[str]
-    assignments: PagedTableResource
-
-
-class _TopicArtifactsResource(_StrictModel):
-    version: Literal[1]
-    topic_meanings_parquet_path: ArtifactResource
-    nodes: list[_TopicNodeArtifactResource]
+    artifact: ArtifactValueT | None
+    source_row_indices: list[list[int]]
 
 
 class TopicStageTiming(_StrictModel):
@@ -261,7 +247,6 @@ class TopicMetadata(_StrictModel):
     engine: str | None = None
     embedding_model: str | None = None
     embedding_backend: str | None = None
-    min_topic_size: int | None = Field(default=None, ge=1)
     random_state: int | None = None
     vectorizer_model: str | None = None
     n_chunks: int | None = Field(default=None, ge=0)
@@ -277,19 +262,28 @@ class _TopicModelingBody(_StrictModel):
     corpus_sizes: list[int]
     per_corpus_topic_counts: list[dict[int, int]] | None = None
     meta: TopicMetadata
+    sources: list[TopicSource]
+    clustering: "TopicClustering"
+
+
+class TopicClustering(_StrictModel):
+    cluster_count: int = Field(ge=0)
+    min_cluster_count: int = Field(ge=0)
+    max_cluster_count: int = Field(ge=0)
+    default_cluster_count: int = Field(ge=0)
+    adjustable: bool
 
 
 class TopicModelingWorkerResult(_TopicModelingBody):
-    artifacts: _TopicArtifacts[PrivateArtifactPath]
+    clustering_context: _TopicClusteringContext[PrivateArtifactPath]
 
 
 class TopicModelingStoredResult(_TopicModelingBody):
-    artifacts: _TopicArtifacts[StoredArtifactIdentity]
+    clustering_context: _TopicClusteringContext[StoredArtifactIdentity]
 
 
 class TopicModelingResult(_TopicModelingBody):
     kind: Literal["topic_modeling"] = "topic_modeling"
-    artifacts: _TopicArtifactsResource
     pagination: ResultPagination
     query: TopicModelingResultQuery
 

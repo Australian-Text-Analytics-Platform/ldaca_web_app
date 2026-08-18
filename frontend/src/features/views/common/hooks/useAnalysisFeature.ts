@@ -17,7 +17,13 @@ interface UseAnalysisFeatureConfig<TResult = unknown, TRequest = unknown> {
   workspaceId: string | null;
   tabId: string;
   resultQuery?: Readonly<Record<string, unknown>>;
-  fetchResult: (taskId: string, query?: Readonly<Record<string, unknown>>) => Promise<TResult>;
+  resultRequestKey?: number;
+  resultCacheMode?: 'default' | 'no-store';
+  fetchResult: (
+    taskId: string,
+    query?: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
+  ) => Promise<TResult>;
   onRequest: (request: TRequest) => void | Promise<void>;
   onCleared: (clearedTaskIds: string[]) => void;
   hydrationTaskId: string | null;
@@ -33,6 +39,9 @@ interface UseAnalysisFeatureReturn<TResult, TRequest> {
   analysisError: string | null;
   result: TResult | null;
   isResultFetching: boolean;
+  isResultPlaceholderData: boolean;
+  resultError: string | null;
+  retryResult: () => void;
   setLocalTaskId: React.Dispatch<React.SetStateAction<string | null>>;
   isRunning: boolean;
   isStopping: boolean;
@@ -115,8 +124,10 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
     workspaceId: config.workspaceId,
     analysisId,
     resultQuery: config.resultQuery,
-    loadResult: async (_workspaceId, ownedAnalysisId, projectionQuery) => {
-      return configRef.current.fetchResult(ownedAnalysisId, projectionQuery);
+    resultRequestKey: config.resultRequestKey,
+    resultCacheMode: config.resultCacheMode,
+    loadResult: async (_workspaceId, ownedAnalysisId, projectionQuery, signal) => {
+      return configRef.current.fetchResult(ownedAnalysisId, projectionQuery, signal);
     },
   });
 
@@ -218,6 +229,9 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
     analysisError: analysis?.error?.message ?? null,
     result,
     isResultFetching: session.isResultFetching,
+    isResultPlaceholderData: session.isResultPlaceholderData,
+    resultError: session.resultError,
+    retryResult: session.retryResult,
     setLocalTaskId,
     isRunning,
     isStopping,

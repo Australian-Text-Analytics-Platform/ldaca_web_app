@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type {
   TopicModelingAnalysisRequest,
   TopicModelingResponse,
+  TopicModelingResultQuery,
   TopicModelingTopic,
 } from '@/api';
 import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
@@ -11,6 +12,7 @@ import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/Analy
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { isArrowStringField } from '@/lib/arrow/arrowTable';
+import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { getAnalysisResultResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
@@ -19,7 +21,6 @@ import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocu
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getRerunActionState } from '../common/rerunActionState';
-import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { analysisInputsFromRequest } from '../common/utils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
@@ -29,16 +30,18 @@ import {
   type TopicModelingAddToWorkspaceSource,
 } from './components/TopicModelingAddToWorkspaceDialog';
 import { createDefaultTopicModelingAddToWorkspaceColumns } from './components/topicModelingAddToWorkspaceState';
-import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 import {
   DEFAULT_MAX_SEGMENT_TOKENS,
-  DEFAULT_TOPIC_SIZE_VALUE,
   normalizeTopicSampleFractions,
   useTopicModelingParameters,
 } from './hooks/useTopicModelingParameters';
 import { useTopicModelingResultControls } from './hooks/useTopicModelingResultControls';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
-import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
+import {
+  nextTopicProjectionAttempt,
+  type TopicProjectionAttempt,
+  useTopicProjectionLifecycle,
+} from './hooks/useTopicProjectionLifecycle';
 import {
   filterTopicRepresentativeWords,
   sliceTopicRepresentativeWords,
@@ -90,9 +93,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const {
     corpusSamples,
     updateCorpusSample,
-    topicSizeValue,
-    topicSizeUserSet,
-    setTopicSizeValueFromUser,
     randomSeed,
     randomSeedUserSet,
     setRandomSeedFromUser,
@@ -101,8 +101,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     maxSegmentTokens,
     setMaxSegmentTokens,
     nodeDocCounts,
-    topicSizeWarning,
-    showSamplingWarning,
     sampleFractionsForRequest,
     hasAnySampling,
     hydrateParameters,
@@ -113,6 +111,19 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     panelNodeIdsKey,
     nodeInfoById: nodeInputs.nodeInfoById,
   });
+  const restoredClusterCount =
+    host.topicModelingClusterSelection?.analysis_id === tabTaskId
+      ? host.topicModelingClusterSelection.cluster_count
+      : null;
+  const [clusterRequest, setClusterRequest] = useState<TopicProjectionAttempt | null>(null);
+  const currentClusterRequest = clusterRequest?.analysisId === tabTaskId ? clusterRequest : null;
+  const committedClusterCount = currentClusterRequest?.clusterCount ?? restoredClusterCount;
+  const resultRequestKey = currentClusterRequest?.requestKey ?? 0;
+  const resultQuery: TopicModelingResultQuery = {
+    kind: 'topic_modeling',
+    page_size: 500,
+    cluster_count: committedClusterCount,
+  };
   const {
     hoveredTopicId,
     setHoveredTopicId,
@@ -125,9 +136,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     handleClearTopicSelection,
   } = useTopicModelingResultControls();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<HTMLDivElement | null>(null);
-  const [chartWidth, setChartWidth] = useState<number>(800);
-  const chartResizeFrameRef = useRef<number | null>(null);
+  const [readyGraphProjectionKey, setReadyGraphProjectionKey] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
   const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
@@ -148,6 +157,9 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     banner: topicWaitingBanner,
     analysisError,
     result,
+    isResultFetching,
+    isResultPlaceholderData,
+    resultError,
   } = useAnalysisFeature<TopicModelingResponse, TopicModelingAnalysisRequest>({
     taskType: ANALYSIS_TASK_TYPES.topicModeling,
     workspaceId: currentWorkspaceId,
@@ -158,9 +170,17 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     controlAnalysisId: activeAnalysis?.id ?? null,
     tabAnalysisIds: analyses.map((analysis) => analysis.id),
     // Called by useAnalysisFeature polling and hydration to load the owned task result.
-    fetchResult: async (taskId) => {
+    resultQuery,
+    resultRequestKey,
+    resultCacheMode: 'no-store',
+    fetchResult: async (taskId, query, signal) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      return getAnalysisResultResource<TopicModelingResponse>(currentWorkspaceId, taskId);
+      return getAnalysisResultResource<TopicModelingResponse>(
+        currentWorkspaceId,
+        taskId,
+        query,
+        signal,
+      );
     },
     // Called by useAnalysisFeature hydration to restore parameters from the stored request envelope.
     onRequest: (requestPayload) => {
@@ -178,7 +198,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const typedServerRequest = serverRequest as {
     node_ids?: string[];
     node_columns?: Record<string, string>;
-    min_topic_size?: number;
     random_seed?: number;
     sample_fractions?: (number | null)[];
     segmentation_method?: 'automatic' | 'paragraph' | 'sentence';
@@ -199,39 +218,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   };
 
   const topicRunningTask = taskStatus.runningTask;
-
-  // Keeps the rendered bubble chart sized to its results container.
-  useEffect(() => {
-    const el = chartRef.current;
-    if (!el) return;
-    // Called by ResizeObserver and once from the container's initial measured width.
-    const updateChartWidth = (width: number) => {
-      const nextWidth = Math.round(width);
-      if (!nextWidth) return;
-      setChartWidth((prevWidth) => (prevWidth === nextWidth ? prevWidth : nextWidth));
-    };
-    const observer = new ResizeObserver((entries) => {
-      const latestEntry = entries.at(-1);
-      if (!latestEntry) return;
-      if (chartResizeFrameRef.current !== null) {
-        cancelAnimationFrame(chartResizeFrameRef.current);
-      }
-      const nextWidth = latestEntry.contentRect.width;
-      chartResizeFrameRef.current = requestAnimationFrame(() => {
-        chartResizeFrameRef.current = null;
-        updateChartWidth(nextWidth);
-      });
-    });
-    observer.observe(el);
-    updateChartWidth(el.getBoundingClientRect().width);
-    return () => {
-      observer.disconnect();
-      if (chartResizeFrameRef.current !== null) {
-        cancelAnimationFrame(chartResizeFrameRef.current);
-        chartResizeFrameRef.current = null;
-      }
-    };
-  }, []);
 
   // Per-source bubble-chart colours come from persisted node metadata, with
   // palette defaults written before a run when a selected node has no colour yet.
@@ -257,7 +243,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         .map((selection) => [selection.nodeId, selection.column]),
     ),
     random_seed: randomSeed,
-    min_topic_size: topicSizeValue,
     sample_fractions: sampleFractionsForRequest,
     segmentation_method: segmentationMethod,
     max_segment_tokens: maxSegmentTokens,
@@ -267,7 +252,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     node_columns:
       request.node_columns && typeof request.node_columns === 'object' ? request.node_columns : {},
     random_seed: Number(request.random_seed),
-    min_topic_size: Number(request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
     sample_fractions: normalizeTopicSampleFractions(
       (request as unknown as { sample_fractions?: unknown }).sample_fractions,
       Array.isArray(request.node_ids) ? request.node_ids.length : 0,
@@ -307,16 +291,16 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const resultKey = tabTaskId ?? (result ? '__hydrated__' : null);
   const [stopWordsEnabledForResult, setStopWordsEnabledForResult] = useState<string | null>(null);
   const stopWordsEnabled = resultKey !== null && stopWordsEnabledForResult === resultKey;
-  const resultArtifacts = result?.artifacts.nodes ?? [];
+  const resultSources = result?.sources ?? [];
   const resultNodeIds =
-    resultArtifacts.length > 0
-      ? resultArtifacts.map((artifact) => artifact.node_id)
+    resultSources.length > 0
+      ? resultSources.map((source) => source.node_id)
       : (typedServerRequest?.node_ids ?? panelNodeIds);
   const resultNodeNames =
     result?.data.meta.node_names && result.data.meta.node_names.length > 0
       ? result.data.meta.node_names
-      : resultArtifacts.length > 0
-        ? resultArtifacts.map((artifact) => artifact.node_name)
+      : resultSources.length > 0
+        ? resultSources.map((source) => source.node_name)
         : panelSelectedNodes.map((node) => node.name);
   const resultRandomSeed =
     result?.data.meta.random_state ?? typedServerRequest?.random_seed ?? randomSeed;
@@ -324,7 +308,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const firstResultNodeId = resultNodeIds[0] ?? null;
   const firstResultColumn = firstResultNodeId
     ? (typedServerRequest?.node_columns?.[firstResultNodeId] ??
-      resultArtifacts.find((artifact) => artifact.node_id === firstResultNodeId)?.text_column ??
+      resultSources.find((source) => source.node_id === firstResultNodeId)?.text_column ??
       null)
     : null;
   const representativeWordsCount = host.topicModelingWordsPerTopic ?? 15;
@@ -334,14 +318,12 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     : new Set<string>();
   const exportTopics = filterTopicRepresentativeWords(rawTopics, effectiveStopWords);
   const topics = sliceTopicRepresentativeWords(exportTopics, representativeWordsCount);
-  const addToWorkspaceSources: TopicModelingAddToWorkspaceSource[] = resultArtifacts.map(
-    (node) => ({
-      id: node.node_id,
-      name: node.node_name,
-      columns: node.original_columns,
-      documentColumn: node.text_column,
-    }),
-  );
+  const addToWorkspaceSources: TopicModelingAddToWorkspaceSource[] = resultSources.map((node) => ({
+    id: node.node_id,
+    name: node.node_name,
+    columns: node.original_columns,
+    documentColumn: node.text_column,
+  }));
 
   const openAddToWorkspaceDialog = () => {
     const sourceIds = new Set(addToWorkspaceSources.map((source) => source.id));
@@ -377,6 +359,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           nodeIds.map((nodeId) => [nodeId, addToWorkspaceNames[nodeId]?.trim() ?? '']),
         ),
         topic_ids: selectedTopicIds.size > 0 ? [...selectedTopicIds] : null,
+        cluster_count: result?.clustering.cluster_count ?? 0,
         topic_meanings_override: exportTopics.map((topic) => ({
           topic_id: topic.id,
           words: topic.representative_words.map((term) => term.word),
@@ -402,7 +385,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       effectiveNodeColumnSelections,
       randomSeed,
       sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
-      minTopicSize: topicSizeValue,
       segmentationMethod,
       maxSegmentTokens,
     },
@@ -417,55 +399,54 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   });
 
   const corpusCount = result?.data.corpus_sizes.length ?? 0;
-  const chartPadding = 40;
-  const chartHeight = Math.min(520, Math.max(320, Math.round(chartWidth * 0.55)));
 
-  const {
-    activeDomain,
-    brushRect,
-    chartSvgRef,
-    isBrushing,
-    handleBrushStart,
-    handleBrushMove,
-    handleBrushEnd,
-    handleResetZoom,
-    isAtGlobalZoom,
-  } = useTopicModelingZoomBrush({
-    topics,
-    chartWidth,
-    chartHeight,
-    chartPadding,
-    setHoveredTopicId,
-    setTooltip,
+  const startClusterProjection = (clusterCount: number) => {
+    setClusterRequest((current) =>
+      nextTopicProjectionAttempt(
+        current,
+        tabTaskId,
+        clusterCount,
+        result?.clustering.cluster_count ?? null,
+      ),
+    );
+  };
+  const currentProjectionAttemptKey = currentClusterRequest
+    ? `${currentClusterRequest.analysisId}:${String(currentClusterRequest.requestKey)}`
+    : null;
+  const attemptMatchesDisplayedResult = Boolean(
+    currentClusterRequest &&
+      result?.clustering.cluster_count === currentClusterRequest.clusterCount,
+  );
+  const graphProjectionKey =
+    attemptMatchesDisplayedResult && currentProjectionAttemptKey
+      ? currentProjectionAttemptKey
+      : `${tabTaskId ?? 'no-analysis'}:result:${String(result?.clustering.cluster_count ?? 'none')}`;
+  const { projectionPending, projectionError, sliderResetKey } = useTopicProjectionLifecycle({
+    analysisId: tabTaskId,
+    attempt: currentClusterRequest,
+    clustering: result?.clustering ?? null,
+    isFetching: isResultFetching,
+    isPlaceholderData: isResultPlaceholderData,
+    resultError,
+    isViewReady:
+      currentProjectionAttemptKey === null ||
+      readyGraphProjectionKey === currentProjectionAttemptKey,
+    onProjectionApplied: () => {
+      handleClearTopicSelection();
+      setHoveredTopicId(null);
+      setTooltip({ topic: null, x: 0, y: 0 });
+      setAddToWorkspaceDialogOpen(false);
+    },
+    persistSelection: (selection) =>
+      host.setPresentationSettings({ topic_modeling_cluster_selection: selection }),
+    onPersistenceError: (cause) => {
+      toast.error('Topics updated, but this cluster count was not remembered.', {
+        description: cause instanceof Error ? cause.message : String(cause),
+      });
+    },
   });
 
   const colorNodeIds = result ? resultNodeIds : panelNodeIds;
-
-  const { bubbleElements, renderSizeComposition } = useTopicModelingBubbleChart({
-    topics,
-    activeDomain,
-    chartWidth,
-    chartHeight,
-    chartPadding,
-    brushRect,
-    chartSvgRef,
-    chartRef,
-    isBrushing,
-    handleBrushStart,
-    handleBrushMove,
-    handleBrushEnd,
-    hoveredTopicId,
-    setHoveredTopicId,
-    setTooltip,
-    corpusCount,
-    panelNodeIds: colorNodeIds,
-    nodeColors,
-    defaultPalette,
-    selectedTopicIds,
-    onToggleTopicSelection: handleToggleTopicSelection,
-    topicSearchQuery,
-    handleResetZoom,
-  });
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- this is a truthiness OR: a falsy banner/result/error must fall through to the next, so ?? would short-circuit incorrectly
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
@@ -491,11 +472,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
         onCorpusSampleChange={updateCorpusSample}
-        topicSizeValue={topicSizeValue}
-        topicSizeUserSet={topicSizeUserSet}
-        topicSizeWarning={topicSizeWarning}
-        onTopicSizeValueChange={setTopicSizeValueFromUser}
-        showSamplingWarning={showSamplingWarning}
         randomSeed={randomSeed}
         randomSeedUserSet={randomSeedUserSet}
         onRandomSeedChange={setRandomSeedFromUser}
@@ -533,12 +509,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           topics={topics}
           exportTopics={exportTopics}
           containerRef={containerRef}
-          chartRef={chartRef}
-          handleResetZoom={handleResetZoom}
-          isAtGlobalZoom={isAtGlobalZoom}
-          bubbleElements={bubbleElements}
           tooltip={tooltip}
-          renderSizeComposition={renderSizeComposition}
+          setTooltip={setTooltip}
           hoveredTopicId={hoveredTopicId}
           setHoveredTopicId={setHoveredTopicId}
           selectedTopicIds={selectedTopicIds}
@@ -546,12 +518,31 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           onClearSelection={handleClearTopicSelection}
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
-          activeDomain={activeDomain}
+          corpusCount={corpusCount}
+          panelNodeIds={colorNodeIds}
+          nodeColors={nodeColors}
+          defaultPalette={defaultPalette}
+          graphProjectionKey={graphProjectionKey}
+          onGraphViewReady={setReadyGraphProjectionKey}
           nodeNames={resultNodeNames}
           randomSeed={resultRandomSeed}
           maxSegmentTokens={resultMaxSegmentTokens}
           onAddToWorkspace={openAddToWorkspaceDialog}
           isAddingToWorkspace={isAddingToWorkspace}
+          projectionPending={projectionPending}
+          projectionError={projectionError}
+          clustering={result?.clustering ?? null}
+          onClusterCountCommit={(value) => {
+            if (value !== result?.clustering.cluster_count) startClusterProjection(value);
+          }}
+          onClusterProjectionRetry={
+            projectionError && currentClusterRequest
+              ? () => {
+                  startClusterProjection(currentClusterRequest.clusterCount);
+                }
+              : undefined
+          }
+          clusterSliderResetKey={sliderResetKey}
           wordsPerTopic={representativeWordsCount}
           onWordsPerTopicChange={(value) => {
             void host.setPresentationSettings({ topic_modeling_words_per_topic: value });

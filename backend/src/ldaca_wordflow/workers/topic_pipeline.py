@@ -14,6 +14,7 @@ Used by:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any, cast
@@ -225,6 +226,9 @@ def _run_rust_topic_modeling(
     raw_result = result_frame["__topic__"][0]
     if not isinstance(raw_result, dict):
         raise ValueError("Topic modeling native result is malformed")
+    clustering_context = raw_result.get("clustering_context")
+    if not isinstance(clustering_context, bytes):
+        raise ValueError("Topic modeling native clustering context is malformed")
 
     raw_topics = raw_result.get("topics")
     if not isinstance(raw_topics, list):
@@ -327,4 +331,80 @@ def _run_rust_topic_modeling(
         "n_chunks": n_chunks,
         "truncated_segment_count": truncated_segment_count,
         "stage_timings_ms": stage_timings_ms,
+        "clustering_context": clustering_context,
+    }
+
+
+def _project_rust_topic_modeling(
+    *, clustering_context: bytes, cluster_count: int, document_count: int
+) -> dict[str, Any]:
+    """Project a validated native context without rerunning model stages."""
+
+    from polars_text import _internal
+
+    try:
+        raw_result = json.loads(
+            _internal.project_topic_modeling_context(
+                clustering_context, int(cluster_count)
+            )
+        )
+    except (TypeError, ValueError, RuntimeError) as exc:
+        raise ValueError("Topic clustering context is invalid") from exc
+    raw_topics = raw_result.get("topics")
+    raw_documents = raw_result.get("documents")
+    if not isinstance(raw_topics, list) or not isinstance(raw_documents, list):
+        raise ValueError("Topic projection result is malformed")
+    if len(raw_topics) != cluster_count or len(raw_documents) != document_count:
+        raise ValueError("Topic projection result has invalid dimensions")
+    topics: list[dict[str, Any]] = []
+    for expected_id, raw_topic in enumerate(raw_topics):
+        if not isinstance(raw_topic, dict):
+            raise ValueError("Topic projection ids are invalid")
+        topic = cast(dict[str, Any], raw_topic)
+        if int(topic.get("id", -1)) != expected_id:
+            raise ValueError("Topic projection ids are invalid")
+        topics.append(
+            {
+                "id": expected_id,
+                "representative_words": list(topic.get("representative_words") or []),
+                "x": float(topic.get("x") or 0.0),
+                "y": float(topic.get("y") or 0.0),
+            }
+        )
+    documents: list[dict[str, Any]] = []
+    expected_topic_ids = {-1, *range(cluster_count)}
+    for expected_index, raw_document in enumerate(raw_documents):
+        if not isinstance(raw_document, dict):
+            raise ValueError("Topic projection document indices are invalid")
+        document = cast(dict[str, Any], raw_document)
+        if int(document.get("doc_index", -1)) != expected_index:
+            raise ValueError("Topic projection document indices are invalid")
+        distribution = {
+            int(topic_id): float(proportion)
+            for topic_id, proportion in document.get("topic_distribution") or []
+        }
+        if not set(distribution).issubset(expected_topic_ids):
+            raise ValueError("Topic projection distribution contains an unknown Topic")
+        documents.append(
+            {
+                "doc_index": expected_index,
+                "dominant_topic": int(document.get("dominant_topic", -1)),
+                "topic_distribution": [
+                    {
+                        "topic_id": topic_id,
+                        "proportion": distribution.get(topic_id, 0.0),
+                    }
+                    for topic_id in [-1, *range(cluster_count)]
+                ],
+            }
+        )
+    return {
+        "topics": topics,
+        "documents": documents,
+        "n_topics": cluster_count,
+        "n_chunks": int(raw_result.get("n_chunks") or 0),
+        "truncated_segment_count": int(
+            raw_result.get("truncated_segment_count") or 0
+        ),
+        "stage_timings_ms": [],
     }

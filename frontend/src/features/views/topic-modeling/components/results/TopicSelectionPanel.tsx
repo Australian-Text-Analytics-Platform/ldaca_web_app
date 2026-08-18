@@ -2,7 +2,7 @@ import React from 'react';
 import type { TopicModelingTopic } from '@/api';
 import { Search, X } from 'lucide-react';
 import { matchChecklistOption } from '@/features/views/common/checklistSearch';
-import { topicRepresentativeText, type ZoomDomain } from '../../topicModelingAdapters';
+import { topicRepresentativeText } from '../../topicModelingAdapters';
 
 interface Props {
   topics: TopicModelingTopic[];
@@ -11,28 +11,18 @@ interface Props {
   onClearSelection: () => void;
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
-  activeDomain: ZoomDomain | null;
-  isAtGlobalZoom: boolean;
+  lassoTopicIds: Set<number>;
+  onClearLassoFilter: () => void;
   renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
-/** Used by: TopicSelectionPanel filtering to check whether a topic is inside the current zoom domain. */
-function isTopicInDomain(topic: TopicModelingTopic, domain: ZoomDomain): boolean {
-  return (
-    topic.x >= domain.xMin &&
-    topic.x <= domain.xMax &&
-    topic.y >= domain.yMin &&
-    topic.y <= domain.yMax
-  );
-}
-
 /**
  * Renders selected and available topic lists beneath the bubble chart.
  * Rendered by: TopicModelingBubbleChartSection, which shares chart hover,
- * selection, search, and zoom-domain state with this list.
- * Flow: sort by size, apply zoom/search filters, then keep list hover and
+ * selection, search, and lasso-filter state with this list.
+ * Flow: sort by size, intersect lasso and search filters, then keep list hover and
  * selection actions synchronized with the chart.
  */
 export function TopicSelectionPanel({
@@ -42,18 +32,17 @@ export function TopicSelectionPanel({
   onClearSelection,
   topicSearchQuery,
   onTopicSearchQueryChange,
-  activeDomain,
-  isAtGlobalZoom,
+  lassoTopicIds,
+  onClearLassoFilter,
   renderSizeComposition,
   hoveredTopicId,
   setHoveredTopicId,
 }: Props) {
   const sortedTopics = topics.toSorted((a, b) => b.total_size - a.total_size);
+  const hasLassoFilter = lassoTopicIds.size > 0;
 
   const filteredTopics = sortedTopics.filter((topic) => {
-    if (!isAtGlobalZoom && activeDomain && !isTopicInDomain(topic, activeDomain)) {
-      return false;
-    }
+    if (hasLassoFilter && !lassoTopicIds.has(topic.id)) return false;
     if (topicSearchQuery.trim()) {
       return matchChecklistOption(topicRepresentativeText(topic), topicSearchQuery);
     }
@@ -127,9 +116,25 @@ export function TopicSelectionPanel({
 
       {/* Right column: all topics (filtered) */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-foreground">
-          All Topics ({filteredTopics.length})
-        </h4>
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-sm font-medium text-foreground">
+            All Topics (
+            {hasLassoFilter
+              ? `${String(filteredTopics.length)} of ${String(topics.length)}`
+              : filteredTopics.length}
+            )
+          </h4>
+          {hasLassoFilter ? (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={onClearLassoFilter}
+              aria-label="Clear lasso filter"
+            >
+              Clear filter
+            </button>
+          ) : null}
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <input

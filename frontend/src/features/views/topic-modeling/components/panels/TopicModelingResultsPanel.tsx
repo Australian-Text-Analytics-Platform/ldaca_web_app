@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import type { TopicModelingResponse, TopicModelingTopic } from '@/api';
-import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
-import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
-import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
-import type { ZoomDomain } from '../../topicModelingAdapters';
+import { LoaderCircle, Plus } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import type { TopicClustering, TopicModelingResponse, TopicModelingTopic } from '@/api';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import { Plus } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
+import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
+import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingStopWordsControl } from '../TopicModelingStopWordsControl';
 
 interface Props {
@@ -27,12 +27,10 @@ interface Props {
   topics: TopicModelingTopic[];
   exportTopics?: TopicModelingTopic[];
   containerRef: React.RefObject<HTMLDivElement | null>;
-  chartRef: React.RefObject<HTMLDivElement | null>;
-  handleResetZoom: () => void;
-  isAtGlobalZoom: boolean;
-  bubbleElements: React.ReactNode;
   tooltip: { topic: TopicModelingTopic | null; x: number; y: number };
-  renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
+  setTooltip: React.Dispatch<
+    React.SetStateAction<{ topic: TopicModelingTopic | null; x: number; y: number }>
+  >;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
   selectedTopicIds: Set<number>;
@@ -40,13 +38,23 @@ interface Props {
   onClearSelection: () => void;
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
-  activeDomain: ZoomDomain | null;
+  corpusCount: number;
+  panelNodeIds: string[];
+  nodeColors: Record<string, string>;
+  defaultPalette: string[];
+  graphProjectionKey: string;
+  onGraphViewReady: (projectionKey: string) => void;
   nodeNames?: string[];
-  topicSizeValue?: number;
   randomSeed?: number;
   maxSegmentTokens: number;
   onAddToWorkspace: () => void;
   isAddingToWorkspace: boolean;
+  projectionPending: boolean;
+  projectionError?: string | null;
+  clustering: TopicClustering | null;
+  onClusterCountCommit: (value: number) => void;
+  onClusterProjectionRetry?: () => void;
+  clusterSliderResetKey?: number;
   wordsPerTopic?: number;
   onWordsPerTopicChange?: (value: number) => void;
   stopWordsEnabled: boolean;
@@ -58,6 +66,112 @@ interface Props {
     column: string | null;
   };
   onStopWordsChange: (words: string[]) => Promise<void>;
+}
+
+function ClusterCountControl({
+  clustering,
+  pending,
+  error,
+  onCommit,
+  onRetry,
+}: {
+  clustering: TopicClustering;
+  pending: boolean;
+  error?: string | null;
+  onCommit: (value: number) => void;
+  onRetry?: () => void;
+}) {
+  const applied = clustering.cluster_count;
+  const [value, setValue] = useState<number[]>([applied]);
+  const activePointerIdRef = useRef<number | null>(null);
+  const latestDraftRef = useRef(applied);
+  const displayedValue = value[0] ?? applied;
+
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      if (activePointerIdRef.current === null) return;
+      activePointerIdRef.current = null;
+      latestDraftRef.current = applied;
+      setValue([applied]);
+    };
+    window.addEventListener('blur', handleWindowBlur);
+    return () => {
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [applied]);
+
+  const rollBackPointerGesture = (pointerId: number) => {
+    if (activePointerIdRef.current !== pointerId) return;
+    activePointerIdRef.current = null;
+    latestDraftRef.current = applied;
+    setValue([applied]);
+  };
+
+  return (
+    <div className="grid min-w-56 gap-1 text-xs text-muted-foreground">
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor="topic-cluster-count">Number of clusters</label>
+        <span className="tabular-nums text-foreground">{displayedValue}</span>
+      </div>
+      {clustering.adjustable ? (
+        <Slider
+          id="topic-cluster-count"
+          data-testid="topic-cluster-slider"
+          aria-label="Number of clusters"
+          min={clustering.min_cluster_count}
+          max={clustering.max_cluster_count}
+          step={1}
+          value={value}
+          disabled={pending}
+          onPointerDown={(event) => {
+            if (pending) return;
+            activePointerIdRef.current = event.pointerId;
+            latestDraftRef.current = displayedValue;
+          }}
+          onPointerUp={(event) => {
+            if (activePointerIdRef.current !== event.pointerId) return;
+            activePointerIdRef.current = null;
+            const next = latestDraftRef.current;
+            if (next !== applied) onCommit(next);
+          }}
+          onPointerCancel={(event) => {
+            rollBackPointerGesture(event.pointerId);
+          }}
+          onLostPointerCapture={(event) => {
+            rollBackPointerGesture(event.pointerId);
+          }}
+          onValueChange={(nextValue) => {
+            const next = nextValue[0] ?? applied;
+            latestDraftRef.current = next;
+            setValue(nextValue);
+            if (activePointerIdRef.current === null && next !== applied) onCommit(next);
+          }}
+        />
+      ) : (
+        <input
+          id="topic-cluster-count"
+          aria-label="Number of clusters"
+          type="range"
+          min={clustering.cluster_count}
+          max={clustering.cluster_count}
+          value={clustering.cluster_count}
+          disabled
+          readOnly
+          className="h-4 w-full accent-primary disabled:opacity-50"
+        />
+      )}
+      {error ? (
+        <span className="flex items-center gap-2 text-destructive">
+          {error}
+          {onRetry ? (
+            <button type="button" className="underline" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function WordsPerTopicControl({
@@ -107,12 +221,8 @@ export function TopicModelingResultsPanel({
   topics,
   exportTopics = topics,
   containerRef,
-  chartRef,
-  handleResetZoom,
-  isAtGlobalZoom,
-  bubbleElements,
   tooltip,
-  renderSizeComposition,
+  setTooltip,
   hoveredTopicId,
   setHoveredTopicId,
   selectedTopicIds,
@@ -120,13 +230,23 @@ export function TopicModelingResultsPanel({
   onClearSelection,
   topicSearchQuery,
   onTopicSearchQueryChange,
-  activeDomain,
+  corpusCount,
+  panelNodeIds,
+  nodeColors,
+  defaultPalette,
+  graphProjectionKey,
+  onGraphViewReady,
   nodeNames,
-  topicSizeValue,
   randomSeed,
   maxSegmentTokens,
   onAddToWorkspace,
   isAddingToWorkspace,
+  projectionPending,
+  projectionError,
+  clustering,
+  onClusterCountCommit,
+  onClusterProjectionRetry,
+  clusterSliderResetKey = 0,
   wordsPerTopic = 15,
   onWordsPerTopicChange = () => undefined,
   stopWordsEnabled,
@@ -183,70 +303,112 @@ export function TopicModelingResultsPanel({
         {isErrorState ? <p className="text-sm text-muted-foreground">{error}</p> : null}
 
         {isSuccessfulState ? (
-          <div className="space-y-4">
-            {truncationWarning ? (
-              <p
-                className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-                role="status"
-              >
-                {truncationWarning}
-              </p>
-            ) : null}
-            <TopicModelingBubbleChartSection
-              topics={topics}
-              exportTopics={exportTopics}
-              chartRef={chartRef}
-              handleResetZoom={handleResetZoom}
-              isAtGlobalZoom={isAtGlobalZoom}
-              bubbleElements={bubbleElements}
-              tooltip={tooltip}
-              renderSizeComposition={renderSizeComposition}
-              hoveredTopicId={hoveredTopicId}
-              setHoveredTopicId={setHoveredTopicId}
-              selectedTopicIds={selectedTopicIds}
-              onToggleTopicSelection={onToggleTopicSelection}
-              onClearSelection={onClearSelection}
-              topicSearchQuery={topicSearchQuery}
-              onTopicSearchQueryChange={onTopicSearchQueryChange}
-              activeDomain={activeDomain}
-              nodeNames={nodeNames}
-              topicSizeValue={topicSizeValue}
-              randomSeed={randomSeed}
-              controlRowSlot={
-                <div className="flex w-full flex-wrap items-end justify-between gap-3">
-                  <div className="flex flex-wrap items-end gap-3">
-                    <p className="pb-2 text-sm text-muted-foreground">Topics ({topics.length})</p>
-                    <WordsPerTopicControl value={wordsPerTopic} onCommit={onWordsPerTopicChange} />
-                    <TopicModelingStopWordsControl
-                      enabled={stopWordsEnabled}
-                      onEnabledChange={onStopWordsEnabledChange}
-                      savedWords={stopWords}
-                      workspaceId={stopWordsDetectionTarget.workspaceId}
-                      nodeId={stopWordsDetectionTarget.nodeId}
-                      column={stopWordsDetectionTarget.column}
-                      onSavedWordsChange={onStopWordsChange}
-                    />
-                  </div>
-                  <DisabledReasonTooltip
-                    reason={
-                      isAddingToWorkspace
-                        ? 'A Data Block is being added to the workspace'
-                        : undefined
-                    }
-                  >
-                    <Button
-                      data-guidance="topic-modeling-add-to-workspace"
-                      size="sm"
-                      onClick={onAddToWorkspace}
-                      disabled={isAddingToWorkspace}
-                    >
-                      <Plus className="mr-1 h-4 w-4" />
-                      Add to Workspace
-                    </Button>
-                  </DisabledReasonTooltip>
-                </div>
+          <div className="relative" aria-busy={projectionPending}>
+            <div
+              data-testid="topic-modeling-result-content"
+              aria-hidden={projectionPending || undefined}
+              inert={projectionPending ? true : undefined}
+              className={
+                projectionPending
+                  ? 'pointer-events-none select-none opacity-40 grayscale'
+                  : undefined
               }
-            />
+            >
+              <div className="space-y-4">
+                {truncationWarning ? (
+                  <p
+                    className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                    role="status"
+                  >
+                    {truncationWarning}
+                  </p>
+                ) : null}
+                <TopicModelingBubbleChartSection
+                  topics={topics}
+                  exportTopics={exportTopics}
+                  tooltip={tooltip}
+                  setTooltip={setTooltip}
+                  hoveredTopicId={hoveredTopicId}
+                  setHoveredTopicId={setHoveredTopicId}
+                  selectedTopicIds={selectedTopicIds}
+                  onToggleTopicSelection={onToggleTopicSelection}
+                  onClearSelection={onClearSelection}
+                  topicSearchQuery={topicSearchQuery}
+                  onTopicSearchQueryChange={onTopicSearchQueryChange}
+                  corpusCount={corpusCount}
+                  panelNodeIds={panelNodeIds}
+                  nodeColors={nodeColors}
+                  defaultPalette={defaultPalette}
+                  projectionKey={graphProjectionKey}
+                  onViewReady={onGraphViewReady}
+                  nodeNames={nodeNames}
+                  clusterCount={clustering?.cluster_count}
+                  exportDisabled={projectionPending}
+                  randomSeed={randomSeed}
+                  controlRowSlot={
+                    <div className="flex w-full flex-wrap items-end justify-between gap-3">
+                      <div className="flex flex-wrap items-end gap-3">
+                        <p className="pb-2 text-sm text-muted-foreground">
+                          Topics ({topics.length})
+                        </p>
+                        {clustering ? (
+                          <ClusterCountControl
+                            key={`${String(clustering.cluster_count)}:${String(clusterSliderResetKey)}`}
+                            clustering={clustering}
+                            pending={projectionPending}
+                            error={projectionError}
+                            onCommit={onClusterCountCommit}
+                            onRetry={onClusterProjectionRetry}
+                          />
+                        ) : null}
+                        <WordsPerTopicControl
+                          value={wordsPerTopic}
+                          onCommit={onWordsPerTopicChange}
+                        />
+                        <TopicModelingStopWordsControl
+                          enabled={stopWordsEnabled}
+                          onEnabledChange={onStopWordsEnabledChange}
+                          savedWords={stopWords}
+                          workspaceId={stopWordsDetectionTarget.workspaceId}
+                          nodeId={stopWordsDetectionTarget.nodeId}
+                          column={stopWordsDetectionTarget.column}
+                          onSavedWordsChange={onStopWordsChange}
+                        />
+                      </div>
+                      <DisabledReasonTooltip
+                        reason={
+                          isAddingToWorkspace
+                            ? 'A Data Block is being added to the workspace'
+                            : undefined
+                        }
+                      >
+                        <Button
+                          data-guidance="topic-modeling-add-to-workspace"
+                          size="sm"
+                          onClick={onAddToWorkspace}
+                          disabled={isAddingToWorkspace || projectionPending}
+                        >
+                          <Plus className="mr-1 h-4 w-4" />
+                          Add to Workspace
+                        </Button>
+                      </DisabledReasonTooltip>
+                    </div>
+                  }
+                />
+              </div>
+            </div>
+            {projectionPending ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-muted/45 backdrop-blur-[1px]"
+              >
+                <div className="flex items-center gap-2 rounded-md border bg-background px-4 py-3 text-sm font-medium shadow-sm">
+                  <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />
+                  Updating topics…
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </AnalysisCardLayout>

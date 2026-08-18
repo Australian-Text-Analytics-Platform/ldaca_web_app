@@ -53,13 +53,6 @@ than split. After the run, a warning reports how many segments lost tail text.
 Automatic mode may overlap adjacent segments; its hidden overlap is one eighth
 of the cap, up to 32 tokens.
 
-<h4 id="help-topic-modeling-min-topic-size">Minimum topic size</h4>
-
-The smallest number of Topic Segments that can form a topic. The default is 10.
-Higher values usually create fewer, broader topics and more outliers; lower
-values allow smaller themes but can create noisier topics. The final topic
-count is determined by the data rather than requested directly.
-
 <h4 id="help-topic-modeling-random-seed">Random seed</h4>
 
 Controls stochastic dimensionality reduction. The default is 0. Keep the same
@@ -92,6 +85,26 @@ your segmentation method and token cap stay selected.
 
 ![Topic modelling results](tutorials/assets/topic_modelling/results.png)
 
+<h3 id="help-topic-modeling-number-of-clusters">Number of clusters</h3>
+
+The Result starts at HDBSCAN's natural number of real Topics. Use **Number of
+clusters** to merge that fit down to two Topics without rerunning embedding or
+dimensionality reduction. Topic −1 is an outlier group, remains unchanged, and
+does not count toward the displayed number. Results with zero, one, or two real
+Topics show a fixed disabled control.
+
+The value changes locally while you move the slider, then Wordflow requests one
+projection after you commit it. The current chart remains visible with
+**Updating topics…** until the new representative words, coordinates, sizes,
+and document assignments arrive. A failed request restores the previous value.
+Changing the count clears Topic selection and chart hover or zoom state. Search,
+stop words, and Words per topic remain in place.
+
+A successfully applied non-default count is remembered for the same Analysis.
+Rerunning creates a new Analysis at its natural count. Export and Add to
+Workspace use the displayed successful projection and are unavailable while an
+update is pending.
+
 <h3 id="help-topic-modeling-words-per-topic">Words per topic and stop words</h3>
 
 **Words per topic** controls how many representative words appear in the topic
@@ -114,9 +127,19 @@ Topic −1 contains outlier documents that did not fit a discovered cluster.
 Hover for a representative-word cloud. Word order reflects c-TF-IDF
 distinctiveness, while word size reflects occurrences in assigned Topic
 Segments; automatic overlap can therefore count repeated source text. These are
-not source-document frequencies. Select topics, search the topic
-list, reset the zoom, or choose **Add to Workspace** to publish selected topic
-data and linked topic meanings as Derived Data Blocks.
+not source-document frequencies.
+
+Drag empty graph space to pan and scroll or pinch to zoom. The graph initially
+fits every bubble; use **Fit view** to restore that complete view after moving
+around. Select topics directly, or enable the lasso control and draw around
+several Topic centres. Lasso mode remains active and later strokes add to the
+filter shown in **All Topics**; **Clear filter** removes that accumulated filter
+without changing manually selected Topics. Search further narrows the filtered
+list. Choose **Add to Workspace** to publish manually selected topic data and
+linked topic meanings as Derived Data Blocks.
+
+The download control exports the current panned and zoomed graph viewport. CSV
+output continues to contain the complete projected Topic result.
 
 If Paragraph or Sentence segments were over the token cap, an amber message
 above the chart reports the truncated count and reminds you that their later
@@ -131,7 +154,7 @@ segmentation method and maximum-token value remain available for the next run.
 
 | Symptom | What to try |
 | --- | --- |
-| Almost all documents are outliers | Lower Minimum topic size, increase sampling, or check whether the corpus has shared themes |
+| Almost all documents are outliers | Increase sampling, try another segmentation method, or check whether the corpus has shared themes |
 | Topics change substantially between runs | Increase sampling and compare runs with fixed seeds |
 | Representative words describe formatting rather than subject matter | Clean boilerplate or choose a segmentation method that better matches the document structure |
 | Many segments are truncated | Increase Maximum tokens per segment or use Automatic segmentation |
@@ -144,16 +167,16 @@ segmentation method and maximum-token value remain available for the next run.
 | Sampling | 100% per Data Block |
 | Segmentation method | Automatic |
 | Maximum tokens per segment | 256 |
-| Minimum topic size | 10 |
 | Random seed | 0 |
 | Words per topic | 15 |
 
 ## Practice exercise
 
 1. Run a corpus with Automatic segmentation.
-2. Clear the Result, choose Paragraph or Sentence, and run again with the same
-   sample, seed, and minimum topic size.
-3. Compare the topic map, representative words, outlier share, and any
+2. Move Number of clusters down and compare the merged representative words.
+3. Clear the Result, choose Paragraph or Sentence, and run again with the same
+   sample and seed.
+4. Compare the topic map, representative words, outlier share, and any
    truncation warning.
 
 [← Back to tutorial index](./index.md)

@@ -7,10 +7,13 @@ interface UseAnalysisSessionOptions<TResult> {
   workspaceId: string | null;
   analysisId: string | null;
   resultQuery?: Readonly<Record<string, unknown>>;
+  resultRequestKey?: number;
+  resultCacheMode?: 'default' | 'no-store';
   loadResult: (
     workspaceId: string,
     analysisId: string,
     query?: Readonly<Record<string, unknown>>,
+    signal?: AbortSignal,
   ) => Promise<TResult>;
 }
 
@@ -22,6 +25,8 @@ export function useAnalysisSession<TResult>({
   workspaceId,
   analysisId,
   resultQuery: projectionQuery,
+  resultRequestKey,
+  resultCacheMode = 'default',
   loadResult,
 }: UseAnalysisSessionOptions<TResult>) {
   const enabled = Boolean(workspaceId && analysisId);
@@ -38,13 +43,14 @@ export function useAnalysisSession<TResult>({
       return getAnalysisResource(workspaceId, analysisId);
     },
   });
-  // `loadResult` selects the transport/projection implementation; the immutable
-  // Analysis id plus `projectionQuery` already define the server resource.
+  const noStore = resultCacheMode === 'no-store';
+  // `resultRequestKey` distinguishes explicit no-store attempts in the client
+  // cache only. `loadResult` receives the unchanged backend query payload.
   const resultResourceQuery = useQuery<TResult>({
     queryKey:
       workspaceId && analysisId
-        ? queryKeys.analysisResult(workspaceId, analysisId, projectionQuery)
-        : queryKeys.inactiveAnalysisResult(projectionQuery),
+        ? queryKeys.analysisResult(workspaceId, analysisId, projectionQuery, resultRequestKey)
+        : queryKeys.inactiveAnalysisResult(projectionQuery, resultRequestKey),
     enabled: enabled && analysisQuery.data?.state === 'succeeded',
     // A paginated observer may retain its last same-Analysis shape while the
     // feature replaces stale rows with a processing body. Never bridge this
@@ -57,10 +63,14 @@ export function useAnalysisSession<TResult>({
       );
       return belongsToCurrentAnalysis ? previousData : undefined;
     },
-    queryFn: async (): Promise<TResult> => {
+    queryFn: async ({ signal }): Promise<TResult> => {
       if (!workspaceId || !analysisId) throw new Error('Analysis session is not active');
-      return loadResult(workspaceId, analysisId, projectionQuery);
+      return loadResult(workspaceId, analysisId, projectionQuery, signal);
     },
+    gcTime: noStore ? 0 : undefined,
+    staleTime: noStore ? Number.POSITIVE_INFINITY : undefined,
+    refetchOnWindowFocus: noStore ? false : undefined,
+    refetchOnReconnect: noStore ? false : undefined,
   });
 
   return {
@@ -68,5 +78,10 @@ export function useAnalysisSession<TResult>({
     result: resultResourceQuery.data ?? null,
     isResultFetching: resultResourceQuery.isFetching,
     isResultPlaceholderData: resultResourceQuery.isPlaceholderData,
+    resultError:
+      resultResourceQuery.error instanceof Error ? resultResourceQuery.error.message : null,
+    retryResult: () => {
+      void resultResourceQuery.refetch();
+    },
   };
 }

@@ -43,7 +43,8 @@ The result contract is:
   topics: [{id, representative_words, x, y}],
   n_chunks,
   truncated_segment_count,
-  stage_timings_ms
+  stage_timings_ms,
+  clustering_context
 }
 ```
 
@@ -57,6 +58,12 @@ Segment. `n_chunks` retains its lower-level name but counts Topic Segments.
 in descending c-TF-IDF order. Counts are over assigned model Topic Segments, so
 automatic overlap can count the same source text more than once. Stopwords and
 display limits are not expression arguments.
+
+`clustering_context` is a zstd-compressed MessagePack binary produced alongside
+the natural HDBSCAN projection. The direct native projector accepts that value
+and an exact real-Topic count from two through the natural count, then returns
+new `documents[]` and `topics[]` JSON without model inference. It preserves
+outlier `-1` and canonicalizes real Topic IDs by Ward-tree order.
 
 ## Direct Functions
 

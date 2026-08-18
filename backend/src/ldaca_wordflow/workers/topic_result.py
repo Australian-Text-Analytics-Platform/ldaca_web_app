@@ -303,55 +303,100 @@ def _build_empty_topic_payload(
     Called by:
     - ``_compute_topic_payload`` in ``topic_modeling``.
     """
-    topic_meanings_path = artifact_root / f"{artifact_prefix}_topic_meanings.parquet"
-    pl.DataFrame(
-        schema={
-            TOPIC_COLUMN: pl.Int64,
-            TOPIC_MEANING_COLUMN: pl.List(pl.String),
-        }
-    ).lazy().sink_parquet(topic_meanings_path)
-
-    node_artifacts: list[dict[str, Any]] = []
-    for index, _corpus in enumerate(sampled.active_corpora):
-        node_id = str(node_infos[index]["node_id"])
-        node_name = str(node_infos[index].get("node_name") or node_id)
-        text_column = str(node_infos[index].get("text_column") or "")
-        original_columns = list(node_infos[index].get("original_columns") or [])
-        assignments_path = (
-            artifact_root / f"{artifact_prefix}_topic_assignments_{node_id}.parquet"
-        )
-        pl.DataFrame(
-            {
-                "__row_nr__": sampled.active_corpora_indices[index],
-                TOPIC_COLUMN: [],
-            }
-        ).with_columns(
-            [
-                pl.col("__row_nr__").cast(pl.Int64),
-                pl.col(TOPIC_COLUMN).cast(pl.Int64),
-            ]
-        ).lazy().sink_parquet(assignments_path)
-        node_artifacts.append(
-            {
-                "node_id": node_id,
-                "node_name": node_name,
-                "text_column": text_column,
-                "original_columns": original_columns,
-                "assignments": {
-                    "table_id": f"assignments:{node_id}",
-                    "artifact": str(assignments_path),
-                },
-            }
-        )
-
     return {
         "topics": [],
         "corpus_sizes": sampled.corpus_sizes,
         "per_corpus_topic_counts": [],
-        "artifacts": {
+        "sources": [
+            {
+                "node_id": str(info["node_id"]),
+                "node_name": str(info.get("node_name") or info["node_id"]),
+                "text_column": str(info.get("text_column") or ""),
+                "original_columns": list(info.get("original_columns") or []),
+            }
+            for info in node_infos
+        ],
+        "clustering": {
+            "cluster_count": 0,
+            "min_cluster_count": 0,
+            "max_cluster_count": 0,
+            "default_cluster_count": 0,
+            "adjustable": False,
+        },
+        "clustering_context": {
             "version": 1,
-            "topic_meanings_parquet_path": str(topic_meanings_path),
-            "nodes": node_artifacts,
+            "artifact": None,
+            "source_row_indices": sampled.active_corpora_indices,
         },
         "meta": {"n_chunks": 0, "truncated_segment_count": 0},
+    }
+
+
+def _build_topic_projection_payload(
+    *,
+    rust_result: dict[str, Any],
+    node_infos: list[dict[str, Any]],
+    corpus_sizes: list[int],
+) -> dict[str, Any]:
+    """Build the authoritative JSON projection without materializing tables."""
+
+    documents = list(rust_result.get("documents") or [])
+    rust_topics = list(rust_result.get("topics") or [])
+    total_docs = sum(corpus_sizes)
+    dominant_by_index = _dominant_topics_by_doc_index(documents, total_docs)
+    per_corpus_topic_counts: list[dict[int, int]] = []
+    offset = 0
+    for size in corpus_sizes:
+        counts: dict[int, int] = {}
+        for topic_id in dominant_by_index[offset : offset + size]:
+            counts[topic_id] = counts.get(topic_id, 0) + 1
+        per_corpus_topic_counts.append(counts)
+        offset += size
+
+    topics: list[dict[str, Any]] = []
+    for raw_topic in rust_topics:
+        topic_id = int(raw_topic["id"])
+        if topic_id < 0:
+            continue
+        words = [
+            {
+                "word": str(candidate["word"]),
+                "occurrence_count": int(candidate["occurrence_count"]),
+            }
+            for candidate in raw_topic.get("representative_words") or []
+            if isinstance(candidate, dict)
+            and candidate.get("word")
+            and int(candidate.get("occurrence_count") or 0) > 0
+        ]
+        sizes = [counts.get(topic_id, 0) for counts in per_corpus_topic_counts]
+        topics.append(
+            {
+                "id": topic_id,
+                "representative_words": words,
+                "size": sizes,
+                "total_size": sum(sizes),
+                "x": float(raw_topic.get("x") or 0.0),
+                "y": float(raw_topic.get("y") or 0.0),
+            }
+        )
+    if [topic["id"] for topic in topics] != list(range(len(topics))):
+        raise ValueError("Topic ids must be contiguous and start at zero")
+    has_outlier = any(topic_id == -1 for topic_id in dominant_by_index)
+    return {
+        "topics": topics,
+        "corpus_sizes": corpus_sizes,
+        "per_corpus_topic_counts": per_corpus_topic_counts,
+        "sources": [
+            {
+                "node_id": str(info["node_id"]),
+                "node_name": str(info.get("node_name") or info["node_id"]),
+                "text_column": str(info.get("text_column") or ""),
+                "original_columns": list(info.get("original_columns") or []),
+            }
+            for info in node_infos
+        ],
+        "meta": {
+            "embeddings_from_ctfidf": False,
+            "total_topics_incl_outlier": len(topics) + int(has_outlier),
+        },
     }

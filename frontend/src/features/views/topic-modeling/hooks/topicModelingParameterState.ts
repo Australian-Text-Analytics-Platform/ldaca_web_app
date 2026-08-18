@@ -1,6 +1,5 @@
 import type { TopicSegmentationMethod } from '@/api';
 
-export const DEFAULT_TOPIC_SIZE_VALUE = 10;
 export const DEFAULT_MAX_SEGMENT_TOKENS = 256;
 const DEFAULT_TOPIC_SAMPLE_PERCENT = 100;
 
@@ -11,8 +10,6 @@ export interface CorpusSample {
 export interface TopicModelingParameterState {
   corpusSamples: CorpusSample[];
   corpusSamplesUserSet: boolean;
-  topicSizeValue: number;
-  topicSizeUserSet: boolean;
   randomSeed: number;
   randomSeedUserSet: boolean;
   segmentationMethod: TopicSegmentationMethod;
@@ -22,7 +19,6 @@ export interface TopicModelingParameterState {
 type TopicModelingParameterAction =
   | { type: 'applyNodeDefaultSamples'; samples: CorpusSample[] }
   | { type: 'updateCorpusSample'; index: number; update: Partial<CorpusSample> }
-  | { type: 'setTopicSizeFromUser'; value: number }
   | { type: 'setRandomSeedFromUser'; value: number }
   | { type: 'setSegmentationMethod'; value: TopicSegmentationMethod }
   | { type: 'setMaxSegmentTokens'; value: number }
@@ -38,8 +34,6 @@ type TopicModelingParameterAction =
 export const createTopicModelingParameterState = (): TopicModelingParameterState => ({
   corpusSamples: [],
   corpusSamplesUserSet: false,
-  topicSizeValue: DEFAULT_TOPIC_SIZE_VALUE,
-  topicSizeUserSet: false,
   randomSeed: 0,
   randomSeedUserSet: false,
   segmentationMethod: 'automatic',
@@ -139,8 +133,6 @@ export const topicModelingParameterReducer = (
       };
       return { ...state, corpusSamples: next, corpusSamplesUserSet: true };
     }
-    case 'setTopicSizeFromUser':
-      return { ...state, topicSizeValue: action.value, topicSizeUserSet: true };
     case 'setRandomSeedFromUser':
       return { ...state, randomSeed: action.value, randomSeedUserSet: true };
     case 'setSegmentationMethod':
@@ -153,8 +145,6 @@ export const topicModelingParameterReducer = (
         ...state,
         randomSeed: Number(action.request.random_seed ?? 0),
         randomSeedUserSet: true,
-        topicSizeValue: Number(action.request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
-        topicSizeUserSet: true,
         segmentationMethod: normalizeSegmentationMethod(action.request.segmentation_method),
         maxSegmentTokens: sanitizeMaxSegmentTokens(
           action.request.max_segment_tokens as number | undefined,
@@ -169,8 +159,6 @@ export const topicModelingParameterReducer = (
       return {
         ...state,
         corpusSamples: state.corpusSamplesUserSet ? state.corpusSamples : action.defaultSamples,
-        topicSizeValue: DEFAULT_TOPIC_SIZE_VALUE,
-        topicSizeUserSet: false,
         randomSeedUserSet: false,
       };
   }

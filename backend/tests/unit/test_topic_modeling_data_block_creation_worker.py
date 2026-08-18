@@ -8,19 +8,18 @@ import pytest
 
 from ldaca_wordflow.analysis.generated_columns import (
     TOPIC_COLUMN,
-    TOPIC_DISTRIBUTION_COLUMN,
     TOPIC_DISTRIBUTION_OUTPUT_COLUMN,
     TOPIC_MEANING_COLUMN,
     TOPIC_TOP1_COLUMN,
 )
 from ldaca_wordflow.domain.workspace import Node, SourceProvenance, Workspace
-from ldaca_wordflow.shared.topic_types import topic_distribution_dtype
 from ldaca_wordflow.workers.input_snapshots import create_worker_input_snapshot
 from ldaca_wordflow.workers.topic_modeling import run_topic_modeling_data_block_creation
 
 
 def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     first_id = uuid.uuid4()
     second_id = uuid.uuid4()
@@ -66,26 +65,26 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
             {"topic_id": 1, "proportion": 1.0},
         ],
     ]
-    assignment_paths: dict[str, str] = {}
-    for node_id in (first_id, second_id):
-        path = tmp_path / f"{node_id}.parquet"
-        pl.DataFrame(
-            {
-                "__row_nr__": [0, 1, 2],
-                TOPIC_COLUMN: [1, 2, 1],
-                TOPIC_DISTRIBUTION_COLUMN: pl.Series(
-                    TOPIC_DISTRIBUTION_COLUMN,
-                    distribution,
-                    dtype=topic_distribution_dtype(2),
-                ),
-            }
-        ).write_parquet(path)
-        assignment_paths[str(node_id)] = str(path)
-    meanings_path = tmp_path / "meanings.parquet"
-    pl.DataFrame(
-        {TOPIC_COLUMN: [1, 2], TOPIC_MEANING_COLUMN: [["old"], ["other"]]},
-        schema={TOPIC_COLUMN: pl.Int64, TOPIC_MEANING_COLUMN: pl.List(pl.String)},
-    ).write_parquet(meanings_path)
+    projected_documents = [
+        {
+            "doc_index": index,
+            "dominant_topic": [1, 0, 1][index % 3],
+            "topic_distribution": distribution[index % 3],
+        }
+        for index in range(6)
+    ]
+    monkeypatch.setattr(
+        "ldaca_wordflow.workers.topic_pipeline._project_rust_topic_modeling",
+        lambda **_kwargs: {
+            "documents": projected_documents,
+            "topics": [
+                {"id": 0, "representative_words": [{"word": "old"}]},
+                {"id": 1, "representative_words": [{"word": "other"}]},
+            ],
+        },
+    )
+    context_path = tmp_path / "context.msgpack.zst"
+    context_path.write_bytes(b"context")
     progress_updates: list[tuple[float, str]] = []
 
     result = run_topic_modeling_data_block_creation(
@@ -103,10 +102,14 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
                 str(second_id): "Second topics",
             },
             "topic_ids": [1],
+            "cluster_count": 2,
             "topic_meanings_override": [{"topic_id": 1, "words": ["new"]}],
         },
-        assignment_paths=assignment_paths,
-        topic_meanings_path=str(meanings_path),
+        clustering_context_path=str(context_path),
+        source_projection={
+            str(first_id): {"row_indices": [0, 1, 2], "offset": 0, "size": 3},
+            str(second_id): {"row_indices": [0, 1, 2], "offset": 3, "size": 3},
+        },
         progress_callback=lambda progress, message: progress_updates.append(
             (progress, message)
         ),

@@ -140,7 +140,22 @@ describe('useAnalysisFeature', () => {
 
     await mocks.sessionOptions?.loadResult?.('workspace-1', 'analysis-1', projection);
 
-    expect(config.fetchResult).toHaveBeenCalledWith('analysis-1', projection);
+    expect(config.fetchResult).toHaveBeenCalledWith('analysis-1', projection, undefined);
+  });
+
+  it('forwards client-only Result attempt configuration to the session seam', () => {
+    const config = {
+      ...baseConfig(),
+      resultRequestKey: 7,
+      resultCacheMode: 'no-store' as const,
+    };
+
+    renderHook(() => useAnalysisFeature(config), { wrapper: createWrapper() });
+
+    expect(mocks.sessionOptions).toMatchObject({
+      resultRequestKey: 7,
+      resultCacheMode: 'no-store',
+    });
   });
 
   it('derives failure state from Analysis without inventing a Result lifecycle', () => {

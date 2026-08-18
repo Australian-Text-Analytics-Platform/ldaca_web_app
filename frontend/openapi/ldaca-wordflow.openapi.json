@@ -1579,40 +1579,6 @@
         "title": "ApiError",
         "type": "object"
       },
-      "ArtifactResource": {
-        "additionalProperties": false,
-        "properties": {
-          "media_type": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Media Type"
-          },
-          "name": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          },
-          "url": {
-            "minLength": 1,
-            "title": "Url",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "url"
-        ],
-        "title": "ArtifactResource",
-        "type": "object"
-      },
       "AuthProvider": {
         "additionalProperties": false,
         "description": "One configured hosted login provider.",
@@ -5515,41 +5481,6 @@
         "title": "NodeUpdateRequest",
         "type": "object"
       },
-      "PagedTableResource": {
-        "additionalProperties": false,
-        "description": "One open-ended table fetched as independent Arrow IPC pages.",
-        "properties": {
-          "delivery": {
-            "const": "paged",
-            "default": "paged",
-            "title": "Delivery",
-            "type": "string"
-          },
-          "rows_url": {
-            "minLength": 1,
-            "title": "Rows Url",
-            "type": "string"
-          },
-          "schema_url": {
-            "minLength": 1,
-            "title": "Schema Url",
-            "type": "string"
-          },
-          "table_id": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Table Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "table_id",
-          "schema_url",
-          "rows_url"
-        ],
-        "title": "PagedTableResource",
-        "type": "object"
-      },
       "Progress": {
         "additionalProperties": false,
         "description": "Exact live and durable progress value shared by background resources.",
@@ -7650,6 +7581,16 @@
             "title": "Stop Words",
             "type": "array"
           },
+          "topic_modeling_cluster_selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TopicModelingClusterSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "topic_modeling_words_per_topic": {
             "anyOf": [
               {
@@ -7743,6 +7684,16 @@
               }
             ],
             "title": "Stop Words"
+          },
+          "topic_modeling_cluster_selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TopicModelingClusterSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "topic_modeling_words_per_topic": {
             "anyOf": [
@@ -7914,6 +7865,44 @@
         "title": "TokenizerModelResource",
         "type": "object"
       },
+      "TopicClustering": {
+        "additionalProperties": false,
+        "properties": {
+          "adjustable": {
+            "title": "Adjustable",
+            "type": "boolean"
+          },
+          "cluster_count": {
+            "minimum": 0.0,
+            "title": "Cluster Count",
+            "type": "integer"
+          },
+          "default_cluster_count": {
+            "minimum": 0.0,
+            "title": "Default Cluster Count",
+            "type": "integer"
+          },
+          "max_cluster_count": {
+            "minimum": 0.0,
+            "title": "Max Cluster Count",
+            "type": "integer"
+          },
+          "min_cluster_count": {
+            "minimum": 0.0,
+            "title": "Min Cluster Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cluster_count",
+          "min_cluster_count",
+          "max_cluster_count",
+          "default_cluster_count",
+          "adjustable"
+        ],
+        "title": "TopicClustering",
+        "type": "object"
+      },
       "TopicItem": {
         "additionalProperties": false,
         "properties": {
@@ -8058,18 +8047,6 @@
             ],
             "title": "Engine"
           },
-          "min_topic_size": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Topic Size"
-          },
           "n_chunks": {
             "anyOf": [
               {
@@ -8180,12 +8157,6 @@
             "title": "Max Segment Tokens",
             "type": "integer"
           },
-          "min_topic_size": {
-            "default": 10,
-            "minimum": 2.0,
-            "title": "Min Topic Size",
-            "type": "integer"
-          },
           "node_columns": {
             "additionalProperties": {
               "minLength": 1,
@@ -8245,9 +8216,35 @@
         "title": "TopicModelingAnalysisRequest",
         "type": "object"
       },
+      "TopicModelingClusterSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_id": {
+            "format": "uuid",
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "cluster_count": {
+            "minimum": 0.0,
+            "title": "Cluster Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis_id",
+          "cluster_count"
+        ],
+        "title": "TopicModelingClusterSelection",
+        "type": "object"
+      },
       "TopicModelingDataBlockCreationAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
+          "cluster_count": {
+            "minimum": 0.0,
+            "title": "Cluster Count",
+            "type": "integer"
+          },
           "kind": {
             "const": "topic_modeling_data_block_creation",
             "default": "topic_modeling_data_block_creation",
@@ -8314,7 +8311,8 @@
         "required": [
           "node_ids",
           "selected_columns",
-          "new_node_names"
+          "new_node_names",
+          "cluster_count"
         ],
         "title": "TopicModelingDataBlockCreationAnalysisRequest",
         "type": "object"
@@ -8322,6 +8320,11 @@
       "TopicModelingDataBlockCreationDerivation": {
         "additionalProperties": false,
         "properties": {
+          "cluster_count": {
+            "minimum": 0.0,
+            "title": "Cluster Count",
+            "type": "integer"
+          },
           "kind": {
             "const": "topic_modeling_data_block_creation",
             "default": "topic_modeling_data_block_creation",
@@ -8338,7 +8341,8 @@
           }
         },
         "required": [
-          "role"
+          "role",
+          "cluster_count"
         ],
         "title": "TopicModelingDataBlockCreationDerivation",
         "type": "object"
@@ -8427,8 +8431,8 @@
       "TopicModelingResult": {
         "additionalProperties": false,
         "properties": {
-          "artifacts": {
-            "$ref": "#/components/schemas/_TopicArtifactsResource"
+          "clustering": {
+            "$ref": "#/components/schemas/TopicClustering"
           },
           "corpus_sizes": {
             "items": {
@@ -8469,6 +8473,13 @@
           "query": {
             "$ref": "#/components/schemas/TopicModelingResultQuery"
           },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/TopicSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
           "topics": {
             "items": {
               "$ref": "#/components/schemas/TopicItem"
@@ -8481,7 +8492,8 @@
           "topics",
           "corpus_sizes",
           "meta",
-          "artifacts",
+          "sources",
+          "clustering",
           "pagination",
           "query"
         ],
@@ -8491,6 +8503,18 @@
       "TopicModelingResultQuery": {
         "additionalProperties": false,
         "properties": {
+          "cluster_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Count"
+          },
           "descending": {
             "default": false,
             "title": "Descending",
@@ -8552,6 +8576,41 @@
         ],
         "title": "TopicSegmentationMethod",
         "type": "string"
+      },
+      "TopicSource": {
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "format": "uuid",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Node Name",
+            "type": "string"
+          },
+          "original_columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Original Columns",
+            "type": "array"
+          },
+          "text_column": {
+            "title": "Text Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_name",
+          "text_column",
+          "original_columns"
+        ],
+        "title": "TopicSource",
+        "type": "object"
       },
       "TopicStageTiming": {
         "additionalProperties": false,
@@ -9586,72 +9645,6 @@
           "nodes"
         ],
         "title": "_TokenTableResources",
-        "type": "object"
-      },
-      "_TopicArtifactsResource": {
-        "additionalProperties": false,
-        "properties": {
-          "nodes": {
-            "items": {
-              "$ref": "#/components/schemas/_TopicNodeArtifactResource"
-            },
-            "title": "Nodes",
-            "type": "array"
-          },
-          "topic_meanings_parquet_path": {
-            "$ref": "#/components/schemas/ArtifactResource"
-          },
-          "version": {
-            "const": 1,
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "version",
-          "topic_meanings_parquet_path",
-          "nodes"
-        ],
-        "title": "_TopicArtifactsResource",
-        "type": "object"
-      },
-      "_TopicNodeArtifactResource": {
-        "additionalProperties": false,
-        "properties": {
-          "assignments": {
-            "$ref": "#/components/schemas/PagedTableResource"
-          },
-          "node_id": {
-            "format": "uuid",
-            "title": "Node Id",
-            "type": "string"
-          },
-          "node_name": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Node Name",
-            "type": "string"
-          },
-          "original_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Original Columns",
-            "type": "array"
-          },
-          "text_column": {
-            "title": "Text Column",
-            "type": "string"
-          }
-        },
-        "required": [
-          "node_id",
-          "node_name",
-          "text_column",
-          "original_columns",
-          "assignments"
-        ],
-        "title": "_TopicNodeArtifactResource",
         "type": "object"
       }
     },

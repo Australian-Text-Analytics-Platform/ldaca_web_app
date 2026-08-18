@@ -106,11 +106,6 @@ const baseProps = {
   corpusSamples: [],
   nodeDocCounts: [],
   onCorpusSampleChange: vi.fn(),
-  topicSizeValue: 10,
-  topicSizeUserSet: false,
-  topicSizeWarning: null as 'orange' | 'red' | null,
-  onTopicSizeValueChange: vi.fn(),
-  showSamplingWarning: false,
   randomSeed: 0,
   randomSeedUserSet: false,
   onRandomSeedChange: vi.fn(),
@@ -158,37 +153,6 @@ describe('TopicModelingParameterPanel', () => {
     expect(onMaxSegmentTokensChange).toHaveBeenLastCalledWith(510);
   });
 
-  it('keeps the raw topic size value input while editing', () => {
-    render(<TopicModelingParameterPanel {...baseProps} topicSizeValue={25} />);
-
-    const input = screen.getByLabelText<HTMLInputElement>('Minimum topic size');
-
-    fireEvent.change(input, { target: { value: '' } });
-    expect(input.value).toBe('');
-
-    fireEvent.change(input, { target: { value: '30' } });
-    expect(input.value).toBe('30');
-  });
-
-  it('commits a bounded integer minimum topic size from the rendered control', () => {
-    const onTopicSizeValueChange = vi.fn();
-    render(
-      <TopicModelingParameterPanel
-        {...baseProps}
-        onTopicSizeValueChange={onTopicSizeValueChange}
-      />,
-    );
-
-    const input = screen.getByLabelText<HTMLInputElement>('Minimum topic size');
-    fireEvent.change(input, { target: { value: '1' } });
-    fireEvent.blur(input);
-    expect(onTopicSizeValueChange).toHaveBeenLastCalledWith(2);
-
-    fireEvent.change(input, { target: { value: '14.6' } });
-    fireEvent.blur(input);
-    expect(onTopicSizeValueChange).toHaveBeenLastCalledWith(15);
-  });
-
   it('renders percentage sampling inside the selected node card', () => {
     render(
       <TopicModelingParameterPanel
@@ -230,28 +194,8 @@ describe('TopicModelingParameterPanel', () => {
     expect(onCorpusSampleChange).toHaveBeenCalledWith(0, { percent: '25' });
   });
 
-  it('shows sampling warning when the sampled document count is small', () => {
-    render(
-      <TopicModelingParameterPanel
-        {...baseProps}
-        nodeInputs={nodeInputsFixture([{ id: 'n1', name: 'Corpus A' }])}
-        corpusSamples={[{ percent: '1' }]}
-        nodeDocCounts={[1000]}
-        showSamplingWarning={true}
-      />,
-    );
-    expect(screen.getByText(/sampled corpus may be too small/i)).toBeInTheDocument();
-  });
-
-  it('renders a Minimum topic size control with an explanatory help icon', () => {
-    render(<TopicModelingParameterPanel {...baseProps} topicSizeValue={10} />);
-
-    const tooltipIcon = screen.getByLabelText(/Minimum topic size is the smallest/i);
-    const input = screen.getByLabelText('Minimum topic size');
-    expect(tooltipIcon).toHaveAttribute(
-      'title',
-      expect.stringMatching(/smallest number of Topic Segments that can form a topic/i),
-    );
-    expect(input).toBeInTheDocument();
+  it('does not render the removed Minimum topic size control', () => {
+    render(<TopicModelingParameterPanel {...baseProps} />);
+    expect(screen.queryByLabelText('Minimum topic size')).not.toBeInTheDocument();
   });
 });

@@ -24,7 +24,7 @@ from .provenance import (
     referenced_node_ids,
     validate_node_provenance,
 )
-from .tab import AnalysisKind, Tab, TabName
+from .tab import AnalysisKind, Tab, TabName, TopicModelingClusterSelection
 from .analysis import (
     Analysis,
     AnalysisArtifactRecord,
@@ -118,6 +118,7 @@ __all__ = [
     "SourceProvenance",
     "Tab",
     "TabName",
+    "TopicModelingClusterSelection",
     "TokenFrequencyAnalysisRequest",
     "TopicModelingAnalysisRequest",
     "TopicModelingDataBlockCreationAnalysisRequest",

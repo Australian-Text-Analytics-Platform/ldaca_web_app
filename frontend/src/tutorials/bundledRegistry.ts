@@ -386,10 +386,10 @@ const tutorial = {
     anchor: 'help-topic-modeling-max-segment-tokens',
     label: 'Maximum tokens per segment',
   },
-  'analysis.topic-modeling.min-topic-size': {
+  'analysis.topic-modeling.number-of-clusters': {
     file: 'tutorials/topic-modeling.md',
-    anchor: 'help-topic-modeling-min-topic-size',
-    label: 'Min Topic Size',
+    anchor: 'help-topic-modeling-number-of-clusters',
+    label: 'Number of clusters',
   },
   'analysis.topic-modeling.random-seed': {
     file: 'tutorials/topic-modeling.md',

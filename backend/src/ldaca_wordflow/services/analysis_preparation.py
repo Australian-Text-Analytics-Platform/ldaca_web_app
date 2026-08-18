@@ -203,7 +203,6 @@ class AnalysisExecutionPreparer:
                     ],
                     "artifact_dir": str(artifact_dir),
                     "artifact_prefix": "topic_modeling",
-                    "min_topic_size": request.min_topic_size,
                     "random_seed": request.random_seed,
                     "sample_fractions": request.sample_fractions,
                     "segmentation_method": request.segmentation_method.value,
@@ -264,21 +263,27 @@ class AnalysisExecutionPreparer:
                 )
                 for reference in parent.artifact_references
             }
-            assignments = {
-                str(node.node_id): artifact_paths[node.assignments.artifact.name]
-                for node in stored.artifacts.nodes
-                if node.node_id in request.node_ids
-            }
+            context = stored.clustering_context.artifact
+            if context is None or context.name not in artifact_paths:
+                raise InvalidInputError("Topic clustering context is unavailable")
+            source_projection: dict[str, dict[str, object]] = {}
+            offset = 0
+            for index, source in enumerate(stored.sources):
+                size = stored.corpus_sizes[index]
+                source_projection[str(source.node_id)] = {
+                    "row_indices": stored.clustering_context.source_row_indices[index],
+                    "offset": offset,
+                    "size": size,
+                }
+                offset += size
             return owned(
                 topic_modeling_data_block_creation_process,
                 {
                     "input_snapshot_dir": str(snapshot_dir),
                     "output_dir": str(artifact_dir),
                     "request_payload": request.model_dump(mode="json"),
-                    "assignment_paths": assignments,
-                    "topic_meanings_path": artifact_paths[
-                        stored.artifacts.topic_meanings_parquet_path.name
-                    ],
+                    "clustering_context_path": artifact_paths[context.name],
+                    "source_projection": source_projection,
                 },
             )
         if isinstance(

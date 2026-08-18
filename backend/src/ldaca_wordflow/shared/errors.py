@@ -58,6 +58,12 @@ class InvalidInputError(AppError):
     code = "invalid_input"
 
 
+class InvalidClusterCountError(AppError):
+    status_code = 422
+    code = "invalid_topic_cluster_count"
+    expose_message = True
+
+
 class UnsafePathError(InvalidInputError):
     """A user-controlled path is not a safe relative storage path.
 

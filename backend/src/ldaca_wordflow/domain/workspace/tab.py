@@ -44,6 +44,13 @@ class AnalysisKind(StrEnum):
     TOPIC_MODELING = "topic_modeling"
 
 
+class TopicModelingClusterSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    analysis_id: uuid.UUID
+    cluster_count: int = Field(ge=0)
+
+
 class Tab(BaseModel):
     """Complete strict public and persisted Tab representation."""
 
@@ -58,6 +65,7 @@ class Tab(BaseModel):
     )
     stop_words: list[str] = Field(default_factory=list)
     topic_modeling_words_per_topic: int | None = Field(default=None, ge=3, le=100)
+    topic_modeling_cluster_selection: TopicModelingClusterSelection | None = None
     created_at: AwareDatetime
     modified_at: AwareDatetime
     revision: int = Field(ge=1)
@@ -76,6 +84,11 @@ class Tab(BaseModel):
                 raise ValueError("Topic Modelling Tabs require a word display count")
         elif self.topic_modeling_words_per_topic is not None:
             raise ValueError("Words per topic belongs only to Topic Modelling Tabs")
+        if (
+            self.topic_modeling_cluster_selection is not None
+            and self.kind is not AnalysisKind.TOPIC_MODELING
+        ):
+            raise ValueError("Topic cluster selection belongs only to Topic Modelling Tabs")
         return self
 
     @classmethod
@@ -96,10 +109,11 @@ class Tab(BaseModel):
             topic_modeling_words_per_topic=(
                 15 if kind is AnalysisKind.TOPIC_MODELING else None
             ),
+            topic_modeling_cluster_selection=None,
             created_at=timestamp,
             modified_at=timestamp,
             revision=1,
         )
 
 
-__all__ = ["AnalysisKind", "Tab", "TabName"]
+__all__ = ["AnalysisKind", "Tab", "TabName", "TopicModelingClusterSelection"]
