@@ -536,16 +536,20 @@ describe('DataLoaderFeature citation UI', () => {
     const unavailable = within(cards.at(-1)!);
     expect(unavailable.getByText('Archived workshop workspace')).toBeInTheDocument();
     expect(unavailable.getByText(unavailableId)).toBeInTheDocument();
-    expect(unavailable.getByText('Workspace from the winter workshop.')).toBeInTheDocument();
+    expect(unavailable.queryByText('Workspace from the winter workshop.')).not.toBeInTheDocument();
     expect(unavailable.getByText(/Created/)).toBeInTheDocument();
     expect(
       unavailable.getByText('Workspace format 14 is incompatible with supported format 15.'),
     ).toBeInTheDocument();
-    expect(unavailable.getByRole('button', { name: 'Load' })).toBeDisabled();
+    expect(unavailable.queryByRole('button', { name: 'Load' })).not.toBeInTheDocument();
     expect(unavailable.getByRole('button', { name: 'Download archive' })).toBeEnabled();
     expect(unavailable.getByRole('button', { name: 'Delete' })).toBeEnabled();
     expect(unavailable.queryByLabelText(/favorites/i)).not.toBeInTheDocument();
-    expect(unavailable.queryByLabelText(/workspace description/i)).not.toBeInTheDocument();
+    const descriptionButton = unavailable.getByRole('button', {
+      name: 'View workspace description',
+    });
+    fireEvent.pointerDown(descriptionButton, { button: 0 });
+    expect(screen.getByText('Workspace from the winter workshop.')).toBeInTheDocument();
 
     await user.click(unavailable.getByRole('button', { name: 'Delete' }));
     const confirmation = screen.getByRole('alertdialog', { name: 'Delete workspace?' });

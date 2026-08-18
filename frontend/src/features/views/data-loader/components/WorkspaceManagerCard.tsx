@@ -162,9 +162,7 @@ export function WorkspaceManagerCard({
                 const workspaceName = workspace.name?.trim()
                   ? workspace.name.trim()
                   : 'Unnamed workspace';
-                const workspaceDescription = workspace.description?.trim()
-                  ? workspace.description.trim()
-                  : 'No description available.';
+                const workspaceDescription = workspace.description?.trim();
                 return (
                   <div
                     key={workspaceId}
@@ -172,16 +170,36 @@ export function WorkspaceManagerCard({
                     className="flex flex-col gap-3 rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 @min-[480px]/workspace-manager:flex-row @min-[480px]/workspace-manager:items-center @min-[480px]/workspace-manager:justify-between"
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 font-medium text-destructive">
-                        <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span>{workspaceName}</span>
+                      <div className="flex items-center gap-1 font-medium">
+                        <CircleAlert
+                          className="h-4 w-4 shrink-0 text-destructive"
+                          aria-hidden="true"
+                        />
+                        <span className="text-destructive">{workspaceName}</span>
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              aria-label="View workspace description"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="max-w-xs">
+                            <DropdownMenuLabel>Description</DropdownMenuLabel>
+                            <div className="px-2 py-1.5 text-sm text-popover-foreground whitespace-pre-wrap">
+                              {workspaceDescription && workspaceDescription.length > 0
+                                ? workspaceDescription
+                                : 'No description added yet.'}
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                       <div className="mt-1 break-all text-[11px] text-muted-foreground">
                         <span>Workspace ID: </span>
                         <span>{workspaceId}</span>
-                      </div>
-                      <div className="mt-2 max-w-prose whitespace-pre-wrap text-xs text-foreground">
-                        {workspaceDescription}
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground">
                         Created {formatTimestamp(workspace.created_at)} | Updated{' '}
@@ -192,11 +210,6 @@ export function WorkspaceManagerCard({
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <DisabledReasonTooltip reason={workspace.message}>
-                        <Button size="sm" variant="secondary" disabled>
-                          Load
-                        </Button>
-                      </DisabledReasonTooltip>
                       <DisabledReasonTooltip
                         reason={isIncompatible ? undefined : workspace.message}
                       >
