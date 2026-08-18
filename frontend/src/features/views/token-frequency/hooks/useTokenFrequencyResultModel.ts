@@ -43,8 +43,8 @@ export const useTokenFrequencyResultModel = ({
 
   const displayNameMap = useMemo(
     () => ({
-      ...responseDisplayNameHints,
       ...lockedNodeNameMap,
+      ...responseDisplayNameHints,
     }),
     [responseDisplayNameHints, lockedNodeNameMap],
   );

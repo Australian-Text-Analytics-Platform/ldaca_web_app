@@ -10,6 +10,7 @@ interface RunAnalysisTaskEnvelopeOptions<TAnalysis extends Analysis> {
   setLocalTaskId: (taskId: string | null) => void;
   onSubmitted: () => void;
   resetBeforeRun?: () => void;
+  prepare?: () => Promise<void>;
   submit: () => Promise<TAnalysis>;
   onSuccess?: (analysis: TAnalysis) => void;
   onError: (error: unknown) => void;
@@ -48,6 +49,7 @@ export async function runAnalysisTaskEnvelope<TAnalysis extends Analysis>({
   setLocalTaskId,
   onSubmitted,
   resetBeforeRun,
+  prepare,
   submit,
   onSuccess,
   onError,
@@ -57,6 +59,7 @@ export async function runAnalysisTaskEnvelope<TAnalysis extends Analysis>({
   resetBeforeRun?.();
 
   try {
+    await prepare?.();
     const response = await submit();
     const taskId = response.id;
     setLocalTaskId(taskId);

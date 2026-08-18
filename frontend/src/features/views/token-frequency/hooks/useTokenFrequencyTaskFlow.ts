@@ -28,6 +28,7 @@ interface AnalysisActions {
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
   onSubmitted: () => void;
+  prepareBeforeRun?: () => Promise<void>;
 }
 
 interface NavigationActions {
@@ -65,6 +66,7 @@ export const useTokenFrequencyTaskFlow = ({
     setLastCompareNodeIds,
     setStopWords,
     onSubmitted,
+    prepareBeforeRun,
   },
   navigation: { setCurrentView, applyStopSetFromText },
 }: UseTokenFrequencyTaskFlowParams) => {
@@ -122,6 +124,7 @@ export const useTokenFrequencyTaskFlow = ({
       setIsRunning,
       setLocalTaskId,
       onSubmitted,
+      prepare: prepareBeforeRun,
       submit: async () => {
         const { data: response } = await submitTabAnalysis({
           body: {

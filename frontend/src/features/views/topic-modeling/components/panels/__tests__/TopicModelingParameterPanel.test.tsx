@@ -102,7 +102,7 @@ const baseProps = {
   nodeColors: {},
   onNodeColorChange: vi.fn(),
   defaultPalette: [],
-  actionState: { runDisabled: false, clearDisabled: false, runLabel: 'Run Analysis' },
+  actionState: { runDisabled: false, clearDisabled: false },
   corpusSamples: [],
   nodeDocCounts: [],
   onCorpusSampleChange: vi.fn(),

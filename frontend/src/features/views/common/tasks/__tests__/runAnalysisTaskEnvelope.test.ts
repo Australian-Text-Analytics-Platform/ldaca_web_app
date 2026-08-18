@@ -8,6 +8,7 @@ const baseOptions = () => ({
   setLocalTaskId: vi.fn(),
   onSubmitted: vi.fn(),
   resetBeforeRun: vi.fn(),
+  prepare: vi.fn(),
   submit: vi.fn(),
   onSuccess: vi.fn(),
   onError: vi.fn(),
@@ -58,6 +59,23 @@ describe('runAnalysisTaskEnvelope', () => {
     expect(options.onError).toHaveBeenCalledWith(error);
     expect(options.onSuccess).not.toHaveBeenCalled();
     expect(options.setIsRunning).toHaveBeenNthCalledWith(1, true);
+    expect(options.setIsRunning).toHaveBeenNthCalledWith(2, false);
+    expect(options.runningRef.current).toBe(false);
+  });
+
+  it('locks before preparation and releases the lock when preparation fails', async () => {
+    const options = baseOptions();
+    const error = new Error('preparation failed');
+    options.prepare.mockRejectedValue(error);
+
+    const result = await runAnalysisTaskEnvelope(options);
+
+    expect(result).toBeNull();
+    expect(options.setIsRunning).toHaveBeenNthCalledWith(1, true);
+    expect(options.prepare).toHaveBeenCalledOnce();
+    expect(options.submit).not.toHaveBeenCalled();
+    expect(options.onError).toHaveBeenCalledWith(error);
+    expect(options.setLocalTaskId).not.toHaveBeenCalled();
     expect(options.setIsRunning).toHaveBeenNthCalledWith(2, false);
     expect(options.runningRef.current).toBe(false);
   });

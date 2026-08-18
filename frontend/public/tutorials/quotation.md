@@ -48,9 +48,10 @@ setting, not an extraction-engine parameter.
 
 <h2 id="help-quotation-run">Step 4 — Preview</h2>
 
-Click **Preview** to create a durable Quotation Preview Analysis. If the Data
-Block, text column, or engine changes afterward, click **Update Preview** to
-replace it with a new immutable request.
+Click **Preview** to create a durable Quotation Preview Analysis. The label
+always remains **Preview**. If the Data Block, text column, or engine changes,
+Preview becomes available again; reverting exactly to the submitted request
+disables it. Preview and **Run All** keep independent request baselines.
 
 The successful Preview Analysis keeps its retained input snapshot. Each page and
 sort request recomputes a fresh projection from that snapshot, not the current
@@ -94,8 +95,10 @@ analysis columns start selected.
 <h3 id="help-quotation-clear-results">Clear results</h3>
 
 The Tab retains its Analysis forest across navigation and Workspace reopen.
-**Clear Results** removes the complete forest, including after failure or
-cancellation.
+**Clear Results** removes the complete forest. Preview or Run All locks every
+parameter only while submission or execution is active; Stop becomes available
+once the task exists. If either root fails or is cancelled, parameters unlock
+but both execution actions stay disabled until Clear Results.
 
 <h2 id="help-quotation-troubleshooting">Troubleshooting</h2>
 
@@ -105,7 +108,7 @@ cancellation.
 | No quotations are shown on one page | The current source-document batch has no extracted quote | Continue to the next page |
 | Precision is low | The text differs from the news style targeted by the rules | Review the disclaimer and validate a representative sample |
 | A generated header does not sort | Generated quote fields are computed after source paging | Sort by the document header or source metadata |
-| Preview does not reflect a later Data Block edit | You are viewing the historical Preview snapshot | Click **Update Preview** to capture the changed source deliberately |
+| Preview does not reflect a later Data Block edit | You are viewing the historical Preview snapshot | Change an execution input and choose **Preview** to capture a new snapshot |
 
 <h2 id="help-quotation-defaults">Quick-reference defaults</h2>
 

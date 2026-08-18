@@ -52,6 +52,7 @@ export interface ConcordanceParameterPanelProps {
   handleRunOrUpdate: () => Promise<void>;
   handleRunAll: () => Promise<void>;
   runAllDisabled: boolean;
+  runAllStateDisabledReason?: string;
   isRunningAll: boolean;
   parametersLocked: boolean;
   handleStopTask?: () => Promise<void>;
@@ -91,6 +92,7 @@ export function ConcordanceParameterPanel({
   handleRunOrUpdate,
   handleRunAll,
   runAllDisabled,
+  runAllStateDisabledReason,
   isRunningAll,
   parametersLocked,
   handleStopTask,
@@ -118,7 +120,7 @@ export function ConcordanceParameterPanel({
           ? 'Enter a search word first'
           : effectiveNodeColumnSelections.some((selection) => !selection.column)
             ? 'Select a column for each data block'
-            : 'Wait for the current analysis to finish'
+            : (runAllStateDisabledReason ?? 'Wait for the current analysis to finish')
     : undefined;
   const clearDisabledReason = actionState.clearDisabled
     ? isSearching || isRunningAll
@@ -346,16 +348,12 @@ export function ConcordanceParameterPanel({
               {isSearching ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {actionState.runLabel === 'Re-run' ? 'Update Preview' : 'Preview'}
+                  Preview
                 </>
               ) : (
                 <>
                   <Play className="mr-2 h-4 w-4" />
-                  {parametersLocked
-                    ? 'Preview'
-                    : actionState.runLabel === 'Re-run'
-                      ? 'Update Preview'
-                      : 'Preview'}
+                  Preview
                 </>
               )}
             </Button>

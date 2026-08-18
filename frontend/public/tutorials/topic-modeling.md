@@ -68,7 +68,7 @@ stability.
 
 <h2 id="help-topic-modeling-run">Step 4 — Run the analysis</h2>
 
-Choose **Run Analysis**. The native pipeline constructs Topic Segments, embeds
+Choose **Run**. The native pipeline constructs Topic Segments, embeds
 them with the configured sentence-transformer model, reduces the embeddings
 with PaCMAP, clusters them with HDBSCAN, calculates c-TF-IDF representative
 words, and saves the Result. The first run can be slower while model resources
@@ -80,9 +80,13 @@ segment is weighted by the Unicode-character length of its retained text;
 Automatic overlap therefore counts repeated source text again. Outlier weight
 remains part of the normalized Topic Distribution.
 
-Parameters are locked while a Result exists. **Clear Results** removes the
-Analysis and unlocks the controls; your segmentation method and token cap stay
-selected.
+The **Run** label never changes. Parameters lock while the Analysis is
+submitting, queued, or running, then unlock after success. Changing an
+execution parameter enables Run again; reverting exactly to the submitted
+request disables it. Words per topic, stop words, search, selection, and chart
+controls are presentation-only and do not enable Run. After failure or
+cancellation, Run stays disabled until **Clear Results** removes the Analysis;
+your segmentation method and token cap stay selected.
 
 <h2 id="help-topic-modeling-results">Result panel</h2>
 

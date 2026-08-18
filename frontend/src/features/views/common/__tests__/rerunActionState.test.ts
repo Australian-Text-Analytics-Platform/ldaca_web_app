@@ -11,9 +11,8 @@ const baseInput = {
 };
 
 describe('getRerunActionState', () => {
-  it('enables Run and disables Clear before the Tab owns an Analysis', () => {
+  it('enables execution and disables Clear before the Tab owns an Analysis', () => {
     expect(getRerunActionState(baseInput)).toMatchObject({
-      runLabel: 'Run',
       runDisabled: false,
       clearDisabled: true,
       clearDisabledReason: 'There are no results to clear',
@@ -35,7 +34,7 @@ describe('getRerunActionState', () => {
   it.each([
     'queued',
     'running',
-  ] as const)('disables Re-run and enables Clear while an Analysis is %s', (analysisState) => {
+  ] as const)('disables execution and Clear while an Analysis is %s', (analysisState) => {
     expect(
       getRerunActionState({
         ...baseInput,
@@ -43,9 +42,8 @@ describe('getRerunActionState', () => {
         analysisState,
       }),
     ).toMatchObject({
-      runLabel: 'Re-run',
       runDisabled: true,
-      clearDisabled: false,
+      clearDisabled: true,
     });
   });
 
@@ -58,8 +56,21 @@ describe('getRerunActionState', () => {
         hasChanges: false,
       }),
     ).toMatchObject({
-      runLabel: 'Re-run',
       runDisabled: true,
+      clearDisabled: false,
+    });
+  });
+
+  it('enables the same static action after a successful request changes', () => {
+    expect(
+      getRerunActionState({
+        ...baseInput,
+        hasAttachedAnalysis: true,
+        analysisState: 'succeeded',
+        hasChanges: true,
+      }),
+    ).toMatchObject({
+      runDisabled: false,
       clearDisabled: false,
     });
   });
@@ -67,7 +78,7 @@ describe('getRerunActionState', () => {
   it.each([
     'failed',
     'cancelled',
-  ] as const)('enables unchanged retry and Clear after an Analysis is %s', (analysisState) => {
+  ] as const)('requires Clear before retrying an Analysis that is %s', (analysisState) => {
     expect(
       getRerunActionState({
         ...baseInput,
@@ -76,9 +87,9 @@ describe('getRerunActionState', () => {
         hasChanges: false,
       }),
     ).toMatchObject({
-      runLabel: 'Re-run',
-      runDisabled: false,
+      runDisabled: true,
       clearDisabled: false,
+      runDisabledReason: 'Clear Results before running again',
     });
   });
 
@@ -91,9 +102,22 @@ describe('getRerunActionState', () => {
         hasChanges: false,
       }),
     ).toMatchObject({
-      runLabel: 'Re-run',
       runDisabled: true,
       clearDisabled: false,
+    });
+  });
+
+  it('blocks an unsubmitted action when another root requires Clear', () => {
+    expect(
+      getRerunActionState({
+        ...baseInput,
+        requiresClear: true,
+        hasAnyAnalysis: true,
+      }),
+    ).toMatchObject({
+      runDisabled: true,
+      clearDisabled: false,
+      runDisabledReason: 'Clear Results before running again',
     });
   });
 });

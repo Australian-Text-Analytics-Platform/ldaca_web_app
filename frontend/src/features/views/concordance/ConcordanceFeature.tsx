@@ -21,8 +21,11 @@ import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { getAnalysisOutputResource, getAnalysisResultResource } from '../common/analysisApi';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
-import { getAnalysisActionLifecycle } from '../common/analysisActionLifecycle';
+import { getRerunActionState } from '../common/rerunActionState';
+import {
+  getAnalysisActionLifecycle,
+  hasClearRequiredAnalysis,
+} from '../common/analysisActionLifecycle';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
@@ -46,7 +49,10 @@ import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
 import type { ConcordanceRunAllReviewSource } from './concordanceRunAllReview';
 import { queryKeys } from '@/lib/queryKeys';
 import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
-import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import {
+  projectWorkspaceNodeMetadata,
+  type WorkspaceNodeMetadata,
+} from '@/features/workspace/common/workspaceNodeMetadata';
 import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { CONCORDANCE_COMBINED_NODE_KEY } from './concordanceTableDomain';
 
@@ -199,15 +205,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     shape: [source.document_count, null],
     tokenizerModel: null,
   }));
-  const resultPanelNodes =
-    concordanceRunAll?.state === 'succeeded' ? reviewNodes : panelSelectedNodes;
-  const resultPanelColumnSelections =
-    concordanceRunAll?.state === 'succeeded'
-      ? concordanceReviewSources.map(({ source }) => ({
-          nodeId: source.node_id,
-          column: source.document_column,
-        }))
-      : nodeColumnSelections;
   const { nodeColorOverrides, setNodeColor, ensureNodeColors } = useNodeColorControls({
     nodeIds: activeNodeIds,
     nodes: panelSelectedNodes,
@@ -352,12 +349,47 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       refreshAnalyses();
     },
   });
+  const requiresClear = hasClearRequiredAnalysis(analyses);
   const analysisActionLifecycle = getAnalysisActionLifecycle({
     isPreviewing: isSearching,
     isSubmittingRunAll,
     runAllState: concordanceRunAll?.state ?? null,
     hasActiveAnalysis: Boolean(activeAnalysis),
+    requiresClear,
   });
+  const previewResultNodeIds = serverRequest?.node_ids ?? [];
+  const previewResultNodes = previewResultNodeIds.flatMap((nodeId) => {
+    const nodeInfo = nodeInfoById[nodeId];
+    const node = nodeInfo
+      ? projectWorkspaceNodeMetadata(nodeInfo)
+      : panelSelectedNodes.find((item) => item.id === nodeId);
+    return node ? [node] : [];
+  });
+  const resultPanelNodes =
+    concordanceRunAll?.state === 'succeeded'
+      ? reviewNodes
+      : previewResultNodes.length > 0
+        ? previewResultNodes
+        : panelSelectedNodes;
+  const resultPanelColumnSelections =
+    concordanceRunAll?.state === 'succeeded'
+      ? concordanceReviewSources.map(({ source }) => ({
+          nodeId: source.node_id,
+          column: source.document_column,
+        }))
+      : previewResultNodeIds.length > 0
+        ? previewResultNodeIds.map((nodeId) => ({
+            nodeId,
+            column: serverRequest?.node_columns[nodeId] ?? '',
+          }))
+        : nodeColumnSelections;
+  const submittedResultRequest =
+    concordanceRunAll?.state === 'succeeded' &&
+    concordanceRunAll.request.kind === 'concordance_run_all'
+      ? concordanceRunAll.request.source
+      : serverRequest;
+  const resultSearchWord = submittedResultRequest?.search_word ?? searchWord;
+  const resultCaseSensitive = submittedResultRequest?.case_sensitive ?? caseSensitive;
 
   const {
     results,
@@ -441,8 +473,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   const { detailPayload, detailOpen, setDetailOpen, concordanceCustomization, handleRowClick } =
     useConcordanceRowDetail({
       currentWorkspaceId,
-      caseSensitive,
-      searchWord,
+      caseSensitive: resultCaseSensitive,
+      searchWord: resultSearchWord,
     });
 
   // No auto-selection on activation: Show metadata starts empty and the user
@@ -487,6 +519,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         setLocalTaskId: setLocalConcordanceTaskId,
         runningRef,
         onSubmitted: refreshAnalyses,
+        prepareBeforeRun: ensureNodeColors,
       },
     });
 
@@ -500,11 +533,16 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     if (!isReview) persistResultPreferences({ pageSize: newSize });
   };
 
-  // Run vs Re-run: with no locking, the primary button is gated purely by
-  // whether the current params or node inputs differ from the last run.
+  // Each action is gated by the exact execution request represented by the draft.
   const lastRunRequest = serverRequest ?? null;
   const currentRequestParams = {
     ...currentConcordanceParams,
+    node_ids: activeNodeIds.slice(0, 2),
+    node_columns: Object.fromEntries(
+      nodeColumnSelections
+        .filter((selection) => activeNodeIds.includes(selection.nodeId) && selection.column)
+        .map((selection) => [selection.nodeId, selection.column]),
+    ),
     search_mode: searchMode,
     node_tokenizer_models: Object.fromEntries(
       activeNodeIds.flatMap((nodeId) => {
@@ -515,6 +553,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   };
   const serverRequestParams = (request: Record<string, unknown>) => ({
     ...readConcordanceServerParams(request),
+    node_ids: Array.isArray(request.node_ids) ? request.node_ids : [],
+    node_columns:
+      request.node_columns && typeof request.node_columns === 'object' ? request.node_columns : {},
     search_mode: request.search_mode === 'tokens' ? 'tokens' : 'regex',
     node_tokenizer_models:
       request.node_tokenizer_models && typeof request.node_tokenizer_models === 'object'
@@ -523,30 +564,45 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   });
   const hasChanges = !lastRunRequest
     ? true
-    : hasParameterDiff(currentRequestParams, serverRequestParams(lastRunRequest)) ||
-      hasNodeSelectionChanged(
-        nodeColumnSelections,
-        lastRunRequest.node_ids,
-        lastRunRequest.node_columns,
-      );
+    : hasParameterDiff(currentRequestParams, serverRequestParams(lastRunRequest));
+  const runAllSourceRequest =
+    concordanceRunAll?.request.kind === 'concordance_run_all'
+      ? concordanceRunAll.request.source
+      : null;
+  const runAllHasChanges = !runAllSourceRequest
+    ? true
+    : hasParameterDiff(currentRequestParams, serverRequestParams(runAllSourceRequest));
+  const isRunnable =
+    panelSelectedNodes.length > 0 &&
+    Boolean(searchWord.trim()) &&
+    nodeColumnSelections.length > 0 &&
+    nodeColumnSelections.every((selection) => Boolean(selection.column));
 
   const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
-    isRunnable:
-      panelSelectedNodes.length > 0 &&
-      Boolean(searchWord.trim()) &&
-      nodeColumnSelections.length > 0 &&
-      nodeColumnSelections.every((s) => Boolean(s.column)),
+    isRunnable,
     hasAttachedAnalysis: Boolean(tabTaskId),
+    hasAnyAnalysis: analyses.length > 0,
     analysisState: concordanceTaskStatus.tasks[0]?.state ?? null,
     hasChanges,
-    isBusy: analysisActionLifecycle.isPreviewing,
+    requiresClear,
+    isBusy: analysisActionLifecycle.parametersLocked,
+  });
+  const runAllActionState = getRerunActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    isRunnable,
+    hasAttachedAnalysis: Boolean(concordanceRunAll),
+    hasAnyAnalysis: analyses.length > 0,
+    analysisState: concordanceRunAll?.state ?? null,
+    hasChanges: runAllHasChanges,
+    requiresClear,
+    isBusy: analysisActionLifecycle.parametersLocked,
   });
 
   // Preserve results across transient graph refetches. Under the add-node-as-
   // needed model, editing a tab's inputs does NOT wipe the displayed results;
-  // it flips the primary button to "Re-run". So there is no selection-driven
-  // auto-clear effect here anymore.
+  // it enables the static Preview action. There is no selection-driven
+  // auto-clear effect.
 
   useEffect(() => {
     if (!currentWorkspaceId) {
@@ -596,12 +652,11 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     return clearResults();
   };
 
-  /** Runs or updates concordance after shared update checks pass. */
+  /** Runs Concordance Preview after the shared action checks pass. */
   /**
-   * Passed to the analysis action controls as the run/update handler.
+   * Passed to the analysis action controls as the Preview handler.
    */
   const handleRunOrUpdate = async () => {
-    await ensureNodeColors();
     await handleSearch();
   };
 
@@ -772,10 +827,12 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         handleRunAll={handleRunAll}
         runAllDisabled={
           analysisActionLifecycle.runAllDisabled ||
+          runAllActionState.runDisabled ||
           panelSelectedNodes.length === 0 ||
           !searchWord.trim() ||
           nodeColumnSelections.some((selection) => !selection.column)
         }
+        runAllStateDisabledReason={runAllActionState.runDisabledReason}
         isRunningAll={analysisActionLifecycle.isRunningAll}
         parametersLocked={analysisActionLifecycle.parametersLocked}
         handleStopTask={activeAnalysis ? stopTask : undefined}
@@ -889,7 +946,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
             setSelectedColumns: setSelectedMetadataColumns,
           }}
           sources={{
-            searchWord,
+            searchWord: resultSearchWord,
             panelSelectedNodes: resultPanelNodes,
             effectiveNodeColumnSelections: resultPanelColumnSelections,
             labelToNodeId,

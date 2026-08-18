@@ -126,7 +126,7 @@ const nodeInputsFixture = (): UseTabNodeInputsResult => {
 const baseProps = {
   nodeInputs: nodeInputsFixture(),
   onColumnChange: vi.fn(),
-  actionState: { runDisabled: false, clearDisabled: false, runLabel: 'Run' },
+  actionState: { runDisabled: false, clearDisabled: false },
   isAnalyzing: false,
   onAnalyze: vi.fn(),
   onStop: vi.fn(),
@@ -134,7 +134,6 @@ const baseProps = {
   onClearResults: vi.fn(),
   hasIncompleteSelections: false,
   hasResults: false,
-  runLabel: 'Run',
   studyNodeId: 'node-a',
   onStudyNodeChange: vi.fn(),
   nodeColors: { 'node-a': '#2563eb', 'node-b': '#dc2626' },

@@ -67,7 +67,11 @@ When multiple grouping columns are added, categories are combined across all col
 
 <h2 id="help-sequential-run">Step 5 — Run the analysis</h2>
 
-Click **Run** to start the analysis. The button label changes to **Update** when you change parameters after a successful run, letting you re-run without clearing first.
+Click **Run** to start the analysis. The label always remains **Run**. Parameters
+lock only while the Analysis is submitting, queued, or running. After success,
+change an execution input to enable Run again; reverting to the submitted values
+disables it. Chart type, axis, selection, and visibility controls do not enable
+Run because they only change presentation.
 
 <h2 id="help-sequential-results">Result panel</h2>
 
@@ -95,7 +99,7 @@ For example, a **Shown** value of *18 / 934* means 18 time buckets are currently
 The **Min Group Size** input in the results header hides any group (series) whose total document count is below the value you enter. This is useful when a few groups have very few records and clutter the chart.
 
 - Default is 10. Set to 0 to show all groups regardless of size.
-- The filter applies immediately — no need to re-run.
+- The filter applies immediately — no need to choose Run again.
 - The **Shown** tile updates to reflect how many points and documents remain after filtering.
 
 <h3 id="help-sequential-chart-type">Chart type</h3>
@@ -139,7 +143,10 @@ Use **Clear Selection** to deselect all periods without losing any other setting
 
 <h3 id="help-sequential-clear-results">Clear results</h3>
 
-The tab keeps its current Trends and Sequence Analysis in the backend so it can reload its lifecycle and Result. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. **Re-run** clears the current Analysis before submitting its replacement.
+The tab keeps its current Trends and Sequence Analysis in the backend so it can
+reload its lifecycle and Result. **Clear Results** removes that Analysis and
+resets the tab. After a failure or cancellation, parameters remain editable but
+Run stays disabled until you choose Clear Results.
 
 <h2 id="help-sequential-troubleshooting">Troubleshooting</h2>
 
@@ -169,7 +176,7 @@ The tab keeps its current Trends and Sequence Analysis in the backend so it can 
 1. Select a data block that has a datetime column.
 2. Run the analysis with **Monthly** frequency to see the overall trend.
 3. Switch to **Weekly** and compare the granularity.
-4. Add a categorical column (e.g. author, genre, or platform) as a Group By column and re-run.
+4. Add a categorical column (e.g. author, genre, or platform) as a Group By column and choose **Run** again.
 5. Click a period of high activity to select it, then Shift-click a later period to extend the selection.
 6. Download the chart in the format you need and compare it with the monthly view.
 

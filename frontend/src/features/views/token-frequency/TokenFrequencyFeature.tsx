@@ -16,7 +16,8 @@ import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { getRerunActionState } from '../common/rerunActionState';
+import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
 import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest } from '../common/utils';
@@ -61,10 +62,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     setInputSet: onTabInputSetChange,
   } = host;
   const tabTaskId = latestRunAll?.id ?? null;
-  const runAllLocksParameters =
-    latestRunAll?.state === 'queued' ||
-    latestRunAll?.state === 'running' ||
-    latestRunAll?.state === 'succeeded';
   const [liveTokenizerModelsByNode, setLiveTokenizerModelsByNode] = useState<
     Record<string, string>
   >({});
@@ -279,6 +276,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     () => buildNodeIdDisplayNameMap(panelSelectedNodes),
     [panelSelectedNodes],
   );
+  const resultNodeColumnSelections = lastCompareNodeIds.map((nodeId) => ({ nodeId }));
 
   const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     state: {
@@ -298,17 +296,13 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       setLastCompareNodeIds,
       setStopWords,
       onSubmitted: refreshAnalyses,
+      prepareBeforeRun: ensureNodeColors,
     },
     navigation: {
       setCurrentView,
       applyStopSetFromText,
     },
   });
-
-  const handleAnalyzeWithNodeColors = async () => {
-    await ensureNodeColors();
-    await handleAnalyze();
-  };
 
   const {
     computeDisplayName,
@@ -325,7 +319,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   } = useTokenFrequencyResultModel({
     results,
     lastCompareNodeIds,
-    nodeColumnSelections: effectiveNodeColumnSelections,
+    nodeColumnSelections: resultNodeColumnSelections,
     lockedNodeNameMap,
     nodeIdToName,
     appliedStopSet: effectiveAppliedStopSet,
@@ -352,6 +346,12 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
 
   const lastRunRequest = serverRequest ?? null;
   const currentTokenFrequencyParams = {
+    node_ids: orderedPanelNodeIds,
+    node_columns: Object.fromEntries(
+      nodeColumnSelections
+        .filter((selection) => orderedPanelNodeIds.includes(selection.nodeId) && selection.column)
+        .map((selection) => [selection.nodeId, selection.column]),
+    ),
     node_tokenizer_models: Object.fromEntries(
       orderedPanelNodeIds.flatMap((nodeId) => {
         const model = (effectiveTokenizerModelsByNode[nodeId] ?? '').trim();
@@ -360,6 +360,9 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     ),
   };
   const serverTokenFrequencyParams = (request: Record<string, unknown>) => ({
+    node_ids: Array.isArray(request.node_ids) ? request.node_ids : [],
+    node_columns:
+      request.node_columns && typeof request.node_columns === 'object' ? request.node_columns : {},
     node_tokenizer_models:
       request.node_tokenizer_models && typeof request.node_tokenizer_models === 'object'
         ? request.node_tokenizer_models
@@ -367,19 +370,18 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   });
   const hasChanges = !lastRunRequest
     ? true
-    : hasParameterDiff(currentTokenFrequencyParams, serverTokenFrequencyParams(lastRunRequest)) ||
-      hasNodeSelectionChanged(
-        nodeColumnSelections,
-        lastRunRequest.node_ids,
-        lastRunRequest.node_columns,
-      );
+    : hasParameterDiff(currentTokenFrequencyParams, serverTokenFrequencyParams(lastRunRequest));
+  const parametersLocked = isRunning || Boolean(activeAnalysis);
+  const requiresClear = hasClearRequiredAnalysis(analyses);
   const baseActionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: panelSelectedNodes.length > 0 && !hasIncompleteSelections,
     hasAttachedAnalysis: Boolean(tabTaskId),
+    hasAnyAnalysis: analyses.length > 0,
     analysisState: taskStatus.tasks[0]?.state ?? null,
     hasChanges,
-    isBusy: isRunning,
+    requiresClear,
+    isBusy: parametersLocked,
   });
   const hasTokenizerModel = missingTokenizerModelNodeIds.length === 0;
   const actionState = {
@@ -429,21 +431,24 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
         nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
         actionState={actionState}
-        parametersLocked={runAllLocksParameters}
+        parametersLocked={parametersLocked}
         isAnalyzing={isRunning}
         isStopping={isStopping}
         onAnalyze={() => {
-          void handleAnalyzeWithNodeColors();
+          void handleAnalyze();
         }}
-        onStop={() => {
-          void stopTask();
-        }}
+        onStop={
+          activeAnalysis
+            ? () => {
+                void stopTask();
+              }
+            : undefined
+        }
         onClearResults={() => {
           void clearResults();
         }}
         hasIncompleteSelections={hasIncompleteSelections}
         hasResults={Boolean(results)}
-        runLabel={actionState.runLabel}
         studyNodeId={effectiveStudyNodeId}
         onStudyNodeChange={(nodeId: string) => {
           setStudyNodeId(nodeId);

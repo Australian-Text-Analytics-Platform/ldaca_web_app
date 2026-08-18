@@ -40,7 +40,11 @@ Stop words are terms you want to exclude from the frequency count — commonly w
 
 <h2 id="help-token-frequency-run">Step 4 — Run the analysis</h2>
 
-Click **Run** to start. After the tab has an Analysis, the button changes to **Re-run**. A successful Analysis can be re-run after you change its inputs or settings; a failed or cancelled Analysis can be retried with the same settings.
+Click **Run** to start. The label always remains **Run**. While the Analysis is
+submitting, queued, or running, its parameters are locked. After success they
+unlock, and Run becomes available only when an execution input changes; return
+every input to its submitted value and Run disables again. Stop words and the
+Cloud/List display limits change only the presentation and do not enable Run.
 
 <h2 id="help-token-frequency-results">Result panel</h2>
 
@@ -120,7 +124,10 @@ The full table can be downloaded as a CSV file. For further reading on keyword a
 
 <h3 id="help-token-frequency-clear-results">Clear results</h3>
 
-The tab keeps its current Analysis in the backend so it can reload its lifecycle and Result. **Clear Results** removes that Analysis and resets the tab, including after failure or cancellation. **Re-run** clears the current Analysis and submits its replacement; if clearing fails, the replacement is not started.
+The tab keeps its current Analysis in the backend so it can reload its lifecycle
+and Result. **Clear Results** removes that Analysis and resets the tab. After a
+failure or cancellation, the parameters stay editable but Run remains disabled
+until you choose Clear Results.
 
 <h2 id="help-token-frequency-troubleshooting">Troubleshooting</h2>
 
@@ -150,7 +157,7 @@ The tab keeps its current Analysis in the backend so it can reload its lifecycle
 1. Select a data block and click **Analyze** with the default settings.
 2. Click **Fill Default** to apply language-matched default stop words, then **Apply Stop Words** and compare the top tokens.
 3. Right-click one of the remaining high-frequency words in the cloud to add it as a custom stop word. Confirm it appears at the start of the stop-word list.
-4. Select a second data block. Use the card-level **Study Corpus / Reference Corpus** switches to set which block is the baseline, then re-run.
+4. Select a second data block. Use the card-level **Study Corpus / Reference Corpus** switches to set which block is the baseline, then choose **Run** again.
 5. Switch to **List view** and use **Filter tokens** with a wildcard pattern (e.g. `*ing`) to find all gerund-form tokens.
 6. In **List view**, scroll one frequency list and observe that the other list scrolls in sync.
 7. Sort the statistics table by **LogRatio** to find the words most distinctively associated with each data block.

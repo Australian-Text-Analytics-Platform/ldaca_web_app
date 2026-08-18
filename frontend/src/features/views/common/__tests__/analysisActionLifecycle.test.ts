@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAnalysisActionLifecycle } from '../analysisActionLifecycle';
+import { getAnalysisActionLifecycle, hasClearRequiredAnalysis } from '../analysisActionLifecycle';
 
 describe('getAnalysisActionLifecycle', () => {
   it('keeps Preview and Run All available before either Analysis exists', () => {
@@ -20,7 +20,7 @@ describe('getAnalysisActionLifecycle', () => {
     });
   });
 
-  it('keeps Preview as the only running action during Preview execution', () => {
+  it('locks parameters and both actions during Preview execution', () => {
     expect(
       getAnalysisActionLifecycle({
         isPreviewing: true,
@@ -31,7 +31,7 @@ describe('getAnalysisActionLifecycle', () => {
     ).toEqual({
       isPreviewing: true,
       isRunningAll: false,
-      parametersLocked: false,
+      parametersLocked: true,
       previewDisabled: true,
       runAllDisabled: true,
     });
@@ -57,12 +57,26 @@ describe('getAnalysisActionLifecycle', () => {
     });
   });
 
+  it('locks at the local Run All submission boundary before an Analysis exists', () => {
+    expect(
+      getAnalysisActionLifecycle({
+        isPreviewing: false,
+        isSubmittingRunAll: true,
+        runAllState: null,
+        hasActiveAnalysis: false,
+      }),
+    ).toMatchObject({
+      isRunningAll: true,
+      parametersLocked: true,
+      previewDisabled: true,
+      runAllDisabled: true,
+    });
+  });
+
   it('unlocks parameters and actions after Run All succeeds', () => {
     expect(
       getAnalysisActionLifecycle({
-        // A superseded Preview resource may still be present in an individual
-        // Query cache. The canonical Run All lifecycle must win presentation.
-        isPreviewing: true,
+        isPreviewing: false,
         isSubmittingRunAll: false,
         runAllState: 'succeeded',
         hasActiveAnalysis: false,
@@ -94,5 +108,34 @@ describe('getAnalysisActionLifecycle', () => {
       previewDisabled: false,
       runAllDisabled: false,
     });
+  });
+
+  it('blocks both actions without locking parameters when Clear Results is required', () => {
+    expect(
+      getAnalysisActionLifecycle({
+        isPreviewing: false,
+        isSubmittingRunAll: false,
+        runAllState: 'failed',
+        hasActiveAnalysis: false,
+        requiresClear: true,
+      }),
+    ).toEqual({
+      isPreviewing: false,
+      isRunningAll: false,
+      parametersLocked: false,
+      previewDisabled: true,
+      runAllDisabled: true,
+    });
+  });
+
+  it('requires Clear for failed or cancelled roots but ignores supporting Analyses', () => {
+    const analysis = (executionScope: 'preview' | 'supporting', state: 'failed' | 'cancelled') =>
+      ({ execution_scope: executionScope, state }) as Parameters<
+        typeof hasClearRequiredAnalysis
+      >[0][number];
+
+    expect(hasClearRequiredAnalysis([analysis('supporting', 'failed')])).toBe(false);
+    expect(hasClearRequiredAnalysis([analysis('preview', 'failed')])).toBe(true);
+    expect(hasClearRequiredAnalysis([analysis('preview', 'cancelled')])).toBe(true);
   });
 });

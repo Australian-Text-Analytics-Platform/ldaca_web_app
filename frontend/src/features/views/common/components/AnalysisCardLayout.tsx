@@ -38,7 +38,6 @@ interface AnalysisCardLayoutProps {
     isStopping?: boolean;
     isClearing?: boolean;
     hasResult?: boolean;
-    previewLabel?: string;
     runAllLabel?: string;
     runAllHelp?: HelpConfig<'tutorial'>;
     stopHelp?: HelpConfig<'tutorial'>;
@@ -74,7 +73,6 @@ export function AnalysisCardLayout({
   cardRef,
 }: AnalysisCardLayoutProps) {
   const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-destructive/50');
-  const previewLabel = actions?.previewLabel ?? 'Preview';
   const runAllLabel = actions?.runAllLabel ?? 'Run All';
   const previewDisabledReason = actions?.previewDisabled
     ? actions.isPreviewing
@@ -150,7 +148,7 @@ export function AnalysisCardLayout({
                   ) : (
                     <Play className="mr-2 h-4 w-4" />
                   )}
-                  {previewLabel}
+                  Preview
                 </Button>
               </DisabledReasonTooltip>
             </div>

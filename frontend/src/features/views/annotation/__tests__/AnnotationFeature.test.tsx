@@ -219,11 +219,22 @@ vi.mock('../components/AnnotationAiSettings', () => ({
 
 vi.mock('../components/AnnotationResultsPanel', () => ({
   AnnotationResultsPanel: ({
+    nodeId,
+    textColumn,
+    annotationColumn,
+    classNodeId,
     correction,
   }: {
+    nodeId: string;
+    textColumn: string;
+    annotationColumn: string;
+    classNodeId: string | null;
     correction: { column: string | null; onCreate: () => void };
   }) => (
     <div>
+      <span data-testid="manual-review-snapshot">
+        {nodeId}:{textColumn}:{annotationColumn}:{classNodeId ?? 'none'}
+      </span>
       <span>Correction: {correction.column ?? 'None'}</span>
       <button type="button" onClick={correction.onCreate}>
         Create correction column
@@ -573,6 +584,50 @@ describe('AnnotationFeature', () => {
     await user.click(screen.getByRole('button', { name: 'Start' }));
     expect(mocks.ensureNodeColors).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('keeps the open Manual table bound to its Start-time snapshot', async () => {
+    const user = userEvent.setup();
+    mocks.sourceColumnNames = ['text', 'annotation'];
+
+    render(
+      <AnnotationFeature
+        host={{
+          tabId: 'tab-1',
+          analyses: [],
+          latestPreview: null,
+          latestRunAll: null,
+          activeAnalysis: null,
+          inputSets: {},
+          settings: {
+            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
+          },
+          correctionColumns: {},
+          setInputSet: mocks.setInputSet,
+          setSetting: mocks.setSetting,
+          setCorrectionColumn: vi.fn(),
+          clearCorrectionColumns: vi.fn(),
+          refreshAnalyses: vi.fn(),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.getByTestId('manual-review-snapshot')).toHaveTextContent(
+      'source-1:text:annotation:none',
+    );
+
+    await user.click(screen.getByRole('combobox', { name: 'Annotation Column' }));
+    await user.click(screen.getByRole('option', { name: 'text' }));
+    expect(screen.getByTestId('manual-review-snapshot')).toHaveTextContent(
+      'source-1:text:annotation:none',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    expect(screen.getByTestId('manual-review-snapshot')).toHaveTextContent(
+      'source-1:text:text:none',
+    );
   });
 
   it('previews the main Data Block color and aborts Manual Start when persistence fails', async () => {

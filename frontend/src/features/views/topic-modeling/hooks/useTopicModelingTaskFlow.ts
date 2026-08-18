@@ -25,6 +25,7 @@ interface TopicModelingActions {
   setError: (value: string | null) => void;
   setLocalTaskId: (id: string | null) => void;
   onSubmitted: () => void;
+  prepareBeforeRun?: () => Promise<void>;
 }
 
 interface Params {
@@ -46,7 +47,7 @@ export function useTopicModelingTaskFlow({
     segmentationMethod,
     maxSegmentTokens,
   },
-  actions: { setIsRunning, runningRef, setError, setLocalTaskId, onSubmitted },
+  actions: { setIsRunning, runningRef, setError, setLocalTaskId, onSubmitted, prepareBeforeRun },
 }: Params) {
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0 || runningRef.current) return;
@@ -81,6 +82,7 @@ export function useTopicModelingTaskFlow({
       resetBeforeRun: () => {
         setError(null);
       },
+      prepare: prepareBeforeRun,
       submit: async () => {
         const { data } = await submitTabAnalysis({
           body: {

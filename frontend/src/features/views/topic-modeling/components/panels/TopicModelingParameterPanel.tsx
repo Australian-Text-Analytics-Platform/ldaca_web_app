@@ -37,7 +37,6 @@ interface Props {
   actionState: {
     runDisabled: boolean;
     clearDisabled: boolean;
-    runLabel: string;
     runDisabledReason?: string;
     clearDisabledReason?: string;
   };
@@ -207,7 +206,7 @@ export function TopicModelingParameterPanel({
         isStopping,
         isClearing,
         hasResult,
-        runAllLabel: actionState.runLabel,
+        runAllLabel: 'Run',
       }}
       actionsGuidanceTarget="topic-modeling-actions"
       parametersLocked={parametersLocked}

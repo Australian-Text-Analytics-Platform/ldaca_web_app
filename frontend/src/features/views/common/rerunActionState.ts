@@ -1,13 +1,10 @@
-import type { NodeColumnSelection } from './nodeSelectionTypes';
-import { normalizeStringArray } from './parameterComparison';
-
 /**
- * Run/Re-run button policy shared by every Analysis view.
+ * Execution and Clear-button policy shared by every Analysis view.
  *
  * The owning Tab's attached Analysis, not Result availability, determines
- * whether the actions represent Run/Re-run and whether Clear is available.
- * Active Analyses cannot be replaced; failed and cancelled Analyses may be
- * retried unchanged; successful Analyses require changed inputs or parameters.
+ * whether Clear is available. Active Analyses cannot be replaced; failed and
+ * cancelled roots require Clear; successful Analyses require an exact request
+ * change before their corresponding action is enabled again.
  */
 export interface RerunActionStateInput {
   hasWorkspace: boolean;
@@ -15,39 +12,42 @@ export interface RerunActionStateInput {
   isRunnable: boolean;
   /** The backend Tab currently references a root Analysis. */
   hasAttachedAnalysis: boolean;
+  /** The backend Tab contains any Analysis, used by the tab-wide Clear action. */
+  hasAnyAnalysis?: boolean;
   /** Latest projected lifecycle state for the attached Analysis, when available. */
-  analysisState: 'queued' | 'running' | 'successful' | 'failed' | 'cancelled' | null;
+  analysisState: 'queued' | 'running' | 'successful' | 'succeeded' | 'failed' | 'cancelled' | null;
   /** Current params or node inputs differ from the last run. */
   hasChanges: boolean;
+  /** A failed or cancelled root requires Clear Results before either action can run. */
+  requiresClear?: boolean;
   isBusy?: boolean;
 }
 
 export interface RerunActionState {
   runDisabled: boolean;
   clearDisabled: boolean;
-  runLabel: 'Run' | 'Re-run';
   runDisabledReason: string | undefined;
   clearDisabledReason: string | undefined;
 }
 
 /**
- * Derives the primary button label/disabled state and the clear-button state.
- * Called by: analysis features when rendering their run controls because the
- * Run vs Re-run decision must be identical across views.
- * Flow: invalid/busy/active → disabled; no attached Analysis → Run; failed or
- * cancelled Analysis → Re-run; successful Analysis → Re-run only after changes.
+ * Derives an execution action's disabled state and the tab-wide Clear state.
+ * Called by: analysis features when rendering Preview, Run, or Run All.
+ * Flow: invalid/busy/active/clear-required → disabled; no attached Analysis →
+ * enabled; successful Analysis → enabled only after an execution-request change.
  */
 export const getRerunActionState = ({
   hasWorkspace,
   isRunnable,
   hasAttachedAnalysis,
+  hasAnyAnalysis = hasAttachedAnalysis,
   analysisState,
   hasChanges,
+  requiresClear = false,
   isBusy = false,
 }: RerunActionStateInput): RerunActionState => {
-  const runLabel: 'Run' | 'Re-run' = hasAttachedAnalysis ? 'Re-run' : 'Run';
   const isActiveAnalysis = analysisState === 'queued' || analysisState === 'running';
-  const canRetryUnchanged = analysisState === 'failed' || analysisState === 'cancelled';
+  const isClearRequiredState = analysisState === 'failed' || analysisState === 'cancelled';
   const attachedStateUnavailable = hasAttachedAnalysis && analysisState === null;
 
   const runDisabled =
@@ -55,66 +55,32 @@ export const getRerunActionState = ({
     !isRunnable ||
     isBusy ||
     isActiveAnalysis ||
+    requiresClear ||
+    isClearRequiredState ||
     attachedStateUnavailable ||
-    (hasAttachedAnalysis && !hasChanges && !canRetryUnchanged);
+    (hasAttachedAnalysis && !hasChanges);
 
-  const clearDisabled = !hasWorkspace || !hasAttachedAnalysis;
+  const clearDisabled = !hasWorkspace || !hasAnyAnalysis || isBusy || isActiveAnalysis;
   const clearDisabledReason = !hasWorkspace
     ? 'Open a workspace first'
-    : !hasAttachedAnalysis
+    : !hasAnyAnalysis
       ? 'There are no results to clear'
-      : undefined;
+      : isBusy || isActiveAnalysis
+        ? 'Stop the running analysis before clearing results'
+        : undefined;
 
   const runDisabledReason: string | undefined = (() => {
     if (isBusy) return undefined;
     if (!hasWorkspace) return 'Open a workspace first';
     if (!isRunnable) return 'Add a data block and select a column to run';
     if (isActiveAnalysis) return 'The analysis is already queued or running';
+    if (requiresClear || isClearRequiredState) return 'Clear Results before running again';
     if (attachedStateUnavailable) return 'Clear the current analysis before running again';
-    if (hasAttachedAnalysis && !hasChanges && !canRetryUnchanged) {
-      return 'Change a parameter or the selection to re-run';
+    if (hasAttachedAnalysis && !hasChanges) {
+      return 'Change a parameter or the selection to run again';
     }
     return undefined;
   })();
 
-  return { runDisabled, clearDisabled, runLabel, runDisabledReason, clearDisabledReason };
-};
-
-/** A request's node selection, normalized for order-independent comparison. */
-interface NodeSelectionSignature {
-  nodeIds: string[];
-  nodeColumns: Record<string, string>;
-}
-
-/**
- * Builds an order-independent signature of the current node inputs.
- * Called by: hasNodeSelectionChanged so adding/removing/re-columning a node
- * flips the button to "Re-run" without false positives from ordering.
- */
-const nodeSelectionSignature = (selections: NodeColumnSelection[]): NodeSelectionSignature => {
-  const nodeIds = normalizeStringArray(selections.map((s) => s.nodeId));
-  const nodeColumns: Record<string, string> = {};
-  selections.forEach((s) => {
-    if (s.nodeId) nodeColumns[s.nodeId] = s.column;
-  });
-  return { nodeIds, nodeColumns };
-};
-
-/**
- * True when the current node inputs differ from the last run's node selection.
- * Called by: analysis features (combined with parameter diffing) to decide
- * whether a successful Analysis has an enabled "Re-run".
- * Flow: compare normalized node id sets, then per-node column picks.
- */
-export const hasNodeSelectionChanged = (
-  current: NodeColumnSelection[],
-  serverNodeIds: string[] | undefined,
-  serverNodeColumns: Record<string, string | undefined> | undefined,
-): boolean => {
-  const cur = nodeSelectionSignature(current);
-  const srvIds = normalizeStringArray(serverNodeIds ?? []);
-  if (cur.nodeIds.length !== srvIds.length || cur.nodeIds.some((id, i) => id !== srvIds[i])) {
-    return true;
-  }
-  return cur.nodeIds.some((id) => (cur.nodeColumns[id] ?? '') !== (serverNodeColumns?.[id] ?? ''));
+  return { runDisabled, clearDisabled, runDisabledReason, clearDisabledReason };
 };

@@ -54,6 +54,7 @@ vi.mock('../../common/nodeInputs', () => ({
     nodeColumnSelections: quotationHydrationMocks.nodeColumnSelections,
     selectedNodes: quotationHydrationMocks.selectedNodes,
     resolvedNodes: quotationHydrationMocks.resolvedNodes,
+    nodeInfoById: {},
     availableNodes: [],
     graphSelectedIds: [],
     recentPresets: [],

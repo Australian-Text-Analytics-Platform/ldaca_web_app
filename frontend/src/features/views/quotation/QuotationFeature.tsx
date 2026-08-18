@@ -35,8 +35,11 @@ import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
-import { getAnalysisActionLifecycle } from '../common/analysisActionLifecycle';
+import { getRerunActionState } from '../common/rerunActionState';
+import {
+  getAnalysisActionLifecycle,
+  hasClearRequiredAnalysis,
+} from '../common/analysisActionLifecycle';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { analysisInputsFromRequest } from '../common/utils';
 import { QuotationEngineSettingsFields } from './components/QuotationEngineSettingsFields';
@@ -54,6 +57,7 @@ import {
   type QuotationReviewRowUnit,
 } from './quotationRunAllReview';
 import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
+import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
 /** Renders the Quotation Preview and Run All workflow. */
 /**
@@ -223,11 +227,13 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       refreshAnalyses();
     },
   });
+  const requiresClear = hasClearRequiredAnalysis(analyses);
   const analysisActionLifecycle = getAnalysisActionLifecycle({
     isPreviewing: isLoadingQuotations,
     isSubmittingRunAll,
     runAllState: quotationRunAll?.state ?? null,
     hasActiveAnalysis: Boolean(activeAnalysis),
+    requiresClear,
   });
   const runAllResultQuery = useQuery({
     queryKey:
@@ -296,6 +302,14 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     serverRequest && typeof serverRequest.column === 'string'
       ? serverRequest.column
       : (activeSelections.find((selection) => selection.nodeId === resultNodeId)?.column ?? '');
+  const previewResultNodeInfo = nodeInputs.nodeInfoById[resultNodeId];
+  const previewResultNode = previewResultNodeInfo
+    ? projectWorkspaceNodeMetadata(previewResultNodeInfo)
+    : displayedNodes.find((node) => node.id === resultNodeId);
+  const previewDisplayedNodes = previewResultNode ? [previewResultNode] : displayedNodes;
+  const previewActiveSelections = resultNodeId
+    ? [{ nodeId: resultNodeId, column: resultColumn }]
+    : activeSelections;
   const { nodeState, resultsByNode } = useQuotationResultControls({
     result: runAllReviewResult ?? result,
     nodeId: runAllSource?.node_id ?? resultNodeId,
@@ -303,7 +317,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   });
   const hasLoaded = Boolean(result);
   const showPreviewTable =
-    displayedNodes.length > 0 && (hasLoaded || (analysisState === 'succeeded' && isResultFetching));
+    Boolean(resultNodeId) && (hasLoaded || (analysisState === 'succeeded' && isResultFetching));
 
   const savedContextLength = Number(host.settings['quotation.contextLength']);
   const {
@@ -339,7 +353,12 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     engineReady;
 
   const lastRunRequest = serverRequest ?? null;
+  const currentQuotationNodeId = displayedNodes[0]?.id ?? '';
+  const currentQuotationColumn =
+    activeSelections.find((selection) => selection.nodeId === currentQuotationNodeId)?.column ?? '';
   const currentQuotationParams = {
+    node_id: currentQuotationNodeId,
+    column: currentQuotationColumn,
     type: resolvedEnginePayload.type,
     engine_id:
       resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
@@ -353,30 +372,40 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         ? (serverEngine as Record<string, unknown>)
         : {};
     return {
+      node_id: typeof request.node_id === 'string' ? request.node_id : '',
+      column: typeof request.column === 'string' ? request.column : '',
       type: engine.type === 'remote' ? 'remote' : 'local',
       engine_id: typeof engine.engine_id === 'string' ? engine.engine_id || null : null,
     };
   };
-  const serverNodeId =
-    lastRunRequest && typeof lastRunRequest.node_id === 'string' ? lastRunRequest.node_id : '';
-  const serverColumn =
-    lastRunRequest && typeof lastRunRequest.column === 'string' ? lastRunRequest.column : '';
   const hasParamsChanged = !lastRunRequest
     ? true
-    : hasParameterDiff(currentQuotationParams, quotationServerParams(lastRunRequest)) ||
-      hasNodeSelectionChanged(
-        activeSelections,
-        serverNodeId ? [serverNodeId] : [],
-        serverNodeId ? { [serverNodeId]: serverColumn } : {},
-      );
+    : hasParameterDiff(currentQuotationParams, quotationServerParams(lastRunRequest));
+  const runAllSourceRequest =
+    quotationRunAll?.request.kind === 'quotation_run_all' ? quotationRunAll.request.source : null;
+  const runAllHasParamsChanged = !runAllSourceRequest
+    ? true
+    : hasParameterDiff(currentQuotationParams, quotationServerParams(runAllSourceRequest));
 
   const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: displayedNodes.length > 0 && !hasIncompleteSelections && engineReady,
     hasAttachedAnalysis: Boolean(tabTaskId),
+    hasAnyAnalysis: analyses.length > 0,
     analysisState: taskStatus.tasks[0]?.state ?? null,
     hasChanges: hasParamsChanged,
-    isBusy: isLoadingQuotations,
+    requiresClear,
+    isBusy: analysisActionLifecycle.parametersLocked,
+  });
+  const runAllActionState = getRerunActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    isRunnable: displayedNodes.length > 0 && !hasIncompleteSelections && engineReady,
+    hasAttachedAnalysis: Boolean(quotationRunAll),
+    hasAnyAnalysis: analyses.length > 0,
+    analysisState: quotationRunAll?.state ?? null,
+    hasChanges: runAllHasParamsChanged,
+    requiresClear,
+    isBusy: analysisActionLifecycle.parametersLocked,
   });
 
   // Updates the selected text column and persists it as the document column preference.
@@ -418,9 +447,9 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       },
     });
 
-  // Runs a fresh quotation analysis or updates a locked task depending on parameter changes.
+  // Runs a fresh Quotation Preview from the current draft.
   /**
-   * Passed to the analysis action button as its run/update handler.
+   * Passed to the Preview action button.
    */
   const handleRunOrUpdate = async () => {
     await handleSearchAll();
@@ -564,24 +593,18 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
               if (!engineReady) return 'Configure the remote engine before running';
               return undefined;
             })(),
-            runAllDisabled: !canRunQuotation || analysisActionLifecycle.runAllDisabled,
-            clearDisabled:
-              analyses.length === 0 ||
-              analysisActionLifecycle.isPreviewing ||
-              analysisActionLifecycle.isRunningAll ||
-              Boolean(activeAnalysis) ||
-              isClearing,
+            runAllDisabled:
+              !canRunQuotation ||
+              analysisActionLifecycle.runAllDisabled ||
+              runAllActionState.runDisabled,
+            runAllDisabledReason: runAllActionState.runDisabledReason,
+            clearDisabled: actionState.clearDisabled || isClearing,
             clearDisabledReason: actionState.clearDisabledReason,
             isPreviewing: analysisActionLifecycle.isPreviewing,
             isRunningAll: analysisActionLifecycle.isRunningAll,
             isStopping,
             isClearing,
             hasResult: hasLoaded,
-            previewLabel: analysisActionLifecycle.parametersLocked
-              ? 'Preview'
-              : actionState.runLabel === 'Re-run'
-                ? 'Update Preview'
-                : 'Preview',
             clearHelp: {
               targetKey: 'analysis.quotation.clear-results',
               label: 'Clear results',
@@ -664,12 +687,12 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
                       tokenizerModel: null,
                     },
                   ]
-                : displayedNodes
+                : previewDisplayedNodes
             }
             activeSelections={
               runAllSource
                 ? [{ nodeId: runAllSource.node_id, column: runAllSource.document_column }]
-                : activeSelections
+                : previewActiveSelections
             }
             resultsByNode={resultsByNode}
             reviewRowUnit={runAllSource ? runAllReviewRowUnit : null}

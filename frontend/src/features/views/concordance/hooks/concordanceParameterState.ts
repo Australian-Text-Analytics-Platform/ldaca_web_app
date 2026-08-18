@@ -55,7 +55,7 @@ export const createConcordanceParameterState = (): ConcordanceParameterState => 
  * Normalizes a saved concordance request's params for diffing against live form
  * values.
  * Used by: ConcordanceFeature when deciding whether the primary action is Run,
- * Re-run, or up to date.
+ * enabled again, or up to date.
  */
 export function readConcordanceServerParams(
   request: Record<string, unknown>,

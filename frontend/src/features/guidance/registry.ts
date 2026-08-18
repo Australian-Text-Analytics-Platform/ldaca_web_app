@@ -229,7 +229,7 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     CONTEXTUAL_HINT_IDS.tokenFrequency.run,
     '[data-guidance="token-frequency-actions"]',
     'Count consistent tokens',
-    'The tokenizer defines what counts as a token, while stop words remove terms you do not want counted. Check the settings, then choose Run or Re-run.',
+    'The tokenizer defines what counts as a token, while stop words remove terms you do not want counted. Check the settings, then choose Run.',
   ),
   hint(
     CONTEXTUAL_HINT_IDS.tokenFrequency.results,
@@ -279,7 +279,7 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     CONTEXTUAL_HINT_IDS.trends.run,
     '[data-guidance="trends-actions"]',
     'Shape the trend',
-    'Set a calendar frequency or numeric interval and optionally group by up to three columns. Check the settings, then choose Run or Re-run.',
+    'Set a calendar frequency or numeric interval and optionally group by up to three columns. Check the settings, then choose Run.',
   ),
   hint(
     CONTEXTUAL_HINT_IDS.trends.results,
@@ -298,7 +298,7 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     CONTEXTUAL_HINT_IDS.topicModeling.run,
     '[data-guidance="topic-modeling-actions"]',
     'Control what becomes a topic',
-    'Segmentation, segment size, minimum topic size, sampling, and the random seed shape the model. Check the settings, then choose Run or Re-run.',
+    'Segmentation, segment size, minimum topic size, sampling, and the random seed shape the model. Check the settings, then choose Run.',
   ),
   hint(
     CONTEXTUAL_HINT_IDS.topicModeling.results,

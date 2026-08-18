@@ -68,7 +68,6 @@ interface TokenFrequencyParameterPanelProps {
   actionState: {
     runDisabled: boolean;
     clearDisabled: boolean;
-    runLabel: string;
     runDisabledReason?: string;
     clearDisabledReason?: string;
   };
@@ -79,7 +78,6 @@ interface TokenFrequencyParameterPanelProps {
   onClearResults: () => void;
   hasIncompleteSelections: boolean;
   hasResults: boolean;
-  runLabel?: string;
   parametersLocked: boolean;
   studyNodeId: string | null;
   onStudyNodeChange: (nodeId: string) => void;
@@ -93,7 +91,7 @@ interface TokenFrequencyParameterPanelProps {
  * Rendered by TokenFrequencyFeature as the setup surface for its active tab.
  * Flow: render node, document-column, tokenizer, study-role, and colour
  * controls, then gate run, stop, and clear actions from the supplied task and
- * rerun state.
+ * execution and Clear state.
  */
 export const TokenFrequencyParameterPanel = ({
   nodeInputs,
@@ -106,7 +104,6 @@ export const TokenFrequencyParameterPanel = ({
   onClearResults,
   hasIncompleteSelections,
   hasResults,
-  runLabel,
   parametersLocked,
   studyNodeId,
   onStudyNodeChange,
@@ -184,7 +181,7 @@ export const TokenFrequencyParameterPanel = ({
         isRunningAll: isAnalyzing,
         isStopping,
         hasResult: hasResults,
-        runAllLabel: runLabel,
+        runAllLabel: 'Run',
         runAllHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
         clearHelp: { targetKey: 'analysis.token-frequency.clear-results', label: 'Clear results' },
       }}

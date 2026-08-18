@@ -20,7 +20,8 @@ import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
 import { analysisInputsFromRequest } from '../common/utils';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { getRerunActionState } from '../common/rerunActionState';
+import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getAnalysisResultResource } from '../common/analysisApi';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
@@ -65,10 +66,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     setInputSet: onTabInputSetChange,
   } = host;
   const tabTaskId = latestRunAll?.id ?? null;
-  const runAllLocksParameters =
-    latestRunAll?.state === 'queued' ||
-    latestRunAll?.state === 'running' ||
-    latestRunAll?.state === 'succeeded';
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -86,12 +83,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const setNodeColumnSelection = nodeInputs.setColumn;
   const panelSelectedNodes = nodeInputs.selectedNodes;
   const activeNodeId = nodeInputs.resolvedNodes[0]?.id ?? '';
-  const sourceDocumentCount = (() => {
-    const firstShapeValue = activeNodeId ? nodeInputs.nodeInfoById[activeNodeId]?.shape?.[0] : null;
-    return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
-      ? firstShapeValue
-      : undefined;
-  })();
   const applyInputsFromSelections = (selections: { nodeId: string; column?: string | null }[]) => {
     onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, nodeInputsFromSelections(selections));
   };
@@ -244,22 +235,38 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const serverNodeId =
     lastRunRequest && typeof lastRunRequest.node_id === 'string' ? lastRunRequest.node_id : '';
   const serverColumn = lastRunRequest ? lastRunRequest.time_column : '';
+  const resultNodeId = serverNodeId || activeNodeId;
+  const resultNodeInfo = resultNodeId ? nodeInputs.nodeInfoById[resultNodeId] : null;
+  const sourceDocumentCount = (() => {
+    const firstShapeValue = resultNodeInfo?.shape?.[0];
+    return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
+      ? firstShapeValue
+      : undefined;
+  })();
+  const currentRequestSignature = {
+    ...currentSequentialParams,
+    node_id: activeNodeId,
+    time_column: activeTimeColumn,
+  };
   const hasParamsChanged = !lastRunRequest
     ? true
-    : hasParameterDiff(currentSequentialParams, readSequentialServerParams(lastRunRequest)) ||
-      hasNodeSelectionChanged(
-        nodeColumnSelections,
-        serverNodeId ? [serverNodeId] : [],
-        serverNodeId ? { [serverNodeId]: serverColumn } : {},
-      );
+    : hasParameterDiff(currentRequestSignature, {
+        ...readSequentialServerParams(lastRunRequest),
+        node_id: serverNodeId,
+        time_column: serverColumn,
+      });
 
+  const parametersLocked = isAnalyzing || Boolean(activeAnalysis);
+  const requiresClear = hasClearRequiredAnalysis(analyses);
   const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: Boolean(activeNodeId),
     hasAttachedAnalysis: Boolean(tabTaskId),
+    hasAnyAnalysis: analyses.length > 0,
     analysisState: taskStatus.tasks[0]?.state ?? null,
     hasChanges: hasParamsChanged,
-    isBusy: isAnalyzing,
+    requiresClear,
+    isBusy: parametersLocked,
   });
 
   useEffect(() => {
@@ -371,7 +378,8 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
       toast.error('Chart SVG not found.');
       return;
     }
-    const nodeName = panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data';
+    const nodeName =
+      resultNodeInfo?.name ?? panelSelectedNodes[0]?.name ?? panelSelectedNodes[0]?.id ?? 'data';
     const { header, legend } = buildSequentialChartExportMetadata({
       nodeName,
       model: chartModel,
@@ -410,15 +418,17 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
             void handleRunOrUpdate();
           },
           // Stops the active sequential-analysis task from the shared layout action.
-          onStop: () => {
-            void stopTask();
-          },
+          onStop: activeAnalysis
+            ? () => {
+                void stopTask();
+              }
+            : undefined,
           // Clears live sequential-analysis results from the shared layout action.
           onClear: () => {
             void handleClearResults();
           },
           runAllDisabled:
-            runAllLocksParameters ||
+            parametersLocked ||
             actionState.runDisabled ||
             isLoading.operations ||
             !activeTimeColumn,
@@ -433,14 +443,14 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           isRunningAll: isAnalyzing,
           isStopping,
           hasResult: Boolean(results),
-          runAllLabel: actionState.runLabel,
+          runAllLabel: 'Run',
           clearHelp: {
             targetKey: 'analysis.sequential-analysis.clear-results',
             label: 'Clear results',
           },
         }}
         actionsGuidanceTarget="trends-actions"
-        parametersLocked={runAllLocksParameters}
+        parametersLocked={parametersLocked}
       >
         <SequentialAnalysisParameterPanel
           nodeInputs={nodeInputs}

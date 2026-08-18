@@ -80,8 +80,10 @@ empty.
 
 <h2 id="help-concordance-run">Step 5 — Preview</h2>
 
-Click **Preview** to create a durable Preview Analysis. After changing a
-parameter, click **Update Preview** to replace it with a new immutable request.
+Click **Preview** to create a durable Preview Analysis. The label always remains
+**Preview**. After success, changing an execution parameter enables Preview
+again; reverting exactly to its submitted request disables it. Preview and
+**Run All** keep independent submitted-request baselines.
 Each page navigation or sort request recomputes that page from the retained
 input snapshot. Preview pages are not retained or reused.
 
@@ -241,7 +243,10 @@ qualifying rows and therefore creates a schema-only Data Block.
 <h3 id="help-concordance-clear-results">Clear results</h3>
 
 The Tab keeps its complete Analysis forest. **Clear Results** removes that
-forest, including after failure or cancellation.
+forest. Preview or Run All locks every parameter only while submission or
+execution is active; Stop becomes available once the task exists. If either
+root fails or is cancelled, parameters unlock but both execution actions stay
+disabled until Clear Results.
 
 <h2 id="help-concordance-troubleshooting">Troubleshooting</h2>
 
@@ -253,7 +258,7 @@ forest, including after failure or cancellation.
 | A regular expression fails | Invalid pattern syntax | Test the pattern on regexr.com |
 | A generated Preview header does not sort | Whole-Result generated sorting requires materialized matches | Run All, then sort the separated Review table |
 | Run All is disabled | Inputs are incomplete or another Run All is active | Complete the inputs or wait for the active Analysis |
-| Preview differs from the edited Data Block | You reopened a historical Preview Analysis | Use **Update Preview** to capture the current Data Block state |
+| Preview differs from the edited Data Block | You reopened a historical Preview Analysis | Change an execution input and choose **Preview** to capture a new snapshot |
 
 <h2 id="help-concordance-defaults">Quick-reference defaults</h2>
 
@@ -280,7 +285,7 @@ forest, including after failure or cancellation.
 4. Run All, open Review Dispersion, hide a term, and select a bin range.
 5. Compare Concordance Match Data Block Creation from Table View with
    Concordance Document Data Block Creation from Dispersion View.
-6. Change the source Data Block, reopen the historical Preview Analysis, and
-   then use **Update Preview** to compare the new request deliberately.
+6. Change an execution input, then choose **Preview** to compare the new request
+   deliberately while the earlier Result remains bound to its snapshot.
 
 [← Back to tutorial index](./index.md)

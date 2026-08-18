@@ -36,6 +36,7 @@ interface ConcordanceActions {
   setLocalTaskId: (id: string | null) => void;
   runningRef: { current: boolean };
   onSubmitted: () => void;
+  prepareBeforeRun?: () => Promise<void>;
 }
 
 interface Params {
@@ -70,7 +71,14 @@ export function useConcordanceTaskFlow({
     caseSensitive,
     ignorePunctuation,
   },
-  actions: { setNodePagination, setIsSearching, setLocalTaskId, runningRef, onSubmitted },
+  actions: {
+    setNodePagination,
+    setIsSearching,
+    setLocalTaskId,
+    runningRef,
+    onSubmitted,
+    prepareBeforeRun,
+  },
 }: Params) {
   /** Starts a fresh concordance analysis or targeted update while preserving the analysis lock. */
   /**
@@ -149,6 +157,7 @@ export function useConcordanceTaskFlow({
       setIsRunning: setIsSearching,
       setLocalTaskId,
       onSubmitted,
+      prepare: prepareBeforeRun,
       submit: async () => {
         const { data } = await submitTabAnalysis({
           body: {

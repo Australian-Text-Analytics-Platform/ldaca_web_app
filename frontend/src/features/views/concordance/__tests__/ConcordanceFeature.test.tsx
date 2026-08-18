@@ -583,7 +583,7 @@ describe('ConcordanceFeature', () => {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update preview/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]!);
 
     return waitFor(() => {
       expect(clearResultsMock).not.toHaveBeenCalled();
@@ -591,7 +591,7 @@ describe('ConcordanceFeature', () => {
     }).finally(unmount);
   });
 
-  it('runs a fresh search when updating Preview after changing parameters', () => {
+  it('runs a fresh Preview after changing parameters', () => {
     mockAnalysisState = 'successful';
     const { unmount } = renderConcordanceFeature('analysis-1');
 
@@ -599,14 +599,14 @@ describe('ConcordanceFeature', () => {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update preview/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Preview' })[0]!);
 
     return waitFor(() => {
       expect(handleSearchMock).toHaveBeenCalledWith();
     }).finally(unmount);
   });
 
-  it('shows Update Preview instead of stale Running after Run All succeeds', () => {
+  it('keeps the Preview label static while a local Preview submission is active', () => {
     mockIsPreviewRunning = true;
     mockRunAllAnalysis = {
       state: 'succeeded',
@@ -616,7 +616,7 @@ describe('ConcordanceFeature', () => {
 
     const { unmount } = renderConcordanceFeature('analysis-1');
 
-    expect(screen.getByRole('button', { name: 'Update Preview' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Running...' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
 

@@ -22,7 +22,11 @@ either directly or with predictions from a configured AI provider.
 
 Choose **Start** to open the annotation table. Select a Codebook value for each
 row; each change is written directly to the annotation column as a Data Block
-Edit. Choose **Close** to hide the table without discarding saved labels.
+Edit. Start captures the source, annotation column, Codebook mapping, and table
+inputs. You can edit the setup as the draft for the next table without changing
+the open table. Choose **Close** even if that draft is incomplete; the next
+Start captures the new setup. Switching modes hides but does not rewrite the
+open Manual snapshot.
 
 Use **Compare To** to add another coder or model. Each comparison starts masked
 as `•••`; reveal it from the eye button in its header to show values,
@@ -65,6 +69,8 @@ Choose **Preview** to create an immutable Analysis snapshot and inspect predicte
 labels without writing to the annotation column. Page through the predictions,
 compare them with existing labels, add corrections if useful, then revise the
 Codebook, examples, model, or settings when the errors show a pattern.
+The label remains **Preview**, and it becomes available after an
+execution-request change. **Run All** compares against its own submitted request.
 
 <h3 id="help-annotation-run-all">Run All and review</h3>
 
@@ -90,6 +96,12 @@ result state; it does not undo labels already written to the Data Block. Use the
 Data Block's session **Undo** action to reverse the latest manual edit, AI write,
 or column creation. Undo history lasts only for the current backend Workspace
 session.
+
+Preview or Run All locks the parameter panel only while submission or execution
+is active. A failed or cancelled root unlocks parameters but disables both
+execution actions until Clear Results. Existing tables remain tied to the
+request or Manual Start snapshot that produced them while you edit the next
+draft.
 
 Before using labels downstream, sample every code, inspect uncertain or costly
 errors, and record who or what produced the labels. Treat AI predictions and

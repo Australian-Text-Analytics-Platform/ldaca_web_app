@@ -102,7 +102,7 @@ can instead fill only blank annotations. Batch size defaults to 20 rows and is
 bounded to 100 rows, while two retries provide at most three attempts per batch;
 Preview and Review toolbars can seed the source Data Block and selected
 correction column as the example pair. Provider fallback remains visible to
-re-run change detection rather than rewriting a historical request.
+execution-request change detection rather than rewriting a historical request.
 
 Annotation comparison columns, reliability metric, and metadata selections are
 presentation state keyed by source Data Block and are shared by Manual, Preview,
@@ -223,10 +223,28 @@ replacement submits with explicit supersession and does not clear first.
 Every disabled lifecycle action exposes its current disabled reason through the
 shared action tooltip on pointer hover or keyboard focus; features supply
 domain-specific reasons while the shared renderer owns the interaction.
-Active Run All locks the submitted parameter panel; a successful Run All does
-not. Annotation replacement is the exception: each Preview or Run All becomes
-the Tab's sole Analysis immediately. An Active Analysis Draft is client-only
-and is never written into Query data.
+The labels are always **Preview**, **Run**, and **Run All**. The parameter panel
+locks from the local submission boundary until the active Preview or Run All
+finishes, then unlocks while the successful Result remains visible. Each action
+compares its complete current execution request with its own latest successful
+request; an exact change enables that action and an exact revert disables it.
+Presentation-only controls do not participate. A failed or cancelled root
+unlocks parameters but disables every execution action in the Tab until
+**Clear Results** removes the forest. Submission errors before an Analysis is
+persisted simply release the local lock. Stop appears only after an active
+Analysis exists, and Clear is disabled during active work. Annotation
+replacement is the exception to forest retention: each Preview or Run All
+becomes the Tab's sole Analysis immediately. An Active Analysis Draft is
+client-only and is never written into Query data.
+
+Displayed Results resolve source identity, columns, ordering, search semantics,
+counts, seeds, and truncation metadata from immutable Result artifacts or the
+submitted request, with current Workspace metadata only as a fallback. Editing
+the next draft therefore cannot rebind an existing Result. Manual Annotation
+uses the same principle locally: **Start** captures the source, annotation
+column, Codebook mapping, and related table inputs. The setup remains editable
+while that table is open, **Close** remains available even if the next draft is
+incomplete, and the next Start captures a replacement snapshot.
 
 Concordance and Quotation Review query explicit document or match projections
 of immutable Analysis tables. Run All therefore creates no graph node and
@@ -352,7 +370,7 @@ falling back to refreshed Data Block metadata.
 Analysis hydration has a stronger authority. Stored document-column and
 tokenizer-model mappings, plus Concordance search mode, come from the immutable
 Analysis request and replace selector defaults, including explicit absence.
-They also participate in re-run change detection. Token Frequency passes its
+They also participate in execution-request change detection. Token Frequency passes its
 exact submitted tokenizer mapping into a Concordance handoff instead of
 consulting current Data Block preferences. Fresh Concordance selections remain
 in Text mode even when every selected Data Block has a model. Selecting Tokens

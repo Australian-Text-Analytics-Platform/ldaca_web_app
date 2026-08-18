@@ -18,7 +18,8 @@ import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { getRerunActionState, hasNodeSelectionChanged } from '../common/rerunActionState';
+import { getRerunActionState } from '../common/rerunActionState';
+import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { analysisInputsFromRequest } from '../common/utils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
@@ -62,10 +63,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     setInputSet: onTabInputSetChange,
   } = host;
   const tabTaskId = latestRunAll?.id ?? null;
-  const runAllLocksParameters =
-    latestRunAll?.state === 'queued' ||
-    latestRunAll?.state === 'running' ||
-    latestRunAll?.state === 'succeeded';
   const { currentWorkspaceId } = useWorkspaceData();
   const { setNodeColor: persistNodeColor, createTopicModelingDataBlocks } = useWorkspaceActions();
   const nodeInputs = useTabNodeInputs({
@@ -253,6 +250,12 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   });
 
   const currentTopicParams = {
+    node_ids: panelNodeIds,
+    node_columns: Object.fromEntries(
+      effectiveNodeColumnSelections
+        .filter((selection) => panelNodeIds.includes(selection.nodeId) && selection.column)
+        .map((selection) => [selection.nodeId, selection.column]),
+    ),
     random_seed: randomSeed,
     min_topic_size: topicSizeValue,
     sample_fractions: sampleFractionsForRequest,
@@ -260,11 +263,14 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     max_segment_tokens: maxSegmentTokens,
   };
   const serverTopicParams = (request: Record<string, unknown>) => ({
+    node_ids: Array.isArray(request.node_ids) ? request.node_ids : [],
+    node_columns:
+      request.node_columns && typeof request.node_columns === 'object' ? request.node_columns : {},
     random_seed: Number(request.random_seed),
     min_topic_size: Number(request.min_topic_size ?? DEFAULT_TOPIC_SIZE_VALUE),
     sample_fractions: normalizeTopicSampleFractions(
       (request as unknown as { sample_fractions?: unknown }).sample_fractions,
-      panelNodeIds.length,
+      Array.isArray(request.node_ids) ? request.node_ids.length : 0,
     ),
     segmentation_method:
       request.segmentation_method === 'paragraph' || request.segmentation_method === 'sentence'
@@ -274,20 +280,19 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   });
   const hasTopicChanges = !typedServerRequest
     ? true
-    : hasParameterDiff(currentTopicParams, serverTopicParams(typedServerRequest)) ||
-      hasNodeSelectionChanged(
-        effectiveNodeColumnSelections,
-        typedServerRequest.node_ids,
-        typedServerRequest.node_columns,
-      );
+    : hasParameterDiff(currentTopicParams, serverTopicParams(typedServerRequest));
 
+  const parametersLocked = isRunning || Boolean(activeAnalysis);
+  const requiresClear = hasClearRequiredAnalysis(analyses);
   const actionState = getRerunActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     isRunnable: panelNodeIds.length > 0 && !panelHasMissingColumns,
     hasAttachedAnalysis: Boolean(tabTaskId),
+    hasAnyAnalysis: analyses.length > 0,
     analysisState: taskStatus.tasks[0]?.state ?? null,
     hasChanges: hasTopicChanges,
-    isBusy: isRunning,
+    requiresClear,
+    isBusy: parametersLocked,
   });
 
   /**
@@ -302,10 +307,26 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const resultKey = tabTaskId ?? (result ? '__hydrated__' : null);
   const [stopWordsEnabledForResult, setStopWordsEnabledForResult] = useState<string | null>(null);
   const stopWordsEnabled = resultKey !== null && stopWordsEnabledForResult === resultKey;
-  const firstNodeId = panelNodeIds[0] ?? null;
-  const firstColumn =
-    effectiveNodeColumnSelections.find((selection) => selection.nodeId === firstNodeId)?.column ??
-    null;
+  const resultArtifacts = result?.artifacts.nodes ?? [];
+  const resultNodeIds =
+    resultArtifacts.length > 0
+      ? resultArtifacts.map((artifact) => artifact.node_id)
+      : (typedServerRequest?.node_ids ?? panelNodeIds);
+  const resultNodeNames =
+    result?.data.meta.node_names && result.data.meta.node_names.length > 0
+      ? result.data.meta.node_names
+      : resultArtifacts.length > 0
+        ? resultArtifacts.map((artifact) => artifact.node_name)
+        : panelSelectedNodes.map((node) => node.name);
+  const resultRandomSeed =
+    result?.data.meta.random_state ?? typedServerRequest?.random_seed ?? randomSeed;
+  const resultMaxSegmentTokens = typedServerRequest?.max_segment_tokens ?? maxSegmentTokens;
+  const firstResultNodeId = resultNodeIds[0] ?? null;
+  const firstResultColumn = firstResultNodeId
+    ? (typedServerRequest?.node_columns?.[firstResultNodeId] ??
+      resultArtifacts.find((artifact) => artifact.node_id === firstResultNodeId)?.text_column ??
+      null)
+    : null;
   const representativeWordsCount = host.topicModelingWordsPerTopic ?? 15;
   const rawTopics: TopicModelingTopic[] = result?.data.topics ?? [];
   const effectiveStopWords = stopWordsEnabled
@@ -313,14 +334,14 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     : new Set<string>();
   const exportTopics = filterTopicRepresentativeWords(rawTopics, effectiveStopWords);
   const topics = sliceTopicRepresentativeWords(exportTopics, representativeWordsCount);
-  const addToWorkspaceSources: TopicModelingAddToWorkspaceSource[] = (
-    result?.artifacts.nodes ?? []
-  ).map((node) => ({
-    id: node.node_id,
-    name: node.node_name,
-    columns: node.original_columns,
-    documentColumn: node.text_column,
-  }));
+  const addToWorkspaceSources: TopicModelingAddToWorkspaceSource[] = resultArtifacts.map(
+    (node) => ({
+      id: node.node_id,
+      name: node.node_name,
+      columns: node.original_columns,
+      documentColumn: node.text_column,
+    }),
+  );
 
   const openAddToWorkspaceDialog = () => {
     const sourceIds = new Set(addToWorkspaceSources.map((source) => source.id));
@@ -391,6 +412,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       setError,
       setLocalTaskId,
       onSubmitted: refreshAnalyses,
+      prepareBeforeRun: ensureNodeColors,
     },
   });
 
@@ -417,7 +439,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     setTooltip,
   });
 
-  const colorNodeIds = panelNodeIds;
+  const colorNodeIds = result ? resultNodeIds : panelNodeIds;
 
   const { bubbleElements, renderSizeComposition } = useTopicModelingBubbleChart({
     topics,
@@ -445,11 +467,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     handleResetZoom,
   });
 
-  const handleRunOrUpdate = async () => {
-    await ensureNodeColors();
-    await handleRun();
-  };
-
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- this is a truthiness OR: a falsy banner/result/error must fall through to the next, so ?? would short-circuit incorrectly
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 
@@ -470,7 +487,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         nodeInputs={nodeInputs}
         onColumnChange={handleColumnChange}
         actionState={actionState}
-        parametersLocked={runAllLocksParameters}
+        parametersLocked={parametersLocked}
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
         onCorpusSampleChange={updateCorpusSample}
@@ -489,10 +506,14 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         isRunning={isRunning}
         isStopping={isStopping}
         isClearing={isClearing}
-        onRun={handleRunOrUpdate}
-        onStop={() => {
-          void stopTask();
-        }}
+        onRun={handleRun}
+        onStop={
+          activeAnalysis
+            ? () => {
+                void stopTask();
+              }
+            : undefined
+        }
         onClear={handleClear}
         hasMissingColumns={panelHasMissingColumns}
         hasResult={Boolean(result ?? analysisError ?? error)}
@@ -526,9 +547,9 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
           activeDomain={activeDomain}
-          nodeNames={panelSelectedNodes.map((n) => n.name)}
-          randomSeed={randomSeed}
-          maxSegmentTokens={maxSegmentTokens}
+          nodeNames={resultNodeNames}
+          randomSeed={resultRandomSeed}
+          maxSegmentTokens={resultMaxSegmentTokens}
           onAddToWorkspace={openAddToWorkspaceDialog}
           isAddingToWorkspace={isAddingToWorkspace}
           wordsPerTopic={representativeWordsCount}
@@ -543,8 +564,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           stopWords={host.stopWords}
           stopWordsDetectionTarget={{
             workspaceId: currentWorkspaceId,
-            nodeId: firstNodeId,
-            column: firstColumn,
+            nodeId: firstResultNodeId,
+            column: firstResultColumn,
           }}
           onStopWordsChange={(words) => {
             return host.setPresentationSettings({ stop_words: words });
