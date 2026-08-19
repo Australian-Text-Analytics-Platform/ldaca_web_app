@@ -11,7 +11,7 @@
 
 ## Frontend
 
-- [x] Add the Top topics per row committed number input.
+- [x] Add the Top topics per document committed number input.
 - [x] Generalize attempts, retries, persistence, and K/N clamping.
 - [x] Preserve graph interactions and dialogs for N-only updates.
 - [x] Resolve open tooltips by Topic ID against current counts.

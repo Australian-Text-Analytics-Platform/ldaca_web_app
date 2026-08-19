@@ -22,7 +22,7 @@ interface Props {
   onClearSelection: () => void;
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
-  corpusCount: number;
+  corpusSizes: number[];
   panelNodeIds: string[];
   nodeColors: Record<string, string>;
   defaultPalette: string[];
@@ -53,7 +53,7 @@ export function TopicModelingBubbleChartSection({
   onClearSelection,
   topicSearchQuery,
   onTopicSearchQueryChange,
-  corpusCount,
+  corpusSizes,
   panelNodeIds,
   nodeColors,
   defaultPalette,
@@ -66,6 +66,7 @@ export function TopicModelingBubbleChartSection({
   topNTopics,
   controlRowSlot,
 }: Props) {
+  const corpusCount = corpusSizes.length;
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [lassoMode, setLassoMode] = useState(false);
@@ -82,7 +83,7 @@ export function TopicModelingBubbleChartSection({
   const hoveredTopicId = listHover.projectionKey === projectionKey ? listHover.topicId : null;
   const bubbles = buildTopicBubbleModels({
     topics,
-    corpusCount,
+    corpusSizes,
     panelNodeIds,
     nodeColors,
     defaultPalette,
@@ -106,7 +107,7 @@ export function TopicModelingBubbleChartSection({
     const header: ChartExportHeaderItem[] = [
       { label: 'Data Block', value: nodeNames?.join(', ') ?? 'data' },
       { label: 'Clusters', value: clusterCount != null ? String(clusterCount) : '—' },
-      { label: 'Top topics per row', value: topNTopics != null ? String(topNTopics) : '—' },
+      { label: 'Top topics per document', value: topNTopics != null ? String(topNTopics) : '—' },
       { label: 'Random Seed', value: randomSeed != null ? String(randomSeed) : '—' },
       { label: 'Topics', value: String(topics.length) },
     ];

@@ -28,7 +28,7 @@ export interface TopicBubbleModel {
 
 interface BuildTopicBubbleModelsOptions {
   topics: TopicModelingTopic[];
-  corpusCount: number;
+  corpusSizes: number[];
   panelNodeIds: string[];
   nodeColors: Record<string, string>;
   defaultPalette: string[];
@@ -80,10 +80,10 @@ export function normalizeTopicPositions(
   );
 }
 
-/** Builds the shared graph/export presentation model for every projected Topic. */
+/** Builds the shared graph/export presentation model for projected Topics with rows. */
 export function buildTopicBubbleModels({
   topics,
-  corpusCount,
+  corpusSizes,
   panelNodeIds,
   nodeColors,
   defaultPalette,
@@ -92,8 +92,10 @@ export function buildTopicBubbleModels({
   hoveredTopicId,
   topicSearchQuery,
 }: BuildTopicBubbleModelsOptions): TopicBubbleModel[] {
-  const positions = normalizeTopicPositions(topics);
-  const maxSize = Math.max(1, ...topics.map((topic) => topic.total_size));
+  const corpusCount = corpusSizes.length;
+  const visibleTopics = topics.filter((topic) => topic.total_size > 0);
+  const positions = normalizeTopicPositions(visibleTopics);
+  const maxSize = Math.max(1, ...visibleTopics.map((topic) => topic.total_size));
   const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
   const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
   const colorA = resolveTopicCorpusColor(
@@ -112,9 +114,13 @@ export function buildTopicBubbleModels({
   );
   const hasSearchFilter = topicSearchQuery.trim().length > 0;
 
-  return topics.map((topic) => {
-    const proportion =
-      corpusCount === 2 && topic.total_size > 0 ? (topic.size[1] ?? 0) / topic.total_size : 0.5;
+  return visibleTopics.map((topic) => {
+    const corpusSizeA = corpusSizes[0] ?? 0;
+    const corpusSizeB = corpusSizes[1] ?? 0;
+    const shareA = corpusSizeA > 0 ? (topic.size[0] ?? 0) / corpusSizeA : 0;
+    const shareB = corpusSizeB > 0 ? (topic.size[1] ?? 0) / corpusSizeB : 0;
+    const combinedShare = shareA + shareB;
+    const proportion = corpusCount === 2 && combinedShare > 0 ? shareB / combinedShare : 0.5;
     return {
       id: topic.id,
       topic,

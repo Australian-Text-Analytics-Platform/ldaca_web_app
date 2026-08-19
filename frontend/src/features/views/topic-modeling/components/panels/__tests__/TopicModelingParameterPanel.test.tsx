@@ -133,7 +133,7 @@ describe('TopicModelingParameterPanel', () => {
     expect(screen.queryByLabelText('Words per topic')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Segmentation method')).toBeInTheDocument();
     expect(screen.getByLabelText('Maximum tokens per segment')).toHaveValue(256);
-    expect(screen.getByLabelText('Minimum cluster size')).toHaveValue(10);
+    expect(screen.getByLabelText('Min topic size')).toHaveValue(10);
     expect(screen.queryByText('Topic Modelling Options')).not.toBeInTheDocument();
   });
 
@@ -197,7 +197,7 @@ describe('TopicModelingParameterPanel', () => {
     expect(onCorpusSampleChange).toHaveBeenCalledWith(0, { percent: '25' });
   });
 
-  it('commits minimum cluster size as an integer of at least two', () => {
+  it('commits Min topic size as an integer of at least two', () => {
     const onMinClusterSizeChange = vi.fn();
     render(
       <TopicModelingParameterPanel
@@ -206,7 +206,7 @@ describe('TopicModelingParameterPanel', () => {
       />,
     );
 
-    const input = screen.getByLabelText<HTMLInputElement>('Minimum cluster size');
+    const input = screen.getByLabelText<HTMLInputElement>('Min topic size');
     fireEvent.change(input, { target: { value: '1' } });
     fireEvent.blur(input);
     expect(onMinClusterSizeChange).toHaveBeenLastCalledWith(2);

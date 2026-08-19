@@ -7,7 +7,7 @@ status: accepted
 ## Context
 
 ADR 0024 fixed HDBSCAN's minimum cluster size at 10 and exposed only the cheap
-result-time Number of clusters projection. Number of clusters can merge the
+result-time Number of topics projection. Number of topics can merge the
 natural HDBSCAN Topics but cannot create finer natural leaves. Users also need
 to tune that initial granularity for corpora whose stable density groups are
 smaller or larger than the default.
@@ -16,7 +16,7 @@ smaller or larger than the default.
 
 `TopicModelingAnalysisRequest.min_cluster_size` is a public initial-run
 parameter with default 10 and minimum 2. The Topic Modelling parameter panel
-labels it **Minimum cluster size** and explains that it controls the smallest
+labels it **Min topic size** and explains that it controls the smallest
 number of Topic Segments that can form a natural HDBSCAN Topic.
 
 The immutable Analysis request owns the value. Request hydration restores it,
@@ -39,5 +39,5 @@ clause.
   Topic.
 - Reopening an Analysis shows the exact initial-run value in the locked
   parameter panel.
-- Cheap Number of clusters and Top topics per row adjustments retain their
+- Cheap Number of topics and Top topics per document adjustments retain their
   existing projection and cache behavior.

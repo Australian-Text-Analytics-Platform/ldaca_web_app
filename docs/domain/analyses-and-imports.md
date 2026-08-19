@@ -259,7 +259,7 @@ leaf ID.
 Token Frequency and Topic Modelling Tabs may own one normalized stopword list;
 Topic Modelling Tabs also own a 3-100 Words-per-topic cap initialized to 15 and
 a nullable successful-Analysis projection selection containing cluster count
-and Top topics per row. Only explicit Tab PATCH operations change these
+and Top topics per document. Only explicit Tab PATCH operations change these
 settings. Analysis lifecycle operations and Clear Results preserve the first
 two; removing or superseding the selected Topic Analysis clears its projection
 selection.

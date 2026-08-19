@@ -238,7 +238,7 @@ Token Frequency and Topic Modelling Tabs expose normalized `stop_words`.
 Topic Modelling Tabs additionally expose `topic_modeling_words_per_topic`
 (3-100, default 15) and nullable `topic_modeling_projection_selection`. The
 latter identifies a succeeded Topic Modelling Analysis in the same Tab plus
-cluster count and Top topics per row within that Result's bounds. Null means
+cluster count and Top topics per document within that Result's bounds. Null means
 both defaults. It is cleared when that Analysis is removed or superseded.
 
 ## Analyses

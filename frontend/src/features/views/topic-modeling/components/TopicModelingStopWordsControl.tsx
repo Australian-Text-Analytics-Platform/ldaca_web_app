@@ -129,7 +129,7 @@ export function TopicModelingStopWordsControl({
 
   return (
     <>
-      <div className="flex h-8 items-center gap-2">
+      <div className="flex min-h-8 flex-wrap items-center gap-2">
         <StopWordsEnabledSwitch
           checked={enabled}
           onCheckedChange={onEnabledChange}
@@ -148,7 +148,7 @@ export function TopicModelingStopWordsControl({
             void replaceWithLanguage(value);
           }}
         >
-          <SelectTrigger className="h-8 w-56 text-xs" aria-label="Stop words language">
+          <SelectTrigger className="h-9 w-56 max-w-full text-xs" aria-label="Stop words language">
             <SelectValue placeholder="Select language" />
           </SelectTrigger>
           <SelectContent>

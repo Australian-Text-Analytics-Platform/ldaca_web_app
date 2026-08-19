@@ -68,7 +68,7 @@ const commonProps = {
   onClearSelection: vi.fn(),
   topicSearchQuery: '',
   onTopicSearchQueryChange: vi.fn(),
-  corpusCount: 2,
+  corpusSizes: [100, 100],
   panelNodeIds: ['a', 'b'],
   nodeColors: { a: '#7c3aed', b: '#dc2626' },
   defaultPalette: ['#7c3aed', '#dc2626'],

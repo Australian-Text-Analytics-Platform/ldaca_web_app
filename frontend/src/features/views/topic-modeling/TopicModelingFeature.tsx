@@ -406,8 +406,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     },
   });
 
-  const corpusCount = result?.data.corpus_sizes.length ?? 0;
-
   const startProjection = (clusterCount: number, topNTopics: number) => {
     if (clusterCount !== result?.clustering.cluster_count) {
       setReadyGraphProjectionKey(null);
@@ -519,7 +517,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           onClearSelection={handleClearTopicSelection}
           topicSearchQuery={topicSearchQuery}
           onTopicSearchQueryChange={setTopicSearchQuery}
-          corpusCount={corpusCount}
           panelNodeIds={colorNodeIds}
           nodeColors={nodeColors}
           defaultPalette={defaultPalette}

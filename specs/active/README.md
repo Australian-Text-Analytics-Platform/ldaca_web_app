@@ -9,4 +9,4 @@ issue backlogs here.
 
 - [Issue 25: Derived Data Block Creation](25-derived-data-block-creation/spec.md)
 - [Issue 56: Topic Representative Words and Result Controls](56-topic-representative-words/spec.md)
-- [Issue 61: Top Topics per Row for Topic Bubbles](61-top-topics-per-row/spec.md)
+- [Issue 61: Top Topics per Document for Topic Bubbles](61-top-topics-per-row/spec.md)

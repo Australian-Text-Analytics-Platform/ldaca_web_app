@@ -297,10 +297,10 @@ export function TopicModelingParameterPanel({
               htmlFor="topic-min-cluster-size"
               className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
             >
-              Minimum cluster size
+              Min topic size
               <span
-                aria-label="Minimum cluster size controls the smallest number of Topic Segments that can form a natural topic"
-                title="Sets the HDBSCAN minimum cluster size for the initial run. Smaller values can produce more natural topics. Changing it requires running a new analysis; Number of clusters only merges the resulting topics."
+                aria-label="Min topic size controls the smallest number of Topic Segments that can form a natural topic"
+                title="Sets the HDBSCAN minimum topic size for the initial run. Smaller values can produce more natural topics. Changing it requires running a new analysis; Number of topics only merges the resulting topics."
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
               >
                 <CircleHelp className="h-4 w-4" />
@@ -308,7 +308,7 @@ export function TopicModelingParameterPanel({
             </Label>
             <Input
               id="topic-min-cluster-size"
-              aria-label="Minimum cluster size"
+              aria-label="Min topic size"
               type="number"
               min={2}
               step={1}

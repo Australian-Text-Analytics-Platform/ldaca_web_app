@@ -1,4 +1,4 @@
-# Top Topics per Row for Topic Bubbles
+# Top Topics per Document for Topic Bubbles
 
 Issue: [#61](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflow/issues/61)
 
@@ -56,7 +56,7 @@ Issue: [#61](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflo
 
 ## Frontend behavior
 
-- **Top topics per row** is a number input. Enter or blur commits one distinct
+- **Top topics per document** is a number input. Enter or blur commits one distinct
   value; partial input and recommitting the applied value send no request.
 - Lowering K below N commits one combined request with N clamped to K.
 - Result attempts use the complete `(K, N, request key)` identity. Graph layout

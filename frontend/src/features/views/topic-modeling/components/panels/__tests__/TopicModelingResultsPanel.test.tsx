@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -103,7 +104,6 @@ const baseProps = {
   onClearSelection: vi.fn(),
   topicSearchQuery: '',
   onTopicSearchQueryChange: vi.fn(),
-  corpusCount: 1,
   panelNodeIds: ['node-1'],
   nodeColors: { 'node-1': '#2563eb' },
   defaultPalette: ['#2563eb'],
@@ -177,18 +177,45 @@ const interruptedPointerGestures: [string, (root: HTMLElement) => void][] = [
 ];
 
 describe('TopicModelingResultsPanel', () => {
-  it('renders the accessible cluster slider with server-provided bounds', () => {
+  it('renders the accessible topic slider with server-provided bounds', () => {
     render(
       <TooltipProvider>
         <TopicModelingResultsPanel {...baseProps} />
       </TooltipProvider>,
     );
 
-    const slider = screen.getByRole('slider', { name: 'Number of clusters' });
+    const slider = screen.getByRole('slider', { name: 'Number of topics' });
     expect(slider).toHaveAttribute('aria-valuemin', '2');
     expect(slider).toHaveAttribute('aria-valuemax', '5');
     expect(slider).toHaveAttribute('aria-valuenow', '4');
+    expect(screen.getByLabelText('Minimum number of topics')).toHaveTextContent('2');
+    const topicCountInput = screen.getByRole('spinbutton', { name: 'Number of topics' });
+    expect(topicCountInput).toHaveAttribute('min', '2');
+    expect(topicCountInput).toHaveAttribute('max', '5');
+    expect(topicCountInput).toHaveValue(4);
     expect(screen.getByText('Topics (1)')).toBeInTheDocument();
+  });
+
+  it('syncs the editable topic count to the slider and commits it once', () => {
+    const onClusterCountCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
+      </TooltipProvider>,
+    );
+
+    const input = screen.getByRole('spinbutton', { name: 'Number of topics' });
+    fireEvent.change(input, { target: { value: '3' } });
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
+      'aria-valuenow',
+      '3',
+    );
+    expect(onClusterCountCommit).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+    expect(onClusterCountCommit).toHaveBeenCalledTimes(1);
+    expect(onClusterCountCommit).toHaveBeenCalledWith(3);
   });
 
   it('disables the fixed control when the natural result has two Topics', () => {
@@ -206,7 +233,8 @@ describe('TopicModelingResultsPanel', () => {
         />
       </TooltipProvider>,
     );
-    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toBeDisabled();
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: 'Number of topics' })).toBeDisabled();
   });
 
   it('commits one cluster query immediately after a keyboard adjustment', () => {
@@ -217,7 +245,7 @@ describe('TopicModelingResultsPanel', () => {
       </TooltipProvider>,
     );
 
-    const slider = screen.getByRole('slider', { name: 'Number of clusters' });
+    const slider = screen.getByRole('slider', { name: 'Number of topics' });
     fireEvent.keyDown(slider, { key: 'ArrowLeft' });
     expect(onClusterCountCommit).toHaveBeenCalledTimes(1);
     expect(onClusterCountCommit).toHaveBeenCalledWith(3);
@@ -233,7 +261,7 @@ describe('TopicModelingResultsPanel', () => {
       </TooltipProvider>,
     );
 
-    const input = screen.getByRole('spinbutton', { name: 'Top topics per row' });
+    const input = screen.getByRole('spinbutton', { name: 'Top topics per document' });
     fireEvent.change(input, { target: { value: '3' } });
     expect(onTopNTopicsCommit).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -251,7 +279,7 @@ describe('TopicModelingResultsPanel', () => {
       </TooltipProvider>,
     );
 
-    const input = screen.getByRole('spinbutton', { name: 'Top topics per row' });
+    const input = screen.getByRole('spinbutton', { name: 'Top topics per document' });
     fireEvent.change(input, { target: { value: '' } });
     fireEvent.blur(input);
     fireEvent.change(input, { target: { value: '2' } });
@@ -271,7 +299,7 @@ describe('TopicModelingResultsPanel', () => {
 
     fireEvent.pointerDown(root, { button: 0, clientX: 0, pointerId: 1 });
     expect(onClusterCountCommit).not.toHaveBeenCalled();
-    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
       'aria-valuenow',
       '2',
     );
@@ -316,7 +344,7 @@ describe('TopicModelingResultsPanel', () => {
 
     const { root } = prepareClusterSlider();
     fireEvent.pointerDown(root, { button: 0, clientX: 0, pointerId: 1 });
-    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
       'aria-valuenow',
       '2',
     );
@@ -324,7 +352,7 @@ describe('TopicModelingResultsPanel', () => {
     interrupt(root);
 
     expect(onClusterCountCommit).not.toHaveBeenCalled();
-    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
       'aria-valuenow',
       '4',
     );
@@ -374,7 +402,7 @@ describe('TopicModelingResultsPanel', () => {
     expect(screen.getByTestId('topic-modeling-result-content')).not.toHaveAttribute('inert');
     expect(screen.getByText('Topics (2)')).toBeInTheDocument();
     expect(screen.getByText('All Topics (2)')).toBeInTheDocument();
-    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
       'aria-valuenow',
       '2',
     );
@@ -387,10 +415,10 @@ describe('TopicModelingResultsPanel', () => {
       </TooltipProvider>,
     );
 
-    fireEvent.keyDown(screen.getByRole('slider', { name: 'Number of clusters' }), {
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'Number of topics' }), {
       key: 'ArrowLeft',
     });
-    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
       'aria-valuenow',
       '3',
     );
@@ -404,7 +432,7 @@ describe('TopicModelingResultsPanel', () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByRole('slider', { name: 'Number of clusters' })).toHaveAttribute(
+    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
       'aria-valuenow',
       '2',
     );
@@ -420,6 +448,25 @@ describe('TopicModelingResultsPanel', () => {
     expect(screen.getByText('Topic Modelling Results')).toBeInTheDocument();
     expect(screen.getByText('Topics (1)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add to Workspace' })).toBeInTheDocument();
+  });
+
+  it('organizes Result settings and moves the Top-N explanation into help', async () => {
+    const user = userEvent.setup();
+    const explanation =
+      'Each row may count toward multiple bubbles. Cutoff ties can include more than this number.';
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText('Result settings')).toBeInTheDocument();
+    expect(screen.getByText('Topic structure')).toBeInTheDocument();
+    expect(screen.getByText('Representative words')).toBeInTheDocument();
+    expect(screen.queryByText(explanation)).not.toBeInTheDocument();
+
+    await user.hover(screen.getByRole('button', { name: 'About Top topics per document' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(explanation);
   });
 
   it('keeps filtering off while stop-word configuration remains editable', () => {

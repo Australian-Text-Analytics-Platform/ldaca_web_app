@@ -1,4 +1,4 @@
-import { LoaderCircle, Plus } from 'lucide-react';
+import { CircleHelp, LoaderCircle, Plus } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import type {
   TopicClustering,
@@ -9,6 +9,7 @@ import type {
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '@/features/views/common/components/AnalysisRunningStateCard';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
@@ -37,7 +38,6 @@ interface Props {
   onClearSelection: () => void;
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
-  corpusCount: number;
   panelNodeIds: string[];
   nodeColors: Record<string, string>;
   defaultPalette: string[];
@@ -84,9 +84,42 @@ function ClusterCountControl({
 }) {
   const applied = clustering.cluster_count;
   const [value, setValue] = useState<number[]>([applied]);
+  const [numberDraft, setNumberDraft] = useState(String(applied));
   const activePointerIdRef = useRef<number | null>(null);
   const latestDraftRef = useRef(applied);
+  const latestCommitRef = useRef(applied);
   const displayedValue = value[0] ?? applied;
+
+  const boundedTopicCount = (raw: string) => {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(
+      clustering.max_cluster_count,
+      Math.max(clustering.min_cluster_count, Math.round(parsed)),
+    );
+  };
+
+  const setTopicCountDraft = (next: number) => {
+    latestDraftRef.current = next;
+    setValue([next]);
+    setNumberDraft(String(next));
+  };
+
+  const commitTopicCount = (next: number) => {
+    if (next === applied || latestCommitRef.current === next) return;
+    latestCommitRef.current = next;
+    onCommit(next);
+  };
+
+  const commitNumberDraft = (raw: string) => {
+    const next = boundedTopicCount(raw);
+    if (next === null) {
+      setTopicCountDraft(applied);
+      return;
+    }
+    setTopicCountDraft(next);
+    commitTopicCount(next);
+  };
 
   useEffect(() => {
     const handleWindowBlur = () => {
@@ -94,6 +127,7 @@ function ClusterCountControl({
       activePointerIdRef.current = null;
       latestDraftRef.current = applied;
       setValue([applied]);
+      setNumberDraft(String(applied));
     };
     window.addEventListener('blur', handleWindowBlur);
     return () => {
@@ -106,61 +140,100 @@ function ClusterCountControl({
     activePointerIdRef.current = null;
     latestDraftRef.current = applied;
     setValue([applied]);
+    setNumberDraft(String(applied));
   };
 
   return (
-    <div className="grid min-w-56 gap-1 text-xs text-muted-foreground">
-      <div className="flex items-center justify-between gap-3">
-        <label htmlFor="topic-cluster-count">Number of clusters</label>
-        <span className="tabular-nums text-foreground">{displayedValue}</span>
+    <div className="grid min-w-0 gap-1 text-xs text-muted-foreground">
+      <div className="flex items-center gap-3">
+        <label htmlFor="topic-cluster-count" className="font-medium">
+          Number of topics
+        </label>
       </div>
-      {clustering.adjustable ? (
-        <Slider
-          id="topic-cluster-count"
-          data-testid="topic-cluster-slider"
-          aria-label="Number of clusters"
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          aria-label="Minimum number of topics"
+          className="w-5 shrink-0 text-center tabular-nums text-foreground"
+        >
+          {clustering.min_cluster_count}
+        </span>
+        <div className="min-w-24 flex-1">
+          {clustering.adjustable ? (
+            <Slider
+              id="topic-cluster-count"
+              data-testid="topic-cluster-slider"
+              aria-label="Number of topics"
+              min={clustering.min_cluster_count}
+              max={clustering.max_cluster_count}
+              step={1}
+              value={value}
+              disabled={pending}
+              onPointerDown={(event) => {
+                if (pending) return;
+                activePointerIdRef.current = event.pointerId;
+                latestDraftRef.current = displayedValue;
+              }}
+              onPointerUp={(event) => {
+                if (activePointerIdRef.current !== event.pointerId) return;
+                activePointerIdRef.current = null;
+                commitTopicCount(latestDraftRef.current);
+              }}
+              onPointerCancel={(event) => {
+                rollBackPointerGesture(event.pointerId);
+              }}
+              onLostPointerCapture={(event) => {
+                rollBackPointerGesture(event.pointerId);
+              }}
+              onValueChange={(nextValue) => {
+                const next = nextValue[0] ?? applied;
+                setTopicCountDraft(next);
+                if (activePointerIdRef.current === null) commitTopicCount(next);
+              }}
+            />
+          ) : (
+            <input
+              id="topic-cluster-count"
+              aria-label="Number of topics"
+              type="range"
+              min={clustering.cluster_count}
+              max={clustering.cluster_count}
+              value={clustering.cluster_count}
+              disabled
+              readOnly
+              className="h-4 w-full accent-primary disabled:opacity-50"
+            />
+          )}
+        </div>
+        <input
+          id="topic-cluster-count-input"
+          aria-label="Number of topics"
+          type="number"
           min={clustering.min_cluster_count}
           max={clustering.max_cluster_count}
           step={1}
-          value={value}
-          disabled={pending}
-          onPointerDown={(event) => {
-            if (pending) return;
-            activePointerIdRef.current = event.pointerId;
-            latestDraftRef.current = displayedValue;
-          }}
-          onPointerUp={(event) => {
-            if (activePointerIdRef.current !== event.pointerId) return;
-            activePointerIdRef.current = null;
-            const next = latestDraftRef.current;
-            if (next !== applied) onCommit(next);
-          }}
-          onPointerCancel={(event) => {
-            rollBackPointerGesture(event.pointerId);
-          }}
-          onLostPointerCapture={(event) => {
-            rollBackPointerGesture(event.pointerId);
-          }}
-          onValueChange={(nextValue) => {
-            const next = nextValue[0] ?? applied;
+          value={numberDraft}
+          disabled={pending || !clustering.adjustable}
+          className="h-9 w-16 shrink-0 rounded-md border border-input bg-background px-2 text-right text-sm tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
+          onChange={(event) => {
+            const raw = event.target.value;
+            setNumberDraft(raw);
+            if (raw.trim() === '') return;
+            const next = boundedTopicCount(raw);
+            if (next === null) return;
             latestDraftRef.current = next;
-            setValue(nextValue);
-            if (activePointerIdRef.current === null && next !== applied) onCommit(next);
+            setValue([next]);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            commitNumberDraft(event.currentTarget.value);
+            event.currentTarget.blur();
+          }}
+          onBlur={(event) => {
+            commitNumberDraft(event.currentTarget.value);
           }}
         />
-      ) : (
-        <input
-          id="topic-cluster-count"
-          aria-label="Number of clusters"
-          type="range"
-          min={clustering.cluster_count}
-          max={clustering.cluster_count}
-          value={clustering.cluster_count}
-          disabled
-          readOnly
-          className="h-4 w-full accent-primary disabled:opacity-50"
-        />
-      )}
+      </div>
       {error ? (
         <span className="flex items-center gap-2 text-destructive">
           {error}
@@ -185,15 +258,16 @@ function WordsPerTopicControl({
   const [draft, setDraft] = useState({ source: value, value: String(value) });
   const displayed = draft.source === value ? draft.value : String(value);
   return (
-    <label className="grid gap-1 text-xs text-muted-foreground">
-      Words per topic
+    <label htmlFor="topic-words-per-topic" className="grid gap-1 text-xs text-muted-foreground">
+      <span className="font-medium">Words per topic</span>
       <input
+        id="topic-words-per-topic"
         aria-label="Words per topic"
         type="number"
         min={3}
         max={100}
         value={displayed}
-        className="h-8 w-24 rounded-md border border-input bg-background px-2 text-right text-sm"
+        className="h-9 w-full rounded-md border border-input bg-background px-2 text-right text-sm"
         onChange={(event) => {
           setDraft({ source: value, value: event.target.value });
         }}
@@ -247,17 +321,37 @@ function TopNTopicsControl({
   };
 
   return (
-    <label className="grid gap-1 text-xs text-muted-foreground">
-      Top topics per row
+    <div className="grid gap-1 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5">
+        <label htmlFor="topic-top-n" className="font-medium">
+          Top topics per document
+        </label>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="About Top topics per document"
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <CircleHelp className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-72">
+            Each row may count toward multiple bubbles. Cutoff ties can include more than this
+            number.
+          </TooltipContent>
+        </Tooltip>
+      </div>
       <input
-        aria-label="Top topics per row"
+        id="topic-top-n"
+        aria-label="Top topics per document"
         type="number"
         min={inclusion.min_top_n_topics}
         max={inclusion.max_top_n_topics}
         step={1}
         value={displayed}
         disabled={pending || !inclusion.adjustable}
-        className="h-8 w-24 rounded-md border border-input bg-background px-2 text-right text-sm"
+        className="h-9 w-full rounded-md border border-input bg-background px-2 text-right text-sm"
         onChange={(event) => {
           setDraft({ source: applied, value: event.target.value });
         }}
@@ -271,7 +365,7 @@ function TopNTopicsControl({
           commit(event.currentTarget.value);
         }}
       />
-    </label>
+    </div>
   );
 }
 
@@ -294,7 +388,6 @@ export function TopicModelingResultsPanel({
   onClearSelection,
   topicSearchQuery,
   onTopicSearchQueryChange,
-  corpusCount,
   panelNodeIds,
   nodeColors,
   defaultPalette,
@@ -397,7 +490,7 @@ export function TopicModelingResultsPanel({
                   onClearSelection={onClearSelection}
                   topicSearchQuery={topicSearchQuery}
                   onTopicSearchQueryChange={onTopicSearchQueryChange}
-                  corpusCount={corpusCount}
+                  corpusSizes={result?.data.corpus_sizes ?? []}
                   panelNodeIds={panelNodeIds}
                   nodeColors={nodeColors}
                   defaultPalette={defaultPalette}
@@ -409,64 +502,106 @@ export function TopicModelingResultsPanel({
                   exportDisabled={projectionPending}
                   randomSeed={randomSeed}
                   controlRowSlot={
-                    <div className="flex w-full flex-wrap items-end justify-between gap-3">
-                      <div className="flex flex-wrap items-end gap-3">
-                        <p className="pb-2 text-sm text-muted-foreground">
-                          Topics ({topics.length})
-                        </p>
-                        {clustering ? (
-                          <ClusterCountControl
-                            key={`clusters:${String(clustering.cluster_count)}:${String(projectionControlResetKey)}`}
-                            clustering={clustering}
-                            pending={projectionPending}
-                            error={projectionError}
-                            onCommit={onClusterCountCommit}
-                            onRetry={onProjectionRetry}
-                          />
-                        ) : null}
-                        {topicInclusion ? (
-                          <TopNTopicsControl
-                            key={`top-n:${String(topicInclusion.top_n_topics)}:${String(projectionControlResetKey)}`}
-                            inclusion={topicInclusion}
-                            pending={projectionPending}
-                            onCommit={onTopNTopicsCommit}
-                          />
-                        ) : null}
-                        <p className="max-w-64 pb-1 text-xs text-muted-foreground">
-                          Each row may count toward multiple bubbles. Cutoff ties can include more
-                          than this number.
-                        </p>
-                        <WordsPerTopicControl
-                          value={wordsPerTopic}
-                          onCommit={onWordsPerTopicChange}
-                        />
-                        <TopicModelingStopWordsControl
-                          enabled={stopWordsEnabled}
-                          onEnabledChange={onStopWordsEnabledChange}
-                          savedWords={stopWords}
-                          workspaceId={stopWordsDetectionTarget.workspaceId}
-                          nodeId={stopWordsDetectionTarget.nodeId}
-                          column={stopWordsDetectionTarget.column}
-                          onSavedWordsChange={onStopWordsChange}
-                        />
-                      </div>
-                      <DisabledReasonTooltip
-                        reason={
-                          isAddingToWorkspace
-                            ? 'A Data Block is being added to the workspace'
-                            : undefined
-                        }
+                    <div className="flex w-full flex-col gap-3">
+                      <section
+                        aria-labelledby="topic-result-settings-heading"
+                        className="rounded-lg border border-border/70 bg-muted/20 p-3"
                       >
-                        <Button
-                          data-guidance="topic-modeling-add-to-workspace"
-                          size="sm"
-                          onClick={onAddToWorkspace}
-                          disabled={isAddingToWorkspace || projectionPending}
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <h3
+                            id="topic-result-settings-heading"
+                            className="text-sm font-medium text-foreground"
+                          >
+                            Result settings
+                          </h3>
+                          <span className="rounded-full border bg-background px-2.5 py-1 text-xs tabular-nums text-muted-foreground">
+                            Topics ({topics.length})
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,24rem),1fr))] gap-x-6 gap-y-4">
+                          <section aria-labelledby="topic-structure-settings" className="space-y-2">
+                            <h4
+                              id="topic-structure-settings"
+                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Topic structure
+                            </h4>
+                            <div className="flex flex-wrap items-end gap-3">
+                              {clustering ? (
+                                <div className="min-w-56 flex-[2_1_16rem]">
+                                  <ClusterCountControl
+                                    key={`clusters:${String(clustering.cluster_count)}:${String(projectionControlResetKey)}`}
+                                    clustering={clustering}
+                                    pending={projectionPending}
+                                    error={projectionError}
+                                    onCommit={onClusterCountCommit}
+                                    onRetry={onProjectionRetry}
+                                  />
+                                </div>
+                              ) : null}
+                              {topicInclusion ? (
+                                <div className="min-w-40 flex-[1_1_10rem]">
+                                  <TopNTopicsControl
+                                    key={`top-n:${String(topicInclusion.top_n_topics)}:${String(projectionControlResetKey)}`}
+                                    inclusion={topicInclusion}
+                                    pending={projectionPending}
+                                    onCommit={onTopNTopicsCommit}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </section>
+
+                          <section aria-labelledby="topic-word-settings" className="space-y-2">
+                            <h4
+                              id="topic-word-settings"
+                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Representative words
+                            </h4>
+                            <div className="flex flex-wrap items-end gap-3">
+                              <div className="min-w-32 flex-[0_1_9rem]">
+                                <WordsPerTopicControl
+                                  value={wordsPerTopic}
+                                  onCommit={onWordsPerTopicChange}
+                                />
+                              </div>
+                              <div className="min-w-0 flex-[1_1_18rem]">
+                                <TopicModelingStopWordsControl
+                                  enabled={stopWordsEnabled}
+                                  onEnabledChange={onStopWordsEnabledChange}
+                                  savedWords={stopWords}
+                                  workspaceId={stopWordsDetectionTarget.workspaceId}
+                                  nodeId={stopWordsDetectionTarget.nodeId}
+                                  column={stopWordsDetectionTarget.column}
+                                  onSavedWordsChange={onStopWordsChange}
+                                />
+                              </div>
+                            </div>
+                          </section>
+                        </div>
+                      </section>
+
+                      <div className="flex justify-end">
+                        <DisabledReasonTooltip
+                          reason={
+                            isAddingToWorkspace
+                              ? 'A Data Block is being added to the workspace'
+                              : undefined
+                          }
                         >
-                          <Plus className="mr-1 h-4 w-4" />
-                          Add to Workspace
-                        </Button>
-                      </DisabledReasonTooltip>
+                          <Button
+                            data-guidance="topic-modeling-add-to-workspace"
+                            size="sm"
+                            onClick={onAddToWorkspace}
+                            disabled={isAddingToWorkspace || projectionPending}
+                          >
+                            <Plus className="mr-1 h-4 w-4" />
+                            Add to Workspace
+                          </Button>
+                        </DisabledReasonTooltip>
+                      </div>
                     </div>
                   }
                 />
