@@ -1,6 +1,6 @@
 [project]
 name = "ldaca-wordflow"
-version = "0.7.1"
+version = "0.7.2"
 description = "LDaCA Wordflow - FastAPI backend with bundled production frontend for the Language Data Commons of Australia"
 readme = "README.md"
 requires-python = ">=3.14"

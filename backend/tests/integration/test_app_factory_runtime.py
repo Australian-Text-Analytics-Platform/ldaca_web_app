@@ -264,11 +264,11 @@ def test_health_is_minimal_and_removed_diagnostics_are_absent(tmp_path: Path) ->
         response = client.get("/health")
 
         assert response.status_code == 200
-        assert response.json() == {"status": "ready", "version": "0.7.1"}
+        assert response.json() == {"status": "ready", "version": "0.7.2"}
         runtime.readiness.mark_stopping()
         stopping = client.get("/health")
         assert stopping.status_code == 503
-        assert stopping.json() == {"status": "stopping", "version": "0.7.1"}
+        assert stopping.json() == {"status": "stopping", "version": "0.7.2"}
         assert client.get("/status").status_code == 404
         assert client.get("/api").status_code == 404
 
