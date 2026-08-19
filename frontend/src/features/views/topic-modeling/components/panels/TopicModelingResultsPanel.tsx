@@ -1,6 +1,11 @@
 import { LoaderCircle, Plus } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
-import type { TopicClustering, TopicModelingResponse, TopicModelingTopic } from '@/api';
+import type {
+  TopicClustering,
+  TopicInclusion,
+  TopicModelingResponse,
+  TopicModelingTopic,
+} from '@/api';
 import { Button } from '@/components/ui/button';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Slider } from '@/components/ui/slider';
@@ -27,12 +32,6 @@ interface Props {
   topics: TopicModelingTopic[];
   exportTopics?: TopicModelingTopic[];
   containerRef: React.RefObject<HTMLDivElement | null>;
-  tooltip: { topic: TopicModelingTopic | null; x: number; y: number };
-  setTooltip: React.Dispatch<
-    React.SetStateAction<{ topic: TopicModelingTopic | null; x: number; y: number }>
-  >;
-  hoveredTopicId: number | null;
-  setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
   selectedTopicIds: Set<number>;
   onToggleTopicSelection: (id: number) => void;
   onClearSelection: () => void;
@@ -52,9 +51,11 @@ interface Props {
   projectionPending: boolean;
   projectionError?: string | null;
   clustering: TopicClustering | null;
+  topicInclusion: TopicInclusion | null;
   onClusterCountCommit: (value: number) => void;
-  onClusterProjectionRetry?: () => void;
-  clusterSliderResetKey?: number;
+  onTopNTopicsCommit: (value: number) => void;
+  onProjectionRetry?: () => void;
+  projectionControlResetKey?: number;
   wordsPerTopic?: number;
   onWordsPerTopicChange?: (value: number) => void;
   stopWordsEnabled: boolean;
@@ -207,6 +208,73 @@ function WordsPerTopicControl({
   );
 }
 
+function TopNTopicsControl({
+  inclusion,
+  pending,
+  onCommit,
+}: {
+  inclusion: TopicInclusion;
+  pending: boolean;
+  onCommit: (value: number) => void;
+}) {
+  const applied = inclusion.top_n_topics;
+  const [draft, setDraft] = useState({ source: applied, value: String(applied) });
+  const latestCommitRef = useRef(applied);
+  const displayed = draft.source === applied ? draft.value : String(applied);
+
+  useEffect(() => {
+    latestCommitRef.current = applied;
+  }, [applied]);
+
+  const commit = (rawValue: string) => {
+    if (rawValue.trim() === '') {
+      setDraft({ source: applied, value: String(applied) });
+      return;
+    }
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      setDraft({ source: applied, value: String(applied) });
+      return;
+    }
+    const next = Math.min(
+      inclusion.max_top_n_topics,
+      Math.max(inclusion.min_top_n_topics, Math.round(parsed)),
+    );
+    setDraft({ source: next, value: String(next) });
+    if (next === applied || latestCommitRef.current === next) return;
+    latestCommitRef.current = next;
+    onCommit(next);
+  };
+
+  return (
+    <label className="grid gap-1 text-xs text-muted-foreground">
+      Top topics per row
+      <input
+        aria-label="Top topics per row"
+        type="number"
+        min={inclusion.min_top_n_topics}
+        max={inclusion.max_top_n_topics}
+        step={1}
+        value={displayed}
+        disabled={pending || !inclusion.adjustable}
+        className="h-8 w-24 rounded-md border border-input bg-background px-2 text-right text-sm"
+        onChange={(event) => {
+          setDraft({ source: applied, value: event.target.value });
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          commit(event.currentTarget.value);
+          event.currentTarget.blur();
+        }}
+        onBlur={(event) => {
+          commit(event.currentTarget.value);
+        }}
+      />
+    </label>
+  );
+}
+
 /**
  * Maps topic-modeling task state to running, error, or successful result content.
  * Rendered by: TopicModelingFeature whenever a banner, result, or local error exists.
@@ -221,10 +289,6 @@ export function TopicModelingResultsPanel({
   topics,
   exportTopics = topics,
   containerRef,
-  tooltip,
-  setTooltip,
-  hoveredTopicId,
-  setHoveredTopicId,
   selectedTopicIds,
   onToggleTopicSelection,
   onClearSelection,
@@ -244,9 +308,11 @@ export function TopicModelingResultsPanel({
   projectionPending,
   projectionError,
   clustering,
+  topicInclusion,
   onClusterCountCommit,
-  onClusterProjectionRetry,
-  clusterSliderResetKey = 0,
+  onTopNTopicsCommit,
+  onProjectionRetry,
+  projectionControlResetKey = 0,
   wordsPerTopic = 15,
   onWordsPerTopicChange = () => undefined,
   stopWordsEnabled,
@@ -326,10 +392,6 @@ export function TopicModelingResultsPanel({
                 <TopicModelingBubbleChartSection
                   topics={topics}
                   exportTopics={exportTopics}
-                  tooltip={tooltip}
-                  setTooltip={setTooltip}
-                  hoveredTopicId={hoveredTopicId}
-                  setHoveredTopicId={setHoveredTopicId}
                   selectedTopicIds={selectedTopicIds}
                   onToggleTopicSelection={onToggleTopicSelection}
                   onClearSelection={onClearSelection}
@@ -343,6 +405,7 @@ export function TopicModelingResultsPanel({
                   onViewReady={onGraphViewReady}
                   nodeNames={nodeNames}
                   clusterCount={clustering?.cluster_count}
+                  topNTopics={topicInclusion?.top_n_topics}
                   exportDisabled={projectionPending}
                   randomSeed={randomSeed}
                   controlRowSlot={
@@ -353,14 +416,26 @@ export function TopicModelingResultsPanel({
                         </p>
                         {clustering ? (
                           <ClusterCountControl
-                            key={`${String(clustering.cluster_count)}:${String(clusterSliderResetKey)}`}
+                            key={`clusters:${String(clustering.cluster_count)}:${String(projectionControlResetKey)}`}
                             clustering={clustering}
                             pending={projectionPending}
                             error={projectionError}
                             onCommit={onClusterCountCommit}
-                            onRetry={onClusterProjectionRetry}
+                            onRetry={onProjectionRetry}
                           />
                         ) : null}
+                        {topicInclusion ? (
+                          <TopNTopicsControl
+                            key={`top-n:${String(topicInclusion.top_n_topics)}:${String(projectionControlResetKey)}`}
+                            inclusion={topicInclusion}
+                            pending={projectionPending}
+                            onCommit={onTopNTopicsCommit}
+                          />
+                        ) : null}
+                        <p className="max-w-64 pb-1 text-xs text-muted-foreground">
+                          Each row may count toward multiple bubbles. Cutoff ties can include more
+                          than this number.
+                        </p>
                         <WordsPerTopicControl
                           value={wordsPerTopic}
                           onCommit={onWordsPerTopicChange}

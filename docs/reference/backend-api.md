@@ -236,10 +236,10 @@ reset after load, clone, import, close/reopen, or backend restart.
 
 Token Frequency and Topic Modelling Tabs expose normalized `stop_words`.
 Topic Modelling Tabs additionally expose `topic_modeling_words_per_topic`
-(3-100, default 15) and nullable `topic_modeling_cluster_selection`. The latter
-must identify a succeeded Topic Modelling Analysis in the same Tab and a count
-within that Result's bounds. It is cleared when that Analysis is removed or
-superseded.
+(3-100, default 15) and nullable `topic_modeling_projection_selection`. The
+latter identifies a succeeded Topic Modelling Analysis in the same Tab plus
+cluster count and Top topics per row within that Result's bounds. Null means
+both defaults. It is cleared when that Analysis is removed or superseded.
 
 ## Analyses
 
@@ -249,7 +249,7 @@ superseded.
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}` | `get_analysis` | 200 | Read one live valid Analysis |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/cancel` | `cancel_analysis` | 200/202 | Cancel queued work or request running cancellation |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result` | `get_analysis_result` | 200 | Stored canonical Result or durable Preview-ready marker |
-| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free page projection, including Topic cluster-tree cuts and fresh Annotation, Concordance, and Quotation Preview work |
+| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free projection, paged only where the Result kind defines pages, including Topic cluster-tree cuts and fresh Annotation, Concordance, and Quotation Preview work |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
@@ -265,14 +265,21 @@ operations return one ID; Topic Modelling Data Block Creation returns topic-data
 topic-meanings IDs for each source in request order. The removed singular field
 is not accepted.
 
-`TopicModelingAnalysisRequest` contains no cluster-size control. Its Result
-contains ordered `sources[]`, authoritative projected `topics[]`, and
-`clustering` bounds. `TopicModelingResultQuery.cluster_count` is nullable for
-the natural fit and otherwise accepts an integer from the advertised minimum to
-maximum. Invalid counts return 422 with the current bounds; a missing private
-clustering-context Artifact returns 410. Topic Modelling Data Block Creation
-requires the displayed `cluster_count` and materializes assignment and meaning
-tables from that projection.
+`TopicModelingAnalysisRequest.min_cluster_size` controls the initial HDBSCAN
+fit, defaults to 10, and accepts integers from 2 upward. Changing it submits a
+new Analysis; it is independent of result-time cluster projection. The Result
+contains ordered `sources[]`, authoritative projected `topics[]`, `clustering`
+bounds, and a `topic_inclusion` descriptor. `TopicModelingResultQuery` accepts
+nullable `cluster_count` and `top_n_topics` and does not expose pagination. An
+unfiltered query returns the complete projected Topic list in one response.
+Null for both returns the canonical stored Result; either explicit value uses
+the immutable projection basis.
+Invalid N returns 422 `invalid_topic_top_n` with the current 0 or 1..K bounds;
+invalid K returns its existing bounded 422, and a missing private clustering-
+context Artifact returns 410. Topic Modelling Data Block Creation requires the
+displayed K and Top N. Selected bubbles publish the deduplicated union of rows
+whose Top-N memberships intersect the selection while preserving dominant
+`TOPIC_top1` and the complete Topic Distribution.
 
 `AnalysisCreate` contains one discriminated Analysis request, one execution
 scope (`preview`, `run_all`, or `supporting`), an optional

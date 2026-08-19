@@ -3,10 +3,12 @@ import type { TopicSegmentationMethod, WorkspaceNodeInfo } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import {
   DEFAULT_MAX_SEGMENT_TOKENS,
+  DEFAULT_MIN_CLUSTER_SIZE,
   createTopicModelingParameterState,
   defaultCorpusSample,
   effectiveSampleDocumentCount,
   normalizeTopicSampleFractions,
+  sanitizeMinClusterSize,
   sanitizeMaxSegmentTokens,
   sampleToFraction,
   sanitizeSamplePercent,
@@ -16,9 +18,11 @@ import {
 
 export {
   DEFAULT_MAX_SEGMENT_TOKENS,
+  DEFAULT_MIN_CLUSTER_SIZE,
   effectiveSampleDocumentCount,
   normalizeTopicSampleFractions,
   sanitizeSamplePercent,
+  sanitizeMinClusterSize,
   sanitizeMaxSegmentTokens,
 };
 export type { CorpusSample };
@@ -34,6 +38,8 @@ export interface UseTopicModelingParametersResult {
   corpusSamples: CorpusSample[];
   corpusSamplesUserSet: boolean;
   updateCorpusSample: (index: number, update: Partial<CorpusSample>) => void;
+  minClusterSize: number;
+  setMinClusterSize: (value: number) => void;
   randomSeed: number;
   randomSeedUserSet: boolean;
   setRandomSeedFromUser: (value: number) => void;
@@ -82,6 +88,7 @@ export function useTopicModelingParameters({
   const {
     corpusSamples,
     corpusSamplesUserSet,
+    minClusterSize,
     randomSeed,
     randomSeedUserSet,
     segmentationMethod,
@@ -129,6 +136,10 @@ export function useTopicModelingParameters({
   // Called by: TopicModelingParameterPanel because the sampling controls edit sparse per-corpus percentage patches.
   const updateCorpusSample = (index: number, update: Partial<CorpusSample>) => {
     dispatchParameters({ type: 'updateCorpusSample', index, update });
+  };
+
+  const setMinClusterSize = (value: number) => {
+    dispatchParameters({ type: 'setMinClusterSize', value: sanitizeMinClusterSize(value) });
   };
 
   /** Records the random seed from an explicit user edit. */
@@ -185,6 +196,8 @@ export function useTopicModelingParameters({
     corpusSamples,
     corpusSamplesUserSet,
     updateCorpusSample,
+    minClusterSize,
+    setMinClusterSize,
     randomSeed,
     randomSeedUserSet,
     setRandomSeedFromUser,

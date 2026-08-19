@@ -30,26 +30,16 @@ describe('topicModelingResultControlReducer', () => {
     ).toBe(0);
   });
 
-  it('updates hover, tooltip, and search state without touching selection', () => {
+  it('updates search state without touching selection', () => {
     const selected = topicModelingResultControlReducer(createTopicModelingResultControlState(), {
       type: 'topicSelectionToggled',
       id: 2,
     });
-    const hovered = topicModelingResultControlReducer(selected, {
-      type: 'hoveredTopicChanged',
-      value: 2,
-    });
-    const withTooltip = topicModelingResultControlReducer(hovered, {
-      type: 'tooltipChanged',
-      value: { x: 12, y: 24, topic: null },
-    });
-    const searched = topicModelingResultControlReducer(withTooltip, {
+    const searched = topicModelingResultControlReducer(selected, {
       type: 'topicSearchChanged',
       query: 'migration',
     });
 
-    expect(searched.hoveredTopicId).toBe(2);
-    expect(searched.tooltip).toMatchObject({ x: 12, y: 24 });
     expect(searched.topicSearchQuery).toBe('migration');
     expect([...searched.selectedTopicIds]).toEqual([2]);
   });
@@ -62,12 +52,10 @@ describe('useTopicModelingResultControls', () => {
     act(() => {
       result.current.handleToggleTopicSelection(5);
       result.current.setTopicSearchQuery('alpha');
-      result.current.setHoveredTopicId(5);
     });
 
     expect([...result.current.selectedTopicIds]).toEqual([5]);
     expect(result.current.topicSearchQuery).toBe('alpha');
-    expect(result.current.hoveredTopicId).toBe(5);
 
     act(() => {
       result.current.handleClearTopicSelection();

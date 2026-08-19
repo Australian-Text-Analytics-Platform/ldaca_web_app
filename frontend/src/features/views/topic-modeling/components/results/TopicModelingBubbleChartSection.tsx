@@ -3,8 +3,6 @@ import type { TopicModelingTopic } from '@/api';
 import JSZip from 'jszip';
 import { toast } from 'sonner';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
-import { ResponsiveWordCloud } from '@/features/views/common/components/ResponsiveWordCloud';
-import { getReadableTextColor } from '../../topicModelingAdapters';
 import {
   buildChartBlob,
   type ChartExportHeaderItem,
@@ -13,22 +11,12 @@ import {
 import { saveBlob } from '@/lib/download';
 import { buildTopicsCSV } from './topicModelingCsv';
 import { TopicModelingFlowChart } from './TopicModelingFlowChart';
-import { buildTopicBubbleModels, resolveTopicCorpusColor } from './topicModelingGraph';
+import { buildTopicBubbleModels } from './topicModelingGraph';
 import { TopicSelectionPanel } from './TopicSelectionPanel';
-
-interface TooltipState {
-  topic: TopicModelingTopic | null;
-  x: number;
-  y: number;
-}
 
 interface Props {
   topics: TopicModelingTopic[];
   exportTopics?: TopicModelingTopic[];
-  tooltip: TooltipState;
-  setTooltip: React.Dispatch<React.SetStateAction<TooltipState>>;
-  hoveredTopicId: number | null;
-  setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
   selectedTopicIds: Set<number>;
   onToggleTopicSelection: (id: number) => void;
   onClearSelection: () => void;
@@ -44,6 +32,7 @@ interface Props {
   clusterCount?: number;
   exportDisabled?: boolean;
   randomSeed?: number;
+  topNTopics?: number;
   /** Result controls placed between the graph and the Topic lists. */
   controlRowSlot?: React.ReactNode;
 }
@@ -55,78 +44,10 @@ const TM_CSV_OPTION = {
 } as const;
 const EMPTY_TOPIC_IDS = new Set<number>();
 
-/** Renders corpus counts with the same persisted colours used by graph bubbles. */
-function TopicSizeComposition({
-  sizes,
-  total,
-  corpusCount,
-  panelNodeIds,
-  nodeColors,
-  defaultPalette,
-}: {
-  sizes: number[] | undefined;
-  total?: number | null;
-  corpusCount: number;
-  panelNodeIds: string[];
-  nodeColors: Record<string, string>;
-  defaultPalette: string[];
-}) {
-  if (corpusCount === 0 || !sizes) return null;
-  const colorA = resolveTopicCorpusColor(
-    0,
-    defaultPalette[0] ?? '#2563eb',
-    panelNodeIds,
-    nodeColors,
-    defaultPalette,
-  );
-  const colorB = resolveTopicCorpusColor(
-    1,
-    defaultPalette[1] ?? '#dc2626',
-    panelNodeIds,
-    nodeColors,
-    defaultPalette,
-  );
-  if (sizes.length === 1) {
-    return (
-      <span className="inline-flex items-center gap-1">
-        <span
-          style={{ background: colorA, color: getReadableTextColor(colorA) }}
-          className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-        >
-          {sizes[0]}
-        </span>
-        <span className="text-[10px] text-gray-500">= {total}</span>
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <span
-        style={{ background: colorA, color: getReadableTextColor(colorA) }}
-        className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-      >
-        {sizes[0]}
-      </span>
-      <span className="text-[10px] text-gray-500">+</span>
-      <span
-        style={{ background: colorB, color: getReadableTextColor(colorB) }}
-        className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-      >
-        {sizes[1]}
-      </span>
-      <span className="text-[10px] text-gray-500">= {total}</span>
-    </span>
-  );
-}
-
 /** Composes the React Flow topic graph, export dialog, result controls, and Topic lists. */
 export function TopicModelingBubbleChartSection({
   topics,
   exportTopics = topics,
-  tooltip,
-  setTooltip,
-  hoveredTopicId,
-  setHoveredTopicId,
   selectedTopicIds,
   onToggleTopicSelection,
   onClearSelection,
@@ -142,6 +63,7 @@ export function TopicModelingBubbleChartSection({
   clusterCount,
   exportDisabled = false,
   randomSeed,
+  topNTopics,
   controlRowSlot,
 }: Props) {
   const chartRef = useRef<HTMLDivElement | null>(null);
@@ -151,8 +73,13 @@ export function TopicModelingBubbleChartSection({
     projectionKey,
     topicIds: EMPTY_TOPIC_IDS,
   });
+  const [listHover, setListHover] = useState({
+    projectionKey,
+    topicId: null as number | null,
+  });
   const lassoTopicIds =
     lassoFilter.projectionKey === projectionKey ? lassoFilter.topicIds : EMPTY_TOPIC_IDS;
+  const hoveredTopicId = listHover.projectionKey === projectionKey ? listHover.topicId : null;
   const bubbles = buildTopicBubbleModels({
     topics,
     corpusCount,
@@ -165,16 +92,7 @@ export function TopicModelingBubbleChartSection({
     topicSearchQuery,
   });
 
-  const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => (
-    <TopicSizeComposition
-      sizes={sizes}
-      total={total}
-      corpusCount={corpusCount}
-      panelNodeIds={panelNodeIds}
-      nodeColors={nodeColors}
-      defaultPalette={defaultPalette}
-    />
-  );
+  const corpusPresentation = { corpusCount, panelNodeIds, nodeColors, defaultPalette };
 
   const handleDownloadChart = async (format: ChartImageFormat, extras: Record<string, boolean>) => {
     const svg = chartRef.current?.querySelector<SVGSVGElement>(
@@ -188,6 +106,7 @@ export function TopicModelingBubbleChartSection({
     const header: ChartExportHeaderItem[] = [
       { label: 'Data Block', value: nodeNames?.join(', ') ?? 'data' },
       { label: 'Clusters', value: clusterCount != null ? String(clusterCount) : '—' },
+      { label: 'Top topics per row', value: topNTopics != null ? String(topNTopics) : '—' },
       { label: 'Random Seed', value: randomSeed != null ? String(randomSeed) : '—' },
       { label: 'Topics', value: String(topics.length) },
     ];
@@ -237,14 +156,14 @@ export function TopicModelingBubbleChartSection({
         >
           <TopicModelingFlowChart
             bubbles={bubbles}
-            chartRootRef={chartRef}
+            corpusPresentation={corpusPresentation}
             projectionKey={projectionKey}
             lassoMode={lassoMode}
+            lassoFilterActive={lassoTopicIds.size > 0}
             exportDisabled={exportDisabled}
             onToggleLassoMode={() => {
               setLassoMode((current) => !current);
-              setHoveredTopicId(null);
-              setTooltip((current) => ({ ...current, topic: null }));
+              setListHover({ projectionKey, topicId: null });
             }}
             onAddLassoTopics={(topicIds) => {
               setLassoFilter((current) => ({
@@ -255,43 +174,16 @@ export function TopicModelingBubbleChartSection({
                 ]),
               }));
             }}
+            onClearLassoFilter={() => {
+              setLassoFilter({ projectionKey, topicIds: EMPTY_TOPIC_IDS });
+            }}
             onDownload={() => {
               setDownloadDialogOpen(true);
             }}
             onViewReady={onViewReady}
             onToggleTopicSelection={onToggleTopicSelection}
-            setHoveredTopicId={setHoveredTopicId}
-            setTooltip={setTooltip}
           />
         </div>
-        {tooltip.topic ? (
-          <div
-            className="pointer-events-none absolute z-30 w-[min(18rem,calc(100%-1rem))] rounded-md border border-border bg-card p-3 text-xs shadow-lg"
-            data-testid="topic-bubble-chart-tooltip"
-            role="tooltip"
-            style={{ left: tooltip.x, top: tooltip.y }}
-          >
-            <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
-            <div className="mt-1 max-h-36 overflow-hidden text-muted-foreground">
-              <ResponsiveWordCloud
-                words={tooltip.topic.representative_words.map((term) => ({
-                  text: term.word,
-                  value: term.occurrence_count,
-                }))}
-                minWidth={180}
-                aspectRatio={0.48}
-              />
-            </div>
-            <span className="sr-only">
-              {tooltip.topic.representative_words
-                .map((term) => `${term.word}, ${String(term.occurrence_count)} occurrences`)
-                .join('; ')}
-            </span>
-            <div className="mt-2">
-              {renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}
-            </div>
-          </div>
-        ) : null}
       </div>
 
       {controlRowSlot ?? null}
@@ -304,12 +196,11 @@ export function TopicModelingBubbleChartSection({
         topicSearchQuery={topicSearchQuery}
         onTopicSearchQueryChange={onTopicSearchQueryChange}
         lassoTopicIds={lassoTopicIds}
-        onClearLassoFilter={() => {
-          setLassoFilter({ projectionKey, topicIds: EMPTY_TOPIC_IDS });
-        }}
-        renderSizeComposition={renderSizeComposition}
+        corpusPresentation={corpusPresentation}
         hoveredTopicId={hoveredTopicId}
-        setHoveredTopicId={setHoveredTopicId}
+        onHoveredTopicChange={(topicId) => {
+          setListHover({ projectionKey, topicId });
+        }}
       />
 
       <ChartImageDownloadDialog

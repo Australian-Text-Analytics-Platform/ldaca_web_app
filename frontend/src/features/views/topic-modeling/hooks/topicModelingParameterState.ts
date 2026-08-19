@@ -1,6 +1,7 @@
 import type { TopicSegmentationMethod } from '@/api';
 
 export const DEFAULT_MAX_SEGMENT_TOKENS = 256;
+export const DEFAULT_MIN_CLUSTER_SIZE = 10;
 const DEFAULT_TOPIC_SAMPLE_PERCENT = 100;
 
 export interface CorpusSample {
@@ -10,6 +11,7 @@ export interface CorpusSample {
 export interface TopicModelingParameterState {
   corpusSamples: CorpusSample[];
   corpusSamplesUserSet: boolean;
+  minClusterSize: number;
   randomSeed: number;
   randomSeedUserSet: boolean;
   segmentationMethod: TopicSegmentationMethod;
@@ -19,6 +21,7 @@ export interface TopicModelingParameterState {
 type TopicModelingParameterAction =
   | { type: 'applyNodeDefaultSamples'; samples: CorpusSample[] }
   | { type: 'updateCorpusSample'; index: number; update: Partial<CorpusSample> }
+  | { type: 'setMinClusterSize'; value: number }
   | { type: 'setRandomSeedFromUser'; value: number }
   | { type: 'setSegmentationMethod'; value: TopicSegmentationMethod }
   | { type: 'setMaxSegmentTokens'; value: number }
@@ -34,6 +37,7 @@ type TopicModelingParameterAction =
 export const createTopicModelingParameterState = (): TopicModelingParameterState => ({
   corpusSamples: [],
   corpusSamplesUserSet: false,
+  minClusterSize: DEFAULT_MIN_CLUSTER_SIZE,
   randomSeed: 0,
   randomSeedUserSet: false,
   segmentationMethod: 'automatic',
@@ -44,6 +48,12 @@ export const sanitizeMaxSegmentTokens = (value: string | number | undefined): nu
   const raw = typeof value === 'number' ? value : Number(value);
   const rounded = Number.isFinite(raw) ? Math.round(raw) : DEFAULT_MAX_SEGMENT_TOKENS;
   return Math.min(510, Math.max(32, rounded));
+};
+
+export const sanitizeMinClusterSize = (value: string | number | undefined): number => {
+  const raw = typeof value === 'number' ? value : Number(value);
+  const rounded = Number.isFinite(raw) ? Math.round(raw) : DEFAULT_MIN_CLUSTER_SIZE;
+  return Math.max(2, rounded);
 };
 
 const normalizeSegmentationMethod = (value: unknown): TopicSegmentationMethod => {
@@ -133,6 +143,8 @@ export const topicModelingParameterReducer = (
       };
       return { ...state, corpusSamples: next, corpusSamplesUserSet: true };
     }
+    case 'setMinClusterSize':
+      return { ...state, minClusterSize: sanitizeMinClusterSize(action.value) };
     case 'setRandomSeedFromUser':
       return { ...state, randomSeed: action.value, randomSeedUserSet: true };
     case 'setSegmentationMethod':
@@ -143,6 +155,9 @@ export const topicModelingParameterReducer = (
       const hasSampling = Array.isArray(action.request.sample_fractions);
       return {
         ...state,
+        minClusterSize: sanitizeMinClusterSize(
+          action.request.min_cluster_size as number | undefined,
+        ),
         randomSeed: Number(action.request.random_seed ?? 0),
         randomSeedUserSet: true,
         segmentationMethod: normalizeSegmentationMethod(action.request.segmentation_method),

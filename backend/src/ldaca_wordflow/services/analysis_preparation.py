@@ -203,6 +203,7 @@ class AnalysisExecutionPreparer:
                     ],
                     "artifact_dir": str(artifact_dir),
                     "artifact_prefix": "topic_modeling",
+                    "min_cluster_size": request.min_cluster_size,
                     "random_seed": request.random_seed,
                     "sample_fractions": request.sample_fractions,
                     "segmentation_method": request.segmentation_method.value,
@@ -252,6 +253,19 @@ class AnalysisExecutionPreparer:
             if parent is None or parent.result_payload is None:
                 raise InvalidInputError("Topic Modeling Result is unavailable")
             stored = TopicModelingStoredResult.model_validate(parent.result_payload)
+            if not (
+                stored.clustering.min_cluster_count
+                <= request.cluster_count
+                <= stored.clustering.max_cluster_count
+            ):
+                raise InvalidInputError(
+                    "Topic Modeling Data Block Creation cluster count is unavailable"
+                )
+            minimum_top_n = 0 if request.cluster_count == 0 else 1
+            if not minimum_top_n <= request.top_n_topics <= request.cluster_count:
+                raise InvalidInputError(
+                    "Topic Modeling Data Block Creation Top N is unavailable"
+                )
             artifact_paths = {
                 reference.name: str(
                     (

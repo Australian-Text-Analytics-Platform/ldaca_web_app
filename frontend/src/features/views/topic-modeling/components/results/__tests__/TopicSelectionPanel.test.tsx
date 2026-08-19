@@ -29,10 +29,15 @@ const topics = [
     y: 2,
   },
 ];
+const corpusPresentation = {
+  corpusCount: 0,
+  panelNodeIds: [],
+  nodeColors: {},
+  defaultPalette: [],
+};
 
 describe('TopicSelectionPanel', () => {
   it('intersects the additive lasso filter with search while keeping manual selections separate', () => {
-    const clearLasso = vi.fn();
     render(
       <TopicSelectionPanel
         topics={topics}
@@ -42,10 +47,9 @@ describe('TopicSelectionPanel', () => {
         topicSearchQuery="alpha"
         onTopicSearchQueryChange={vi.fn()}
         lassoTopicIds={new Set([0, 1, 2])}
-        onClearLassoFilter={clearLasso}
-        renderSizeComposition={() => null}
+        corpusPresentation={corpusPresentation}
         hoveredTopicId={null}
-        setHoveredTopicId={vi.fn()}
+        onHoveredTopicChange={vi.fn()}
       />,
     );
 
@@ -55,11 +59,11 @@ describe('TopicSelectionPanel', () => {
     expect(screen.getByText('Topic 0')).toBeInTheDocument();
     expect(screen.getByText('Topic 2')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear lasso filter' }));
-    expect(clearLasso).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Clear lasso filter' })).not.toBeInTheDocument();
   });
 
   it('shows all topics when no lasso filter is active', () => {
+    const onHoveredTopicChange = vi.fn();
     render(
       <TopicSelectionPanel
         topics={topics}
@@ -69,14 +73,19 @@ describe('TopicSelectionPanel', () => {
         topicSearchQuery=""
         onTopicSearchQueryChange={vi.fn()}
         lassoTopicIds={new Set()}
-        onClearLassoFilter={vi.fn()}
-        renderSizeComposition={() => null}
+        corpusPresentation={corpusPresentation}
         hoveredTopicId={null}
-        setHoveredTopicId={vi.fn()}
+        onHoveredTopicChange={onHoveredTopicChange}
       />,
     );
 
     expect(screen.getByRole('heading', { name: 'All Topics (3)' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear lasso filter' })).not.toBeInTheDocument();
+
+    const topicRow = screen.getByRole('button', { name: /Topic 0/ });
+    fireEvent.mouseEnter(topicRow);
+    fireEvent.mouseLeave(topicRow);
+    expect(onHoveredTopicChange).toHaveBeenNthCalledWith(1, 0);
+    expect(onHoveredTopicChange).toHaveBeenNthCalledWith(2, null);
   });
 });

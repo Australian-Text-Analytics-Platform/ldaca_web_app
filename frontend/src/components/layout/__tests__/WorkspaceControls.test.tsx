@@ -4,29 +4,12 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { WorkspaceControls } from '../WorkspaceControls';
 
-/** Workspace graph fixture used to verify batch-delete selection counts and root sorting behavior. */
-const mockGraph = {
-  nodes: [
-    { id: 'a', name: 'Alpha', operation: 'import' },
-    { id: 'b', name: 'Beta', operation: 'filter' },
-    { id: 'c', name: 'Gamma', operation: 'filter' },
-  ],
-  edges: [
-    { source: 'a', target: 'b' },
-    { source: 'b', target: 'c' },
-  ],
-};
-
-/** Mutable selection fixture consumed by the mocked selection hook in each test. */
-const selectionState = { selectedNodeIds: [] as string[] };
-
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   /**
    * Supplies workspace identity and graph roots consumed by `WorkspaceControls`.
    */
   useWorkspaceData: () => ({
     currentWorkspace: { id: 'ws-1', name: 'Main Workspace' },
-    workspaceGraph: mockGraph,
   }),
 }));
 
@@ -34,43 +17,18 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Used by: WorkspaceControls tests to provide action spies. */
   useWorkspaceActions: () => ({
     renameWorkspace: vi.fn(),
-    deleteNode: vi.fn().mockResolvedValue(undefined),
-    clearSelection: vi.fn(),
-  }),
-}));
-
-vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
-  /** Used by: WorkspaceControls tests to expose the mutable selected-node fixture. */
-  useWorkspaceSelection: () => ({
-    selectedNodeIds: selectionState.selectedNodeIds,
   }),
 }));
 
 describe('WorkspaceControls', () => {
-  it('replaces Save with a Delete (n) batch button that is always enabled', () => {
-    selectionState.selectedNodeIds = ['a', 'b'];
+  it('keeps workspace identity actions in the header and leaves deletion to the graph toolbar', () => {
     render(
       <TooltipProvider>
         <WorkspaceControls />
       </TooltipProvider>,
     );
 
-    // Save is gone — the batch slot is repurposed for delete.
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    const deleteButton = screen.getByRole('button', { name: /delete \(2\)/i });
-    // Always clickable: the confirmation dialog is the real gate, no hidden threshold.
-    expect(deleteButton).toBeEnabled();
-  });
-
-  it('keeps the Delete button enabled with 3+ nodes selected', () => {
-    selectionState.selectedNodeIds = ['a', 'b', 'c'];
-    render(
-      <TooltipProvider>
-        <WorkspaceControls />
-      </TooltipProvider>,
-    );
-
-    const deleteButton = screen.getByRole('button', { name: /delete \(3\)/i });
-    expect(deleteButton).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Rename workspace' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
   });
 });

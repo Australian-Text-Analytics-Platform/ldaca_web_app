@@ -1,11 +1,8 @@
 """Result construction for the topic-modeling worker.
 
-Consumes the dict result of the Rust ``polars-text`` topic-modeling expression
-and turns it into the wire payload the API and frontend expect: per-node
-``__row_nr__`` -> ``TOPIC_topic`` assignment parquet files, a shared
-``TOPIC_topic`` -> ``TOPIC_topic_meaning`` meanings parquet, per-corpus topic
-counts, and topic bubble-chart records
-(``id``/``label``/``representative_words``/``size``/``total_size``/``x``/``y``).
+Consumes native Topic outcomes and builds the compact Result projection used by
+the API and frontend. Complete row distributions are materialized separately
+by Topic Data Block Creation.
 
 Used by:
 - ``_compute_topic_payload`` in ``topic_modeling`` for result building.
@@ -13,61 +10,28 @@ Used by:
 
 from __future__ import annotations
 
-import logging
+import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import polars as pl
-
-from ..analysis.generated_columns import (
-    TOPIC_COLUMN,
-    TOPIC_DISTRIBUTION_COLUMN,
-    TOPIC_MEANING_COLUMN,
+from ..analysis.topic_inclusion import (
+    aggregate_topic_activations,
+    topic_counts_from_activations,
+    topic_inclusion_descriptor,
 )
-from ..shared.topic_types import topic_distribution_dtype
 from .topic_types import _SampledTopicCorpora
-
-logger = logging.getLogger(__name__)
-
-
-def _dominant_topics_by_doc_index(
-    documents: list[dict[str, Any]], total_docs: int
-) -> list[int]:
-    """Flatten Rust ``documents[]`` into a per-doc dominant-topic list.
-
-    Rust returns one record per input document carrying ``doc_index`` (its
-    position in the flattened ``all_docs`` order) and ``dominant_topic`` (a topic
-    id, or ``-1`` for an all-outlier document). We index by ``doc_index`` so the
-    result lines up positionally with ``all_docs`` regardless of record order.
-
-    Called by:
-    - ``_build_topic_result_payload`` (this module).
-    """
-    dominant = [-1] * total_docs
-    for doc in documents:
-        try:
-            doc_index = int(doc["doc_index"])
-        except KeyError, TypeError, ValueError:
-            continue
-        if 0 <= doc_index < total_docs:
-            raw = doc.get("dominant_topic", -1)
-            dominant[doc_index] = int(raw) if isinstance(raw, (int, np.integer)) else -1
-    return dominant
-
 
 def _distribution_by_doc_index(
     documents: list[dict[str, Any]], total_docs: int, topic_ids: list[int]
 ) -> list[list[dict[str, Any]]]:
     """Flatten Rust ``documents[]`` into per-doc topic-distribution lists.
 
-    Mirrors :func:`_dominant_topics_by_doc_index` but extracts the soft
-    ``topic_distribution`` (``[{topic_id, proportion}, ...]``) so it can be
-    written into the assignment parquet for the Data Block Creation distribution filter.
+    Extracts the soft ``topic_distribution``
+    (``[{topic_id, proportion}, ...]``) for Topic Data Block Creation.
     Every valid document gets exactly ``[-1, *topic_ids]`` in that order.
 
     Called by:
-    - ``_build_topic_result_payload`` (this module).
+    - ``create_topic_modeling_data_blocks_worker`` in ``topic_modeling``.
     """
     expected_ids = [-1, *topic_ids]
     expected_set = set(expected_ids)
@@ -100,194 +64,6 @@ def _distribution_by_doc_index(
             for topic_id in expected_ids
         ]
     return distributions
-
-
-def _build_topic_result_payload(
-    *,
-    rust_result: dict[str, Any],
-    node_infos: list[dict[str, Any]],
-    corpus_sizes: list[int],
-    active_corpora_indices: list[list[int]],
-    artifact_prefix: str,
-    artifact_root: Any,
-) -> dict[str, Any]:
-    """Turn the Rust pipeline result dict into the topic-result wire payload.
-
-    Writes one ``__row_nr__`` -> ``TOPIC_topic`` assignment parquet per node and a
-    shared meanings parquet, computes per-corpus topic counts (hard dominant-topic
-    counts), and assembles topic bubble-chart records using Rust-provided PaCMAP
-    ``x``/``y`` coordinates (no Python-side PCA/UMAP projection needed).
-
-    Called by:
-    - ``_compute_topic_payload`` in ``topic_modeling`` for the run.
-    """
-    documents = list(rust_result.get("documents") or [])
-    rust_topics = list(rust_result.get("topics") or [])
-
-    if artifact_prefix is None or artifact_root is None:
-        raise ValueError("artifact_prefix and artifact_root are required")
-    artifact_root_path = Path(artifact_root)
-    topic_meanings_path = (
-        artifact_root_path / f"{artifact_prefix}_topic_meanings.parquet"
-    )
-
-    total_docs = sum(int(size) for size in corpus_sizes)
-    dominant_by_index = _dominant_topics_by_doc_index(documents, total_docs)
-    topic_ids = sorted(
-        int(topic["id"])
-        for topic in rust_topics
-        if isinstance(topic, dict) and int(topic.get("id", -1)) >= 0
-    )
-    if topic_ids != list(range(len(topic_ids))):
-        raise ValueError("Topic ids must be contiguous and start at zero")
-    distribution_by_index = _distribution_by_doc_index(
-        documents, total_docs, topic_ids
-    )
-    distribution_dtype = topic_distribution_dtype(len(topic_ids))
-
-    assignments: list[list[int]] = []
-    node_artifacts: list[dict[str, Any]] = []
-    offset = 0
-    for idx, size in enumerate(corpus_sizes):
-        end = offset + size
-        normalized_topics = [
-            int(topic_id) for topic_id in dominant_by_index[offset:end]
-        ]
-        assignments.append(normalized_topics)
-        corpus_distribution = distribution_by_index[offset:end]
-
-        node_id = str(node_infos[idx]["node_id"])
-        node_name = str(node_infos[idx].get("node_name") or node_id)
-        text_column = str(node_infos[idx].get("text_column") or "")
-        original_columns = list(node_infos[idx].get("original_columns") or [])
-        assignments_path = (
-            artifact_root_path
-            / f"{artifact_prefix}_topic_assignments_{node_id}.parquet"
-        )
-
-        pl.DataFrame(
-            {
-                "__row_nr__": active_corpora_indices[idx],
-                TOPIC_COLUMN: normalized_topics,
-                TOPIC_DISTRIBUTION_COLUMN: pl.Series(
-                    TOPIC_DISTRIBUTION_COLUMN,
-                    corpus_distribution,
-                    dtype=distribution_dtype,
-                ),
-            }
-        ).with_columns(
-            [
-                pl.col("__row_nr__").cast(pl.Int64),
-                pl.col(TOPIC_COLUMN).cast(pl.Int64),
-            ]
-        ).lazy().sink_parquet(assignments_path)
-        node_artifacts.append(
-            {
-                "node_id": node_id,
-                "node_name": node_name,
-                "text_column": text_column,
-                "original_columns": original_columns,
-                "assignments": {
-                    "table_id": f"assignments:{node_id}",
-                    "artifact": str(assignments_path),
-                },
-            }
-        )
-        offset = end
-
-    per_corpus_topic_counts: list[dict[int, int]] = []
-    for corpus_topics in assignments:
-        counts: dict[int, int] = {}
-        for topic_id in corpus_topics:
-            counts[topic_id] = counts.get(topic_id, 0) + 1
-        per_corpus_topic_counts.append(counts)
-
-    topic_ids: list[int] = []
-    payload_representative_words_by_topic: list[list[dict[str, Any]]] = []
-    meaning_words_by_topic: list[list[str]] = []
-    coords_by_topic: dict[int, tuple[float, float]] = {}
-    for topic in rust_topics:
-        try:
-            topic_id = int(topic["id"])
-        except KeyError, TypeError, ValueError:
-            continue
-        if topic_id < 0:
-            continue
-        topic_ids.append(topic_id)
-        representative_words: list[dict[str, Any]] = []
-        for candidate in topic.get("representative_words") or []:
-            if not isinstance(candidate, dict):
-                continue
-            word = candidate.get("word")
-            occurrence_count = candidate.get("occurrence_count")
-            if (
-                isinstance(word, str)
-                and word
-                and isinstance(occurrence_count, int)
-                and occurrence_count > 0
-            ):
-                representative_words.append(
-                    {"word": word, "occurrence_count": occurrence_count}
-                )
-        payload_representative_words_by_topic.append(representative_words)
-        meaning_words_by_topic.append(
-            [candidate["word"] for candidate in representative_words]
-        )
-        coords_by_topic[topic_id] = (
-            float(topic.get("x") or 0.0),
-            float(topic.get("y") or 0.0),
-        )
-
-    topic_payloads = []
-    for i, topic_id in enumerate(topic_ids):
-        per_sizes = [
-            per_corpus_topic_counts[j].get(topic_id, 0)
-            for j in range(len(per_corpus_topic_counts))
-        ]
-        x, y = coords_by_topic.get(topic_id, (0.0, 0.0))
-        topic_payloads.append(
-            {
-                "id": topic_id,
-                "representative_words": payload_representative_words_by_topic[i]
-                if i < len(payload_representative_words_by_topic)
-                else [],
-                "size": per_sizes,
-                "total_size": int(sum(per_sizes)),
-                "x": x,
-                "y": y,
-            }
-        )
-
-    pl.DataFrame(
-        {
-            TOPIC_COLUMN: topic_ids,
-            TOPIC_MEANING_COLUMN: meaning_words_by_topic,
-        },
-        schema={
-            TOPIC_COLUMN: pl.Int64,
-            TOPIC_MEANING_COLUMN: pl.List(pl.String),
-        },
-    ).lazy().sink_parquet(topic_meanings_path)
-
-    artifacts: dict[str, Any] = {
-        "version": 1,
-        "topic_meanings_parquet_path": str(topic_meanings_path),
-        "nodes": node_artifacts,
-    }
-
-    has_outlier = any(topic_id == -1 for corpus in assignments for topic_id in corpus)
-    n_topics = int(rust_result.get("n_topics") or len(topic_ids))
-
-    return {
-        "topics": topic_payloads,
-        "corpus_sizes": corpus_sizes,
-        "per_corpus_topic_counts": per_corpus_topic_counts,
-        "artifacts": artifacts,
-        "meta": {
-            "embeddings_from_ctfidf": False,
-            "total_topics_incl_outlier": n_topics + (1 if has_outlier else 0),
-        },
-    }
 
 
 def _build_empty_topic_payload(
@@ -323,6 +99,7 @@ def _build_empty_topic_payload(
             "default_cluster_count": 0,
             "adjustable": False,
         },
+        "topic_inclusion": topic_inclusion_descriptor(0),
         "clustering_context": {
             "version": 1,
             "artifact": None,
@@ -332,27 +109,15 @@ def _build_empty_topic_payload(
     }
 
 
-def _build_topic_projection_payload(
+def _build_topic_projection_basis(
     *,
     rust_result: dict[str, Any],
-    node_infos: list[dict[str, Any]],
     corpus_sizes: list[int],
 ) -> dict[str, Any]:
-    """Build the authoritative JSON projection without materializing tables."""
+    """Build one complete, N-independent basis for Result count projections."""
 
     documents = list(rust_result.get("documents") or [])
     rust_topics = list(rust_result.get("topics") or [])
-    total_docs = sum(corpus_sizes)
-    dominant_by_index = _dominant_topics_by_doc_index(documents, total_docs)
-    per_corpus_topic_counts: list[dict[int, int]] = []
-    offset = 0
-    for size in corpus_sizes:
-        counts: dict[int, int] = {}
-        for topic_id in dominant_by_index[offset : offset + size]:
-            counts[topic_id] = counts.get(topic_id, 0) + 1
-        per_corpus_topic_counts.append(counts)
-        offset += size
-
     topics: list[dict[str, Any]] = []
     for raw_topic in rust_topics:
         topic_id = int(raw_topic["id"])
@@ -368,20 +133,77 @@ def _build_topic_projection_payload(
             and candidate.get("word")
             and int(candidate.get("occurrence_count") or 0) > 0
         ]
-        sizes = [counts.get(topic_id, 0) for counts in per_corpus_topic_counts]
         topics.append(
             {
                 "id": topic_id,
                 "representative_words": words,
-                "size": sizes,
-                "total_size": sum(sizes),
                 "x": float(raw_topic.get("x") or 0.0),
                 "y": float(raw_topic.get("y") or 0.0),
             }
         )
     if [topic["id"] for topic in topics] != list(range(len(topics))):
         raise ValueError("Topic ids must be contiguous and start at zero")
-    has_outlier = any(topic_id == -1 for topic_id in dominant_by_index)
+    return {
+        "topics": topics,
+        "activations": aggregate_topic_activations(
+            documents,
+            corpus_sizes,
+            len(topics),
+        ),
+        "has_outlier": any(
+            int(document.get("dominant_topic", -1)) == -1
+            for document in documents
+        ),
+    }
+
+
+def _encode_topic_projection_basis(basis: dict[str, Any]) -> bytes:
+    """Encode one cache value with exact byte accounting."""
+
+    return json.dumps(basis, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def _decode_topic_projection_basis(payload: bytes) -> dict[str, Any]:
+    """Decode and minimally validate one internal cache value."""
+
+    value = json.loads(payload)
+    if not isinstance(value, dict):
+        raise ValueError("Topic projection basis is malformed")
+    if not isinstance(value.get("topics"), list) or not isinstance(
+        value.get("activations"), list
+    ):
+        raise ValueError("Topic projection basis is incomplete")
+    return value
+
+
+def _build_topic_projection_payload(
+    *,
+    basis: dict[str, Any],
+    node_infos: list[dict[str, Any]],
+    corpus_sizes: list[int],
+    top_n_topics: int,
+) -> dict[str, Any]:
+    """Build authoritative Topic JSON for one Top-N request from a full basis."""
+
+    basis_topics = list(basis.get("topics") or [])
+    topic_count = len(basis_topics)
+    per_corpus_topic_counts = topic_counts_from_activations(
+        basis.get("activations") or [],
+        corpus_count=len(corpus_sizes),
+        topic_count=topic_count,
+        top_n_topics=top_n_topics,
+    )
+    topics: list[dict[str, Any]] = []
+    for raw_topic in basis_topics:
+        topic_id = int(raw_topic["id"])
+        sizes = [counts.get(topic_id, 0) for counts in per_corpus_topic_counts]
+        topics.append(
+            {
+                **raw_topic,
+                "size": sizes,
+                "total_size": sum(sizes),
+            }
+        )
     return {
         "topics": topics,
         "corpus_sizes": corpus_sizes,
@@ -397,6 +219,8 @@ def _build_topic_projection_payload(
         ],
         "meta": {
             "embeddings_from_ctfidf": False,
-            "total_topics_incl_outlier": len(topics) + int(has_outlier),
+            "total_topics_incl_outlier": topic_count
+            + int(bool(basis.get("has_outlier"))),
         },
+        "topic_inclusion": topic_inclusion_descriptor(topic_count, top_n_topics),
     }

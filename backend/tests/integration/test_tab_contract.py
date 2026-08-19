@@ -86,7 +86,7 @@ def test_tabs_are_open_workspace_children_with_exact_resources(tmp_path: Path) -
             "annotation_correction_columns",
             "stop_words",
             "topic_modeling_words_per_topic",
-            "topic_modeling_cluster_selection",
+            "topic_modeling_projection_selection",
             "created_at",
             "modified_at",
             "revision",
@@ -97,7 +97,7 @@ def test_tabs_are_open_workspace_children_with_exact_resources(tmp_path: Path) -
         assert tab["annotation_correction_columns"] == {}
         assert tab["stop_words"] == []
         assert tab["topic_modeling_words_per_topic"] is None
-        assert tab["topic_modeling_cluster_selection"] is None
+        assert tab["topic_modeling_projection_selection"] is None
         assert tab["created_at"] == tab["modified_at"]
         assert tab["revision"] == 1
         assert first.headers["Location"] == (
@@ -196,7 +196,7 @@ def test_tab_presentation_settings_are_normalized_and_kind_scoped(tmp_path: Path
             headers=unsafe,
         ).json()
         assert topic["topic_modeling_words_per_topic"] == 15
-        assert topic["topic_modeling_cluster_selection"] is None
+        assert topic["topic_modeling_projection_selection"] is None
 
         updated = client.patch(
             f"{collection}/{topic['id']}",
@@ -289,9 +289,9 @@ def test_workspace_archive_round_trip_preserves_tabs(tmp_path: Path) -> None:
                 "name": "Portable tab",
                 "analysis_ids": [],
                 "annotation_correction_columns": {},
-                    "stop_words": [],
-                    "topic_modeling_words_per_topic": None,
-                    "topic_modeling_cluster_selection": None,
+                "stop_words": [],
+                "topic_modeling_words_per_topic": None,
+                "topic_modeling_projection_selection": None,
                 "created_at": original["created_at"],
                 "modified_at": original["modified_at"],
                 "revision": 1,

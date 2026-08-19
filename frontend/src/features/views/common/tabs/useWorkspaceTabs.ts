@@ -7,7 +7,7 @@ import {
   listTabs,
   updateTab as updateServerTab,
 } from '@/api';
-import type { AnalysisKind, Tab, TopicModelingClusterSelection } from '@/api';
+import type { AnalysisKind, Tab, TopicModelingProjectionSelection } from '@/api';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/stores/authStore';
@@ -48,7 +48,7 @@ export interface UseWorkspaceTabsResult {
 interface TabPresentationPatch {
   stop_words?: string[];
   topic_modeling_words_per_topic?: number | null;
-  topic_modeling_cluster_selection?: TopicModelingClusterSelection | null;
+  topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
 }
 
 interface LocalTabState {

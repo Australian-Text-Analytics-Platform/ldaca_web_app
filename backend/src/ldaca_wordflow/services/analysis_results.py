@@ -22,6 +22,7 @@ from ..analysis.annotation_examples import prepare_annotation_examples
 from ..analysis.concordance_projection import filter_concordance_documents
 from ..analysis.quotation_core import compute_quotation_page
 from ..analysis.token_cache import tokenize_lazyframe, tokens_cache_path
+from ..analysis.topic_inclusion import topic_inclusion_descriptor
 from ..analysis.generated_columns import (
     CONC_MATCHED_TEXT_COLUMN,
     CONC_START_IDX_COLUMN,
@@ -72,6 +73,7 @@ from ..shared.errors import (
     ArtifactGoneError,
     InvalidInputError,
     InvalidClusterCountError,
+    InvalidTopicTopNError,
     AnnotationProviderError,
     NodeNotFoundError,
 )
@@ -87,14 +89,22 @@ from ..workers.input_snapshots import (
     clone_worker_input_snapshot,
     load_snapshot_node,
 )
-from ..workers.topic_pipeline import _project_rust_topic_modeling
-from ..workers.topic_result import _build_topic_projection_payload
+from ..workers.topic_pipeline import _project_rust_topic_projection_basis
+from ..workers.topic_result import (
+    _build_topic_projection_payload,
+    _decode_topic_projection_basis,
+    _encode_topic_projection_basis,
+)
 from .analyses import AnalysisService
 from .analysis_artifacts import AnalysisArtifactService
 from .analysis_preparation import resolve_analysis_quotation_engine
 from .provider_credentials import ProviderCredentialStore
 from .response_snapshots import ResponseSnapshot
 from .storage_admission import StorageAdmissionService, StorageReservation
+from .topic_projection_cache import (
+    TopicProjectionBasisCache,
+    TopicProjectionCacheKey,
+)
 from .workspace import WorkspaceLease
 
 T = TypeVar("T")
@@ -140,6 +150,10 @@ class AnalysisResultService:
         self._query_root = query_root
         self._cache_root = cache_root
         self._limiter = limiter
+        self._topic_projection_cache = TopicProjectionBasisCache(
+            max_entries=settings.max_topic_projection_cache_entries,
+            max_bytes=settings.max_topic_projection_cache_bytes,
+        )
 
     async def reconcile(self) -> None:
         """Remove query snapshots abandoned by this deployment's prior process."""
@@ -551,6 +565,10 @@ class AnalysisResultService:
                         topic_stored,
                         effective_query,
                         context_path,
+                        self._topic_projection_cache,
+                        user_id,
+                        workspace_id,
+                        analysis_id,
                     ),
                     stored=stored,
                 )
@@ -964,6 +982,26 @@ def _sort_and_page(
     descending: bool,
     columns: set[str],
 ) -> tuple[list[dict[str, JsonData]], dict[str, JsonData]]:
+    rows = _sort_rows(rows, sort_by=sort_by, descending=descending, columns=columns)
+    total = len(rows)
+    start = (page - 1) * page_size
+    return rows[start : start + page_size], {
+        "page": page,
+        "page_size": page_size,
+        "total_rows": total,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+    }
+
+
+def _sort_rows(
+    rows: list[dict[str, JsonData]],
+    *,
+    sort_by: str | None,
+    descending: bool,
+    columns: set[str],
+) -> list[dict[str, JsonData]]:
+    """Sort a complete JSON result while keeping nulls last."""
+
     if sort_by is not None:
         if sort_by not in columns:
             raise InvalidInputError("Result sort column not found")
@@ -974,14 +1012,7 @@ def _sort_and_page(
             reverse=descending,
         )
         rows = [*present, *missing]
-    total = len(rows)
-    start = (page - 1) * page_size
-    return rows[start : start + page_size], {
-        "page": page,
-        "page_size": page_size,
-        "total_rows": total,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-    }
+    return rows
 
 
 def _json_sort_key(value: JsonData) -> tuple[int, int | float | str]:
@@ -1000,6 +1031,10 @@ def _query_topics(
     stored: TopicModelingStoredResult,
     query: TopicModelingResultQuery,
     context_path: Path | None,
+    projection_cache: TopicProjectionBasisCache | None = None,
+    user_id: str = "test-user",
+    workspace_id: str = "test-workspace",
+    analysis_id: str = "test-analysis",
 ) -> dict[str, JsonData]:
     requested_count = query.cluster_count
     natural_count = stored.clustering.default_cluster_count
@@ -1015,26 +1050,80 @@ def _query_topics(
                 "default_cluster_count": natural_count,
             },
         )
+    requested_top_n = query.top_n_topics
+    try:
+        inclusion = topic_inclusion_descriptor(applied_count, requested_top_n)
+    except ValueError as exc:
+        bounds = topic_inclusion_descriptor(applied_count)
+        raise InvalidTopicTopNError(
+            "Top topics per row is outside the supported range",
+            details={
+                "min_top_n_topics": bounds["min_top_n_topics"],
+                "max_top_n_topics": bounds["max_top_n_topics"],
+                "default_top_n_topics": bounds["default_top_n_topics"],
+                "cluster_count": applied_count,
+            },
+        ) from exc
+    applied_top_n = int(inclusion["top_n_topics"])
     effective = stored
-    if requested_count is not None:
+    if requested_count is not None or requested_top_n is not None:
         if context_path is None or not context_path.is_file():
             raise ArtifactGoneError("Topic clustering context is unavailable")
         try:
-            rust_result = _project_rust_topic_modeling(
-                clustering_context=context_path.read_bytes(),
+            metadata = context_path.stat()
+        except OSError as exc:
+            raise ArtifactGoneError(
+                "Topic clustering context is unavailable"
+            ) from exc
+        try:
+            cache_key = TopicProjectionCacheKey(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                analysis_id=analysis_id,
+                context_path=str(context_path.resolve()),
+                context_inode=metadata.st_ino,
+                context_size=metadata.st_size,
+                context_mtime_ns=metadata.st_mtime_ns,
                 cluster_count=applied_count,
-                document_count=sum(stored.corpus_sizes),
+            )
+
+            def build_basis() -> bytes:
+                try:
+                    context_bytes = context_path.read_bytes()
+                except OSError as exc:
+                    raise ArtifactGoneError(
+                        "Topic clustering context is unavailable"
+                    ) from exc
+                basis = _project_rust_topic_projection_basis(
+                    clustering_context=context_bytes,
+                    cluster_count=applied_count,
+                    corpus_sizes=stored.corpus_sizes,
+                )
+                return _encode_topic_projection_basis(basis)
+
+            basis_bytes = (
+                projection_cache.get_or_build(cache_key, build_basis)
+                if projection_cache is not None
+                else build_basis()
             )
             projection = _build_topic_projection_payload(
-                rust_result=rust_result,
-                node_infos=[source.model_dump(mode="json") for source in stored.sources],
+                basis=_decode_topic_projection_basis(basis_bytes),
+                node_infos=[
+                    source.model_dump(mode="json") for source in stored.sources
+                ],
                 corpus_sizes=stored.corpus_sizes,
+                top_n_topics=applied_top_n,
             )
             effective = TopicModelingStoredResult.model_validate(
                 {
                     **stored.model_dump(mode="json"),
                     "topics": projection["topics"],
                     "per_corpus_topic_counts": projection["per_corpus_topic_counts"],
+                    "topic_inclusion": projection["topic_inclusion"],
+                    "meta": {
+                        **stored.meta.model_dump(mode="json"),
+                        **projection["meta"],
+                    },
                     "clustering": {
                         **stored.clustering.model_dump(mode="json"),
                         "cluster_count": applied_count,
@@ -1063,17 +1152,14 @@ def _query_topics(
         if effective.topics
         else set()
     )
-    page_rows, pagination = _sort_and_page(
+    rows = _sort_rows(
         rows,
-        page=query.page,
-        page_size=query.page_size,
         sort_by=query.sort_by,
         descending=query.descending,
         columns=columns,
     )
     payload["kind"] = "topic_modeling"
-    payload["topics"] = cast(JsonData, page_rows)
-    payload["pagination"] = pagination
+    payload["topics"] = cast(JsonData, rows)
     payload["query"] = cast(JsonData, query.model_dump(mode="json"))
     return payload
 

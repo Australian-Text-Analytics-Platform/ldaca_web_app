@@ -26,6 +26,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable
 
+from ..analysis.topic_inclusion import topic_inclusion_descriptor
 from .topic_pipeline import (
     _resolve_vectorizer_model,
     _run_rust_topic_modeling,
@@ -33,7 +34,9 @@ from .topic_pipeline import (
 )
 from .topic_result import (
     _build_empty_topic_payload,
+    _build_topic_projection_basis,
     _build_topic_projection_payload,
+    _distribution_by_doc_index,
 )
 from .topic_types import _PreparedTopicPayload
 from .utils import process_entrypoint
@@ -42,7 +45,6 @@ from .utils import process_entrypoint
 # Recorded in result metadata so the API/frontend can report which model was
 # used; the actual download/loading is handled inside ``polars_text``.
 _DEFAULT_EMBEDDER_MODEL = "onnx-community/all-MiniLM-L6-v2-ONNX"
-_INTERNAL_MIN_CLUSTER_SIZE = 10
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,7 @@ def run_topic_modeling_data_block_creation(
         TOPIC_MEANING_COLUMN,
         TOPIC_TOP1_COLUMN,
     )
+    from ..analysis.topic_inclusion import top_topic_ids
     from ..domain.workspace import TopicModelingDataBlockCreationAnalysisRequest
     from ..shared.topic_types import topic_distribution_dtype
     from .input_snapshots import load_snapshot_node
@@ -115,25 +118,52 @@ def run_topic_modeling_data_block_creation(
         size = int(source_context["size"])
         row_indices = list(source_context["row_indices"])
         projected_documents = projection["documents"][offset : offset + size]
+        selected_topic_ids = set(request.topic_ids or [])
+        included_rows: list[int] = []
+        included_top_topics: set[int] = set()
+        for row_offset, document in enumerate(projected_documents):
+            row_topics = top_topic_ids(
+                document.get("topic_distribution") or [],
+                request.cluster_count,
+                request.top_n_topics,
+            )
+            if selected_topic_ids and not row_topics.intersection(selected_topic_ids):
+                continue
+            included_rows.append(row_offset)
+            included_top_topics.update(row_topics)
+        padded_distributions = _distribution_by_doc_index(
+            [
+                {
+                    "doc_index": row_offset,
+                    "topic_distribution": document.get("topic_distribution") or [],
+                }
+                for row_offset, document in enumerate(projected_documents)
+            ],
+            size,
+            list(range(request.cluster_count)),
+        )
         assignments = pl.DataFrame(
             {
-                "__row_nr__": row_indices,
-                TOPIC_COLUMN: [
-                    int(document["dominant_topic"])
-                    for document in projected_documents
-                ],
+                "__row_nr__": pl.Series(
+                    "__row_nr__",
+                    [row_indices[row_offset] for row_offset in included_rows],
+                    dtype=pl.Int64,
+                ),
+                TOPIC_COLUMN: pl.Series(
+                    TOPIC_COLUMN,
+                    [
+                        int(projected_documents[row_offset]["dominant_topic"])
+                        for row_offset in included_rows
+                    ],
+                    dtype=pl.Int64,
+                ),
                 TOPIC_DISTRIBUTION_COLUMN: pl.Series(
                     TOPIC_DISTRIBUTION_COLUMN,
-                    [
-                        document["topic_distribution"]
-                        for document in projected_documents
-                    ],
+                    [padded_distributions[row_offset] for row_offset in included_rows],
                     dtype=topic_distribution_dtype(request.cluster_count),
                 ),
             }
         ).lazy()
-        if request.topic_ids is not None:
-            assignments = assignments.filter(pl.col(TOPIC_COLUMN).is_in(request.topic_ids))
         joined = (
             source.data.with_row_index("__row_nr__")
             .with_columns(pl.col("__row_nr__").cast(pl.Int64))
@@ -153,15 +183,7 @@ def run_topic_modeling_data_block_creation(
         topic_data = pl.scan_parquet(topic_data_path)
         output_columns = topic_data.collect_schema().names()
         record_count = int(topic_data.select(pl.len()).collect().item())
-        present_topic_ids = sorted(
-            int(value)
-            for value in topic_data.select(TOPIC_TOP1_COLUMN)
-            .unique()
-            .collect()[TOPIC_TOP1_COLUMN]
-            .drop_nulls()
-            .to_list()
-            if int(value) >= 0
-        )
+        present_topic_ids = sorted(included_top_topics)
         topic_meanings_frame = pl.DataFrame(
             {
                 TOPIC_COLUMN: present_topic_ids,
@@ -180,10 +202,11 @@ def run_topic_modeling_data_block_creation(
         topic_name = request.new_node_names[source_uuid]
         topic_data_provenance = {
             "type": "derivation",
-                "operation": {
-                    "kind": "topic_modeling_data_block_creation",
-                    "role": "topic_data",
-                    "cluster_count": request.cluster_count,
+            "operation": {
+                "kind": "topic_modeling_data_block_creation",
+                "role": "topic_data",
+                "cluster_count": request.cluster_count,
+                "top_n_topics": request.top_n_topics,
             },
             "inputs": [
                 {
@@ -194,10 +217,11 @@ def run_topic_modeling_data_block_creation(
         }
         topic_meanings_provenance = {
             "type": "derivation",
-                "operation": {
-                    "kind": "topic_modeling_data_block_creation",
-                    "role": "topic_meanings",
-                    "cluster_count": request.cluster_count,
+            "operation": {
+                "kind": "topic_modeling_data_block_creation",
+                "role": "topic_meanings",
+                "cluster_count": request.cluster_count,
+                "top_n_topics": request.top_n_topics,
             },
             "inputs": [
                 {
@@ -355,6 +379,7 @@ def _compute_topic_payload(
     corpora: list[list[str]],
     artifact_root: Path,
     artifact_prefix: str,
+    min_cluster_size: int,
     random_seed: int,
     progress_callback: Callable[[float, str], None] | None,
     sample_fractions: list[float | None] | None,
@@ -389,8 +414,6 @@ def _compute_topic_payload(
         raise ValueError("All corpora must contain at least one document.")
 
     random_state = int(random_seed)
-    min_cluster_size = _INTERNAL_MIN_CLUSTER_SIZE
-
     vectorizer_model = _resolve_vectorizer_model(sampled.all_docs)
 
     logger.info(
@@ -416,10 +439,16 @@ def _compute_topic_payload(
     if progress_callback:
         progress_callback(0.85, "Assembling topic results...")
 
-    payload = _build_topic_projection_payload(
+    basis = _build_topic_projection_basis(
         rust_result=rust_result,
+        corpus_sizes=sampled.corpus_sizes,
+    )
+    topic_inclusion = topic_inclusion_descriptor(len(basis["topics"]))
+    payload = _build_topic_projection_payload(
+        basis=basis,
         node_infos=node_infos,
         corpus_sizes=sampled.corpus_sizes,
+        top_n_topics=int(topic_inclusion["top_n_topics"]),
     )
     context_path = artifact_root / f"{artifact_prefix}_topic_clustering_context.msgpack.zst"
     context_path.write_bytes(rust_result["clustering_context"])
@@ -472,6 +501,7 @@ def _compute_topic_modeling(
     artifact_dir: str,
     artifact_prefix: str,
     embedding_cache_path: str,
+    min_cluster_size: int = 10,
     input_snapshot_dir: str | None = None,
     corpora: list[list[str]] | None = None,
     random_seed: int = 0,
@@ -490,8 +520,9 @@ def _compute_topic_modeling(
             + PaCMAP + HDBSCAN + c-TF-IDF) out-of-process and returns an artifact
             manifest (Parquet outputs) for main-process lazy retrieval/finalization.
 
-    HDBSCAN uses the private fixed minimum cluster size. The Rust pipeline
-    manages its own in-process embedder and DuckDB embedding cache.
+    ``min_cluster_size`` controls the smallest HDBSCAN cluster in the initial
+    natural fit. The Rust pipeline manages its own in-process embedder and
+    DuckDB embedding cache.
 
     Flow: load workspace corpora, sample, run the Rust pipeline, build topic
         payloads, and return artifacts to the Analysis service.
@@ -526,6 +557,7 @@ def _compute_topic_modeling(
             corpora=prepared_payload.corpora,
             artifact_root=prepared_payload.artifact_root,
             artifact_prefix=artifact_prefix,
+            min_cluster_size=min_cluster_size,
             random_seed=random_seed,
             progress_callback=progress_callback,
             sample_fractions=sample_fractions,
@@ -542,6 +574,7 @@ def _compute_topic_modeling(
             "per_corpus_topic_counts": topic_payload["per_corpus_topic_counts"],
             "sources": topic_payload["sources"],
             "clustering": topic_payload["clustering"],
+            "topic_inclusion": topic_payload["topic_inclusion"],
             "clustering_context": topic_payload["clustering_context"],
             "meta": {
                 **topic_payload["meta"],
@@ -567,6 +600,7 @@ def run_topic_modeling_analysis(
     artifact_prefix: str,
     input_snapshot_dir: str,
     embedding_cache_path: str,
+    min_cluster_size: int = 10,
     random_seed: int = 0,
     segmentation_method: str = "automatic",
     max_segment_tokens: int = 256,
@@ -582,6 +616,7 @@ def run_topic_modeling_analysis(
         artifact_prefix=artifact_prefix,
         input_snapshot_dir=input_snapshot_dir,
         corpora=None,
+        min_cluster_size=min_cluster_size,
         random_seed=random_seed,
         segmentation_method=segmentation_method,
         max_segment_tokens=max_segment_tokens,

@@ -6290,39 +6290,6 @@
         "title": "ResultColumnMetadata",
         "type": "object"
       },
-      "ResultPagination": {
-        "additionalProperties": false,
-        "properties": {
-          "page": {
-            "minimum": 1.0,
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "minimum": 1.0,
-            "title": "Page Size",
-            "type": "integer"
-          },
-          "total_pages": {
-            "minimum": 0.0,
-            "title": "Total Pages",
-            "type": "integer"
-          },
-          "total_rows": {
-            "minimum": 0.0,
-            "title": "Total Rows",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "page",
-          "page_size",
-          "total_rows",
-          "total_pages"
-        ],
-        "title": "ResultPagination",
-        "type": "object"
-      },
       "ResultSorting": {
         "additionalProperties": false,
         "properties": {
@@ -7581,10 +7548,10 @@
             "title": "Stop Words",
             "type": "array"
           },
-          "topic_modeling_cluster_selection": {
+          "topic_modeling_projection_selection": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/TopicModelingClusterSelection"
+                "$ref": "#/components/schemas/TopicModelingProjectionSelection"
               },
               {
                 "type": "null"
@@ -7685,10 +7652,10 @@
             ],
             "title": "Stop Words"
           },
-          "topic_modeling_cluster_selection": {
+          "topic_modeling_projection_selection": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/TopicModelingClusterSelection"
+                "$ref": "#/components/schemas/TopicModelingProjectionSelection"
               },
               {
                 "type": "null"
@@ -7901,6 +7868,44 @@
           "adjustable"
         ],
         "title": "TopicClustering",
+        "type": "object"
+      },
+      "TopicInclusion": {
+        "additionalProperties": false,
+        "properties": {
+          "adjustable": {
+            "title": "Adjustable",
+            "type": "boolean"
+          },
+          "default_top_n_topics": {
+            "minimum": 0.0,
+            "title": "Default Top N Topics",
+            "type": "integer"
+          },
+          "max_top_n_topics": {
+            "minimum": 0.0,
+            "title": "Max Top N Topics",
+            "type": "integer"
+          },
+          "min_top_n_topics": {
+            "minimum": 0.0,
+            "title": "Min Top N Topics",
+            "type": "integer"
+          },
+          "top_n_topics": {
+            "minimum": 0.0,
+            "title": "Top N Topics",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "top_n_topics",
+          "min_top_n_topics",
+          "max_top_n_topics",
+          "default_top_n_topics",
+          "adjustable"
+        ],
+        "title": "TopicInclusion",
         "type": "object"
       },
       "TopicItem": {
@@ -8157,6 +8162,12 @@
             "title": "Max Segment Tokens",
             "type": "integer"
           },
+          "min_cluster_size": {
+            "default": 10,
+            "minimum": 2.0,
+            "title": "Min Cluster Size",
+            "type": "integer"
+          },
           "node_columns": {
             "additionalProperties": {
               "minLength": 1,
@@ -8216,27 +8227,6 @@
         "title": "TopicModelingAnalysisRequest",
         "type": "object"
       },
-      "TopicModelingClusterSelection": {
-        "additionalProperties": false,
-        "properties": {
-          "analysis_id": {
-            "format": "uuid",
-            "title": "Analysis Id",
-            "type": "string"
-          },
-          "cluster_count": {
-            "minimum": 0.0,
-            "title": "Cluster Count",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "analysis_id",
-          "cluster_count"
-        ],
-        "title": "TopicModelingClusterSelection",
-        "type": "object"
-      },
       "TopicModelingDataBlockCreationAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
@@ -8286,6 +8276,11 @@
             "title": "Selected Columns",
             "type": "object"
           },
+          "top_n_topics": {
+            "minimum": 0.0,
+            "title": "Top N Topics",
+            "type": "integer"
+          },
           "topic_ids": {
             "anyOf": [
               {
@@ -8312,7 +8307,8 @@
           "node_ids",
           "selected_columns",
           "new_node_names",
-          "cluster_count"
+          "cluster_count",
+          "top_n_topics"
         ],
         "title": "TopicModelingDataBlockCreationAnalysisRequest",
         "type": "object"
@@ -8338,11 +8334,17 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "top_n_topics": {
+            "minimum": 0.0,
+            "title": "Top N Topics",
+            "type": "integer"
           }
         },
         "required": [
           "role",
-          "cluster_count"
+          "cluster_count",
+          "top_n_topics"
         ],
         "title": "TopicModelingDataBlockCreationDerivation",
         "type": "object"
@@ -8428,6 +8430,33 @@
         "title": "TopicModelingDataBlockCreationResult",
         "type": "object"
       },
+      "TopicModelingProjectionSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_id": {
+            "format": "uuid",
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "cluster_count": {
+            "minimum": 0.0,
+            "title": "Cluster Count",
+            "type": "integer"
+          },
+          "top_n_topics": {
+            "minimum": 0.0,
+            "title": "Top N Topics",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis_id",
+          "cluster_count",
+          "top_n_topics"
+        ],
+        "title": "TopicModelingProjectionSelection",
+        "type": "object"
+      },
       "TopicModelingResult": {
         "additionalProperties": false,
         "properties": {
@@ -8449,9 +8478,6 @@
           },
           "meta": {
             "$ref": "#/components/schemas/TopicMetadata"
-          },
-          "pagination": {
-            "$ref": "#/components/schemas/ResultPagination"
           },
           "per_corpus_topic_counts": {
             "anyOf": [
@@ -8480,6 +8506,9 @@
             "title": "Sources",
             "type": "array"
           },
+          "topic_inclusion": {
+            "$ref": "#/components/schemas/TopicInclusion"
+          },
           "topics": {
             "items": {
               "$ref": "#/components/schemas/TopicItem"
@@ -8494,7 +8523,7 @@
           "meta",
           "sources",
           "clustering",
-          "pagination",
+          "topic_inclusion",
           "query"
         ],
         "title": "TopicModelingResult",
@@ -8526,19 +8555,6 @@
             "title": "Kind",
             "type": "string"
           },
-          "page": {
-            "default": 1,
-            "minimum": 1.0,
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "default": 50,
-            "maximum": 500.0,
-            "minimum": 1.0,
-            "title": "Page Size",
-            "type": "integer"
-          },
           "sort_by": {
             "anyOf": [
               {
@@ -8549,6 +8565,18 @@
               }
             ],
             "title": "Sort By"
+          },
+          "top_n_topics": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top N Topics"
           },
           "topic_ids": {
             "anyOf": [

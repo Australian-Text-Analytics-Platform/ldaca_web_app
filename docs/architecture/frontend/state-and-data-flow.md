@@ -304,8 +304,8 @@ sequential chart state. These values can be lost without changing the durable
 Analysis or Result and are not exported with a Workspace.
 
 Stopword lists for Token Frequency and Topic Modelling, the Topic Modelling
-Words-per-topic cap, and its last successfully applied non-default cluster
-count are backend-owned Tab presentation settings. Features patch
+Words-per-topic cap, and its last successfully applied non-default Topic
+projection `(Analysis, cluster count, Top N)` are backend-owned Tab presentation settings. Features patch
 them optimistically in the shared Tab Query cache, roll back on failure, and do
 not refetch the immutable Result. Stopword enablement and detected language are
 Result-scoped transient state and reset when a Result hydrates. In Topic
@@ -315,13 +315,17 @@ persisting the detected or selected language. The cluster slider owns one local
 pointer transaction: movement updates its controlled draft, a normal release
 commits the latest draft once, and pointer cancellation, lost capture, or window
 blur restores the applied count without querying. Keyboard changes commit
-immediately. Each changed commit creates one no-store Result request with a
-client-only attempt key; the attempt key is part of TanStack identity but not
-the backend payload. The prior graph and Topic list remain mounted but inert
-until a matching non-placeholder response is installed and its React Flow Topic
-nodes are measured and fitted. Cancelled and late responses cannot replace the
-current attempt, a failure restores the applied thumb, and a successful attempt
-issues one Tab presentation PATCH after resetting result interactions.
+immediately. The Top-topics-per-row number input commits on Enter or blur;
+partial input and the already-applied value do not query. Each distinct K/N
+commit creates one no-store Result request with a client-only attempt key; the
+attempt key is part of TanStack identity but not the backend payload. Lowering
+K below N sends one pair with N clamped to K. The prior graph and Topic list
+remain mounted but inert until a matching non-placeholder response is
+installed. A K change also waits for measured and fitted React Flow nodes;
+an N-only response keeps selection, search, lasso, viewport, tooltip identity,
+and an open publication dialog. Cancelled and late responses cannot replace
+the current attempt, a failure restores the applied controls, and a successful
+attempt issues one Tab presentation PATCH.
 
 The Topic graph is a non-editable React Flow projection over normalized backend
 coordinates. React Flow owns its container measurement and viewport; fitted
@@ -330,7 +334,8 @@ pan or zoom switches to a deliberately manual viewport until Fit View or the
 next Result projection. A freehand canvas overlay owns sticky additive lasso
 gestures and projects Topic centres through the current viewport. Its transient
 ID union filters the All Topics list together with search, remains independent
-from manually selected Topics, and resets when projection identity changes.
+from manually selected Topics, and resets when the K-based layout identity
+changes rather than when only Top N changes.
 Image export serializes the shared bubble model through the current viewport
 rather than screenshotting React Flow's HTML controls.
 

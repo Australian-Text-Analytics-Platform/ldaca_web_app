@@ -627,10 +627,9 @@ def test__compute_topic_modeling_sampling_records_before_after_sizes(
     assert result["meta"]["corpus_sizes_after_sample"] == [10]
 
 
-def test__compute_topic_modeling_uses_fixed_internal_cluster_size(
+def test__compute_topic_modeling_forwards_requested_minimum_cluster_size(
     tmp_path, monkeypatch
 ):
-    """The removed public parameter cannot alter HDBSCAN leaf construction."""
     captured_kwargs: dict[str, Any] = {}
 
     def fake_run(**kwargs):
@@ -655,8 +654,8 @@ def test__compute_topic_modeling_uses_fixed_internal_cluster_size(
         artifact_dir=str(tmp_path),
         artifact_prefix="tm_min",
         embedding_cache_path=str(tmp_path / "embeddings.duckdb"),
+        min_cluster_size=4,
     )
 
-    assert captured_kwargs["min_cluster_size"] == 10
-    assert "min_topic_size" not in result["meta"]
+    assert captured_kwargs["min_cluster_size"] == 4
     assert result["clustering"]["max_cluster_count"] == 2

@@ -275,6 +275,7 @@ class TopicModelingDataBlockCreationDerivation(_StrictModel):
     kind: Literal["topic_modeling_data_block_creation"] = "topic_modeling_data_block_creation"
     role: Literal["topic_data", "topic_meanings"]
     cluster_count: int = Field(ge=0)
+    top_n_topics: int = Field(ge=0)
 
 
 DerivationOperation = Annotated[

@@ -106,6 +106,8 @@ const baseProps = {
   corpusSamples: [],
   nodeDocCounts: [],
   onCorpusSampleChange: vi.fn(),
+  minClusterSize: 10,
+  onMinClusterSizeChange: vi.fn(),
   randomSeed: 0,
   randomSeedUserSet: false,
   onRandomSeedChange: vi.fn(),
@@ -131,6 +133,7 @@ describe('TopicModelingParameterPanel', () => {
     expect(screen.queryByLabelText('Words per topic')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Segmentation method')).toBeInTheDocument();
     expect(screen.getByLabelText('Maximum tokens per segment')).toHaveValue(256);
+    expect(screen.getByLabelText('Minimum cluster size')).toHaveValue(10);
     expect(screen.queryByText('Topic Modelling Options')).not.toBeInTheDocument();
   });
 
@@ -194,8 +197,22 @@ describe('TopicModelingParameterPanel', () => {
     expect(onCorpusSampleChange).toHaveBeenCalledWith(0, { percent: '25' });
   });
 
-  it('does not render the removed Minimum topic size control', () => {
-    render(<TopicModelingParameterPanel {...baseProps} />);
-    expect(screen.queryByLabelText('Minimum topic size')).not.toBeInTheDocument();
+  it('commits minimum cluster size as an integer of at least two', () => {
+    const onMinClusterSizeChange = vi.fn();
+    render(
+      <TopicModelingParameterPanel
+        {...baseProps}
+        onMinClusterSizeChange={onMinClusterSizeChange}
+      />,
+    );
+
+    const input = screen.getByLabelText<HTMLInputElement>('Minimum cluster size');
+    fireEvent.change(input, { target: { value: '1' } });
+    fireEvent.blur(input);
+    expect(onMinClusterSizeChange).toHaveBeenLastCalledWith(2);
+
+    fireEvent.change(input, { target: { value: '25.4' } });
+    fireEvent.blur(input);
+    expect(onMinClusterSizeChange).toHaveBeenLastCalledWith(25);
   });
 });

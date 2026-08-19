@@ -28,6 +28,16 @@ def test_legacy_topic_modeling_request_defaults_to_automatic_segments() -> None:
         TopicSegmentationMethod.AUTOMATIC,
         256,
     )
+    assert request.min_cluster_size == 10
+
+
+def test_topic_modeling_request_accepts_custom_minimum_cluster_size() -> None:
+    assert _request(min_cluster_size=25).min_cluster_size == 25
+
+
+def test_topic_modeling_request_rejects_minimum_cluster_size_below_two() -> None:
+    with pytest.raises(ValidationError):
+        _request(min_cluster_size=1)
 
 
 @pytest.mark.parametrize("max_segment_tokens", [31, 511])

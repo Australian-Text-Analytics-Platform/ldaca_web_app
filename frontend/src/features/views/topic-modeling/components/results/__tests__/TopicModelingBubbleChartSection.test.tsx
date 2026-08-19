@@ -3,19 +3,29 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TopicModelingBubbleChartSection } from '../TopicModelingBubbleChartSection';
 import { buildTopicsCSV } from '../topicModelingCsv';
+import type { TopicBubbleModel } from '../topicModelingGraph';
 
 vi.mock('../TopicModelingFlowChart', () => ({
   TopicModelingFlowChart: ({
     lassoMode,
+    lassoFilterActive,
     onToggleLassoMode,
+    onClearLassoFilter,
     onAddLassoTopics,
+    bubbles,
   }: {
     lassoMode: boolean;
+    lassoFilterActive: boolean;
     onToggleLassoMode: () => void;
+    onClearLassoFilter: () => void;
     onAddLassoTopics: (ids: Set<number>) => void;
+    bubbles: TopicBubbleModel[];
   }) => (
     <div data-testid="topic-flow-chart">
       <span>{lassoMode ? 'lasso enabled' : 'pan enabled'}</span>
+      <span>
+        Hovered topics: {bubbles.filter((bubble) => bubble.hovered).map((bubble) => bubble.id)}
+      </span>
       <button type="button" onClick={onToggleLassoMode}>
         Toggle lasso
       </button>
@@ -25,6 +35,9 @@ vi.mock('../TopicModelingFlowChart', () => ({
       <button type="button" onClick={() => onAddLassoTopics(new Set([1]))}>
         Lasso one
       </button>
+      <button type="button" disabled={!lassoFilterActive} onClick={onClearLassoFilter}>
+        Clear filter
+      </button>
     </div>
   ),
 }));
@@ -32,30 +45,24 @@ vi.mock('../TopicModelingFlowChart', () => ({
 vi.mock('../TopicSelectionPanel', () => ({
   TopicSelectionPanel: ({
     lassoTopicIds,
-    onClearLassoFilter,
+    onHoveredTopicChange,
   }: {
     lassoTopicIds: Set<number>;
-    onClearLassoFilter: () => void;
+    onHoveredTopicChange: (topicId: number | null) => void;
   }) => (
     <div data-testid="topic-selection-panel">
       <span>Lasso topics: {[...lassoTopicIds].join(',')}</span>
-      <button type="button" onClick={onClearLassoFilter}>
-        Clear filter
+      <button type="button" onMouseEnter={() => onHoveredTopicChange(0)}>
+        Hover topic zero
+      </button>
+      <button type="button" onMouseEnter={() => onHoveredTopicChange(null)}>
+        Leave topic zero
       </button>
     </div>
   ),
 }));
 
-vi.mock('@/features/views/common/components/ResponsiveWordCloud', () => ({
-  ResponsiveWordCloud: ({ words }: { words: { text: string; value: number }[] }) => (
-    <div>{words.map((word) => `${word.text}:${String(word.value)}`).join(', ')}</div>
-  ),
-}));
-
 const commonProps = {
-  setTooltip: vi.fn(),
-  hoveredTopicId: null,
-  setHoveredTopicId: vi.fn(),
   selectedTopicIds: new Set<number>(),
   onToggleTopicSelection: vi.fn(),
   onClearSelection: vi.fn(),
@@ -70,44 +77,32 @@ const commonProps = {
 };
 
 describe('TopicModelingBubbleChartSection', () => {
-  it('renders the tooltip overlay outside the clipped chart shell', () => {
-    render(
+  it('keeps list hover local and resets it when the graph projection changes', () => {
+    const topic = {
+      id: 0,
+      representative_words: [{ word: 'alpha', occurrence_count: 4 }],
+      size: [4, 0],
+      total_size: 4,
+      x: 0,
+      y: 0,
+    };
+    const view = render(<TopicModelingBubbleChartSection {...commonProps} topics={[topic]} />);
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Hover topic zero' }));
+    expect(screen.getByText('Hovered topics: 0')).toBeInTheDocument();
+
+    view.rerender(
       <TopicModelingBubbleChartSection
         {...commonProps}
-        topics={[]}
-        tooltip={{
-          x: 120,
-          y: 80,
-          topic: {
-            id: 31,
-            representative_words: [
-              { word: 'alpha', occurrence_count: 7 },
-              { word: 'beta', occurrence_count: 3 },
-            ],
-            size: [4, 6],
-            total_size: 10,
-            x: 0,
-            y: 0,
-          },
-        }}
+        projectionKey="analysis-1:2"
+        topics={[topic]}
       />,
     );
-
-    const tooltip = screen.getByTestId('topic-bubble-chart-tooltip');
-    const clippedChartShell = screen.getByTestId('topic-bubble-chart-shell');
-    expect(clippedChartShell).not.toContainElement(tooltip);
-    expect(tooltip).toHaveAttribute('role', 'tooltip');
-    expect(screen.getByText(/alpha, 7 occurrences/)).toBeInTheDocument();
+    expect(screen.getByText('Hovered topics:')).toBeInTheDocument();
   });
 
   it('keeps lasso mode sticky and unions repeated lasso results until cleared', () => {
-    const view = render(
-      <TopicModelingBubbleChartSection
-        {...commonProps}
-        topics={[]}
-        tooltip={{ topic: null, x: 0, y: 0 }}
-      />,
-    );
+    const view = render(<TopicModelingBubbleChartSection {...commonProps} topics={[]} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle lasso' }));
     expect(screen.getByText('lasso enabled')).toBeInTheDocument();
@@ -115,13 +110,17 @@ describe('TopicModelingBubbleChartSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lasso one' }));
     expect(screen.getByText('Lasso topics: 0,1')).toBeInTheDocument();
 
+    view.rerender(<TopicModelingBubbleChartSection {...commonProps} topics={[]} />);
+    expect(screen.getByText('Lasso topics: 0,1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
+    expect(screen.getByText('Lasso topics:')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear filter' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lasso zero' }));
+
     view.rerender(
-      <TopicModelingBubbleChartSection
-        {...commonProps}
-        projectionKey="analysis-1:2"
-        topics={[]}
-        tooltip={{ topic: null, x: 0, y: 0 }}
-      />,
+      <TopicModelingBubbleChartSection {...commonProps} projectionKey="analysis-1:2" topics={[]} />,
     );
     expect(screen.getByText('lasso enabled')).toBeInTheDocument();
     expect(screen.getByText('Lasso topics:')).toBeInTheDocument();

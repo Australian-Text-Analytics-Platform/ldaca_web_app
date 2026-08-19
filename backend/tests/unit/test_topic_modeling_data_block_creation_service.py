@@ -39,6 +39,7 @@ def _data_block_creation_fixture(
     tmp_path: Path,
     *,
     invalid_meanings_count: bool = False,
+    invalid_top_n_provenance: bool = False,
 ) -> tuple[Workspace, AnalysisRecord, TopicModelingDataBlockCreationWorkerResult, uuid.UUID]:
     source_id = uuid.uuid4()
     workspace = Workspace(name="topic Data Block Creation")
@@ -78,6 +79,7 @@ def _data_block_creation_fixture(
         selected_columns={source_id: ["text"]},
         new_node_names={source_id: "Topic data"},
         cluster_count=2,
+        top_n_topics=2,
     )
     child = AnalysisRecord.create(
         request,
@@ -116,7 +118,9 @@ def _data_block_creation_fixture(
     ).write_parquet(meanings_path)
     topic_provenance = DerivationProvenance(
         operation=TopicModelingDataBlockCreationDerivation(
-            role="topic_data", cluster_count=2
+            role="topic_data",
+            cluster_count=2,
+            top_n_topics=1 if invalid_top_n_provenance else 2,
         ),
         inputs=[
             DerivationInput(role="source", value=node_reference(str(source_id)))
@@ -124,7 +128,7 @@ def _data_block_creation_fixture(
     )
     meanings_provenance = DerivationProvenance(
         operation=TopicModelingDataBlockCreationDerivation(
-            role="topic_meanings", cluster_count=2
+            role="topic_meanings", cluster_count=2, top_n_topics=2
         ),
         inputs=[
             DerivationInput(
@@ -233,3 +237,22 @@ def test_topic_modeling_data_block_creation_rolls_back_every_output_on_failure(
 
     assert set(workspace.nodes) == {str(source_id)}
     assert list((tmp_path / "data").glob("*.parquet")) == []
+
+
+def test_topic_modeling_data_block_creation_rejects_mismatched_top_n_provenance(
+    tmp_path: Path,
+) -> None:
+    workspace, child, result, _source_id = _data_block_creation_fixture(
+        tmp_path,
+        invalid_top_n_provenance=True,
+    )
+
+    with pytest.raises(ValueError, match="provenance"):
+        _publish_topic_modeling_data_blocks(
+            tmp_path / "analyses" / str(child.id),
+            workspace,
+            tmp_path,
+            child,
+            result,
+            10_000_000,
+        )

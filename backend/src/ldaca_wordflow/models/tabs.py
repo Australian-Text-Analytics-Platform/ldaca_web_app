@@ -7,7 +7,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from ..domain.workspace import AnalysisKind, TabName, TopicModelingClusterSelection
+from ..domain.workspace import AnalysisKind, TabName, TopicModelingProjectionSelection
 
 
 class _StrictModel(BaseModel):
@@ -39,7 +39,7 @@ class TabUpdate(_StrictModel):
     annotation_correction_columns: dict[uuid.UUID, TabName] | None = None
     stop_words: Annotated[list[str], BeforeValidator(_normalize_stop_words)] | None = None
     topic_modeling_words_per_topic: int | None = Field(default=None, ge=3, le=100)
-    topic_modeling_cluster_selection: TopicModelingClusterSelection | None = None
+    topic_modeling_projection_selection: TopicModelingProjectionSelection | None = None
 
     @model_validator(mode="after")
     def require_update(self) -> "TabUpdate":

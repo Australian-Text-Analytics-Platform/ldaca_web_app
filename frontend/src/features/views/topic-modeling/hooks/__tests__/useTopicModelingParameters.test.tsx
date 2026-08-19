@@ -53,6 +53,7 @@ describe('useTopicModelingParameters', () => {
     expect(result.current.effectiveDocCounts).toEqual([8000, 80]);
     expect(result.current.sampleFractionsForRequest).toEqual([null, null]);
     expect(result.current.hasAnySampling).toBe(false);
+    expect(result.current.minClusterSize).toBe(10);
     expect(result.current.randomSeed).toBe(0);
   });
 
@@ -100,11 +101,13 @@ describe('useTopicModelingParameters', () => {
 
     act(() => {
       result.current.hydrateParameters({
+        min_cluster_size: 25,
         random_seed: 7,
         sample_fractions: [0.2, null],
       });
     });
 
+    expect(result.current.minClusterSize).toBe(25);
     expect(result.current.randomSeed).toBe(7);
     expect(result.current.randomSeedUserSet).toBe(true);
     expect(result.current.corpusSamples).toEqual([{ percent: '20' }, { percent: '100' }]);

@@ -60,10 +60,14 @@ automatic overlap can count the same source text more than once. Stopwords and
 display limits are not expression arguments.
 
 `clustering_context` is a zstd-compressed MessagePack binary produced alongside
-the natural HDBSCAN projection. The direct native projector accepts that value
-and an exact real-Topic count from two through the natural count, then returns
-new `documents[]` and `topics[]` JSON without model inference. It preserves
-outlier `-1` and canonicalizes real Topic IDs by Ward-tree order.
+the natural HDBSCAN projection. The direct native projectors accept that value
+and an exact real-Topic count from two through the natural count without model
+inference. `project_topic_modeling_context` returns new `documents[]` and
+`topics[]` JSON for Data Block Creation. `project_topic_modeling_basis` also
+accepts ordered corpus sizes and returns Topic metadata plus sorted
+`[corpus_index, topic_id, minimum_n, count]` activations for Result-time bubble
+counts. Both preserve outlier `-1` semantics and canonicalize real Topic IDs by
+Ward-tree order.
 
 ## Direct Functions
 

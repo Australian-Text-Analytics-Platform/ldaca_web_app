@@ -52,7 +52,7 @@ describe('getAnalysisResultResource', () => {
     expect(getAnalysisResultMock).toHaveBeenCalledTimes(1);
   });
 
-  it('drains every topic page before returning a Topic Modeling Result', async () => {
+  it('returns every Topic without client-side pagination', async () => {
     const topic = (id: number) => ({
       id,
       label: `Topic ${String(id)}`,
@@ -72,28 +72,10 @@ describe('getAnalysisResultResource', () => {
     getAnalysisResultMock.mockResolvedValue({
       data: {
         ...common,
-        topics: [topic(0)],
-        pagination: { page: 1, page_size: 50, total_rows: 501, total_pages: 11 },
-        query: { kind: 'topic_modeling', page: 1, page_size: 50 },
+        topics: Array.from({ length: 501 }, (_, index) => topic(index)),
+        query: { kind: 'topic_modeling' },
       },
     });
-    queryAnalysisResultMock
-      .mockResolvedValueOnce({
-        data: {
-          ...common,
-          topics: Array.from({ length: 500 }, (_, index) => topic(index)),
-          pagination: { page: 1, page_size: 500, total_rows: 501, total_pages: 2 },
-          query: { kind: 'topic_modeling', page: 1, page_size: 500 },
-        },
-      })
-      .mockResolvedValueOnce({
-        data: {
-          ...common,
-          topics: [topic(500)],
-          pagination: { page: 2, page_size: 500, total_rows: 501, total_pages: 2 },
-          query: { kind: 'topic_modeling', page: 2, page_size: 500 },
-        },
-      });
 
     const result = await getAnalysisResultResource<{
       data: { topics: { id: number }[]; meta: { truncated_segment_count?: number } };
@@ -102,11 +84,53 @@ describe('getAnalysisResultResource', () => {
     expect(result?.data.topics).toHaveLength(501);
     expect(result?.data.topics.at(-1)?.id).toBe(500);
     expect(result?.data.meta.truncated_segment_count).toBe(7);
-    expect(queryAnalysisResultMock).toHaveBeenCalledTimes(2);
-    expect(queryAnalysisResultMock).toHaveBeenNthCalledWith(
-      2,
+    expect(queryAnalysisResultMock).not.toHaveBeenCalled();
+  });
+
+  it('sends the complete cluster and Top-N projection query', async () => {
+    queryAnalysisResultMock.mockResolvedValue({
+      data: {
+        kind: 'topic_modeling',
+        topics: [],
+        corpus_sizes: [],
+        per_corpus_topic_counts: [],
+        meta: {},
+        sources: [],
+        clustering: {
+          cluster_count: 3,
+          min_cluster_count: 2,
+          max_cluster_count: 4,
+          default_cluster_count: 4,
+          adjustable: true,
+        },
+        topic_inclusion: {
+          top_n_topics: 2,
+          min_top_n_topics: 1,
+          max_top_n_topics: 3,
+          default_top_n_topics: 2,
+          adjustable: true,
+        },
+        query: {
+          kind: 'topic_modeling',
+          cluster_count: 3,
+          top_n_topics: 2,
+        },
+      },
+    });
+
+    await getAnalysisResultResource('workspace-1', 'analysis-1', {
+      kind: 'topic_modeling',
+      cluster_count: 3,
+      top_n_topics: 2,
+    });
+
+    expect(queryAnalysisResultMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: expect.objectContaining({ kind: 'topic_modeling', page: 2, page_size: 500 }),
+        body: {
+          kind: 'topic_modeling',
+          cluster_count: 3,
+          top_n_topics: 2,
+        },
       }),
     );
   });

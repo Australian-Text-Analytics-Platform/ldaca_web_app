@@ -1,11 +1,35 @@
-import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import '@xyflow/react/dist/style.css';
 
-import { Background, BackgroundVariant, Controls, MiniMap, ReactFlow } from '@xyflow/react';
-import { CircleOff, Loader2, Map } from 'lucide-react';
+import {
+  Background,
+  BackgroundVariant,
+  ControlButton,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  useReactFlow,
+  useStore,
+} from '@xyflow/react';
+import { CircleOff, Loader2, Map, Minus, Plus, Scan, Trash2 } from 'lucide-react';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
+import { cn } from '@/lib/utils';
 
 import { useWorkspaceGraph } from '../hooks/useWorkspaceGraph';
 
@@ -13,55 +37,252 @@ export interface WorkspaceGraphFeatureProps {
   fallback?: ReactNode;
 }
 
-/**
- * Control button that toggles the React Flow minimap overview.
- * Rendered within `WorkspaceGraphFeature` because graph controls need a compact overview toggle.
- * Flow: receive the overview state, choose the button title/icon opacity, and invoke the supplied toggle handler from React Flow controls.
- */
-const OverviewToggle = ({ active, onToggle }: { active: boolean; onToggle: () => void }) => (
-  <button
-    type="button"
-    className="react-flow__controls-button"
-    onClick={onToggle}
-    title={active ? 'Hide overview' : 'Show overview'}
-  >
-    <Map className={active ? 'h-4 w-4' : 'h-4 w-4 opacity-60'} aria-hidden="true" />
-  </button>
-);
+interface WorkspaceGraphControlButtonProps {
+  accessibleLabel: string;
+  label: string;
+  children: ReactNode;
+  disabled?: boolean;
+  active?: boolean;
+  destructive?: boolean;
+  onClick: () => void;
+}
 
 /**
- * Control button that clears selected workspace nodes.
- * Rendered within `WorkspaceGraphFeature` because multi-select graph sessions need a one-click clear action.
- * Flow: receive disabled state and clear callback, render a React Flow control button, and block the clear action when no selection can be cleared.
+ * Expandable action used in the Workspace Graph View control rail.
+ * Flow: keep the icon visible in the collapsed rail and reveal its text label on rail hover or focus.
  */
-const DeselectButton = ({ disabled, onClear }: { disabled: boolean; onClear: () => void }) => (
-  <button
-    type="button"
-    className="react-flow__controls-button"
-    onClick={onClear}
-    disabled={disabled}
-    title="Deselect all selected data blocks"
-    style={{ opacity: disabled ? 0.5 : 1 }}
-  >
-    <CircleOff className="h-4 w-4" aria-hidden="true" />
-  </button>
-);
-
-/**
- * Floating selection count shown over the graph canvas.
- * Rendered within `WorkspaceGraphFeature` because graph users need visible multi-selection feedback.
- * Flow: skip the overlay when no nodes exist, otherwise render selected and total counts over the graph canvas.
- */
-const GraphSelectionOverlay = ({ selected, total }: { selected: number; total: number }) => {
-  if (!total) {
-    return null;
-  }
+function WorkspaceGraphControlButton({
+  accessibleLabel,
+  label,
+  children,
+  disabled,
+  active,
+  destructive,
+  onClick,
+}: WorkspaceGraphControlButtonProps) {
   return (
-    <div className="absolute top-4 left-4 z-10 rounded border border-border bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm">
-      {selected}/{total} selected
-    </div>
+    <ControlButton
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={accessibleLabel}
+      className={cn(
+        '!h-10 !w-10 !min-w-10 !justify-start !gap-3 !overflow-hidden !px-3',
+        'transition-[width,background-color,color] duration-150 ease-out',
+        'group-hover/workspace-controls:!w-40 group-focus-within/workspace-controls:!w-40',
+        'disabled:!bg-muted disabled:!text-muted-foreground disabled:opacity-50',
+        active && '!bg-violet-100 !text-violet-700',
+        destructive && !disabled && '!text-destructive hover:!bg-destructive/10',
+      )}
+    >
+      <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:!size-4 [&_svg]:!max-h-none [&_svg]:!max-w-none [&_svg]:!fill-none">
+        {children}
+      </span>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none whitespace-nowrap text-xs font-medium opacity-0 transition-opacity duration-100 group-hover/workspace-controls:opacity-100 group-focus-within/workspace-controls:opacity-100"
+      >
+        {label}
+      </span>
+    </ControlButton>
   );
-};
+}
+
+/**
+ * Selection summary at the start of the graph control rail.
+ * Flow: always show the compact selected/total value and reveal its descriptive label with the other controls.
+ */
+const GraphSelectionControl = ({ selected, total }: { selected: number; total: number }) => (
+  <div
+    role="status"
+    aria-label={`${String(selected)} of ${String(total)} selected`}
+    className="flex h-10 w-10 min-w-10 items-center justify-start gap-3 overflow-hidden px-2 text-xs font-semibold text-foreground tabular-nums transition-[width,padding] duration-150 ease-out group-hover/workspace-controls:w-40 group-hover/workspace-controls:px-3 group-focus-within/workspace-controls:w-40 group-focus-within/workspace-controls:px-3"
+  >
+    <span className="shrink-0">
+      {selected}/{total}
+    </span>
+    <span
+      aria-hidden="true"
+      className="pointer-events-none whitespace-nowrap font-medium opacity-0 transition-opacity duration-100 group-hover/workspace-controls:opacity-100 group-focus-within/workspace-controls:opacity-100"
+    >
+      selected
+    </span>
+  </div>
+);
+
+/**
+ * Batch-delete action and confirmation owned by the graph where selection is made.
+ * Flow: resolve the selected Data Blocks, confirm their names, settle every deletion, then clear graph selection.
+ */
+function WorkspaceGraphDeleteControl() {
+  const { workspaceGraph } = useWorkspaceData();
+  const { deleteNode, clearSelection } = useWorkspaceActions();
+  const { selectedNodeIds } = useWorkspaceSelection();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const selectedCount = selectedNodeIds.length;
+  const canDelete = selectedCount > 0;
+
+  const selectedForDelete = (() => {
+    if (!workspaceGraph || !canDelete) return [];
+    const selectedIds = new Set(selectedNodeIds);
+    return workspaceGraph.nodes
+      .filter((node) => selectedIds.has(node.id))
+      .map((node) => ({
+        id: node.id,
+        name: typeof node.name === 'string' && node.name.trim() ? node.name : node.id,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  })();
+
+  const handleDelete = async () => {
+    if (!canDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await Promise.allSettled(selectedForDelete.map((item) => deleteNode(item.id)));
+      clearSelection();
+      setConfirmOpen(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <>
+      <WorkspaceGraphControlButton
+        accessibleLabel={`Delete (${String(selectedCount)})`}
+        label={`Delete (${String(selectedCount)})`}
+        disabled={!canDelete || isDeleting}
+        destructive
+        onClick={() => {
+          setConfirmOpen(true);
+        }}
+      >
+        <Trash2 aria-hidden="true" />
+      </WorkspaceGraphControlButton>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedForDelete.length} data block
+              {selectedForDelete.length === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. The following data blocks will be removed:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
+            {selectedForDelete.map((item) => (
+              <li key={item.id}>{item.name}</li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button asChild variant="destructive" disabled={isDeleting || !canDelete}>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleDelete();
+                }}
+                disabled={isDeleting || !canDelete}
+              >
+                {isDeleting ? 'Deleting…' : `Delete ${String(selectedForDelete.length)}`}
+              </AlertDialogAction>
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+interface WorkspaceGraphControlsProps {
+  selected: number;
+  total: number;
+  canClearSelection: boolean;
+  showOverview: boolean;
+  onClearSelection: () => void;
+  onToggleOverview: () => void;
+}
+
+/**
+ * Upper-left graph rail containing viewport, overview, selection, and destructive actions.
+ * Flow: call React Flow's viewport APIs through explicit expandable controls so every icon and label shares one layout.
+ */
+function WorkspaceGraphControls({
+  selected,
+  total,
+  canClearSelection,
+  showOverview,
+  onClearSelection,
+  onToggleOverview,
+}: WorkspaceGraphControlsProps) {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+  const minZoomReached = useStore((state) => state.transform[2] <= state.minZoom);
+  const maxZoomReached = useStore((state) => state.transform[2] >= state.maxZoom);
+
+  return (
+    <Controls
+      orientation="vertical"
+      position="top-left"
+      showZoom={false}
+      showFitView={false}
+      showInteractive={false}
+      className="group/workspace-controls overflow-hidden rounded-md border border-border bg-background shadow-md"
+      style={{ zIndex: 20 }}
+      aria-label="Workspace graph controls"
+    >
+      <GraphSelectionControl selected={selected} total={total} />
+      <WorkspaceGraphControlButton
+        accessibleLabel="Zoom in"
+        label="Zoom in"
+        disabled={maxZoomReached}
+        onClick={() => {
+          void zoomIn();
+        }}
+      >
+        <Plus aria-hidden="true" />
+      </WorkspaceGraphControlButton>
+      <WorkspaceGraphControlButton
+        accessibleLabel="Zoom out"
+        label="Zoom out"
+        disabled={minZoomReached}
+        onClick={() => {
+          void zoomOut();
+        }}
+      >
+        <Minus aria-hidden="true" />
+      </WorkspaceGraphControlButton>
+      <WorkspaceGraphControlButton
+        accessibleLabel="Fit view"
+        label="Fit view"
+        onClick={() => {
+          void fitView({ padding: 0.2, includeHiddenNodes: false });
+        }}
+      >
+        <Scan aria-hidden="true" />
+      </WorkspaceGraphControlButton>
+      <WorkspaceGraphControlButton
+        accessibleLabel={showOverview ? 'Hide overview' : 'Show overview'}
+        label="Overview"
+        active={showOverview}
+        onClick={onToggleOverview}
+      >
+        <Map aria-hidden="true" />
+      </WorkspaceGraphControlButton>
+      <WorkspaceGraphControlButton
+        accessibleLabel="Clear selection"
+        label="Clear selection"
+        disabled={!canClearSelection}
+        onClick={onClearSelection}
+      >
+        <CircleOff aria-hidden="true" />
+      </WorkspaceGraphControlButton>
+      <WorkspaceGraphDeleteControl />
+    </Controls>
+  );
+}
 
 /**
  * Placeholder shown while the workspace graph query is loading.
@@ -120,8 +341,6 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
 
   return (
     <div className="relative h-full w-full">
-      <GraphSelectionOverlay selected={graph.selectedCount} total={graph.totalNodes} />
-
       <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}
@@ -149,18 +368,16 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         onConnectEnd={graph.handleConnectEnd}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls position="top-right">
-          <OverviewToggle
-            active={showOverview}
-            onToggle={() => {
-              setShowOverview((value) => !value);
-            }}
-          />
-          <DeselectButton
-            disabled={!graph.canClearSelection}
-            onClear={() => graph.clearSelection?.()}
-          />
-        </Controls>
+        <WorkspaceGraphControls
+          selected={graph.selectedCount}
+          total={graph.totalNodes}
+          canClearSelection={graph.canClearSelection}
+          showOverview={showOverview}
+          onClearSelection={() => graph.clearSelection?.()}
+          onToggleOverview={() => {
+            setShowOverview((value) => !value);
+          }}
+        />
         {showOverview && (
           <MiniMap
             position="bottom-right"

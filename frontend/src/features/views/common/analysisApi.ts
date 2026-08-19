@@ -127,31 +127,7 @@ export async function getAnalysisResultResource<TResult>(
     return { ...tokenResult, data: Object.fromEntries(entries), statistics } as TResult;
   }
   if (result.kind === 'topic_modeling') {
-    let topicResult = result as TopicModelingResult;
-    if (topicResult.pagination.total_pages > 1) {
-      const loadPage = async (page: number) => {
-        const { data } = await queryAnalysisResult({
-          path: { workspace_id: workspaceId, analysis_id: analysisId },
-          body: { ...topicProjection, kind: 'topic_modeling', page, page_size: 500 },
-          signal,
-          throwOnError: true,
-        });
-        if (data.kind !== 'topic_modeling') {
-          throw new Error('Topic Modelling query returned the wrong Result kind');
-        }
-        return data as TopicModelingResult;
-      };
-      const firstPage = await loadPage(1);
-      const laterPages = await Promise.all(
-        Array.from({ length: Math.max(0, firstPage.pagination.total_pages - 1) }, (_, index) =>
-          loadPage(index + 2),
-        ),
-      );
-      topicResult = {
-        ...firstPage,
-        topics: [firstPage, ...laterPages].flatMap((page) => page.topics),
-      };
-    }
+    const topicResult = result as TopicModelingResult;
     return {
       ...topicResult,
       data: {

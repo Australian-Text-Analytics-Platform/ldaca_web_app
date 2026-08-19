@@ -124,6 +124,16 @@ class Settings(BaseSettings):
         ge=1,
         description="Maximum private input, output, and Artifact files per Analysis",
     )
+    max_topic_projection_cache_entries: int = Field(
+        default=16,
+        ge=0,
+        description="Maximum complete Topic projection bases retained per runtime",
+    )
+    max_topic_projection_cache_bytes: int = Field(
+        default=64 * 1024 * 1024,
+        ge=0,
+        description="Maximum encoded bytes retained by the Topic projection cache",
+    )
     max_user_file_import_bytes: int = Field(
         default=1024 * 1024 * 1024,
         ge=1,

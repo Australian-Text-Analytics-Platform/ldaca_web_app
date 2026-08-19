@@ -28,10 +28,13 @@ class _PagedQuery(_StrictModel):
     descending: bool = False
 
 
-class TopicModelingResultQuery(_PagedQuery):
+class TopicModelingResultQuery(_StrictModel):
     kind: Literal["topic_modeling"] = "topic_modeling"
     topic_ids: list[int] | None = None
     cluster_count: int | None = Field(default=None, ge=0)
+    top_n_topics: int | None = Field(default=None, ge=0)
+    sort_by: str | None = None
+    descending: bool = False
 
 
 class ConcordanceResultQuery(_PagedQuery):
@@ -264,6 +267,7 @@ class _TopicModelingBody(_StrictModel):
     meta: TopicMetadata
     sources: list[TopicSource]
     clustering: "TopicClustering"
+    topic_inclusion: "TopicInclusion"
 
 
 class TopicClustering(_StrictModel):
@@ -271,6 +275,14 @@ class TopicClustering(_StrictModel):
     min_cluster_count: int = Field(ge=0)
     max_cluster_count: int = Field(ge=0)
     default_cluster_count: int = Field(ge=0)
+    adjustable: bool
+
+
+class TopicInclusion(_StrictModel):
+    top_n_topics: int = Field(ge=0)
+    min_top_n_topics: int = Field(ge=0)
+    max_top_n_topics: int = Field(ge=0)
+    default_top_n_topics: int = Field(ge=0)
     adjustable: bool
 
 
@@ -284,7 +296,6 @@ class TopicModelingStoredResult(_TopicModelingBody):
 
 class TopicModelingResult(_TopicModelingBody):
     kind: Literal["topic_modeling"] = "topic_modeling"
-    pagination: ResultPagination
     query: TopicModelingResultQuery
 
 
@@ -785,5 +796,6 @@ __all__ = [
     "TopicModelingDataBlockCreationResult",
     "TopicModelingDataBlockCreationStoredResult",
     "TopicModelingDataBlockCreationWorkerResult",
+    "TopicInclusion",
     "stored_result_payload",
 ]

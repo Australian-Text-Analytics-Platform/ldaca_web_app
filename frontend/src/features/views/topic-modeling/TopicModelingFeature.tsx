@@ -32,6 +32,7 @@ import {
 import { createDefaultTopicModelingAddToWorkspaceColumns } from './components/topicModelingAddToWorkspaceState';
 import {
   DEFAULT_MAX_SEGMENT_TOKENS,
+  DEFAULT_MIN_CLUSTER_SIZE,
   normalizeTopicSampleFractions,
   useTopicModelingParameters,
 } from './hooks/useTopicModelingParameters';
@@ -93,6 +94,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const {
     corpusSamples,
     updateCorpusSample,
+    minClusterSize,
+    setMinClusterSize,
     randomSeed,
     randomSeedUserSet,
     setRandomSeedFromUser,
@@ -111,24 +114,24 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     panelNodeIdsKey,
     nodeInfoById: nodeInputs.nodeInfoById,
   });
-  const restoredClusterCount =
-    host.topicModelingClusterSelection?.analysis_id === tabTaskId
-      ? host.topicModelingClusterSelection.cluster_count
+  const restoredProjectionSelection =
+    host.topicModelingProjectionSelection?.analysis_id === tabTaskId
+      ? host.topicModelingProjectionSelection
       : null;
-  const [clusterRequest, setClusterRequest] = useState<TopicProjectionAttempt | null>(null);
-  const currentClusterRequest = clusterRequest?.analysisId === tabTaskId ? clusterRequest : null;
-  const committedClusterCount = currentClusterRequest?.clusterCount ?? restoredClusterCount;
-  const resultRequestKey = currentClusterRequest?.requestKey ?? 0;
+  const [projectionRequest, setProjectionRequest] = useState<TopicProjectionAttempt | null>(null);
+  const currentProjectionRequest =
+    projectionRequest?.analysisId === tabTaskId ? projectionRequest : null;
+  const committedClusterCount =
+    currentProjectionRequest?.clusterCount ?? restoredProjectionSelection?.cluster_count ?? null;
+  const committedTopNTopics =
+    currentProjectionRequest?.topNTopics ?? restoredProjectionSelection?.top_n_topics ?? null;
+  const resultRequestKey = currentProjectionRequest?.requestKey ?? 0;
   const resultQuery: TopicModelingResultQuery = {
     kind: 'topic_modeling',
-    page_size: 500,
     cluster_count: committedClusterCount,
+    top_n_topics: committedTopNTopics,
   };
   const {
-    hoveredTopicId,
-    setHoveredTopicId,
-    tooltip,
-    setTooltip,
     selectedTopicIds,
     topicSearchQuery,
     setTopicSearchQuery,
@@ -198,6 +201,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const typedServerRequest = serverRequest as {
     node_ids?: string[];
     node_columns?: Record<string, string>;
+    min_cluster_size?: number;
     random_seed?: number;
     sample_fractions?: (number | null)[];
     segmentation_method?: 'automatic' | 'paragraph' | 'sentence';
@@ -242,6 +246,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         .filter((selection) => panelNodeIds.includes(selection.nodeId) && selection.column)
         .map((selection) => [selection.nodeId, selection.column]),
     ),
+    min_cluster_size: minClusterSize,
     random_seed: randomSeed,
     sample_fractions: sampleFractionsForRequest,
     segmentation_method: segmentationMethod,
@@ -251,6 +256,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     node_ids: Array.isArray(request.node_ids) ? request.node_ids : [],
     node_columns:
       request.node_columns && typeof request.node_columns === 'object' ? request.node_columns : {},
+    min_cluster_size: Number(request.min_cluster_size ?? DEFAULT_MIN_CLUSTER_SIZE),
     random_seed: Number(request.random_seed),
     sample_fractions: normalizeTopicSampleFractions(
       (request as unknown as { sample_fractions?: unknown }).sample_fractions,
@@ -360,6 +366,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         ),
         topic_ids: selectedTopicIds.size > 0 ? [...selectedTopicIds] : null,
         cluster_count: result?.clustering.cluster_count ?? 0,
+        top_n_topics: result?.topic_inclusion.top_n_topics ?? 0,
         topic_meanings_override: exportTopics.map((topic) => ({
           topic_id: topic.id,
           words: topic.representative_words.map((term) => term.word),
@@ -383,6 +390,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       panelNodeIds,
       panelHasMissingColumns,
       effectiveNodeColumnSelections,
+      minClusterSize,
       randomSeed,
       sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
       segmentationMethod,
@@ -400,47 +408,42 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
 
   const corpusCount = result?.data.corpus_sizes.length ?? 0;
 
-  const startClusterProjection = (clusterCount: number) => {
-    setClusterRequest((current) =>
+  const startProjection = (clusterCount: number, topNTopics: number) => {
+    if (clusterCount !== result?.clustering.cluster_count) {
+      setReadyGraphProjectionKey(null);
+    }
+    setProjectionRequest((current) =>
       nextTopicProjectionAttempt(
         current,
         tabTaskId,
         clusterCount,
+        topNTopics,
         result?.clustering.cluster_count ?? null,
+        result?.topic_inclusion.top_n_topics ?? null,
       ),
     );
   };
-  const currentProjectionAttemptKey = currentClusterRequest
-    ? `${currentClusterRequest.analysisId}:${String(currentClusterRequest.requestKey)}`
-    : null;
-  const attemptMatchesDisplayedResult = Boolean(
-    currentClusterRequest &&
-      result?.clustering.cluster_count === currentClusterRequest.clusterCount,
-  );
-  const graphProjectionKey =
-    attemptMatchesDisplayedResult && currentProjectionAttemptKey
-      ? currentProjectionAttemptKey
-      : `${tabTaskId ?? 'no-analysis'}:result:${String(result?.clustering.cluster_count ?? 'none')}`;
-  const { projectionPending, projectionError, sliderResetKey } = useTopicProjectionLifecycle({
+  const graphProjectionKey = `${tabTaskId ?? 'no-analysis'}:result:${String(result?.clustering.cluster_count ?? 'none')}`;
+  const { projectionPending, projectionError, controlResetKey } = useTopicProjectionLifecycle({
     analysisId: tabTaskId,
-    attempt: currentClusterRequest,
+    attempt: currentProjectionRequest,
     clustering: result?.clustering ?? null,
+    topicInclusion: result?.topic_inclusion ?? null,
     isFetching: isResultFetching,
     isPlaceholderData: isResultPlaceholderData,
     resultError,
     isViewReady:
-      currentProjectionAttemptKey === null ||
-      readyGraphProjectionKey === currentProjectionAttemptKey,
-    onProjectionApplied: () => {
+      currentProjectionRequest?.layoutChanged !== true ||
+      readyGraphProjectionKey === graphProjectionKey,
+    onProjectionApplied: (layoutChanged) => {
+      if (!layoutChanged) return;
       handleClearTopicSelection();
-      setHoveredTopicId(null);
-      setTooltip({ topic: null, x: 0, y: 0 });
       setAddToWorkspaceDialogOpen(false);
     },
     persistSelection: (selection) =>
-      host.setPresentationSettings({ topic_modeling_cluster_selection: selection }),
+      host.setPresentationSettings({ topic_modeling_projection_selection: selection }),
     onPersistenceError: (cause) => {
-      toast.error('Topics updated, but this cluster count was not remembered.', {
+      toast.error('Topics updated, but these projection settings were not remembered.', {
         description: cause instanceof Error ? cause.message : String(cause),
       });
     },
@@ -472,6 +475,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         corpusSamples={corpusSamples}
         nodeDocCounts={nodeDocCounts}
         onCorpusSampleChange={updateCorpusSample}
+        minClusterSize={minClusterSize}
+        onMinClusterSizeChange={setMinClusterSize}
         randomSeed={randomSeed}
         randomSeedUserSet={randomSeedUserSet}
         onRandomSeedChange={setRandomSeedFromUser}
@@ -509,10 +514,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           topics={topics}
           exportTopics={exportTopics}
           containerRef={containerRef}
-          tooltip={tooltip}
-          setTooltip={setTooltip}
-          hoveredTopicId={hoveredTopicId}
-          setHoveredTopicId={setHoveredTopicId}
           selectedTopicIds={selectedTopicIds}
           onToggleTopicSelection={handleToggleTopicSelection}
           onClearSelection={handleClearTopicSelection}
@@ -532,17 +533,26 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           projectionPending={projectionPending}
           projectionError={projectionError}
           clustering={result?.clustering ?? null}
+          topicInclusion={result?.topic_inclusion ?? null}
           onClusterCountCommit={(value) => {
-            if (value !== result?.clustering.cluster_count) startClusterProjection(value);
+            const appliedTopN = result?.topic_inclusion.top_n_topics ?? 0;
+            startProjection(value, Math.min(value, appliedTopN));
           }}
-          onClusterProjectionRetry={
-            projectionError && currentClusterRequest
+          onTopNTopicsCommit={(value) => {
+            const appliedClusterCount = result?.clustering.cluster_count ?? 0;
+            startProjection(appliedClusterCount, value);
+          }}
+          onProjectionRetry={
+            projectionError && currentProjectionRequest
               ? () => {
-                  startClusterProjection(currentClusterRequest.clusterCount);
+                  startProjection(
+                    currentProjectionRequest.clusterCount,
+                    currentProjectionRequest.topNTopics,
+                  );
                 }
               : undefined
           }
-          clusterSliderResetKey={sliderResetKey}
+          projectionControlResetKey={controlResetKey}
           wordsPerTopic={representativeWordsCount}
           onWordsPerTopicChange={(value) => {
             void host.setPresentationSettings({ topic_modeling_words_per_topic: value });

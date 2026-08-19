@@ -5,7 +5,7 @@
  * drafts, active selection, and input controls in memory while the server
  * remains the source of truth for tab identity and analysis ownership.
  */
-import type { AnalysisKind, Tab, TopicModelingClusterSelection } from '@/api';
+import type { AnalysisKind, Tab, TopicModelingProjectionSelection } from '@/api';
 
 export interface AnalysisTabInput {
   node_id: string;
@@ -22,7 +22,7 @@ export interface AnalysisTab {
   annotation_correction_columns: Record<string, string>;
   stop_words: string[];
   topic_modeling_words_per_topic: number | null;
-  topic_modeling_cluster_selection: TopicModelingClusterSelection | null;
+  topic_modeling_projection_selection: TopicModelingProjectionSelection | null;
   created_at?: string;
   modified_at?: string;
   revision?: number;
@@ -40,7 +40,7 @@ export function tabFromResource(tab: Tab, local?: Partial<AnalysisTab>): Analysi
     annotation_correction_columns: tab.annotation_correction_columns ?? {},
     stop_words: tab.stop_words ?? [],
     topic_modeling_words_per_topic: tab.topic_modeling_words_per_topic ?? null,
-    topic_modeling_cluster_selection: tab.topic_modeling_cluster_selection ?? null,
+    topic_modeling_projection_selection: tab.topic_modeling_projection_selection ?? null,
     created_at: tab.created_at,
     modified_at: tab.modified_at,
     revision: tab.revision,

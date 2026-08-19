@@ -64,6 +64,12 @@ class InvalidClusterCountError(AppError):
     expose_message = True
 
 
+class InvalidTopicTopNError(AppError):
+    status_code = 422
+    code = "invalid_topic_top_n"
+    expose_message = True
+
+
 class UnsafePathError(InvalidInputError):
     """A user-controlled path is not a safe relative storage path.
 

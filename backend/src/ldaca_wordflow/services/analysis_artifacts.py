@@ -615,6 +615,11 @@ def _validate_published_data_block_identity(
             operation_value, TopicModelingDataBlockCreationDerivation
         ):
             raise ValueError("Topic Modeling Data Block Creation provenance is invalid")
+        if (
+            operation_value.cluster_count != request.cluster_count
+            or operation_value.top_n_topics != request.top_n_topics
+        ):
+            raise ValueError("Topic Modeling Data Block Creation provenance is invalid")
         source_id = references[0]
         if operation_value.role == "topic_data":
             source_uuid = uuid.UUID(source_id)

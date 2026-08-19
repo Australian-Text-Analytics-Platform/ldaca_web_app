@@ -3,50 +3,49 @@ import '@xyflow/react/dist/style.css';
 import {
   ControlButton,
   Controls,
+  type Node,
+  type NodeProps,
+  type NodeTypes,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
-  type Node,
-  type NodeMouseHandler,
-  type NodeProps,
-  type NodeTypes,
   type Viewport,
 } from '@xyflow/react';
-import { Download, LassoSelect } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
-import type { TopicModelingTopic } from '@/api';
+import { Download, FilterX, LassoSelect, Minus, Plus, Scan } from 'lucide-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { NodeTooltip, NodeTooltipContent, NodeTooltipTrigger } from '@/components/node-tooltip';
+import { ResponsiveWordCloud } from '@/features/views/common/components/ResponsiveWordCloud';
 import { cn } from '@/lib/utils';
+import { type TopicCorpusPresentation, TopicSizeComposition } from './TopicSizeComposition';
 import {
   findTopicIdsInsideLasso,
+  TOPIC_GRAPH_HEIGHT,
+  TOPIC_GRAPH_WIDTH,
   type TopicBubbleModel,
   type TopicGraphPoint,
 } from './topicModelingGraph';
 
 interface TopicBubbleNodeData extends Record<string, unknown> {
   bubble: TopicBubbleModel;
+  corpusPresentation: TopicCorpusPresentation;
 }
 
 export type TopicFlowNode = Node<TopicBubbleNodeData, 'topic'>;
 
-interface TooltipState {
-  topic: TopicModelingTopic | null;
-  x: number;
-  y: number;
-}
-
 interface Props {
   bubbles: TopicBubbleModel[];
-  chartRootRef: React.RefObject<HTMLDivElement | null>;
+  corpusPresentation: TopicCorpusPresentation;
   projectionKey: string;
   lassoMode: boolean;
+  lassoFilterActive: boolean;
   exportDisabled: boolean;
   onToggleLassoMode: () => void;
+  onClearLassoFilter: () => void;
   onAddLassoTopics: (topicIds: Set<number>) => void;
   onDownload: () => void;
   onViewReady: (projectionKey: string) => void;
   onToggleTopicSelection: (topicId: number) => void;
-  setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
-  setTooltip: React.Dispatch<React.SetStateAction<TooltipState>>;
 }
 
 const NODE_ORIGIN: [number, number] = [0.5, 0.5];
@@ -58,89 +57,167 @@ const FIT_VIEW_OPTIONS = {
   duration: 0,
 } as const;
 
+interface TopicGraphControlButtonProps {
+  accessibleLabel: string;
+  label: string;
+  children: ReactNode;
+  disabled?: boolean;
+  pressed?: boolean;
+  active?: boolean;
+  onClick: () => void;
+}
+
+function TopicGraphControlButton({
+  accessibleLabel,
+  label,
+  children,
+  disabled,
+  pressed,
+  active,
+  onClick,
+}: TopicGraphControlButtonProps) {
+  return (
+    <ControlButton
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={accessibleLabel}
+      aria-pressed={pressed}
+      className={cn(
+        '!h-10 !w-10 !min-w-10 !justify-start !gap-3 !overflow-hidden !px-3',
+        'transition-[width,background-color,color] duration-150 ease-out',
+        'group-hover/topic-controls:!w-40 group-focus-within/topic-controls:!w-40',
+        'disabled:!bg-muted disabled:!text-muted-foreground disabled:opacity-50',
+        active && '!bg-violet-100 !text-violet-700',
+      )}
+    >
+      <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:!size-4 [&_svg]:!max-h-none [&_svg]:!max-w-none [&_svg]:!fill-none">
+        {children}
+      </span>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none whitespace-nowrap text-xs font-medium opacity-0 transition-opacity duration-100 group-hover/topic-controls:opacity-100 group-focus-within/topic-controls:opacity-100"
+      >
+        {label}
+      </span>
+    </ControlButton>
+  );
+}
+
 /** Renders one measured React Flow node using the shared Topic bubble model. */
 function TopicBubbleNode({ data }: NodeProps<TopicFlowNode>) {
-  const { bubble } = data;
+  const { bubble, corpusPresentation } = data;
   const outerRadius = bubble.radius + 7;
   const diameter = outerRadius * 2;
+  const tooltipPosition =
+    bubble.position.x <= TOPIC_GRAPH_WIDTH / 2 ? Position.Right : Position.Left;
   return (
-    <div
-      data-testid={`topic-flow-node-${String(bubble.id)}`}
-      data-topic-id={bubble.id}
-      className={cn('relative', bubble.filteredOut && 'pointer-events-none opacity-[0.18]')}
-      style={{ width: diameter, height: diameter }}
-      aria-hidden="true"
-    >
-      <svg width={diameter} height={diameter} className="block overflow-visible">
-        {bubble.lassoed ? (
+    <NodeTooltip className="size-full">
+      <NodeTooltipTrigger
+        data-testid={`topic-flow-node-${String(bubble.id)}`}
+        data-topic-id={bubble.id}
+        className={cn(
+          'group relative size-full',
+          bubble.filteredOut && 'pointer-events-none opacity-[0.18]',
+        )}
+        aria-hidden="true"
+      >
+        <svg width={diameter} height={diameter} className="block overflow-visible">
+          {bubble.lassoed ? (
+            <circle
+              cx={outerRadius}
+              cy={outerRadius}
+              r={bubble.radius + 6}
+              fill="none"
+              stroke="#7c3aed"
+              strokeWidth={2.5}
+              strokeDasharray="5 3"
+              data-testid={`topic-lasso-ring-${String(bubble.id)}`}
+            />
+          ) : null}
+          {bubble.selected ? (
+            <circle
+              cx={outerRadius}
+              cy={outerRadius}
+              r={bubble.radius + 4}
+              fill="none"
+              stroke="#16a34a"
+              strokeWidth={2}
+              strokeOpacity={0.7}
+            />
+          ) : null}
           <circle
             cx={outerRadius}
             cy={outerRadius}
-            r={bubble.radius + 6}
-            fill="none"
-            stroke="#7c3aed"
-            strokeWidth={2.5}
-            strokeDasharray="5 3"
-            data-testid={`topic-lasso-ring-${String(bubble.id)}`}
+            r={bubble.hovered && !bubble.filteredOut ? bubble.radius + 2 : bubble.radius}
+            fill={bubble.fill}
+            fillOpacity={bubble.hovered ? 0.88 : bubble.selected ? 0.78 : 0.6}
+            stroke={bubble.selected ? '#16a34a' : bubble.hovered ? '#3b82f6' : '#94a3b8'}
+            strokeWidth={bubble.selected || bubble.hovered ? 2 : 1}
+            className={cn(
+              'transition-[fill-opacity,stroke,stroke-width] duration-100',
+              !bubble.filteredOut &&
+                'group-hover:fill-opacity-[0.88] group-hover:stroke-ring group-hover:[stroke-width:2]',
+            )}
           />
-        ) : null}
-        {bubble.selected ? (
-          <circle
-            cx={outerRadius}
-            cy={outerRadius}
-            r={bubble.radius + 4}
-            fill="none"
-            stroke="#16a34a"
-            strokeWidth={2}
-            strokeOpacity={0.7}
+          <text
+            x={outerRadius}
+            y={outerRadius + 4}
+            textAnchor="middle"
+            fontSize={12}
+            fill="#1e293b"
+            className="pointer-events-none select-none"
+          >
+            {`T${String(bubble.id)}`}
+          </text>
+        </svg>
+      </NodeTooltipTrigger>
+      <NodeTooltipContent
+        align={
+          bubble.position.y < TOPIC_GRAPH_HEIGHT / 3
+            ? 'start'
+            : bubble.position.y > (TOPIC_GRAPH_HEIGHT * 2) / 3
+              ? 'end'
+              : 'center'
+        }
+        position={tooltipPosition}
+        offset={12}
+        role="tooltip"
+        tabIndex={-1}
+        data-testid={`topic-flow-tooltip-${String(bubble.id)}`}
+        className="pointer-events-none w-[min(18rem,calc(100%-1rem))] rounded-md border border-border bg-card p-3 text-xs text-card-foreground shadow-lg"
+      >
+        <div className="text-sm font-semibold">Topic {bubble.topic.id}</div>
+        <div className="mt-1 max-h-36 overflow-hidden text-muted-foreground">
+          <ResponsiveWordCloud
+            words={bubble.topic.representative_words.map((term) => ({
+              text: term.word,
+              value: term.occurrence_count,
+            }))}
+            minWidth={180}
+            aspectRatio={0.48}
           />
-        ) : null}
-        <circle
-          cx={outerRadius}
-          cy={outerRadius}
-          r={bubble.hovered && !bubble.filteredOut ? bubble.radius + 2 : bubble.radius}
-          fill={bubble.fill}
-          fillOpacity={bubble.hovered ? 0.88 : bubble.selected ? 0.78 : 0.6}
-          stroke={bubble.selected ? '#16a34a' : bubble.hovered ? '#3b82f6' : '#94a3b8'}
-          strokeWidth={bubble.selected || bubble.hovered ? 2 : 1}
-        />
-        <text
-          x={outerRadius}
-          y={outerRadius + 4}
-          textAnchor="middle"
-          fontSize={12}
-          fill="#1e293b"
-          className="pointer-events-none select-none"
-        >
-          {`T${String(bubble.id)}`}
-        </text>
-      </svg>
-    </div>
+        </div>
+        <span className="sr-only">
+          {bubble.topic.representative_words
+            .map((term) => `${term.word}, ${String(term.occurrence_count)} occurrences`)
+            .join('; ')}
+        </span>
+        <div className="mt-2">
+          <TopicSizeComposition
+            sizes={bubble.topic.size}
+            total={bubble.topic.total_size}
+            {...corpusPresentation}
+          />
+        </div>
+      </NodeTooltipContent>
+    </NodeTooltip>
   );
 }
 
 const TOPIC_NODE_TYPES = {
   topic: TopicBubbleNode,
 } satisfies NodeTypes;
-
-function positionTooltip(event: React.MouseEvent, bounds: DOMRect) {
-  const cursorX = event.clientX - bounds.left;
-  const cursorY = event.clientY - bounds.top;
-  const tooltipWidth = 288;
-  const tooltipHeight = 240;
-  const gap = 12;
-  const edge = 8;
-  return {
-    x:
-      cursorX + gap + tooltipWidth <= bounds.width - edge
-        ? cursorX + gap
-        : Math.max(edge, cursorX - tooltipWidth - gap),
-    y:
-      cursorY + gap + tooltipHeight <= bounds.height - edge
-        ? cursorY + gap
-        : Math.max(edge, cursorY - tooltipHeight - gap),
-  };
-}
 
 function drawLassoPath(canvas: HTMLCanvasElement, points: TopicGraphPoint[]) {
   const bounds = canvas.getBoundingClientRect();
@@ -335,34 +412,34 @@ function TopicExportSvg({
 /** Renders the interactive React Flow topic plane and its native control toolbar. */
 function TopicModelingFlowChartInner({
   bubbles,
-  chartRootRef,
+  corpusPresentation,
   projectionKey,
   lassoMode,
+  lassoFilterActive,
   exportDisabled,
   onToggleLassoMode,
+  onClearLassoFilter,
   onAddLassoTopics,
   onDownload,
   onViewReady,
   onToggleTopicSelection,
-  setHoveredTopicId,
-  setTooltip,
 }: Props) {
   const flowRef = useRef<HTMLDivElement | null>(null);
   const fittedViewportRef = useRef(true);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
   const [paneSize, setPaneSize] = useState({ width: 1, height: 1 });
-  const { fitView, getViewport } = useReactFlow<TopicFlowNode>();
+  const { fitView, getViewport, zoomIn, zoomOut } = useReactFlow<TopicFlowNode>();
   const nodes: TopicFlowNode[] = bubbles.map((bubble) => {
     const diameter = (bubble.radius + 7) * 2;
     return {
       id: `topic-${String(bubble.id)}`,
       type: 'topic',
       position: bubble.position,
-      data: { bubble },
+      data: { bubble, corpusPresentation },
       draggable: false,
       selectable: false,
       focusable: false,
-      zIndex: bubble.hovered ? 4 : bubble.selected ? 3 : bubble.lassoed ? 2 : 1,
+      zIndex: bubble.selected ? 3 : bubble.lassoed ? 2 : 1,
       style: { width: diameter, height: diameter },
     };
   });
@@ -425,32 +502,8 @@ function TopicModelingFlowChartInner({
     };
   }, [fitView, getViewport, nodes.length]);
 
-  const handleNodeEnter: NodeMouseHandler<TopicFlowNode> = (event, node) => {
-    if (lassoMode || node.data.bubble.filteredOut) return;
-    setHoveredTopicId(node.data.bubble.id);
-    const bounds = chartRootRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-    setTooltip({
-      ...positionTooltip(event, bounds),
-      topic: node.data.bubble.topic,
-    });
-  };
-  const handleNodeMove: NodeMouseHandler<TopicFlowNode> = (event, node) => {
-    if (lassoMode || node.data.bubble.filteredOut) return;
-    const bounds = chartRootRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-    setTooltip({
-      ...positionTooltip(event, bounds),
-      topic: node.data.bubble.topic,
-    });
-  };
-  const clearHover = () => {
-    setHoveredTopicId(null);
-    setTooltip((current) => ({ ...current, topic: null }));
-  };
-
   return (
-    <div ref={flowRef} className="relative size-full" onMouseLeave={clearHover}>
+    <div ref={flowRef} className="relative size-full">
       <ReactFlow<TopicFlowNode>
         nodes={nodes}
         edges={EMPTY_EDGES}
@@ -475,12 +528,8 @@ function TopicModelingFlowChartInner({
             onToggleTopicSelection(node.data.bubble.id);
           }
         }}
-        onNodeMouseEnter={handleNodeEnter}
-        onNodeMouseMove={handleNodeMove}
-        onNodeMouseLeave={clearHover}
         onMoveStart={(event) => {
           if (event) fittedViewportRef.current = false;
-          clearHover();
         }}
         onMoveEnd={(_event, nextViewport) => {
           setViewport(nextViewport);
@@ -491,43 +540,72 @@ function TopicModelingFlowChartInner({
         className="bg-white"
       >
         <Controls
-          orientation="horizontal"
-          position="top-right"
+          orientation="vertical"
+          position="top-left"
+          showZoom={false}
+          showFitView={false}
           showInteractive={false}
+          className="group/topic-controls overflow-hidden rounded-md border border-border bg-background shadow-md"
           style={{ zIndex: 20 }}
           aria-label="Topic graph controls"
-          onZoomIn={() => {
-            fittedViewportRef.current = false;
-          }}
-          onZoomOut={() => {
-            fittedViewportRef.current = false;
-          }}
-          onFitView={() => {
-            fittedViewportRef.current = true;
-            void fitView(FIT_VIEW_OPTIONS).then(() => {
-              setViewport(getViewport());
-            });
-          }}
         >
-          <ControlButton
-            type="button"
+          <TopicGraphControlButton
+            accessibleLabel="Zoom in"
+            label="Zoom in"
+            onClick={() => {
+              fittedViewportRef.current = false;
+              void zoomIn();
+            }}
+          >
+            <Plus aria-hidden="true" />
+          </TopicGraphControlButton>
+          <TopicGraphControlButton
+            accessibleLabel="Zoom out"
+            label="Zoom out"
+            onClick={() => {
+              fittedViewportRef.current = false;
+              void zoomOut();
+            }}
+          >
+            <Minus aria-hidden="true" />
+          </TopicGraphControlButton>
+          <TopicGraphControlButton
+            accessibleLabel="Fit view"
+            label="Fit view"
+            onClick={() => {
+              fittedViewportRef.current = true;
+              void fitView(FIT_VIEW_OPTIONS).then(() => {
+                setViewport(getViewport());
+              });
+            }}
+          >
+            <Scan aria-hidden="true" />
+          </TopicGraphControlButton>
+          <TopicGraphControlButton
+            accessibleLabel={lassoMode ? 'Disable additive lasso' : 'Enable additive lasso'}
+            label="Select topics"
+            pressed={lassoMode}
+            active={lassoMode}
             onClick={onToggleLassoMode}
-            aria-label={lassoMode ? 'Disable additive lasso' : 'Enable additive lasso'}
-            aria-pressed={lassoMode}
-            title={lassoMode ? 'Disable additive lasso' : 'Enable additive lasso'}
-            className={lassoMode ? '!bg-violet-100 !text-violet-700' : undefined}
           >
-            <LassoSelect className="size-4" aria-hidden="true" />
-          </ControlButton>
-          <ControlButton
-            type="button"
-            onClick={onDownload}
+            <LassoSelect aria-hidden="true" />
+          </TopicGraphControlButton>
+          <TopicGraphControlButton
+            accessibleLabel="Clear lasso filter"
+            label="Clear filter"
+            disabled={!lassoFilterActive}
+            onClick={onClearLassoFilter}
+          >
+            <FilterX aria-hidden="true" />
+          </TopicGraphControlButton>
+          <TopicGraphControlButton
+            accessibleLabel="Download chart"
+            label="Download chart"
             disabled={exportDisabled}
-            aria-label="Download chart"
-            title="Download chart"
+            onClick={onDownload}
           >
-            <Download className="size-4" aria-hidden="true" />
-          </ControlButton>
+            <Download aria-hidden="true" />
+          </TopicGraphControlButton>
         </Controls>
         <TopicLassoCanvas enabled={lassoMode} bubbles={bubbles} onComplete={onAddLassoTopics} />
       </ReactFlow>

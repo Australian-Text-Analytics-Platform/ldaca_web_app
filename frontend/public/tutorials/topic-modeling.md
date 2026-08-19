@@ -53,6 +53,13 @@ than split. After the run, a warning reports how many segments lost tail text.
 Automatic mode may overlap adjacent segments; its hidden overlap is one eighth
 of the cap, up to 32 tokens.
 
+<h4 id="help-topic-modeling-min-cluster-size">Minimum cluster size</h4>
+
+Sets the smallest number of Topic Segments that can form a natural HDBSCAN
+Topic. The default is 10 and the minimum is 2. Smaller values can produce more,
+finer natural Topics but may be noisier; larger values require more supporting
+segments per natural Topic. Changing this value requires a new run.
+
 <h4 id="help-topic-modeling-random-seed">Random seed</h4>
 
 Controls stochastic dimensionality reduction. The default is 0. Keep the same
@@ -79,7 +86,7 @@ execution parameter enables Run again; reverting exactly to the submitted
 request disables it. Words per topic, stop words, search, selection, and chart
 controls are presentation-only and do not enable Run. After failure or
 cancellation, Run stays disabled until **Clear Results** removes the Analysis;
-your segmentation method and token cap stay selected.
+your segmentation method, token cap, and minimum cluster size stay selected.
 
 <h2 id="help-topic-modeling-results">Result panel</h2>
 
@@ -100,10 +107,26 @@ and document assignments arrive. A failed request restores the previous value.
 Changing the count clears Topic selection and chart hover or zoom state. Search,
 stop words, and Words per topic remain in place.
 
-A successfully applied non-default count is remembered for the same Analysis.
-Rerunning creates a new Analysis at its natural count. Export and Add to
-Workspace use the displayed successful projection and are unavailable while an
-update is pending.
+A successfully applied non-default projection is remembered for the same
+Analysis. If a lower cluster count cannot support the current Top topics per
+row, Wordflow sends one update with that value clamped to the new count.
+Rerunning creates a new Analysis at its natural count and Top 2. Export and Add
+to Workspace use the displayed successful projection and are unavailable while
+an update is pending.
+
+<h3 id="help-topic-modeling-top-topics-per-row">Top topics per row</h3>
+
+**Top topics per row** controls how many of each source row's strongest
+positive real-topic shares contribute to bubble counts. The default is 2. Topic
+−1 and zero shares never count. If several Topics tie at the cutoff, all tied
+Topics count, so one row may contribute to more than this number and to several
+bubbles.
+
+Enter a value and press Enter or leave the input to request one update. Partial
+input and the already-applied value make no request. Changing only this value
+updates bubble sizes, corpus composition, Topic lists, tooltip counts, CSV, and
+publication membership without moving the Topic layout or clearing selection,
+search, lasso filters, pan, zoom, or an open Add to Workspace dialog.
 
 <h3 id="help-topic-modeling-words-per-topic">Words per topic and stop words</h3>
 
@@ -119,10 +142,12 @@ Result.
 
 <h3 id="help-topic-modeling-bubble-chart">Bubble chart</h3>
 
-Each bubble is a discovered topic. Bubble size reflects the documents whose
-dominant assignment is that topic; in a two-corpus run, colour composition
-shows the corpus split. Nearby bubbles have more similar topic representations.
-Topic −1 contains outlier documents that did not fit a discovered cluster.
+Each bubble is a discovered topic. Bubble size reflects source rows whose
+positive share for that Topic is within the displayed Top topics per row; in a
+two-corpus run, colour composition shows the corpus split. A row may count in
+multiple bubbles, so bubble totals need not equal the source-row count. Nearby
+bubbles have more similar topic representations. Topic −1 remains an outlier
+group and is not a real-Topic bubble membership.
 
 Hover for a representative-word cloud. Word order reflects c-TF-IDF
 distinctiveness, while word size reflects occurrences in assigned Topic
@@ -133,13 +158,15 @@ Drag empty graph space to pan and scroll or pinch to zoom. The graph initially
 fits every bubble; use **Fit view** to restore that complete view after moving
 around. Select topics directly, or enable the lasso control and draw around
 several Topic centres. Lasso mode remains active and later strokes add to the
-filter shown in **All Topics**; **Clear filter** removes that accumulated filter
-without changing manually selected Topics. Search further narrows the filtered
-list. Choose **Add to Workspace** to publish manually selected topic data and
-linked topic meanings as Derived Data Blocks.
+filter shown in **All Topics**; use **Clear filter** in the graph toolbar to
+remove that accumulated filter without changing manually selected Topics.
+Search further narrows the filtered list. Choose **Add to Workspace** to publish
+manually selected topic data and linked topic meanings as Derived Data Blocks.
 
-The download control exports the current panned and zoomed graph viewport. CSV
-output continues to contain the complete projected Topic result.
+The download control exports the current panned and zoomed graph viewport. Its
+header records Data Block, cluster count, Top topics per row, random seed, and
+Topic count. CSV output continues to contain the complete projected Topic
+result and its current counts.
 
 If Paragraph or Sentence segments were over the token cap, an amber message
 above the chart reports the truncated count and reminds you that their later
@@ -148,7 +175,8 @@ text was not modelled.
 <h3 id="help-topic-modeling-clear-results">Clear results</h3>
 
 **Clear Results** removes the retained Analysis and Result. The selected
-segmentation method and maximum-token value remain available for the next run.
+segmentation method, maximum-token value, and minimum cluster size remain
+available for the next run.
 
 <h2 id="help-topic-modeling-troubleshooting">Troubleshooting</h2>
 
@@ -167,16 +195,19 @@ segmentation method and maximum-token value remain available for the next run.
 | Sampling | 100% per Data Block |
 | Segmentation method | Automatic |
 | Maximum tokens per segment | 256 |
+| Minimum cluster size | 10 |
 | Random seed | 0 |
+| Top topics per row | 2, or the available Topic count when smaller |
 | Words per topic | 15 |
 
 ## Practice exercise
 
 1. Run a corpus with Automatic segmentation.
-2. Move Number of clusters down and compare the merged representative words.
-3. Clear the Result, choose Paragraph or Sentence, and run again with the same
+2. Change Top topics per row and compare bubble membership without moving the map.
+3. Move Number of clusters down and compare the merged representative words.
+4. Clear the Result, choose Paragraph or Sentence, and run again with the same
    sample and seed.
-4. Compare the topic map, representative words, outlier share, and any
+5. Compare the topic map, representative words, outlier share, and any
    truncation warning.
 
 [← Back to tutorial index](./index.md)

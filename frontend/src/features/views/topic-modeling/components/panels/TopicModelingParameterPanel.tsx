@@ -18,6 +18,7 @@ import {
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import {
   effectiveSampleDocumentCount,
+  sanitizeMinClusterSize,
   sanitizeSamplePercent,
   sanitizeMaxSegmentTokens,
   type CorpusSample,
@@ -43,6 +44,8 @@ interface Props {
   corpusSamples: CorpusSample[];
   nodeDocCounts: number[];
   onCorpusSampleChange: (idx: number, update: Partial<CorpusSample>) => void;
+  minClusterSize: number;
+  onMinClusterSizeChange: (value: number) => void;
   randomSeed: number;
   randomSeedUserSet: boolean;
   onRandomSeedChange: (value: number) => void;
@@ -76,6 +79,8 @@ export function TopicModelingParameterPanel({
   corpusSamples,
   nodeDocCounts,
   onCorpusSampleChange,
+  minClusterSize,
+  onMinClusterSizeChange,
   randomSeed,
   randomSeedUserSet,
   onRandomSeedChange,
@@ -93,6 +98,21 @@ export function TopicModelingParameterPanel({
   hasResult,
   parametersLocked,
 }: Props) {
+  const [minClusterSizeDraft, setMinClusterSizeDraft] = useState<NumericInputDraft>(() => ({
+    source: minClusterSize,
+    value: String(minClusterSize),
+  }));
+  const minClusterSizeValueDraft =
+    minClusterSizeDraft.source === minClusterSize
+      ? minClusterSizeDraft.value
+      : String(minClusterSize);
+
+  const handleMinClusterSizeBlur = (event: FocusEvent<HTMLInputElement>) => {
+    const next = sanitizeMinClusterSize(event.currentTarget.value);
+    setMinClusterSizeDraft({ source: next, value: String(next) });
+    onMinClusterSizeChange(next);
+  };
+
   const [maxSegmentTokensDraft, setMaxSegmentTokensDraft] = useState<NumericInputDraft>(() => ({
     source: maxSegmentTokens,
     value: String(maxSegmentTokens),
@@ -269,6 +289,38 @@ export function TopicModelingParameterPanel({
                 });
               }}
               onBlur={handleMaxSegmentTokensBlur}
+            />
+          </div>
+
+          <div className="min-w-[11rem] space-y-1">
+            <Label
+              htmlFor="topic-min-cluster-size"
+              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
+            >
+              Minimum cluster size
+              <span
+                aria-label="Minimum cluster size controls the smallest number of Topic Segments that can form a natural topic"
+                title="Sets the HDBSCAN minimum cluster size for the initial run. Smaller values can produce more natural topics. Changing it requires running a new analysis; Number of clusters only merges the resulting topics."
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
+              >
+                <CircleHelp className="h-4 w-4" />
+              </span>
+            </Label>
+            <Input
+              id="topic-min-cluster-size"
+              aria-label="Minimum cluster size"
+              type="number"
+              min={2}
+              step={1}
+              value={minClusterSizeValueDraft}
+              className="h-9 w-full px-2 text-right text-sm"
+              onChange={(event) => {
+                setMinClusterSizeDraft({
+                  source: minClusterSize,
+                  value: event.target.value,
+                });
+              }}
+              onBlur={handleMinClusterSizeBlur}
             />
           </div>
 

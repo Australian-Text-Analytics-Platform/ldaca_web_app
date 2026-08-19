@@ -39,9 +39,12 @@ document column and returns one run result with independent `documents[]` and
 complete `topics[]` lists plus run metadata and an opaque clustering context.
 Segmentation is the only mode-specific stage; the shared rollup weights
 retained segment text by Unicode character count without changing the
-equal-observation clustering input. A direct PyO3 projector cuts the context's
-real-Topic Ward tree and recomputes the same output contract without rerunning
-embedding, PaCMAP, or HDBSCAN.
+equal-observation clustering input. Direct PyO3 projectors cut the context's
+real-Topic Ward tree without rerunning embedding, PaCMAP, or HDBSCAN. Topic
+Data Block Creation requests complete row distributions. Result-time bubble
+queries request only Topic metadata plus aggregated
+`(corpus, topic, minimum N, count)` activations, so row distributions are not
+serialized across the native boundary for interactive Top-N changes.
 
 Expression APIs preserve lazy execution. Direct PyO3 functions are reserved
 for operations that are not natural expressions, such as model inventory,

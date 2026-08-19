@@ -74,6 +74,13 @@ const baseProps = {
       ],
       corpus_sizes: [4],
       meta: {},
+      topic_inclusion: {
+        top_n_topics: 2,
+        min_top_n_topics: 1,
+        max_top_n_topics: 4,
+        default_top_n_topics: 2,
+        adjustable: true,
+      },
     },
   },
   error: null,
@@ -91,10 +98,6 @@ const baseProps = {
     },
   ],
   containerRef: { current: null },
-  tooltip: { topic: null, x: 0, y: 0 },
-  setTooltip: vi.fn(),
-  hoveredTopicId: null,
-  setHoveredTopicId: vi.fn(),
   selectedTopicIds: new Set<number>(),
   onToggleTopicSelection: vi.fn(),
   onClearSelection: vi.fn(),
@@ -120,7 +123,15 @@ const baseProps = {
     default_cluster_count: 5,
     adjustable: true,
   },
+  topicInclusion: {
+    top_n_topics: 2,
+    min_top_n_topics: 1,
+    max_top_n_topics: 4,
+    default_top_n_topics: 2,
+    adjustable: true,
+  },
   onClusterCountCommit: vi.fn(),
+  onTopNTopicsCommit: vi.fn(),
   stopWordsEnabled: false,
   onStopWordsEnabledChange: vi.fn(),
   stopWords: [],
@@ -212,6 +223,40 @@ describe('TopicModelingResultsPanel', () => {
     expect(onClusterCountCommit).toHaveBeenCalledWith(3);
     fireEvent.keyUp(slider, { key: 'ArrowLeft' });
     expect(onClusterCountCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits each distinct Top-N value once on Enter or blur', () => {
+    const onTopNTopicsCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onTopNTopicsCommit={onTopNTopicsCommit} />
+      </TooltipProvider>,
+    );
+
+    const input = screen.getByRole('spinbutton', { name: 'Top topics per row' });
+    fireEvent.change(input, { target: { value: '3' } });
+    expect(onTopNTopicsCommit).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onTopNTopicsCommit).toHaveBeenCalledTimes(1);
+    expect(onTopNTopicsCommit).toHaveBeenCalledWith(3);
+    fireEvent.blur(input);
+    expect(onTopNTopicsCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not commit a partial or already-applied Top-N value', () => {
+    const onTopNTopicsCommit = vi.fn();
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel {...baseProps} onTopNTopicsCommit={onTopNTopicsCommit} />
+      </TooltipProvider>,
+    );
+
+    const input = screen.getByRole('spinbutton', { name: 'Top topics per row' });
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: '2' } });
+    fireEvent.blur(input);
+    expect(onTopNTopicsCommit).not.toHaveBeenCalled();
   });
 
   it('commits the latest draft once on release even after pointer capture is lost', () => {

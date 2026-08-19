@@ -1217,12 +1217,12 @@ class WorkspaceService:
                         request.topic_modeling_words_per_topic
                     )
                     changed = True
-            if "topic_modeling_cluster_selection" in request.model_fields_set:
+            if "topic_modeling_projection_selection" in request.model_fields_set:
                 if tab.kind is not AnalysisKind.TOPIC_MODELING:
                     raise InvalidInputError(
-                        "Topic cluster selection belongs only to Topic Modelling Tabs"
+                        "Topic projection selection belongs only to Topic Modelling Tabs"
                     )
-                selection = request.topic_modeling_cluster_selection
+                selection = request.topic_modeling_projection_selection
                 if selection is not None:
                     record = lease.workspace.analyses.get(str(selection.analysis_id))
                     if (
@@ -1233,7 +1233,7 @@ class WorkspaceService:
                         or record.result_payload is None
                     ):
                         raise InvalidInputError(
-                            "Topic cluster selection Analysis is unavailable"
+                            "Topic projection selection Analysis is unavailable"
                         )
                     stored = TopicModelingStoredResult.model_validate(
                         record.result_payload
@@ -1244,10 +1244,18 @@ class WorkspaceService:
                         <= stored.clustering.max_cluster_count
                     ):
                         raise InvalidInputError(
-                            "Topic cluster selection is outside the supported range"
+                            "Topic projection cluster count is outside the supported range"
                         )
-                if tab.topic_modeling_cluster_selection != selection:
-                    tab.topic_modeling_cluster_selection = selection
+                    if not (
+                        stored.topic_inclusion.min_top_n_topics
+                        <= selection.top_n_topics
+                        <= selection.cluster_count
+                    ):
+                        raise InvalidInputError(
+                            "Top topics per row is outside the supported range"
+                        )
+                if tab.topic_modeling_projection_selection != selection:
+                    tab.topic_modeling_projection_selection = selection
                     changed = True
             if changed:
                 tab.modified_at = datetime.now(UTC)

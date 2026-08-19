@@ -27,7 +27,7 @@ from ldaca_wordflow.domain.workspace import (
     Tab,
     TokenFrequencyAnalysisRequest,
     TopicModelingAnalysisRequest,
-    TopicModelingClusterSelection,
+    TopicModelingProjectionSelection,
     ValidAnalysisIntegrity,
     Workspace,
     TopicModelingDataBlockCreationAnalysisRequest,
@@ -179,6 +179,7 @@ def test_topic_modeling_data_block_creation_request_preserves_ordered_sources() 
         new_node_names={first: "First topics", second: "Second topics"},
         topic_ids=[3, 1],
         cluster_count=4,
+        top_n_topics=2,
         topic_meanings_override=[
             {"topic_id": 3, "words": ["one", "two"]},
             {"topic_id": 1, "words": ["three"]},
@@ -198,6 +199,16 @@ def test_topic_modeling_data_block_creation_request_preserves_ordered_sources() 
             selected_columns={first: ["text"]},
             new_node_names={first: "Topics"},
             cluster_count=2,
+            top_n_topics=2,
+        )
+    with pytest.raises(ValidationError, match="fit"):
+        TopicModelingDataBlockCreationAnalysisRequest(
+            node_ids=[first],
+            selected_columns={first: ["text"]},
+            new_node_names={first: "Topics"},
+            topic_ids=[2],
+            cluster_count=2,
+            top_n_topics=2,
         )
 
     document_creation = ConcordanceDocumentDataBlockCreationAnalysisRequest(
@@ -221,6 +232,7 @@ def test_topic_modeling_data_block_creation_request_preserves_ordered_sources() 
             selected_columns={first: ["text"]},
             new_node_names={first: "Topics", second: "Other topics"},
             cluster_count=2,
+            top_n_topics=2,
         )
     with pytest.raises(ValidationError):
         ConcordanceAnalysisRequest(
@@ -437,7 +449,7 @@ def test_workspace_supports_arbitrary_depth_analysis_forests_and_reservations() 
     assert tab.analysis_ids == [root.id, child.id, grandchild.id]
 
 
-def test_removing_topic_analysis_clears_its_tab_cluster_selection() -> None:
+def test_removing_topic_analysis_clears_its_tab_projection_selection() -> None:
     workspace = Workspace(name="topics")
     tab = workspace.add_tab(
         Tab.create(
@@ -458,14 +470,15 @@ def test_removing_topic_analysis_clears_its_tab_cluster_selection() -> None:
             timestamp=datetime.now(UTC),
         )
     )
-    tab.topic_modeling_cluster_selection = TopicModelingClusterSelection(
+    tab.topic_modeling_projection_selection = TopicModelingProjectionSelection(
         analysis_id=analysis.id,
         cluster_count=2,
+        top_n_topics=2,
     )
 
     workspace.remove_analysis(str(analysis.id))
 
-    assert tab.topic_modeling_cluster_selection is None
+    assert tab.topic_modeling_projection_selection is None
 
 
 def test_workspace_separates_live_visibility_from_detached_reservations() -> None:

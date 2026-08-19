@@ -2,8 +2,8 @@ import type { TopicModelingTopic } from '@/api';
 import { matchChecklistOption } from '@/features/views/common/checklistSearch';
 import { interpolateColor } from '../../topicModelingAdapters';
 
-const TOPIC_GRAPH_WIDTH = 1000;
-const TOPIC_GRAPH_HEIGHT = 550;
+export const TOPIC_GRAPH_WIDTH = 1000;
+export const TOPIC_GRAPH_HEIGHT = 550;
 
 export interface TopicGraphPoint {
   x: number;

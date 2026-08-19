@@ -126,6 +126,7 @@ class TopicModelingAnalysisRequest(_StrictModel):
     kind: Literal["topic_modeling"] = "topic_modeling"
     node_ids: list[uuid.UUID] = Field(min_length=1, max_length=2)
     node_columns: dict[uuid.UUID, NonEmptyText]
+    min_cluster_size: int = Field(default=10, ge=2)
     random_seed: int = 0
     sample_fractions: list[float | None] | None = None
     segmentation_method: TopicSegmentationMethod = TopicSegmentationMethod.AUTOMATIC
@@ -436,6 +437,7 @@ class TopicModelingDataBlockCreationAnalysisRequest(_StrictModel):
     new_node_names: dict[uuid.UUID, NonEmptyText]
     topic_ids: list[int] | None = None
     cluster_count: int = Field(ge=0)
+    top_n_topics: int = Field(ge=0)
     topic_meanings_override: list[TopicMeaningOverride] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -454,9 +456,18 @@ class TopicModelingDataBlockCreationAnalysisRequest(_StrictModel):
             set(self.topic_ids)
         ):
             raise ValueError("Selected Topic IDs must be unique")
+        if self.topic_ids is not None and any(
+            topic_id < 0 or topic_id >= self.cluster_count for topic_id in self.topic_ids
+        ):
+            raise ValueError("Selected Topic IDs must fit the selected cluster count")
+        minimum_top_n = 0 if self.cluster_count == 0 else 1
+        if not minimum_top_n <= self.top_n_topics <= self.cluster_count:
+            raise ValueError("Top topics per row must fit the selected cluster count")
         override_ids = [item.topic_id for item in self.topic_meanings_override]
         if len(override_ids) != len(set(override_ids)):
             raise ValueError("Topic meaning overrides must be unique")
+        if any(topic_id < 0 or topic_id >= self.cluster_count for topic_id in override_ids):
+            raise ValueError("Topic meaning overrides must fit the selected cluster count")
         return self
 
 

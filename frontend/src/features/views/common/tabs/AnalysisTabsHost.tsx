@@ -20,7 +20,7 @@
  * ownership or persisted state.
  */
 import { useEffect, useRef, type ComponentType } from 'react';
-import type { Analysis, TopicModelingClusterSelection } from '@/api';
+import type { Analysis, TopicModelingProjectionSelection } from '@/api';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useUserPreferences } from '@/features/preferences/useUserPreferences';
 import { useTabAnalysisForest } from '../hooks/useTabAnalysisForest';
@@ -44,7 +44,7 @@ interface AnalysisFeatureHost {
   correctionColumns: Record<string, string>;
   stopWords: string[];
   topicModelingWordsPerTopic: number | null;
-  topicModelingClusterSelection: TopicModelingClusterSelection | null;
+  topicModelingProjectionSelection: TopicModelingProjectionSelection | null;
   setInputSet: (selectorId: string, inputs: AnalysisTabInput[]) => void;
   setSetting: (key: string, value: string) => void;
   setCorrectionColumn: (nodeId: string, column: string | null) => Promise<void>;
@@ -52,7 +52,7 @@ interface AnalysisFeatureHost {
   setPresentationSettings: (patch: {
     stop_words?: string[];
     topic_modeling_words_per_topic?: number | null;
-    topic_modeling_cluster_selection?: TopicModelingClusterSelection | null;
+    topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
   }) => Promise<void>;
   refreshAnalyses: () => void;
 }
@@ -172,7 +172,7 @@ export function AnalysisTabsHost({
             correctionColumns: activeTab.annotation_correction_columns,
             stopWords: activeTab.stop_words,
             topicModelingWordsPerTopic: activeTab.topic_modeling_words_per_topic,
-            topicModelingClusterSelection: activeTab.topic_modeling_cluster_selection,
+            topicModelingProjectionSelection: activeTab.topic_modeling_projection_selection,
             setInputSet: (selectorId, inputs) => {
               setTabInputSet(activeTab.tab_id, selectorId, inputs);
             },

@@ -153,9 +153,9 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
     valid = await service.create_workspace("owner", "Valid")
     incompatible_ids = [
         _publish_workspace(service, owner_id="owner", name=f"Schema {version}")
-        for version in (16, 17)
+        for version in (17, 18)
     ]
-    for workspace_id, version in zip(incompatible_ids, (16, 17), strict=True):
+    for workspace_id, version in zip(incompatible_ids, (17, 18), strict=True):
         snapshot_path = workspaces_root(service.settings) / workspace_id / "workspace.json"
         payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
         payload["workspace_metadata"]["version"] = version
@@ -174,15 +174,15 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
         (record.stored_schema_version, record.supported_schema_version)
         for record in unavailable
         if isinstance(record, UnavailableWorkspaceRecord)
-    } == {(16, 18), (17, 18)}
+    } == {(17, 19), (18, 19)}
     assert all(
         isinstance(record, UnavailableWorkspaceRecord)
         and record.reason == "incompatible_format"
         for record in unavailable
     )
     unavailable_by_name = {record.name: record for record in unavailable}
-    assert unavailable_by_name["Schema 16"].description == "Description 16"
     assert unavailable_by_name["Schema 17"].description == "Description 17"
+    assert unavailable_by_name["Schema 18"].description == "Description 18"
     assert all(
         record.created_at == "2024-01-01T00:00:00+00:00"
         and record.modified_at == "2024-01-02T00:00:00+00:00"

@@ -30,11 +30,13 @@ from ldaca_wordflow.services.analysis_results import (
     _query_topics,
     _sort_and_page,
 )
+from ldaca_wordflow.services.topic_projection_cache import TopicProjectionBasisCache
 from ldaca_wordflow.shared.errors import (
     AnalysisCorruptError,
     ArtifactGoneError,
     InvalidClusterCountError,
     InvalidInputError,
+    InvalidTopicTopNError,
 )
 from ldaca_wordflow.shared.json_data import JsonData
 
@@ -81,6 +83,13 @@ def _topic_stored_result() -> TopicModelingStoredResult:
                 "default_cluster_count": 4,
                 "adjustable": True,
             },
+            "topic_inclusion": {
+                "top_n_topics": 2,
+                "min_top_n_topics": 1,
+                "max_top_n_topics": 4,
+                "default_top_n_topics": 2,
+                "adjustable": True,
+            },
             "clustering_context": {
                 "version": 1,
                 "artifact": {
@@ -99,7 +108,7 @@ def test_natural_topic_query_is_side_effect_free_and_hides_private_context() -> 
 
     payload = _query_topics(
         stored,
-        TopicModelingResultQuery(page=1, page_size=2),
+        TopicModelingResultQuery(),
         None,
     )
 
@@ -107,8 +116,15 @@ def test_natural_topic_query_is_side_effect_free_and_hides_private_context() -> 
     clustering = cast(dict[str, Any], payload["clustering"])
     topics = cast(list[dict[str, Any]], payload["topics"])
     assert clustering["cluster_count"] == 4
-    assert [row["id"] for row in topics] == [0, 1]
+    assert [row["id"] for row in topics] == [0, 1, 2, 3]
+    assert "pagination" not in payload
     assert stored.model_dump(mode="json") == before
+
+
+@pytest.mark.parametrize("field", ["page", "page_size"])
+def test_topic_query_rejects_pagination(field: str) -> None:
+    with pytest.raises(ValidationError):
+        TopicModelingResultQuery.model_validate({field: 1})
 
 
 def test_explicit_natural_topic_query_runs_projector(tmp_path, monkeypatch) -> None:
@@ -130,21 +146,12 @@ def test_explicit_natural_topic_query_runs_projector(tmp_path, monkeypatch) -> N
                 }
                 for topic_id in range(4)
             ],
-            "documents": [
-                {
-                    "doc_index": index,
-                    "dominant_topic": index,
-                    "topic_distribution": [
-                        {"topic_id": topic_id, "proportion": float(topic_id == index)}
-                        for topic_id in range(4)
-                    ],
-                }
-                for index in range(4)
-            ],
+            "activations": [[0, topic_id, 1, 1] for topic_id in range(4)],
+            "has_outlier": False,
         }
 
     monkeypatch.setattr(
-        "ldaca_wordflow.services.analysis_results._project_rust_topic_modeling",
+        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
         fake_project,
     )
 
@@ -156,6 +163,54 @@ def test_explicit_natural_topic_query_runs_projector(tmp_path, monkeypatch) -> N
 
     assert calls == [4]
     assert cast(dict[str, Any], payload["clustering"])["cluster_count"] == 4
+
+
+def test_changing_only_top_n_reuses_the_projection_basis(tmp_path, monkeypatch) -> None:
+    context_path = tmp_path / "context.msgpack.zst"
+    context_path.write_bytes(b"context")
+    calls = 0
+
+    def fake_project(**_kwargs):
+        nonlocal calls
+        calls += 1
+        return {
+            "topics": [
+                {
+                    "id": topic_id,
+                    "representative_words": [
+                        {"word": f"word-{topic_id}", "occurrence_count": 1}
+                    ],
+                    "x": float(topic_id),
+                    "y": 0.0,
+                }
+                for topic_id in range(4)
+            ],
+            "activations": [[0, 0, 1, 4], [0, 1, 2, 4], [0, 2, 2, 4]],
+            "has_outlier": False,
+        }
+
+    monkeypatch.setattr(
+        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
+        fake_project,
+    )
+    cache = TopicProjectionBasisCache(max_entries=16, max_bytes=1_000_000)
+
+    first = _query_topics(
+        _topic_stored_result(),
+        TopicModelingResultQuery(top_n_topics=1),
+        context_path,
+        cache,
+    )
+    tied = _query_topics(
+        _topic_stored_result(),
+        TopicModelingResultQuery(top_n_topics=2),
+        context_path,
+        cache,
+    )
+
+    assert calls == 1
+    assert first["per_corpus_topic_counts"] == [{"0": 4}]
+    assert tied["per_corpus_topic_counts"] == [{"0": 4, "1": 4, "2": 4}]
 
 
 def test_topic_query_rejects_count_with_current_bounds() -> None:
@@ -170,6 +225,22 @@ def test_topic_query_rejects_count_with_current_bounds() -> None:
         "min_cluster_count": 2,
         "max_cluster_count": 4,
         "default_cluster_count": 4,
+    }
+
+
+def test_topic_query_rejects_top_n_with_current_bounds() -> None:
+    with pytest.raises(InvalidTopicTopNError) as exc_info:
+        _query_topics(
+            _topic_stored_result(),
+            TopicModelingResultQuery(top_n_topics=5),
+            None,
+        )
+
+    assert exc_info.value.details == {
+        "min_top_n_topics": 1,
+        "max_top_n_topics": 4,
+        "default_top_n_topics": 2,
+        "cluster_count": 4,
     }
 
 
@@ -188,7 +259,7 @@ def test_topic_projection_marks_invalid_context_as_analysis_corrupt(
     context_path = tmp_path / "context.msgpack.zst"
     context_path.write_bytes(b"invalid")
     monkeypatch.setattr(
-        "ldaca_wordflow.services.analysis_results._project_rust_topic_modeling",
+        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
         lambda **_kwargs: (_ for _ in ()).throw(ValueError("invalid context")),
     )
 
@@ -200,7 +271,7 @@ def test_topic_projection_marks_invalid_context_as_analysis_corrupt(
         )
 
 
-def test_topic_projection_filters_and_pages_projected_topics(tmp_path, monkeypatch) -> None:
+def test_topic_projection_filters_projected_topics(tmp_path, monkeypatch) -> None:
     context_path = tmp_path / "context.msgpack.zst"
     context_path.write_bytes(b"context")
 
@@ -217,36 +288,25 @@ def test_topic_projection_filters_and_pages_projected_topics(tmp_path, monkeypat
                 }
                 for topic_id in range(2)
             ],
-            "documents": [
-                {
-                    "doc_index": index,
-                    "dominant_topic": index % 2,
-                    "topic_distribution": [
-                        {"topic_id": -1, "proportion": 0.0},
-                        {"topic_id": 0, "proportion": float(index % 2 == 0)},
-                        {"topic_id": 1, "proportion": float(index % 2 == 1)},
-                    ],
-                }
-                for index in range(4)
-            ],
+            "activations": [[0, 0, 1, 2], [0, 1, 1, 2]],
+            "has_outlier": False,
         }
 
     monkeypatch.setattr(
-        "ldaca_wordflow.services.analysis_results._project_rust_topic_modeling",
+        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
         fake_project,
     )
     payload = _query_topics(
         _topic_stored_result(),
-        TopicModelingResultQuery(cluster_count=2, topic_ids=[1], page=1, page_size=1),
+        TopicModelingResultQuery(cluster_count=2, topic_ids=[1]),
         context_path,
     )
 
     clustering = cast(dict[str, Any], payload["clustering"])
     topics = cast(list[dict[str, Any]], payload["topics"])
-    pagination = cast(dict[str, Any], payload["pagination"])
     assert clustering["cluster_count"] == 2
     assert [row["id"] for row in topics] == [1]
-    assert pagination["total_rows"] == 1
+    assert "pagination" not in payload
     assert payload["per_corpus_topic_counts"] == [{"0": 2, "1": 2}]
 
 

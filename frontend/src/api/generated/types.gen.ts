@@ -3145,28 +3145,6 @@ export type ResultColumnMetadata = {
 };
 
 /**
- * ResultPagination
- */
-export type ResultPagination = {
-    /**
-     * Page
-     */
-    page: number;
-    /**
-     * Page Size
-     */
-    page_size: number;
-    /**
-     * Total Pages
-     */
-    total_pages: number;
-    /**
-     * Total Rows
-     */
-    total_rows: number;
-};
-
-/**
  * ResultSorting
  */
 export type ResultSorting = {
@@ -3798,7 +3776,7 @@ export type Tab = {
      * Stop Words
      */
     stop_words?: Array<string>;
-    topic_modeling_cluster_selection?: TopicModelingClusterSelection | null;
+    topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
     /**
      * Topic Modeling Words Per Topic
      */
@@ -3834,7 +3812,7 @@ export type TabUpdate = {
      * Stop Words
      */
     stop_words?: Array<string> | null;
-    topic_modeling_cluster_selection?: TopicModelingClusterSelection | null;
+    topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
     /**
      * Topic Modeling Words Per Topic
      */
@@ -3956,6 +3934,32 @@ export type TopicClustering = {
 };
 
 /**
+ * TopicInclusion
+ */
+export type TopicInclusion = {
+    /**
+     * Adjustable
+     */
+    adjustable: boolean;
+    /**
+     * Default Top N Topics
+     */
+    default_top_n_topics: number;
+    /**
+     * Max Top N Topics
+     */
+    max_top_n_topics: number;
+    /**
+     * Min Top N Topics
+     */
+    min_top_n_topics: number;
+    /**
+     * Top N Topics
+     */
+    top_n_topics: number;
+};
+
+/**
  * TopicItem
  */
 export type TopicItem = {
@@ -4074,6 +4078,10 @@ export type TopicModelingAnalysisRequest = {
      */
     max_segment_tokens?: number;
     /**
+     * Min Cluster Size
+     */
+    min_cluster_size?: number;
+    /**
      * Node Columns
      */
     node_columns: {
@@ -4092,20 +4100,6 @@ export type TopicModelingAnalysisRequest = {
      */
     sample_fractions?: Array<number | null> | null;
     segmentation_method?: TopicSegmentationMethod;
-};
-
-/**
- * TopicModelingClusterSelection
- */
-export type TopicModelingClusterSelection = {
-    /**
-     * Analysis Id
-     */
-    analysis_id: string;
-    /**
-     * Cluster Count
-     */
-    cluster_count: number;
 };
 
 /**
@@ -4137,6 +4131,10 @@ export type TopicModelingDataBlockCreationAnalysisRequest = {
         [key: string]: Array<string>;
     };
     /**
+     * Top N Topics
+     */
+    top_n_topics: number;
+    /**
      * Topic Ids
      */
     topic_ids?: Array<number> | null;
@@ -4162,6 +4160,10 @@ export type TopicModelingDataBlockCreationDerivation = {
      * Role
      */
     role: 'topic_data' | 'topic_meanings';
+    /**
+     * Top N Topics
+     */
+    top_n_topics: number;
 };
 
 /**
@@ -4213,6 +4215,24 @@ export type TopicModelingDataBlockCreationResult = {
 };
 
 /**
+ * TopicModelingProjectionSelection
+ */
+export type TopicModelingProjectionSelection = {
+    /**
+     * Analysis Id
+     */
+    analysis_id: string;
+    /**
+     * Cluster Count
+     */
+    cluster_count: number;
+    /**
+     * Top N Topics
+     */
+    top_n_topics: number;
+};
+
+/**
  * TopicModelingResult
  */
 export type TopicModelingResult = {
@@ -4226,7 +4246,6 @@ export type TopicModelingResult = {
      */
     kind?: 'topic_modeling';
     meta: TopicMetadata;
-    pagination: ResultPagination;
     /**
      * Per Corpus Topic Counts
      */
@@ -4238,6 +4257,7 @@ export type TopicModelingResult = {
      * Sources
      */
     sources: Array<TopicSource>;
+    topic_inclusion: TopicInclusion;
     /**
      * Topics
      */
@@ -4261,17 +4281,13 @@ export type TopicModelingResultQuery = {
      */
     kind?: 'topic_modeling';
     /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Page Size
-     */
-    page_size?: number;
-    /**
      * Sort By
      */
     sort_by?: string | null;
+    /**
+     * Top N Topics
+     */
+    top_n_topics?: number | null;
     /**
      * Topic Ids
      */

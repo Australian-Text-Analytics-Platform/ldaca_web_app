@@ -29,6 +29,8 @@ Unknown settings are rejected.
 | `USER_FILE_IMPORT_CAPACITY` | Concurrent complete User File Imports on the independent scheduler |
 | `SHUTDOWN_GRACE_SECONDS` | Shared positive finite Analysis/import termination deadline |
 | `MAX_ANALYSIS_STORAGE_BYTES` / `MAX_ANALYSIS_STORAGE_FILES` | Private snapshot, output, and Artifact bounds per Analysis |
+| `MAX_TOPIC_PROJECTION_CACHE_ENTRIES` | Complete Topic projection bases retained per runtime; default 16, zero disables |
+| `MAX_TOPIC_PROJECTION_CACHE_BYTES` | Encoded Topic projection basis byte bound; default 67108864, zero disables |
 | `MAX_USER_FILE_IMPORT_BYTES` / `MAX_USER_FILE_IMPORT_FILES` | Staged output bounds per User File Import |
 | `MAX_USER_FILE_IMPORT_RECORD_BYTES` | Strict per-import JSON record limit |
 | `MAX_CONCURRENT_WORKSPACE_IMPORTS` | Archive import concurrency |
@@ -58,6 +60,12 @@ Both execution capacities default to two and accept any positive integer with
 no schema ceiling or unlimited sentinel. `SHUTDOWN_GRACE_SECONDS` defaults to
 10 seconds and must be positive and finite. All three are immutable for one
 runtime and change only after restart.
+
+The Topic projection cache is process-local and runtime-owned. It stores only
+compact, complete, N-independent bases by principal, Workspace, Analysis,
+immutable context identity, and cluster count. Entry or byte limit zero
+disables retention. Oversized bases still serve their current request, while
+failed or invalid projections are never retained.
 
 ## Server And Providers
 

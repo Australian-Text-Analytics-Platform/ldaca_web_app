@@ -76,7 +76,7 @@ def _sample_corpora_for_topic_modeling(
     - ``_compute_topic_payload`` in ``topic_modeling``.
 
     The flattened ``all_docs`` order (corpus 0 documents, then corpus 1, ...) is
-    the contract shared with ``_build_topic_result_payload``: the native result's
+    shared by Topic Result and Data Block projection: the native result's
     ``documents[].doc_index`` indexes back into this sampled document list, and
     ``corpus_sizes`` splits the flat result back into per-corpus summaries.
     """
@@ -335,26 +335,12 @@ def _run_rust_topic_modeling(
     }
 
 
-def _project_rust_topic_modeling(
-    *, clustering_context: bytes, cluster_count: int, document_count: int
-) -> dict[str, Any]:
-    """Project a validated native context without rerunning model stages."""
+def _normalize_projected_topics(
+    raw_topics: object, cluster_count: int
+) -> list[dict[str, Any]]:
+    """Validate the Topic metadata shared by native projection responses."""
 
-    from polars_text import _internal
-
-    try:
-        raw_result = json.loads(
-            _internal.project_topic_modeling_context(
-                clustering_context, int(cluster_count)
-            )
-        )
-    except (TypeError, ValueError, RuntimeError) as exc:
-        raise ValueError("Topic clustering context is invalid") from exc
-    raw_topics = raw_result.get("topics")
-    raw_documents = raw_result.get("documents")
-    if not isinstance(raw_topics, list) or not isinstance(raw_documents, list):
-        raise ValueError("Topic projection result is malformed")
-    if len(raw_topics) != cluster_count or len(raw_documents) != document_count:
+    if not isinstance(raw_topics, list) or len(raw_topics) != cluster_count:
         raise ValueError("Topic projection result has invalid dimensions")
     topics: list[dict[str, Any]] = []
     for expected_id, raw_topic in enumerate(raw_topics):
@@ -371,6 +357,32 @@ def _project_rust_topic_modeling(
                 "y": float(topic.get("y") or 0.0),
             }
         )
+    return topics
+
+
+def _project_rust_topic_modeling(
+    *, clustering_context: bytes, cluster_count: int, document_count: int
+) -> dict[str, Any]:
+    """Project complete row distributions for Data Block Creation."""
+
+    from polars_text import _internal
+
+    try:
+        raw_result = json.loads(
+            _internal.project_topic_modeling_context(
+                clustering_context, int(cluster_count)
+            )
+        )
+    except (TypeError, ValueError, RuntimeError) as exc:
+        raise ValueError("Topic clustering context is invalid") from exc
+    if not isinstance(raw_result, dict):
+        raise ValueError("Topic projection result is malformed")
+    raw_documents = raw_result.get("documents")
+    if not isinstance(raw_documents, list):
+        raise ValueError("Topic projection result is malformed")
+    if len(raw_documents) != document_count:
+        raise ValueError("Topic projection result has invalid dimensions")
+    topics = _normalize_projected_topics(raw_result.get("topics"), cluster_count)
     documents: list[dict[str, Any]] = []
     expected_topic_ids = {-1, *range(cluster_count)}
     for expected_index, raw_document in enumerate(raw_documents):
@@ -379,12 +391,19 @@ def _project_rust_topic_modeling(
         document = cast(dict[str, Any], raw_document)
         if int(document.get("doc_index", -1)) != expected_index:
             raise ValueError("Topic projection document indices are invalid")
-        distribution = {
-            int(topic_id): float(proportion)
-            for topic_id, proportion in document.get("topic_distribution") or []
-        }
-        if not set(distribution).issubset(expected_topic_ids):
-            raise ValueError("Topic projection distribution contains an unknown Topic")
+        distribution: dict[int, float] = {}
+        for raw_entry in document.get("topic_distribution") or []:
+            try:
+                topic_id, proportion = raw_entry
+                normalized_topic_id = int(topic_id)
+                normalized_proportion = float(proportion)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Topic projection distribution is malformed") from exc
+            if normalized_topic_id not in expected_topic_ids:
+                raise ValueError("Topic projection distribution contains an unknown Topic")
+            if normalized_topic_id in distribution:
+                raise ValueError("Topic projection distribution contains a duplicate Topic")
+            distribution[normalized_topic_id] = normalized_proportion
         documents.append(
             {
                 "doc_index": expected_index,
@@ -392,9 +411,9 @@ def _project_rust_topic_modeling(
                 "topic_distribution": [
                     {
                         "topic_id": topic_id,
-                        "proportion": distribution.get(topic_id, 0.0),
+                        "proportion": distribution[topic_id],
                     }
-                    for topic_id in [-1, *range(cluster_count)]
+                    for topic_id in sorted(distribution)
                 ],
             }
         )
@@ -407,4 +426,63 @@ def _project_rust_topic_modeling(
             raw_result.get("truncated_segment_count") or 0
         ),
         "stage_timings_ms": [],
+    }
+
+
+def _project_rust_topic_projection_basis(
+    *, clustering_context: bytes, cluster_count: int, corpus_sizes: list[int]
+) -> dict[str, Any]:
+    """Project compact N-independent bubble-count facts in native code."""
+
+    from polars_text import _internal
+
+    try:
+        raw_basis = json.loads(
+            _internal.project_topic_modeling_basis(
+                clustering_context,
+                int(cluster_count),
+                [int(size) for size in corpus_sizes],
+            )
+        )
+    except (TypeError, ValueError, RuntimeError) as exc:
+        raise ValueError("Topic clustering context is invalid") from exc
+    if not isinstance(raw_basis, dict):
+        raise ValueError("Topic projection basis is malformed")
+    topics = _normalize_projected_topics(raw_basis.get("topics"), cluster_count)
+    raw_activations = raw_basis.get("activations")
+    if not isinstance(raw_activations, list):
+        raise ValueError("Topic projection basis is malformed")
+    activations: list[list[int]] = []
+    previous_key: tuple[int, int, int] | None = None
+    for raw_activation in raw_activations:
+        if not isinstance(raw_activation, list) or len(raw_activation) != 4:
+            raise ValueError("Topic projection activation is malformed")
+        try:
+            corpus_index = int(raw_activation[0])
+            topic_id = int(raw_activation[1])
+            minimum_n = int(raw_activation[2])
+            count = int(raw_activation[3])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Topic projection activation is malformed") from exc
+        key = (corpus_index, topic_id, minimum_n)
+        if (
+            corpus_index < 0
+            or corpus_index >= len(corpus_sizes)
+            or topic_id < 0
+            or topic_id >= cluster_count
+            or minimum_n < 1
+            or minimum_n > cluster_count
+            or count < 1
+            or (previous_key is not None and key <= previous_key)
+        ):
+            raise ValueError("Topic projection activation is invalid")
+        activations.append([corpus_index, topic_id, minimum_n, count])
+        previous_key = key
+    has_outlier = raw_basis.get("has_outlier")
+    if not isinstance(has_outlier, bool):
+        raise ValueError("Topic projection basis is malformed")
+    return {
+        "topics": topics,
+        "activations": activations,
+        "has_outlier": has_outlier,
     }

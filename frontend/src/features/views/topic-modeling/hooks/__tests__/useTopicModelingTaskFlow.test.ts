@@ -28,7 +28,7 @@ describe('useTopicModelingTaskFlow', () => {
         randomSeed: 0,
         representativeWordsCount: 10,
         sampleFractions: null,
-        minTopicSize: 5,
+        minClusterSize: 5,
         segmentationMethod: 'paragraph',
         maxSegmentTokens: 64,
       },
@@ -50,6 +50,7 @@ describe('useTopicModelingTaskFlow', () => {
           request: expect.objectContaining({
             kind: 'topic_modeling',
             node_ids: ['node-1'],
+            min_cluster_size: 5,
             segmentation_method: 'paragraph',
             max_segment_tokens: 64,
           }),

@@ -56,8 +56,8 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
         ],
         [
             {"topic_id": -1, "proportion": 0.0},
-            {"topic_id": 0, "proportion": 0.0},
-            {"topic_id": 1, "proportion": 0.0},
+            {"topic_id": 0, "proportion": 0.6},
+            {"topic_id": 1, "proportion": 0.4},
         ],
         [
             {"topic_id": -1, "proportion": 0.0},
@@ -103,6 +103,7 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
             },
             "topic_ids": [1],
             "cluster_count": 2,
+            "top_n_topics": 2,
             "topic_meanings_override": [{"topic_id": 1, "words": ["new"]}],
         },
         clustering_context_path=str(context_path),
@@ -126,7 +127,8 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
         TOPIC_TOP1_COLUMN,
         TOPIC_DISTRIBUTION_OUTPUT_COLUMN,
     ]
-    assert data["text"].to_list() == ["zero", "two"]
+    assert data["text"].to_list() == ["zero", "one", "two"]
+    assert data[TOPIC_TOP1_COLUMN].to_list() == [1, 0, 1]
     output_dtype = data.schema[TOPIC_DISTRIBUTION_OUTPUT_COLUMN]
     assert isinstance(output_dtype, pl.Extension)
     assert output_dtype.ext_name() == "org.ldaca.wordflow.topic_distribution.v1"
@@ -142,5 +144,12 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
     assert all(progress < 1.0 for progress, _message in progress_updates)
     meanings = pl.read_parquet(first["topic_meanings"]["parquet_path"])
     assert meanings.to_dicts() == [
+        {TOPIC_COLUMN: 0, TOPIC_MEANING_COLUMN: ["old"]},
         {TOPIC_COLUMN: 1, TOPIC_MEANING_COLUMN: ["new"]}
     ]
+    assert first["topic_data"]["data_block"]["provenance"]["operation"] == {
+        "kind": "topic_modeling_data_block_creation",
+        "role": "topic_data",
+        "cluster_count": 2,
+        "top_n_topics": 2,
+    }

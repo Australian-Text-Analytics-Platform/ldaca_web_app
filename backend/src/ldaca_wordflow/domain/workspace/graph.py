@@ -167,9 +167,9 @@ class Workspace:
         for tab in self.tabs.values():
             if parsed in tab.analysis_ids:
                 tab.analysis_ids.remove(parsed)
-            selection = tab.topic_modeling_cluster_selection
+            selection = tab.topic_modeling_projection_selection
             if selection is not None and selection.analysis_id == parsed:
-                tab.topic_modeling_cluster_selection = None
+                tab.topic_modeling_projection_selection = None
 
     def replace_analysis(self, analysis: AnalysisRecord) -> AnalysisRecord:
         """Replace one valid lifecycle record without changing its identity."""

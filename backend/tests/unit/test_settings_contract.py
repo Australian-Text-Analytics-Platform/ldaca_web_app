@@ -93,6 +93,14 @@ def test_network_and_capacity_settings_are_bounded() -> None:
         Settings(max_analysis_storage_bytes=0)
     with pytest.raises(ValidationError):
         Settings(max_analysis_storage_files=0)
+    assert Settings().max_topic_projection_cache_entries == 16
+    assert Settings().max_topic_projection_cache_bytes == 67_108_864
+    assert Settings(max_topic_projection_cache_entries=0).max_topic_projection_cache_entries == 0
+    assert Settings(max_topic_projection_cache_bytes=0).max_topic_projection_cache_bytes == 0
+    with pytest.raises(ValidationError):
+        Settings(max_topic_projection_cache_entries=-1)
+    with pytest.raises(ValidationError):
+        Settings(max_topic_projection_cache_bytes=-1)
     with pytest.raises(ValidationError):
         Settings(shutdown_grace_seconds=0)
     with pytest.raises(ValidationError):

@@ -218,7 +218,7 @@ def test_tab_resources_are_exact_and_the_collection_is_unpaginated() -> None:
         "annotation_correction_columns",
         "stop_words",
         "topic_modeling_words_per_topic",
-        "topic_modeling_cluster_selection",
+        "topic_modeling_projection_selection",
         "created_at",
         "modified_at",
         "revision",
@@ -228,7 +228,7 @@ def test_tab_resources_are_exact_and_the_collection_is_unpaginated() -> None:
         "annotation_correction_columns",
         "stop_words",
         "topic_modeling_words_per_topic",
-        "topic_modeling_cluster_selection",
+        "topic_modeling_projection_selection",
     }
     collection = schema["paths"]["/api/workspaces/{workspace_id}/tabs"]["get"]
     assert [parameter["name"] for parameter in collection["parameters"]] == [
@@ -261,6 +261,15 @@ def test_pagination_is_one_based_everywhere_it_is_exposed() -> None:
                 if option.get("type") == "integer"
             )
         assert minimum == 1
+
+
+def test_topic_modeling_result_is_complete_and_not_paginated() -> None:
+    schemas = app.openapi()["components"]["schemas"]
+
+    assert "pagination" not in schemas["TopicModelingResult"]["properties"]
+    query_properties = schemas["TopicModelingResultQuery"]["properties"]
+    assert "page" not in query_properties
+    assert "page_size" not in query_properties
 
 
 def test_every_validation_response_uses_the_safe_api_error_contract() -> None:

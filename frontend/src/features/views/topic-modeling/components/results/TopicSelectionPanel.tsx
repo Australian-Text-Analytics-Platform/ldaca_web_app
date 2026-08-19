@@ -1,8 +1,8 @@
-import React from 'react';
 import type { TopicModelingTopic } from '@/api';
 import { Search, X } from 'lucide-react';
 import { matchChecklistOption } from '@/features/views/common/checklistSearch';
 import { topicRepresentativeText } from '../../topicModelingAdapters';
+import { TopicSizeComposition, type TopicCorpusPresentation } from './TopicSizeComposition';
 
 interface Props {
   topics: TopicModelingTopic[];
@@ -12,18 +12,17 @@ interface Props {
   topicSearchQuery: string;
   onTopicSearchQueryChange: (query: string) => void;
   lassoTopicIds: Set<number>;
-  onClearLassoFilter: () => void;
-  renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
+  corpusPresentation: TopicCorpusPresentation;
   hoveredTopicId: number | null;
-  setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
+  onHoveredTopicChange: (topicId: number | null) => void;
 }
 
 /**
  * Renders selected and available topic lists beneath the bubble chart.
- * Rendered by: TopicModelingBubbleChartSection, which shares chart hover,
- * selection, search, and lasso-filter state with this list.
- * Flow: sort by size, intersect lasso and search filters, then keep list hover and
- * selection actions synchronized with the chart.
+ * Rendered by: TopicModelingBubbleChartSection, which shares list hover,
+ * selection, search, and lasso-filter state with the chart.
+ * Flow: sort by size, intersect lasso and search filters, then project list hover
+ * into bubble emphasis while keeping bubble hover local to the graph node.
  */
 export function TopicSelectionPanel({
   topics,
@@ -33,10 +32,9 @@ export function TopicSelectionPanel({
   topicSearchQuery,
   onTopicSearchQueryChange,
   lassoTopicIds,
-  onClearLassoFilter,
-  renderSizeComposition,
+  corpusPresentation,
   hoveredTopicId,
-  setHoveredTopicId,
+  onHoveredTopicChange,
 }: Props) {
   const sortedTopics = topics.toSorted((a, b) => b.total_size - a.total_size);
   const hasLassoFilter = lassoTopicIds.size > 0;
@@ -82,10 +80,10 @@ export function TopicSelectionPanel({
                   key={topic.id}
                   className={`flex items-center justify-between rounded-lg border border-border p-2 transition-colors ${isHovered ? 'bg-accent' : 'bg-muted/50'}`}
                   onMouseEnter={() => {
-                    setHoveredTopicId(topic.id);
+                    onHoveredTopicChange(topic.id);
                   }}
                   onMouseLeave={() => {
-                    setHoveredTopicId(null);
+                    onHoveredTopicChange(null);
                   }}
                 >
                   <div className="min-w-0 flex-1">
@@ -116,25 +114,13 @@ export function TopicSelectionPanel({
 
       {/* Right column: all topics (filtered) */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h4 className="text-sm font-medium text-foreground">
-            All Topics (
-            {hasLassoFilter
-              ? `${String(filteredTopics.length)} of ${String(topics.length)}`
-              : filteredTopics.length}
-            )
-          </h4>
-          {hasLassoFilter ? (
-            <button
-              type="button"
-              className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={onClearLassoFilter}
-              aria-label="Clear lasso filter"
-            >
-              Clear filter
-            </button>
-          ) : null}
-        </div>
+        <h4 className="text-sm font-medium text-foreground">
+          All Topics (
+          {hasLassoFilter
+            ? `${String(filteredTopics.length)} of ${String(topics.length)}`
+            : filteredTopics.length}
+          )
+        </h4>
         <div className="relative">
           <Search className="pointer-events-none absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <input
@@ -171,15 +157,19 @@ export function TopicSelectionPanel({
                   }
                 }}
                 onMouseEnter={() => {
-                  setHoveredTopicId(topic.id);
+                  onHoveredTopicChange(topic.id);
                 }}
                 onMouseLeave={() => {
-                  setHoveredTopicId(null);
+                  onHoveredTopicChange(null);
                 }}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">Topic {topic.id}</span>
-                  {renderSizeComposition(topic.size, topic.total_size)}
+                  <TopicSizeComposition
+                    sizes={topic.size}
+                    total={topic.total_size}
+                    {...corpusPresentation}
+                  />
                 </div>
                 <div
                   className="mt-0.5 truncate text-xs text-muted-foreground"

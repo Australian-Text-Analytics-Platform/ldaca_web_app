@@ -44,6 +44,7 @@ then use the same downstream modelling pipeline.
 - Explore prominent and niche language patterns.
 - Compare the contribution of two corpora to the same discovered topics.
 - Adjust the displayed number of real Topics from the natural fit down to two.
+- Count each row in bubbles for its strongest one or more positive Topics.
 - Inspect representative words, topic sizes, similarity, and outliers.
 - Pan and zoom the fitted Topic graph, or cumulatively lasso Topics to filter
   the All Topics list.
@@ -54,16 +55,27 @@ then use the same downstream modelling pipeline.
 Topic modelling is not a classifier or a definitive account of what a corpus
 is “about”. Clusters can reflect subject matter, genre, author, boilerplate,
 document length, or data-cleaning artefacts. Topic −1 is the expected outlier
-group rather than an error. Sampling, segmentation, the displayed number of
-clusters, and the random seed can all affect the result, so compare
-configurations and return to the source documents when naming or interpreting
-a topic.
+group rather than an error. Sampling, segmentation, minimum cluster size, the
+displayed number of clusters, and the random seed can all affect the result, so
+compare configurations and return to the source documents when naming or
+interpreting a topic.
+
+Minimum cluster size controls the smallest number of Topic Segments that can
+form a natural HDBSCAN Topic during the initial run. Its default is 10 and its
+minimum is 2. Changing it requires a new run and may change the maximum natural
+Topic count.
 
 The Number of clusters Result control merges HDBSCAN's natural real Topics; it
 does not rerun the model and cannot split above that natural count. Topic −1 is
 never counted or merged. After each change Wordflow recalculates representative
-words, coordinates, and document assignments. Bubble size remains the integer
-number of source documents whose weighted dominant assignment is that topic.
+words, coordinates, and document assignments.
+
+Top topics per row defaults to two. A bubble counts a source row when that
+Topic has a positive share among the row's strongest N real-topic shares.
+Outlier −1 and zero shares do not count; ties at the cutoff all count. A row can
+therefore contribute to several bubbles, and bubble totals can exceed the
+number of source rows. Changing only Top N updates counts without changing the
+map layout or clearing graph interactions.
 
 The term *topic* is technical rather than authorial. A critical overview is
 available in [this open-access article](https://doi.org/10.1177/14614456241293075)
