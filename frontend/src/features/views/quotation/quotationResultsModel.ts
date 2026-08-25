@@ -47,7 +47,9 @@ const toQuotationCellText = (value: unknown): string => {
     return String(value);
   }
   if (typeof value === 'string') return value;
-  return JSON.stringify(value);
+  return JSON.stringify(value, (_key, child: unknown) =>
+    typeof child === 'bigint' ? child.toString() : child,
+  );
 };
 
 /** Returns the stable product palette entry for one canonical highlight type. */
@@ -96,19 +98,28 @@ const normalizeSpan = (
   end: unknown,
   type: unknown,
 ): QuotationSpan | null => {
+  const toSafeIndex = (value: unknown): number | null => {
+    if (typeof value === 'bigint') {
+      if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+      return Number(value);
+    }
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+      return null;
+    }
+    return value;
+  };
+  const safeStart = toSafeIndex(start);
+  const safeEnd = toSafeIndex(end);
   if (
     !isQuotationHighlightType(type) ||
-    typeof start !== 'number' ||
-    typeof end !== 'number' ||
-    !Number.isInteger(start) ||
-    !Number.isInteger(end) ||
-    start < 0 ||
-    end <= start
+    safeStart === null ||
+    safeEnd === null ||
+    safeEnd <= safeStart
   ) {
     return null;
   }
-  const normalizedStart = offsets[start];
-  const normalizedEnd = offsets[end];
+  const normalizedStart = offsets[safeStart];
+  const normalizedEnd = offsets[safeEnd];
   if (normalizedStart === undefined || normalizedEnd === undefined) return null;
   return { start: normalizedStart, end: normalizedEnd, type };
 };

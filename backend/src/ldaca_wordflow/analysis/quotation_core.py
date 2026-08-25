@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from functools import partial
 from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 
@@ -22,7 +23,6 @@ import polars as pl
 from polars.exceptions import ColumnNotFoundError
 
 from ..domain.workspace import Node
-from ..shared.serialization import serialize_json_rows
 from ..shared.errors import InvalidInputError
 from ..models.quotation import QuotationEngineType, ResolvedQuotationEngine
 from .generated_columns import (
@@ -45,10 +45,42 @@ from .generated_columns import (
 logger = logging.getLogger(__name__)
 
 QUOTATION_GROUP_COLUMN = "quotation"
+QUOTATION_GROUP_DTYPE = pl.List(
+    pl.Struct(
+        {
+            "speaker": pl.Utf8,
+            "speaker_start_idx": pl.Int64,
+            "speaker_end_idx": pl.Int64,
+            "quote": pl.Utf8,
+            "quote_start_idx": pl.Int64,
+            "quote_end_idx": pl.Int64,
+            "verb": pl.Utf8,
+            "verb_start_idx": pl.Int64,
+            "verb_end_idx": pl.Int64,
+            "quote_type": pl.Utf8,
+            "quote_token_count": pl.Int64,
+            "is_floating_quote": pl.Boolean,
+            "quote_row_idx": pl.Int64,
+        }
+    )
+)
 CORE_QUOTATION_COLUMNS = QUOTE_COLUMN_NAMES
 
 RemoteQuotationExtractor = Callable[..., Awaitable[dict[str, Any]]]
 BlockingRunner = Callable[..., Awaitable[Any]]
+
+
+@dataclass(frozen=True, slots=True)
+class QuotationPage:
+    """One source-document page with native grouped quotation values."""
+
+    frame: pl.DataFrame
+    page: int
+    page_size: int
+    total_source_rows: int
+    has_next: bool
+    sort_by: str | None
+    descending: bool
 
 
 def to_polars_dataframe(data: Any) -> pl.DataFrame:
@@ -262,7 +294,14 @@ def remote_payload_to_grouped_dataframe(
     grouped_quotes = [
         quotes_by_identifier.get(str(idx), []) for idx in range(base_df.height)
     ]
-    return base_df.with_columns(pl.Series(QUOTATION_GROUP_COLUMN, grouped_quotes))
+    return base_df.with_columns(
+        pl.Series(
+            QUOTATION_GROUP_COLUMN,
+            grouped_quotes,
+            dtype=QUOTATION_GROUP_DTYPE,
+            strict=False,
+        )
+    )
 
 
 def _project_quotation_hit(raw_hit: dict[str, Any]) -> dict[str, Any]:
@@ -295,16 +334,6 @@ def _quotation_hit_has_content(hit: dict[str, Any]) -> bool:
     return False
 
 
-def _quotation_metadata(columns: list[str]) -> dict[str, list[str]]:
-    """Support quotation computation helpers with a quotation metadata helper."""
-
-    return {
-        "quotation_columns": [c for c in columns if c in CORE_QUOTATION_COLUMNS],
-        "metadata_columns": [c for c in columns if c not in CORE_QUOTATION_COLUMNS],
-        "all_columns": columns,
-    }
-
-
 def _empty_flattened_quotation_dataframe(result_df: pl.DataFrame) -> pl.DataFrame:
     """Support quotation computation helpers with an empty flattened quotation dataframe helper."""
 
@@ -328,47 +357,6 @@ def _empty_flattened_quotation_dataframe(result_df: pl.DataFrame) -> pl.DataFram
         QUOTE_ROW_IDX_COLUMN: cast(pl.DataType, pl.Int64),
     }
     return pl.DataFrame(schema=schema)
-
-
-def _serialize_grouped_quotation_rows(
-    result_df: pl.DataFrame,
-) -> tuple[list[list[dict[str, Any]]], list[str]]:
-    """Serialize collected quotation rows into grouped per-document hit lists."""
-    if result_df.height == 0:
-        return [], []
-
-    metadata_columns = [
-        column for column in result_df.columns if column != QUOTATION_GROUP_COLUMN
-    ]
-    columns = [
-        *metadata_columns,
-        *CORE_QUOTATION_COLUMNS,
-    ]
-
-    grouped_rows: list[list[dict[str, Any]]] = []
-    for row in result_df.to_dicts():
-        raw_hits = row.get(QUOTATION_GROUP_COLUMN) or []
-        if not isinstance(raw_hits, list):
-            continue
-
-        base_row = {
-            key: value for key, value in row.items() if key != QUOTATION_GROUP_COLUMN
-        }
-        grouped_hits: list[dict[str, Any]] = []
-        for raw_hit in raw_hits:
-            if not isinstance(raw_hit, dict):
-                continue
-            projected_hit = {
-                **base_row,
-                **_project_quotation_hit(raw_hit),
-            }
-            if _quotation_hit_has_content(projected_hit):
-                grouped_hits.append(projected_hit)
-
-        if grouped_hits:
-            grouped_rows.append(grouped_hits)
-
-    return grouped_rows, columns
 
 
 def flatten_grouped_quotation_dataframe(result_df: pl.DataFrame) -> pl.DataFrame:
@@ -430,7 +418,7 @@ async def compute_quote_dataframe(
         documents = await run_blocking(prepare_documents_payload, base_df, column)
         if not documents:
             return base_df.with_columns(
-                pl.Series(QUOTATION_GROUP_COLUMN, [], dtype=pl.List(pl.Null))
+                pl.Series(QUOTATION_GROUP_COLUMN, [], dtype=QUOTATION_GROUP_DTYPE)
             )
         payload = await extract_remote_paginated(
             engine,
@@ -481,7 +469,7 @@ async def compute_on_demand_page(
     descending: bool,
     compute_quote_dataframe_fn,
     run_blocking: BlockingRunner,
-) -> Dict[str, Any]:
+) -> QuotationPage:
     """Compute one on-demand quotation page from source node data.
 
     - When `page_size` is None, estimate through bounded density probes.
@@ -533,27 +521,19 @@ async def compute_on_demand_page(
     quote_df = await compute_quote_dataframe_fn(
         node, slice_df, column, engine, use_base_only=True
     )
-    page_rows, columns = await run_blocking(_serialize_grouped_quotation_rows, quote_df)
-    metadata = _quotation_metadata(columns)
+    page_frame = quote_df.filter(
+        pl.col(QUOTATION_GROUP_COLUMN).list.len().fill_null(0) > 0
+    )
 
-    return {
-        "data": serialize_json_rows(page_rows),
-        "columns": columns,
-        "metadata": metadata,
-        "pagination": {
-            "page": page,
-            "page_size": effective_page_size,
-            "total_source_rows": total_source_rows,
-            "total_source_pages": total_source_pages,
-            "result_count": len(page_rows),
-            "has_next": page < total_source_pages,
-            "has_prev": page > 1,
-        },
-        "sorting": {
-            "sort_by": effective_sort_by,
-            "descending": descending,
-        },
-    }
+    return QuotationPage(
+        frame=page_frame,
+        page=page,
+        page_size=effective_page_size,
+        total_source_rows=total_source_rows,
+        has_next=page < total_source_pages,
+        sort_by=effective_sort_by,
+        descending=descending,
+    )
 
 
 async def compute_quotation_page(
@@ -569,7 +549,7 @@ async def compute_quotation_page(
     quotation_service_timeout: float,
     extract_remote_fn: RemoteQuotationExtractor,
     run_blocking: BlockingRunner,
-) -> Dict[str, Any]:
+) -> QuotationPage:
     """Compute one quotation page with the configured local/remote extractor.
 
 

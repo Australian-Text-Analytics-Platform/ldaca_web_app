@@ -75,6 +75,38 @@ describe('quotationResultsModel', () => {
     ]);
   });
 
+  it('accepts bounded native Int64 offsets and rejects string or unsafe offsets', () => {
+    const base = { text: 'abcdef', [QUOTATION_COLUMN_KEYS.quote]: 'bc' };
+    const native = normalizeQuotationRow(
+      {
+        ...base,
+        [QUOTATION_COLUMN_KEYS.quoteStartIdx]: 1n,
+        [QUOTATION_COLUMN_KEYS.quoteEndIdx]: 3n,
+      },
+      'text',
+    );
+    const strings = normalizeQuotationRow(
+      {
+        ...base,
+        [QUOTATION_COLUMN_KEYS.quoteStartIdx]: '1',
+        [QUOTATION_COLUMN_KEYS.quoteEndIdx]: '3',
+      },
+      'text',
+    );
+    const unsafe = normalizeQuotationRow(
+      {
+        ...base,
+        [QUOTATION_COLUMN_KEYS.quoteStartIdx]: 1n,
+        [QUOTATION_COLUMN_KEYS.quoteEndIdx]: BigInt(Number.MAX_SAFE_INTEGER) + 1n,
+      },
+      'text',
+    );
+
+    expect(native.spans).toEqual([{ start: 1, end: 3, type: 'quote' }]);
+    expect(strings.spans).toEqual([]);
+    expect(unsafe.spans).toEqual([]);
+  });
+
   it('normalizes custom overlapping spans once and preserves canonical type order', () => {
     const row = normalizeQuotationRow(
       {

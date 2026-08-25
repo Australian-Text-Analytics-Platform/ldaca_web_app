@@ -313,6 +313,15 @@ retain that presentation shape; the requested page remains a distinct Query
 resource and the placeholder is not cached as its Result. Categorical values use infinite queries, and
 preprocessing previews use debounced, cancellable queries.
 
+Quotation Preview and Run All use separate transport adapters but converge on
+one Arrow-native page projector. The projector reads the decoded `Table`,
+`Vector`, and struct values rather than JSON-friendly display rows, maps nested
+quotation fields to canonical `QUOTE_*` fields, and produces the presentation
+state directly. Native `bigint` offsets become numbers only during bounded span
+normalization; ordinary table cells retain the generic display conversion.
+Preview document controls and Run All Review controls keep independent page
+requests and defaults.
+
 Filter, Find, Create, and Expression keep their create/update choice in
 local component state. Create is the default, and changing the tool or selected
 Data Block resets the choice; it is not an account or device preference.

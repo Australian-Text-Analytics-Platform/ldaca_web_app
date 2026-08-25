@@ -51,8 +51,9 @@ from ..models.analysis_results import (
     ConcordanceStoredResult,
     ConcordanceRunAllStoredResult,
     PublishedDataBlockStoredResult,
-    QuotationResultQuery,
+    QuotationPreviewQuery,
     QuotationRunAllStoredResult,
+    QuotationStoredResult,
     ConcordanceDensityResult,
     PreviewReadyStoredResult,
     RunAllSourceTable,
@@ -424,6 +425,67 @@ class AnalysisResultService:
             )
             return snapshot, source, record.request.kind
 
+    async def quotation_preview_page(
+        self,
+        user_id: str,
+        workspace_id: str,
+        analysis_id: str,
+        query: QuotationPreviewQuery,
+    ) -> IpcTablePage:
+        """Compute one Quotation Preview page as native Arrow IPC."""
+
+        input_snapshot: _QueryInputSnapshot | None = None
+        try:
+            async with self._analyses.successful_record_context(
+                user_id,
+                workspace_id,
+                analysis_id,
+                allow_closing=False,
+            ) as (lease, record):
+                if not isinstance(record.request, QuotationAnalysisRequest):
+                    raise AnalysisKindMismatchError(
+                        "Quotation Preview requires a Quotation Analysis"
+                    )
+                if record.result_payload is None:
+                    raise AnalysisCorruptError("Analysis data is corrupt")
+                try:
+                    QuotationStoredResult.model_validate(record.result_payload)
+                except ValidationError as exc:
+                    raise AnalysisCorruptError("Analysis data is corrupt") from exc
+                input_snapshot = await self._create_query_snapshot(lease, record)
+                request = record.request.model_copy(deep=True)
+                await self._artifacts.ensure_available(lease, record)
+
+            snapshot_node = await self._run_sync(
+                load_snapshot_node,
+                input_snapshot.path,
+                str(request.node_id),
+            )
+            page = await compute_quotation_page(
+                snapshot_node.to_node(),
+                request.column,
+                resolve_analysis_quotation_engine(request, self._settings),
+                page=query.page,
+                page_size=query.page_size,
+                sort_by=query.sort_by,
+                descending=query.descending,
+                quotation_service_max_batch_size=(
+                    self._settings.quotation_service_max_batch_size
+                ),
+                quotation_service_timeout=self._settings.quotation_service_timeout,
+                extract_remote_fn=self._quotation_client.extract,
+                run_blocking=self._run_sync,
+            )
+            return IpcTablePage(
+                content=encode_ipc_stream(page.frame),
+                has_next=page.has_next,
+                total_rows=page.total_source_rows,
+            )
+        finally:
+            with anyio.CancelScope(shield=True):
+                if input_snapshot is not None:
+                    await self._cleanup_query_snapshot(input_snapshot)
+
     async def query(
         self,
         user_id: str,
@@ -517,9 +579,7 @@ class AnalysisResultService:
 
                 if isinstance(
                     effective_query,
-                    ConcordanceResultQuery
-                    | QuotationResultQuery
-                    | AnnotationResultQuery,
+                    ConcordanceResultQuery | AnnotationResultQuery,
                 ):
                     input_snapshot = await self._create_query_snapshot(lease, record)
 
@@ -549,42 +609,6 @@ class AnalysisResultService:
                     ),
                     stored=stored,
                 )
-            if isinstance(effective_query, QuotationResultQuery) and isinstance(
-                request,
-                QuotationAnalysisRequest,
-            ):
-                if input_snapshot is None:
-                    raise RuntimeError("Quotation query input was not prepared")
-                snapshot_node = await self._run_sync(
-                    load_snapshot_node,
-                    input_snapshot.path,
-                    str(request.node_id),
-                )
-                page = await compute_quotation_page(
-                    snapshot_node.to_node(),
-                    request.column,
-                    resolve_analysis_quotation_engine(request, self._settings),
-                    page=effective_query.page,
-                    page_size=effective_query.page_size,
-                    sort_by=effective_query.sort_by,
-                    descending=effective_query.descending,
-                    quotation_service_max_batch_size=(
-                        self._settings.quotation_service_max_batch_size
-                    ),
-                    quotation_service_timeout=(
-                        self._settings.quotation_service_timeout
-                    ),
-                    extract_remote_fn=self._quotation_client.extract,
-                    run_blocking=self._run_sync,
-                )
-                payload = cast(dict[str, JsonData], dict(page))
-                payload["ready"] = True
-                payload["kind"] = "quotation"
-                payload["query"] = cast(
-                    JsonData,
-                    effective_query.model_dump(mode="json"),
-                )
-                return ResultMaterialization(payload=payload, stored=stored)
             if isinstance(effective_query, AnnotationResultQuery) and isinstance(
                 request,
                 AnnotationAnalysisRequest,
@@ -670,8 +694,6 @@ def _default_query(kind: str) -> AnalysisResultQuery:
         return TopicModelingResultQuery()
     if kind == "concordance":
         return ConcordanceResultQuery()
-    if kind == "quotation":
-        return QuotationResultQuery()
     if kind == "annotation":
         return AnnotationResultQuery()
     raise AnalysisCorruptError("Analysis data is corrupt")

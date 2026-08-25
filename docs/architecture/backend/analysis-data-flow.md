@@ -70,6 +70,10 @@ ready marker; `POST result/query` computes a fresh page without persisting a
 page cache. Annotation Preview queries rerun provider inference for every page
 request. Its shared example-preparation helper deterministically reconstructs
 the request's per-label subset from the retained Example Data Block snapshot.
+Quotation is the table-shaped exception: its dedicated
+`POST result/tables/quotation-preview/query` response is Arrow IPC with source
+row pagination headers. It returns matching documents only, but continuation is
+calculated from every source document in the requested page range.
 
 Run All Analyses process the complete snapshot. Concordance and Quotation store
 complete immutable table Results. Annotation is the explicit in-place
@@ -161,6 +165,7 @@ flowchart LR
     FILES --> SERVICE
     SERVICE --> DEFAULT["GET result"]
     SERVICE --> QUERY["POST result/query"]
+    SERVICE --> PREVIEW["Quotation Preview Arrow query"]
     SERVICE --> TABLE["Arrow table and page streams"]
     SERVICE --> DOWNLOAD["Named Artifact download"]
 ```
@@ -179,6 +184,11 @@ relative-bin predicate runs before count, sort, and page. Concordance Match
 Data Block Creation explodes the artifact; Concordance Document Data Block
 Creation reuses the document filter and keeps stable source-row identity.
 Quotation Result Data Block Creation remains flat.
+
+Quotation Preview and Run All document projections share the same Arrow shape:
+source columns plus `quotation: List<Struct<...>>`, with every quotation offset
+stored as `Int64`. Preview encodes its computed Polars frame only at the Result
+service response boundary and does not persist a table artifact.
 
 Concordance density is a separate side-effect-free projection over the complete
 immutable child Result. It returns exact-match series in 100 fixed relative

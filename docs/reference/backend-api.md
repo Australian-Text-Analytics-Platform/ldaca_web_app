@@ -247,7 +247,8 @@ Analysis and Result lifecycle operations.
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}` | `get_analysis` | 200 | Read one live valid Analysis |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/cancel` | `cancel_analysis` | 200/202 | Cancel queued work or request running cancellation |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result` | `get_analysis_result` | 200 | Stored canonical Result or durable Preview-ready marker |
-| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free page projection, including fresh Annotation, Concordance, and Quotation Preview work |
+| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free JSON projection for Topic Modelling, Concordance, or Annotation; Quotation is invalid here |
+| `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query` | `query_quotation_preview_table` | 200 Arrow | On-demand Quotation Preview document page from the retained snapshot |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
@@ -331,5 +332,9 @@ or `503` with `status: stopping`, plus the installed package version.
   and `X-Wordflow-Has-Next`; they do not
   calculate or return total row/page counts. Complete Result tables use one
   self-contained stream. JSON is not a fallback representation for tables.
+- Quotation Preview is a source-page exception: it also returns
+  `X-Wordflow-Total-Rows`, calculated across all source documents. Its Arrow
+  page can be empty while `X-Wordflow-Has-Next` is true because documents
+  without quotation matches are omitted after source pagination.
 - `/api/events` carries monotonic process-local sequence numbers and resource
   refresh signals. It offers no historical `Last-Event-ID` replay.

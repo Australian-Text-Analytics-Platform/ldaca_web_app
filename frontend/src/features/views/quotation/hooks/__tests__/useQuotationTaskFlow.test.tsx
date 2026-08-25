@@ -43,7 +43,7 @@ describe('useQuotationTaskFlow', () => {
           hasLoaded: false,
           displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
           activeSelections: [{ nodeId: 'node-1', column: 'text' }],
-          nodeState: {},
+          previewRequest: { page: 1, page_size: 50, sort_by: null, descending: false },
           originalColumnsByNode: { 'node-1': ['text'] },
           buildEngineRequest: () => ({ type: 'local' }),
           supersedesAnalysisIds: [],
@@ -51,8 +51,8 @@ describe('useQuotationTaskFlow', () => {
         actions: {
           setIsLoadingQuotations: vi.fn(),
           showErrorDialog: vi.fn(),
-          setResultQuery: vi.fn(),
-          resetResultQuery: vi.fn(),
+          setPreviewRequest: vi.fn(),
+          resetPreviewRequest: vi.fn(),
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
           onSubmitted,
@@ -78,8 +78,8 @@ describe('useQuotationTaskFlow', () => {
 
   it('does not synthesize a Result while the submitted Analysis is queued', async () => {
     submitTabAnalysis.mockResolvedValueOnce({ data: queuedQuotationAnalysis() });
-    const setResultQuery = vi.fn();
-    const resetResultQuery = vi.fn();
+    const setPreviewRequest = vi.fn();
+    const resetPreviewRequest = vi.fn();
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
         state: {
@@ -88,7 +88,7 @@ describe('useQuotationTaskFlow', () => {
           hasLoaded: false,
           displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
           activeSelections: [{ nodeId: 'node-1', column: 'text' }],
-          nodeState: {},
+          previewRequest: { page: 1, page_size: 50, sort_by: null, descending: false },
           originalColumnsByNode: { 'node-1': ['text'] },
           buildEngineRequest: () => ({ type: 'local' }),
           supersedesAnalysisIds: [],
@@ -96,8 +96,8 @@ describe('useQuotationTaskFlow', () => {
         actions: {
           setIsLoadingQuotations: vi.fn(),
           showErrorDialog: vi.fn(),
-          setResultQuery,
-          resetResultQuery,
+          setPreviewRequest,
+          resetPreviewRequest,
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
           onSubmitted: vi.fn(),
@@ -107,12 +107,12 @@ describe('useQuotationTaskFlow', () => {
 
     await act(async () => result.current.handleSearchAll());
 
-    expect(resetResultQuery).toHaveBeenCalledOnce();
-    expect(setResultQuery).not.toHaveBeenCalled();
+    expect(resetPreviewRequest).toHaveBeenCalledOnce();
+    expect(setPreviewRequest).not.toHaveBeenCalled();
   });
 
   it('sorts by the selected source column before schema options finish hydrating', async () => {
-    const setResultQuery = vi.fn();
+    const setPreviewRequest = vi.fn();
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
         state: {
@@ -121,14 +121,7 @@ describe('useQuotationTaskFlow', () => {
           hasLoaded: true,
           displayedNodes: [{ id: 'node-1', name: 'Node 1' }],
           activeSelections: [{ nodeId: 'node-1', column: 'text' }],
-          nodeState: {
-            'node-1': {
-              currentPage: 1,
-              pageSize: 100,
-              sortBy: undefined,
-              descending: false,
-            },
-          },
+          previewRequest: { page: 1, page_size: 100, sort_by: null, descending: false },
           originalColumnsByNode: { 'node-1': [] },
           buildEngineRequest: () => ({ type: 'local' }),
           supersedesAnalysisIds: [],
@@ -136,8 +129,8 @@ describe('useQuotationTaskFlow', () => {
         actions: {
           setIsLoadingQuotations: vi.fn(),
           showErrorDialog: vi.fn(),
-          setResultQuery,
-          resetResultQuery: vi.fn(),
+          setPreviewRequest,
+          resetPreviewRequest: vi.fn(),
           setLocalTaskId: vi.fn(),
           runningRef: { current: false },
           onSubmitted: vi.fn(),
@@ -147,7 +140,7 @@ describe('useQuotationTaskFlow', () => {
 
     await act(async () => result.current.handleSort('node-1', 'text'));
 
-    expect(setResultQuery).toHaveBeenCalledWith({
+    expect(setPreviewRequest).toHaveBeenCalledWith({
       page: 1,
       page_size: 100,
       sort_by: 'text',

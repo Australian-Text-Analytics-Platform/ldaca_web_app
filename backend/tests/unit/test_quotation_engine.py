@@ -21,7 +21,6 @@ from ldaca_wordflow.domain.workspace import (
     QuotationEngineType,
 )
 from ldaca_wordflow.models.quotation import ResolvedQuotationEngine
-from ldaca_wordflow.models.analysis_results import QuotationResult
 from ldaca_wordflow.infrastructure.providers.quotation_engines import (
     resolve_quotation_engine,
 )
@@ -139,7 +138,7 @@ async def test_quotation_page_rejects_an_unknown_sort_column() -> None:
 
 
 @pytest.mark.asyncio
-async def test_quotation_page_serializes_temporal_metadata_for_worker_result() -> None:
+async def test_quotation_page_preserves_native_temporal_and_nested_arrow_values() -> None:
     created_at = datetime(2020, 10, 16, 22, 2, 13, tzinfo=UTC)
     node = Node(
         data=pl.DataFrame({"body": ["quoted text"], "created_at": [created_at]}).lazy(),
@@ -159,7 +158,7 @@ async def test_quotation_page_serializes_temporal_metadata_for_worker_result() -
             },
         )
 
-    payload = await compute_on_demand_page(
+    page = await compute_on_demand_page(
         node,
         "body",
         ResolvedQuotationEngine(),
@@ -171,10 +170,47 @@ async def test_quotation_page_serializes_temporal_metadata_for_worker_result() -
         run_blocking=_run_inline,
     )
 
-    result = QuotationResult.model_validate(payload)
+    assert page.frame.schema["created_at"] == pl.Datetime("us", "UTC")
+    quotation_dtype = page.frame.schema["quotation"]
+    assert isinstance(quotation_dtype, pl.List)
+    quotation_struct_dtype = quotation_dtype.inner
+    assert isinstance(quotation_struct_dtype, pl.Struct)
+    quotation_fields = {
+        field.name: field.dtype for field in quotation_struct_dtype.fields
+    }
+    assert quotation_fields["quote_start_idx"] == pl.Int64
+    assert quotation_fields["quote_end_idx"] == pl.Int64
+    assert page.frame["created_at"].to_list() == [created_at]
+    assert page.frame["quotation"].to_list()[0][0]["quote"] == "quoted text"
+    assert page.total_source_rows == 1
+    assert page.has_next is False
 
-    assert result.data is not None
-    assert result.data[0][0]["created_at"] == "2020-10-16T22:02:13Z"
+
+@pytest.mark.asyncio
+async def test_empty_sparse_page_can_still_have_a_later_source_page() -> None:
+    node = Node(
+        data=pl.DataFrame({"body": ["no quote", "quoted text"]}).lazy(),
+        name="Documents",
+    )
+
+    async def fake_compute(_node, base_df, *_args, **_kwargs):
+        return remote_payload_to_grouped_dataframe(base_df, {"results": []})
+
+    page = await compute_on_demand_page(
+        node,
+        "body",
+        ResolvedQuotationEngine(),
+        page=1,
+        page_size=1,
+        sort_by=None,
+        descending=False,
+        compute_quote_dataframe_fn=fake_compute,
+        run_blocking=_run_inline,
+    )
+
+    assert page.frame.height == 0
+    assert page.total_source_rows == 2
+    assert page.has_next is True
 
 
 @pytest.mark.asyncio

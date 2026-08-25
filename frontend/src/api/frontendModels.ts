@@ -13,7 +13,6 @@ import type {
   DataPortalSearchRequest,
   ExpressionNodeCreateRequest,
   FileResource,
-  QuotationResult,
   ResultColumnMetadata,
   SampleCollection,
   SequentialResult,
@@ -75,8 +74,6 @@ export type TopicModelingResponse = Omit<TopicModelingResult, 'topics'> & {
     per_corpus_topic_counts?: Record<string, number>[] | null;
   };
 };
-
-export type QuotationAnalysisResponse = QuotationResult;
 
 export type SequentialAnalysisResponse = Omit<SequentialResult, 'table'> & {
   table?: SequentialResult['table'];

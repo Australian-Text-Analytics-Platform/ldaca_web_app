@@ -87,14 +87,6 @@ export async function getAnalysisResultResource<TResult>(
     }
     return projectConcordanceResult(page) as TResult;
   }
-  if (result.kind === 'quotation' && result.data == null) {
-    const { data } = await queryAnalysisResult({
-      path: { workspace_id: workspaceId, analysis_id: analysisId },
-      body: { kind: 'quotation' },
-      throwOnError: true,
-    });
-    return data as TResult;
-  }
   if (result.kind === 'token_frequency') {
     const tokenResult = result as TokenFrequencyResult;
     const entries = await Promise.all(

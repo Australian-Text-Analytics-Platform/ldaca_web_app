@@ -175,6 +175,8 @@ visible Review page.
 
 Concordance and Quotation Preview use Preview-scoped Analyses. Each requested
 page is computed from the retained immutable snapshot.
+Quotation's stored Result is only a durable ready marker. Its document pages
+are on-demand Arrow projections and are never persisted as table artifacts.
 
 Quotation Run All is one Run-All-scoped Analysis with one immutable nested
 document Result. Concordance Run All is a thin Run-All-scoped Analysis Group

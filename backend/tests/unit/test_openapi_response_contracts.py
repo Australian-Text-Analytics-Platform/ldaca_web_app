@@ -117,6 +117,24 @@ def test_analysis_requests_results_and_queries_are_discriminated() -> None:
     )
 
 
+def test_quotation_preview_query_is_a_dedicated_arrow_contract() -> None:
+    schema = app.openapi()
+    path = schema["paths"][
+        "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query"
+    ]["post"]
+    assert "application/vnd.apache.arrow.stream" in path["responses"]["200"]["content"]
+    body = schema["components"]["schemas"]["QuotationPreviewQuery"]["properties"]
+    assert body["page"]["default"] == 1
+    assert body["page_size"]["default"] == 50
+    assert body["page_size"]["maximum"] == 500
+
+    generic = schema["paths"][
+        "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query"
+    ]["post"]["requestBody"]["content"]["application/json"]["schema"]
+    refs = {branch["$ref"] for branch in generic["oneOf"]}
+    assert "#/components/schemas/QuotationPreviewQuery" not in refs
+
+
 def test_annotation_requests_share_one_annotation_class_schema() -> None:
     schemas = app.openapi()["components"]["schemas"]
     annotation_class_schemas = [

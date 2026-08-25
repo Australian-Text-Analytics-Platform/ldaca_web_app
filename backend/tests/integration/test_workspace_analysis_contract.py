@@ -32,6 +32,91 @@ def _wait_analysis(
         time.sleep(0.05)
 
 
+def test_quotation_preview_page_is_native_arrow_ipc(tmp_path: Path) -> None:
+    settings = Settings(
+        data_root=tmp_path,
+        multi_user=False,
+        session_cookie_secure=False,
+        cors_allowed_origins=("http://testserver",),
+        trusted_hosts=("testserver",),
+    )
+    with TestClient(
+        create_app(settings, serve_frontend=False),
+        base_url="http://testserver",
+    ) as client:
+        csrf = client.get("/api/session").json()["csrf_token"]
+        unsafe = {"Origin": "http://testserver", "X-CSRF-Token": csrf}
+        upload = client.post(
+            "/api/user-files/uploads",
+            params={"path": "quotes.csv"},
+            content='text,created_at\n"Alice said hello.",2020-10-16T22:02:13Z\n'.encode(),
+            headers={**unsafe, "Content-Type": "application/octet-stream"},
+        )
+        assert upload.status_code == 201
+        workspace_id = client.post(
+            "/api/workspaces", json={"name": "Quotation IPC"}, headers=unsafe
+        ).json()["id"]
+        assert client.put(
+            f"/api/workspaces/{workspace_id}/open", headers=unsafe
+        ).status_code == 200
+        node = client.post(
+            f"/api/workspaces/{workspace_id}/nodes",
+            json={"kind": "file", "file_path": "quotes.csv"},
+            headers=unsafe,
+        ).json()
+        tab = client.post(
+            f"/api/workspaces/{workspace_id}/tabs",
+            json={"kind": "quotation", "name": "Quotation"},
+            headers=unsafe,
+        ).json()
+        created = client.post(
+            f"/api/workspaces/{workspace_id}/tabs/{tab['id']}/analyses",
+            json={
+                "execution_scope": "preview",
+                "request": {
+                    "kind": "quotation",
+                    "node_id": node["id"],
+                    "column": "text",
+                    "engine": {"type": "local"},
+                },
+            },
+            headers=unsafe,
+        )
+        assert created.status_code == 201, created.text
+        analysis_id = created.json()["id"]
+        assert _wait_analysis(client, workspace_id, analysis_id)["state"] == "succeeded"
+
+        marker = client.get(
+            f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"
+        )
+        assert marker.json() == {"kind": "quotation", "ready": True}
+        page = client.post(
+            f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query",
+            json={"page": 1, "page_size": 1, "sort_by": None, "descending": False},
+            headers=unsafe,
+        )
+        assert page.status_code == 200, page.text
+        assert page.headers["content-type"] == "application/vnd.apache.arrow.stream"
+        assert page.headers["x-wordflow-has-next"] == "false"
+        assert page.headers["x-wordflow-total-rows"] == "1"
+        frame = pl.read_ipc_stream(BytesIO(page.content))
+        assert frame.columns == ["text", "created_at", "quotation"]
+        quotation_dtype = frame.schema["quotation"]
+        assert isinstance(quotation_dtype, pl.List)
+        quotation_struct = quotation_dtype.inner
+        assert isinstance(quotation_struct, pl.Struct)
+        fields = {field.name: field.dtype for field in quotation_struct.fields}
+        assert fields["speaker_start_idx"] == pl.Int64
+        assert fields["quote_start_idx"] == pl.Int64
+
+        removed_json = client.post(
+            f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query",
+            json={"kind": "quotation", "page": 1, "page_size": 1},
+            headers=unsafe,
+        )
+        assert removed_json.status_code == 422
+
+
 def test_sequential_analysis_is_owned_by_its_tab_and_workspace(tmp_path: Path) -> None:
     settings = Settings(
         data_root=tmp_path,

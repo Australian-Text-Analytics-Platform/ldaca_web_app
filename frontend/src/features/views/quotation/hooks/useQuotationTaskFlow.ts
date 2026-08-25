@@ -1,12 +1,10 @@
-import type { QuotationAnalysisRequest, QuotationResultQuery, Analysis } from '@/api';
+import type { QuotationAnalysisRequest, Analysis } from '@/api';
 import { submitTabAnalysis } from '@/api';
+import type { NodeDataRequest } from '@/lib/queryKeys';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
-import type { NodePaginationState } from '../../common/tasks/types';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
-
-const DEFAULT_PAGE_SIZE = 50;
 
 /** Extracts the most useful backend error detail for quotation dialogs. */
 /**
@@ -39,7 +37,7 @@ interface QuotationState {
   hasLoaded: boolean;
   displayedNodes: Pick<WorkspaceNodeMetadata, 'id' | 'name'>[];
   activeSelections: NodeColumnSelection[];
-  nodeState: Record<string, NodePaginationState>;
+  previewRequest: NodeDataRequest;
   originalColumnsByNode: Record<string, string[]>;
   buildEngineRequest: () => QuotationEngineRequestPayload | null;
   supersedesAnalysisIds: string[];
@@ -48,8 +46,8 @@ interface QuotationState {
 interface QuotationActions {
   setIsLoadingQuotations: (value: boolean) => void;
   showErrorDialog: (message: string) => void;
-  setResultQuery: (query: QuotationResultQuery) => void;
-  resetResultQuery: () => void;
+  setPreviewRequest: (query: NodeDataRequest) => void;
+  resetPreviewRequest: () => void;
   setLocalTaskId: (id: string | null) => void;
   runningRef: { current: boolean };
   onSubmitted: () => void;
@@ -73,7 +71,7 @@ export function useQuotationTaskFlow({
     hasLoaded,
     displayedNodes,
     activeSelections,
-    nodeState,
+    previewRequest,
     originalColumnsByNode,
     buildEngineRequest,
     supersedesAnalysisIds,
@@ -81,8 +79,8 @@ export function useQuotationTaskFlow({
   actions: {
     setIsLoadingQuotations,
     showErrorDialog,
-    setResultQuery,
-    resetResultQuery,
+    setPreviewRequest,
+    resetPreviewRequest,
     setLocalTaskId,
     runningRef,
     onSubmitted,
@@ -148,7 +146,7 @@ export function useQuotationTaskFlow({
       setLocalTaskId,
       onSubmitted,
       resetBeforeRun: () => {
-        resetResultQuery();
+        resetPreviewRequest();
       },
       submit: async () => {
         const { data } = await submitTabAnalysis({
@@ -178,27 +176,19 @@ export function useQuotationTaskFlow({
    * Flow: resolve the locked task/source context, query the requested page or
    * sort state, then replace the Query-owned projection parameters.
    */
-  const updateStoredQuotationResult = (overrides: Partial<QuotationResultQuery> = {}) => {
+  const updateStoredQuotationResult = (overrides: Partial<NodeDataRequest> = {}) => {
     if (!currentWorkspaceId) return null;
     const context = resolveLockedNodeContext();
     if (!context) return null;
 
-    const { nodeId } = context;
-    const st = nodeState[nodeId] ?? {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
+    const payload: NodeDataRequest = {
+      page: overrides.page ?? previewRequest.page,
+      page_size: overrides.page_size ?? previewRequest.page_size,
+      sort_by: overrides.sort_by ?? previewRequest.sort_by,
+      descending: overrides.descending ?? previewRequest.descending,
     };
 
-    const payload: QuotationResultQuery = {
-      page: overrides.page ?? st.currentPage,
-      page_size: overrides.page_size ?? st.pageSize,
-      sort_by: overrides.sort_by ?? st.sortBy ?? null,
-      descending: overrides.descending ?? st.descending,
-    };
-
-    setResultQuery(payload);
+    setPreviewRequest(payload);
     return payload;
   };
 
@@ -246,26 +236,13 @@ export function useQuotationTaskFlow({
    * Returned to `QuotationFeature` by `useQuotationTaskFlow`.
    * Flow: ignore non-sortable columns, toggle sort direction for repeated columns, then submit fresh unlocked work or update the locked Result projection.
    */
-  const handleSort = async (nodeId: string, column: string) => {
+  const handleSort = (nodeId: string, column: string) => {
     const sortableColumns = new Set(originalColumnsByNode[nodeId] ?? []);
     const sourceColumn = activeSelections.find((selection) => selection.nodeId === nodeId)?.column;
     if (column !== sourceColumn && !sortableColumns.has(column)) return;
-    const st = nodeState[nodeId] ?? {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
-    };
-    const isSame = st.sortBy === column;
-    const nextDescending: boolean = isSame ? !st.descending : false;
-    if (!hasLoaded) {
-      await fetchQuotations(nodeId, {
-        page: 1,
-        sortBy: column,
-        descending: nextDescending,
-      });
-      return;
-    }
+    const isSame = previewRequest.sort_by === column;
+    const nextDescending: boolean = isSame ? !previewRequest.descending : false;
+    if (!hasLoaded) return;
     updateStoredQuotationResult({
       page: 1,
       sort_by: column,
