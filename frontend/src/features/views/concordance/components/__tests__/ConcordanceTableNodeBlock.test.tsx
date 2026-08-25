@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-container, testing-library/no-node-access -- Radix exposes the imperative viewport only as an internal DOM slot. */
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -254,5 +255,38 @@ describe('ConcordanceTableNodeBlock', () => {
     expect(screen.getByRole('columnheader', { name: 'CONC_matched_text' })).toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Processing preview page' })).toBeInTheDocument();
     expect(screen.queryByText('alpha')).not.toBeInTheDocument();
+  });
+
+  it('resets only the table row axis when paging', () => {
+    const handlePageChange = vi.fn();
+    const pagedNodeData: ConcordanceNodeResult = {
+      ...nodeData,
+      pagination: {
+        ...nodeData.pagination,
+        total_source_rows: 40,
+        total_source_pages: 2,
+        has_next: true,
+      },
+    };
+    const { container } = render(
+      <ConcordanceTableNodeBlock
+        {...buildProps(vi.fn())}
+        nodeData={pagedNodeData}
+        handlePageChange={handlePageChange}
+      />,
+    );
+    const viewport = container.querySelector<HTMLDivElement>(
+      '[data-testid="analysis-table-scroll-area"] [data-slot="scroll-area-viewport"]',
+    );
+    expect(viewport).not.toBeNull();
+    if (!viewport) return;
+    viewport.scrollLeft = 180;
+    viewport.scrollTop = 60;
+
+    fireEvent.click(screen.getByRole('link', { name: 'Go to next page' }));
+
+    expect(handlePageChange).toHaveBeenCalledWith(2, 'node-1', 'node-1');
+    expect(viewport.scrollLeft).toBe(180);
+    expect(viewport.scrollTop).toBe(0);
   });
 });

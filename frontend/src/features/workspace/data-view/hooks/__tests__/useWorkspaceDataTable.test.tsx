@@ -56,6 +56,14 @@ const createWrapper = (queryClient: QueryClient) =>
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
+
 describe('useWorkspaceDataTable', () => {
   beforeEach(() => {
     activateNode.mockReset();
@@ -236,5 +244,77 @@ describe('useWorkspaceDataTable', () => {
       expect(result.current.table.hasNext).toBe(true);
     });
     expect(result.current.table.rowCount).toBeUndefined();
+  });
+
+  it('retains the current Data Block page while an uncached sort is fetching', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const sortedPage = deferred<ReturnType<typeof makeArrowPage>>();
+    queryWorkspaceSqlTableMock
+      .mockResolvedValueOnce(makeArrowPage(undefined, [{ text: 'before-sort' }]))
+      .mockReturnValueOnce(sortedPage.promise);
+
+    const { result } = renderHook(() => useWorkspaceDataTable(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.table.data).toEqual([{ text: 'before-sort' }]);
+    });
+
+    act(() => {
+      result.current.table.onSortingChange?.([{ id: 'text', desc: false }]);
+    });
+
+    await waitFor(() => {
+      expect(queryWorkspaceSqlTableMock).toHaveBeenCalledTimes(2);
+      expect(result.current.table.fetching).toBe(true);
+    });
+    expect(result.current.table.loading).toBe(false);
+    expect(result.current.table.data).toEqual([{ text: 'before-sort' }]);
+
+    act(() => {
+      sortedPage.resolve(makeArrowPage(undefined, [{ text: 'after-sort' }]));
+    });
+
+    await waitFor(() => {
+      expect(result.current.table.fetching).toBe(false);
+      expect(result.current.table.data).toEqual([{ text: 'after-sort' }]);
+    });
+  });
+
+  it('does not retain rows across Data Block ownership changes', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const nextNodePage = deferred<ReturnType<typeof makeArrowPage>>();
+    queryWorkspaceSqlTableMock
+      .mockResolvedValueOnce(makeArrowPage(undefined, [{ text: 'node-b-row' }]))
+      .mockReturnValueOnce(nextNodePage.promise);
+
+    const { result, rerender } = renderHook(() => useWorkspaceDataTable(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.table.data).toEqual([{ text: 'node-b-row' }]);
+    });
+
+    const nextNode = { id: 'node-a', name: 'A', shape: [100, 1] };
+    useWorkspaceSelectionMock.mockReturnValue({
+      activeNodeId: nextNode.id,
+      selectedNode: nextNode,
+      selectedNodes: [nextNode],
+      selectedNodeIds: [nextNode.id],
+    });
+    rerender();
+
+    await waitFor(() => {
+      expect(queryWorkspaceSqlTableMock).toHaveBeenCalledTimes(2);
+      expect(result.current.table.loading).toBe(true);
+      expect(result.current.table.fetching).toBe(true);
+    });
+    expect(result.current.table.data).toEqual([]);
   });
 });

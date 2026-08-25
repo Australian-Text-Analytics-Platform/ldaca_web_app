@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowRight } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { sqlTable } from '@/api';
 import {
@@ -121,6 +121,7 @@ export function AnnotationResultsPanel({
   onMetadataColumnsChange,
   correction,
 }: AnnotationResultsPanelProps) {
+  const tableViewportRef = useRef<HTMLDivElement>(null);
   const correctionColumn = correction.column;
   const { setCell } = useWorkspaceActions();
   const queryClient = useQueryClient();
@@ -232,7 +233,15 @@ export function AnnotationResultsPanel({
     rowCount: effectiveRowCount,
     pageIndex: pagination.pageIndex,
     pageSize: pagination.pageSize,
-    onPaginationChange: setPagination,
+    onPaginationChange: (next) => {
+      if (
+        next.pageIndex !== pagination.pageIndex ||
+        next.pageSize !== pagination.pageSize
+      ) {
+        if (tableViewportRef.current) tableViewportRef.current.scrollTop = 0;
+      }
+      setPagination(next);
+    },
   });
   const comparisonQueries = useFullColumnComparisons({
     workspaceId,
@@ -319,7 +328,7 @@ export function AnnotationResultsPanel({
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="max-h-96 overflow-auto">
+          <div ref={tableViewportRef} className="max-h-96 overflow-auto">
             <Table className="w-full table-auto" disableContainer>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>

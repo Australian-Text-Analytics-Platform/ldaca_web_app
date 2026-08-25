@@ -8,8 +8,14 @@ import type { ConcordanceAnalysisResponse } from '@/api';
 import type { ConcordanceRunAllReviewSource } from '../../concordanceRunAllReview';
 import { useConcordanceResultSession } from '../useConcordanceResultSession';
 
+const fetchArrowTablePageMock = vi.hoisted(() => vi.fn());
 const getConcordanceTableDensityMock = vi.hoisted(() => vi.fn());
 const queryConcordanceDocumentProjectionTableMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/arrow/arrowTable', async (importOriginal) => ({
+  ...(await importOriginal()),
+  fetchArrowTablePage: fetchArrowTablePageMock,
+}));
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -95,6 +101,24 @@ const secondReviewSource: ConcordanceRunAllReviewSource = {
       table_id: 'concordance-run-all-2',
     },
   },
+};
+
+const makeReviewPage = (matchedText: string) => ({
+  table: {},
+  columns: ['text', 'CONC_matched_text'],
+  schema: [],
+  rows: [{ text: `${matchedText} document`, CONC_matched_text: matchedText }],
+  hasNext: false,
+  etag: `etag-${matchedText}`,
+  totalRows: 2,
+});
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 };
 
 describe('useConcordanceResultSession', () => {
@@ -219,5 +243,102 @@ describe('useConcordanceResultSession', () => {
     for (const [request] of queryConcordanceDocumentProjectionTableMock.mock.calls) {
       expect(request.body.excluded_matched_texts).toEqual(['jobs']);
     }
+  });
+
+  it('retains a Run All projection while an uncached same-source sort is fetching', async () => {
+    const nextPage = deferred<ReturnType<typeof makeReviewPage>>();
+    fetchArrowTablePageMock
+      .mockReset()
+      .mockResolvedValueOnce(makeReviewPage('Alpha'))
+      .mockReturnValueOnce(nextPage.promise);
+
+    const { result: hook } = renderHook(
+      () =>
+        useConcordanceResultSession({
+          workspaceId: 'workspace-1',
+          analysisId: null,
+          baseResult: null,
+          viewMode: 'separated',
+          combinedPage: 1,
+          selectedNodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
+          showDispersion: false,
+          reviewSources: [reviewSource],
+          selectedBinIndices: {},
+          excludedMatchedTexts: new Set(),
+          binCount: 20,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe(
+        'Alpha',
+      );
+    });
+
+    act(() => {
+      hook.current.handleReviewSort('CONC_matched_text', 'node-1');
+    });
+
+    await waitFor(() => {
+      expect(fetchArrowTablePageMock).toHaveBeenCalledTimes(2);
+      expect(hook.current.nodeLoading['node-1']).toBe(true);
+    });
+    expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe(
+      'Alpha',
+    );
+
+    act(() => {
+      nextPage.resolve(makeReviewPage('Beta'));
+    });
+
+    await waitFor(() => {
+      expect(hook.current.nodeLoading['node-1']).toBe(false);
+      expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe(
+        'Beta',
+      );
+    });
+  });
+
+  it('does not retain a projection across Run All source ownership changes', async () => {
+    const nextSourcePage = deferred<ReturnType<typeof makeReviewPage>>();
+    fetchArrowTablePageMock
+      .mockReset()
+      .mockResolvedValueOnce(makeReviewPage('Alpha'))
+      .mockReturnValueOnce(nextSourcePage.promise);
+    let sources = [reviewSource];
+
+    const { result: hook, rerender } = renderHook(
+      () =>
+        useConcordanceResultSession({
+          workspaceId: 'workspace-1',
+          analysisId: null,
+          baseResult: null,
+          viewMode: 'separated',
+          combinedPage: 1,
+          selectedNodes: sources.map(({ source }) =>
+            projectWorkspaceNodeMetadata({ id: source.node_id, name: source.node_name }),
+          ),
+          showDispersion: false,
+          reviewSources: sources,
+          selectedBinIndices: {},
+          excludedMatchedTexts: new Set(),
+          binCount: 20,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(hook.current.results).not.toBeNull();
+    });
+
+    sources = [secondReviewSource];
+    rerender();
+
+    await waitFor(() => {
+      expect(fetchArrowTablePageMock).toHaveBeenCalledTimes(2);
+      expect(hook.current.nodeLoading['node-2']).toBe(true);
+    });
+    expect(hook.current.results).toBeNull();
   });
 });

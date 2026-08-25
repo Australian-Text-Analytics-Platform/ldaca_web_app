@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ReactNode } from 'react';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
@@ -113,6 +114,10 @@ function CombinedConcordanceTable({
   highlightL1R1,
   resultSummary,
 }: ConcordanceTableNodeBlockProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (viewportRef.current) viewportRef.current.scrollTop = 0;
+  }, [globalPageSize]);
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
     nodeData,
     showMetadata,
@@ -128,11 +133,15 @@ function CombinedConcordanceTable({
     // Invoked by useServerTable when combined-view pagination changes.
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
         onPageSizeChange(next.pageSize);
         return;
       }
       const newPage = next.pageIndex + 1;
-      if (newPage !== combinedPage) setCombinedPage(newPage);
+      if (newPage !== combinedPage) {
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
+        setCombinedPage(newPage);
+      }
     },
   });
 
@@ -177,7 +186,11 @@ function CombinedConcordanceTable({
           <span className="text-xs text-gray-500">Rows colored by source data block</span>
         </div>
       </div>
-      <AnalysisTableFrame maxHeightClass="max-h-100" belowTable={combinedBelowTable}>
+      <AnalysisTableFrame
+        maxHeightClass="max-h-100"
+        belowTable={combinedBelowTable}
+        viewportRef={viewportRef}
+      >
         <ConcordanceRowsTable
           table={table}
           rows={rows}
@@ -244,6 +257,10 @@ function PerNodeConcordanceTable({
   highlightL1R1,
   resultSummary,
 }: ConcordanceTableNodeBlockProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (viewportRef.current) viewportRef.current.scrollTop = 0;
+  }, [globalPageSize]);
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
   const { rows, tableColumns, columns } = buildConcordanceTableModel({
@@ -281,11 +298,15 @@ function PerNodeConcordanceTable({
     // Invoked by useServerTable when this node's pagination changes.
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
         onPageSizeChange(next.pageSize);
         return;
       }
       const newPage = next.pageIndex + 1;
-      if (newPage !== currentPage) handlePageChange(newPage, paginationKey, requestNodeId);
+      if (newPage !== currentPage) {
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
+        handlePageChange(newPage, paginationKey, requestNodeId);
+      }
     },
   });
 
@@ -340,6 +361,7 @@ function PerNodeConcordanceTable({
       <AnalysisTableFrame
         maxHeightClass="max-h-100"
         belowTable={belowTable}
+        viewportRef={viewportRef}
         style={
           showNodeIndicator
             ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor }

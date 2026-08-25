@@ -7,6 +7,7 @@ interface AnalysisTableScrollAreaProps {
   children: React.ReactNode;
   contentClassName?: string;
   className?: string;
+  viewportRef?: React.Ref<HTMLDivElement>;
 }
 
 /**
@@ -19,8 +20,10 @@ const AnalysisTableScrollArea = ({
   children,
   contentClassName = 'min-w-max',
   className,
+  viewportRef,
 }: AnalysisTableScrollAreaProps) => (
   <ScrollArea
+    viewportRef={viewportRef}
     scrollbars="both"
     data-testid="analysis-table-scroll-area"
     className={cn(maxHeightClass, className)}
@@ -48,12 +51,17 @@ export const AnalysisTableFrame = ({
   contentClassName,
   className,
   style,
+  viewportRef,
 }: AnalysisTableFrameProps) => (
   <div
     className={cn('overflow-hidden rounded-lg border border-border bg-card', className)}
     style={style}
   >
-    <AnalysisTableScrollArea maxHeightClass={maxHeightClass} contentClassName={contentClassName}>
+    <AnalysisTableScrollArea
+      maxHeightClass={maxHeightClass}
+      contentClassName={contentClassName}
+      viewportRef={viewportRef}
+    >
       {children}
     </AnalysisTableScrollArea>
     {belowTable}

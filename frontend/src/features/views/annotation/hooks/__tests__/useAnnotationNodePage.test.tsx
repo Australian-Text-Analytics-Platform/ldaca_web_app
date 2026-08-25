@@ -17,6 +17,14 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 );
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
+
 describe('useAnnotationNodePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -126,5 +134,52 @@ describe('useAnnotationNodePage', () => {
       expect(lastRequest?.body.page).toBe(1);
       expect(lastRequest?.body.sql).toContain('"annotation" != "reviewer"');
     });
+  });
+
+  it('retains same-node annotation rows while an uncached page is fetching', async () => {
+    const secondPage = deferred<{ rows: { text: string }[]; hasNext: boolean; etag: string }>();
+    queryWorkspaceSqlTable
+      .mockReset()
+      .mockResolvedValueOnce({
+        rows: [{ text: 'page-one' }],
+        hasNext: true,
+        etag: 'page-one',
+      })
+      .mockReturnValueOnce(secondPage.promise);
+    const { result } = renderHook(
+      () =>
+        useAnnotationNodePage({
+          workspaceId: 'workspace-1',
+          nodeId: 'node-1',
+          sourceSql: 'SELECT * FROM "node-1"',
+          sourceColumns: ['text', 'annotation'],
+          annotationColumn: 'annotation',
+          differenceColumn: null,
+          rowCount: 20,
+          pageSize: 10,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.rows).toEqual([{ text: 'page-one' }]));
+    act(() => {
+      result.current.setPagination({ pageIndex: 1, pageSize: 10 });
+    });
+
+    await waitFor(() => {
+      expect(queryWorkspaceSqlTable).toHaveBeenCalledTimes(2);
+      expect(result.current.query.isFetching).toBe(true);
+    });
+    expect(result.current.query.isLoading).toBe(false);
+    expect(result.current.rows).toEqual([{ text: 'page-one' }]);
+
+    act(() => {
+      secondPage.resolve({
+        rows: [{ text: 'page-two' }],
+        hasNext: false,
+        etag: 'page-two',
+      });
+    });
+    await waitFor(() => expect(result.current.rows).toEqual([{ text: 'page-two' }]));
   });
 });

@@ -64,7 +64,8 @@ export function useAnnotationNodePage({
     page: pagination.pageIndex + 1,
     page_size: pagination.pageSize,
   });
-  const query = useQuery({
+  const pageOwner = JSON.stringify([workspaceId, nodeId, differenceQuery.pageSql]);
+  const query = useQuery<Awaited<ReturnType<typeof queryWorkspaceSqlTable>>>({
     queryKey: queryKeys.workspaceSql(
       workspaceId ?? '',
       [nodeId],
@@ -73,6 +74,9 @@ export function useAnnotationNodePage({
       request.page_size,
     ),
     enabled: Boolean(workspaceId) && enabled,
+    meta: { annotationPageOwner: pageOwner },
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.meta?.annotationPageOwner === pageOwner ? previousData : undefined,
     queryFn: async ({ signal }) => {
       if (!workspaceId) throw new Error('Missing workspace ID');
       const data = await queryWorkspaceSqlTable({
@@ -90,7 +94,7 @@ export function useAnnotationNodePage({
     },
   });
   const countSql = differenceQuery.countSql;
-  const countQuery = useQuery({
+  const countQuery = useQuery<Awaited<ReturnType<typeof queryWorkspaceSqlTable>>>({
     queryKey: queryKeys.workspaceSql(
       workspaceId ?? '',
       [nodeId],

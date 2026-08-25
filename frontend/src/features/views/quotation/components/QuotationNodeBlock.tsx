@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
@@ -108,10 +109,15 @@ function QuotationNodeBlockContent({
   showPageSize = true,
   children,
 }: QuotationNodeBlockProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const page = pagination?.page ?? 1;
   const pageSize = pagination?.page_size ?? 50;
   const rowCount = pagination?.total_source_rows ?? 0;
   const sortableColumnSet = new Set(sortableColumns);
+
+  useEffect(() => {
+    if (viewportRef.current) viewportRef.current.scrollTop = 0;
+  }, [pageSize]);
 
   const columns: ColumnDef<QuotationResultRow>[] = cols.map((columnName) => ({
     id: columnName,
@@ -165,11 +171,13 @@ function QuotationNodeBlockContent({
     // Invoked by useServerTable when quotation pagination changes.
     onPaginationChange: (next) => {
       if (next.pageSize !== pageSize) {
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
         onPageSizeChange(next.pageSize);
         return;
       }
       const newPage = next.pageIndex + 1;
       if (newPage !== page) {
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
         onPageChange(newPage);
       }
     },
@@ -186,6 +194,7 @@ function QuotationNodeBlockContent({
       <AnalysisTableFrame
         maxHeightClass="max-h-[70vh]"
         contentClassName="min-w-max h-full"
+        viewportRef={viewportRef}
         belowTable={
           <ServerPaginationFooter
             table={table}

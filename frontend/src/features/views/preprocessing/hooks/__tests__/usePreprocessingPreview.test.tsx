@@ -28,6 +28,14 @@ const createWrapper = () => {
   };
 };
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
+
 describe('usePreprocessingPreview', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -306,5 +314,59 @@ describe('usePreprocessingPreview', () => {
     });
 
     expect(result.current.data).toEqual([{ workspace: 'workspace-2' }]);
+  });
+
+  it('retains the same operation preview while an uncached page is fetching', async () => {
+    vi.useFakeTimers();
+    const secondPage = deferred<{
+      data: { token: string }[];
+      columns: string[];
+      pagination: PreviewPagination;
+    }>();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: [{ token: 'page-one' }],
+        columns: ['token'],
+        pagination: pagination(1),
+      })
+      .mockReturnValueOnce(secondPage.promise);
+    const { result } = renderHook(
+      () =>
+        usePreprocessingPreview({
+          request: { nodeId: 'node-1' },
+          identity: {
+            workspaceId: 'workspace-1',
+            operation: 'filter',
+            nodeIds: ['node-1'],
+          },
+          debounceMs: 0,
+          fetcher,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await flushPreviewTimer(0);
+    await vi.waitFor(() => expect(result.current.data).toEqual([{ token: 'page-one' }]));
+    act(() => {
+      result.current.setPage(2);
+    });
+
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(result.current.loading).toBe(true);
+    });
+    expect(result.current.data).toEqual([{ token: 'page-one' }]);
+    expect(result.current.columns).toEqual(['token']);
+
+    await act(async () => {
+      secondPage.resolve({
+        data: [{ token: 'page-two' }],
+        columns: ['token'],
+        pagination: pagination(2),
+      });
+      await secondPage.promise;
+    });
+    await vi.waitFor(() => expect(result.current.data).toEqual([{ token: 'page-two' }]));
   });
 });

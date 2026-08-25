@@ -6,7 +6,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 
 import { getConcordanceTableDensity, queryAnalysisResult } from '@/api';
 import type {
@@ -15,7 +15,7 @@ import type {
   ConcordanceResultQuery,
 } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
+import { createNodeDataRequest, queryKeys, type NodeDataRequest } from '@/lib/queryKeys';
 import { fetchArrowTablePage } from '@/lib/arrow/arrowTable';
 import { queryConcordanceDocumentProjectionTable } from '@/api/tableApi';
 import { projectConcordanceResult } from '../../common/analysisApi';
@@ -117,6 +117,154 @@ interface UseConcordanceResultSessionOptions {
   excludedMatchedTexts: ReadonlySet<string>;
   binCount: DispersionDisplayBinCount;
 }
+
+interface ConcordanceProjectionDescriptor {
+  nodeId: string;
+  query: ConcordanceResultQuery;
+  pageRequest: NodeDataRequest;
+  documentFilter: {
+    excluded_matched_texts: string[];
+    bin_count: DispersionDisplayBinCount | null;
+    selected_bins: number[] | null;
+  };
+  reviewSource: ConcordanceRunAllReviewSource | null;
+  enabled: boolean;
+}
+
+interface UseConcordanceProjectionQueryOptions {
+  slot: 0 | 1;
+  workspaceId: string | null;
+  analysisId: string | null;
+  viewMode: 'separated' | 'combined';
+  reviewRowUnit: ConcordanceReviewRowUnit;
+  projection: ConcordanceProjectionDescriptor | undefined;
+}
+
+/**
+ * Owns one of Concordance's two fixed projection observers. Fixed slots allow
+ * TanStack Query to supply the previous observer data while an uncached page,
+ * sort, or document filter is loading.
+ */
+const useConcordanceProjectionQuery = ({
+  slot,
+  workspaceId,
+  analysisId,
+  viewMode,
+  reviewRowUnit,
+  projection,
+}: UseConcordanceProjectionQueryOptions) => {
+  const projectionQuery = projection?.query;
+  const reviewSource = projection?.reviewSource;
+  const queryKey =
+    workspaceId && reviewSource
+      ? [
+          ...queryKeys.analysisTableProjectionPage(
+            workspaceId,
+            reviewSource.analysisId,
+            reviewSource.source.table.table_id,
+            reviewRowUnit,
+            projection.pageRequest,
+          ),
+          reviewRowUnit === 'documents' ? projection.documentFilter : null,
+        ]
+      : workspaceId && analysisId && projectionQuery
+        ? queryKeys.analysisResult(workspaceId, analysisId, {
+            kind: 'concordance',
+            ...projectionQuery,
+          })
+        : queryKeys.inactiveAnalysisResult({ kind: 'concordance-projection', slot });
+  const ownerIdentity =
+    workspaceId && projection
+      ? JSON.stringify(
+          reviewSource
+            ? [
+                workspaceId,
+                reviewSource.analysisId,
+                reviewSource.source.table.table_id,
+                projection.nodeId,
+                reviewRowUnit,
+                viewMode,
+              ]
+            : analysisId
+              ? [workspaceId, analysisId, projection.nodeId, viewMode]
+              : null,
+        )
+      : null;
+
+  // The descriptor's page, filter, source, and owner fields are serialized in
+  // queryKey; the fixed-slot wrapper keeps them grouped as one value.
+  // eslint-disable-next-line @tanstack/query/exhaustive-deps
+  return useQuery<ConcordanceAnalysisResponse>({
+    queryKey,
+    enabled: projection?.enabled ?? false,
+    meta: { concordanceProjectionOwner: ownerIdentity },
+    placeholderData: (previousData, previousQuery) =>
+      ownerIdentity &&
+      previousQuery?.meta?.concordanceProjectionOwner === ownerIdentity
+        ? previousData
+        : undefined,
+    queryFn: async (): Promise<ConcordanceAnalysisResponse> => {
+      if (!projection) {
+        throw new Error('Concordance projection is inactive');
+      }
+      const activeQuery = projection.query;
+      if (workspaceId && reviewSource) {
+        const pageNumber = activeQuery.page ?? 1;
+        const pageSize = activeQuery.page_size ?? projection.pageRequest.page_size;
+        const page =
+          reviewRowUnit === 'documents'
+            ? await queryConcordanceDocumentProjectionTable({
+                path: {
+                  workspace_id: workspaceId,
+                  analysis_id: reviewSource.analysisId,
+                  table_id: reviewSource.source.table.table_id,
+                },
+                body: {
+                  page: pageNumber,
+                  page_size: pageSize,
+                  sort_by: activeQuery.sort_by ?? null,
+                  descending: activeQuery.descending ?? false,
+                  ...projection.documentFilter,
+                },
+              })
+            : await fetchArrowTablePage(reviewSource.source.table.matches.rows_url, {
+                page: pageNumber,
+                pageSize,
+                sortBy: activeQuery.sort_by ?? null,
+                descending: activeQuery.descending ?? false,
+              });
+        const result = projectConcordanceRunAllReviewPage(
+          reviewSource,
+          page,
+          pageNumber,
+          pageSize,
+          activeQuery.sort_by ?? null,
+          activeQuery.descending ?? false,
+          reviewRowUnit,
+        );
+        return {
+          kind: 'concordance',
+          ready: true,
+          sources: null,
+          query: null,
+          data: { [reviewSource.source.node_id]: result },
+          combinable: false,
+          metadata: result.metadata,
+        };
+      }
+      if (!workspaceId || !analysisId) throw new Error('Analysis session is not active');
+      const { data } = await queryAnalysisResult({
+        body: { kind: 'concordance', ...activeQuery },
+        path: { workspace_id: workspaceId, analysis_id: analysisId },
+        throwOnError: true,
+      });
+      if (data.kind !== 'concordance') {
+        throw new Error('Concordance query returned the wrong Result kind');
+      }
+      return projectConcordanceResult(data);
+    },
+  });
+};
 
 /** Projects immutable per-page Query resources and owns only result-view controls. */
 export function useConcordanceResultSession({
@@ -255,87 +403,23 @@ export function useConcordanceResultSession({
     };
   });
 
-  const projectionQueries = useQueries({
-    queries: projections.map(({ query, pageRequest, documentFilter, reviewSource, enabled }) => {
-      const projection = { kind: 'concordance', ...query } as const;
-      // pageRequest already contains the effective global-or-node page size.
-      // eslint-disable-next-line @tanstack/query/exhaustive-deps
-      return {
-        queryKey:
-          workspaceId && reviewSource
-            ? [
-                ...queryKeys.analysisTableProjectionPage(
-                  workspaceId,
-                  reviewSource.analysisId,
-                  reviewSource.source.table.table_id,
-                  reviewRowUnit,
-                  pageRequest,
-                ),
-                reviewRowUnit === 'documents' ? documentFilter : null,
-              ]
-            : workspaceId && analysisId
-              ? queryKeys.analysisResult(workspaceId, analysisId, projection)
-              : queryKeys.inactiveAnalysisResult(projection),
-        enabled,
-        queryFn: async (): Promise<ConcordanceAnalysisResponse> => {
-          if (workspaceId && reviewSource) {
-            const pageNumber = query.page ?? 1;
-            const pageSize = query.page_size ?? state.globalPageSize;
-            const page =
-              reviewRowUnit === 'documents'
-                ? await queryConcordanceDocumentProjectionTable({
-                    path: {
-                      workspace_id: workspaceId,
-                      analysis_id: reviewSource.analysisId,
-                      table_id: reviewSource.source.table.table_id,
-                    },
-                    body: {
-                      page: pageNumber,
-                      page_size: pageSize,
-                      sort_by: query.sort_by ?? null,
-                      descending: query.descending ?? false,
-                      ...documentFilter,
-                    },
-                  })
-                : await fetchArrowTablePage(reviewSource.source.table.matches.rows_url, {
-                    page: pageNumber,
-                    pageSize,
-                    sortBy: query.sort_by ?? null,
-                    descending: query.descending ?? false,
-                  });
-            const result = projectConcordanceRunAllReviewPage(
-              reviewSource,
-              page,
-              pageNumber,
-              pageSize,
-              query.sort_by ?? null,
-              query.descending ?? false,
-              reviewRowUnit,
-            );
-            return {
-              kind: 'concordance',
-              ready: true,
-              sources: null,
-              query: null,
-              data: { [reviewSource.source.node_id]: result },
-              combinable: false,
-              metadata: result.metadata,
-            };
-          }
-          if (!workspaceId || !analysisId) throw new Error('Analysis session is not active');
-          const { data } = await queryAnalysisResult({
-            body: { kind: 'concordance', ...query },
-            path: { workspace_id: workspaceId, analysis_id: analysisId },
-            throwOnError: true,
-          });
-          if (data.kind !== 'concordance') {
-            throw new Error('Concordance query returned the wrong Result kind');
-          }
-          return projectConcordanceResult(data);
-        },
-      };
-    }),
+  const firstProjectionQuery = useConcordanceProjectionQuery({
+    slot: 0,
+    workspaceId,
+    analysisId,
+    viewMode,
+    reviewRowUnit,
+    projection: projections[0],
   });
+  const secondProjectionQuery = useConcordanceProjectionQuery({
+    slot: 1,
+    workspaceId,
+    analysisId,
+    viewMode,
+    reviewRowUnit,
+    projection: projections[1],
+  });
+  const projectionQueries = [firstProjectionQuery, secondProjectionQuery];
   const densityQueries = useQueries({
     queries: reviewSources.map((review) => ({
       queryKey: workspaceId

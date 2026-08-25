@@ -219,6 +219,19 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       nodeTableRequest.page_size,
     ),
     enabled: Boolean(currentWorkspaceId && activeNodeId),
+    // Keep the active Data Block's table mounted while paging or sorting
+    // changes its SQL projection. Never carry rows into another owner.
+    placeholderData: (previousData, previousQuery) => {
+      if (!currentWorkspaceId || !activeNodeId || !previousQuery) return undefined;
+      const previousKey = previousQuery.queryKey;
+      const previousRequest = previousKey[3];
+      const previousNodeIds = previousRequest.nodeIds;
+      return previousKey[1] === currentWorkspaceId &&
+        previousNodeIds.length === 1 &&
+        previousNodeIds[0] === activeNodeId
+        ? previousData
+        : undefined;
+    },
     /**
      * Fetches the active node page for `WorkspaceTable`.
      * Called by: TanStack Query when the complete request value changes.
@@ -358,6 +371,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     columns: nodeData.columns,
     columnFields: nodeData.columnFields,
     loading: nodeDataQuery.isLoading,
+    fetching: nodeDataQuery.isFetching,
     workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,
     documentColumn: selectedNode?.document ?? undefined,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Column as TableColumn,
   SortingState,
@@ -56,6 +56,8 @@ export interface WorkspaceTableProps {
   columns: string[];
   columnFields: Record<string, ArrowField>;
   loading?: boolean;
+  /** Background fetch state that must not replace the current table shell. */
+  fetching?: boolean;
   workspaceId?: string;
   nodeId?: string;
   documentColumn?: string;
@@ -89,6 +91,7 @@ export function WorkspaceTable({
   columns: responseColumns,
   columnFields,
   loading = false,
+  fetching = false,
   workspaceId,
   nodeId,
   documentColumn,
@@ -104,6 +107,7 @@ export function WorkspaceTable({
   onPageChange,
   onPageSizeChange,
 }: WorkspaceTableProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
   const {
@@ -118,6 +122,14 @@ export function WorkspaceTable({
     () => responseColumns.filter((column) => column.trim().length > 0),
     [responseColumns],
   );
+
+  // A cached owner switch may not enter the loading branch, so reset the
+  // viewport explicitly when the workspace or Data Block identity changes.
+  useEffect(() => {
+    if (!viewportRef.current) return;
+    viewportRef.current.scrollLeft = 0;
+    viewportRef.current.scrollTop = 0;
+  }, [workspaceId, nodeId]);
 
   const mutations = useColumnMutations({
     workspaceId,
@@ -328,6 +340,9 @@ export function WorkspaceTable({
   ) => {
     const current = { pageIndex, pageSize };
     const next = typeof updater === 'function' ? updater(current) : updater;
+    if (next.pageSize !== pageSize || next.pageIndex !== pageIndex) {
+      if (viewportRef.current) viewportRef.current.scrollTop = 0;
+    }
     if (next.pageSize !== pageSize) onPageSizeChange?.(next.pageSize);
     if (next.pageIndex !== pageIndex) onPageChange?.(next.pageIndex + 1);
   };
@@ -412,7 +427,7 @@ export function WorkspaceTable({
   return (
     <>
       <div className="flex h-full w-full flex-col min-h-0">
-        <ScrollArea scrollbars="both" className="flex-1 bg-white">
+        <ScrollArea viewportRef={viewportRef} scrollbars="both" className="flex-1 bg-white">
           <Table disableContainer className="w-max table-auto">
             <TableHeader className="sticky top-0 z-20 bg-muted">
               {tableInstance.getHeaderGroups().map((hg) => (
@@ -525,6 +540,7 @@ export function WorkspaceTable({
           pageSize={pageSize}
           rowCount={usesLookaheadPagination ? undefined : totalRows}
           hasNext={usesLookaheadPagination ? hasNext : undefined}
+          loading={fetching}
           compact
         />
       </div>

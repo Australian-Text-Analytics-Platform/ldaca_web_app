@@ -31,6 +31,18 @@ export type QuotationPageTarget =
 export function useQuotationPage(target: QuotationPageTarget | null, request: NodeDataRequest) {
   const tableId = target?.kind === 'preview' ? 'quotation-preview' : target?.source.table.table_id;
   const rowUnit = target?.kind === 'run_all' ? target.rowUnit : 'documents';
+  const ownerKey =
+    target && tableId
+      ? queryKeys
+          .analysisTableProjectionPage(
+            target.workspaceId,
+            target.analysisId,
+            tableId,
+            rowUnit,
+            request,
+          )
+          .slice(0, -1)
+      : null;
   const query = useQuery({
     queryKey:
       target && tableId
@@ -44,7 +56,9 @@ export function useQuotationPage(target: QuotationPageTarget | null, request: No
         : queryKeys.inactiveAnalysisResult({ ...request }),
     enabled: target !== null,
     placeholderData: (previousData, previousQuery) =>
-      target && previousQuery?.queryKey.some((part) => part === target.analysisId)
+      ownerKey &&
+      previousQuery &&
+      ownerKey.every((segment, index) => previousQuery.queryKey[index] === segment)
         ? previousData
         : undefined,
     queryFn: async (): Promise<QuotationResultState> => {

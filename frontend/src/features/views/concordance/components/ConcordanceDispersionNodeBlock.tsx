@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ReactNode } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -145,6 +146,10 @@ export function ConcordanceDispersionNodeBlock({
   termColors,
   resultSummary,
 }: ConcordanceDispersionNodeBlockProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (viewportRef.current) viewportRef.current.scrollTop = 0;
+  }, [globalPageSize]);
   const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
 
   // Footer-only TanStack instance shared by both branches (only one mounts per
@@ -163,11 +168,13 @@ export function ConcordanceDispersionNodeBlock({
     pageSize: globalPageSize,
     onPaginationChange: (next) => {
       if (next.pageSize !== globalPageSize) {
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
         onPageSizeChange(next.pageSize);
         return;
       }
       const newPage = next.pageIndex + 1;
       if (newPage === activePage) return;
+      if (viewportRef.current) viewportRef.current.scrollTop = 0;
       if (isCombinedView) setCombinedPage(newPage);
       else handlePageChange(newPage, paginationKey, requestNodeId);
     },
@@ -225,7 +232,11 @@ export function ConcordanceDispersionNodeBlock({
             <span className="text-xs text-gray-500">Rows colored by source data block</span>
           </div>
         </div>
-        <AnalysisTableFrame maxHeightClass="max-h-100" belowTable={combinedBelowTable}>
+        <AnalysisTableFrame
+          maxHeightClass="max-h-100"
+          belowTable={combinedBelowTable}
+          viewportRef={viewportRef}
+        >
           <ConcordanceDispersionRowsTable
             rows={rows}
             tableColumns={tableColumns}
@@ -384,6 +395,7 @@ export function ConcordanceDispersionNodeBlock({
       <AnalysisTableFrame
         maxHeightClass="max-h-100"
         belowTable={belowTable}
+        viewportRef={viewportRef}
         style={
           showNodeIndicator
             ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor }

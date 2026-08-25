@@ -139,11 +139,19 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
           pageSize,
         )
       : queryKeys.preprocessingPreviewDisabled;
+  const previewOwner = identity
+    ? hashKey([identity.workspaceId, identity.operation, identity.nodeIds])
+    : null;
 
-  const previewQuery = useQuery({
+  const previewQuery = useQuery<PreviewFetcherResult<Row>>({
     queryKey,
     enabled: ready && debouncedRequestIdentity === requestIdentity,
     retry: false,
+    meta: { preprocessingPreviewOwner: previewOwner },
+    placeholderData: (previousData, previousQuery) =>
+      previewOwner && previousQuery?.meta?.preprocessingPreviewOwner === previewOwner
+        ? previousData
+        : undefined,
     queryFn: async ({ signal }): Promise<PreviewFetcherResult<Row>> => {
       if (!request) throw new Error('Preview request is unavailable');
       return fetcher({ request, page, pageSize, signal });
